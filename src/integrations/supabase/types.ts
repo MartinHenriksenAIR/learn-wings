@@ -757,6 +757,29 @@ export type Database = {
         Args: { invitation_id: string }
         Returns: string
       }
+      get_org_invitations_safe: {
+        Args: { p_org_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by_user_id: string
+          is_platform_admin_invite: boolean
+          link_id: string
+          org_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          status: Database["public"]["Enums"]["invitation_status"]
+        }[]
+      }
+      get_quiz_options_for_learner: {
+        Args: { p_question_id: string }
+        Returns: {
+          id: string
+          option_text: string
+          question_id: string
+        }[]
+      }
       get_quiz_options_with_answers: {
         Args: { p_question_id: string }
         Returns: {

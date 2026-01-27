@@ -164,11 +164,9 @@ export default function CoursePlayer() {
         if (questionsData) {
           const questionsWithOptions = await Promise.all(
             questionsData.map(async (q) => {
-              // Use the public view that excludes is_correct column
+              // Use the secure RPC function that checks access and excludes is_correct
               const { data: options } = await supabase
-                .from('quiz_options_public')
-                .select('id, question_id, option_text')
-                .eq('question_id', q.id);
+                .rpc('get_quiz_options_for_learner', { p_question_id: q.id });
               // Add is_correct as undefined since we don't have access to it
               return { 
                 ...q, 
