@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
-import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption } from '@/lib/types';
+import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { 
   ChevronRight, 
   CheckCircle2, 
@@ -21,10 +22,13 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { CourseCompletionDialog } from '@/components/course/CourseCompletionDialog';
+import { CourseReviewDialog } from '@/components/course/CourseReviewDialog';
 
 export default function CoursePlayer() {
   const { courseId } = useParams<{ courseId: string }>();
   const { user, currentOrg } = useAuth();
+  const { features } = usePlatformSettings();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -41,6 +45,12 @@ export default function CoursePlayer() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
+
+  // Course completion and review state
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [existingReview, setExistingReview] = useState<CourseReview | null>(null);
+  const [courseJustCompleted, setCourseJustCompleted] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,6 +114,27 @@ export default function CoursePlayer() {
     fetchData();
   }, [user, currentOrg, courseId]);
 
+  // Load existing review
+  useEffect(() => {
+    const loadExistingReview = async () => {
+      if (!user || !currentOrg || !courseId) return;
+
+      const { data } = await supabase
+        .from('course_reviews')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('org_id', currentOrg.id)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (data) {
+        setExistingReview(data as CourseReview);
+      }
+    };
+
+    loadExistingReview();
+  }, [user, currentOrg, courseId]);
+
   // Load quiz when lesson changes
   useEffect(() => {
     const loadQuiz = async () => {
@@ -154,7 +185,7 @@ export default function CoursePlayer() {
     setAnswers({});
   };
 
-  const handleCompleteLesson = async () => {
+  const handleCompleteLesson = async (isLastLesson = false) => {
     if (!user || !currentOrg || !currentLesson) return;
 
     setCompletingLesson(true);
@@ -171,28 +202,44 @@ export default function CoursePlayer() {
     });
 
     if (!error) {
-      setProgress(prev => ({
-        ...prev,
+      const newProgress = {
+        ...progress,
         [currentLesson.id]: {
           id: '',
           org_id: currentOrg.id,
           user_id: user.id,
           lesson_id: currentLesson.id,
-          status: 'completed',
+          status: 'completed' as const,
           completed_at: new Date().toISOString(),
         }
-      }));
+      };
+      setProgress(newProgress);
 
-      toast({
-        title: 'Lesson completed!',
-        description: 'Great job! Keep up the momentum.',
-      });
-
-      // Auto-advance to next lesson
+      // Check if this completes the course
       const allLessons = modules.flatMap(m => m.lessons);
-      const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
-      if (currentIndex < allLessons.length - 1) {
-        setCurrentLesson(allLessons[currentIndex + 1]);
+      const completedCount = Object.values(newProgress).filter(p => p.status === 'completed').length;
+      const isCourseComplete = completedCount >= allLessons.length;
+
+      if (isCourseComplete && !courseJustCompleted) {
+        setCourseJustCompleted(true);
+        setShowCompletionDialog(true);
+        
+        // Update enrollment status to completed
+        await supabase.from('enrollments').update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        }).eq('user_id', user.id).eq('org_id', currentOrg.id).eq('course_id', courseId);
+      } else {
+        toast({
+          title: 'Lesson completed!',
+          description: 'Great job! Keep up the momentum.',
+        });
+
+        // Auto-advance to next lesson if not last
+        const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
+        if (currentIndex < allLessons.length - 1) {
+          setCurrentLesson(allLessons[currentIndex + 1]);
+        }
       }
     }
 
@@ -508,7 +555,7 @@ export default function CoursePlayer() {
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     ) : (
-                      <Button onClick={handleCompleteLesson} disabled={completingLesson}>
+                      <Button onClick={() => handleCompleteLesson()} disabled={completingLesson}>
                         {completingLesson ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
@@ -530,6 +577,46 @@ export default function CoursePlayer() {
           )}
         </div>
       </div>
+
+      {/* Course Completion Dialog */}
+      {course && (
+        <CourseCompletionDialog
+          open={showCompletionDialog}
+          onOpenChange={setShowCompletionDialog}
+          courseTitle={course.title}
+          onLeaveReview={() => setShowReviewDialog(true)}
+        />
+      )}
+
+      {/* Course Review Dialog */}
+      {course && user && currentOrg && (
+        <CourseReviewDialog
+          open={showReviewDialog}
+          onOpenChange={setShowReviewDialog}
+          courseId={course.id}
+          courseTitle={course.title}
+          orgId={currentOrg.id}
+          userId={user.id}
+          existingReview={existingReview ? {
+            id: existingReview.id,
+            rating: existingReview.rating,
+            comment: existingReview.comment,
+          } : undefined}
+          onReviewSubmitted={() => {
+            // Refresh existing review
+            supabase
+              .from('course_reviews')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('org_id', currentOrg.id)
+              .eq('course_id', course.id)
+              .maybeSingle()
+              .then(({ data }) => {
+                if (data) setExistingReview(data as CourseReview);
+              });
+          }}
+        />
+      )}
     </AppLayout>
   );
 }
