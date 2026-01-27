@@ -33,7 +33,7 @@ import {
   Users,
   Building2,
   BarChart3,
-  Settings,
+  Settings as SettingsIcon,
   LogOut,
   ChevronDown,
   Layers,
@@ -86,6 +86,7 @@ export function AppSidebar() {
     { title: 'Organizations', url: '/app/admin/organizations', icon: Building2 },
     { title: 'Course Manager', url: '/app/admin/courses', icon: GraduationCap },
     { title: 'Global Analytics', url: '/app/admin/analytics/global', icon: BarChart3 },
+    { title: 'Platform Settings', url: '/app/admin/platform/settings', icon: SettingsIcon },
   ];
 
   const initials = profile?.full_name
@@ -264,7 +265,7 @@ export function AppSidebar() {
               </>
             )}
             <DropdownMenuItem onClick={() => navigate('/app/settings')}>
-              <Settings className="mr-2 h-4 w-4" />
+              <SettingsIcon className="mr-2 h-4 w-4" />
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />

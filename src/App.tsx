@@ -20,6 +20,7 @@ import PlatformDashboard from "./pages/platform-admin/PlatformDashboard";
 import OrganizationsManager from "./pages/platform-admin/OrganizationsManager";
 import CoursesManager from "./pages/platform-admin/CoursesManager";
 import CourseEditor from "./pages/platform-admin/CourseEditor";
+import PlatformSettings from "./pages/platform-admin/PlatformSettings";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -67,6 +68,7 @@ function AppRoutes() {
       <Route path="/app/admin/courses" element={<ProtectedRoute><CoursesManager /></ProtectedRoute>} />
       <Route path="/app/admin/courses/:courseId" element={<ProtectedRoute><CourseEditor /></ProtectedRoute>} />
       <Route path="/app/admin/analytics/global" element={<ProtectedRoute><OrgAnalytics /></ProtectedRoute>} />
+      <Route path="/app/admin/platform/settings" element={<ProtectedRoute><PlatformSettings /></ProtectedRoute>} />
       <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
       {/* Redirects */}
