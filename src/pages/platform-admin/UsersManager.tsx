@@ -52,6 +52,7 @@ import { Profile, OrgMembership, Organization, OrgRole, Invitation } from '@/lib
 import { Users, MoreHorizontal, Shield, ShieldOff, Search, Loader2, Mail, Copy, Check, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
+import { getInviteLink } from '@/lib/config';
 
 // Invite type includes platform_admin option
 type InviteRoleType = 'learner' | 'org_admin' | 'platform_admin';
@@ -269,7 +270,7 @@ export default function UsersManager() {
       return;
     }
     
-    const link = `${window.location.origin}/signup?invite=${linkId}`;
+    const link = getInviteLink(linkId);
     await navigator.clipboard.writeText(link);
     setCopiedToken(invitationId);
     toast({

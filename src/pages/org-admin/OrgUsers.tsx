@@ -53,6 +53,7 @@ import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
 import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX, UserCog, ShieldCheck, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
+import { getInviteLink } from '@/lib/config';
 
 const inviteSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -175,7 +176,7 @@ export default function OrgUsers() {
   };
 
   const handleCopyInviteLink = async (linkId: string) => {
-    const link = `${window.location.origin}/signup?invite=${linkId}`;
+    const link = getInviteLink(linkId);
     await navigator.clipboard.writeText(link);
     setCopiedToken(linkId);
     toast({
