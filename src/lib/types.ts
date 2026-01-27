@@ -41,6 +41,7 @@ export interface Invitation {
   email: string;
   role: OrgRole;
   token: string;
+  link_id: string;
   status: InvitationStatus;
   invited_by_user_id: string | null;
   created_at: string;

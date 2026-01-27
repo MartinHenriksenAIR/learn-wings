@@ -337,10 +337,10 @@ export default function OrganizationDetail() {
     setInviting(false);
   };
 
-  const handleCopyInviteLink = async (token: string) => {
-    const link = `${window.location.origin}/signup?invite=${token}`;
+  const handleCopyInviteLink = async (linkId: string) => {
+    const link = `${window.location.origin}/signup?invite=${linkId}`;
     await navigator.clipboard.writeText(link);
-    setCopiedToken(token);
+    setCopiedToken(linkId);
     toast({
       title: 'Link copied!',
       description: 'Share this link with the invited user.',
@@ -698,9 +698,9 @@ export default function OrganizationDetail() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleCopyInviteLink(invitation.token)}
+                      onClick={() => handleCopyInviteLink(invitation.link_id)}
                     >
-                      {copiedToken === invitation.token ? (
+                      {copiedToken === invitation.link_id ? (
                         <Check className="h-4 w-4" />
                       ) : (
                         <Copy className="h-4 w-4" />

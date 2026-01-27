@@ -125,34 +125,52 @@ export default function Signup() {
 
     // If there's an invitation, accept it
     if (invitation && inviteToken) {
-      // Wait a bit for the profile trigger to create the profile
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for the profile trigger to create the profile
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Get the new user
       const { data: { user: newUser } } = await supabase.auth.getUser();
       
       if (newUser) {
-        if (invitation.is_platform_admin_invite) {
-          // Set the user as platform admin
-          await supabase
-            .from('profiles')
-            .update({ is_platform_admin: true })
-            .eq('id', newUser.id);
-        } else if (invitation.org_id) {
-          // Create org membership
-          await supabase.from('org_memberships').insert({
-            org_id: invitation.org_id,
-            user_id: newUser.id,
-            role: invitation.role,
-            status: 'active',
-          });
-        }
+        try {
+          if (invitation.is_platform_admin_invite) {
+            // Set the user as platform admin
+            await supabase
+              .from('profiles')
+              .update({ is_platform_admin: true })
+              .eq('id', newUser.id);
+          } else if (invitation.org_id) {
+            // Check if membership already exists
+            const { data: existingMembership } = await supabase
+              .from('org_memberships')
+              .select('id')
+              .eq('org_id', invitation.org_id)
+              .eq('user_id', newUser.id)
+              .maybeSingle();
 
-        // Update invitation status
-        await supabase
-          .from('invitations')
-          .update({ status: 'accepted' })
-          .eq('id', invitation.id);
+            if (!existingMembership) {
+              // Create org membership
+              const { error: membershipError } = await supabase.from('org_memberships').insert({
+                org_id: invitation.org_id,
+                user_id: newUser.id,
+                role: invitation.role,
+                status: 'active',
+              });
+              
+              if (membershipError) {
+                console.error('Failed to create membership:', membershipError);
+              }
+            }
+          }
+
+          // Update invitation status
+          await supabase
+            .from('invitations')
+            .update({ status: 'accepted' })
+            .eq('id', invitation.id);
+        } catch (err) {
+          console.error('Error processing invitation:', err);
+        }
       }
     }
 
