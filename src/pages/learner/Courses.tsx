@@ -23,7 +23,10 @@ export default function LearnerCourses() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user || !currentOrg) return;
+      if (!user || !currentOrg) {
+        setLoading(false);
+        return;
+      }
 
       // Fetch accessible courses for this org
       const { data: accessData } = await supabase
@@ -118,6 +121,18 @@ export default function LearnerCourses() {
       <AppLayout title="Course Catalog" breadcrumbs={[{ label: 'Courses' }]}>
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!currentOrg) {
+    return (
+      <AppLayout title="Course Catalog" breadcrumbs={[{ label: 'Courses' }]}>
+        <div className="flex h-64 flex-col items-center justify-center text-center">
+          <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground">No organization selected.</p>
+          <p className="text-sm text-muted-foreground">Join an organization to access courses.</p>
         </div>
       </AppLayout>
     );

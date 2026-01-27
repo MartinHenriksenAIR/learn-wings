@@ -20,7 +20,10 @@ export default function LearnerDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user || !currentOrg) return;
+      if (!user || !currentOrg) {
+        setLoading(false);
+        return;
+      }
 
       // Fetch enrollments with courses
       const { data: enrollmentData } = await supabase
@@ -86,6 +89,18 @@ export default function LearnerDashboard() {
       <AppLayout title="Dashboard">
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!currentOrg) {
+    return (
+      <AppLayout title="Dashboard">
+        <div className="flex h-64 flex-col items-center justify-center text-center">
+          <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground">No organization selected.</p>
+          <p className="text-sm text-muted-foreground">Join an organization to access your courses.</p>
         </div>
       </AppLayout>
     );

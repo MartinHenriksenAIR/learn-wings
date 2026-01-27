@@ -61,7 +61,10 @@ export default function OrgUsers() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const fetchData = async () => {
-    if (!currentOrg) return;
+    if (!currentOrg) {
+      setLoading(false);
+      return;
+    }
 
     // Fetch members
     const { data: memberData } = await supabase
@@ -226,6 +229,18 @@ export default function OrgUsers() {
       <AppLayout title="Team Members" breadcrumbs={[{ label: 'Team Members' }]}>
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!currentOrg) {
+    return (
+      <AppLayout title="Team Members" breadcrumbs={[{ label: 'Team Members' }]}>
+        <div className="flex h-64 flex-col items-center justify-center text-center">
+          <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground">No organization selected.</p>
+          <p className="text-sm text-muted-foreground">Join an organization to manage team members.</p>
         </div>
       </AppLayout>
     );

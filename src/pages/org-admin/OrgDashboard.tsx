@@ -18,7 +18,10 @@ export default function OrgDashboard() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      if (!currentOrg) return;
+      if (!currentOrg) {
+        setLoading(false);
+        return;
+      }
 
       // Get total users
       const { count: totalUsers } = await supabase
@@ -68,6 +71,18 @@ export default function OrgDashboard() {
       <AppLayout title="Organization Overview">
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!currentOrg) {
+    return (
+      <AppLayout title="Organization Overview">
+        <div className="flex h-64 flex-col items-center justify-center text-center">
+          <Building2 className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground">No organization selected.</p>
+          <p className="text-sm text-muted-foreground">Join an organization to view its dashboard.</p>
         </div>
       </AppLayout>
     );

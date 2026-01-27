@@ -15,7 +15,10 @@ export default function Certificates() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user || !currentOrg) return;
+      if (!user || !currentOrg) {
+        setLoading(false);
+        return;
+      }
 
       const { data } = await supabase
         .from('enrollments')
@@ -38,6 +41,18 @@ export default function Certificates() {
       <AppLayout title="Certificates" breadcrumbs={[{ label: 'Certificates' }]}>
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!currentOrg) {
+    return (
+      <AppLayout title="Certificates" breadcrumbs={[{ label: 'Certificates' }]}>
+        <div className="flex h-64 flex-col items-center justify-center text-center">
+          <Award className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground">No organization selected.</p>
+          <p className="text-sm text-muted-foreground">Join an organization to earn certificates.</p>
         </div>
       </AppLayout>
     );
