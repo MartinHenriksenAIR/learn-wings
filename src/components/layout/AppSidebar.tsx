@@ -40,6 +40,7 @@ import {
   Award,
   Eye,
 } from 'lucide-react';
+import { OrgSelector } from '@/components/OrgSelector';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -122,6 +123,9 @@ export function AppSidebar() {
           )}
         </div>
       </SidebarHeader>
+
+      {/* Org selector for platform admins viewing as learner/org_admin */}
+      <OrgSelector />
 
       <SidebarContent className="px-2">
         {/* Learner section - shown to all users */}
