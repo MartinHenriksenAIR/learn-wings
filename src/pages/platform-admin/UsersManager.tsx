@@ -255,10 +255,23 @@ export default function UsersManager() {
     setInviting(false);
   };
 
-  const handleCopyInviteLink = async (token: string) => {
-    const link = `${window.location.origin}/signup?invite=${token}`;
+  const handleCopyInviteLink = async (invitationId: string) => {
+    // Use the secure RPC function to get the link_id (not the raw token)
+    const { data: linkId, error } = await supabase
+      .rpc('get_invitation_link_id', { invitation_id: invitationId });
+    
+    if (error || !linkId) {
+      toast({
+        title: 'Failed to get invite link',
+        description: 'Could not retrieve the invitation link.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    const link = `${window.location.origin}/signup?invite=${linkId}`;
     await navigator.clipboard.writeText(link);
-    setCopiedToken(token);
+    setCopiedToken(invitationId);
     toast({
       title: 'Link copied!',
       description: 'Share this link with the invited user.',
@@ -442,9 +455,9 @@ export default function UsersManager() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleCopyInviteLink(invitation.token)}
+                      onClick={() => handleCopyInviteLink(invitation.id)}
                     >
-                      {copiedToken === invitation.token ? (
+                      {copiedToken === invitation.id ? (
                         <Check className="h-4 w-4" />
                       ) : (
                         <Copy className="h-4 w-4" />
