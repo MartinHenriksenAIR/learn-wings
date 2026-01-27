@@ -46,7 +46,10 @@ export default function OrgAnalytics() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!currentOrg) return;
+      if (!currentOrg) {
+        setLoading(false);
+        return;
+      }
 
       // Get total users
       const { count: totalUsers } = await supabase
@@ -193,6 +196,18 @@ export default function OrgAnalytics() {
       <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!currentOrg) {
+    return (
+      <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
+        <div className="flex h-64 flex-col items-center justify-center text-center">
+          <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground">No organization selected.</p>
+          <p className="text-sm text-muted-foreground">Join an organization to view analytics.</p>
         </div>
       </AppLayout>
     );
