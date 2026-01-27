@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,10 +30,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
-import { Organization } from '@/lib/types';
-import { Building2, Plus, Users, Loader2, ChevronRight } from 'lucide-react';
+import { Organization, Profile, OrgRole } from '@/lib/types';
+import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
 
 const orgSchema = z.object({
@@ -38,13 +48,21 @@ const orgSchema = z.object({
 export default function OrganizationsManager() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [orgs, setOrgs] = useState<(Organization & { memberCount: number })[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Initial admin state
+  const [adminTab, setAdminTab] = useState<'existing' | 'invite'>('existing');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [inviteEmail, setInviteEmail] = useState('');
 
   const fetchOrgs = async () => {
     const { data } = await supabase
@@ -53,7 +71,6 @@ export default function OrganizationsManager() {
       .order('created_at', { ascending: false });
 
     if (data) {
-      // Get member counts
       const orgsWithCounts = await Promise.all(
         data.map(async (org) => {
           const { count } = await supabase
@@ -69,8 +86,17 @@ export default function OrganizationsManager() {
     setLoading(false);
   };
 
+  const fetchProfiles = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('full_name');
+    if (data) setProfiles(data as Profile[]);
+  };
+
   useEffect(() => {
     fetchOrgs();
+    fetchProfiles();
   }, []);
 
   const handleCreate = async () => {
@@ -88,10 +114,12 @@ export default function OrganizationsManager() {
 
     setCreating(true);
 
-    const { error } = await supabase.from('organizations').insert({
+    // Create organization
+    const { data: newOrg, error } = await supabase.from('organizations').insert({
       name,
       slug,
-    });
+      logo_url: logoUrl,
+    }).select().single();
 
     if (error) {
       if (error.message.includes('duplicate')) {
@@ -103,18 +131,45 @@ export default function OrganizationsManager() {
           variant: 'destructive',
         });
       }
-    } else {
-      toast({
-        title: 'Organization created!',
-        description: `${name} is now ready.`,
-      });
-      setCreateOpen(false);
-      setName('');
-      setSlug('');
-      fetchOrgs();
+      setCreating(false);
+      return;
     }
 
+    // Assign initial admin if selected
+    if (adminTab === 'existing' && selectedUserId) {
+      await supabase.from('org_memberships').insert({
+        org_id: newOrg.id,
+        user_id: selectedUserId,
+        role: 'org_admin' as OrgRole,
+        status: 'active',
+      });
+    } else if (adminTab === 'invite' && inviteEmail.trim()) {
+      await supabase.from('invitations').insert({
+        org_id: newOrg.id,
+        email: inviteEmail.trim(),
+        role: 'org_admin' as OrgRole,
+        invited_by_user_id: user?.id,
+      });
+    }
+
+    toast({
+      title: 'Organization created!',
+      description: `${name} is now ready.`,
+    });
+    setCreateOpen(false);
+    resetForm();
+    fetchOrgs();
     setCreating(false);
+  };
+
+  const resetForm = () => {
+    setName('');
+    setSlug('');
+    setLogoUrl(null);
+    setAdminTab('existing');
+    setSelectedUserId('');
+    setInviteEmail('');
+    setErrors({});
   };
 
   // Auto-generate slug from name
@@ -140,14 +195,14 @@ export default function OrganizationsManager() {
     <AppLayout title="Organizations" breadcrumbs={[{ label: 'Organizations' }]}>
       {/* Actions */}
       <div className="mb-6 flex justify-end">
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Create Organization
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Create Organization</DialogTitle>
               <DialogDescription>
@@ -155,6 +210,18 @@ export default function OrganizationsManager() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {/* Logo Upload */}
+              <div className="space-y-2">
+                <Label>Logo (optional)</Label>
+                <FileUpload
+                  bucket="org-logos"
+                  accept="image"
+                  value={logoUrl}
+                  onChange={(url) => setLogoUrl(url)}
+                  maxSizeMB={5}
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="name">Organization Name</Label>
                 <Input
@@ -180,6 +247,48 @@ export default function OrganizationsManager() {
                 {errors.slug && (
                   <p className="text-xs text-destructive">{errors.slug}</p>
                 )}
+              </div>
+
+              {/* Initial Admin Assignment */}
+              <div className="space-y-2">
+                <Label>Initial Admin (optional)</Label>
+                <Tabs value={adminTab} onValueChange={(v) => setAdminTab(v as 'existing' | 'invite')}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="existing" className="flex items-center gap-1">
+                      <UserPlus className="h-3 w-3" />
+                      Existing User
+                    </TabsTrigger>
+                    <TabsTrigger value="invite" className="flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      Send Invite
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="existing" className="mt-2">
+                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a user..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {profiles.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TabsContent>
+                  <TabsContent value="invite" className="mt-2">
+                    <Input
+                      type="email"
+                      placeholder="admin@company.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      An invite link will be created for this email.
+                    </p>
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
             <DialogFooter>
@@ -229,9 +338,17 @@ export default function OrganizationsManager() {
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Building2 className="h-5 w-5 text-primary" />
-                      </div>
+                      {org.logo_url ? (
+                        <img
+                          src={org.logo_url}
+                          alt={org.name}
+                          className="h-10 w-10 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                          <Building2 className="h-5 w-5 text-primary" />
+                        </div>
+                      )}
                       <span className="font-medium">{org.name}</span>
                     </div>
                   </TableCell>

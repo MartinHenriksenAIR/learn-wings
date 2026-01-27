@@ -15,6 +15,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Course, CourseLevel } from '@/lib/types';
@@ -31,6 +32,7 @@ export default function CoursesManager() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [level, setLevel] = useState<CourseLevel>('basic');
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const fetchCourses = async () => {
@@ -45,13 +47,13 @@ export default function CoursesManager() {
     if (!title.trim()) return;
     setCreating(true);
     const { error } = await supabase.from('courses').insert({
-      title, description, level, created_by_user_id: user?.id, is_published: false,
+      title, description, level, thumbnail_url: thumbnailUrl, created_by_user_id: user?.id, is_published: false,
     });
     if (error) {
       toast({ title: 'Failed to create course', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Course created!' });
-      setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic');
+      setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic'); setThumbnailUrl(null);
       fetchCourses();
     }
     setCreating(false);
@@ -74,6 +76,17 @@ export default function CoursesManager() {
           <DialogContent>
             <DialogHeader><DialogTitle>Create Course</DialogTitle><DialogDescription>Add a new course to the platform.</DialogDescription></DialogHeader>
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Thumbnail</Label>
+                <FileUpload
+                  bucket="lms-assets"
+                  folder="thumbnails"
+                  accept="image"
+                  value={thumbnailUrl}
+                  onChange={(url) => setThumbnailUrl(url)}
+                  maxSizeMB={10}
+                />
+              </div>
               <div className="space-y-2"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Course title" /></div>
               <div className="space-y-2"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Course description" /></div>
               <div className="space-y-2"><Label>Level</Label>
@@ -98,7 +111,11 @@ export default function CoursesManager() {
               className="cursor-pointer transition-shadow hover:shadow-md"
               onClick={() => navigate(`/app/admin/courses/${course.id}`)}
             >
-              <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary" />
+              {course.thumbnail_url ? (
+                <img src={course.thumbnail_url} alt={course.title} className="aspect-video object-cover" />
+              ) : (
+                <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary" />
+              )}
               <CardContent className="p-4">
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <h3 className="font-display font-semibold">{course.title}</h3>

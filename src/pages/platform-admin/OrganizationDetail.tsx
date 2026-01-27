@@ -48,6 +48,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization, OrgMembership, Profile, OrgRole, Invitation } from '@/lib/types';
 import {
@@ -119,6 +120,7 @@ export default function OrganizationDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editSlug, setEditSlug] = useState('');
+  const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Delete organization state
@@ -370,6 +372,7 @@ export default function OrganizationDetail() {
     if (org) {
       setEditName(org.name);
       setEditSlug(org.slug);
+      setEditLogoUrl(org.logo_url || null);
       setEditOpen(true);
     }
   };
@@ -389,7 +392,7 @@ export default function OrganizationDetail() {
 
     const { error } = await supabase
       .from('organizations')
-      .update({ name: editName, slug: editSlug })
+      .update({ name: editName, slug: editSlug, logo_url: editLogoUrl })
       .eq('id', orgId);
 
     if (error) {
@@ -484,9 +487,13 @@ export default function OrganizationDetail() {
       {/* Header with org info and actions */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
-            <Building2 className="h-7 w-7 text-primary" />
-          </div>
+          {org.logo_url ? (
+            <img src={org.logo_url} alt={org.name} className="h-14 w-14 rounded-xl object-cover" />
+          ) : (
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
+              <Building2 className="h-7 w-7 text-primary" />
+            </div>
+          )}
           <div>
             <h2 className="text-xl font-semibold">{org.name}</h2>
             <p className="text-sm text-muted-foreground">/{org.slug}</p>
@@ -874,10 +881,20 @@ export default function OrganizationDetail() {
           <DialogHeader>
             <DialogTitle>Edit Organization</DialogTitle>
             <DialogDescription>
-              Update the organization name and slug.
+              Update the organization details.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Logo</Label>
+              <FileUpload
+                bucket="org-logos"
+                accept="image"
+                value={editLogoUrl}
+                onChange={(url) => setEditLogoUrl(url)}
+                maxSizeMB={5}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="edit-name">Organization Name</Label>
               <Input

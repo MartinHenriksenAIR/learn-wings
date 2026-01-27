@@ -16,6 +16,7 @@ import {
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
+import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil } from 'lucide-react';
@@ -37,6 +38,7 @@ export default function CourseEditor() {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editLevel, setEditLevel] = useState<CourseLevel>('basic');
+  const [editThumbnailUrl, setEditThumbnailUrl] = useState<string | null>(null);
 
   // Module dialog state
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
@@ -52,6 +54,8 @@ export default function CourseEditor() {
   const [lessonType, setLessonType] = useState<LessonType>('document');
   const [lessonContent, setLessonContent] = useState('');
   const [lessonDuration, setLessonDuration] = useState<number | null>(null);
+  const [lessonVideoPath, setLessonVideoPath] = useState<string | null>(null);
+  const [lessonDocPath, setLessonDocPath] = useState<string | null>(null);
   const [savingLesson, setSavingLesson] = useState(false);
 
   const fetchCourse = async () => {
@@ -62,6 +66,7 @@ export default function CourseEditor() {
       setEditTitle(data.title);
       setEditDescription(data.description || '');
       setEditLevel(data.level as CourseLevel);
+      setEditThumbnailUrl(data.thumbnail_url || null);
     }
   };
 
@@ -100,7 +105,7 @@ export default function CourseEditor() {
     setSaving(true);
     const { error } = await supabase
       .from('courses')
-      .update({ title: editTitle, description: editDescription, level: editLevel })
+      .update({ title: editTitle, description: editDescription, level: editLevel, thumbnail_url: editThumbnailUrl })
       .eq('id', courseId);
     if (error) {
       toast({ title: 'Failed to save course', description: error.message, variant: 'destructive' });
@@ -161,6 +166,8 @@ export default function CourseEditor() {
     setLessonType('document');
     setLessonContent('');
     setLessonDuration(null);
+    setLessonVideoPath(null);
+    setLessonDocPath(null);
     setLessonDialogOpen(true);
   };
 
@@ -171,6 +178,8 @@ export default function CourseEditor() {
     setLessonType(lesson.lesson_type);
     setLessonContent(lesson.content_text || '');
     setLessonDuration(lesson.duration_minutes);
+    setLessonVideoPath(lesson.video_storage_path || null);
+    setLessonDocPath(lesson.document_storage_path || null);
     setLessonDialogOpen(true);
   };
 
@@ -184,6 +193,8 @@ export default function CourseEditor() {
       lesson_type: lessonType,
       content_text: lessonContent || null,
       duration_minutes: lessonDuration,
+      video_storage_path: lessonType === 'video' ? lessonVideoPath : null,
+      document_storage_path: lessonType === 'document' ? lessonDocPath : null,
     };
 
     if (editingLesson) {
@@ -265,6 +276,17 @@ export default function CourseEditor() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Thumbnail</Label>
+            <FileUpload
+              bucket="lms-assets"
+              folder="thumbnails"
+              accept="image"
+              value={editThumbnailUrl}
+              onChange={(url) => setEditThumbnailUrl(url)}
+              maxSizeMB={10}
+            />
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Title</Label>
@@ -426,18 +448,41 @@ export default function CourseEditor() {
               </div>
             </div>
             {lessonType === 'document' && (
-              <div className="space-y-2">
-                <Label>Content</Label>
-                <Textarea
-                  value={lessonContent}
-                  onChange={(e) => setLessonContent(e.target.value)}
-                  rows={5}
-                  placeholder="Lesson content text..."
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label>Document File (optional)</Label>
+                  <FileUpload
+                    bucket="lms-assets"
+                    folder="documents"
+                    accept="document"
+                    value={lessonDocPath ? `Document uploaded` : null}
+                    onChange={(_, path) => setLessonDocPath(path)}
+                    maxSizeMB={50}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Content Text (optional)</Label>
+                  <Textarea
+                    value={lessonContent}
+                    onChange={(e) => setLessonContent(e.target.value)}
+                    rows={5}
+                    placeholder="Additional lesson content or description..."
+                  />
+                </div>
+              </>
             )}
             {lessonType === 'video' && (
-              <p className="text-sm text-muted-foreground">Video upload will be available in a future update.</p>
+              <div className="space-y-2">
+                <Label>Video File</Label>
+                <FileUpload
+                  bucket="lms-assets"
+                  folder="videos"
+                  accept="video"
+                  value={lessonVideoPath ? `Video uploaded` : null}
+                  onChange={(_, path) => setLessonVideoPath(path)}
+                  maxSizeMB={500}
+                />
+              </div>
             )}
             {lessonType === 'quiz' && (
               <p className="text-sm text-muted-foreground">Quiz editor will be available in a future update.</p>
