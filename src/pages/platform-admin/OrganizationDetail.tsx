@@ -49,7 +49,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { Organization, OrgMembership, Profile, OrgRole } from '@/lib/types';
+import { Organization, OrgMembership, Profile, OrgRole, Invitation } from '@/lib/types';
 import {
   Building2,
   Users,
@@ -61,12 +61,20 @@ import {
   User,
   UserPlus,
   ArrowLeft,
+  Mail,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
 const addUserSchema = z.object({
   userId: z.string().uuid('Please select a user'),
+  role: z.enum(['org_admin', 'learner']),
+});
+
+const inviteSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
   role: z.enum(['org_admin', 'learner']),
 });
 
@@ -77,6 +85,7 @@ export default function OrganizationDetail() {
 
   const [org, setOrg] = useState<Organization | null>(null);
   const [members, setMembers] = useState<(OrgMembership & { profile: Profile })[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [availableUsers, setAvailableUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -84,6 +93,12 @@ export default function OrganizationDetail() {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<OrgRole>('learner');
   const [adding, setAdding] = useState(false);
+
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<OrgRole>('learner');
+  const [inviting, setInviting] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const [roleChangeDialog, setRoleChangeDialog] = useState<{
     open: boolean;
@@ -115,6 +130,18 @@ export default function OrganizationDetail() {
 
     if (memberData) {
       setMembers(memberData as any);
+    }
+
+    // Fetch pending invitations
+    const { data: inviteData } = await supabase
+      .from('invitations')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (inviteData) {
+      setInvitations(inviteData as Invitation[]);
     }
 
     // Fetch all users to find ones not in this org
@@ -247,6 +274,80 @@ export default function OrganizationDetail() {
     }
   };
 
+  const handleInvite = async () => {
+    const result = inviteSchema.safeParse({ email: inviteEmail, role: inviteRole });
+    if (!result.success) {
+      toast({
+        title: 'Invalid input',
+        description: result.error.errors[0].message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setInviting(true);
+
+    const { data: invitation, error } = await supabase
+      .from('invitations')
+      .insert({
+        org_id: orgId,
+        email: inviteEmail,
+        role: inviteRole,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        title: 'Failed to create invitation',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Invitation created!',
+        description: 'Copy the invite link to share with the user.',
+      });
+      setInviteOpen(false);
+      setInviteEmail('');
+      setInviteRole('learner');
+      fetchData();
+    }
+
+    setInviting(false);
+  };
+
+  const handleCopyInviteLink = async (token: string) => {
+    const link = `${window.location.origin}/signup?invite=${token}`;
+    await navigator.clipboard.writeText(link);
+    setCopiedToken(token);
+    toast({
+      title: 'Link copied!',
+      description: 'Share this link with the invited user.',
+    });
+    setTimeout(() => setCopiedToken(null), 2000);
+  };
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    const { error } = await supabase
+      .from('invitations')
+      .update({ status: 'expired' })
+      .eq('id', invitationId);
+
+    if (error) {
+      toast({
+        title: 'Failed to cancel invitation',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Invitation cancelled',
+      });
+      fetchData();
+    }
+  };
+
   const roleColors = {
     org_admin: 'bg-purple-100 text-purple-800',
     learner: 'bg-blue-100 text-blue-800',
@@ -306,66 +407,124 @@ export default function OrganizationDetail() {
           </div>
         </div>
 
-        <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add User to {org.name}</DialogTitle>
-              <DialogDescription>
-                Select a user and assign them a role in this organization.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>User</Label>
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a user..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableUsers.length === 0 ? (
-                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                        All users are already members
-                      </div>
-                    ) : (
-                      availableUsers.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.full_name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Role</Label>
-                <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as OrgRole)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="learner">Learner</SelectItem>
-                    <SelectItem value="org_admin">Organization Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAddUserOpen(false)}>
-                Cancel
+        <div className="flex gap-2">
+          {/* Invite User Dialog */}
+          <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Mail className="mr-2 h-4 w-4" />
+                Invite User
               </Button>
-              <Button onClick={handleAddUser} disabled={adding || !selectedUserId}>
-                {adding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Invite User to {org.name}</DialogTitle>
+                <DialogDescription>
+                  Send an invitation email to join this organization.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">Email Address</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    placeholder="colleague@company.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as OrgRole)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="learner">Learner</SelectItem>
+                      <SelectItem value="org_admin">Organization Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setInviteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleInvite} disabled={inviting}>
+                  {inviting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mail className="mr-2 h-4 w-4" />
+                  )}
+                  Create Invitation
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Add Existing User Dialog */}
+          <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="mr-2 h-4 w-4" />
                 Add User
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add User to {org.name}</DialogTitle>
+                <DialogDescription>
+                  Select an existing user and assign them a role in this organization.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>User</Label>
+                  <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a user..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableUsers.length === 0 ? (
+                        <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                          All users are already members
+                        </div>
+                      ) : (
+                        availableUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.full_name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as OrgRole)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="learner">Learner</SelectItem>
+                      <SelectItem value="org_admin">Organization Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAddUserOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddUser} disabled={adding || !selectedUserId}>
+                  {adding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Add User
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Stats */}
@@ -408,6 +567,58 @@ export default function OrganizationDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Pending Invitations */}
+      {invitations.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base">Pending Invitations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {invitations.map((invitation) => (
+                <div
+                  key={invitation.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{invitation.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Expires {new Date(invitation.expires_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Badge className={roleColors[invitation.role]}>
+                      {invitation.role === 'org_admin' ? 'Admin' : 'Learner'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyInviteLink(invitation.token)}
+                    >
+                      {copiedToken === invitation.token ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCancelInvitation(invitation.id)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Members Table */}
       {members.length === 0 ? (
