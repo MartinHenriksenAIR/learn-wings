@@ -3,6 +3,8 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Profile, OrgMembership, Organization, UserContext } from '@/lib/types';
 
+export type ViewMode = 'learner' | 'org_admin' | 'platform_admin';
+
 interface AuthContextType extends UserContext {
   user: User | null;
   session: Session | null;
@@ -11,6 +13,11 @@ interface AuthContextType extends UserContext {
   signOut: () => Promise<void>;
   refreshUserContext: () => Promise<void>;
   setCurrentOrg: (org: Organization) => void;
+  // View mode for platform admins to preview as different roles
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+  effectiveIsPlatformAdmin: boolean;
+  effectiveIsOrgAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,9 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [memberships, setMemberships] = useState<OrgMembership[]>([]);
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('platform_admin');
 
   const isPlatformAdmin = profile?.is_platform_admin ?? false;
   const isOrgAdmin = memberships.some(m => m.role === 'org_admin' && m.status === 'active');
+
+  // Effective roles based on view mode (only platform admins can change view mode)
+  const effectiveIsPlatformAdmin = isPlatformAdmin && viewMode === 'platform_admin';
+  const effectiveIsOrgAdmin = isPlatformAdmin 
+    ? viewMode === 'org_admin' || viewMode === 'platform_admin'
+    : isOrgAdmin;
 
   const fetchUserContext = async (userId: string) => {
     try {
@@ -155,6 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         refreshUserContext,
         setCurrentOrg,
+        viewMode,
+        setViewMode,
+        effectiveIsPlatformAdmin,
+        effectiveIsOrgAdmin,
       }}
     >
       {children}

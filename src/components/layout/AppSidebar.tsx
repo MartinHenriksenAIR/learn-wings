@@ -13,7 +13,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { NavLink } from '@/components/NavLink';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, ViewMode } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +22,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import {
   BookOpen,
@@ -35,18 +38,34 @@ import {
   ChevronDown,
   Layers,
   Award,
+  Eye,
 } from 'lucide-react';
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { profile, isPlatformAdmin, isOrgAdmin, currentOrg, signOut } = useAuth();
+  const { 
+    profile, 
+    isPlatformAdmin, 
+    effectiveIsPlatformAdmin, 
+    effectiveIsOrgAdmin, 
+    currentOrg, 
+    signOut,
+    viewMode,
+    setViewMode,
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
+  };
+
+  const viewModeLabels: Record<ViewMode, string> = {
+    learner: 'Learner',
+    org_admin: 'Org. Admin',
+    platform_admin: 'Platform Admin',
   };
 
   const learnerItems = [
@@ -74,6 +93,13 @@ export function AppSidebar() {
     .join('')
     .toUpperCase()
     .slice(0, 2) || 'U';
+
+  const getCurrentRoleLabel = () => {
+    if (isPlatformAdmin) {
+      return `Viewing as: ${viewModeLabels[viewMode]}`;
+    }
+    return effectiveIsOrgAdmin ? 'Org Admin' : 'Learner';
+  };
 
   return (
     <Sidebar className="border-r-0">
@@ -129,7 +155,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Org Admin section */}
-        {(isOrgAdmin || isPlatformAdmin) && (
+        {effectiveIsOrgAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider">
               Organization
@@ -161,7 +187,7 @@ export function AppSidebar() {
         )}
 
         {/* Platform Admin section */}
-        {isPlatformAdmin && (
+        {effectiveIsPlatformAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider">
               Platform Admin
@@ -210,7 +236,7 @@ export function AppSidebar() {
                   <div className="flex flex-1 flex-col items-start text-left">
                     <span className="text-sm font-medium">{profile?.full_name}</span>
                     <span className="text-xs text-sidebar-foreground/60">
-                      {isPlatformAdmin ? 'Platform Admin' : isOrgAdmin ? 'Org Admin' : 'Learner'}
+                      {getCurrentRoleLabel()}
                     </span>
                   </div>
                   <ChevronDown className="h-4 w-4 opacity-50" />
@@ -219,6 +245,20 @@ export function AppSidebar() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
+            {isPlatformAdmin && (
+              <>
+                <DropdownMenuLabel className="flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  Switch View
+                </DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+                  <DropdownMenuRadioItem value="platform_admin">Platform Admin</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="org_admin">Org. Admin</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="learner">Learner</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onClick={() => navigate('/app/settings')}>
               <Settings className="mr-2 h-4 w-4" />
               Settings
