@@ -41,8 +41,8 @@ export function OrgSelector() {
     fetchOrgs();
   }, [isPlatformAdmin, currentOrg, setCurrentOrg]);
 
-  // Only show for platform admins
-  if (!isPlatformAdmin) {
+  // Only show for platform admins viewing as org_admin or learner
+  if (!isPlatformAdmin || viewMode === 'platform_admin') {
     return null;
   }
 
