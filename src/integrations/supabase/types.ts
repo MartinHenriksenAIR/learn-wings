@@ -769,6 +769,7 @@ export type Database = {
       is_org_admin: { Args: { check_org_id: string }; Returns: boolean }
       is_org_member: { Args: { check_org_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      user_can_access_quiz: { Args: { p_quiz_id: string }; Returns: boolean }
     }
     Enums: {
       access_type: "enabled" | "disabled"

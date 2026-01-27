@@ -59,6 +59,27 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Validate user has access to this quiz via their organization
+    const { data: hasAccess, error: accessError } = await supabase.rpc('user_can_access_quiz', {
+      p_quiz_id: quiz_id
+    });
+
+    if (accessError) {
+      console.error('Error checking quiz access:', accessError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to validate quiz access' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!hasAccess) {
+      console.error('User does not have access to quiz:', quiz_id);
+      return new Response(
+        JSON.stringify({ error: 'Quiz not found or access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Use service role to access quiz_options with is_correct
     const serviceClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
