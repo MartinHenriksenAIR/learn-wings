@@ -64,6 +64,8 @@ import {
   Mail,
   Copy,
   Check,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
@@ -76,6 +78,12 @@ const addUserSchema = z.object({
 const inviteSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   role: z.enum(['org_admin', 'learner']),
+});
+
+const editOrgSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
+  slug: z.string().min(1, 'Slug is required').max(50, 'Slug must be less than 50 characters')
+    .regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens'),
 });
 
 export default function OrganizationDetail() {
@@ -106,6 +114,16 @@ export default function OrganizationDetail() {
     newRole: OrgRole;
   } | null>(null);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+
+  // Edit organization state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Delete organization state
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchData = async () => {
     if (!orgId) return;
@@ -348,6 +366,74 @@ export default function OrganizationDetail() {
     }
   };
 
+  const handleOpenEdit = () => {
+    if (org) {
+      setEditName(org.name);
+      setEditSlug(org.slug);
+      setEditOpen(true);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    const result = editOrgSchema.safeParse({ name: editName, slug: editSlug });
+    if (!result.success) {
+      toast({
+        title: 'Invalid input',
+        description: result.error.errors[0].message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from('organizations')
+      .update({ name: editName, slug: editSlug })
+      .eq('id', orgId);
+
+    if (error) {
+      toast({
+        title: 'Failed to update organization',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Organization updated',
+        description: 'The organization details have been saved.',
+      });
+      setEditOpen(false);
+      fetchData();
+    }
+
+    setSaving(false);
+  };
+
+  const handleDeleteOrg = async () => {
+    setDeleting(true);
+
+    const { error } = await supabase
+      .from('organizations')
+      .delete()
+      .eq('id', orgId);
+
+    if (error) {
+      toast({
+        title: 'Failed to delete organization',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setDeleting(false);
+    } else {
+      toast({
+        title: 'Organization deleted',
+        description: 'The organization has been permanently deleted.',
+      });
+      navigate('/app/admin/organizations');
+    }
+  };
+
   const roleColors = {
     org_admin: 'bg-purple-100 text-purple-800',
     learner: 'bg-blue-100 text-blue-800',
@@ -405,6 +491,9 @@ export default function OrganizationDetail() {
             <h2 className="text-xl font-semibold">{org.name}</h2>
             <p className="text-sm text-muted-foreground">/{org.slug}</p>
           </div>
+          <Button variant="ghost" size="icon" onClick={handleOpenEdit}>
+            <Pencil className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="flex gap-2">
@@ -524,6 +613,11 @@ export default function OrganizationDetail() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Delete Button */}
+          <Button variant="outline" size="icon" onClick={() => setDeleteOpen(true)} className="text-destructive hover:bg-destructive/10">
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -769,6 +863,75 @@ export default function OrganizationDetail() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleChangeRole}>
               {roleChangeDialog?.newRole === 'org_admin' ? 'Promote to Admin' : 'Change to Learner'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Organization Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Organization</DialogTitle>
+            <DialogDescription>
+              Update the organization name and slug.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Organization Name</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Acme Corp"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-slug">Slug</Label>
+              <Input
+                id="edit-slug"
+                value={editSlug}
+                onChange={(e) => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                placeholder="acme-corp"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used in URLs. Only lowercase letters, numbers, and hyphens.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Organization Confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Organization?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{org.name}</strong> and all associated data
+              including memberships, invitations, enrollments, and progress records.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteOrg}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete Organization
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
