@@ -40,6 +40,7 @@ import {
   Layers,
   Award,
   Eye,
+  KeyRound,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
 
@@ -81,7 +82,7 @@ export function AppSidebar() {
   // Build org admin items based on feature toggles
   const orgAdminItems = [
     { title: 'Organization', url: '/app/admin/org', icon: Building2 },
-    { title: 'Team Members', url: '/app/admin/users', icon: Users },
+    { title: 'Team Members', url: '/app/admin/org/users', icon: Users },
     ...(features.analytics_enabled ? [{ title: 'Analytics', url: '/app/admin/analytics', icon: BarChart3 }] : []),
   ];
 
@@ -89,7 +90,9 @@ export function AppSidebar() {
   const platformAdminItems = [
     { title: 'Platform Overview', url: '/app/admin/platform', icon: Layers },
     { title: 'Organizations', url: '/app/admin/organizations', icon: Building2 },
+    { title: 'Users', url: '/app/admin/users', icon: Users },
     { title: 'Course Manager', url: '/app/admin/courses', icon: GraduationCap },
+    { title: 'Course Access', url: '/app/admin/course-access', icon: KeyRound },
     ...(features.analytics_enabled ? [{ title: 'Global Analytics', url: '/app/admin/analytics/global', icon: BarChart3 }] : []),
     { title: 'Platform Settings', url: '/app/admin/platform/settings', icon: SettingsIcon },
   ];

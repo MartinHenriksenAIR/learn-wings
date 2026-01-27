@@ -34,12 +34,23 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
-import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX } from 'lucide-react';
+import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX, UserCog, ShieldCheck, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
@@ -59,6 +70,12 @@ export default function OrgUsers() {
   const [inviteRole, setInviteRole] = useState<OrgRole>('learner');
   const [inviting, setInviting] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [roleChangeDialog, setRoleChangeDialog] = useState<{
+    open: boolean;
+    member: (OrgMembership & { profile: Profile }) | null;
+    newRole: OrgRole;
+  } | null>(null);
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
 
   const fetchData = async () => {
     if (!currentOrg) {
@@ -211,6 +228,35 @@ export default function OrgUsers() {
       });
       fetchData();
     }
+  };
+
+  const handleChangeRole = async () => {
+    if (!roleChangeDialog?.member) return;
+    
+    const { member, newRole } = roleChangeDialog;
+    setUpdatingRole(member.id);
+    setRoleChangeDialog(null);
+
+    const { error } = await supabase
+      .from('org_memberships')
+      .update({ role: newRole })
+      .eq('id', member.id);
+
+    if (error) {
+      toast({
+        title: 'Failed to change role',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Role updated',
+        description: `${member.profile?.full_name} is now ${newRole === 'org_admin' ? 'an Admin' : 'a Learner'}.`,
+      });
+      fetchData();
+    }
+
+    setUpdatingRole(null);
   };
 
   const roleColors = {
@@ -407,11 +453,43 @@ export default function OrgUsers() {
                     {member.user_id !== user?.id && member.status === 'active' && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" disabled={updatingRole === member.id}>
+                            {updatingRole === member.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MoreHorizontal className="h-4 w-4" />
+                            )}
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {member.role === 'learner' ? (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setRoleChangeDialog({
+                                  open: true,
+                                  member,
+                                  newRole: 'org_admin',
+                                })
+                              }
+                            >
+                              <ShieldCheck className="mr-2 h-4 w-4" />
+                              Promote to Admin
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setRoleChangeDialog({
+                                  open: true,
+                                  member,
+                                  newRole: 'learner',
+                                })
+                              }
+                            >
+                              <User className="mr-2 h-4 w-4" />
+                              Change to Learner
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => handleDisableMember(member.id)}
                             className="text-destructive"
@@ -429,6 +507,41 @@ export default function OrgUsers() {
           </Table>
         </Card>
       )}
+
+      {/* Role Change Confirmation Dialog */}
+      <AlertDialog
+        open={roleChangeDialog?.open}
+        onOpenChange={(open) => !open && setRoleChangeDialog(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {roleChangeDialog?.newRole === 'org_admin'
+                ? 'Promote to Organization Admin?'
+                : 'Change to Learner?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {roleChangeDialog?.newRole === 'org_admin' ? (
+                <>
+                  <strong>{roleChangeDialog?.member?.profile?.full_name}</strong> will be able to 
+                  manage team members, view analytics, and control course access for this organization.
+                </>
+              ) : (
+                <>
+                  <strong>{roleChangeDialog?.member?.profile?.full_name}</strong> will lose admin 
+                  privileges and only have access as a regular learner.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleChangeRole}>
+              {roleChangeDialog?.newRole === 'org_admin' ? 'Promote to Admin' : 'Change to Learner'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

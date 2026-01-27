@@ -20,6 +20,8 @@ import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
 import PlatformDashboard from "./pages/platform-admin/PlatformDashboard";
 import OrganizationsManager from "./pages/platform-admin/OrganizationsManager";
 import CoursesManager from "./pages/platform-admin/CoursesManager";
+import CourseAccessManager from "./pages/platform-admin/CourseAccessManager";
+import UsersManager from "./pages/platform-admin/UsersManager";
 import CourseEditor from "./pages/platform-admin/CourseEditor";
 import PlatformSettings from "./pages/platform-admin/PlatformSettings";
 import Settings from "./pages/Settings";
@@ -60,14 +62,16 @@ function AppRoutes() {
       
       {/* Protected org admin routes */}
       <Route path="/app/admin/org" element={<ProtectedRoute><OrgDashboard /></ProtectedRoute>} />
-      <Route path="/app/admin/users" element={<ProtectedRoute><OrgUsers /></ProtectedRoute>} />
+      <Route path="/app/admin/org/users" element={<ProtectedRoute><OrgUsers /></ProtectedRoute>} />
       <Route path="/app/admin/analytics" element={<ProtectedRoute><OrgAnalytics /></ProtectedRoute>} />
       
       {/* Protected platform admin routes */}
       <Route path="/app/admin/platform" element={<ProtectedRoute><PlatformDashboard /></ProtectedRoute>} />
       <Route path="/app/admin/organizations" element={<ProtectedRoute><OrganizationsManager /></ProtectedRoute>} />
       <Route path="/app/admin/courses" element={<ProtectedRoute><CoursesManager /></ProtectedRoute>} />
+      <Route path="/app/admin/course-access" element={<ProtectedRoute><CourseAccessManager /></ProtectedRoute>} />
       <Route path="/app/admin/courses/:courseId" element={<ProtectedRoute><CourseEditor /></ProtectedRoute>} />
+      <Route path="/app/admin/users" element={<ProtectedRoute><UsersManager /></ProtectedRoute>} />
       <Route path="/app/admin/analytics/global" element={<ProtectedRoute><OrgAnalytics /></ProtectedRoute>} />
       <Route path="/app/admin/platform/settings" element={<ProtectedRoute><PlatformSettings /></ProtectedRoute>} />
       <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
