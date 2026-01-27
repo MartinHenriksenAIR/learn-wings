@@ -19,6 +19,7 @@ import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
 import PlatformDashboard from "./pages/platform-admin/PlatformDashboard";
 import OrganizationsManager from "./pages/platform-admin/OrganizationsManager";
 import CoursesManager from "./pages/platform-admin/CoursesManager";
+import CourseEditor from "./pages/platform-admin/CourseEditor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ function AppRoutes() {
       <Route path="/app/admin/platform" element={<ProtectedRoute><PlatformDashboard /></ProtectedRoute>} />
       <Route path="/app/admin/organizations" element={<ProtectedRoute><OrganizationsManager /></ProtectedRoute>} />
       <Route path="/app/admin/courses" element={<ProtectedRoute><CoursesManager /></ProtectedRoute>} />
+      <Route path="/app/admin/courses/:courseId" element={<ProtectedRoute><CourseEditor /></ProtectedRoute>} />
       <Route path="/app/admin/analytics/global" element={<ProtectedRoute><OrgAnalytics /></ProtectedRoute>} />
       
       {/* Redirects */}

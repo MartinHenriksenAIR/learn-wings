@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function CoursesManager() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -91,7 +93,11 @@ export default function CoursesManager() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {courses.map((course) => (
-            <Card key={course.id}>
+            <Card
+              key={course.id}
+              className="cursor-pointer transition-shadow hover:shadow-md"
+              onClick={() => navigate(`/app/admin/courses/${course.id}`)}
+            >
               <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary" />
               <CardContent className="p-4">
                 <div className="mb-2 flex items-start justify-between gap-2">
@@ -100,7 +106,10 @@ export default function CoursesManager() {
                 </div>
                 <p className="mb-4 text-sm text-muted-foreground line-clamp-2">{course.description}</p>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2"><Switch checked={course.is_published} onCheckedChange={() => togglePublish(course)} /><span className="text-sm">{course.is_published ? 'Published' : 'Draft'}</span></div>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Switch checked={course.is_published} onCheckedChange={() => togglePublish(course)} />
+                    <span className="text-sm">{course.is_published ? 'Published' : 'Draft'}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
