@@ -3,7 +3,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -13,6 +14,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,9 +48,16 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Profile, OrgMembership, Organization } from '@/lib/types';
-import { Users, MoreHorizontal, Shield, ShieldOff, Search, Loader2 } from 'lucide-react';
+import { Profile, OrgMembership, Organization, OrgRole, Invitation } from '@/lib/types';
+import { Users, MoreHorizontal, Shield, ShieldOff, Search, Loader2, Mail, Copy, Check, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { z } from 'zod';
+
+const inviteSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  orgId: z.string().uuid('Please select an organization'),
+  role: z.enum(['org_admin', 'learner']),
+});
 
 interface UserWithDetails extends Profile {
   memberships: (OrgMembership & { organization: Organization })[];
@@ -43,8 +67,18 @@ export default function UsersManager() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithDetails[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [invitations, setInvitations] = useState<(Invitation & { organization?: Organization })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteOrgId, setInviteOrgId] = useState('');
+  const [inviteRole, setInviteRole] = useState<OrgRole>('learner');
+  const [inviting, setInviting] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     userId: string;
@@ -53,7 +87,7 @@ export default function UsersManager() {
   } | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     // Fetch all profiles
     const { data: profiles } = await supabase
       .from('profiles')
@@ -71,6 +105,27 @@ export default function UsersManager() {
       .select('*, organization:organizations(*)')
       .eq('status', 'active');
 
+    // Fetch all organizations
+    const { data: orgs } = await supabase
+      .from('organizations')
+      .select('*')
+      .order('name');
+
+    if (orgs) {
+      setOrganizations(orgs as Organization[]);
+    }
+
+    // Fetch pending invitations
+    const { data: inviteData } = await supabase
+      .from('invitations')
+      .select('*, organization:organizations(*)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (inviteData) {
+      setInvitations(inviteData as any);
+    }
+
     // Combine profiles with their memberships
     const usersWithDetails = profiles.map((profile) => ({
       ...profile,
@@ -82,7 +137,7 @@ export default function UsersManager() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchData();
   }, []);
 
   const handleTogglePlatformAdmin = async () => {
@@ -110,10 +165,88 @@ export default function UsersManager() {
           ? 'User now has platform admin privileges.' 
           : 'User no longer has platform admin privileges.',
       });
-      fetchUsers();
+      fetchData();
     }
 
     setUpdating(null);
+  };
+
+  const handleInvite = async () => {
+    const result = inviteSchema.safeParse({ email: inviteEmail, orgId: inviteOrgId, role: inviteRole });
+    if (!result.success) {
+      toast({
+        title: 'Invalid input',
+        description: result.error.errors[0].message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setInviting(true);
+
+    const { error } = await supabase
+      .from('invitations')
+      .insert({
+        org_id: inviteOrgId,
+        email: inviteEmail,
+        role: inviteRole,
+      });
+
+    if (error) {
+      toast({
+        title: 'Failed to create invitation',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Invitation created!',
+        description: 'Copy the invite link to share with the user.',
+      });
+      setInviteOpen(false);
+      setInviteEmail('');
+      setInviteOrgId('');
+      setInviteRole('learner');
+      fetchData();
+    }
+
+    setInviting(false);
+  };
+
+  const handleCopyInviteLink = async (token: string) => {
+    const link = `${window.location.origin}/signup?invite=${token}`;
+    await navigator.clipboard.writeText(link);
+    setCopiedToken(token);
+    toast({
+      title: 'Link copied!',
+      description: 'Share this link with the invited user.',
+    });
+    setTimeout(() => setCopiedToken(null), 2000);
+  };
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    const { error } = await supabase
+      .from('invitations')
+      .update({ status: 'expired' })
+      .eq('id', invitationId);
+
+    if (error) {
+      toast({
+        title: 'Failed to cancel invitation',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Invitation cancelled',
+      });
+      fetchData();
+    }
+  };
+
+  const roleColors = {
+    org_admin: 'bg-purple-100 text-purple-800',
+    learner: 'bg-blue-100 text-blue-800',
   };
 
   const filteredUsers = users.filter((u) =>
@@ -132,9 +265,9 @@ export default function UsersManager() {
 
   return (
     <AppLayout title="Platform Users" breadcrumbs={[{ label: 'Users' }]}>
-      {/* Search */}
-      <div className="mb-6">
-        <div className="relative max-w-sm">
+      {/* Header with search and invite */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search users..."
@@ -143,7 +276,129 @@ export default function UsersManager() {
             className="pl-9"
           />
         </div>
+
+        <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Invite User
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Invite User</DialogTitle>
+              <DialogDescription>
+                Send an invitation to join an organization on the platform.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="invite-email">Email Address</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="colleague@company.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Organization</Label>
+                <Select value={inviteOrgId} onValueChange={setInviteOrgId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an organization..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as OrgRole)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="learner">Learner</SelectItem>
+                    <SelectItem value="org_admin">Organization Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setInviteOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleInvite} disabled={inviting}>
+                {inviting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="mr-2 h-4 w-4" />
+                )}
+                Create Invitation
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {/* Pending Invitations */}
+      {invitations.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base">Pending Invitations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {invitations.map((invitation) => (
+                <div
+                  key={invitation.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{invitation.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {invitation.organization?.name} • Expires{' '}
+                        {new Date(invitation.expires_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Badge className={roleColors[invitation.role]}>
+                      {invitation.role === 'org_admin' ? 'Admin' : 'Learner'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyInviteLink(invitation.token)}
+                    >
+                      {copiedToken === invitation.token ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCancelInvitation(invitation.id)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Users Table */}
       {filteredUsers.length === 0 ? (
