@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,7 @@ import {
 } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization } from '@/lib/types';
-import { Building2, Plus, Users, Loader2 } from 'lucide-react';
+import { Building2, Plus, Users, Loader2, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
@@ -35,6 +36,7 @@ const orgSchema = z.object({
 });
 
 export default function OrganizationsManager() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [orgs, setOrgs] = useState<(Organization & { memberCount: number })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,11 +217,16 @@ export default function OrganizationsManager() {
                 <TableHead>Slug</TableHead>
                 <TableHead>Members</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {orgs.map((org) => (
-                <TableRow key={org.id}>
+                <TableRow 
+                  key={org.id} 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`/app/admin/organizations/${org.id}`)}
+                >
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -237,6 +244,9 @@ export default function OrganizationsManager() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(org.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ))}

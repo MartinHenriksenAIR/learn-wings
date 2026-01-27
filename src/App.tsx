@@ -19,6 +19,7 @@ import OrgUsers from "./pages/org-admin/OrgUsers";
 import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
 import PlatformDashboard from "./pages/platform-admin/PlatformDashboard";
 import OrganizationsManager from "./pages/platform-admin/OrganizationsManager";
+import OrganizationDetail from "./pages/platform-admin/OrganizationDetail";
 import CoursesManager from "./pages/platform-admin/CoursesManager";
 import CourseAccessManager from "./pages/platform-admin/CourseAccessManager";
 import UsersManager from "./pages/platform-admin/UsersManager";
@@ -68,6 +69,7 @@ function AppRoutes() {
       {/* Protected platform admin routes */}
       <Route path="/app/admin/platform" element={<ProtectedRoute><PlatformDashboard /></ProtectedRoute>} />
       <Route path="/app/admin/organizations" element={<ProtectedRoute><OrganizationsManager /></ProtectedRoute>} />
+      <Route path="/app/admin/organizations/:orgId" element={<ProtectedRoute><OrganizationDetail /></ProtectedRoute>} />
       <Route path="/app/admin/courses" element={<ProtectedRoute><CoursesManager /></ProtectedRoute>} />
       <Route path="/app/admin/course-access" element={<ProtectedRoute><CourseAccessManager /></ProtectedRoute>} />
       <Route path="/app/admin/courses/:courseId" element={<ProtectedRoute><CourseEditor /></ProtectedRoute>} />
