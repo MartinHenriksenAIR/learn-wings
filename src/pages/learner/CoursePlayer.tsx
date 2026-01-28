@@ -457,29 +457,15 @@ export default function CoursePlayer() {
                         <p>Loading video...</p>
                       </div>
                     ) : currentLesson.video_url ? (
-                      // SharePoint embed - show video with fallback link for auth issues
-                      <div className="w-full h-full flex flex-col">
-                        <iframe
-                          src={getVideoEmbedUrl(currentLesson.video_url) || currentLesson.video_url}
-                          className="w-full flex-1 rounded-lg"
-                          frameBorder="0"
-                          allowFullScreen
-                          allow="autoplay; fullscreen; encrypted-media"
-                          referrerPolicy="no-referrer"
-                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-                          title={currentLesson.title}
-                        />
-                        <div className="mt-2 text-center">
-                          <a 
-                            href={currentLesson.video_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm text-muted-foreground hover:text-primary underline"
-                          >
-                            Har du problemer med at se videoen? Klik her for at åbne i nyt faneblad
-                          </a>
-                        </div>
-                      </div>
+                      // External video embed (Google Drive, SharePoint, etc.)
+                      <iframe
+                        src={getVideoEmbedUrl(currentLesson.video_url) || currentLesson.video_url}
+                        className="w-full h-full rounded-lg"
+                        frameBorder="0"
+                        allowFullScreen
+                        allow="autoplay; fullscreen; encrypted-media"
+                        title={currentLesson.title}
+                      />
                     ) : signedVideoUrl ? (
                         <video
                           key={signedVideoUrl}

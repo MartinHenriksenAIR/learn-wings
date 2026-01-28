@@ -1,9 +1,80 @@
 /**
  * Video URL Utilities
  * 
- * Handles validation and transformation of SharePoint and Microsoft Stream video URLs
+ * Handles validation and transformation of video URLs from supported platforms
  * for embedding in an iframe.
+ * 
+ * Supported platforms:
+ * - Google Drive (recommended)
+ * - SharePoint (embed.aspx URLs only)
+ * - Microsoft Stream
  */
+
+/**
+ * Validates if a URL is a Google Drive URL.
+ * Matches patterns like:
+ * - https://drive.google.com/file/d/{fileId}/view
+ * - https://drive.google.com/file/d/{fileId}/preview
+ * - https://drive.google.com/open?id={fileId}
+ */
+export function isGoogleDriveUrl(url: string): boolean {
+  if (!url) return false;
+  
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'drive.google.com';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extracts the file ID from a Google Drive URL.
+ */
+function extractGoogleDriveFileId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    
+    // Format: /file/d/{fileId}/...
+    const pathMatch = parsed.pathname.match(/\/file\/d\/([^/]+)/);
+    if (pathMatch) {
+      return pathMatch[1];
+    }
+    
+    // Format: ?id={fileId}
+    const idParam = parsed.searchParams.get('id');
+    if (idParam) {
+      return idParam;
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Transforms a Google Drive URL into an embeddable URL.
+ * 
+ * Input patterns:
+ * - https://drive.google.com/file/d/{fileId}/view
+ * - https://drive.google.com/file/d/{fileId}/view?usp=sharing
+ * - https://drive.google.com/open?id={fileId}
+ * 
+ * Output:
+ * - https://drive.google.com/file/d/{fileId}/preview
+ */
+export function getGoogleDriveEmbedUrl(url: string): string | null {
+  const cleanedUrl = cleanVideoUrl(url);
+  
+  if (!isGoogleDriveUrl(cleanedUrl)) return null;
+  
+  const fileId = extractGoogleDriveFileId(cleanedUrl);
+  if (!fileId) return null;
+  
+  // The /preview endpoint is designed for iframe embedding
+  return `https://drive.google.com/file/d/${fileId}/preview`;
+}
 
 /**
  * Validates if a URL is a SharePoint video URL.
@@ -45,13 +116,13 @@ export function isMicrosoftStreamUrl(url: string): boolean {
 }
 
 /**
- * Cleans a SharePoint/Stream URL that might contain extra HTML attributes
+ * Cleans a video URL that might contain extra HTML attributes
  * from copying the entire embed code instead of just the src URL.
  * 
  * Input: 'https://...embed.aspx?..." width="640" height="360"...'
  * Output: 'https://...embed.aspx?...'
  */
-export function cleanSharePointUrl(input: string): string {
+export function cleanVideoUrl(input: string): string {
   if (!input) return input;
   
   // Trim whitespace
@@ -73,6 +144,9 @@ export function cleanSharePointUrl(input: string): string {
   return url.trim();
 }
 
+// Keep the old function name as an alias for backward compatibility
+export const cleanSharePointUrl = cleanVideoUrl;
+
 /**
  * Transforms a Microsoft Stream URL into an embeddable URL.
  * 
@@ -83,7 +157,7 @@ export function cleanSharePointUrl(input: string): string {
  * - https://web.microsoftstream.com/embed/video/{id}?autoplay=false&showinfo=true
  */
 export function getMicrosoftStreamEmbedUrl(url: string): string | null {
-  const cleanedUrl = cleanSharePointUrl(url);
+  const cleanedUrl = cleanVideoUrl(url);
   
   if (!isMicrosoftStreamUrl(cleanedUrl)) return null;
   
@@ -118,10 +192,13 @@ export function getMicrosoftStreamEmbedUrl(url: string): string | null {
  * 
  * Output:
  * - Embed URL with action=embedview parameter
+ * 
+ * WARNING: SharePoint embedding has significant limitations due to X-Frame-Options.
+ * Consider using Google Drive instead for reliable cross-origin embedding.
  */
 export function getSharePointEmbedUrl(url: string): string | null {
   // First clean the URL in case extra HTML attributes were pasted
-  const cleanedUrl = cleanSharePointUrl(url);
+  const cleanedUrl = cleanVideoUrl(url);
   
   if (!isSharePointUrl(cleanedUrl)) return null;
   
@@ -175,19 +252,24 @@ export function getSharePointEmbedUrl(url: string): string | null {
 
 /**
  * Gets the best embeddable URL for any supported video source.
- * Tries Microsoft Stream first (better iframe support), then SharePoint.
+ * Priority: Google Drive > Microsoft Stream > SharePoint
  */
 export function getVideoEmbedUrl(url: string): string | null {
   if (!url) return null;
   
-  const cleanedUrl = cleanSharePointUrl(url);
+  const cleanedUrl = cleanVideoUrl(url);
   
-  // Try Microsoft Stream first (better cross-origin support)
+  // Try Google Drive first (most reliable for cross-origin embedding)
+  if (isGoogleDriveUrl(cleanedUrl)) {
+    return getGoogleDriveEmbedUrl(cleanedUrl);
+  }
+  
+  // Try Microsoft Stream (better cross-origin support than SharePoint)
   if (isMicrosoftStreamUrl(cleanedUrl)) {
     return getMicrosoftStreamEmbedUrl(cleanedUrl);
   }
   
-  // Try SharePoint
+  // Try SharePoint (may have X-Frame-Options issues)
   if (isSharePointUrl(cleanedUrl)) {
     return getSharePointEmbedUrl(cleanedUrl);
   }
@@ -198,15 +280,15 @@ export function getVideoEmbedUrl(url: string): string | null {
 
 /**
  * Validates a video URL and returns validation result.
- * Accepts SharePoint embed URLs and Microsoft Stream URLs.
+ * Accepts Google Drive, SharePoint embed URLs, and Microsoft Stream URLs.
  */
-export function validateSharePointUrl(url: string): { valid: boolean; error?: string } {
+export function validateVideoUrl(url: string): { valid: boolean; error?: string } {
   if (!url || !url.trim()) {
     return { valid: false, error: 'URL is required' };
   }
   
   // Clean the URL first (handle pasted embed codes with HTML attributes)
-  const cleanedUrl = cleanSharePointUrl(url);
+  const cleanedUrl = cleanVideoUrl(url);
   
   try {
     new URL(cleanedUrl);
@@ -214,9 +296,23 @@ export function validateSharePointUrl(url: string): { valid: boolean; error?: st
     return { valid: false, error: 'Invalid URL format' };
   }
   
-  if (!isSharePointUrl(cleanedUrl) && !isMicrosoftStreamUrl(cleanedUrl)) {
-    return { valid: false, error: 'URL must be a SharePoint embed URL (*.sharepoint.com/...embed.aspx) or Microsoft Stream link' };
+  if (isGoogleDriveUrl(cleanedUrl)) {
+    const fileId = extractGoogleDriveFileId(cleanedUrl);
+    if (!fileId) {
+      return { valid: false, error: 'Could not extract file ID from Google Drive URL. Use format: drive.google.com/file/d/{fileId}/view' };
+    }
+    return { valid: true };
   }
   
-  return { valid: true };
+  if (isSharePointUrl(cleanedUrl) || isMicrosoftStreamUrl(cleanedUrl)) {
+    return { valid: true };
+  }
+  
+  return { 
+    valid: false, 
+    error: 'URL must be a Google Drive link (drive.google.com/file/d/...), SharePoint embed URL, or Microsoft Stream link' 
+  };
 }
+
+// Keep the old function name as an alias for backward compatibility
+export const validateSharePointUrl = validateVideoUrl;

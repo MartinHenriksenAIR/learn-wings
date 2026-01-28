@@ -22,7 +22,7 @@ import {
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
-import { isSharePointUrl, validateSharePointUrl, cleanSharePointUrl } from '@/lib/sharepoint';
+import { validateVideoUrl, cleanVideoUrl } from '@/lib/sharepoint';
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil, Link } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
@@ -60,7 +60,7 @@ export default function CourseEditor() {
   const [lessonDuration, setLessonDuration] = useState<number | null>(null);
   const [lessonVideoPath, setLessonVideoPath] = useState<string | null>(null);
   const [lessonVideoUrl, setLessonVideoUrl] = useState<string | null>(null);
-  const [lessonVideoSource, setLessonVideoSource] = useState<'upload' | 'sharepoint'>('upload');
+  const [lessonVideoSource, setLessonVideoSource] = useState<'upload' | 'external'>('upload');
   const [lessonDocPath, setLessonDocPath] = useState<string | null>(null);
   const [savingLesson, setSavingLesson] = useState(false);
 
@@ -192,7 +192,7 @@ export default function CourseEditor() {
     setLessonDuration(lesson.duration_minutes);
     setLessonVideoPath(lesson.video_storage_path || null);
     setLessonVideoUrl(lesson.video_url || null);
-    setLessonVideoSource(lesson.video_url ? 'sharepoint' : 'upload');
+    setLessonVideoSource(lesson.video_url ? 'external' : 'upload');
     setLessonDocPath(lesson.document_storage_path || null);
     setLessonDialogOpen(true);
   };
@@ -200,14 +200,14 @@ export default function CourseEditor() {
   const handleSaveLesson = async () => {
     if (!lessonModuleId || !lessonTitle.trim()) return;
     
-    // Clean and validate SharePoint URL if using that source
+    // Clean and validate external video URL if using that source
     let cleanedVideoUrl: string | null = null;
-    if (lessonType === 'video' && lessonVideoSource === 'sharepoint' && lessonVideoUrl) {
+    if (lessonType === 'video' && lessonVideoSource === 'external' && lessonVideoUrl) {
       // Clean the URL (removes any accidentally pasted HTML attributes)
-      cleanedVideoUrl = cleanSharePointUrl(lessonVideoUrl);
-      const validation = validateSharePointUrl(cleanedVideoUrl);
+      cleanedVideoUrl = cleanVideoUrl(lessonVideoUrl);
+      const validation = validateVideoUrl(cleanedVideoUrl);
       if (!validation.valid) {
-        toast({ title: 'Invalid SharePoint URL', description: validation.error, variant: 'destructive' });
+        toast({ title: 'Invalid Video URL', description: validation.error, variant: 'destructive' });
         return;
       }
     }
@@ -221,7 +221,7 @@ export default function CourseEditor() {
       content_text: lessonContent || null,
       duration_minutes: lessonDuration,
       video_storage_path: lessonType === 'video' && lessonVideoSource === 'upload' ? lessonVideoPath : null,
-      video_url: lessonType === 'video' && lessonVideoSource === 'sharepoint' ? cleanedVideoUrl : null,
+      video_url: lessonType === 'video' && lessonVideoSource === 'external' ? cleanedVideoUrl : null,
       document_storage_path: lessonType === 'document' ? lessonDocPath : null,
     };
 
@@ -565,13 +565,13 @@ export default function CourseEditor() {
                       <input
                         type="radio"
                         name="videoSource"
-                        checked={lessonVideoSource === 'sharepoint'}
-                        onChange={() => setLessonVideoSource('sharepoint')}
+                        checked={lessonVideoSource === 'external'}
+                        onChange={() => setLessonVideoSource('external')}
                         className="h-4 w-4"
                       />
                       <span className="text-sm flex items-center gap-1">
                         <Link className="h-3 w-3" />
-                        SharePoint URL
+                        External URL
                       </span>
                     </label>
                   </div>
@@ -591,17 +591,17 @@ export default function CourseEditor() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <Label>SharePoint Embed URL</Label>
+                    <Label>Video URL (Google Drive anbefalet)</Label>
                     <Input
                       value={lessonVideoUrl || ''}
                       onChange={(e) => setLessonVideoUrl(e.target.value || null)}
-                      placeholder="https://yourcompany.sharepoint.com/.../embed.aspx?UniqueId=..."
+                      placeholder="https://drive.google.com/file/d/.../view"
                     />
                     <p className="text-xs text-muted-foreground">
-                      <strong>Important:</strong> Use the <strong>Embed</strong> link (not Share link).
+                      <strong>Google Drive (anbefalet):</strong> Upload video til Google Drive → Højreklik → Del → "Alle med linket" → Kopier link
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      In SharePoint: Click video → Share → Embed → Copy the <code className="bg-muted px-1 rounded">src="..."</code> URL from the iframe code.
+                      <strong>SharePoint:</strong> Brug Embed-linket (ikke Share). Klik video → Del → Integrer → Kopier <code className="bg-muted px-1 rounded">src="..."</code> URL.
                     </p>
                   </div>
                 )}
