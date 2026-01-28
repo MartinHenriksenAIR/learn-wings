@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const allowedOrigins = [
   'https://learn-wings.lovable.app',
   'https://id-preview--ee335e84-7b72-46fe-bdb4-cd3d716c9247.lovable.app',
+  'https://ee335e84-7b72-46fe-bdb4-cd3d716c9247.lovableproject.com',
 ];
 
 function getCorsHeaders(req: Request): Record<string, string> {
