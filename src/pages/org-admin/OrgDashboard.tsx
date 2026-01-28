@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { FileUpload } from '@/components/ui/file-upload';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Building2, Users, BookOpen, TrendingUp, Loader2 } from 'lucide-react';
+import { Building2, Users, BookOpen, TrendingUp, Loader2, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function OrgDashboard() {
-  const { currentOrg } = useAuth();
+  const { currentOrg, refreshUserContext } = useAuth();
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -15,6 +19,8 @@ export default function OrgDashboard() {
     completionRate: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [logoDialogOpen, setLogoDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -66,6 +72,35 @@ export default function OrgDashboard() {
     fetchStats();
   }, [currentOrg]);
 
+  const handleLogoUpload = async (url: string | null, storagePath: string | null) => {
+    if (!currentOrg || !url) return;
+    
+    setUploading(true);
+    try {
+      // For public bucket, construct the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('org-logos')
+        .getPublicUrl(storagePath!);
+
+      const { error } = await supabase
+        .from('organizations')
+        .update({ logo_url: publicUrl })
+        .eq('id', currentOrg.id);
+
+      if (error) throw error;
+
+      toast.success('Logo updated successfully');
+      setLogoDialogOpen(false);
+      // Refresh to get updated org data
+      await refreshUserContext();
+    } catch (error: any) {
+      console.error('Error updating logo:', error);
+      toast.error(error.message || 'Failed to update logo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <AppLayout title="Organization Overview">
@@ -96,8 +131,47 @@ export default function OrgDashboard() {
       {/* Org Info */}
       <Card className="mb-6">
         <CardContent className="flex items-center gap-4 p-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
-            <Building2 className="h-8 w-8 text-primary" />
+          <div className="relative group">
+            {currentOrg?.logo_url ? (
+              <img
+                src={currentOrg.logo_url}
+                alt={`${currentOrg.name} logo`}
+                className="h-16 w-16 rounded-xl object-cover"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
+                <Building2 className="h-8 w-8 text-primary" />
+              </div>
+            )}
+            <Dialog open={logoDialogOpen} onOpenChange={setLogoDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Update Organization Logo</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <FileUpload
+                    bucket="org-logos"
+                    folder={currentOrg.id}
+                    accept="image"
+                    maxSizeMB={2}
+                    onChange={handleLogoUpload}
+                    disabled={uploading}
+                  />
+                  <p className="text-xs text-muted-foreground text-center">
+                    Upload a square image (recommended: 256x256px). Max 2MB.
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
           <div>
             <h2 className="font-display text-xl font-bold">{currentOrg?.name}</h2>
