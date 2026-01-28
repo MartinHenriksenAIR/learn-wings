@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { Separator } from '@/components/ui/separator';
@@ -35,13 +36,17 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink href={homeHref}>Home</BreadcrumbLink>
+                  <BreadcrumbLink asChild>
+                    <Link to={homeHref}>Home</Link>
+                  </BreadcrumbLink>
                 </BreadcrumbItem>
                 {breadcrumbs.map((crumb, index) => (
                   <BreadcrumbItem key={index}>
                     <BreadcrumbSeparator />
                     {crumb.href ? (
-                      <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink>
+                      <BreadcrumbLink asChild>
+                        <Link to={crumb.href}>{crumb.label}</Link>
+                      </BreadcrumbLink>
                     ) : (
                       <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                     )}
