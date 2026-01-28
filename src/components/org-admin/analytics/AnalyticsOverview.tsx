@@ -28,33 +28,6 @@ export function AnalyticsOverview({
 }: AnalyticsOverviewProps) {
   return (
     <div className="space-y-6">
-      {/* Report Generation */}
-      {showComplianceReport && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <div>
-              <CardTitle className="text-base">AI Act Compliance</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Generate a PDF report documenting staff training completion status
-              </p>
-            </div>
-            <Button
-              onClick={onGenerateReport}
-              disabled={generatingReport}
-              variant="outline"
-              className="gap-2"
-            >
-              {generatingReport ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileText className="h-4 w-4" />
-              )}
-              {generatingReport ? 'Generating...' : 'Download Report'}
-            </Button>
-          </CardHeader>
-        </Card>
-      )}
-
       {/* Summary Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
@@ -130,6 +103,33 @@ export function AnalyticsOverview({
           </CardContent>
         </Card>
       </div>
+
+      {/* Report Generation - Moved to bottom */}
+      {showComplianceReport && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle className="text-base">AI Act Compliance</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Generate a PDF report documenting staff training completion status
+              </p>
+            </div>
+            <Button
+              onClick={onGenerateReport}
+              disabled={generatingReport}
+              variant="outline"
+              className="gap-2"
+            >
+              {generatingReport ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              {generatingReport ? 'Generating...' : 'Download Report'}
+            </Button>
+          </CardHeader>
+        </Card>
+      )}
     </div>
   );
 }
