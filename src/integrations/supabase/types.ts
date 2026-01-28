@@ -311,6 +311,7 @@ export type Database = {
           sort_order: number
           title: string
           video_storage_path: string | null
+          video_url: string | null
         }
         Insert: {
           content_text?: string | null
@@ -322,6 +323,7 @@ export type Database = {
           sort_order?: number
           title: string
           video_storage_path?: string | null
+          video_url?: string | null
         }
         Update: {
           content_text?: string | null
@@ -333,6 +335,7 @@ export type Database = {
           sort_order?: number
           title?: string
           video_storage_path?: string | null
+          video_url?: string | null
         }
         Relationships: [
           {

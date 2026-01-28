@@ -76,6 +76,7 @@ export interface Lesson {
   lesson_type: LessonType;
   content_text: string | null;
   video_storage_path: string | null;
+  video_url: string | null;
   document_storage_path: string | null;
   sort_order: number;
   duration_minutes: number | null;

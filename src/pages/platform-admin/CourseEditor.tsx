@@ -22,7 +22,8 @@ import {
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
-import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil } from 'lucide-react';
+import { isSharePointUrl, validateSharePointUrl } from '@/lib/sharepoint';
+import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil, Link } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 
@@ -58,6 +59,8 @@ export default function CourseEditor() {
   const [lessonContent, setLessonContent] = useState('');
   const [lessonDuration, setLessonDuration] = useState<number | null>(null);
   const [lessonVideoPath, setLessonVideoPath] = useState<string | null>(null);
+  const [lessonVideoUrl, setLessonVideoUrl] = useState<string | null>(null);
+  const [lessonVideoSource, setLessonVideoSource] = useState<'upload' | 'sharepoint'>('upload');
   const [lessonDocPath, setLessonDocPath] = useState<string | null>(null);
   const [savingLesson, setSavingLesson] = useState(false);
 
@@ -174,6 +177,8 @@ export default function CourseEditor() {
     setLessonContent('');
     setLessonDuration(null);
     setLessonVideoPath(null);
+    setLessonVideoUrl(null);
+    setLessonVideoSource('upload');
     setLessonDocPath(null);
     setLessonDialogOpen(true);
   };
@@ -186,12 +191,24 @@ export default function CourseEditor() {
     setLessonContent(lesson.content_text || '');
     setLessonDuration(lesson.duration_minutes);
     setLessonVideoPath(lesson.video_storage_path || null);
+    setLessonVideoUrl(lesson.video_url || null);
+    setLessonVideoSource(lesson.video_url ? 'sharepoint' : 'upload');
     setLessonDocPath(lesson.document_storage_path || null);
     setLessonDialogOpen(true);
   };
 
   const handleSaveLesson = async () => {
     if (!lessonModuleId || !lessonTitle.trim()) return;
+    
+    // Validate SharePoint URL if using that source
+    if (lessonType === 'video' && lessonVideoSource === 'sharepoint' && lessonVideoUrl) {
+      const validation = validateSharePointUrl(lessonVideoUrl);
+      if (!validation.valid) {
+        toast({ title: 'Invalid SharePoint URL', description: validation.error, variant: 'destructive' });
+        return;
+      }
+    }
+    
     setSavingLesson(true);
 
     const lessonData = {
@@ -200,7 +217,8 @@ export default function CourseEditor() {
       lesson_type: lessonType,
       content_text: lessonContent || null,
       duration_minutes: lessonDuration,
-      video_storage_path: lessonType === 'video' ? lessonVideoPath : null,
+      video_storage_path: lessonType === 'video' && lessonVideoSource === 'upload' ? lessonVideoPath : null,
+      video_url: lessonType === 'video' && lessonVideoSource === 'sharepoint' ? lessonVideoUrl : null,
       document_storage_path: lessonType === 'document' ? lessonDocPath : null,
     };
 
@@ -526,16 +544,61 @@ export default function CourseEditor() {
               </>
             )}
             {lessonType === 'video' && (
-              <div className="space-y-2">
-                <Label>Video File</Label>
-                <FileUpload
-                  bucket="lms-assets"
-                  folder="videos"
-                  accept="video"
-                  value={lessonVideoPath ? `Video uploaded` : null}
-                  onChange={(_, path) => setLessonVideoPath(path)}
-                  maxSizeMB={500}
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Video Source</Label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="videoSource"
+                        checked={lessonVideoSource === 'upload'}
+                        onChange={() => setLessonVideoSource('upload')}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm">Upload Video</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="videoSource"
+                        checked={lessonVideoSource === 'sharepoint'}
+                        onChange={() => setLessonVideoSource('sharepoint')}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm flex items-center gap-1">
+                        <Link className="h-3 w-3" />
+                        SharePoint URL
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                
+                {lessonVideoSource === 'upload' ? (
+                  <div className="space-y-2">
+                    <Label>Video File</Label>
+                    <FileUpload
+                      bucket="lms-assets"
+                      folder="videos"
+                      accept="video"
+                      value={lessonVideoPath ? `Video uploaded` : null}
+                      onChange={(_, path) => setLessonVideoPath(path)}
+                      maxSizeMB={500}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>SharePoint Video URL</Label>
+                    <Input
+                      value={lessonVideoUrl || ''}
+                      onChange={(e) => setLessonVideoUrl(e.target.value || null)}
+                      placeholder="https://yourcompany.sharepoint.com/:v:/s/..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Paste a SharePoint share or embed link. Use "Anyone with the link" sharing for seamless playback.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
             {lessonType === 'quiz' && (

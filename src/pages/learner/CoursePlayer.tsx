@@ -10,6 +10,7 @@ import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
+import { getSharePointEmbedUrl } from '@/lib/sharepoint';
 import { 
   ChevronRight, 
   CheckCircle2, 
@@ -449,12 +450,23 @@ export default function CoursePlayer() {
                 {/* Lesson content based on type */}
                 {currentLesson.lesson_type === 'video' && (
                   <div className="space-y-4">
-                    <div className="aspect-video rounded-lg bg-muted flex items-center justify-center">
+                    <div className="aspect-video rounded-lg bg-muted flex items-center justify-center overflow-hidden">
                       {loadingAssets ? (
                         <div className="text-center text-muted-foreground">
                           <Loader2 className="mx-auto h-12 w-12 mb-2 animate-spin" />
                           <p>Loading video...</p>
                         </div>
+                      ) : currentLesson.video_url ? (
+                        // SharePoint embed
+                        <iframe
+                          src={getSharePointEmbedUrl(currentLesson.video_url) || currentLesson.video_url}
+                          className="w-full h-full rounded-lg"
+                          frameBorder="0"
+                          scrolling="no"
+                          allowFullScreen
+                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                          title={currentLesson.title}
+                        />
                       ) : signedVideoUrl ? (
                         <video
                           key={signedVideoUrl}
