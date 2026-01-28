@@ -20,6 +20,7 @@ import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
 import { FileUpload } from '@/components/ui/file-upload';
+import { AzureVideoUpload } from '@/components/ui/azure-video-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil } from 'lucide-react';
@@ -58,6 +59,7 @@ export default function CourseEditor() {
   const [lessonContent, setLessonContent] = useState('');
   const [lessonDuration, setLessonDuration] = useState<number | null>(null);
   const [lessonVideoPath, setLessonVideoPath] = useState<string | null>(null);
+  const [lessonAzureBlobPath, setLessonAzureBlobPath] = useState<string | null>(null);
   const [lessonDocPath, setLessonDocPath] = useState<string | null>(null);
   const [savingLesson, setSavingLesson] = useState(false);
 
@@ -174,6 +176,7 @@ export default function CourseEditor() {
     setLessonContent('');
     setLessonDuration(null);
     setLessonVideoPath(null);
+    setLessonAzureBlobPath(null);
     setLessonDocPath(null);
     setLessonDialogOpen(true);
   };
@@ -186,6 +189,7 @@ export default function CourseEditor() {
     setLessonContent(lesson.content_text || '');
     setLessonDuration(lesson.duration_minutes);
     setLessonVideoPath(lesson.video_storage_path || null);
+    setLessonAzureBlobPath(lesson.azure_blob_path || null);
     setLessonDocPath(lesson.document_storage_path || null);
     setLessonDialogOpen(true);
   };
@@ -203,6 +207,7 @@ export default function CourseEditor() {
       duration_minutes: lessonDuration,
       video_storage_path: lessonType === 'video' ? lessonVideoPath : null,
       video_url: null,
+      azure_blob_path: lessonType === 'video' ? lessonAzureBlobPath : null,
       document_storage_path: lessonType === 'document' ? lessonDocPath : null,
     };
 
@@ -529,17 +534,13 @@ export default function CourseEditor() {
             )}
             {lessonType === 'video' && (
               <div className="space-y-2">
-                <Label>Video File</Label>
-                <FileUpload
-                  bucket="lms-assets"
-                  folder="videos"
-                  accept="video"
-                  value={lessonVideoPath ? `Video uploaded` : null}
-                  onChange={(_, path) => setLessonVideoPath(path)}
-                  maxSizeMB={20}
+                <Label>Video File (Azure Cloud)</Label>
+                <AzureVideoUpload
+                  value={lessonAzureBlobPath}
+                  onChange={setLessonAzureBlobPath}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Max filstørrelse: 20MB. Understøttede formater: MP4, WebM, MOV.
+                  Ingen filstørrelses-begrænsning. Videoer uploades direkte til Azure Cloud Storage.
                 </p>
               </div>
             )}

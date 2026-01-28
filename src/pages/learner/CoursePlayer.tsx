@@ -50,6 +50,7 @@ export default function CoursePlayer() {
   // Signed URLs for secure content access
   const [signedVideoUrl, setSignedVideoUrl] = useState<string | null>(null);
   const [signedDocUrl, setSignedDocUrl] = useState<string | null>(null);
+  const [azureVideoUrl, setAzureVideoUrl] = useState<string | null>(null);
   const [loadingAssets, setLoadingAssets] = useState(false);
 
   // Course completion and review state
@@ -194,20 +195,39 @@ export default function CoursePlayer() {
       if (!currentLesson) {
         setSignedVideoUrl(null);
         setSignedDocUrl(null);
+        setAzureVideoUrl(null);
         return;
       }
 
       setLoadingAssets(true);
       try {
-        const [videoUrl, docUrl] = await Promise.all([
-          currentLesson.video_storage_path 
-            ? getSignedAssetUrl(currentLesson.video_storage_path)
-            : null,
-          currentLesson.document_storage_path 
-            ? getSignedAssetUrl(currentLesson.document_storage_path)
-            : null,
-        ]);
-        setSignedVideoUrl(videoUrl);
+        // Check for Azure blob path first (preferred for videos)
+        if (currentLesson.azure_blob_path) {
+          const { data, error } = await supabase.functions.invoke('azure-view-url', {
+            body: { blobPath: currentLesson.azure_blob_path, lessonId: currentLesson.id },
+          });
+          
+          if (!error && data?.viewUrl) {
+            setAzureVideoUrl(data.viewUrl);
+          } else {
+            console.error('Error getting Azure view URL:', error);
+            setAzureVideoUrl(null);
+          }
+          setSignedVideoUrl(null);
+        } else if (currentLesson.video_storage_path) {
+          // Fallback to Supabase storage for legacy videos
+          const videoUrl = await getSignedAssetUrl(currentLesson.video_storage_path);
+          setSignedVideoUrl(videoUrl);
+          setAzureVideoUrl(null);
+        } else {
+          setSignedVideoUrl(null);
+          setAzureVideoUrl(null);
+        }
+        
+        // Load document URL
+        const docUrl = currentLesson.document_storage_path 
+          ? await getSignedAssetUrl(currentLesson.document_storage_path)
+          : null;
         setSignedDocUrl(docUrl);
       } catch (error) {
         console.error('Error loading signed URLs:', error);
@@ -455,6 +475,13 @@ export default function CoursePlayer() {
                           <Loader2 className="mx-auto h-12 w-12 mb-2 animate-spin" />
                           <p>Loading video...</p>
                         </div>
+                      ) : azureVideoUrl ? (
+                        <video
+                          key={azureVideoUrl}
+                          controls
+                          className="w-full h-full rounded-lg"
+                          src={azureVideoUrl}
+                        />
                       ) : signedVideoUrl ? (
                         <video
                           key={signedVideoUrl}
@@ -462,7 +489,7 @@ export default function CoursePlayer() {
                           className="w-full h-full rounded-lg"
                           src={signedVideoUrl}
                         />
-                      ) : currentLesson.video_storage_path ? (
+                      ) : currentLesson.azure_blob_path || currentLesson.video_storage_path ? (
                         <div className="text-center text-muted-foreground">
                           <Play className="mx-auto h-12 w-12 mb-2" />
                           <p>Unable to load video. Please try again.</p>

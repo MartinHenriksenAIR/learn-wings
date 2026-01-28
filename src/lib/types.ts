@@ -78,6 +78,7 @@ export interface Lesson {
   video_storage_path: string | null;
   video_url: string | null;
   document_storage_path: string | null;
+  azure_blob_path: string | null;
   sort_order: number;
   duration_minutes: number | null;
   quiz?: Quiz;

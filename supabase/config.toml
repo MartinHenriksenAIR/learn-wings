@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.send-invitation-email]
 verify_jwt = false
+
+[functions.azure-upload-url]
+verify_jwt = false
+
+[functions.azure-view-url]
+verify_jwt = false

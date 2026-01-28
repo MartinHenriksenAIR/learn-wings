@@ -302,6 +302,7 @@ export type Database = {
       }
       lessons: {
         Row: {
+          azure_blob_path: string | null
           content_text: string | null
           document_storage_path: string | null
           duration_minutes: number | null
@@ -314,6 +315,7 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          azure_blob_path?: string | null
           content_text?: string | null
           document_storage_path?: string | null
           duration_minutes?: number | null
@@ -326,6 +328,7 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          azure_blob_path?: string | null
           content_text?: string | null
           document_storage_path?: string | null
           duration_minutes?: number | null
