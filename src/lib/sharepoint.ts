@@ -187,20 +187,24 @@ export function getVideoEmbedUrl(url: string): string | null {
 
 /**
  * Validates a video URL and returns validation result.
+ * Accepts SharePoint embed URLs and Microsoft Stream URLs.
  */
 export function validateSharePointUrl(url: string): { valid: boolean; error?: string } {
   if (!url || !url.trim()) {
     return { valid: false, error: 'URL is required' };
   }
   
+  // Clean the URL first (handle pasted embed codes with HTML attributes)
+  const cleanedUrl = cleanSharePointUrl(url);
+  
   try {
-    new URL(url);
+    new URL(cleanedUrl);
   } catch {
     return { valid: false, error: 'Invalid URL format' };
   }
   
-  if (!isSharePointUrl(url) && !isMicrosoftStreamUrl(url)) {
-    return { valid: false, error: 'URL must be a SharePoint (*.sharepoint.com) or Microsoft Stream link' };
+  if (!isSharePointUrl(cleanedUrl) && !isMicrosoftStreamUrl(cleanedUrl)) {
+    return { valid: false, error: 'URL must be a SharePoint embed URL (*.sharepoint.com/...embed.aspx) or Microsoft Stream link' };
   }
   
   return { valid: true };
