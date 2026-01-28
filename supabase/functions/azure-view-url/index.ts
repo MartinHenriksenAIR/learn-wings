@@ -82,6 +82,8 @@ function generateReadSasToken(
 }
 
 Deno.serve(async (req) => {
+  console.log('azure-view-url: Request received');
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -90,7 +92,10 @@ Deno.serve(async (req) => {
   try {
     // Verify user is authenticated
     const authHeader = req.headers.get('Authorization');
+    console.log('azure-view-url: Auth header present:', !!authHeader);
+    
     if (!authHeader?.startsWith('Bearer ')) {
+      console.log('azure-view-url: Missing or invalid auth header');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
         status: 401, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
