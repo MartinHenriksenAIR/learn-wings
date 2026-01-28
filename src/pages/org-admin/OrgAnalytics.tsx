@@ -64,6 +64,7 @@ export default function OrgAnalytics() {
   const [userStats, setUserStats] = useState<UserStats[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'completed' | 'score'>('name');
   const [selectedUser, setSelectedUser] = useState<UserStats | null>(null);
   const [progressDialogOpen, setProgressDialogOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -331,12 +332,24 @@ export default function OrgAnalytics() {
     ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
     : [{ label: 'Analytics' }];
 
-  // Filter user stats by department
-  const filteredUserStats = userStats.filter((user) => {
-    if (selectedDepartment === 'all') return true;
-    if (selectedDepartment === 'unassigned') return !user.department;
-    return user.department === selectedDepartment;
-  });
+  // Filter and sort user stats
+  const filteredUserStats = userStats
+    .filter((user) => {
+      if (selectedDepartment === 'all') return true;
+      if (selectedDepartment === 'unassigned') return !user.department;
+      return user.department === selectedDepartment;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'completed':
+          return b.completed - a.completed;
+        case 'score':
+          return b.avgQuizScore - a.avgQuizScore;
+        case 'name':
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
 
   // Generate compliance report
   const handleGenerateReport = async () => {
@@ -497,20 +510,32 @@ export default function OrgAnalytics() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-base">Team Performance</CardTitle>
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className="w-40 h-8 text-xs">
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'name' | 'completed' | 'score')}>
+                  <SelectTrigger className="w-32 h-8 text-xs">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="completed">Progress</SelectItem>
+                    <SelectItem value="score">Activity</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                  <SelectTrigger className="w-40 h-8 text-xs">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {filteredUserStats.length === 0 ? (
