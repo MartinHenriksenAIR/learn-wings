@@ -22,8 +22,7 @@ import {
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
-import { validateVideoUrl, cleanVideoUrl } from '@/lib/sharepoint';
-import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil, Link } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 
@@ -59,8 +58,6 @@ export default function CourseEditor() {
   const [lessonContent, setLessonContent] = useState('');
   const [lessonDuration, setLessonDuration] = useState<number | null>(null);
   const [lessonVideoPath, setLessonVideoPath] = useState<string | null>(null);
-  const [lessonVideoUrl, setLessonVideoUrl] = useState<string | null>(null);
-  const [lessonVideoSource, setLessonVideoSource] = useState<'upload' | 'external'>('upload');
   const [lessonDocPath, setLessonDocPath] = useState<string | null>(null);
   const [savingLesson, setSavingLesson] = useState(false);
 
@@ -177,8 +174,6 @@ export default function CourseEditor() {
     setLessonContent('');
     setLessonDuration(null);
     setLessonVideoPath(null);
-    setLessonVideoUrl(null);
-    setLessonVideoSource('upload');
     setLessonDocPath(null);
     setLessonDialogOpen(true);
   };
@@ -191,26 +186,12 @@ export default function CourseEditor() {
     setLessonContent(lesson.content_text || '');
     setLessonDuration(lesson.duration_minutes);
     setLessonVideoPath(lesson.video_storage_path || null);
-    setLessonVideoUrl(lesson.video_url || null);
-    setLessonVideoSource(lesson.video_url ? 'external' : 'upload');
     setLessonDocPath(lesson.document_storage_path || null);
     setLessonDialogOpen(true);
   };
 
   const handleSaveLesson = async () => {
     if (!lessonModuleId || !lessonTitle.trim()) return;
-    
-    // Clean and validate external video URL if using that source
-    let cleanedVideoUrl: string | null = null;
-    if (lessonType === 'video' && lessonVideoSource === 'external' && lessonVideoUrl) {
-      // Clean the URL (removes any accidentally pasted HTML attributes)
-      cleanedVideoUrl = cleanVideoUrl(lessonVideoUrl);
-      const validation = validateVideoUrl(cleanedVideoUrl);
-      if (!validation.valid) {
-        toast({ title: 'Invalid Video URL', description: validation.error, variant: 'destructive' });
-        return;
-      }
-    }
     
     setSavingLesson(true);
 
@@ -220,8 +201,8 @@ export default function CourseEditor() {
       lesson_type: lessonType,
       content_text: lessonContent || null,
       duration_minutes: lessonDuration,
-      video_storage_path: lessonType === 'video' && lessonVideoSource === 'upload' ? lessonVideoPath : null,
-      video_url: lessonType === 'video' && lessonVideoSource === 'external' ? cleanedVideoUrl : null,
+      video_storage_path: lessonType === 'video' ? lessonVideoPath : null,
+      video_url: null,
       document_storage_path: lessonType === 'document' ? lessonDocPath : null,
     };
 
@@ -547,64 +528,19 @@ export default function CourseEditor() {
               </>
             )}
             {lessonType === 'video' && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Video Source</Label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="videoSource"
-                        checked={lessonVideoSource === 'upload'}
-                        onChange={() => setLessonVideoSource('upload')}
-                        className="h-4 w-4"
-                      />
-                      <span className="text-sm">Upload Video</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="videoSource"
-                        checked={lessonVideoSource === 'external'}
-                        onChange={() => setLessonVideoSource('external')}
-                        className="h-4 w-4"
-                      />
-                      <span className="text-sm flex items-center gap-1">
-                        <Link className="h-3 w-3" />
-                        External URL
-                      </span>
-                    </label>
-                  </div>
-                </div>
-                
-                {lessonVideoSource === 'upload' ? (
-                  <div className="space-y-2">
-                    <Label>Video File</Label>
-                    <FileUpload
-                      bucket="lms-assets"
-                      folder="videos"
-                      accept="video"
-                      value={lessonVideoPath ? `Video uploaded` : null}
-                      onChange={(_, path) => setLessonVideoPath(path)}
-                      maxSizeMB={500}
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label>Video URL (Google Drive anbefalet)</Label>
-                    <Input
-                      value={lessonVideoUrl || ''}
-                      onChange={(e) => setLessonVideoUrl(e.target.value || null)}
-                      placeholder="https://drive.google.com/file/d/.../view"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      <strong>Google Drive (anbefalet):</strong> Upload video til Google Drive → Højreklik → Del → "Alle med linket" → Kopier link
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      <strong>SharePoint:</strong> Brug Embed-linket (ikke Share). Klik video → Del → Integrer → Kopier <code className="bg-muted px-1 rounded">src="..."</code> URL.
-                    </p>
-                  </div>
-                )}
+              <div className="space-y-2">
+                <Label>Video File</Label>
+                <FileUpload
+                  bucket="lms-assets"
+                  folder="videos"
+                  accept="video"
+                  value={lessonVideoPath ? `Video uploaded` : null}
+                  onChange={(_, path) => setLessonVideoPath(path)}
+                  maxSizeMB={20}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Max filstørrelse: 20MB. Understøttede formater: MP4, WebM, MOV.
+                </p>
               </div>
             )}
             {lessonType === 'quiz' && (
