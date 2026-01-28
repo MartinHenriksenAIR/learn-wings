@@ -113,6 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
     const allowedLinkDomains = [
       'learn-wings.lovable.app',
       'id-preview--ee335e84-7b72-46fe-bdb4-cd3d716c9247.lovable.app',
+      'ai-uddannelse.dk',
     ];
     try {
       const linkUrl = new URL(inviteLink);
