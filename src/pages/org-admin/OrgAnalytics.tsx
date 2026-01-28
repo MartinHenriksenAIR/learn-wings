@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -23,8 +24,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization } from '@/lib/types';
-import { Users, TrendingUp, Award, BookOpen, Loader2, ChevronRight } from 'lucide-react';
+import { Users, TrendingUp, Award, BookOpen, Loader2, ChevronRight, FileText, Download } from 'lucide-react';
 import { UserProgressDialog } from '@/components/org-admin/UserProgressDialog';
+import { toast } from 'sonner';
 
 interface CourseStats {
   id: string;
@@ -37,6 +39,7 @@ interface CourseStats {
 interface UserStats {
   id: string;
   name: string;
+  department: string | null;
   enrollments: number;
   completed: number;
   avgQuizScore: number;
@@ -59,8 +62,11 @@ export default function OrgAnalytics() {
   });
   const [courseStats, setCourseStats] = useState<CourseStats[]>([]);
   const [userStats, setUserStats] = useState<UserStats[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<UserStats | null>(null);
   const [progressDialogOpen, setProgressDialogOpen] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   // Fetch organizations for global view filter
   useEffect(() => {
@@ -234,16 +240,23 @@ export default function OrgAnalytics() {
 
       // Get user stats (top 10)
       let userStatsData: UserStats[] = [];
+      let uniqueDepartments: string[] = [];
 
       if (orgFilter) {
         const { data: members } = await supabase
           .from('org_memberships')
-          .select('user_id, profile:profiles(id, full_name)')
+          .select('user_id, profile:profiles(id, full_name, department)')
           .eq('org_id', orgFilter)
           .eq('status', 'active')
-          .limit(10);
+          .limit(50);
 
         if (members) {
+          // Extract unique departments
+          const depts = members
+            .map(m => (m.profile as any)?.department)
+            .filter((d): d is string => Boolean(d));
+          uniqueDepartments = [...new Set(depts)];
+
           for (const member of members) {
             const profile = member.profile as any;
             if (!profile) continue;
@@ -267,6 +280,7 @@ export default function OrgAnalytics() {
             userStatsData.push({
               id: profile.id,
               name: profile.full_name,
+              department: profile.department || null,
               enrollments: userEnrollments?.length || 0,
               completed: userEnrollments?.filter(e => e.status === 'completed').length || 0,
               avgQuizScore: avgScore,
@@ -276,6 +290,7 @@ export default function OrgAnalytics() {
       }
       // For global "all" view, we skip user-level stats as it would be too broad
 
+      setDepartments(uniqueDepartments);
       setUserStats(userStatsData);
       setLoading(false);
     };
@@ -316,6 +331,64 @@ export default function OrgAnalytics() {
     ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
     : [{ label: 'Analytics' }];
 
+  // Filter user stats by department
+  const filteredUserStats = userStats.filter((user) => {
+    if (selectedDepartment === 'all') return true;
+    if (selectedDepartment === 'unassigned') return !user.department;
+    return user.department === selectedDepartment;
+  });
+
+  // Generate compliance report
+  const handleGenerateReport = async () => {
+    if (!effectiveOrgId) {
+      toast.error('Please select an organization');
+      return;
+    }
+
+    setGeneratingReport(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Please log in to generate reports');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-compliance-report`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ orgId: effectiveOrgId }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate report');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ai-act-compliance-report-${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Compliance report downloaded successfully');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to generate report');
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   return (
     <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
       {/* Organization Filter for Global View */}
@@ -335,6 +408,31 @@ export default function OrgAnalytics() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+      )}
+
+      {/* Report Generation - Only for org-specific view */}
+      {!isGlobalView && currentOrg && (
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">AI Act Compliance</h2>
+            <p className="text-sm text-muted-foreground">
+              Generate a PDF report documenting staff training completion status
+            </p>
+          </div>
+          <Button
+            onClick={handleGenerateReport}
+            disabled={generatingReport}
+            variant="outline"
+            className="gap-2"
+          >
+            {generatingReport ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+            {generatingReport ? 'Generating...' : 'Download Report'}
+          </Button>
         </div>
       )}
 
@@ -397,17 +495,36 @@ export default function OrgAnalytics() {
         {/* User Performance - Only show when org is selected */}
         {(effectiveOrgId || !isGlobalView) && (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-base">Team Performance</CardTitle>
+              {departments.length > 0 && (
+                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                  <SelectTrigger className="w-40 h-8 text-xs">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </CardHeader>
             <CardContent className="p-0">
-              {userStats.length === 0 ? (
-                <p className="p-6 text-sm text-muted-foreground">No user data available.</p>
+              {filteredUserStats.length === 0 ? (
+                <p className="p-6 text-sm text-muted-foreground">
+                  {userStats.length === 0 ? 'No user data available.' : 'No users in this department.'}
+                </p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Department</TableHead>
                       <TableHead className="text-right">Courses</TableHead>
                       <TableHead className="text-right">Completed</TableHead>
                       <TableHead className="text-right">Avg Score</TableHead>
@@ -415,7 +532,7 @@ export default function OrgAnalytics() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {userStats.map((user) => (
+                    {filteredUserStats.map((user) => (
                       <TableRow
                         key={user.id}
                         className="cursor-pointer"
@@ -425,6 +542,9 @@ export default function OrgAnalytics() {
                         }}
                       >
                         <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {user.department || <span className="italic">Unassigned</span>}
+                        </TableCell>
                         <TableCell className="text-right">{user.enrollments}</TableCell>
                         <TableCell className="text-right">{user.completed}</TableCell>
                         <TableCell className="text-right">{user.avgQuizScore}%</TableCell>
