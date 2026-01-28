@@ -454,25 +454,18 @@ export default function CoursePlayer() {
                       {loadingAssets ? (
                         <div className="text-center text-muted-foreground">
                           <Loader2 className="mx-auto h-12 w-12 mb-2 animate-spin" />
-                          <p>Loading video...</p>
-                        </div>
-                      ) : currentLesson.video_url ? (
-                        // SharePoint video - show link to open in new tab
-                        <div className="w-full h-full flex flex-col items-center justify-center text-center p-6">
-                          <Play className="h-16 w-16 text-muted-foreground mb-4" />
-                          <h3 className="text-lg font-medium mb-2">SharePoint Video</h3>
-                          <p className="text-muted-foreground mb-4 max-w-md">
-                            This video is hosted on SharePoint. Click below to watch it in a new tab.
-                          </p>
-                          <Button 
-                            onClick={() => window.open(currentLesson.video_url!, '_blank')}
-                            className="gap-2"
-                          >
-                            <Play className="h-4 w-4" />
-                            Open Video in SharePoint
-                          </Button>
-                        </div>
-                      ) : signedVideoUrl ? (
+                        <p>Loading video...</p>
+                      </div>
+                    ) : currentLesson.video_url ? (
+                      // SharePoint embed
+                      <iframe
+                        src={getSharePointEmbedUrl(currentLesson.video_url) || currentLesson.video_url}
+                        className="w-full h-full rounded-lg"
+                        frameBorder="0"
+                        allowFullScreen
+                        title={currentLesson.title}
+                      />
+                    ) : signedVideoUrl ? (
                         <video
                           key={signedVideoUrl}
                           controls

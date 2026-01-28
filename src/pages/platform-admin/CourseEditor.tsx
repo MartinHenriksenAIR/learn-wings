@@ -588,14 +588,15 @@ export default function CourseEditor() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <Label>SharePoint Video URL</Label>
+                    <Label>SharePoint Embed URL</Label>
                     <Input
                       value={lessonVideoUrl || ''}
                       onChange={(e) => setLessonVideoUrl(e.target.value || null)}
-                      placeholder="https://yourcompany.sharepoint.com/:v:/s/..."
+                      placeholder="https://yourcompany.sharepoint.com/.../embed.aspx?..."
                     />
                     <p className="text-xs text-muted-foreground">
-                      Paste a SharePoint share or embed link. Use "Anyone with the link" sharing for seamless playback.
+                      <strong>Important:</strong> Use SharePoint's <strong>Embed</strong> option (not Share). 
+                      Right-click the video → "Embed" → Copy the URL from the iframe code.
                     </p>
                   </div>
                 )}
