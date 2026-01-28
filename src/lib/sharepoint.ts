@@ -1,7 +1,7 @@
 /**
- * SharePoint Video URL Utilities
+ * Video URL Utilities
  * 
- * Handles validation and transformation of SharePoint video URLs
+ * Handles validation and transformation of SharePoint and Microsoft Stream video URLs
  * for embedding in an iframe.
  */
 
@@ -26,17 +26,26 @@ export function isSharePointUrl(url: string): boolean {
 }
 
 /**
- * Transforms a SharePoint share URL into an embeddable URL.
- * 
- * Input patterns:
- * - Share link: https://company.sharepoint.com/:v:/s/SiteName/EaBC123...
- * - Already embed: https://company.sharepoint.com/.../embed.aspx?...
- * 
- * Output:
- * - Embed URL with action=embedview parameter
+ * Validates if a URL is a Microsoft Stream video URL.
+ * Matches patterns like:
+ * - https://web.microsoftstream.com/video/{id}
+ * - https://web.microsoftstream.com/embed/video/{id}
+ * - https://{tenant}.stream.office.com/video/{id} (new Stream)
  */
+export function isMicrosoftStreamUrl(url: string): boolean {
+  if (!url) return false;
+  
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'web.microsoftstream.com' || 
+           parsed.hostname.endsWith('.stream.office.com');
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Cleans a SharePoint URL that might contain extra HTML attributes
+ * Cleans a SharePoint/Stream URL that might contain extra HTML attributes
  * from copying the entire embed code instead of just the src URL.
  * 
  * Input: 'https://...embed.aspx?..." width="640" height="360"...'
@@ -64,6 +73,52 @@ export function cleanSharePointUrl(input: string): string {
   return url.trim();
 }
 
+/**
+ * Transforms a Microsoft Stream URL into an embeddable URL.
+ * 
+ * Input patterns:
+ * - https://web.microsoftstream.com/video/{id}
+ * 
+ * Output:
+ * - https://web.microsoftstream.com/embed/video/{id}?autoplay=false&showinfo=true
+ */
+export function getMicrosoftStreamEmbedUrl(url: string): string | null {
+  const cleanedUrl = cleanSharePointUrl(url);
+  
+  if (!isMicrosoftStreamUrl(cleanedUrl)) return null;
+  
+  try {
+    const parsed = new URL(cleanedUrl);
+    
+    // Already an embed URL
+    if (parsed.pathname.includes('/embed/video/')) {
+      return cleanedUrl;
+    }
+    
+    // Transform /video/{id} to /embed/video/{id}
+    if (parsed.pathname.includes('/video/')) {
+      const videoId = parsed.pathname.split('/video/')[1]?.split('/')[0]?.split('?')[0];
+      if (videoId) {
+        return `https://${parsed.hostname}/embed/video/${videoId}?autoplay=false&showinfo=true`;
+      }
+    }
+    
+    return cleanedUrl;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Transforms a SharePoint share URL into an embeddable URL.
+ * 
+ * Input patterns:
+ * - Share link: https://company.sharepoint.com/:v:/s/SiteName/EaBC123...
+ * - Already embed: https://company.sharepoint.com/.../embed.aspx?...
+ * 
+ * Output:
+ * - Embed URL with action=embedview parameter
+ */
 export function getSharePointEmbedUrl(url: string): string | null {
   // First clean the URL in case extra HTML attributes were pasted
   const cleanedUrl = cleanSharePointUrl(url);
@@ -108,7 +163,30 @@ export function getSharePointEmbedUrl(url: string): string | null {
 }
 
 /**
- * Validates a SharePoint URL and returns validation result.
+ * Gets the best embeddable URL for any supported video source.
+ * Tries Microsoft Stream first (better iframe support), then SharePoint.
+ */
+export function getVideoEmbedUrl(url: string): string | null {
+  if (!url) return null;
+  
+  const cleanedUrl = cleanSharePointUrl(url);
+  
+  // Try Microsoft Stream first (better cross-origin support)
+  if (isMicrosoftStreamUrl(cleanedUrl)) {
+    return getMicrosoftStreamEmbedUrl(cleanedUrl);
+  }
+  
+  // Try SharePoint
+  if (isSharePointUrl(cleanedUrl)) {
+    return getSharePointEmbedUrl(cleanedUrl);
+  }
+  
+  // Return as-is if not recognized
+  return cleanedUrl;
+}
+
+/**
+ * Validates a video URL and returns validation result.
  */
 export function validateSharePointUrl(url: string): { valid: boolean; error?: string } {
   if (!url || !url.trim()) {
@@ -121,8 +199,8 @@ export function validateSharePointUrl(url: string): { valid: boolean; error?: st
     return { valid: false, error: 'Invalid URL format' };
   }
   
-  if (!isSharePointUrl(url)) {
-    return { valid: false, error: 'URL must be a SharePoint link (*.sharepoint.com)' };
+  if (!isSharePointUrl(url) && !isMicrosoftStreamUrl(url)) {
+    return { valid: false, error: 'URL must be a SharePoint (*.sharepoint.com) or Microsoft Stream link' };
   }
   
   return { valid: true };

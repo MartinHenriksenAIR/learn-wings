@@ -10,7 +10,7 @@ import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
-import { getSharePointEmbedUrl } from '@/lib/sharepoint';
+import { getVideoEmbedUrl } from '@/lib/sharepoint';
 import { 
   ChevronRight, 
   CheckCircle2, 
@@ -459,7 +459,7 @@ export default function CoursePlayer() {
                     ) : currentLesson.video_url ? (
                       // SharePoint embed
                       <iframe
-                        src={getSharePointEmbedUrl(currentLesson.video_url) || currentLesson.video_url}
+                        src={getVideoEmbedUrl(currentLesson.video_url) || currentLesson.video_url}
                         className="w-full h-full rounded-lg"
                         frameBorder="0"
                         allowFullScreen
