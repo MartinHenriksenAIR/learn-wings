@@ -6,15 +6,18 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Enrollment, Course } from '@/lib/types';
-import { Award, Download, Loader2, XCircle } from 'lucide-react';
+import { Award, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Navigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Certificates() {
   const { user, currentOrg, profile } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const { toast } = useToast();
   const [completedEnrollments, setCompletedEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,6 +41,51 @@ export default function Certificates() {
 
     fetchData();
   }, [user, currentOrg]);
+
+  const handleDownloadCertificate = async (enrollmentId: string, courseTitle: string) => {
+    setDownloadingId(enrollmentId);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-certificate', {
+        body: { enrollmentId },
+      });
+
+      if (error) {
+        console.error('Error generating certificate:', error);
+        toast({
+          title: 'Failed to generate certificate',
+          description: error.message || 'Please try again later.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Create blob from response and trigger download
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `certificate-${courseTitle.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Certificate downloaded',
+        description: 'Your certificate has been downloaded successfully.',
+      });
+    } catch (err) {
+      console.error('Error downloading certificate:', err);
+      toast({
+        title: 'Failed to download certificate',
+        description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   // Redirect if certificates are disabled
   if (!settingsLoading && !features.certificates_enabled) {
@@ -101,8 +149,17 @@ export default function Certificates() {
                       day: 'numeric'
                     })}
                   </div>
-                  <Button variant="outline" size="sm" disabled>
-                    <Download className="mr-2 h-4 w-4" />
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleDownloadCertificate(enrollment.id, enrollment.course?.title || 'course')}
+                    disabled={downloadingId === enrollment.id}
+                  >
+                    {downloadingId === enrollment.id ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
                     Download
                   </Button>
                 </div>

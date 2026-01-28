@@ -2,3 +2,9 @@ project_id = "cairuxpyfshugwjrrqha"
 
 [functions.grade-quiz]
 verify_jwt = false
+
+[functions.generate-certificate]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
