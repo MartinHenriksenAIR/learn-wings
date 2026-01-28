@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.azure-delete-blob]
 verify_jwt = false
+
+[functions.generate-compliance-report]
+verify_jwt = false
