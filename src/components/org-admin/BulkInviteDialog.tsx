@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, Download, FileSpreadsheet, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
+import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 
 interface BulkInviteDialogProps {
   open: boolean;
@@ -167,14 +168,19 @@ export function BulkInviteDialog({
     setProcessing(true);
     let success = 0;
     let failed = 0;
+    let emailsSent = 0;
 
     for (const invite of validInvites) {
-      const { error } = await supabase.from('invitations').insert({
-        org_id: orgId,
-        email: invite.email,
-        role: invite.role,
-        invited_by_user_id: userId,
-      });
+      const { data: insertedInvitation, error } = await supabase
+        .from('invitations')
+        .insert({
+          org_id: orgId,
+          email: invite.email,
+          role: invite.role,
+          invited_by_user_id: userId,
+        })
+        .select('id')
+        .single();
 
       if (error) {
         failed++;
@@ -188,6 +194,24 @@ export function BulkInviteDialog({
         }
       } else {
         success++;
+        
+        // Send invitation email
+        if (insertedInvitation?.id) {
+          const { data: linkId } = await supabase
+            .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
+          
+          if (linkId) {
+            const emailResult = await sendInvitationEmail({
+              email: invite.email,
+              orgName,
+              role: invite.role,
+              linkId,
+            });
+            if (emailResult.success) {
+              emailsSent++;
+            }
+          }
+        }
       }
     }
 
@@ -198,7 +222,9 @@ export function BulkInviteDialog({
     if (success > 0) {
       toast({
         title: `${success} invitation${success > 1 ? 's' : ''} created`,
-        description: failed > 0 ? `${failed} failed. Check the list for details.` : undefined,
+        description: emailsSent > 0 
+          ? `${emailsSent} email${emailsSent > 1 ? 's' : ''} sent.${failed > 0 ? ` ${failed} failed.` : ''}`
+          : failed > 0 ? `${failed} failed. Check the list for details.` : undefined,
       });
       onSuccess();
     }

@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import { getInviteLink } from '@/lib/config';
 import { UserDetailDialog } from '@/components/platform-admin/UserDetailDialog';
+import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 
 // Invite type includes platform_admin option
 type InviteRoleType = 'learner' | 'org_admin' | 'platform_admin';
@@ -154,14 +155,16 @@ export default function UsersManager() {
 
     if (inviteType === 'platform_admin') {
       // Platform admin invite - no org required
-      const { error } = await supabase
+      const { data: insertedInvitation, error } = await supabase
         .from('invitations')
         .insert({
           email: inviteEmail,
           role: 'learner', // Role doesn't matter for platform admins, they get is_platform_admin flag
           is_platform_admin_invite: true,
           org_id: null,
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) {
         toast({
@@ -170,9 +173,28 @@ export default function UsersManager() {
           variant: 'destructive',
         });
       } else {
+        // Send invitation email
+        let emailSent = false;
+        if (insertedInvitation?.id) {
+          const { data: linkId } = await supabase
+            .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
+          
+          if (linkId) {
+            const emailResult = await sendInvitationEmail({
+              email: inviteEmail,
+              orgName: null,
+              role: 'platform_admin',
+              linkId,
+            });
+            emailSent = emailResult.success;
+          }
+        }
+        
         toast({
           title: 'Platform admin invitation created!',
-          description: 'Copy the invite link to share with the user.',
+          description: emailSent 
+            ? 'Invitation email sent successfully.' 
+            : 'Copy the invite link to share with the user.',
         });
         setInviteOpen(false);
         setInviteEmail('');
@@ -182,14 +204,16 @@ export default function UsersManager() {
       }
     } else {
       // Regular org invite
-      const { error } = await supabase
+      const { data: insertedInvitation, error } = await supabase
         .from('invitations')
         .insert({
           org_id: inviteOrgId,
           email: inviteEmail,
           role: inviteType as OrgRole,
           is_platform_admin_invite: false,
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) {
         toast({
@@ -198,9 +222,31 @@ export default function UsersManager() {
           variant: 'destructive',
         });
       } else {
+        // Send invitation email
+        let emailSent = false;
+        if (insertedInvitation?.id) {
+          const { data: linkId } = await supabase
+            .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
+          
+          // Get org name for the email
+          const selectedOrg = organizations.find(org => org.id === inviteOrgId);
+          
+          if (linkId) {
+            const emailResult = await sendInvitationEmail({
+              email: inviteEmail,
+              orgName: selectedOrg?.name || null,
+              role: inviteType as 'learner' | 'org_admin',
+              linkId,
+            });
+            emailSent = emailResult.success;
+          }
+        }
+        
         toast({
           title: 'Invitation created!',
-          description: 'Copy the invite link to share with the user.',
+          description: emailSent 
+            ? 'Invitation email sent successfully.' 
+            : 'Copy the invite link to share with the user.',
         });
         setInviteOpen(false);
         setInviteEmail('');
