@@ -131,12 +131,12 @@ export default function OrgDashboard() {
       {/* Org Info */}
       <Card className="mb-6">
         <CardContent className="flex items-center gap-4 p-6">
-          <div className="relative group">
+          <div className="relative group shrink-0">
             {currentOrg?.logo_url ? (
               <img
                 src={currentOrg.logo_url}
                 alt={`${currentOrg.name} logo`}
-                className="h-16 w-16 rounded-xl object-cover"
+                className="h-16 w-16 rounded-xl object-contain bg-muted"
               />
             ) : (
               <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
@@ -158,6 +158,22 @@ export default function OrgDashboard() {
                   <DialogTitle>Update Organization Logo</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
+                  <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted">
+                        <Building2 className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Recommended specifications</p>
+                        <p className="text-xs text-muted-foreground">
+                          Square image, 256×256px or larger
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          PNG or JPG format, max 2MB
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   <FileUpload
                     bucket="org-logos"
                     folder={currentOrg.id}
@@ -166,9 +182,6 @@ export default function OrgDashboard() {
                     onChange={handleLogoUpload}
                     disabled={uploading}
                   />
-                  <p className="text-xs text-muted-foreground text-center">
-                    Upload a square image (recommended: 256x256px). Max 2MB.
-                  </p>
                 </div>
               </DialogContent>
             </Dialog>
