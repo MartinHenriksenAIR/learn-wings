@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -60,19 +60,16 @@ export function BulkInviteDialog({
   const [results, setResults] = useState<{ success: number; failed: number } | null>(null);
 
   const handleDownloadTemplate = () => {
-    const templateData = [
-      { email: 'john.doe@example.com', role: 'learner' },
-      { email: 'jane.smith@example.com', role: 'org_admin' },
-    ];
-
-    const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Invitations');
-
-    // Set column widths
-    ws['!cols'] = [{ wch: 30 }, { wch: 15 }];
-
-    XLSX.writeFile(wb, 'invitation_template.xlsx');
+    const csvContent = 'email,role\njohn.doe@example.com,learner\njane.smith@example.com,org_admin';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'invitation_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 
     toast({
       title: 'Template downloaded',
@@ -80,55 +77,54 @@ export function BulkInviteDialog({
     });
   };
 
-  const parseExcelFile = (file: File): Promise<ParsedInvite[]> => {
+  const parseCsvFile = (file: File): Promise<ParsedInvite[]> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<{ email: string; role: string }>(firstSheet);
+      Papa.parse<{ email: string; role: string }>(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          try {
+            const parsed: ParsedInvite[] = results.data.map((row) => {
+              const email = String(row.email || '').trim().toLowerCase();
+              const roleRaw = String(row.role || '').trim().toLowerCase();
+              const role = roleRaw === 'org_admin' || roleRaw === 'admin' ? 'org_admin' : 'learner';
 
-          const parsed: ParsedInvite[] = jsonData.map((row) => {
-            const email = String(row.email || '').trim().toLowerCase();
-            const roleRaw = String(row.role || '').trim().toLowerCase();
-            const role = roleRaw === 'org_admin' || roleRaw === 'admin' ? 'org_admin' : 'learner';
-
-            // Validate email
-            const emailResult = emailSchema.safeParse(email);
-            if (!emailResult.success) {
-              return {
-                email,
-                role,
-                valid: false,
-                error: 'Invalid email format',
-              };
-            }
-
-            return { email, role, valid: true };
-          });
-
-          // Check for duplicates
-          const seen = new Set<string>();
-          parsed.forEach((item) => {
-            if (item.valid) {
-              if (seen.has(item.email)) {
-                item.valid = false;
-                item.error = 'Duplicate email';
-              } else {
-                seen.add(item.email);
+              // Validate email
+              const emailResult = emailSchema.safeParse(email);
+              if (!emailResult.success) {
+                return {
+                  email,
+                  role,
+                  valid: false,
+                  error: 'Invalid email format',
+                };
               }
-            }
-          });
 
-          resolve(parsed);
-        } catch (err) {
-          reject(new Error('Failed to parse Excel file'));
-        }
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsArrayBuffer(file);
+              return { email, role, valid: true };
+            });
+
+            // Check for duplicates
+            const seen = new Set<string>();
+            parsed.forEach((item) => {
+              if (item.valid) {
+                if (seen.has(item.email)) {
+                  item.valid = false;
+                  item.error = 'Duplicate email';
+                } else {
+                  seen.add(item.email);
+                }
+              }
+            });
+
+            resolve(parsed);
+          } catch (err) {
+            reject(new Error('Failed to parse CSV file'));
+          }
+        },
+        error: (error) => {
+          reject(new Error(error.message || 'Failed to parse CSV file'));
+        },
+      });
     });
   };
 
@@ -140,7 +136,7 @@ export function BulkInviteDialog({
     setResults(null);
 
     try {
-      const parsed = await parseExcelFile(file);
+      const parsed = await parseCsvFile(file);
       setParsedData(parsed);
     } catch (err: any) {
       toast({
@@ -245,7 +241,7 @@ export function BulkInviteDialog({
         <DialogHeader>
           <DialogTitle>Bulk Invite Members</DialogTitle>
           <DialogDescription>
-            Upload an Excel file to invite multiple members to {orgName}.
+            Upload a CSV file to invite multiple members to {orgName}.
           </DialogDescription>
         </DialogHeader>
 
@@ -257,7 +253,7 @@ export function BulkInviteDialog({
               <div>
                 <p className="font-medium">Download Template</p>
                 <p className="text-sm text-muted-foreground">
-                  Use this template to format your invitations correctly.
+                  Use this CSV template to format your invitations correctly.
                 </p>
               </div>
             </div>
@@ -269,11 +265,11 @@ export function BulkInviteDialog({
 
           {/* Upload Section */}
           <div className="space-y-2">
-            <Label>Upload Excel File</Label>
+            <Label>Upload CSV File</Label>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xlsx,.xls"
+              accept=".csv"
               onChange={handleFileChange}
               className="hidden"
             />
@@ -290,7 +286,7 @@ export function BulkInviteDialog({
                 <>
                   <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    Click to upload Excel file (.xlsx, .xls)
+                    Click to upload CSV file (.csv)
                   </p>
                 </>
               )}
