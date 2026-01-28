@@ -72,7 +72,6 @@ export default function OrgUsers() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteFirstName, setInviteFirstName] = useState('');
@@ -223,25 +222,33 @@ export default function OrgUsers() {
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
-  const handleDisableMember = async (membershipId: string) => {
+  const [removeMemberDialog, setRemoveMemberDialog] = useState<{
+    open: boolean;
+    member: (OrgMembership & { profile: Profile }) | null;
+  } | null>(null);
+
+  const handleRemoveMember = async () => {
+    if (!removeMemberDialog?.member) return;
+    
     const { error } = await supabase
       .from('org_memberships')
-      .update({ status: 'disabled' })
-      .eq('id', membershipId);
+      .delete()
+      .eq('id', removeMemberDialog.member.id);
 
     if (error) {
       toast({
-        title: 'Failed to disable member',
+        title: 'Failed to remove member',
         description: error.message,
         variant: 'destructive',
       });
     } else {
       toast({
-        title: 'Member disabled',
-        description: 'The user can no longer access this organization.',
+        title: 'Member removed',
+        description: `${removeMemberDialog.member.profile?.full_name} has been removed from the organization.`,
       });
       fetchData();
     }
+    setRemoveMemberDialog(null);
   };
 
   const handleCancelInvitation = async (invitationId: string) => {
@@ -301,7 +308,6 @@ export default function OrgUsers() {
   const statusColors = {
     active: 'bg-green-100 text-green-800',
     invited: 'bg-yellow-100 text-yellow-800',
-    disabled: 'bg-red-100 text-red-800',
   };
 
   const memberFilters: FilterConfig[] = [
@@ -313,27 +319,17 @@ export default function OrgUsers() {
         { value: 'learner', label: 'Learner' },
       ],
     },
-    {
-      key: 'status',
-      label: 'Status',
-      options: [
-        { value: 'active', label: 'Active' },
-        { value: 'disabled', label: 'Disabled' },
-      ],
-    },
   ];
 
-  const filterValues = { role: roleFilter, status: statusFilter };
+  const filterValues = { role: roleFilter };
 
   const handleFilterChange = (key: string, value: string) => {
     if (key === 'role') setRoleFilter(value);
-    if (key === 'status') setStatusFilter(value);
   };
 
   const clearFilters = () => {
     setSearchQuery('');
     setRoleFilter('all');
-    setStatusFilter('all');
   };
 
   const filteredMembers = members.filter(member => {
@@ -344,10 +340,7 @@ export default function OrgUsers() {
     // Role filter
     const matchesRole = roleFilter === 'all' || member.role === roleFilter;
 
-    // Status filter
-    const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
-
-    return matchesSearch && matchesRole && matchesStatus;
+    return matchesSearch && matchesRole;
   });
 
   if (loading) {
@@ -552,16 +545,15 @@ export default function OrgUsers() {
         </Card>
       )}
 
-      {/* Members Table */}
       {filteredMembers.length === 0 ? (
         <EmptyState
           icon={<Users className="h-6 w-6" />}
-          title={searchQuery || roleFilter !== 'all' || statusFilter !== 'all' ? "No matching members" : "No team members yet"}
-          description={searchQuery || roleFilter !== 'all' || statusFilter !== 'all' 
+          title={searchQuery || roleFilter !== 'all' ? "No matching members" : "No team members yet"}
+          description={searchQuery || roleFilter !== 'all'
             ? "Try adjusting your filters." 
             : "Invite colleagues to join your organization."}
           action={
-            !searchQuery && roleFilter === 'all' && statusFilter === 'all' ? (
+            !searchQuery && roleFilter === 'all' ? (
               <Button onClick={() => setInviteOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Invite Member
@@ -648,11 +640,11 @@ export default function OrgUsers() {
                           )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            onClick={() => handleDisableMember(member.id)}
+                            onClick={() => setRemoveMemberDialog({ open: true, member })}
                             className="text-destructive"
                           >
                             <UserX className="mr-2 h-4 w-4" />
-                            Disable Access
+                            Remove from Team
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -695,6 +687,32 @@ export default function OrgUsers() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleChangeRole}>
               {roleChangeDialog?.newRole === 'org_admin' ? 'Promote to Admin' : 'Change to Learner'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Member Confirmation Dialog */}
+      <AlertDialog
+        open={removeMemberDialog?.open}
+        onOpenChange={(open) => !open && setRemoveMemberDialog(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove team member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{removeMemberDialog?.member?.profile?.full_name}</strong> will be removed from 
+              this organization. They will lose access to all courses and their progress data will 
+              be retained but they won't be able to continue learning until re-invited.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleRemoveMember}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove Member
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
