@@ -497,22 +497,20 @@ export default function OrgAnalytics() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-base">Team Performance</CardTitle>
-              {departments.length > 0 && (
-                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                  <SelectTrigger className="w-40 h-8 text-xs">
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-40 h-8 text-xs">
+                  <SelectValue placeholder="All Departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                </SelectContent>
+              </Select>
             </CardHeader>
             <CardContent className="p-0">
               {filteredUserStats.length === 0 ? (
