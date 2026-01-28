@@ -39,11 +39,11 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       
-      {/* Protected learner routes */}
-      <Route path="/app/dashboard" element={<ProtectedRoute><LearnerDashboard /></ProtectedRoute>} />
-      <Route path="/app/courses" element={<ProtectedRoute><LearnerCourses /></ProtectedRoute>} />
-      <Route path="/app/learn/:courseId" element={<ProtectedRoute><CoursePlayer /></ProtectedRoute>} />
-      <Route path="/app/certificates" element={<ProtectedRoute><Certificates /></ProtectedRoute>} />
+      {/* Protected learner routes - not accessible by platform admins */}
+      <Route path="/app/dashboard" element={<ProtectedRoute learnerOnly><LearnerDashboard /></ProtectedRoute>} />
+      <Route path="/app/courses" element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
+      <Route path="/app/learn/:courseId" element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
+      <Route path="/app/certificates" element={<ProtectedRoute learnerOnly><Certificates /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
       <Route path="/app/admin/org" element={<ProtectedRoute requireOrgAdmin><OrgDashboard /></ProtectedRoute>} />
