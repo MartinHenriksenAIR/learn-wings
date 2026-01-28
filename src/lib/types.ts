@@ -12,6 +12,9 @@ export type AccessType = 'enabled' | 'disabled';
 export interface Profile {
   id: string;
   full_name: string;
+  first_name: string | null;
+  last_name: string | null;
+  department: string | null;
   is_platform_admin: boolean;
   created_at: string;
 }

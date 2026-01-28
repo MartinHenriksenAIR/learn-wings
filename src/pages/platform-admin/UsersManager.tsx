@@ -548,6 +548,7 @@ export default function UsersManager() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Department</TableHead>
                 <TableHead>Organizations</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Joined</TableHead>
@@ -572,6 +573,9 @@ export default function UsersManager() {
                         )}
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {userItem.department || '-'}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">

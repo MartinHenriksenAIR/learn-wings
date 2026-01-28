@@ -38,6 +38,9 @@ interface BulkInviteDialogProps {
 interface ParsedInvite {
   email: string;
   role: 'learner' | 'org_admin';
+  first_name: string;
+  last_name: string;
+  department: string;
   valid: boolean;
   error?: string;
 }
@@ -60,7 +63,7 @@ export function BulkInviteDialog({
   const [results, setResults] = useState<{ success: number; failed: number } | null>(null);
 
   const handleDownloadTemplate = () => {
-    const csvContent = 'email,role\njohn.doe@example.com,learner\njane.smith@example.com,org_admin';
+    const csvContent = 'email,first_name,last_name,department,role\njohn.doe@example.com,John,Doe,Engineering,learner\njane.smith@example.com,Jane,Smith,Management,org_admin';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -79,13 +82,16 @@ export function BulkInviteDialog({
 
   const parseCsvFile = (file: File): Promise<ParsedInvite[]> => {
     return new Promise((resolve, reject) => {
-      Papa.parse<{ email: string; role: string }>(file, {
+      Papa.parse<{ email: string; first_name?: string; last_name?: string; department?: string; role: string }>(file, {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
           try {
             const parsed: ParsedInvite[] = results.data.map((row) => {
               const email = String(row.email || '').trim().toLowerCase();
+              const firstName = String(row.first_name || '').trim();
+              const lastName = String(row.last_name || '').trim();
+              const department = String(row.department || '').trim();
               const roleRaw = String(row.role || '').trim().toLowerCase();
               const role = roleRaw === 'org_admin' || roleRaw === 'admin' ? 'org_admin' : 'learner';
 
@@ -94,13 +100,16 @@ export function BulkInviteDialog({
               if (!emailResult.success) {
                 return {
                   email,
+                  first_name: firstName,
+                  last_name: lastName,
+                  department,
                   role,
                   valid: false,
                   error: 'Invalid email format',
                 };
               }
 
-              return { email, role, valid: true };
+              return { email, first_name: firstName, last_name: lastName, department, role, valid: true };
             });
 
             // Check for duplicates
@@ -309,12 +318,15 @@ export function BulkInviteDialog({
                 )}
               </div>
 
-              <div className="border rounded-lg max-h-60 overflow-y-auto">
+              <div className="border rounded-lg max-h-60 overflow-x-auto overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Status</TableHead>
+                      <TableHead className="w-12">Status</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>First Name</TableHead>
+                      <TableHead>Last Name</TableHead>
+                      <TableHead>Department</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Error</TableHead>
                     </TableRow>
@@ -330,6 +342,9 @@ export function BulkInviteDialog({
                           )}
                         </TableCell>
                         <TableCell className="font-medium">{row.email}</TableCell>
+                        <TableCell>{row.first_name || '-'}</TableCell>
+                        <TableCell>{row.last_name || '-'}</TableCell>
+                        <TableCell>{row.department || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {row.role === 'org_admin' ? 'Admin' : 'Learner'}

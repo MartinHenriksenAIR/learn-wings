@@ -13,7 +13,9 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
 const profileSchema = z.object({
-  fullName: z.string().trim().min(1, 'Name is required').max(100, 'Name is too long'),
+  firstName: z.string().trim().min(1, 'First name is required').max(50, 'First name is too long'),
+  lastName: z.string().trim().max(50, 'Last name is too long').optional(),
+  department: z.string().trim().max(100, 'Department is too long').optional(),
 });
 
 const passwordSchema = z.object({
@@ -29,9 +31,11 @@ export default function Settings() {
   const { toast } = useToast();
   
   // Profile state
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [department, setDepartment] = useState('');
   const [saving, setSaving] = useState(false);
-  const [profileErrors, setProfileErrors] = useState<{ fullName?: string }>({});
+  const [profileErrors, setProfileErrors] = useState<{ firstName?: string; lastName?: string; department?: string }>({});
 
   // Password state
   const [newPassword, setNewPassword] = useState('');
@@ -42,23 +46,24 @@ export default function Settings() {
     confirmPassword?: string 
   }>({});
 
-  // Sync fullName when profile loads
+  // Sync profile fields when profile loads
   useEffect(() => {
-    if (profile?.full_name) {
-      setFullName(profile.full_name);
+    if (profile) {
+      setFirstName(profile.first_name || '');
+      setLastName(profile.last_name || '');
+      setDepartment(profile.department || '');
     }
-  }, [profile?.full_name]);
+  }, [profile]);
 
   const handleProfileSave = async () => {
     setProfileErrors({});
     
-    const result = profileSchema.safeParse({ fullName });
+    const result = profileSchema.safeParse({ firstName, lastName, department });
     if (!result.success) {
-      const errors: { fullName?: string } = {};
+      const errors: { firstName?: string; lastName?: string; department?: string } = {};
       result.error.errors.forEach((err) => {
-        if (err.path[0] === 'fullName') {
-          errors.fullName = err.message;
-        }
+        const field = err.path[0] as 'firstName' | 'lastName' | 'department';
+        errors[field] = err.message;
       });
       setProfileErrors(errors);
       return;
@@ -67,9 +72,18 @@ export default function Settings() {
     if (!profile) return;
     
     setSaving(true);
+    
+    // Build full_name from first and last name
+    const fullName = lastName ? `${firstName.trim()} ${lastName.trim()}` : firstName.trim();
+    
     const { error } = await supabase
       .from('profiles')
-      .update({ full_name: fullName.trim() })
+      .update({ 
+        full_name: fullName,
+        first_name: firstName.trim() || null,
+        last_name: lastName.trim() || null,
+        department: department.trim() || null,
+      })
       .eq('id', profile.id);
 
     if (error) {
@@ -180,21 +194,57 @@ export default function Settings() {
                 Email cannot be changed.
               </p>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => {
+                    setFirstName(e.target.value);
+                    if (profileErrors.firstName) {
+                      setProfileErrors((prev) => ({ ...prev, firstName: undefined }));
+                    }
+                  }}
+                  placeholder="First name"
+                />
+                {profileErrors.firstName && (
+                  <p className="text-sm text-destructive">{profileErrors.firstName}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  value={lastName}
+                  onChange={(e) => {
+                    setLastName(e.target.value);
+                    if (profileErrors.lastName) {
+                      setProfileErrors((prev) => ({ ...prev, lastName: undefined }));
+                    }
+                  }}
+                  placeholder="Last name"
+                />
+                {profileErrors.lastName && (
+                  <p className="text-sm text-destructive">{profileErrors.lastName}</p>
+                )}
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="department">Department</Label>
               <Input
-                id="fullName"
-                value={fullName}
+                id="department"
+                value={department}
                 onChange={(e) => {
-                  setFullName(e.target.value);
-                  if (profileErrors.fullName) {
-                    setProfileErrors({});
+                  setDepartment(e.target.value);
+                  if (profileErrors.department) {
+                    setProfileErrors((prev) => ({ ...prev, department: undefined }));
                   }
                 }}
-                placeholder="Your full name"
+                placeholder="e.g. Engineering, Sales, Marketing"
               />
-              {profileErrors.fullName && (
-                <p className="text-sm text-destructive">{profileErrors.fullName}</p>
+              {profileErrors.department && (
+                <p className="text-sm text-destructive">{profileErrors.department}</p>
               )}
             </div>
             <Button onClick={handleProfileSave} disabled={saving}>

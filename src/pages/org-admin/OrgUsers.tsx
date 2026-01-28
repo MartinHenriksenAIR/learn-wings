@@ -517,6 +517,7 @@ export default function OrgUsers() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Department</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
@@ -530,6 +531,9 @@ export default function OrgUsers() {
                     <div>
                       <p className="font-medium">{member.profile?.full_name}</p>
                     </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {member.profile?.department || '-'}
                   </TableCell>
                   <TableCell>
                     <Badge className={roleColors[member.role]}>

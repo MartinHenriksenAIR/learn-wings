@@ -231,8 +231,11 @@ export function UserDetailDialog({
               </div>
               <div>
                 <div>{user.full_name}</div>
+                {user.department && (
+                  <span className="text-sm text-muted-foreground font-normal">{user.department}</span>
+                )}
                 {isCurrentUser && (
-                  <span className="text-xs text-muted-foreground font-normal">(You)</span>
+                  <span className="text-xs text-muted-foreground font-normal block">(You)</span>
                 )}
               </div>
             </DialogTitle>
