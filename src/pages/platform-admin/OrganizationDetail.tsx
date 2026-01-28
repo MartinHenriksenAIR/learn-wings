@@ -67,6 +67,7 @@ import {
   Check,
   Pencil,
   Trash2,
+  UsersRound,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
@@ -121,6 +122,7 @@ export default function OrganizationDetail() {
   const [editName, setEditName] = useState('');
   const [editSlug, setEditSlug] = useState('');
   const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
+  const [editSeatLimit, setEditSeatLimit] = useState<string>('');
   const [saving, setSaving] = useState(false);
 
   // Delete organization state
@@ -371,6 +373,7 @@ export default function OrganizationDetail() {
       setEditName(org.name);
       setEditSlug(org.slug);
       setEditLogoUrl(org.logo_url || null);
+      setEditSeatLimit(org.seat_limit?.toString() || '');
       setEditOpen(true);
     }
   };
@@ -390,7 +393,12 @@ export default function OrganizationDetail() {
 
     const { error } = await supabase
       .from('organizations')
-      .update({ name: editName, slug: editSlug, logo_url: editLogoUrl })
+      .update({ 
+        name: editName, 
+        slug: editSlug, 
+        logo_url: editLogoUrl,
+        seat_limit: editSeatLimit ? parseInt(editSeatLimit, 10) : null,
+      })
       .eq('id', orgId);
 
     if (error) {
@@ -627,16 +635,24 @@ export default function OrganizationDetail() {
       </div>
 
       {/* Stats */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <Users className="h-5 w-5 text-muted-foreground" />
+              <UsersRound className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-2xl font-bold">{activeMembers.length}</p>
-                <p className="text-sm text-muted-foreground">Active Members</p>
+                <p className="text-2xl font-bold">
+                  {activeMembers.length}
+                  {org.seat_limit ? <span className="text-base font-normal text-muted-foreground"> / {org.seat_limit}</span> : ''}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {org.seat_limit ? 'Seats Used' : 'Active Members'}
+                </p>
               </div>
             </div>
+            {org.seat_limit && activeMembers.length >= org.seat_limit && (
+              <p className="mt-2 text-xs text-destructive font-medium">Seat limit reached</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -661,6 +677,17 @@ export default function OrganizationDetail() {
                   {activeMembers.filter((m) => m.role === 'learner').length}
                 </p>
                 <p className="text-sm text-muted-foreground">Learners</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <Mail className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-2xl font-bold">{invitations.length}</p>
+                <p className="text-sm text-muted-foreground">Pending Invites</p>
               </div>
             </div>
           </CardContent>
@@ -912,6 +939,20 @@ export default function OrganizationDetail() {
               />
               <p className="text-xs text-muted-foreground">
                 Used in URLs. Only lowercase letters, numbers, and hyphens.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-seat-limit">Seat Limit</Label>
+              <Input
+                id="edit-seat-limit"
+                type="number"
+                min="1"
+                placeholder="Unlimited"
+                value={editSeatLimit}
+                onChange={(e) => setEditSeatLimit(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Maximum number of users allowed. Leave empty for unlimited.
               </p>
             </div>
           </div>

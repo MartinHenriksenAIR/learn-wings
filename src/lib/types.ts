@@ -21,6 +21,7 @@ export interface Organization {
   name: string;
   slug: string;
   logo_url: string | null;
+  seat_limit: number | null;
   created_at: string;
 }
 

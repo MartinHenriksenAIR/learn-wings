@@ -437,6 +437,7 @@ export type Database = {
           id: string
           logo_url: string | null
           name: string
+          seat_limit: number | null
           slug: string
         }
         Insert: {
@@ -444,6 +445,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name: string
+          seat_limit?: number | null
           slug: string
         }
         Update: {
@@ -451,6 +453,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name?: string
+          seat_limit?: number | null
           slug?: string
         }
         Relationships: []

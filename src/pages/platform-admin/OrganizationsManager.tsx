@@ -35,7 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization, Profile, OrgRole } from '@/lib/types';
-import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail } from 'lucide-react';
+import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail, UsersRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
@@ -59,6 +59,7 @@ export default function OrganizationsManager() {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [seatLimit, setSeatLimit] = useState<string>('');
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -122,6 +123,7 @@ export default function OrganizationsManager() {
       name,
       slug,
       logo_url: logoUrl,
+      seat_limit: seatLimit ? parseInt(seatLimit, 10) : null,
     }).select().single();
 
     if (error) {
@@ -188,6 +190,7 @@ export default function OrganizationsManager() {
     setName('');
     setSlug('');
     setLogoUrl(null);
+    setSeatLimit('');
     setAdminTab('existing');
     setSelectedUserId('');
     setInviteEmail('');
@@ -282,6 +285,20 @@ export default function OrganizationsManager() {
                   <p className="text-xs text-destructive">{errors.slug}</p>
                 )}
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="seatLimit">Seat Limit (optional)</Label>
+                <Input
+                  id="seatLimit"
+                  type="number"
+                  min="1"
+                  placeholder="Unlimited"
+                  value={seatLimit}
+                  onChange={(e) => setSeatLimit(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum number of users allowed. Leave empty for unlimited.
+                </p>
+              </div>
 
               {/* Initial Admin Assignment */}
               <div className="space-y-2">
@@ -360,7 +377,7 @@ export default function OrganizationsManager() {
               <TableRow>
                 <TableHead>Organization</TableHead>
                 <TableHead>Slug</TableHead>
-                <TableHead>Members</TableHead>
+                <TableHead>Seats</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
@@ -391,8 +408,14 @@ export default function OrganizationsManager() {
                   <TableCell className="text-muted-foreground">{org.slug}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span>{org.memberCount}</span>
+                      <UsersRound className="h-4 w-4 text-muted-foreground" />
+                      <span>
+                        {org.memberCount}
+                        {org.seat_limit ? ` / ${org.seat_limit}` : ''}
+                      </span>
+                      {org.seat_limit && org.memberCount >= org.seat_limit && (
+                        <span className="ml-1 text-xs text-destructive font-medium">Full</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
