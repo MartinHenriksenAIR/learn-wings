@@ -24,7 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization } from '@/lib/types';
-import { Users, TrendingUp, Award, BookOpen, Loader2, ChevronRight, FileText, Download } from 'lucide-react';
+import { Users, TrendingUp, Award, BookOpen, Loader2, ChevronRight, FileText, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { UserProgressDialog } from '@/components/org-admin/UserProgressDialog';
 import { toast } from 'sonner';
 
@@ -65,6 +65,7 @@ export default function OrgAnalytics() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'completed' | 'score'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedUser, setSelectedUser] = useState<UserStats | null>(null);
   const [progressDialogOpen, setProgressDialogOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -340,15 +341,20 @@ export default function OrgAnalytics() {
       return user.department === selectedDepartment;
     })
     .sort((a, b) => {
+      let comparison = 0;
       switch (sortBy) {
         case 'completed':
-          return b.completed - a.completed;
+          comparison = b.completed - a.completed;
+          break;
         case 'score':
-          return b.avgQuizScore - a.avgQuizScore;
+          comparison = b.avgQuizScore - a.avgQuizScore;
+          break;
         case 'name':
         default:
-          return a.name.localeCompare(b.name);
+          comparison = a.name.localeCompare(b.name);
+          break;
       }
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
 
   // Generate compliance report
@@ -521,6 +527,19 @@ export default function OrgAnalytics() {
                     <SelectItem value="score">Activity</SelectItem>
                   </SelectContent>
                 </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                  title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                >
+                  {sortDirection === 'asc' ? (
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  )}
+                </Button>
                 <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                   <SelectTrigger className="w-40 h-8 text-xs">
                     <SelectValue placeholder="All Departments" />
