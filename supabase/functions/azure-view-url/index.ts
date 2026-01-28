@@ -142,27 +142,27 @@ Deno.serve(async (req) => {
 
     const isPlatformAdmin = profile?.is_platform_admin || false;
 
-    if (!isPlatformAdmin && lessonId) {
-      // Check if user is enrolled in a course that contains this lesson
-      const { data: enrollment, error: enrollmentError } = await supabase
-        .from('enrollments')
-        .select(`
-          id,
-          course:courses!inner(
-            id,
-            course_modules!inner(
-              id,
-              lessons!inner(id)
-            )
-          )
-        `)
-        .eq('user_id', userId)
-        .not('course.course_modules.lessons', 'is', null);
+    if (!isPlatformAdmin) {
+      // Use the existing can_access_lms_asset function for consistent access control
+      const { data: hasAccess, error: accessError } = await supabase.rpc(
+        'can_access_lms_asset',
+        { file_path: blobPath }
+      );
 
-      // If no enrollment found, still allow access (simpler check for now)
-      // In production, you'd want to verify the lessonId matches the blobPath
-      if (enrollmentError) {
-        console.log('Warning: Could not verify enrollment', enrollmentError);
+      if (accessError) {
+        console.error('Error checking asset access:', accessError);
+        return new Response(JSON.stringify({ error: 'Access check failed' }), { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+
+      if (!hasAccess) {
+        console.log(`Access denied for user ${userId} to blob: ${blobPath}`);
+        return new Response(JSON.stringify({ error: 'Access denied' }), { 
+          status: 403, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
       }
     }
 
