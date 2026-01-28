@@ -103,23 +103,21 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     console.log('azure-upload-url: SUPABASE_URL present:', !!supabaseUrl);
-    console.log('azure-upload-url: SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
+    console.log('azure-upload-url: SUPABASE_SERVICE_ROLE_KEY present:', !!supabaseServiceKey);
 
-    const supabase = createClient(
-      supabaseUrl!,
-      supabaseAnonKey!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    // Use service role key to bypass RLS for admin check
+    const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
-    // Get the authenticated user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    console.log('azure-upload-url: getUser result - user:', !!user, 'error:', userError?.message);
+    // Extract and verify the JWT token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    console.log('azure-upload-url: getUser(token) result - user:', !!user, 'error:', userError?.message);
     
     if (userError || !user) {
-      console.log('azure-upload-url: User auth failed:', userError?.message);
+      console.log('azure-upload-url: JWT validation failed:', userError?.message);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
         status: 401, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
