@@ -1,171 +1,215 @@
 
-# Plan: Add Course Deletion for Platform Admin
+
+# Plan: Add User Progress Details for Org Admins
 
 ## Overview
-Implement the ability for platform administrators to delete courses from the platform. This includes adding a delete button with confirmation dialog to both the course list page and the individual course editor page, ensuring proper cascade deletion of all related data.
+Implement a detailed view for Org Admins to see individual learner progress on courses. This will include lesson completion status, quiz attempt history, and overall progress metrics per user.
 
 ## Current State Analysis
 
-### Database Structure
-The database already has proper CASCADE delete rules configured:
-- `courses` -> `course_modules` (CASCADE)
-- `course_modules` -> `lessons` (CASCADE)
-- `lessons` -> `quizzes` (CASCADE)
-- `quizzes` -> `quiz_questions` (CASCADE)
-- `courses` -> `org_course_access` (CASCADE)
-- `courses` -> `enrollments` (CASCADE)
-- `courses` -> `course_reviews` (CASCADE)
-- `lessons` -> `lesson_progress` (CASCADE)
-- `quizzes` -> `quiz_attempts` (CASCADE)
-
-This means deleting a course will automatically clean up all related data.
+### Existing Data Structure
+- **`enrollments`**: Tracks which users are enrolled in which courses (with `status`: enrolled/completed)
+- **`lesson_progress`**: Tracks individual lesson completion per user (`status`: not_started/in_progress/completed)
+- **`quiz_attempts`**: Stores quiz results (score, passed, timestamps)
+- **`org_memberships`**: Links users to organizations with roles
 
 ### Existing Patterns
-- The `UserDetailDialog` component uses `AlertDialog` for delete confirmation
-- The `OrganizationDetail` page has a similar delete pattern with confirmation
-- RLS policies already allow platform admins to delete courses (`is_platform_admin()`)
+- `OrgAnalytics.tsx`: Shows summary user stats in a table (name, enrollments, completed, avg quiz score)
+- `UserDetailDialog.tsx`: Modal pattern for viewing/editing user details
+- `OrgUsers.tsx`: Table-based member listing with click actions
+- All org admin pages use `currentOrg` from `useAuth()` to scope data
+
+### RLS Policies (Already Configured)
+- Org admins can view `enrollments` in their org via `is_org_admin(org_id)`
+- Org admins can view `lesson_progress` in their org via `is_org_admin(org_id)`
+- Org admins can view `quiz_attempts` in their org via `is_org_admin(org_id)`
+
+## Implementation Approach
+
+### Option: Add Click-to-View on OrgAnalytics User Table
+The simplest approach is to make the existing user rows in `OrgAnalytics.tsx` clickable, opening a dialog that shows detailed progress for that user.
 
 ## Implementation Steps
 
-### Step 1: Update CoursesManager.tsx (Course List Page)
-Add a delete button to each course card with confirmation dialog:
+### Step 1: Create UserProgressDialog Component
+Create a new dialog component to display detailed user progress:
 
-1. Add state variables for delete dialog:
-   - `deleteOpen: boolean` - controls dialog visibility
-   - `courseToDelete: Course | null` - stores the course being deleted
-   - `deleting: boolean` - loading state during deletion
+**File**: `src/components/org-admin/UserProgressDialog.tsx`
 
-2. Add a delete icon button to each course card (next to the publish toggle)
+Features:
+- Header with user name and overall stats
+- List of enrolled courses with progress bars
+- Expandable course sections showing:
+  - Module/lesson completion status (checkmarks)
+  - Quiz attempt history with scores and dates
+- Summary metrics (total lessons completed, avg quiz score, last activity)
 
-3. Add AlertDialog component for delete confirmation with:
-   - Warning about permanent deletion of all related data
-   - Course title displayed prominently
-   - Cancel and Delete buttons with loading state
-
-4. Implement `handleDeleteCourse` function:
-   - Call Supabase to delete the course
-   - Show success/error toast
-   - Refresh the course list
-
-### Step 2: Update CourseEditor.tsx (Individual Course Page)
-Add a delete button to the course details section:
-
-1. Add state variables for delete confirmation
-
-2. Add a "Delete Course" button (destructive variant) in the Course Details card header
-
-3. Add AlertDialog for confirmation with the same pattern
-
-4. Implement delete handler that:
-   - Deletes the course
-   - Shows success toast
-   - Navigates back to the courses list (`/app/admin/courses`)
+### Step 2: Update OrgAnalytics.tsx
+Modify the Team Performance table to:
+- Make rows clickable to open the progress dialog
+- Add a "View Details" button or cursor pointer indicator
+- Import and render the `UserProgressDialog` component
 
 ## UI/UX Design
 
-### Course List (CoursesManager)
+### Team Performance Table (Updated)
 ```text
-+----------------------------------+
-| [Course Card]                    |
-| +------------------------------+ |
-| | Thumbnail                    | |
-| +------------------------------+ |
-| | Title            [Level]     | |
-| | Description...               | |
-| +------------------------------+ |
-| | [Toggle] Published  [Trash]  | |
-| +------------------------------+ |
-+----------------------------------+
++------------------------------------------------------+
+| Team Performance                                      |
++------------------------------------------------------+
+| Name          | Courses | Completed | Avg Score | -> |
++------------------------------------------------------+
+| John Smith    |    3    |     2     |    85%    | >  |  <- Clickable row
+| Jane Doe      |    2    |     1     |    92%    | >  |
++------------------------------------------------------+
 ```
 
-### Course Editor (CourseEditor)
+### User Progress Dialog
 ```text
-+----------------------------------------+
-| Course Details                [Level]   |
-|                     [Delete] [Save]     |
-+----------------------------------------+
-| Thumbnail, Title, Description...        |
-+----------------------------------------+
-```
-
-### Confirmation Dialog
-```text
-+------------------------------------------+
-|  Delete Course?                          |
-|------------------------------------------|
-|  This will permanently delete            |
-|  "Course Title" and all associated       |
-|  data including:                         |
-|  - All modules and lessons               |
-|  - All learner enrollments and progress  |
-|  - All quiz attempts and reviews         |
-|                                          |
-|  This action cannot be undone.           |
-|                                          |
-|  [Cancel]              [Delete Course]   |
-+------------------------------------------+
++----------------------------------------------------------+
+| [Avatar] John Smith                                       |
+| Member since: Jan 15, 2026                               |
+|----------------------------------------------------------|
+| Summary                                                   |
+| +----------+ +----------+ +----------+ +-------------+   |
+| | 3        | | 2        | | 85%      | | Jan 25      |   |
+| | Enrolled | | Complete | | Avg Quiz | | Last Active |   |
+| +----------+ +----------+ +----------+ +-------------+   |
+|----------------------------------------------------------|
+| Course Progress                                          |
+|                                                          |
+| [v] Introduction to AI                    [====100%====] |
+|     Completed on Jan 20, 2026                           |
+|                                                          |
+|     Module 1: Basics                                     |
+|       [x] Lesson 1: What is AI?                         |
+|       [x] Lesson 2: History of AI                       |
+|       [x] Quiz: Module 1 Review (Score: 90%)            |
+|                                                          |
+|     Quiz Attempts:                                       |
+|     +----------+-------+--------+------------------+    |
+|     | Quiz     | Score | Passed | Date             |    |
+|     +----------+-------+--------+------------------+    |
+|     | Module 1 | 90%   | Yes    | Jan 20, 2:30 PM  |    |
+|     | Module 1 | 65%   | No     | Jan 19, 4:15 PM  |    |
+|     +----------+-------+--------+------------------+    |
+|                                                          |
+| [ ] Machine Learning Fundamentals        [===60%=====]   |
+|     In Progress                                          |
+|                                                          |
++----------------------------------------------------------+
+|                                              [Close]     |
++----------------------------------------------------------+
 ```
 
 ## Technical Details
 
 ### Files to Create
-None - all changes are modifications to existing files.
+
+**1. `src/components/org-admin/UserProgressDialog.tsx`**
+- Props: `userId`, `userName`, `orgId`, `open`, `onOpenChange`
+- Fetches and displays:
+  - User's enrollments with course details
+  - Lesson progress per course
+  - Quiz attempts with scores and timestamps
+- Uses existing UI components: Dialog, Card, Progress, Badge, Table, Accordion
 
 ### Files to Modify
 
-**1. `src/pages/platform-admin/CoursesManager.tsx`**
-- Import `AlertDialog` components and `Trash2` icon
-- Add delete state management
-- Add delete button to each course card
-- Add confirmation dialog
-- Implement delete handler with toast notifications
+**2. `src/pages/org-admin/OrgAnalytics.tsx`**
+- Add state for selected user and dialog visibility
+- Make table rows clickable
+- Add ChevronRight icon to indicate clickability
+- Import and render `UserProgressDialog`
 
-**2. `src/pages/platform-admin/CourseEditor.tsx`**
-- Import `AlertDialog` components
-- Add delete state management
-- Add "Delete Course" button in the Course Details card
-- Add confirmation dialog
-- Implement delete handler that navigates back after deletion
+### Data Fetching Strategy
 
-### Code Patterns to Follow
-Use the existing patterns from `UserDetailDialog.tsx` and `OrganizationDetail.tsx`:
+The dialog will fetch data when opened:
 
 ```typescript
-// State
-const [deleteOpen, setDeleteOpen] = useState(false);
-const [deleting, setDeleting] = useState(false);
+// 1. Get user's enrollments for this org
+const { data: enrollments } = await supabase
+  .from('enrollments')
+  .select(`
+    *,
+    course:courses(id, title, level)
+  `)
+  .eq('org_id', orgId)
+  .eq('user_id', userId);
 
-// Handler
-const handleDeleteCourse = async () => {
-  setDeleting(true);
-  const { error } = await supabase
-    .from('courses')
-    .delete()
-    .eq('id', course.id);
-  
-  if (error) {
-    toast({ 
-      title: 'Failed to delete course', 
-      description: error.message, 
-      variant: 'destructive' 
-    });
-  } else {
-    toast({ title: 'Course deleted' });
-    // Navigate or refresh
-  }
-  setDeleting(false);
-};
+// 2. For each course, get modules and lessons
+const { data: modules } = await supabase
+  .from('course_modules')
+  .select(`
+    *,
+    lessons(id, title, lesson_type, sort_order)
+  `)
+  .eq('course_id', courseId)
+  .order('sort_order');
+
+// 3. Get lesson progress for user
+const { data: progress } = await supabase
+  .from('lesson_progress')
+  .select('*')
+  .eq('user_id', userId)
+  .eq('org_id', orgId);
+
+// 4. Get quiz attempts for user
+const { data: attempts } = await supabase
+  .from('quiz_attempts')
+  .select(`
+    *,
+    quiz:quizzes(lesson_id)
+  `)
+  .eq('user_id', userId)
+  .eq('org_id', orgId)
+  .order('started_at', { ascending: false });
 ```
 
+### Component Structure
+
+```typescript
+interface UserProgressDialogProps {
+  userId: string;
+  userName: string;
+  orgId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+interface EnrollmentWithProgress {
+  enrollment: Enrollment;
+  course: Course;
+  modules: CourseModule[];
+  lessonProgress: Record<string, LessonProgress>;
+  quizAttempts: QuizAttempt[];
+  totalLessons: number;
+  completedLessons: number;
+}
+```
+
+### UI Components Used
+- `Dialog` - Main container
+- `Card` - Summary stats section
+- `Progress` - Course completion bars
+- `Accordion` or `Collapsible` - Expandable course sections
+- `Badge` - Status indicators (Completed, In Progress)
+- `Table` - Quiz attempt history
+- `CheckCircle2`, `Circle` icons - Lesson completion status
+
 ## Security Considerations
-- RLS policies already restrict course deletion to platform admins only
-- The CASCADE delete rules ensure referential integrity
-- No edge function needed - direct Supabase deletion is sufficient
+- All data access is already protected by RLS policies
+- Org admins can only view progress for users in their organization
+- No edge functions required - direct Supabase queries with existing policies
 
 ## Testing Recommendations
 After implementation:
-1. Create a test course with modules, lessons, and enrollments
-2. Test deletion from the course list view
-3. Test deletion from the course editor view
-4. Verify all related data is cleaned up (check modules, lessons, enrollments in database)
-5. Verify navigation works correctly after deletion
+1. Log in as an org admin
+2. Navigate to Analytics page
+3. Click on a user row to open the progress dialog
+4. Verify enrolled courses are displayed
+5. Verify lesson completion status is accurate
+6. Verify quiz attempt history shows all attempts
+7. Test with users who have no enrollments (should show empty state)
+8. Test with users who have completed courses vs in-progress
+
