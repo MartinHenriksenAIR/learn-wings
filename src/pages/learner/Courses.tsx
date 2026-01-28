@@ -6,10 +6,26 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, Enrollment } from '@/lib/types';
-import { BookOpen, Search, Play, Clock, CheckCircle2, Loader2 } from 'lucide-react';
+import { BookOpen, Search, Play, Clock, CheckCircle2, Loader2, MoreVertical, LogOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LearnerCourses() {
@@ -20,49 +36,55 @@ export default function LearnerCourses() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState<string | null>(null);
+  const [unenrollDialog, setUnenrollDialog] = useState<{ open: boolean; course: Course | null; enrollment: Enrollment | null }>({
+    open: false,
+    course: null,
+    enrollment: null,
+  });
+  const [unenrolling, setUnenrolling] = useState(false);
+
+  const fetchData = async () => {
+    if (!user || !currentOrg) {
+      setLoading(false);
+      return;
+    }
+
+    // Fetch accessible courses for this org
+    const { data: accessData } = await supabase
+      .from('org_course_access')
+      .select('course_id')
+      .eq('org_id', currentOrg.id)
+      .eq('access', 'enabled');
+
+    if (accessData && accessData.length > 0) {
+      const courseIds = accessData.map(a => a.course_id);
+      
+      const { data: coursesData } = await supabase
+        .from('courses')
+        .select('*')
+        .in('id', courseIds)
+        .eq('is_published', true);
+
+      if (coursesData) {
+        setCourses(coursesData as Course[]);
+      }
+    }
+
+    // Fetch user's enrollments
+    const { data: enrollmentData } = await supabase
+      .from('enrollments')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('org_id', currentOrg.id);
+
+    if (enrollmentData) {
+      setEnrollments(enrollmentData as Enrollment[]);
+    }
+
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!user || !currentOrg) {
-        setLoading(false);
-        return;
-      }
-
-      // Fetch accessible courses for this org
-      const { data: accessData } = await supabase
-        .from('org_course_access')
-        .select('course_id')
-        .eq('org_id', currentOrg.id)
-        .eq('access', 'enabled');
-
-      if (accessData && accessData.length > 0) {
-        const courseIds = accessData.map(a => a.course_id);
-        
-        const { data: coursesData } = await supabase
-          .from('courses')
-          .select('*')
-          .in('id', courseIds)
-          .eq('is_published', true);
-
-        if (coursesData) {
-          setCourses(coursesData as Course[]);
-        }
-      }
-
-      // Fetch user's enrollments
-      const { data: enrollmentData } = await supabase
-        .from('enrollments')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('org_id', currentOrg.id);
-
-      if (enrollmentData) {
-        setEnrollments(enrollmentData as Enrollment[]);
-      }
-
-      setLoading(false);
-    };
-
     fetchData();
   }, [user, currentOrg]);
 
@@ -89,16 +111,38 @@ export default function LearnerCourses() {
         title: 'Enrolled successfully!',
         description: 'You can now start learning.',
       });
-      // Refresh enrollments
-      const { data } = await supabase
-        .from('enrollments')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('org_id', currentOrg.id);
-      if (data) setEnrollments(data as Enrollment[]);
+      fetchData();
     }
 
     setEnrolling(null);
+  };
+
+  const handleUnenroll = async () => {
+    if (!unenrollDialog.enrollment) return;
+
+    setUnenrolling(true);
+
+    const { error } = await supabase
+      .from('enrollments')
+      .delete()
+      .eq('id', unenrollDialog.enrollment.id);
+
+    if (error) {
+      toast({
+        title: 'Failed to unenroll',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Unenrolled from course',
+        description: `You've been unenrolled from "${unenrollDialog.course?.title}". Your progress has been removed.`,
+      });
+      fetchData();
+    }
+
+    setUnenrolling(false);
+    setUnenrollDialog({ open: false, course: null, enrollment: null });
   };
 
   const getEnrollmentStatus = (courseId: string) => {
@@ -177,15 +221,40 @@ export default function LearnerCourses() {
                       Completed
                     </div>
                   )}
+                  {enrollment && enrollment.status !== 'completed' && (
+                    <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-accent-foreground">
+                      Enrolled
+                    </div>
+                  )}
                 </div>
                 <CardContent className="p-4">
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <h3 className="font-display font-semibold leading-tight">
                       {course.title}
                     </h3>
-                    <Badge className={levelColors[course.level]}>
-                      {course.level}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge className={levelColors[course.level]}>
+                        {course.level}
+                      </Badge>
+                      {enrollment && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => setUnenrollDialog({ open: true, course, enrollment })}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <LogOut className="mr-2 h-4 w-4" />
+                              Unenroll from course
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   </div>
                   <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
                     {course.description}
@@ -226,6 +295,39 @@ export default function LearnerCourses() {
           })}
         </div>
       )}
+
+      {/* Unenroll Confirmation Dialog */}
+      <AlertDialog
+        open={unenrollDialog.open}
+        onOpenChange={(open) => !open && setUnenrollDialog({ open: false, course: null, enrollment: null })}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unenroll from course?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to unenroll from <strong>"{unenrollDialog.course?.title}"</strong>? 
+              This will remove all your progress and you'll need to re-enroll to access the course again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unenrolling}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnenroll}
+              disabled={unenrolling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {unenrolling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Unenrolling...
+                </>
+              ) : (
+                'Unenroll'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
