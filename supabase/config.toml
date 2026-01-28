@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.azure-view-url]
 verify_jwt = false
+
+[functions.azure-delete-blob]
+verify_jwt = false

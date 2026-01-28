@@ -229,9 +229,48 @@ export default function CourseEditor() {
   };
 
   const handleDeleteLesson = async (lessonId: string) => {
+    // First, get the lesson to check if it has an Azure blob
+    const { data: lesson, error: fetchError } = await supabase
+      .from('lessons')
+      .select('azure_blob_path')
+      .eq('id', lessonId)
+      .maybeSingle();
+
+    if (fetchError) {
+      toast({ title: 'Failed to fetch lesson', description: fetchError.message, variant: 'destructive' });
+      return;
+    }
+
+    // If lesson has an Azure blob, delete it first
+    if (lesson?.azure_blob_path) {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const response = await supabase.functions.invoke('azure-delete-blob', {
+          body: { blobPath: lesson.azure_blob_path },
+        });
+
+        if (response.error) {
+          console.error('Failed to delete Azure blob:', response.error);
+          // Continue with lesson deletion even if blob deletion fails
+          toast({ 
+            title: 'Warning', 
+            description: 'Could not delete video file from storage, but lesson will be removed.',
+            variant: 'destructive' 
+          });
+        } else {
+          console.log('Azure blob deleted successfully:', lesson.azure_blob_path);
+        }
+      } catch (err) {
+        console.error('Error calling azure-delete-blob:', err);
+        // Continue with lesson deletion
+      }
+    }
+
+    // Delete the lesson from the database
     const { error } = await supabase.from('lessons').delete().eq('id', lessonId);
-    if (error) toast({ title: 'Failed to delete lesson', description: error.message, variant: 'destructive' });
-    else {
+    if (error) {
+      toast({ title: 'Failed to delete lesson', description: error.message, variant: 'destructive' });
+    } else {
       toast({ title: 'Lesson deleted' });
       fetchModules();
     }
