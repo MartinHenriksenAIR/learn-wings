@@ -15,7 +15,8 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, TrendingUp, Award, BookOpen, Loader2 } from 'lucide-react';
+import { Users, TrendingUp, Award, BookOpen, Loader2, ChevronRight } from 'lucide-react';
+import { UserProgressDialog } from '@/components/org-admin/UserProgressDialog';
 
 interface CourseStats {
   id: string;
@@ -46,6 +47,8 @@ export default function OrgAnalytics() {
   });
   const [courseStats, setCourseStats] = useState<CourseStats[]>([]);
   const [userStats, setUserStats] = useState<UserStats[]>([]);
+  const [selectedUser, setSelectedUser] = useState<UserStats | null>(null);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -292,15 +295,26 @@ export default function OrgAnalytics() {
                   <TableHead className="text-right">Courses</TableHead>
                   <TableHead className="text-right">Completed</TableHead>
                   <TableHead className="text-right">Avg Score</TableHead>
+                  <TableHead className="w-8"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {userStats.map((user) => (
-                  <TableRow key={user.id}>
+                  <TableRow
+                    key={user.id}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      setSelectedUser(user);
+                      setProgressDialogOpen(true);
+                    }}
+                  >
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell className="text-right">{user.enrollments}</TableCell>
                     <TableCell className="text-right">{user.completed}</TableCell>
                     <TableCell className="text-right">{user.avgQuizScore}%</TableCell>
+                    <TableCell>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -308,6 +322,16 @@ export default function OrgAnalytics() {
           </CardContent>
         </Card>
       </div>
+
+      {selectedUser && currentOrg && (
+        <UserProgressDialog
+          userId={selectedUser.id}
+          userName={selectedUser.name}
+          orgId={currentOrg.id}
+          open={progressDialogOpen}
+          onOpenChange={setProgressDialogOpen}
+        />
+      )}
     </AppLayout>
   );
 }
