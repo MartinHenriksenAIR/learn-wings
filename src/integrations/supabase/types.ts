@@ -728,6 +728,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_invitation: {
+        Args: { p_invitation_link_id: string; p_user_id: string }
+        Returns: Json
+      }
       can_access_lms_asset: { Args: { file_path: string }; Returns: boolean }
       current_org_ids_for_user: { Args: never; Returns: string[] }
       get_invitation_by_token: {

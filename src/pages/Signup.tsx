@@ -123,7 +123,7 @@ export default function Signup() {
       return;
     }
 
-    // If there's an invitation, accept it
+    // If there's an invitation, accept it using the secure RPC function
     if (invitation && inviteToken) {
       // Wait for the profile trigger to create the profile
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -133,41 +133,19 @@ export default function Signup() {
       
       if (newUser) {
         try {
-          if (invitation.is_platform_admin_invite) {
-            // Set the user as platform admin
-            await supabase
-              .from('profiles')
-              .update({ is_platform_admin: true })
-              .eq('id', newUser.id);
-          } else if (invitation.org_id) {
-            // Check if membership already exists
-            const { data: existingMembership } = await supabase
-              .from('org_memberships')
-              .select('id')
-              .eq('org_id', invitation.org_id)
-              .eq('user_id', newUser.id)
-              .maybeSingle();
-
-            if (!existingMembership) {
-              // Create org membership
-              const { error: membershipError } = await supabase.from('org_memberships').insert({
-                org_id: invitation.org_id,
-                user_id: newUser.id,
-                role: invitation.role,
-                status: 'active',
-              });
-              
-              if (membershipError) {
-                console.error('Failed to create membership:', membershipError);
-              }
-            }
+          // Use the secure RPC function to accept the invitation
+          // This bypasses RLS and correctly assigns the role from the invitation
+          const { data: acceptResult, error: acceptError } = await supabase
+            .rpc('accept_invitation', {
+              p_invitation_link_id: inviteToken,
+              p_user_id: newUser.id,
+            });
+          
+          if (acceptError) {
+            console.error('Failed to accept invitation:', acceptError);
+          } else if (acceptResult && typeof acceptResult === 'object' && 'success' in acceptResult && !acceptResult.success) {
+            console.error('Invitation acceptance failed:', (acceptResult as { error?: string }).error);
           }
-
-          // Update invitation status
-          await supabase
-            .from('invitations')
-            .update({ status: 'accepted' })
-            .eq('id', invitation.id);
         } catch (err) {
           console.error('Error processing invitation:', err);
         }
