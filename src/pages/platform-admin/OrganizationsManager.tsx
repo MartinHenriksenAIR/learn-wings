@@ -39,6 +39,7 @@ import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail } from 'l
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
+import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 
 const orgSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -146,12 +147,31 @@ export default function OrganizationsManager() {
         status: 'active',
       });
     } else if (adminTab === 'invite' && inviteEmail.trim()) {
-      await supabase.from('invitations').insert({
-        org_id: newOrg.id,
-        email: inviteEmail.trim(),
-        role: 'org_admin' as OrgRole,
-        invited_by_user_id: user?.id,
-      });
+      const { data: insertedInvitation } = await supabase
+        .from('invitations')
+        .insert({
+          org_id: newOrg.id,
+          email: inviteEmail.trim(),
+          role: 'org_admin' as OrgRole,
+          invited_by_user_id: user?.id,
+        })
+        .select('id')
+        .single();
+
+      // Send invitation email
+      if (insertedInvitation?.id) {
+        const { data: linkId } = await supabase
+          .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
+        
+        if (linkId) {
+          await sendInvitationEmail({
+            email: inviteEmail.trim(),
+            orgName: name,
+            role: 'org_admin',
+            linkId,
+          });
+        }
+      }
     }
 
     toast({
