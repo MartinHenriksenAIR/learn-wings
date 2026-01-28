@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
+import { getSignedAssetUrl } from '@/lib/storage';
 import { 
   ChevronRight, 
   CheckCircle2, 
@@ -45,6 +46,11 @@ export default function CoursePlayer() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
+
+  // Signed URLs for secure content access
+  const [signedVideoUrl, setSignedVideoUrl] = useState<string | null>(null);
+  const [signedDocUrl, setSignedDocUrl] = useState<string | null>(null);
+  const [loadingAssets, setLoadingAssets] = useState(false);
 
   // Course completion and review state
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
@@ -180,6 +186,37 @@ export default function CoursePlayer() {
     };
 
     loadQuiz();
+  }, [currentLesson]);
+
+  // Load signed URLs for secure content access when lesson changes
+  useEffect(() => {
+    const loadSignedUrls = async () => {
+      if (!currentLesson) {
+        setSignedVideoUrl(null);
+        setSignedDocUrl(null);
+        return;
+      }
+
+      setLoadingAssets(true);
+      try {
+        const [videoUrl, docUrl] = await Promise.all([
+          currentLesson.video_storage_path 
+            ? getSignedAssetUrl(currentLesson.video_storage_path)
+            : null,
+          currentLesson.document_storage_path 
+            ? getSignedAssetUrl(currentLesson.document_storage_path)
+            : null,
+        ]);
+        setSignedVideoUrl(videoUrl);
+        setSignedDocUrl(docUrl);
+      } catch (error) {
+        console.error('Error loading signed URLs:', error);
+      } finally {
+        setLoadingAssets(false);
+      }
+    };
+
+    loadSignedUrls();
   }, [currentLesson]);
 
   const handleSelectLesson = (lesson: Lesson) => {
@@ -413,12 +450,23 @@ export default function CoursePlayer() {
                 {currentLesson.lesson_type === 'video' && (
                   <div className="space-y-4">
                     <div className="aspect-video rounded-lg bg-muted flex items-center justify-center">
-                      {currentLesson.video_storage_path ? (
+                      {loadingAssets ? (
+                        <div className="text-center text-muted-foreground">
+                          <Loader2 className="mx-auto h-12 w-12 mb-2 animate-spin" />
+                          <p>Loading video...</p>
+                        </div>
+                      ) : signedVideoUrl ? (
                         <video
+                          key={signedVideoUrl}
                           controls
                           className="w-full h-full rounded-lg"
-                          src={currentLesson.video_storage_path}
+                          src={signedVideoUrl}
                         />
+                      ) : currentLesson.video_storage_path ? (
+                        <div className="text-center text-muted-foreground">
+                          <Play className="mx-auto h-12 w-12 mb-2" />
+                          <p>Unable to load video. Please try again.</p>
+                        </div>
                       ) : (
                         <div className="text-center text-muted-foreground">
                           <Play className="mx-auto h-12 w-12 mb-2" />
@@ -441,14 +489,19 @@ export default function CoursePlayer() {
                         <p className="text-muted-foreground">Document content will appear here.</p>
                       )}
                     </div>
-                    {currentLesson.document_storage_path && (
+                    {signedDocUrl ? (
                       <Button variant="outline" asChild>
-                        <a href={currentLesson.document_storage_path} target="_blank" rel="noopener noreferrer">
+                        <a href={signedDocUrl} target="_blank" rel="noopener noreferrer">
                           <FileText className="mr-2 h-4 w-4" />
                           View Document
                         </a>
                       </Button>
-                    )}
+                    ) : currentLesson.document_storage_path && loadingAssets ? (
+                      <Button variant="outline" disabled>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading Document...
+                      </Button>
+                    ) : null}
                   </div>
                 )}
 

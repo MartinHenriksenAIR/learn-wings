@@ -78,13 +78,16 @@ export function FileUpload({
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
+      // Get signed URL (expires in 1 hour) for secure access
+      const { data: signedData, error: signedError } = await supabase.storage
         .from(bucket)
-        .getPublicUrl(storagePath);
+        .createSignedUrl(storagePath, 3600);
+
+      if (signedError) throw signedError;
 
       setProgress(100);
-      onChange(urlData.publicUrl, storagePath);
+      // Store the signed URL for display, and the storage path for persistence
+      onChange(signedData.signedUrl, storagePath);
     } catch (err: any) {
       setError(err.message || 'Upload failed');
       onChange(null, null);
