@@ -275,15 +275,17 @@ export default function Login() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm">
-              <span className="text-muted-foreground">Don't have an account? </span>
-              <Link
-                to={inviteToken ? `/signup?invite=${inviteToken}` : '/signup'}
-                className="font-medium text-accent hover:underline"
-              >
-                Sign up
-              </Link>
-            </div>
+            {inviteToken && (
+              <div className="mt-6 text-center text-sm">
+                <span className="text-muted-foreground">Don't have an account? </span>
+                <Link
+                  to={`/signup?invite=${inviteToken}`}
+                  className="font-medium text-accent hover:underline"
+                >
+                  Sign up
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
