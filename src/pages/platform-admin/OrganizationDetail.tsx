@@ -106,6 +106,9 @@ export default function OrganizationDetail() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFirstName, setInviteFirstName] = useState('');
+  const [inviteLastName, setInviteLastName] = useState('');
+  const [inviteDepartment, setInviteDepartment] = useState('');
   const [inviteRole, setInviteRole] = useState<OrgRole>('learner');
   const [inviting, setInviting] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -330,6 +333,9 @@ export default function OrganizationDetail() {
       });
       setInviteOpen(false);
       setInviteEmail('');
+      setInviteFirstName('');
+      setInviteLastName('');
+      setInviteDepartment('');
       setInviteRole('learner');
       fetchData();
     }
@@ -534,6 +540,35 @@ export default function OrganizationDetail() {
                     placeholder="colleague@company.com"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="invite-first-name">First Name</Label>
+                    <Input
+                      id="invite-first-name"
+                      placeholder="John"
+                      value={inviteFirstName}
+                      onChange={(e) => setInviteFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="invite-last-name">Last Name</Label>
+                    <Input
+                      id="invite-last-name"
+                      placeholder="Doe"
+                      value={inviteLastName}
+                      onChange={(e) => setInviteLastName(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-department">Department</Label>
+                  <Input
+                    id="invite-department"
+                    placeholder="Engineering"
+                    value={inviteDepartment}
+                    onChange={(e) => setInviteDepartment(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
