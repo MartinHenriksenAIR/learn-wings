@@ -85,36 +85,18 @@ export default function Login() {
   }, [user, isPlatformAdmin, isOrgAdmin, isLoading, navigate, inviteToken]);
 
   const acceptInvitation = async (userId: string) => {
-    if (!invitation) return;
+    if (!invitation || !inviteToken) return;
 
-    if (invitation.is_platform_admin_invite) {
-      await supabase
-        .from('profiles')
-        .update({ is_platform_admin: true })
-        .eq('id', userId);
-    } else if (invitation.org_id) {
-      // Check if membership already exists
-      const { data: existingMembership } = await supabase
-        .from('org_memberships')
-        .select('id')
-        .eq('org_id', invitation.org_id)
-        .eq('user_id', userId)
-        .maybeSingle();
+    // Use the secure RPC function for invitation acceptance
+    const { data: acceptResult, error: acceptError } = await supabase
+      .rpc('accept_invitation', {
+        p_invitation_link_id: inviteToken,
+        p_user_id: userId,
+      });
 
-      if (!existingMembership) {
-        await supabase.from('org_memberships').insert({
-          org_id: invitation.org_id,
-          user_id: userId,
-          role: invitation.role,
-          status: 'active',
-        });
-      }
+    if (acceptError) {
+      console.error('Failed to accept invitation:', acceptError);
     }
-
-    await supabase
-      .from('invitations')
-      .update({ status: 'accepted' })
-      .eq('id', invitation.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
