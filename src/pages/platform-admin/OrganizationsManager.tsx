@@ -392,11 +392,13 @@ export default function OrganizationsManager() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       {org.logo_url ? (
-                        <img
-                          src={org.logo_url}
-                          alt={org.name}
-                          className="h-10 w-10 rounded-lg object-cover"
-                        />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted overflow-hidden">
+                          <img
+                            src={org.logo_url}
+                            alt={org.name}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </div>
                       ) : (
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                           <Building2 className="h-5 w-5 text-primary" />
