@@ -463,6 +463,8 @@ export default function CoursePlayer() {
                         className="w-full h-full rounded-lg"
                         frameBorder="0"
                         allowFullScreen
+                        allow="autoplay; fullscreen; encrypted-media"
+                        referrerPolicy="no-referrer-when-downgrade"
                         title={currentLesson.title}
                       />
                     ) : signedVideoUrl ? (
