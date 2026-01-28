@@ -97,15 +97,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Use service role key to bypass RLS for user verification
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Get the authenticated user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // Validate JWT token by passing it to getUser
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
+      console.log('azure-view-url: Auth failed:', userError?.message);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
         status: 401, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -113,6 +115,7 @@ Deno.serve(async (req) => {
     }
 
     const userId = user.id;
+    console.log('azure-view-url: User authenticated:', userId);
 
     // Parse request body
     const { blobPath, lessonId } = await req.json();
