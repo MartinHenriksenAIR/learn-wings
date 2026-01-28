@@ -1,18 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { StatCard } from '@/components/ui/stat-card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -24,17 +13,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization } from '@/lib/types';
-import { Users, TrendingUp, Award, BookOpen, Loader2, ChevronRight, FileText, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { UserProgressDialog } from '@/components/org-admin/UserProgressDialog';
+import { Loader2, Users, BarChart3, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface CourseStats {
-  id: string;
-  title: string;
-  enrolled: number;
-  completed: number;
-  avgProgress: number;
-}
+import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
+import { TeamPerformanceTab } from '@/components/org-admin/analytics/TeamPerformanceTab';
+import { CourseProgressTab } from '@/components/org-admin/analytics/CourseProgressTab';
 
 interface UserStats {
   id: string;
@@ -47,12 +30,14 @@ interface UserStats {
 
 export default function OrgAnalytics() {
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isGlobalView = location.pathname === '/app/admin/analytics/global';
   const { currentOrg, isPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [loading, setLoading] = useState(true);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers7Days: 0,
@@ -60,15 +45,15 @@ export default function OrgAnalytics() {
     avgQuizScore: 0,
     completionRate: 0,
   });
-  const [courseStats, setCourseStats] = useState<CourseStats[]>([]);
   const [userStats, setUserStats] = useState<UserStats[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'completed' | 'score'>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedUser, setSelectedUser] = useState<UserStats | null>(null);
-  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
+
+  // Sync tab with URL
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setSearchParams({ tab: value });
+  };
 
   // Fetch organizations for global view filter
   useEffect(() => {
@@ -101,7 +86,6 @@ export default function OrgAnalytics() {
 
       setLoading(true);
 
-      // Build query filters based on context
       const orgFilter = effectiveOrgId;
 
       // Get total users
@@ -176,71 +160,7 @@ export default function OrgAnalytics() {
         completionRate,
       });
 
-      // Get course stats
-      let courseStatsData: CourseStats[] = [];
-      
-      if (orgFilter) {
-        // Specific org: get courses with access
-        const { data: orgCourses } = await supabase
-          .from('org_course_access')
-          .select('course_id, course:courses(id, title)')
-          .eq('org_id', orgFilter)
-          .eq('access', 'enabled');
-
-        if (orgCourses) {
-          for (const access of orgCourses) {
-            const course = access.course as any;
-            if (!course) continue;
-
-            const { data: courseEnrollments } = await supabase
-              .from('enrollments')
-              .select('*')
-              .eq('org_id', orgFilter)
-              .eq('course_id', course.id);
-
-            const enrolled = courseEnrollments?.length || 0;
-            const completed = courseEnrollments?.filter(e => e.status === 'completed').length || 0;
-
-            courseStatsData.push({
-              id: course.id,
-              title: course.title,
-              enrolled,
-              completed,
-              avgProgress: enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0,
-            });
-          }
-        }
-      } else if (isGlobalView) {
-        // Global view: get all courses
-        const { data: allCourses } = await supabase
-          .from('courses')
-          .select('id, title')
-          .limit(10);
-
-        if (allCourses) {
-          for (const course of allCourses) {
-            const { data: courseEnrollments } = await supabase
-              .from('enrollments')
-              .select('status')
-              .eq('course_id', course.id);
-
-            const enrolled = courseEnrollments?.length || 0;
-            const completed = courseEnrollments?.filter(e => e.status === 'completed').length || 0;
-
-            courseStatsData.push({
-              id: course.id,
-              title: course.title,
-              enrolled,
-              completed,
-              avgProgress: enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0,
-            });
-          }
-        }
-      }
-
-      setCourseStats(courseStatsData);
-
-      // Get user stats (top 10)
+      // Get user stats for team performance
       let userStatsData: UserStats[] = [];
       let uniqueDepartments: string[] = [];
 
@@ -249,8 +169,7 @@ export default function OrgAnalytics() {
           .from('org_memberships')
           .select('user_id, profile:profiles(id, full_name, department)')
           .eq('org_id', orgFilter)
-          .eq('status', 'active')
-          .limit(50);
+          .eq('status', 'active');
 
         if (members) {
           // Extract unique departments
@@ -265,7 +184,7 @@ export default function OrgAnalytics() {
 
             const { data: userEnrollments } = await supabase
               .from('enrollments')
-              .select('*')
+              .select('status')
               .eq('org_id', orgFilter)
               .eq('user_id', profile.id);
 
@@ -290,7 +209,6 @@ export default function OrgAnalytics() {
           }
         }
       }
-      // For global "all" view, we skip user-level stats as it would be too broad
 
       setDepartments(uniqueDepartments);
       setUserStats(userStatsData);
@@ -299,63 +217,6 @@ export default function OrgAnalytics() {
 
     fetchData();
   }, [currentOrg, effectiveOrgId, isGlobalView]);
-
-  // Redirect if analytics are disabled
-  if (!settingsLoading && !features.analytics_enabled) {
-    return <Navigate to="/app/dashboard" replace />;
-  }
-
-  if (loading || settingsLoading) {
-    return (
-      <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
-      </AppLayout>
-    );
-  }
-
-  // For org-specific view, require currentOrg
-  if (!isGlobalView && !currentOrg) {
-    return (
-      <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
-        <div className="flex h-64 flex-col items-center justify-center text-center">
-          <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">No organization selected.</p>
-          <p className="text-sm text-muted-foreground">Join an organization to view analytics.</p>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization Analytics';
-  const breadcrumbs = isGlobalView 
-    ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
-    : [{ label: 'Analytics' }];
-
-  // Filter and sort user stats
-  const filteredUserStats = userStats
-    .filter((user) => {
-      if (selectedDepartment === 'all') return true;
-      if (selectedDepartment === 'unassigned') return !user.department;
-      return user.department === selectedDepartment;
-    })
-    .sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case 'completed':
-          comparison = b.completed - a.completed;
-          break;
-        case 'score':
-          comparison = b.avgQuizScore - a.avgQuizScore;
-          break;
-        case 'name':
-        default:
-          comparison = a.name.localeCompare(b.name);
-          break;
-      }
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
 
   // Generate compliance report
   const handleGenerateReport = async () => {
@@ -408,6 +269,39 @@ export default function OrgAnalytics() {
     }
   };
 
+  // Redirect if analytics are disabled
+  if (!settingsLoading && !features.analytics_enabled) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
+  if (loading || settingsLoading) {
+    return (
+      <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // For org-specific view, require currentOrg
+  if (!isGlobalView && !currentOrg) {
+    return (
+      <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
+        <div className="flex h-64 flex-col items-center justify-center text-center">
+          <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground">No organization selected.</p>
+          <p className="text-sm text-muted-foreground">Join an organization to view analytics.</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization Analytics';
+  const breadcrumbs = isGlobalView 
+    ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
+    : [{ label: 'Analytics' }];
+
   return (
     <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
       {/* Organization Filter for Global View */}
@@ -430,202 +324,57 @@ export default function OrgAnalytics() {
         </div>
       )}
 
-      {/* Report Generation - Only for org-specific view */}
-      {!isGlobalView && currentOrg && (
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">AI Act Compliance</h2>
-            <p className="text-sm text-muted-foreground">
-              Generate a PDF report documenting staff training completion status
-            </p>
-          </div>
-          <Button
-            onClick={handleGenerateReport}
-            disabled={generatingReport}
-            variant="outline"
-            className="gap-2"
-          >
-            {generatingReport ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileText className="h-4 w-4" />
-            )}
-            {generatingReport ? 'Generating...' : 'Download Report'}
-          </Button>
-        </div>
-      )}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsTrigger value="overview" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="team" className="gap-2">
+            <Users className="h-4 w-4" />
+            Team
+          </TabsTrigger>
+          <TabsTrigger value="courses" className="gap-2">
+            <BookOpen className="h-4 w-4" />
+            Courses
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Summary Stats */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard
-          title={isGlobalView && selectedOrgId === 'all' ? 'Total Users' : 'Total Members'}
-          value={stats.totalUsers}
-          icon={<Users className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Active (7 days)"
-          value={stats.activeUsers7Days}
-          icon={<TrendingUp className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Active (30 days)"
-          value={stats.activeUsers30Days}
-          icon={<TrendingUp className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Completion Rate"
-          value={`${stats.completionRate}%`}
-          icon={<Award className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Avg Quiz Score"
-          value={`${stats.avgQuizScore}%`}
-          icon={<BookOpen className="h-5 w-5" />}
-        />
-      </div>
+        <TabsContent value="overview">
+          <AnalyticsOverview
+            stats={stats}
+            isGlobalView={isGlobalView}
+            selectedOrgId={selectedOrgId}
+            showComplianceReport={!isGlobalView && !!currentOrg}
+            generatingReport={generatingReport}
+            onGenerateReport={handleGenerateReport}
+          />
+        </TabsContent>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Course Progress */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Course Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {courseStats.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No courses available yet.</p>
-            ) : (
-              <div className="space-y-4">
-                {courseStats.map((course) => (
-                  <div key={course.id} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{course.title}</span>
-                      <span className="text-muted-foreground">
-                        {course.completed}/{course.enrolled} completed
-                      </span>
-                    </div>
-                    <Progress value={course.avgProgress} className="h-2" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <TabsContent value="team">
+          {effectiveOrgId ? (
+            <TeamPerformanceTab
+              userStats={userStats}
+              departments={departments}
+              orgId={effectiveOrgId}
+            />
+          ) : (
+            <div className="py-12 text-center text-muted-foreground">
+              Select an organization to view team performance.
+            </div>
+          )}
+        </TabsContent>
 
-        {/* User Performance - Only show when org is selected */}
-        {(effectiveOrgId || !isGlobalView) && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <CardTitle className="text-base">Team Performance</CardTitle>
-              <div className="flex items-center gap-2">
-                <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'name' | 'completed' | 'score')}>
-                  <SelectTrigger className="w-32 h-8 text-xs">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="completed">Progress</SelectItem>
-                    <SelectItem value="score">Activity</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                  title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
-                >
-                  {sortDirection === 'asc' ? (
-                    <ArrowUp className="h-3.5 w-3.5" />
-                  ) : (
-                    <ArrowDown className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                  <SelectTrigger className="w-40 h-8 text-xs">
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {filteredUserStats.length === 0 ? (
-                <p className="p-6 text-sm text-muted-foreground">
-                  {userStats.length === 0 ? 'No user data available.' : 'No users in this department.'}
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead className="text-right">Courses</TableHead>
-                      <TableHead className="text-right">Completed</TableHead>
-                      <TableHead className="text-right">Avg Score</TableHead>
-                      <TableHead className="w-8"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUserStats.map((user) => (
-                      <TableRow
-                        key={user.id}
-                        className="cursor-pointer"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setProgressDialogOpen(true);
-                        }}
-                      >
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {user.department || <span className="italic">Unassigned</span>}
-                        </TableCell>
-                        <TableCell className="text-right">{user.enrollments}</TableCell>
-                        <TableCell className="text-right">{user.completed}</TableCell>
-                        <TableCell className="text-right">{user.avgQuizScore}%</TableCell>
-                        <TableCell>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Show message when viewing all orgs in global view */}
-        {isGlobalView && selectedOrgId === 'all' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Team Performance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Select a specific organization to view individual user performance.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {selectedUser && effectiveOrgId && (
-        <UserProgressDialog
-          userId={selectedUser.id}
-          userName={selectedUser.name}
-          orgId={effectiveOrgId}
-          open={progressDialogOpen}
-          onOpenChange={setProgressDialogOpen}
-        />
-      )}
+        <TabsContent value="courses">
+          {effectiveOrgId ? (
+            <CourseProgressTab orgId={effectiveOrgId} />
+          ) : (
+            <div className="py-12 text-center text-muted-foreground">
+              Select an organization to view course progress.
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </AppLayout>
   );
 }
