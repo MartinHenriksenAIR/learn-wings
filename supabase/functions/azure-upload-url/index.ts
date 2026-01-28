@@ -88,24 +88,38 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('azure-upload-url: Request received');
+    
     // Verify user is authenticated and is platform admin
     const authHeader = req.headers.get('Authorization');
+    console.log('azure-upload-url: Auth header present:', !!authHeader);
+    
     if (!authHeader?.startsWith('Bearer ')) {
+      console.log('azure-upload-url: Missing or invalid auth header');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
         status: 401, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    console.log('azure-upload-url: SUPABASE_URL present:', !!supabaseUrl);
+    console.log('azure-upload-url: SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
+
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
+      supabaseUrl!,
+      supabaseAnonKey!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
     // Get the authenticated user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
+    console.log('azure-upload-url: getUser result - user:', !!user, 'error:', userError?.message);
+    
     if (userError || !user) {
+      console.log('azure-upload-url: User auth failed:', userError?.message);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
         status: 401, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -113,6 +127,7 @@ Deno.serve(async (req) => {
     }
 
     const userId = user.id;
+    console.log('azure-upload-url: User ID:', userId);
 
     // Check if user is platform admin
     const { data: profile, error: profileError } = await supabase
@@ -121,7 +136,10 @@ Deno.serve(async (req) => {
       .eq('id', userId)
       .single();
 
+    console.log('azure-upload-url: Profile result - is_platform_admin:', profile?.is_platform_admin, 'error:', profileError?.message);
+
     if (profileError || !profile?.is_platform_admin) {
+      console.log('azure-upload-url: Not a platform admin');
       return new Response(JSON.stringify({ error: 'Only platform admins can upload videos' }), { 
         status: 403, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
