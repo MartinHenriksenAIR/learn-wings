@@ -457,7 +457,7 @@ export default function CoursePlayer() {
                         <p>Loading video...</p>
                       </div>
                     ) : currentLesson.video_url ? (
-                      // SharePoint embed
+                      // SharePoint embed with credentialless to prevent browser cookies from forcing auth
                       <iframe
                         src={getVideoEmbedUrl(currentLesson.video_url) || currentLesson.video_url}
                         className="w-full h-full rounded-lg"
@@ -466,6 +466,8 @@ export default function CoursePlayer() {
                         allow="autoplay; fullscreen; encrypted-media"
                         referrerPolicy="no-referrer-when-downgrade"
                         title={currentLesson.title}
+                        // @ts-expect-error - credentialless is a new attribute not in React types yet
+                        credentialless="true"
                       />
                     ) : signedVideoUrl ? (
                         <video
