@@ -16,6 +16,7 @@ import LearnerDashboard from "./pages/learner/Dashboard";
 import LearnerCourses from "./pages/learner/Courses";
 import CoursePlayer from "./pages/learner/CoursePlayer";
 import Certificates from "./pages/learner/Certificates";
+import IdeasHub from "./pages/learner/IdeasHub";
 import OrgDashboard from "./pages/org-admin/OrgDashboard";
 import OrgUsers from "./pages/org-admin/OrgUsers";
 import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
@@ -44,6 +45,7 @@ function AppRoutes() {
       <Route path="/app/courses" element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
       <Route path="/app/learn/:courseId" element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
       <Route path="/app/certificates" element={<ProtectedRoute learnerOnly><Certificates /></ProtectedRoute>} />
+      <Route path="/app/ideas" element={<ProtectedRoute learnerOnly><IdeasHub /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
       <Route path="/app/admin/org" element={<ProtectedRoute requireOrgAdmin><OrgDashboard /></ProtectedRoute>} />
