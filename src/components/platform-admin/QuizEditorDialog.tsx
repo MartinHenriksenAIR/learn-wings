@@ -393,16 +393,27 @@ export function QuizEditorDialog({
                             onValueChange={(value) => setCorrectOption(qIndex, value)}
                           >
                             {question.options.map((option, oIndex) => (
-                              <div key={option.id} className="flex items-center gap-2">
+                              <div 
+                                key={option.id} 
+                                className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                                  option.is_correct 
+                                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' 
+                                    : 'border-transparent hover:bg-muted/50'
+                                }`}
+                                onClick={() => setCorrectOption(qIndex, option.id)}
+                              >
                                 <RadioGroupItem value={option.id} id={option.id} />
                                 <Input
                                   value={option.option_text}
                                   onChange={(e) => updateOptionText(qIndex, oIndex, e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
                                   placeholder={`Option ${oIndex + 1}`}
                                   className="flex-1"
                                 />
                                 {option.is_correct && (
-                                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                                  <Badge variant="outline" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 border-emerald-300">
+                                    Correct
+                                  </Badge>
                                 )}
                                 {question.options.length > 2 && (
                                   <Button
@@ -410,7 +421,10 @@ export function QuizEditorDialog({
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    onClick={() => removeOption(qIndex, oIndex)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeOption(qIndex, oIndex);
+                                    }}
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
