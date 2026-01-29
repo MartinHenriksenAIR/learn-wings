@@ -537,7 +537,7 @@ export default function CourseEditor() {
 
       {/* Lesson Dialog */}
       <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingLesson ? 'Edit Lesson' : 'Add Lesson'}</DialogTitle>
             <DialogDescription>
