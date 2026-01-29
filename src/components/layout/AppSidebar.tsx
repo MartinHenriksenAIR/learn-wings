@@ -39,6 +39,7 @@ import {
   ChevronDown,
   Award,
   Eye,
+  Lightbulb,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
 
@@ -74,6 +75,7 @@ export function AppSidebar() {
   const learnerItems = [
     { title: 'Dashboard', url: '/app/dashboard', icon: LayoutDashboard },
     { title: 'My Courses', url: '/app/courses', icon: BookOpen },
+    { title: 'Ideas Hub', url: '/app/ideas', icon: Lightbulb },
     ...(features.certificates_enabled ? [{ title: 'Certificates', url: '/app/certificates', icon: Award }] : []),
   ];
 

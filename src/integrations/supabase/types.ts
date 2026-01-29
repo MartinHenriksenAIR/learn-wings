@@ -14,6 +14,64 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversations: {
+        Row: {
+          context_id: string | null
+          context_type: string
+          created_at: string
+          id: string
+          idea_id: string | null
+          messages: Json
+          org_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          context_id?: string | null
+          context_type: string
+          created_at?: string
+          id?: string
+          idea_id?: string | null
+          messages?: Json
+          org_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          context_id?: string | null
+          context_type?: string
+          created_at?: string
+          id?: string
+          idea_id?: string | null
+          messages?: Json
+          org_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversations_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_conversations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_conversations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_modules: {
         Row: {
           course_id: string
@@ -184,6 +242,353 @@ export type Database = {
           },
           {
             foreignKeyName: "enrollments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      idea_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          parent_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "idea_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "idea_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      idea_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          idea_id: string
+          org_id: string
+          parent_comment_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          idea_id: string
+          org_id: string
+          parent_comment_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          idea_id?: string
+          org_id?: string
+          parent_comment_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "idea_comments_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "idea_comments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "idea_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "idea_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "idea_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      idea_evaluations: {
+        Row: {
+          complexity_score: number | null
+          created_at: string
+          evaluated_by: string
+          id: string
+          idea_id: string
+          notes: string | null
+          updated_at: string
+          value_score: number | null
+          viability_assessment: string | null
+        }
+        Insert: {
+          complexity_score?: number | null
+          created_at?: string
+          evaluated_by: string
+          id?: string
+          idea_id: string
+          notes?: string | null
+          updated_at?: string
+          value_score?: number | null
+          viability_assessment?: string | null
+        }
+        Update: {
+          complexity_score?: number | null
+          created_at?: string
+          evaluated_by?: string
+          id?: string
+          idea_id?: string
+          notes?: string | null
+          updated_at?: string
+          value_score?: number | null
+          viability_assessment?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "idea_evaluations_evaluated_by_fkey"
+            columns: ["evaluated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "idea_evaluations_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      idea_specifications: {
+        Row: {
+          created_at: string
+          created_by: string
+          dependencies: string | null
+          estimated_effort: string | null
+          id: string
+          idea_id: string
+          next_steps: string | null
+          out_of_scope: string | null
+          problem_definition: string | null
+          requirements: string | null
+          risks: string | null
+          success_criteria: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          dependencies?: string | null
+          estimated_effort?: string | null
+          id?: string
+          idea_id: string
+          next_steps?: string | null
+          out_of_scope?: string | null
+          problem_definition?: string | null
+          requirements?: string | null
+          risks?: string | null
+          success_criteria?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          dependencies?: string | null
+          estimated_effort?: string | null
+          id?: string
+          idea_id?: string
+          next_steps?: string | null
+          out_of_scope?: string | null
+          problem_definition?: string | null
+          requirements?: string | null
+          risks?: string | null
+          success_criteria?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "idea_specifications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "idea_specifications_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      idea_votes: {
+        Row: {
+          created_at: string
+          id: string
+          idea_id: string
+          org_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          idea_id: string
+          org_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          idea_id?: string
+          org_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "idea_votes_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "ideas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "idea_votes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "idea_votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ideas: {
+        Row: {
+          category_id: string | null
+          course_context_id: string | null
+          created_at: string
+          description: string | null
+          expected_impact: string | null
+          id: string
+          lesson_context_id: string | null
+          org_id: string
+          problem_statement: string | null
+          proposed_solution: string | null
+          status: Database["public"]["Enums"]["idea_status"]
+          submitted_at: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          course_context_id?: string | null
+          created_at?: string
+          description?: string | null
+          expected_impact?: string | null
+          id?: string
+          lesson_context_id?: string | null
+          org_id: string
+          problem_statement?: string | null
+          proposed_solution?: string | null
+          status?: Database["public"]["Enums"]["idea_status"]
+          submitted_at?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          course_context_id?: string | null
+          created_at?: string
+          description?: string | null
+          expected_impact?: string | null
+          id?: string
+          lesson_context_id?: string | null
+          org_id?: string
+          problem_statement?: string | null
+          proposed_solution?: string | null
+          status?: Database["public"]["Enums"]["idea_status"]
+          submitted_at?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ideas_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "idea_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideas_course_context_id_fkey"
+            columns: ["course_context_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideas_lesson_context_id_fkey"
+            columns: ["lesson_context_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ideas_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -790,6 +1195,14 @@ export type Database = {
       access_type: "enabled" | "disabled"
       course_level: "basic" | "intermediate" | "advanced"
       enrollment_status: "enrolled" | "completed"
+      idea_status:
+        | "draft"
+        | "submitted"
+        | "under_review"
+        | "approved"
+        | "in_progress"
+        | "completed"
+        | "archived"
       invitation_status: "pending" | "accepted" | "expired"
       lesson_type: "video" | "document" | "quiz"
       membership_status: "active" | "invited" | "disabled"
@@ -925,6 +1338,15 @@ export const Constants = {
       access_type: ["enabled", "disabled"],
       course_level: ["basic", "intermediate", "advanced"],
       enrollment_status: ["enrolled", "completed"],
+      idea_status: [
+        "draft",
+        "submitted",
+        "under_review",
+        "approved",
+        "in_progress",
+        "completed",
+        "archived",
+      ],
       invitation_status: ["pending", "accepted", "expired"],
       lesson_type: ["video", "document", "quiz"],
       membership_status: ["active", "invited", "disabled"],
