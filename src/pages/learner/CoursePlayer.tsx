@@ -584,28 +584,47 @@ export default function CoursePlayer() {
                         </p>
                         {quizScore >= quiz.passing_score ? (
                           progress[currentLesson.id]?.status === 'completed' ? (
-                            <div className="space-y-3">
-                              <Badge variant="secondary" className="bg-success/20 text-success">
-                                <CheckCircle2 className="mr-1 h-3 w-3" />
-                                Lesson Complete
-                              </Badge>
-                              <div>
-                                <Button
-                                  onClick={() => {
-                                    const allLessons = modules.flatMap(m => m.lessons);
-                                    const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
-                                    if (currentIndex < allLessons.length - 1) {
-                                      setCurrentLesson(allLessons[currentIndex + 1]);
-                                      setQuizSubmitted(false);
-                                      setAnswers({});
-                                    }
-                                  }}
-                                >
-                                  Next Lesson
-                                  <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
+                            (() => {
+                              const allLessons = modules.flatMap(m => m.lessons);
+                              const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
+                              const isLastLesson = currentIndex >= allLessons.length - 1;
+                              
+                              // Find current module and check if this is the last lesson in the module
+                              const currentModule = modules.find(m => m.lessons.some(l => l.id === currentLesson.id));
+                              const isLastInModule = currentModule && 
+                                currentModule.lessons[currentModule.lessons.length - 1]?.id === currentLesson.id;
+                              
+                              const buttonText = isLastLesson 
+                                ? 'Finish Course' 
+                                : isLastInModule 
+                                  ? 'Next Module' 
+                                  : 'Next Lesson';
+
+                              return (
+                                <div className="space-y-3">
+                                  <Badge variant="secondary" className="bg-success/20 text-success">
+                                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                                    Lesson Complete
+                                  </Badge>
+                                  <div>
+                                    <Button
+                                      onClick={() => {
+                                        if (isLastLesson) {
+                                          navigate('/app/courses');
+                                        } else {
+                                          setCurrentLesson(allLessons[currentIndex + 1]);
+                                          setQuizSubmitted(false);
+                                          setAnswers({});
+                                        }
+                                      }}
+                                    >
+                                      {buttonText}
+                                      <ArrowRight className="ml-2 h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })()
                           ) : (
                             <Button onClick={() => handleCompleteLesson()} disabled={completingLesson}>
                               {completingLesson ? (
