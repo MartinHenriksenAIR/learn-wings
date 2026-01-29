@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/hooks/useAuth';
@@ -531,26 +532,47 @@ export default function CoursePlayer() {
 
                 {currentLesson.lesson_type === 'document' && (
                   <div className="space-y-4">
-                    <div className="prose prose-sm max-w-none">
-                      {currentLesson.content_text ? (
+                    {currentLesson.content_text && (
+                      <div className="prose prose-sm max-w-none">
                         <p>{currentLesson.content_text}</p>
-                      ) : (
-                        <p className="text-muted-foreground">Document content will appear here.</p>
-                      )}
-                    </div>
-                    {(signedDocUrl || azureDocUrl) ? (
-                      <Button variant="outline" asChild>
-                        <a href={azureDocUrl || signedDocUrl || ''} target="_blank" rel="noopener noreferrer">
-                          <FileText className="mr-2 h-4 w-4" />
-                          View Document
-                        </a>
-                      </Button>
-                    ) : currentLesson.document_storage_path && loadingAssets ? (
-                      <Button variant="outline" disabled>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Loading Document...
-                      </Button>
-                    ) : null}
+                      </div>
+                    )}
+                    {loadingAssets ? (
+                      <div className="flex items-center justify-center py-12 border rounded-lg bg-muted/50">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        <span className="ml-3 text-muted-foreground">Loading document...</span>
+                      </div>
+                    ) : (signedDocUrl || azureDocUrl) ? (
+                      <div className="space-y-3">
+                        {/* Embedded PDF viewer */}
+                        <div className="rounded-lg border bg-muted/30 overflow-hidden" style={{ height: '70vh' }}>
+                          <iframe
+                            src={`${azureDocUrl || signedDocUrl}#toolbar=1&navpanes=0`}
+                            className="w-full h-full"
+                            title="Document viewer"
+                          />
+                        </div>
+                        {/* Download button */}
+                        <div className="flex justify-end">
+                          <Button variant="outline" asChild>
+                            <a href={azureDocUrl || signedDocUrl || ''} download>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download Document
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    ) : currentLesson.document_storage_path ? (
+                      <div className="flex items-center justify-center py-12 border rounded-lg bg-muted/50">
+                        <FileText className="h-8 w-8 text-muted-foreground" />
+                        <span className="ml-3 text-muted-foreground">Unable to load document. Please try again.</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center py-12 border rounded-lg bg-muted/50">
+                        <FileText className="h-8 w-8 text-muted-foreground" />
+                        <span className="ml-3 text-muted-foreground">No document uploaded</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
