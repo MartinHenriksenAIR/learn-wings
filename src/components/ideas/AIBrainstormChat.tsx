@@ -1,13 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Sparkles, Send, Loader2, RotateCcw, Lightbulb } from 'lucide-react';
+import { Sparkles, Send, Loader2, RotateCcw, Lightbulb, AlertCircle } from 'lucide-react';
 import { AIMessage } from '@/lib/ideas-types';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const INITIAL_SUGGESTIONS = [
   "I've noticed our team spends a lot of time on manual data entry...",
@@ -16,12 +18,19 @@ const INITIAL_SUGGESTIONS = [
   "We have repetitive tasks in our department that could benefit from AI...",
 ];
 
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/idea-assistant`;
+
 export function AIBrainstormChat() {
-  const { profile } = useAuth();
+  const { profile, currentOrg } = useAuth();
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const orgId = currentOrg?.id;
 
   const userInitials = profile?.full_name
     ?.split(' ')
@@ -36,29 +45,196 @@ export function AIBrainstormChat() {
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  // Save conversation to database
+  const saveConversation = useCallback(async (msgs: AIMessage[]) => {
+    if (!profile?.id || !orgId) return;
 
+    try {
+      const messagesJson = JSON.stringify(msgs);
+      
+      if (conversationId) {
+        await supabase
+          .from('ai_conversations')
+          .update({
+            messages: JSON.parse(messagesJson),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', conversationId);
+      } else {
+        const { data, error: insertError } = await supabase
+          .from('ai_conversations')
+          .insert([{
+            user_id: profile.id,
+            org_id: orgId,
+            context_type: 'ideas_hub',
+            messages: JSON.parse(messagesJson),
+          }])
+          .select('id')
+          .single();
+
+        if (data && !insertError) {
+          setConversationId(data.id);
+        }
+      }
+    } catch (err) {
+      console.error('Error saving conversation:', err);
+    }
+  }, [profile?.id, orgId, conversationId]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading || !orgId) return;
+
+    setError(null);
     const userMessage: AIMessage = {
       role: 'user',
       content: input.trim(),
       timestamp: new Date().toISOString(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInput('');
     setIsLoading(true);
 
-    // Simulate AI response for now - will be replaced with edge function
-    setTimeout(() => {
-      const aiResponse: AIMessage = {
-        role: 'assistant',
-        content: generateMockResponse(userMessage.content, messages.length),
-        timestamp: new Date().toISOString(),
+    // Create abort controller for this request
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          messages: newMessages,
+          orgId,
+          conversationId,
+        }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+        }
+        if (response.status === 402) {
+          throw new Error('AI credits exhausted. Please contact your administrator.');
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to get AI response');
+      }
+
+      if (!response.body) {
+        throw new Error('No response body');
+      }
+
+      // Stream the response
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let assistantContent = '';
+      let textBuffer = '';
+
+      const updateAssistantMessage = (content: string) => {
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'assistant') {
+            return prev.map((m, i) => 
+              i === prev.length - 1 ? { ...m, content } : m
+            );
+          }
+          return [...prev, { 
+            role: 'assistant', 
+            content, 
+            timestamp: new Date().toISOString() 
+          }];
+        });
       };
-      setMessages(prev => [...prev, aiResponse]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        textBuffer += decoder.decode(value, { stream: true });
+
+        // Process line by line
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith('\r')) line = line.slice(0, -1);
+          if (line.startsWith(':') || line.trim() === '') continue;
+          if (!line.startsWith('data: ')) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') break;
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantContent += content;
+              updateAssistantMessage(assistantContent);
+            }
+          } catch {
+            // Incomplete JSON, put back and wait for more
+            textBuffer = line + '\n' + textBuffer;
+            break;
+          }
+        }
+      }
+
+      // Final flush
+      if (textBuffer.trim()) {
+        for (let raw of textBuffer.split('\n')) {
+          if (!raw) continue;
+          if (raw.endsWith('\r')) raw = raw.slice(0, -1);
+          if (raw.startsWith(':') || raw.trim() === '') continue;
+          if (!raw.startsWith('data: ')) continue;
+          const jsonStr = raw.slice(6).trim();
+          if (jsonStr === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantContent += content;
+              updateAssistantMessage(assistantContent);
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
+      // Save conversation after complete response
+      const finalMessages: AIMessage[] = [
+        ...newMessages,
+        {
+          role: 'assistant',
+          content: assistantContent,
+          timestamp: new Date().toISOString(),
+        },
+      ];
+      await saveConversation(finalMessages);
+
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return; // User cancelled
+      }
+      console.error('Chat error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to get AI response';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      // Remove the user message if we failed
+      setMessages(messages);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+      abortControllerRef.current = null;
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -66,8 +242,13 @@ export function AIBrainstormChat() {
   };
 
   const handleReset = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     setMessages([]);
     setInput('');
+    setError(null);
+    setConversationId(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -102,6 +283,13 @@ export function AIBrainstormChat() {
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col overflow-hidden pb-4">
+        {error && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
         <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6">
@@ -155,7 +343,7 @@ export function AIBrainstormChat() {
                   </div>
                 </div>
               ))}
-              {isLoading && (
+              {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                 <div className="flex gap-3">
                   <Avatar className="h-8 w-8 shrink-0">
                     <AvatarFallback className="bg-primary text-primary-foreground text-xs">
@@ -182,7 +370,7 @@ export function AIBrainstormChat() {
           />
           <Button 
             onClick={handleSend} 
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !orgId}
             size="icon"
             className="shrink-0"
           >
@@ -196,19 +384,4 @@ export function AIBrainstormChat() {
       </CardContent>
     </Card>
   );
-}
-
-// Temporary mock response generator - will be replaced with edge function
-function generateMockResponse(userMessage: string, messageCount: number): string {
-  const responses = [
-    `That's an interesting observation! Let me ask you a few clarifying questions:\n\n1. **Scope**: Which specific part of this process takes the most time? Can you walk me through a typical workflow?\n\n2. **Frequency**: How often does this process occur? Daily? Weekly? This helps us estimate the potential impact.\n\n3. **Current pain points**: What are the top 3 frustrations your team experiences with this process today?`,
-    
-    `I appreciate you sharing more details. Before we go further, let me challenge an assumption:\n\n**Have you considered whether this process actually needs to exist at all?** Sometimes the best optimization is elimination.\n\nThat said, if the process is necessary, here are some angles to explore:\n\n- **Input quality**: Could better upstream data reduce downstream work?\n- **Automation potential**: What percentage of decisions in this workflow are rule-based vs. judgment calls?\n- **Integration opportunities**: Are there existing tools that could connect better?`,
-    
-    `You're building a clearer picture. Let's think about **feasibility**:\n\n**Quick wins** (1-2 weeks):\n- Standardized templates or checklists\n- Simple automation rules\n\n**Medium effort** (1-3 months):\n- Workflow automation with existing tools\n- API integrations\n\n**Major initiative** (3+ months):\n- Custom AI solution\n- Process redesign\n\nWhich category feels most appropriate for your idea? And importantly: who would need to approve this, and what resources would be required?`,
-    
-    `Now we're getting somewhere! Let me help you frame this as a concrete proposal:\n\n**Problem Statement Draft:**\nBased on what you've shared, it sounds like the core problem is [process inefficiency] leading to [time/cost impact].\n\n**Questions to strengthen your case:**\n1. Can you quantify the current state? (hours/week, error rate, etc.)\n2. What would success look like? What metrics would improve?\n3. Who else in the organization might have similar needs?\n\nWhen you're ready, I can help you structure this into a formal idea submission.`,
-  ];
-
-  return responses[Math.min(messageCount, responses.length - 1)];
 }
