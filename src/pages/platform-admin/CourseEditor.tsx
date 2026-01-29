@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/accordion';
 import { FileUpload } from '@/components/ui/file-upload';
 import { AzureVideoUpload } from '@/components/ui/azure-video-upload';
+import { AzureDocumentUpload } from '@/components/ui/azure-document-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil } from 'lucide-react';
@@ -551,13 +552,10 @@ export default function CourseEditor() {
               <>
                 <div className="space-y-2">
                   <Label>Document File (optional)</Label>
-                  <FileUpload
-                    bucket="lms-assets"
-                    folder="documents"
-                    accept="document"
-                    value={lessonDocPath ? `Document uploaded` : null}
-                    onChange={(_, path) => setLessonDocPath(path)}
-                    maxSizeMB={50}
+                  <AzureDocumentUpload
+                    value={lessonDocPath}
+                    onChange={setLessonDocPath}
+                    maxSizeMB={100}
                   />
                 </div>
                 <div className="space-y-2">
