@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.generate-compliance-report]
 verify_jwt = false
+
+[functions.azure-document-upload-url]
+verify_jwt = false

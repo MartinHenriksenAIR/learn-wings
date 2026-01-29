@@ -51,6 +51,7 @@ export default function CoursePlayer() {
   const [signedVideoUrl, setSignedVideoUrl] = useState<string | null>(null);
   const [signedDocUrl, setSignedDocUrl] = useState<string | null>(null);
   const [azureVideoUrl, setAzureVideoUrl] = useState<string | null>(null);
+  const [azureDocUrl, setAzureDocUrl] = useState<string | null>(null);
   const [loadingAssets, setLoadingAssets] = useState(false);
 
   // Course completion and review state
@@ -196,6 +197,7 @@ export default function CoursePlayer() {
         setSignedVideoUrl(null);
         setSignedDocUrl(null);
         setAzureVideoUrl(null);
+        setAzureDocUrl(null);
         return;
       }
 
@@ -224,11 +226,31 @@ export default function CoursePlayer() {
           setAzureVideoUrl(null);
         }
         
-        // Load document URL
-        const docUrl = currentLesson.document_storage_path 
-          ? await getSignedAssetUrl(currentLesson.document_storage_path)
-          : null;
-        setSignedDocUrl(docUrl);
+        // Load document URL - check if it's an Azure path (starts with 'documents/')
+        if (currentLesson.document_storage_path) {
+          if (currentLesson.document_storage_path.startsWith('documents/')) {
+            // Azure-stored document
+            const { data, error } = await supabase.functions.invoke('azure-view-url', {
+              body: { blobPath: currentLesson.document_storage_path, lessonId: currentLesson.id },
+            });
+            
+            if (!error && data?.viewUrl) {
+              setAzureDocUrl(data.viewUrl);
+            } else {
+              console.error('Error getting Azure document URL:', error);
+              setAzureDocUrl(null);
+            }
+            setSignedDocUrl(null);
+          } else {
+            // Legacy Supabase-stored document
+            const docUrl = await getSignedAssetUrl(currentLesson.document_storage_path);
+            setSignedDocUrl(docUrl);
+            setAzureDocUrl(null);
+          }
+        } else {
+          setSignedDocUrl(null);
+          setAzureDocUrl(null);
+        }
       } catch (error) {
         console.error('Error loading signed URLs:', error);
       } finally {
@@ -516,9 +538,9 @@ export default function CoursePlayer() {
                         <p className="text-muted-foreground">Document content will appear here.</p>
                       )}
                     </div>
-                    {signedDocUrl ? (
+                    {(signedDocUrl || azureDocUrl) ? (
                       <Button variant="outline" asChild>
-                        <a href={signedDocUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={azureDocUrl || signedDocUrl || ''} target="_blank" rel="noopener noreferrer">
                           <FileText className="mr-2 h-4 w-4" />
                           View Document
                         </a>
