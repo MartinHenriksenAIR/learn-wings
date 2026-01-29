@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Download, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 // Configure PDF.js worker
@@ -45,6 +46,24 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
 
   const zoomOut = () => {
     setScale((prev) => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = 'document.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Download failed:', err);
+      toast.error('Failed to download document');
+    }
   };
 
   return (
@@ -99,11 +118,9 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
           </Button>
         </div>
 
-        <Button variant="outline" size="sm" asChild>
-          <a href={url} download>
-            <Download className="mr-2 h-4 w-4" />
-            Download
-          </a>
+        <Button variant="outline" size="sm" onClick={handleDownload}>
+          <Download className="mr-2 h-4 w-4" />
+          Download
         </Button>
       </div>
 
