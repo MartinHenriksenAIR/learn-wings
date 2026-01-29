@@ -22,9 +22,10 @@ import {
 import { FileUpload } from '@/components/ui/file-upload';
 import { AzureVideoUpload } from '@/components/ui/azure-video-upload';
 import { AzureDocumentUpload } from '@/components/ui/azure-document-upload';
+import { QuizEditorDialog } from '@/components/platform-admin/QuizEditorDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
-import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 
@@ -67,6 +68,11 @@ export default function CourseEditor() {
   // Delete course state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Quiz editor state
+  const [quizEditorOpen, setQuizEditorOpen] = useState(false);
+  const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
+  const [quizLessonTitle, setQuizLessonTitle] = useState('');
 
   const fetchCourse = async () => {
     if (!courseId) return;
@@ -467,6 +473,20 @@ export default function CourseEditor() {
                                 <span className="text-xs text-muted-foreground">{lesson.duration_minutes} min</span>
                               )}
                             </div>
+                            {lesson.lesson_type === 'quiz' && features.quizzes_enabled && (
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => {
+                                  setQuizLessonId(lesson.id);
+                                  setQuizLessonTitle(lesson.title);
+                                  setQuizEditorOpen(true);
+                                }}
+                              >
+                                <Settings className="mr-1 h-3 w-3" />
+                                Edit Quiz
+                              </Button>
+                            )}
                             <Button size="icon" variant="ghost" onClick={() => openEditLesson(lesson)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -582,7 +602,17 @@ export default function CourseEditor() {
               </div>
             )}
             {lessonType === 'quiz' && (
-              <p className="text-sm text-muted-foreground">Quiz editor will be available in a future update.</p>
+              <div className="rounded-lg border border-dashed p-4 text-center">
+                <HelpCircle className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground mb-2">
+                  {editingLesson 
+                    ? 'Save the lesson first, then use "Edit Quiz" to configure questions.'
+                    : 'Create the lesson first, then configure the quiz questions.'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Learners will need to pass the quiz to complete this lesson.
+                </p>
+              </div>
             )}
           </div>
           <DialogFooter>
@@ -594,6 +624,17 @@ export default function CourseEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quiz Editor Dialog */}
+      {quizLessonId && (
+        <QuizEditorDialog
+          lessonId={quizLessonId}
+          lessonTitle={quizLessonTitle}
+          open={quizEditorOpen}
+          onOpenChange={setQuizEditorOpen}
+          onQuizSaved={fetchModules}
+        />
+      )}
     </AppLayout>
   );
 }
