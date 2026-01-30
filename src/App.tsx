@@ -27,6 +27,9 @@ import CourseEditor from "./pages/platform-admin/CourseEditor";
 import PlatformSettings from "./pages/platform-admin/PlatformSettings";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import CommunityFeed from "./pages/community/CommunityFeed";
+import PostDetail from "./pages/community/PostDetail";
+import IdeaLibrary from "./pages/community/IdeaLibrary";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +47,11 @@ function AppRoutes() {
       <Route path="/app/courses" element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
       <Route path="/app/learn/:courseId" element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
       <Route path="/app/certificates" element={<ProtectedRoute learnerOnly><Certificates /></ProtectedRoute>} />
+      
+      {/* Community routes */}
+      <Route path="/app/community" element={<ProtectedRoute><CommunityFeed /></ProtectedRoute>} />
+      <Route path="/app/community/:scope/posts/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
+      <Route path="/app/community/org/ideas" element={<ProtectedRoute><IdeaLibrary /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
       <Route path="/app/admin/org" element={<ProtectedRoute requireOrgAdmin><OrgDashboard /></ProtectedRoute>} />

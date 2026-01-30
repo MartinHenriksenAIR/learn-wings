@@ -76,6 +76,7 @@ export function AppSidebar() {
     { title: 'Dashboard', url: '/app/dashboard', icon: LayoutDashboard },
     { title: 'My Courses', url: '/app/courses', icon: BookOpen },
     ...(features.certificates_enabled ? [{ title: 'Certificates', url: '/app/certificates', icon: Award }] : []),
+    ...(features.community_enabled ? [{ title: 'Community', url: '/app/community', icon: Users }] : []),
   ];
 
   // Build org admin items based on feature toggles

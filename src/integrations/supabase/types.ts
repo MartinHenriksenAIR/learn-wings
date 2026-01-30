@@ -72,6 +72,240 @@ export type Database = {
           },
         ]
       }
+      community_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_restricted: boolean
+          name: string
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_restricted?: boolean
+          name: string
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_restricted?: boolean
+          name?: string
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      community_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_hidden: boolean
+          parent_comment_id: string | null
+          post_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_hidden?: boolean
+          parent_comment_id?: string | null
+          post_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_hidden?: boolean
+          parent_comment_id?: string | null
+          post_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "community_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_posts: {
+        Row: {
+          category_id: string
+          content: string
+          created_at: string
+          event_date: string | null
+          event_location: string | null
+          event_recording_url: string | null
+          event_registration_url: string | null
+          id: string
+          is_hidden: boolean
+          is_locked: boolean
+          is_pinned: boolean
+          org_id: string | null
+          scope: Database["public"]["Enums"]["community_scope"]
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          content: string
+          created_at?: string
+          event_date?: string | null
+          event_location?: string | null
+          event_recording_url?: string | null
+          event_registration_url?: string | null
+          id?: string
+          is_hidden?: boolean
+          is_locked?: boolean
+          is_pinned?: boolean
+          org_id?: string | null
+          scope: Database["public"]["Enums"]["community_scope"]
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          content?: string
+          created_at?: string
+          event_date?: string | null
+          event_location?: string | null
+          event_recording_url?: string | null
+          event_registration_url?: string | null
+          id?: string
+          is_hidden?: boolean
+          is_locked?: boolean
+          is_pinned?: boolean
+          org_id?: string | null
+          scope?: Database["public"]["Enums"]["community_scope"]
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "community_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_reports: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          id: string
+          org_id: string | null
+          reason: string
+          reporter_user_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["report_status"]
+          target_id: string
+          target_type: Database["public"]["Enums"]["report_target_type"]
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          reason: string
+          reporter_user_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["report_status"]
+          target_id: string
+          target_type: Database["public"]["Enums"]["report_target_type"]
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string | null
+          reason?: string
+          reporter_user_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["report_status"]
+          target_id?: string
+          target_type?: Database["public"]["Enums"]["report_target_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_reports_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_reports_reporter_user_id_fkey"
+            columns: ["reporter_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_modules: {
         Row: {
           course_id: string
@@ -508,52 +742,94 @@ export type Database = {
       }
       ideas: {
         Row: {
+          admin_notes: string | null
+          affected_roles: string | null
+          business_area: Database["public"]["Enums"]["business_area"] | null
           category_id: string | null
+          constraints_risks: string | null
           course_context_id: string | null
           created_at: string
+          current_process: string | null
+          data_inputs: string | null
           description: string | null
+          desired_process: string | null
           expected_impact: string | null
+          frequency_volume: string | null
           id: string
           lesson_context_id: string | null
           org_id: string
+          pain_points: string | null
           problem_statement: string | null
+          proposed_improvement: string | null
           proposed_solution: string | null
+          rejection_reason: string | null
           status: Database["public"]["Enums"]["idea_status"]
           submitted_at: string | null
+          success_metrics: string | null
+          systems_involved: string | null
+          tags: string[] | null
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          admin_notes?: string | null
+          affected_roles?: string | null
+          business_area?: Database["public"]["Enums"]["business_area"] | null
           category_id?: string | null
+          constraints_risks?: string | null
           course_context_id?: string | null
           created_at?: string
+          current_process?: string | null
+          data_inputs?: string | null
           description?: string | null
+          desired_process?: string | null
           expected_impact?: string | null
+          frequency_volume?: string | null
           id?: string
           lesson_context_id?: string | null
           org_id: string
+          pain_points?: string | null
           problem_statement?: string | null
+          proposed_improvement?: string | null
           proposed_solution?: string | null
+          rejection_reason?: string | null
           status?: Database["public"]["Enums"]["idea_status"]
           submitted_at?: string | null
+          success_metrics?: string | null
+          systems_involved?: string | null
+          tags?: string[] | null
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          admin_notes?: string | null
+          affected_roles?: string | null
+          business_area?: Database["public"]["Enums"]["business_area"] | null
           category_id?: string | null
+          constraints_risks?: string | null
           course_context_id?: string | null
           created_at?: string
+          current_process?: string | null
+          data_inputs?: string | null
           description?: string | null
+          desired_process?: string | null
           expected_impact?: string | null
+          frequency_volume?: string | null
           id?: string
           lesson_context_id?: string | null
           org_id?: string
+          pain_points?: string | null
           problem_statement?: string | null
+          proposed_improvement?: string | null
           proposed_solution?: string | null
+          rejection_reason?: string | null
           status?: Database["public"]["Enums"]["idea_status"]
           submitted_at?: string | null
+          success_metrics?: string | null
+          systems_involved?: string | null
+          tags?: string[] | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -1107,9 +1383,24 @@ export type Database = {
         Args: { p_invitation_link_id: string; p_user_id: string }
         Returns: Json
       }
+      can_access_community_post: {
+        Args: { p_post_id: string }
+        Returns: boolean
+      }
       can_access_lms_asset: { Args: { file_path: string }; Returns: boolean }
+      can_post_restricted_category: {
+        Args: {
+          p_org_id: string
+          p_scope: Database["public"]["Enums"]["community_scope"]
+        }
+        Returns: boolean
+      }
       can_user_access_lms_asset: {
         Args: { file_path: string; p_user_id: string }
+        Returns: boolean
+      }
+      can_view_idea_admin_fields: {
+        Args: { p_org_id: string }
         Returns: boolean
       }
       current_org_ids_for_user: { Args: never; Returns: string[] }
@@ -1173,6 +1464,7 @@ export type Database = {
           status: Database["public"]["Enums"]["invitation_status"]
         }[]
       }
+      get_post_org_id: { Args: { p_post_id: string }; Returns: string }
       get_quiz_options_for_learner: {
         Args: { p_question_id: string }
         Returns: {
@@ -1197,6 +1489,16 @@ export type Database = {
     }
     Enums: {
       access_type: "enabled" | "disabled"
+      business_area:
+        | "hr"
+        | "finance"
+        | "sales"
+        | "support"
+        | "ops"
+        | "it"
+        | "legal"
+        | "other"
+      community_scope: "org" | "global"
       course_level: "basic" | "intermediate" | "advanced"
       enrollment_status: "enrolled" | "completed"
       idea_status:
@@ -1207,11 +1509,17 @@ export type Database = {
         | "in_progress"
         | "completed"
         | "archived"
+        | "in_review"
+        | "accepted"
+        | "rejected"
+        | "done"
       invitation_status: "pending" | "accepted" | "expired"
       lesson_type: "video" | "document" | "quiz"
       membership_status: "active" | "invited" | "disabled"
       org_role: "org_admin" | "learner"
       progress_status: "not_started" | "in_progress" | "completed"
+      report_status: "pending" | "reviewed" | "dismissed"
+      report_target_type: "post" | "comment"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1340,6 +1648,17 @@ export const Constants = {
   public: {
     Enums: {
       access_type: ["enabled", "disabled"],
+      business_area: [
+        "hr",
+        "finance",
+        "sales",
+        "support",
+        "ops",
+        "it",
+        "legal",
+        "other",
+      ],
+      community_scope: ["org", "global"],
       course_level: ["basic", "intermediate", "advanced"],
       enrollment_status: ["enrolled", "completed"],
       idea_status: [
@@ -1350,12 +1669,18 @@ export const Constants = {
         "in_progress",
         "completed",
         "archived",
+        "in_review",
+        "accepted",
+        "rejected",
+        "done",
       ],
       invitation_status: ["pending", "accepted", "expired"],
       lesson_type: ["video", "document", "quiz"],
       membership_status: ["active", "invited", "disabled"],
       org_role: ["org_admin", "learner"],
       progress_status: ["not_started", "in_progress", "completed"],
+      report_status: ["pending", "reviewed", "dismissed"],
+      report_target_type: ["post", "comment"],
     },
   },
 } as const
