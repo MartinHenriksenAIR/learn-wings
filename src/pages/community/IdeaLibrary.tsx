@@ -121,14 +121,14 @@ export default function IdeaLibrary() {
                 />
               </div>
               <Select
-                value={selectedBusinessArea}
-                onValueChange={setSelectedBusinessArea}
+                value={selectedBusinessArea || 'all'}
+                onValueChange={(v) => setSelectedBusinessArea(v === 'all' ? '' : v)}
               >
                 <SelectTrigger className="w-full md:w-[200px]">
                   <SelectValue placeholder="All business areas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All business areas</SelectItem>
+                  <SelectItem value="all">All business areas</SelectItem>
                   {BUSINESS_AREAS.map((area) => (
                     <SelectItem key={area.value} value={area.value}>
                       {area.label}
