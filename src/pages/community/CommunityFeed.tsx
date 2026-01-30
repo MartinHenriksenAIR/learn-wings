@@ -190,14 +190,14 @@ export default function CommunityFeed() {
                     />
                   </div>
                   <Select
-                    value={selectedCategory}
-                    onValueChange={setSelectedCategory}
+                    value={selectedCategory || 'all'}
+                    onValueChange={(v) => setSelectedCategory(v === 'all' ? '' : v)}
                   >
                     <SelectTrigger className="w-full md:w-[200px]">
                       <SelectValue placeholder="All categories" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All categories</SelectItem>
+                      <SelectItem value="all">All categories</SelectItem>
                       {categories.map((cat) => (
                         <SelectItem key={cat.id} value={cat.id}>
                           {cat.name}
