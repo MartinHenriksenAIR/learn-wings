@@ -21,7 +21,10 @@ export default function LearnerDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       if (!user || !currentOrg) {
-        setLoading(false);
+        // Don't set loading to false if user exists but currentOrg isn't loaded yet
+        if (!user) {
+          setLoading(false);
+        }
         return;
       }
 

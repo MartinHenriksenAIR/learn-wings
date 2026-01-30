@@ -1108,6 +1108,10 @@ export type Database = {
         Returns: Json
       }
       can_access_lms_asset: { Args: { file_path: string }; Returns: boolean }
+      can_user_access_lms_asset: {
+        Args: { file_path: string; p_user_id: string }
+        Returns: boolean
+      }
       current_org_ids_for_user: { Args: never; Returns: string[] }
       get_invitation_by_token: {
         Args: { lookup_token: string }

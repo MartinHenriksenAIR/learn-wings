@@ -158,10 +158,11 @@ Deno.serve(async (req) => {
     const isPlatformAdmin = profile?.is_platform_admin || false;
 
     if (!isPlatformAdmin) {
-      // Use the existing can_access_lms_asset function for consistent access control
+      // Use the can_user_access_lms_asset function that accepts user_id parameter
+      // This is needed because service role client doesn't have auth.uid()
       const { data: hasAccess, error: accessError } = await supabase.rpc(
-        'can_access_lms_asset',
-        { file_path: blobPath }
+        'can_user_access_lms_asset',
+        { p_user_id: userId, file_path: blobPath }
       );
 
       if (accessError) {
