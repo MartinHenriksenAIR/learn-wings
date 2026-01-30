@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import i18n from '@/i18n';
 import {
   Sidebar,
   SidebarContent,
@@ -45,7 +46,8 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
-import logoLight from '@/assets/logo-light.png';
+import logoLightDa from '@/assets/logo-light.png';
+import logoLightEn from '@/assets/logo-light-en.png';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -127,8 +129,8 @@ export function AppSidebar() {
             <GraduationCap className="h-6 w-6 text-sidebar-primary" />
           ) : (
             <img 
-              src={logoLight} 
-              alt="AI Uddannelse" 
+              src={i18n.language === 'da' ? logoLightDa : logoLightEn} 
+              alt={i18n.language === 'da' ? 'AI Uddannelse' : 'AI Education'} 
               className="h-auto w-full max-w-[180px] object-contain"
             />
           )}
