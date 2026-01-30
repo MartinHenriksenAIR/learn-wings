@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { GraduationCap, Loader2, ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
+import logoLight from '@/assets/logo-light.png';
 
 const passwordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -121,10 +122,11 @@ export default function ResetPassword() {
       <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
         <div className="w-full max-w-md">
           <div className="mb-8 flex flex-col items-center text-center">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-              <GraduationCap className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <h1 className="font-display text-2xl font-bold">AIR Academy</h1>
+            <img 
+              src={logoLight} 
+              alt="AI Uddannelse" 
+              className="mb-4 h-14 w-auto object-contain"
+            />
             <p className="text-sm text-muted-foreground">Enterprise Learning Platform</p>
           </div>
 
@@ -161,10 +163,11 @@ export default function ResetPassword() {
       <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
         <div className="w-full max-w-md">
           <div className="mb-8 flex flex-col items-center text-center">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-              <GraduationCap className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <h1 className="font-display text-2xl font-bold">AIR Academy</h1>
+            <img 
+              src={logoLight} 
+              alt="AI Uddannelse" 
+              className="mb-4 h-14 w-auto object-contain"
+            />
             <p className="text-sm text-muted-foreground">Enterprise Learning Platform</p>
           </div>
 
@@ -197,10 +200,11 @@ export default function ResetPassword() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <GraduationCap className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <h1 className="font-display text-2xl font-bold">AIR Academy</h1>
+          <img 
+            src={logoLight} 
+            alt="AI Uddannelse" 
+            className="mb-4 h-14 w-auto object-contain"
+          />
           <p className="text-sm text-muted-foreground">Enterprise Learning Platform</p>
         </div>
 

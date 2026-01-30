@@ -131,8 +131,8 @@ const handler = async (req: Request): Promise<Response> => {
     const roleLabel = role === 'org_admin' ? 'Administrator' : role === 'platform_admin' ? 'Platform Administrator' : 'Learner';
     
     const subject = isPlatformAdminInvite
-      ? "Du er blevet inviteret som Platform Administrator på AIR Academy"
-      : `Du er blevet inviteret til ${orgName} på AIR Academy`;
+      ? "Du er blevet inviteret som Platform Administrator på AI Uddannelse"
+      : `Du er blevet inviteret til ${orgName} på AI Uddannelse`;
 
     const html = generateEmailHtml({
       email,
@@ -143,7 +143,7 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     const emailResponse = await resend.emails.send({
-      from: "AIR Academy <no-reply@ai-uddannelse.dk>",
+      from: "AI Uddannelse <no-reply@ai-uddannelse.dk>",
       to: [email],
       subject,
       html,
@@ -181,8 +181,8 @@ function generateEmailHtml({
   isPlatformAdmin: boolean;
 }): string {
   const welcomeMessage = isPlatformAdmin
-    ? "Du er blevet inviteret til at blive Platform Administrator på AIR Academy."
-    : `Du er blevet inviteret til at blive ${roleLabel} hos <strong>${orgName}</strong> på AIR Academy.`;
+    ? "Du er blevet inviteret til at blive Platform Administrator på AI Uddannelse."
+    : `Du er blevet inviteret til at blive ${roleLabel} hos <strong>${orgName}</strong> på AI Uddannelse.`;
 
   return `
 <!DOCTYPE html>
@@ -190,20 +190,18 @@ function generateEmailHtml({
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invitation til AIR Academy</title>
+  <title>Invitation til AI Uddannelse</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
     <tr>
       <td style="padding: 40px 20px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-          <!-- Header -->
+          <!-- Header with Logo -->
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; border-bottom: 1px solid #e4e4e7;">
-              <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #18181b;">
-                AIR Academy
-              </h1>
-              <p style="margin: 8px 0 0; font-size: 14px; color: #71717a;">
+              <img src="https://ai-uddannelse.dk/logo-light.png" alt="AI Uddannelse" style="height: 50px; width: auto;" />
+              <p style="margin: 12px 0 0; font-size: 14px; color: #71717a;">
                 AI Uddannelse til Virksomheder
               </p>
             </td>
@@ -268,7 +266,7 @@ function generateEmailHtml({
           <tr>
             <td style="text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
-                © ${new Date().getFullYear()} AIR Academy. Alle rettigheder forbeholdes.
+                © ${new Date().getFullYear()} AI Uddannelse. Alle rettigheder forbeholdes.
               </p>
             </td>
           </tr>

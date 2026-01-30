@@ -41,6 +41,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
+import logoLight from '@/assets/logo-light.png';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -110,16 +111,15 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r-0">
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
-            <GraduationCap className="h-5 w-5 text-sidebar-primary-foreground" />
-          </div>
-          {!collapsed && (
-            <div className="flex flex-col">
-              <span className="font-display text-lg font-bold text-sidebar-foreground">
-                AIR Academy
-              </span>
-            </div>
+        <div className="flex items-center justify-center">
+          {collapsed ? (
+            <GraduationCap className="h-6 w-6 text-sidebar-primary" />
+          ) : (
+            <img 
+              src={logoLight} 
+              alt="AI Uddannelse" 
+              className="h-10 w-auto object-contain"
+            />
           )}
         </div>
       </SidebarHeader>
@@ -233,7 +233,7 @@ export function AppSidebar() {
               className="w-full justify-start gap-3 px-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
+                <AvatarFallback className="bg-[hsl(145,63%,42%)] text-white text-xs">
                   {initials}
                 </AvatarFallback>
               </Avatar>
