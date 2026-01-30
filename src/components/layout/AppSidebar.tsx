@@ -120,7 +120,7 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r-0">
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-start">
           {collapsed ? (
             <GraduationCap className="h-6 w-6 text-sidebar-primary" />
           ) : (
