@@ -6,6 +6,7 @@ interface FeatureSettings {
   quizzes_enabled: boolean;
   analytics_enabled: boolean;
   course_reviews_enabled: boolean;
+  community_enabled: boolean;
 }
 
 interface BrandingSettings {
@@ -26,6 +27,7 @@ const defaultFeatures: FeatureSettings = {
   quizzes_enabled: true,
   analytics_enabled: true,
   course_reviews_enabled: false,
+  community_enabled: true,
 };
 
 const defaultBranding: BrandingSettings = {
