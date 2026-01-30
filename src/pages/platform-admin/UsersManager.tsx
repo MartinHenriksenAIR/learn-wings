@@ -166,9 +166,13 @@ export default function UsersManager() {
         .from('invitations')
         .insert({
           email: inviteEmail,
+          first_name: inviteFirstName || null,
+          last_name: inviteLastName || null,
+          department: inviteDepartment || null,
           role: 'learner', // Role doesn't matter for platform admins, they get is_platform_admin flag
           is_platform_admin_invite: true,
           org_id: null,
+          invited_by_user_id: user?.id,
         })
         .select('id')
         .single();
@@ -219,8 +223,12 @@ export default function UsersManager() {
         .insert({
           org_id: inviteOrgId,
           email: inviteEmail,
+          first_name: inviteFirstName || null,
+          last_name: inviteLastName || null,
+          department: inviteDepartment || null,
           role: inviteType as OrgRole,
           is_platform_admin_invite: false,
+          invited_by_user_id: user?.id,
         })
         .select('id')
         .single();
