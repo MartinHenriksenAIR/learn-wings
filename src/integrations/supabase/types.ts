@@ -1189,6 +1189,7 @@ export type Database = {
           id: string
           is_platform_admin: boolean
           last_name: string | null
+          preferred_language: string | null
         }
         Insert: {
           created_at?: string
@@ -1198,6 +1199,7 @@ export type Database = {
           id: string
           is_platform_admin?: boolean
           last_name?: string | null
+          preferred_language?: string | null
         }
         Update: {
           created_at?: string
@@ -1207,6 +1209,7 @@ export type Database = {
           id?: string
           is_platform_admin?: boolean
           last_name?: string | null
+          preferred_language?: string | null
         }
         Relationships: []
       }
