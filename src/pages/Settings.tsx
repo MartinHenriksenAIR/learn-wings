@@ -3,14 +3,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, User, Lock, Mail, Calendar, Shield, Building2 } from 'lucide-react';
+import { Loader2, User, Lock, Mail, Calendar, Shield, Building2, Globe } from 'lucide-react';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { useTranslation } from 'react-i18next';
 
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required').max(50, 'First name is too long'),
@@ -29,6 +37,7 @@ const passwordSchema = z.object({
 export default function Settings() {
   const { profile, user, memberships, isPlatformAdmin, refreshUserContext } = useAuth();
   const { toast } = useToast();
+  const { t, i18n } = useTranslation();
   
   // Profile state
   const [firstName, setFirstName] = useState('');
@@ -46,14 +55,51 @@ export default function Settings() {
     confirmPassword?: string 
   }>({});
 
+  // Language state
+  const [languageSaving, setLanguageSaving] = useState(false);
+
   // Sync profile fields when profile loads
   useEffect(() => {
     if (profile) {
       setFirstName(profile.first_name || '');
       setLastName(profile.last_name || '');
       setDepartment(profile.department || '');
+      // Sync i18n language with profile preference
+      if (profile.preferred_language && profile.preferred_language !== i18n.language) {
+        i18n.changeLanguage(profile.preferred_language);
+      }
     }
-  }, [profile]);
+  }, [profile, i18n]);
+
+  const handleLanguageChange = async (newLanguage: string) => {
+    if (!profile) return;
+    
+    setLanguageSaving(true);
+    
+    // Update i18n immediately for instant feedback
+    await i18n.changeLanguage(newLanguage);
+    localStorage.setItem('preferred_language', newLanguage);
+    
+    // Persist to database
+    const { error } = await supabase
+      .from('profiles')
+      .update({ preferred_language: newLanguage })
+      .eq('id', profile.id);
+
+    if (error) {
+      toast({
+        title: t('settings.languageUpdateFailed'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: t('settings.languageUpdated'),
+      });
+      await refreshUserContext();
+    }
+    setLanguageSaving(false);
+  };
 
   const handleProfileSave = async () => {
     setProfileErrors({});
@@ -310,6 +356,35 @@ export default function Settings() {
               {passwordSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Update Password
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Language Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-muted-foreground" />
+              <CardTitle>{t('settings.language')}</CardTitle>
+            </div>
+            <CardDescription>{t('settings.languageDescription')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Select
+                value={profile?.preferred_language || i18n.language || 'en'}
+                onValueChange={handleLanguageChange}
+                disabled={languageSaving}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">{t('languages.en')}</SelectItem>
+                  <SelectItem value="da">{t('languages.da')}</SelectItem>
+                </SelectContent>
+              </Select>
+              {languageSaving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            </div>
           </CardContent>
         </Card>
 

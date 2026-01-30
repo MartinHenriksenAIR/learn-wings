@@ -17,6 +17,7 @@ export interface Profile {
   department: string | null;
   is_platform_admin: boolean;
   created_at: string;
+  preferred_language: string | null;
 }
 
 export interface Organization {
