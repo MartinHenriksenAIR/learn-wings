@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ export default function Login() {
   const { signIn, user, isPlatformAdmin, isOrgAdmin, isLoading, refreshUserContext } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get('invite');
 
@@ -61,8 +63,8 @@ export default function Login() {
         setEmail(invitationData.email);
       } else {
         toast({
-          title: 'Invalid invitation',
-          description: 'This invitation link is invalid or has expired.',
+          title: t('auth.invalidInvitation'),
+          description: t('auth.invalidInvitationDescription'),
           variant: 'destructive',
         });
       }
@@ -70,7 +72,7 @@ export default function Login() {
     };
 
     loadInvitation();
-  }, [inviteToken, toast]);
+  }, [inviteToken, toast, t]);
 
   // Redirect if already logged in (unless processing invite)
   useEffect(() => {
@@ -120,9 +122,9 @@ export default function Login() {
 
     if (error) {
       toast({
-        title: 'Sign in failed',
+        title: t('auth.signInFailed'),
         description: error.message === 'Invalid login credentials' 
-          ? 'Invalid email or password. Please try again.' 
+          ? t('auth.invalidCredentials')
           : error.message,
         variant: 'destructive',
       });
@@ -140,7 +142,7 @@ export default function Login() {
     }
 
     toast({
-      title: 'Welcome back!',
+      title: t('auth.welcomeBack'),
       description: invitation 
         ? `You have been added to ${invitation.organization?.name || 'the organization'}.`
         : 'You have successfully signed in.',
@@ -175,7 +177,7 @@ export default function Login() {
             alt="AI Uddannelse" 
             className="mb-4 h-14 w-auto object-contain"
           />
-          <p className="text-sm text-muted-foreground">Enterprise Learning Platform</p>
+          <p className="text-sm text-muted-foreground">{t('auth.platformDescription')}</p>
         </div>
 
         {invitation && (
@@ -183,12 +185,14 @@ export default function Login() {
             <CheckCircle2 className="h-4 w-4 text-accent" />
             <AlertDescription className="text-sm">
               {invitation.is_platform_admin_invite ? (
-                <>You've been invited to join <strong>AIR Academy</strong> as a <strong>Platform Admin</strong>.</>
+                <span dangerouslySetInnerHTML={{ __html: t('auth.invitedToPlatformAdmin') }} />
               ) : (
-                <>
-                  You've been invited to join <strong>{invitation.organization?.name}</strong> as a{' '}
-                  <strong>{invitation.role === 'org_admin' ? 'Team Admin' : 'Learner'}</strong>.
-                </>
+                <span dangerouslySetInnerHTML={{ 
+                  __html: t('auth.invitedToOrg', { 
+                    orgName: invitation.organization?.name,
+                    role: invitation.role === 'org_admin' ? t('auth.teamAdmin') : t('nav.roles.learner')
+                  }) 
+                }} />
               )}
             </AlertDescription>
           </Alert>
@@ -196,17 +200,17 @@ export default function Login() {
 
         <Card className="shadow-card">
           <CardHeader className="text-center">
-            <CardTitle className="font-display text-xl">Sign in to your account</CardTitle>
+            <CardTitle className="font-display text-xl">{t('auth.signInToContinue')}</CardTitle>
             <CardDescription>
               {invitation 
-                ? 'Sign in to accept your invitation'
-                : 'Enter your credentials to access the platform'}
+                ? t('auth.signInToAcceptInvitation')
+                : t('auth.enterCredentials')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('auth.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -223,12 +227,12 @@ export default function Login() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t('auth.password')}</Label>
                   <Link
                     to="/forgot-password"
                     className="text-xs font-medium text-accent hover:underline"
                   >
-                    Forgot password?
+                    {t('auth.forgotPassword')}
                   </Link>
                 </div>
                 <Input
@@ -249,24 +253,24 @@ export default function Login() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
+                    {t('auth.signingIn')}
                   </>
                 ) : invitation ? (
-                  'Sign in & Accept Invitation'
+                  t('auth.signInAndAcceptInvitation')
                 ) : (
-                  'Sign in'
+                  t('auth.signIn')
                 )}
               </Button>
             </form>
 
             {inviteToken && (
               <div className="mt-6 text-center text-sm">
-                <span className="text-muted-foreground">Don't have an account? </span>
+                <span className="text-muted-foreground">{t('auth.noAccount')} </span>
                 <Link
                   to={`/signup?invite=${inviteToken}`}
                   className="font-medium text-accent hover:underline"
                 >
-                  Sign up
+                  {t('auth.signUp')}
                 </Link>
               </div>
             )}

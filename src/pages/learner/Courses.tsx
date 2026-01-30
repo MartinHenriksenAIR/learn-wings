@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function LearnerCourses() {
   const { user, currentOrg } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [search, setSearch] = useState('');
@@ -104,14 +106,14 @@ export default function LearnerCourses() {
 
     if (error) {
       toast({
-        title: 'Enrollment failed',
+        title: t('courses.enrollmentFailed'),
         description: error.message,
         variant: 'destructive',
       });
     } else {
       toast({
-        title: 'Enrolled successfully!',
-        description: 'You can now start learning.',
+        title: t('courses.enrolledSuccessfully'),
+        description: t('courses.startLearningNow'),
       });
       fetchData();
     }
@@ -131,14 +133,14 @@ export default function LearnerCourses() {
 
     if (error) {
       toast({
-        title: 'Failed to unenroll',
+        title: t('courses.unenrollFailed'),
         description: error.message,
         variant: 'destructive',
       });
     } else {
       toast({
-        title: 'Unenrolled from course',
-        description: `You've been unenrolled from "${unenrollDialog.course?.title}". Your progress has been removed.`,
+        title: t('courses.unenrolledFromCourse'),
+        description: t('courses.unenrolledDescription', { courseTitle: unenrollDialog.course?.title }),
       });
       fetchData();
     }
@@ -154,20 +156,20 @@ export default function LearnerCourses() {
   const courseFilters: FilterConfig[] = [
     {
       key: 'level',
-      label: 'Level',
+      label: t('courses.level'),
       options: [
-        { value: 'basic', label: 'Basic' },
-        { value: 'intermediate', label: 'Intermediate' },
-        { value: 'advanced', label: 'Advanced' },
+        { value: 'basic', label: t('courses.levels.basic') },
+        { value: 'intermediate', label: t('courses.levels.intermediate') },
+        { value: 'advanced', label: t('courses.levels.advanced') },
       ],
     },
     {
       key: 'status',
-      label: 'Status',
+      label: t('courses.status'),
       options: [
-        { value: 'enrolled', label: 'Enrolled' },
-        { value: 'completed', label: 'Completed' },
-        { value: 'not_enrolled', label: 'Not Enrolled' },
+        { value: 'enrolled', label: t('courses.statusOptions.enrolled') },
+        { value: 'completed', label: t('courses.statusOptions.completed') },
+        { value: 'not_enrolled', label: t('courses.statusOptions.notEnrolled') },
       ],
     },
   ];
@@ -216,7 +218,7 @@ export default function LearnerCourses() {
 
   if (loading) {
     return (
-      <AppLayout title="Course Catalog" breadcrumbs={[{ label: 'Courses' }]}>
+      <AppLayout title={t('courses.title')} breadcrumbs={[{ label: t('nav.courses') }]}>
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
         </div>
@@ -226,24 +228,24 @@ export default function LearnerCourses() {
 
   if (!currentOrg) {
     return (
-      <AppLayout title="Course Catalog" breadcrumbs={[{ label: 'Courses' }]}>
+      <AppLayout title={t('courses.title')} breadcrumbs={[{ label: t('nav.courses') }]}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">No organization selected.</p>
-          <p className="text-sm text-muted-foreground">Join an organization to access courses.</p>
+          <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
+          <p className="text-sm text-muted-foreground">{t('courses.joinOrgToAccessCourses')}</p>
         </div>
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout title="Course Catalog" breadcrumbs={[{ label: 'Courses' }]}>
+    <AppLayout title={t('courses.title')} breadcrumbs={[{ label: t('nav.courses') }]}>
       {/* Search and Filters */}
       <div className="mb-6">
         <SearchFilter
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Search courses..."
+          searchPlaceholder={t('courses.searchPlaceholder')}
           filters={courseFilters}
           filterValues={filterValues}
           onFilterChange={handleFilterChange}
@@ -254,11 +256,11 @@ export default function LearnerCourses() {
       {filteredCourses.length === 0 ? (
         <EmptyState
           icon={<BookOpen className="h-6 w-6" />}
-          title="No courses available"
+          title={t('courses.noCoursesAvailable')}
           description={
             search
-              ? 'No courses match your search. Try a different term.'
-              : 'There are no courses available for your organization yet.'
+              ? t('courses.noCoursesMatch')
+              : t('courses.noCoursesForOrg')
           }
         />
       ) : (
@@ -272,12 +274,12 @@ export default function LearnerCourses() {
                   {enrollment?.status === 'completed' && (
                     <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-success px-2 py-1 text-xs font-medium text-success-foreground">
                       <CheckCircle2 className="h-3 w-3" />
-                      Completed
+                      {t('dashboard.completed')}
                     </div>
                   )}
                   {enrollment && enrollment.status !== 'completed' && (
                     <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-accent-foreground">
-                      Enrolled
+                      {t('common.enrolled')}
                     </div>
                   )}
                 </div>
@@ -303,7 +305,7 @@ export default function LearnerCourses() {
                               className="text-destructive focus:text-destructive"
                             >
                               <LogOut className="mr-2 h-4 w-4" />
-                              Unenroll from course
+                              {t('courses.unenrollFromCourse')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -316,14 +318,14 @@ export default function LearnerCourses() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />
-                      <span>Self-paced</span>
+                      <span>{t('common.selfPaced')}</span>
                     </div>
                     
                     {enrollment ? (
                       <Link to={`/app/learn/${course.id}`}>
                         <Button size="sm">
                           <Play className="mr-1 h-3 w-3" />
-                          {enrollment.status === 'completed' ? 'Review' : 'Continue'}
+                          {enrollment.status === 'completed' ? t('common.review') : t('common.continue')}
                         </Button>
                       </Link>
                     ) : (
@@ -335,10 +337,10 @@ export default function LearnerCourses() {
                         {enrolling === course.id ? (
                           <>
                             <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                            Enrolling...
+                            {t('common.enrolling')}
                           </>
                         ) : (
-                          'Enroll'
+                          t('common.enroll')
                         )}
                       </Button>
                     )}
@@ -357,14 +359,13 @@ export default function LearnerCourses() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Unenroll from course?</AlertDialogTitle>
+            <AlertDialogTitle>{t('courses.unenrollConfirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to unenroll from <strong>"{unenrollDialog.course?.title}"</strong>? 
-              This will remove all your progress and you'll need to re-enroll to access the course again.
+              {t('courses.unenrollConfirmDescription', { courseTitle: unenrollDialog.course?.title })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={unenrolling}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={unenrolling}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleUnenroll}
               disabled={unenrolling}
@@ -373,10 +374,10 @@ export default function LearnerCourses() {
               {unenrolling ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Unenrolling...
+                  {t('common.unenrolling')}
                 </>
               ) : (
-                'Unenroll'
+                t('common.unenroll')
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

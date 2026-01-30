@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Sidebar,
   SidebarContent,
@@ -49,6 +50,7 @@ import logoLight from '@/assets/logo-light.png';
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
+  const { t } = useTranslation();
   const { 
     profile, 
     isPlatformAdmin, 
@@ -69,38 +71,38 @@ export function AppSidebar() {
   };
 
   const viewModeLabels: Record<ViewMode, string> = {
-    learner: 'Learner',
-    org_admin: 'Org. Admin',
-    platform_admin: 'Platform Admin',
+    learner: t('nav.roles.learner'),
+    org_admin: t('nav.roles.orgAdmin'),
+    platform_admin: t('nav.roles.platformAdmin'),
   };
 
   // Build learner items based on feature toggles
   const learnerItems = [
-    { title: 'Dashboard', url: '/app/dashboard', icon: LayoutDashboard },
-    { title: 'My Courses', url: '/app/courses', icon: BookOpen },
-    ...(features.certificates_enabled ? [{ title: 'Certificates', url: '/app/certificates', icon: Award }] : []),
-    ...(features.community_enabled ? [{ title: 'Community', url: '/app/community', icon: MessageSquare }] : []),
+    { title: t('nav.dashboard'), url: '/app/dashboard', icon: LayoutDashboard },
+    { title: t('nav.courses'), url: '/app/courses', icon: BookOpen },
+    ...(features.certificates_enabled ? [{ title: t('nav.certificates'), url: '/app/certificates', icon: Award }] : []),
+    ...(features.community_enabled ? [{ title: t('nav.community'), url: '/app/community', icon: MessageSquare }] : []),
   ];
 
   // Build org admin items based on feature toggles
   const orgAdminItems = [
-    { title: 'Organization', url: '/app/admin/org', icon: Building2 },
-    { title: 'Team Members', url: '/app/admin/org/users', icon: Users },
-    ...(features.analytics_enabled ? [{ title: 'Analytics', url: '/app/admin/analytics', icon: BarChart3 }] : []),
+    { title: t('nav.organization'), url: '/app/admin/org', icon: Building2 },
+    { title: t('nav.teamMembers'), url: '/app/admin/org/users', icon: Users },
+    ...(features.analytics_enabled ? [{ title: t('nav.analytics'), url: '/app/admin/analytics', icon: BarChart3 }] : []),
     ...(features.community_enabled ? [
-      { title: 'Ideas Overview', url: '/app/admin/org/ideas', icon: Lightbulb },
-      { title: 'Moderation', url: '/app/admin/org/moderation', icon: Flag },
+      { title: t('nav.ideasOverview'), url: '/app/admin/org/ideas', icon: Lightbulb },
+      { title: t('nav.moderation'), url: '/app/admin/org/moderation', icon: Flag },
     ] : []),
   ];
 
   // Build platform admin items based on feature toggles
   const platformAdminItems = [
-    { title: 'Organizations', url: '/app/admin/organizations', icon: Building2 },
-    { title: 'Users', url: '/app/admin/users', icon: Users },
-    { title: 'Course Manager', url: '/app/admin/courses', icon: GraduationCap },
-    ...(features.analytics_enabled ? [{ title: 'Global Analytics', url: '/app/admin/analytics/global', icon: BarChart3 }] : []),
-    ...(features.community_enabled ? [{ title: 'Community Moderation', url: '/app/admin/platform/moderation', icon: Flag }] : []),
-    { title: 'Platform Settings', url: '/app/admin/platform/settings', icon: SettingsIcon },
+    { title: t('nav.organizations'), url: '/app/admin/organizations', icon: Building2 },
+    { title: t('nav.users'), url: '/app/admin/users', icon: Users },
+    { title: t('nav.courseManager'), url: '/app/admin/courses', icon: GraduationCap },
+    ...(features.analytics_enabled ? [{ title: t('nav.globalAnalytics'), url: '/app/admin/analytics/global', icon: BarChart3 }] : []),
+    ...(features.community_enabled ? [{ title: t('nav.communityModeration'), url: '/app/admin/platform/moderation', icon: Flag }] : []),
+    { title: t('nav.platformSettings'), url: '/app/admin/platform/settings', icon: SettingsIcon },
   ];
 
   const initials = profile?.full_name
@@ -112,9 +114,9 @@ export function AppSidebar() {
 
   const getCurrentRoleLabel = () => {
     if (isPlatformAdmin) {
-      return `Viewing as: ${viewModeLabels[viewMode]}`;
+      return t('nav.viewingAs', { role: viewModeLabels[viewMode] });
     }
-    return effectiveIsOrgAdmin ? 'Org Admin' : 'Learner';
+    return effectiveIsOrgAdmin ? t('nav.roles.orgAdmin') : t('nav.roles.learner');
   };
 
   return (
@@ -141,12 +143,12 @@ export function AppSidebar() {
         {!effectiveIsPlatformAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider">
-              Learning
+              {t('nav.learning')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {learnerItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild
                       isActive={location.pathname === item.url}
@@ -173,12 +175,12 @@ export function AppSidebar() {
         {effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider">
-              Organization
+              {t('nav.organization')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {orgAdminItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild
                       isActive={location.pathname === item.url}
@@ -205,12 +207,12 @@ export function AppSidebar() {
         {effectiveIsPlatformAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider">
-              Platform Admin
+              {t('nav.platformAdmin')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {platformAdminItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild
                       isActive={location.pathname === item.url}
@@ -264,24 +266,24 @@ export function AppSidebar() {
               <>
                 <DropdownMenuLabel className="flex items-center gap-2">
                   <Eye className="h-4 w-4" />
-                  Switch View
+                  {t('nav.switchView')}
                 </DropdownMenuLabel>
                 <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-                  <DropdownMenuRadioItem value="platform_admin">Platform Admin</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="org_admin">Org. Admin</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="learner">Learner</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="platform_admin">{t('nav.roles.platformAdmin')}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="org_admin">{t('nav.roles.orgAdmin')}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="learner">{t('nav.roles.learner')}</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
                 <DropdownMenuSeparator />
               </>
             )}
             <DropdownMenuItem onClick={() => navigate('/app/settings')}>
               <SettingsIcon className="mr-2 h-4 w-4" />
-              Settings
+              {t('nav.settings')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
-              Sign out
+              {t('nav.signOut')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

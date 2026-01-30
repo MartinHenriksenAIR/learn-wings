@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,6 +16,7 @@ export default function Certificates() {
   const { user, currentOrg, profile } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [completedEnrollments, setCompletedEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -53,8 +55,8 @@ export default function Certificates() {
       if (error) {
         console.error('Error generating certificate:', error);
         toast({
-          title: 'Failed to generate certificate',
-          description: error.message || 'Please try again later.',
+          title: t('certificates.generateFailed'),
+          description: error.message || t('certificates.generateFailedDescription'),
           variant: 'destructive',
         });
         return;
@@ -72,14 +74,14 @@ export default function Certificates() {
       window.URL.revokeObjectURL(url);
 
       toast({
-        title: 'Certificate downloaded',
-        description: 'Your certificate has been downloaded successfully.',
+        title: t('certificates.downloadSuccess'),
+        description: t('certificates.downloadSuccessDescription'),
       });
     } catch (err) {
       console.error('Error downloading certificate:', err);
       toast({
-        title: 'Failed to download certificate',
-        description: 'An unexpected error occurred. Please try again.',
+        title: t('certificates.downloadFailed'),
+        description: t('certificates.downloadFailedDescription'),
         variant: 'destructive',
       });
     } finally {
@@ -94,7 +96,7 @@ export default function Certificates() {
 
   if (loading || settingsLoading) {
     return (
-      <AppLayout title="Certificates" breadcrumbs={[{ label: 'Certificates' }]}>
+      <AppLayout title={t('certificates.title')} breadcrumbs={[{ label: t('nav.certificates') }]}>
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
         </div>
@@ -104,23 +106,23 @@ export default function Certificates() {
 
   if (!currentOrg) {
     return (
-      <AppLayout title="Certificates" breadcrumbs={[{ label: 'Certificates' }]}>
+      <AppLayout title={t('certificates.title')} breadcrumbs={[{ label: t('nav.certificates') }]}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <Award className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">No organization selected.</p>
-          <p className="text-sm text-muted-foreground">Join an organization to earn certificates.</p>
+          <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
+          <p className="text-sm text-muted-foreground">{t('certificates.joinOrgToEarn')}</p>
         </div>
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout title="Certificates" breadcrumbs={[{ label: 'Certificates' }]}>
+    <AppLayout title={t('certificates.title')} breadcrumbs={[{ label: t('nav.certificates') }]}>
       {completedEnrollments.length === 0 ? (
         <EmptyState
           icon={<Award className="h-6 w-6" />}
-          title="No certificates yet"
-          description="Complete courses to earn certificates. They'll appear here once you finish."
+          title={t('certificates.noCertificates')}
+          description={t('certificates.noCertificatesDescription')}
         />
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
@@ -130,24 +132,20 @@ export default function Certificates() {
                 <div className="flex items-center gap-2 mb-4">
                   <Award className="h-8 w-8" />
                   <span className="text-sm font-medium uppercase tracking-wider opacity-80">
-                    Certificate of Completion
+                    {t('certificates.certificateOfCompletion')}
                   </span>
                 </div>
                 <h3 className="font-display text-xl font-bold mb-2">
                   {enrollment.course?.title}
                 </h3>
                 <p className="text-sm opacity-80">
-                  Awarded to {profile?.full_name}
+                  {t('certificates.awardedTo', { name: profile?.full_name })}
                 </p>
               </div>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
-                    Completed on {new Date(enrollment.completed_at!).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
+                    {t('common.completedOn')} {new Date(enrollment.completed_at!).toLocaleDateString()}
                   </div>
                   <Button 
                     variant="outline" 
@@ -160,7 +158,7 @@ export default function Certificates() {
                     ) : (
                       <Download className="mr-2 h-4 w-4" />
                     )}
-                    Download
+                    {t('common.download')}
                   </Button>
                 </div>
               </CardContent>

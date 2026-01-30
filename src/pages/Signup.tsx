@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ export default function Signup() {
   const { signUp, user, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get('invite');
 
@@ -70,8 +72,8 @@ export default function Signup() {
         setEmail(invitationData.email);
       } else {
         toast({
-          title: 'Invalid invitation',
-          description: 'This invitation link is invalid or has expired.',
+          title: t('auth.invalidInvitation'),
+          description: t('auth.invalidInvitationDescription'),
           variant: 'destructive',
         });
       }
@@ -79,7 +81,7 @@ export default function Signup() {
     };
 
     loadInvitation();
-  }, [inviteToken, toast]);
+  }, [inviteToken, toast, t]);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -109,13 +111,13 @@ export default function Signup() {
     if (error) {
       if (error.message.includes('already registered')) {
         toast({
-          title: 'Account exists',
-          description: 'An account with this email already exists. Please sign in instead.',
+          title: t('auth.accountExists'),
+          description: t('auth.accountExistsDescription'),
           variant: 'destructive',
         });
       } else {
         toast({
-          title: 'Sign up failed',
+          title: t('auth.signUpFailed'),
           description: error.message,
           variant: 'destructive',
         });
@@ -154,8 +156,8 @@ export default function Signup() {
     }
 
     toast({
-      title: 'Account created!',
-      description: 'Welcome to AIR Academy. Redirecting you now...',
+      title: t('auth.accountCreated'),
+      description: t('auth.welcomeToAcademy'),
     });
 
     // Small delay then redirect
@@ -183,7 +185,7 @@ export default function Signup() {
             alt="AI Uddannelse" 
             className="mb-4 h-14 w-auto object-contain"
           />
-          <p className="text-sm text-muted-foreground">Enterprise Learning Platform</p>
+          <p className="text-sm text-muted-foreground">{t('auth.platformDescription')}</p>
         </div>
 
         {invitation && (
@@ -191,12 +193,14 @@ export default function Signup() {
             <CheckCircle2 className="h-4 w-4 text-accent" />
             <AlertDescription className="text-sm">
               {invitation.is_platform_admin_invite ? (
-                <>You've been invited to join <strong>AIR Academy</strong> as a <strong>Platform Admin</strong>.</>
+                <span dangerouslySetInnerHTML={{ __html: t('auth.invitedToPlatformAdmin') }} />
               ) : (
-                <>
-                  You've been invited to join <strong>{invitation.organization?.name}</strong> as a{' '}
-                  <strong>{invitation.role === 'org_admin' ? 'Team Admin' : 'Learner'}</strong>.
-                </>
+                <span dangerouslySetInnerHTML={{ 
+                  __html: t('auth.invitedToOrg', { 
+                    orgName: invitation.organization?.name,
+                    role: invitation.role === 'org_admin' ? t('auth.teamAdmin') : t('nav.roles.learner')
+                  }) 
+                }} />
               )}
             </AlertDescription>
           </Alert>
@@ -204,15 +208,15 @@ export default function Signup() {
 
         <Card className="shadow-card">
           <CardHeader className="text-center">
-            <CardTitle className="font-display text-xl">Create your account</CardTitle>
+            <CardTitle className="font-display text-xl">{t('auth.createYourAccount')}</CardTitle>
             <CardDescription>
-              Get started with your learning journey
+              {t('auth.getStarted')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
+                <Label htmlFor="fullName">{t('auth.fullName')}</Label>
                 <Input
                   id="fullName"
                   type="text"
@@ -228,7 +232,7 @@ export default function Signup() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('auth.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -244,7 +248,7 @@ export default function Signup() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t('auth.password')}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -260,7 +264,7 @@ export default function Signup() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Label htmlFor="confirmPassword">{t('auth.confirmPassword')}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -279,21 +283,21 @@ export default function Signup() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating account...
+                    {t('auth.creatingAccount')}
                   </>
                 ) : (
-                  'Create account'
+                  t('auth.createAccount')
                 )}
               </Button>
             </form>
 
             <div className="mt-6 text-center text-sm">
-              <span className="text-muted-foreground">Already have an account? </span>
+              <span className="text-muted-foreground">{t('auth.haveAccount')} </span>
               <Link
                 to={inviteToken ? `/login?invite=${inviteToken}` : '/login'}
                 className="font-medium text-accent hover:underline"
               >
-                Sign in
+                {t('auth.signIn')}
               </Link>
             </div>
           </CardContent>

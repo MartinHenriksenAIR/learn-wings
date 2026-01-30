@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
 import { ProgressRing } from '@/components/ui/progress-ring';
@@ -14,6 +15,7 @@ import { BookOpen, Clock, Award, Play, ArrowRight, Loader2 } from 'lucide-react'
 
 export default function LearnerDashboard() {
   const { user, currentOrg } = useAuth();
+  const { t } = useTranslation();
   const [enrollments, setEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
   const [progressData, setProgressData] = useState<Record<string, { total: number; completed: number }>>({});
   const [loading, setLoading] = useState(true);
@@ -89,7 +91,7 @@ export default function LearnerDashboard() {
 
   if (loading) {
     return (
-      <AppLayout title="Dashboard">
+      <AppLayout title={t('dashboard.title')}>
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
         </div>
@@ -99,37 +101,37 @@ export default function LearnerDashboard() {
 
   if (!currentOrg) {
     return (
-      <AppLayout title="Dashboard">
+      <AppLayout title={t('dashboard.title')}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">No organization selected.</p>
-          <p className="text-sm text-muted-foreground">Join an organization to access your courses.</p>
+          <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
+          <p className="text-sm text-muted-foreground">{t('common.joinOrgToContinue')}</p>
         </div>
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout title="My Dashboard">
+    <AppLayout title={t('dashboard.title')}>
       {/* Stats Grid */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Courses Enrolled"
+          title={t('dashboard.coursesEnrolled')}
           value={enrollments.length}
           icon={<BookOpen className="h-5 w-5" />}
         />
         <StatCard
-          title="In Progress"
+          title={t('dashboard.inProgress')}
           value={inProgressCourses.length}
           icon={<Clock className="h-5 w-5" />}
         />
         <StatCard
-          title="Completed"
+          title={t('dashboard.completed')}
           value={completedCourses.length}
           icon={<Award className="h-5 w-5" />}
         />
         <StatCard
-          title="Overall Progress"
+          title={t('dashboard.overallProgress')}
           value={`${Math.round(totalProgress)}%`}
           icon={<ProgressRing progress={totalProgress} size={40} showLabel={false} />}
         />
@@ -138,10 +140,10 @@ export default function LearnerDashboard() {
       {/* Continue Learning */}
       <div className="mb-8">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">Continue Learning</h2>
+          <h2 className="font-display text-lg font-semibold">{t('dashboard.continueLearning')}</h2>
           <Link to="/app/courses">
             <Button variant="ghost" size="sm">
-              View all courses
+              {t('dashboard.viewAllCourses')}
               <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </Link>
@@ -150,11 +152,11 @@ export default function LearnerDashboard() {
         {inProgressCourses.length === 0 ? (
           <EmptyState
             icon={<BookOpen className="h-6 w-6" />}
-            title="No courses in progress"
-            description="Start learning by enrolling in a course from the catalog."
+            title={t('dashboard.noCoursesInProgress')}
+            description={t('dashboard.startLearning')}
             action={
               <Link to="/app/courses">
-                <Button>Browse Courses</Button>
+                <Button>{t('dashboard.browseCourses')}</Button>
               </Link>
             }
           />
@@ -185,13 +187,13 @@ export default function LearnerDashboard() {
                       <div className="flex items-center gap-2">
                         <ProgressRing progress={progressPercent} size={32} strokeWidth={4} />
                         <span className="text-xs text-muted-foreground">
-                          {progress?.completed || 0}/{progress?.total || 0} lessons
+                          {progress?.completed || 0}/{progress?.total || 0} {t('common.lessons')}
                         </span>
                       </div>
                       <Link to={`/app/learn/${enrollment.course_id}`}>
                         <Button size="sm">
                           <Play className="mr-1 h-3 w-3" />
-                          Continue
+                          {t('common.continue')}
                         </Button>
                       </Link>
                     </div>
@@ -206,7 +208,7 @@ export default function LearnerDashboard() {
       {/* Completed Courses */}
       {completedCourses.length > 0 && (
         <div>
-          <h2 className="mb-4 font-display text-lg font-semibold">Completed Courses</h2>
+          <h2 className="mb-4 font-display text-lg font-semibold">{t('dashboard.completedCourses')}</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {completedCourses.map((enrollment) => (
               <Card key={enrollment.id}>
@@ -217,7 +219,7 @@ export default function LearnerDashboard() {
                   <div className="flex-1">
                     <h3 className="font-medium">{enrollment.course?.title}</h3>
                     <p className="text-xs text-muted-foreground">
-                      Completed on {new Date(enrollment.completed_at!).toLocaleDateString()}
+                      {t('common.completedOn')} {new Date(enrollment.completed_at!).toLocaleDateString()}
                     </p>
                   </div>
                 </CardContent>
