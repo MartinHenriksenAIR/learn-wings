@@ -57,9 +57,10 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       data.forEach((setting) => {
         const value = setting.value as Record<string, unknown>;
         if (setting.key === 'features') {
-          setFeatures(value as unknown as FeatureSettings);
+          // Merge with defaults to ensure new feature flags are included
+          setFeatures(prev => ({ ...prev, ...value as unknown as Partial<FeatureSettings> }));
         } else if (setting.key === 'branding') {
-          setBranding(value as unknown as BrandingSettings);
+          setBranding(prev => ({ ...prev, ...value as unknown as Partial<BrandingSettings> }));
         }
       });
     }
