@@ -127,7 +127,7 @@ export function AppSidebar() {
             <img 
               src={logoLight} 
               alt="AI Uddannelse" 
-              className="h-10 w-40 object-contain"
+              className="h-auto w-full max-w-[180px] object-contain"
             />
           )}
         </div>
