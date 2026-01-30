@@ -39,6 +39,9 @@ import {
   ChevronDown,
   Award,
   Eye,
+  Lightbulb,
+  Flag,
+  MessageSquare,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
 import logoLight from '@/assets/logo-light.png';
@@ -76,7 +79,7 @@ export function AppSidebar() {
     { title: 'Dashboard', url: '/app/dashboard', icon: LayoutDashboard },
     { title: 'My Courses', url: '/app/courses', icon: BookOpen },
     ...(features.certificates_enabled ? [{ title: 'Certificates', url: '/app/certificates', icon: Award }] : []),
-    ...(features.community_enabled ? [{ title: 'Community', url: '/app/community', icon: Users }] : []),
+    ...(features.community_enabled ? [{ title: 'Community', url: '/app/community', icon: MessageSquare }] : []),
   ];
 
   // Build org admin items based on feature toggles
@@ -84,6 +87,10 @@ export function AppSidebar() {
     { title: 'Organization', url: '/app/admin/org', icon: Building2 },
     { title: 'Team Members', url: '/app/admin/org/users', icon: Users },
     ...(features.analytics_enabled ? [{ title: 'Analytics', url: '/app/admin/analytics', icon: BarChart3 }] : []),
+    ...(features.community_enabled ? [
+      { title: 'Ideas Overview', url: '/app/admin/org/ideas', icon: Lightbulb },
+      { title: 'Moderation', url: '/app/admin/org/moderation', icon: Flag },
+    ] : []),
   ];
 
   // Build platform admin items based on feature toggles
@@ -92,6 +99,7 @@ export function AppSidebar() {
     { title: 'Users', url: '/app/admin/users', icon: Users },
     { title: 'Course Manager', url: '/app/admin/courses', icon: GraduationCap },
     ...(features.analytics_enabled ? [{ title: 'Global Analytics', url: '/app/admin/analytics/global', icon: BarChart3 }] : []),
+    ...(features.community_enabled ? [{ title: 'Community Moderation', url: '/app/admin/platform/moderation', icon: Flag }] : []),
     { title: 'Platform Settings', url: '/app/admin/platform/settings', icon: SettingsIcon },
   ];
 

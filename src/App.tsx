@@ -30,6 +30,11 @@ import NotFound from "./pages/NotFound";
 import CommunityFeed from "./pages/community/CommunityFeed";
 import PostDetail from "./pages/community/PostDetail";
 import IdeaLibrary from "./pages/community/IdeaLibrary";
+import IdeaSubmit from "./pages/community/IdeaSubmit";
+import IdeaDetail from "./pages/community/IdeaDetail";
+import OrgIdeasManagement from "./pages/org-admin/OrgIdeasManagement";
+import OrgCommunityModeration from "./pages/org-admin/OrgCommunityModeration";
+import PlatformCommunityModeration from "./pages/platform-admin/PlatformCommunityModeration";
 
 const queryClient = new QueryClient();
 
@@ -52,11 +57,15 @@ function AppRoutes() {
       <Route path="/app/community" element={<ProtectedRoute><CommunityFeed /></ProtectedRoute>} />
       <Route path="/app/community/:scope/posts/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
       <Route path="/app/community/org/ideas" element={<ProtectedRoute><IdeaLibrary /></ProtectedRoute>} />
+      <Route path="/app/community/org/ideas/new" element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
+      <Route path="/app/community/org/ideas/:ideaId" element={<ProtectedRoute><IdeaDetail /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
       <Route path="/app/admin/org" element={<ProtectedRoute requireOrgAdmin><OrgDashboard /></ProtectedRoute>} />
       <Route path="/app/admin/org/users" element={<ProtectedRoute requireOrgAdmin><OrgUsers /></ProtectedRoute>} />
       <Route path="/app/admin/analytics" element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
+      <Route path="/app/admin/org/ideas" element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />
+      <Route path="/app/admin/org/moderation" element={<ProtectedRoute requireOrgAdmin><OrgCommunityModeration /></ProtectedRoute>} />
       
       {/* Protected platform admin routes */}
       <Route path="/app/admin/organizations" element={<ProtectedRoute requirePlatformAdmin><OrganizationsManager /></ProtectedRoute>} />
@@ -66,6 +75,7 @@ function AppRoutes() {
       <Route path="/app/admin/users" element={<ProtectedRoute requirePlatformAdmin><UsersManager /></ProtectedRoute>} />
       <Route path="/app/admin/analytics/global" element={<ProtectedRoute requirePlatformAdmin><OrgAnalytics /></ProtectedRoute>} />
       <Route path="/app/admin/platform/settings" element={<ProtectedRoute requirePlatformAdmin><PlatformSettings /></ProtectedRoute>} />
+      <Route path="/app/admin/platform/moderation" element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
       <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
       {/* Redirects */}
