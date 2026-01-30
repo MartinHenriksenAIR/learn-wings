@@ -134,14 +134,14 @@ export default function Settings() {
 
     if (error) {
       toast({
-        title: 'Failed to update profile',
+        title: t('settings.profileUpdateFailed'),
         description: error.message,
         variant: 'destructive',
       });
     } else {
       toast({
-        title: 'Profile updated',
-        description: 'Your changes have been saved.',
+        title: t('settings.profileUpdated'),
+        description: t('settings.profileUpdatedDescription'),
       });
       await refreshUserContext();
     }
@@ -170,14 +170,14 @@ export default function Settings() {
 
     if (error) {
       toast({
-        title: 'Failed to update password',
+        title: t('settings.passwordUpdateFailed'),
         description: error.message,
         variant: 'destructive',
       });
     } else {
       toast({
-        title: 'Password updated',
-        description: 'Your password has been changed successfully.',
+        title: t('settings.passwordUpdated'),
+        description: t('settings.passwordUpdatedDescription'),
       });
       setNewPassword('');
       setConfirmPassword('');
@@ -188,13 +188,13 @@ export default function Settings() {
   // Determine role display
   const getRoleDisplay = () => {
     if (isPlatformAdmin) {
-      return { label: 'Platform Admin', variant: 'default' as const };
+      return { label: t('nav.roles.platformAdmin'), variant: 'default' as const };
     }
     
     const adminMembership = memberships.find(m => m.role === 'org_admin' && m.status === 'active');
     if (adminMembership) {
       return { 
-        label: `Org Admin at ${adminMembership.organization?.name || 'Organization'}`,
+        label: `${t('nav.roles.orgAdmin')} at ${adminMembership.organization?.name || 'Organization'}`,
         variant: 'secondary' as const 
       };
     }
@@ -202,7 +202,7 @@ export default function Settings() {
     const learnerMembership = memberships.find(m => m.role === 'learner' && m.status === 'active');
     if (learnerMembership) {
       return { 
-        label: `Learner at ${learnerMembership.organization?.name || 'Organization'}`,
+        label: `${t('nav.roles.learner')} at ${learnerMembership.organization?.name || 'Organization'}`,
         variant: 'outline' as const 
       };
     }
@@ -213,22 +213,22 @@ export default function Settings() {
   const roleInfo = getRoleDisplay();
 
   return (
-    <AppLayout title="Settings" breadcrumbs={[{ label: 'Settings' }]}>
+    <AppLayout title={t('settings.title')} breadcrumbs={[{ label: t('nav.settings') }]}>
       <div className="max-w-2xl space-y-6">
         {/* Profile Section */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-muted-foreground" />
-              <CardTitle>Profile</CardTitle>
+              <CardTitle>{t('settings.profile')}</CardTitle>
             </div>
-            <CardDescription>Update your personal information.</CardDescription>
+            <CardDescription>{t('settings.updateProfile')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                Email
+                {t('auth.email')}
               </Label>
               <Input
                 id="email"
@@ -237,12 +237,12 @@ export default function Settings() {
                 className="bg-muted"
               />
               <p className="text-xs text-muted-foreground">
-                Email cannot be changed.
+                {t('settings.emailCannotBeChanged')}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">{t('settings.firstName')}</Label>
                 <Input
                   id="firstName"
                   value={firstName}
@@ -252,14 +252,14 @@ export default function Settings() {
                       setProfileErrors((prev) => ({ ...prev, firstName: undefined }));
                     }
                   }}
-                  placeholder="First name"
+                  placeholder={t('settings.firstName')}
                 />
                 {profileErrors.firstName && (
                   <p className="text-sm text-destructive">{profileErrors.firstName}</p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName">{t('settings.lastName')}</Label>
                 <Input
                   id="lastName"
                   value={lastName}
@@ -269,7 +269,7 @@ export default function Settings() {
                       setProfileErrors((prev) => ({ ...prev, lastName: undefined }));
                     }
                   }}
-                  placeholder="Last name"
+                  placeholder={t('settings.lastName')}
                 />
                 {profileErrors.lastName && (
                   <p className="text-sm text-destructive">{profileErrors.lastName}</p>
@@ -277,7 +277,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
+              <Label htmlFor="department">{t('settings.department')}</Label>
               <Input
                 id="department"
                 value={department}
@@ -287,7 +287,7 @@ export default function Settings() {
                     setProfileErrors((prev) => ({ ...prev, department: undefined }));
                   }
                 }}
-                placeholder="e.g. Engineering, Sales, Marketing"
+                placeholder={t('settings.departmentPlaceholder')}
               />
               {profileErrors.department && (
                 <p className="text-sm text-destructive">{profileErrors.department}</p>
@@ -295,7 +295,7 @@ export default function Settings() {
             </div>
             <Button onClick={handleProfileSave} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
+              {t('settings.saveChanges')}
             </Button>
           </CardContent>
         </Card>
@@ -305,13 +305,13 @@ export default function Settings() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Lock className="h-5 w-5 text-muted-foreground" />
-              <CardTitle>Security</CardTitle>
+              <CardTitle>{t('settings.security')}</CardTitle>
             </div>
-            <CardDescription>Change your password.</CardDescription>
+            <CardDescription>{t('settings.changePassword')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
+              <Label htmlFor="newPassword">{t('settings.newPassword')}</Label>
               <Input
                 id="newPassword"
                 type="password"
@@ -322,17 +322,17 @@ export default function Settings() {
                     setPasswordErrors((prev) => ({ ...prev, newPassword: undefined }));
                   }
                 }}
-                placeholder="Enter new password"
+                placeholder={t('settings.enterNewPassword')}
               />
               <p className="text-xs text-muted-foreground">
-                Must be at least 6 characters.
+                {t('settings.passwordMinLength')}
               </p>
               {passwordErrors.newPassword && (
                 <p className="text-sm text-destructive">{passwordErrors.newPassword}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword">{t('auth.confirmPassword')}</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -343,7 +343,7 @@ export default function Settings() {
                     setPasswordErrors((prev) => ({ ...prev, confirmPassword: undefined }));
                   }
                 }}
-                placeholder="Confirm new password"
+                placeholder={t('settings.confirmNewPassword')}
               />
               {passwordErrors.confirmPassword && (
                 <p className="text-sm text-destructive">{passwordErrors.confirmPassword}</p>
@@ -354,7 +354,7 @@ export default function Settings() {
               disabled={passwordSaving || !newPassword || !confirmPassword}
             >
               {passwordSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Update Password
+              {t('settings.updatePassword')}
             </Button>
           </CardContent>
         </Card>
@@ -393,15 +393,15 @@ export default function Settings() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-muted-foreground" />
-              <CardTitle>Account Information</CardTitle>
+              <CardTitle>{t('settings.accountInfo')}</CardTitle>
             </div>
-            <CardDescription>Your account details and role.</CardDescription>
+            <CardDescription>{t('settings.accountDetails')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">Account created</p>
+                <p className="text-sm font-medium">{t('settings.accountCreated')}</p>
                 <p className="text-sm text-muted-foreground">
                   {profile?.created_at 
                     ? format(new Date(profile.created_at), 'MMMM d, yyyy')
@@ -412,7 +412,7 @@ export default function Settings() {
             <div className="flex items-center gap-3">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">Role</p>
+                <p className="text-sm font-medium">{t('settings.role')}</p>
                 <Badge variant={roleInfo.variant} className="mt-1">
                   {roleInfo.label}
                 </Badge>
@@ -420,7 +420,7 @@ export default function Settings() {
             </div>
             {memberships.length > 1 && (
               <div className="pt-2">
-                <p className="text-sm font-medium mb-2">Organizations</p>
+                <p className="text-sm font-medium mb-2">{t('settings.organizations')}</p>
                 <div className="flex flex-wrap gap-2">
                   {memberships.map((m) => (
                     <Badge key={m.id} variant="outline">
