@@ -183,6 +183,9 @@ export function BulkInviteDialog({
           email: invite.email,
           role: invite.role,
           invited_by_user_id: userId,
+          first_name: invite.first_name || null,
+          last_name: invite.last_name || null,
+          department: invite.department || null,
         })
         .select('id')
         .single();
