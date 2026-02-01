@@ -39,7 +39,8 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
           throw new Error(`Failed to fetch PDF: ${response.status}`);
         }
         const arrayBuffer = await response.arrayBuffer();
-        setPdfData(arrayBuffer);
+        // Create a copy to prevent detached ArrayBuffer issues
+        setPdfData(arrayBuffer.slice(0));
       } catch (err) {
         console.error('PDF fetch error:', err);
         setError('Failed to load PDF document');
