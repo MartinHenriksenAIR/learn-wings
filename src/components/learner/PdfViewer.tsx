@@ -1,5 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Download, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,35 +21,36 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.0);
-  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [fetchingPdf, setFetchingPdf] = useState(false);
 
-  // Fetch PDF as Uint8Array to avoid CORS issues with Azure SAS URLs
-  // and prevent detached ArrayBuffer errors
+  // Fetch PDF and create object URL to avoid CORS and ArrayBuffer issues
   useEffect(() => {
     let isCancelled = false;
+    let objectUrl: string | null = null;
     
     const fetchPdf = async () => {
       if (!url) return;
       
       setFetchingPdf(true);
       setError(null);
-      setPdfData(null);
+      setPdfUrl(null);
       setPageNumber(1);
       setNumPages(0);
+      setLoading(true);
       
       try {
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Failed to fetch PDF: ${response.status}`);
         }
-        const arrayBuffer = await response.arrayBuffer();
+        const blob = await response.blob();
         
         // Only update state if the effect hasn't been cleaned up
         if (!isCancelled) {
-          // Convert to Uint8Array to prevent detached ArrayBuffer issues
-          const uint8Array = new Uint8Array(arrayBuffer);
-          setPdfData(uint8Array);
+          // Create an object URL from the blob - this avoids ArrayBuffer issues
+          objectUrl = URL.createObjectURL(blob);
+          setPdfUrl(objectUrl);
         }
       } catch (err) {
         if (!isCancelled) {
@@ -66,6 +69,10 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
     
     return () => {
       isCancelled = true;
+      // Clean up the object URL when the component unmounts or URL changes
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
     };
   }, [url]);
 
@@ -114,6 +121,9 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
       toast.error('Failed to download document');
     }
   };
+
+  // Memoize the file prop to prevent unnecessary reloads
+  const fileSource = useMemo(() => pdfUrl, [pdfUrl]);
 
   return (
     <div className={cn('flex flex-col', className)}>
@@ -183,10 +193,10 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : pdfData ? (
+        ) : fileSource ? (
           <div className="flex justify-center p-4">
             <Document
-              file={{ data: pdfData }}
+              file={fileSource}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
               loading={
@@ -198,8 +208,6 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
               <Page
                 pageNumber={pageNumber}
                 scale={scale}
-                renderTextLayer={false}
-                renderAnnotationLayer={false}
                 loading={
                   <div className="flex items-center justify-center h-64">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
