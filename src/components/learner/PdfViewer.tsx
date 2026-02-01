@@ -19,11 +19,14 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.0);
-  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [fetchingPdf, setFetchingPdf] = useState(false);
 
-  // Fetch PDF as blob to avoid CORS issues with Azure SAS URLs
+  // Fetch PDF as Uint8Array to avoid CORS issues with Azure SAS URLs
+  // and prevent detached ArrayBuffer errors
   useEffect(() => {
+    let isCancelled = false;
+    
     const fetchPdf = async () => {
       if (!url) return;
       
@@ -39,18 +42,31 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
           throw new Error(`Failed to fetch PDF: ${response.status}`);
         }
         const arrayBuffer = await response.arrayBuffer();
-        // Create a copy to prevent detached ArrayBuffer issues
-        setPdfData(arrayBuffer.slice(0));
+        
+        // Only update state if the effect hasn't been cleaned up
+        if (!isCancelled) {
+          // Convert to Uint8Array to prevent detached ArrayBuffer issues
+          const uint8Array = new Uint8Array(arrayBuffer);
+          setPdfData(uint8Array);
+        }
       } catch (err) {
-        console.error('PDF fetch error:', err);
-        setError('Failed to load PDF document');
-        setLoading(false);
+        if (!isCancelled) {
+          console.error('PDF fetch error:', err);
+          setError('Failed to load PDF document');
+          setLoading(false);
+        }
       } finally {
-        setFetchingPdf(false);
+        if (!isCancelled) {
+          setFetchingPdf(false);
+        }
       }
     };
 
     fetchPdf();
+    
+    return () => {
+      isCancelled = true;
+    };
   }, [url]);
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
