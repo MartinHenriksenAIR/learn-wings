@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Download, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
@@ -19,6 +19,38 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.0);
+  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
+  const [fetchingPdf, setFetchingPdf] = useState(false);
+
+  // Fetch PDF as blob to avoid CORS issues with Azure SAS URLs
+  useEffect(() => {
+    const fetchPdf = async () => {
+      if (!url) return;
+      
+      setFetchingPdf(true);
+      setError(null);
+      setPdfData(null);
+      setPageNumber(1);
+      setNumPages(0);
+      
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.status}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        setPdfData(arrayBuffer);
+      } catch (err) {
+        console.error('PDF fetch error:', err);
+        setError('Failed to load PDF document');
+        setLoading(false);
+      } finally {
+        setFetchingPdf(false);
+      }
+    };
+
+    fetchPdf();
+  }, [url]);
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -81,7 +113,7 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm text-muted-foreground min-w-[80px] text-center">
-            {loading ? '...' : `${pageNumber} / ${numPages}`}
+            {loading || fetchingPdf ? '...' : `${pageNumber} / ${numPages}`}
           </span>
           <Button
             variant="outline"
@@ -130,10 +162,14 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
           <div className="flex items-center justify-center h-64 text-destructive">
             <p>{error}</p>
           </div>
-        ) : (
+        ) : fetchingPdf ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : pdfData ? (
           <div className="flex justify-center p-4">
             <Document
-              file={url}
+              file={{ data: pdfData }}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
               loading={
@@ -155,7 +191,7 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
               />
             </Document>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
