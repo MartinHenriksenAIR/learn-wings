@@ -95,7 +95,10 @@
     "invalidInvitation": "Ugyldig invitation",
     "invalidInvitationDescription": "Dette invitationslink er ugyldigt eller udløbet.",
     "invitedToPlatformAdmin": "Du er blevet inviteret til at deltage i <strong>AIR Academy</strong> som <strong>Platformadministrator</strong>.",
+    "invitedToPlatformAdminText": "Du er blevet inviteret til at deltage i AIR Academy som Platformadministrator.",
     "invitedToOrg": "Du er blevet inviteret til at deltage i <strong>{{orgName}}</strong> som <strong>{{role}}</strong>.",
+    "invitedToOrgPrefix": "Du er blevet inviteret til at deltage i",
+    "invitedToOrgMiddle": "som",
     "teamAdmin": "Teamadministrator",
     "platformDescription": "Enterprise læringsplatform"
   },

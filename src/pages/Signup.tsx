@@ -193,14 +193,14 @@ export default function Signup() {
             <CheckCircle2 className="h-4 w-4 text-accent" />
             <AlertDescription className="text-sm">
               {invitation.is_platform_admin_invite ? (
-                <span dangerouslySetInnerHTML={{ __html: t('auth.invitedToPlatformAdmin') }} />
+                <span>{t('auth.invitedToPlatformAdminText')}</span>
               ) : (
-                <span dangerouslySetInnerHTML={{ 
-                  __html: t('auth.invitedToOrg', { 
-                    orgName: invitation.organization?.name,
-                    role: invitation.role === 'org_admin' ? t('auth.teamAdmin') : t('nav.roles.learner')
-                  }) 
-                }} />
+                <span>
+                  {t('auth.invitedToOrgPrefix')}{' '}
+                  <strong>{invitation.organization?.name}</strong>{' '}
+                  {t('auth.invitedToOrgMiddle')}{' '}
+                  <strong>{invitation.role === 'org_admin' ? t('auth.teamAdmin') : t('nav.roles.learner')}</strong>
+                </span>
               )}
             </AlertDescription>
           </Alert>
