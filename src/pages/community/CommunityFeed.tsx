@@ -282,11 +282,6 @@ export default function CommunityFeed() {
 
           {/* Sidebar */}
           <div className="space-y-4">
-            {/* AI Champions (org only) */}
-            {scope === 'org' && currentOrg && (
-              <AIChampionsList orgId={currentOrg.id} />
-            )}
-
             {/* Upcoming Events */}
             {eventPosts.length > 0 && (
               <UpcomingEvents
@@ -341,6 +336,11 @@ export default function CommunityFeed() {
                   </Button>
                 </CardContent>
               </Card>
+            )}
+
+            {/* AI Champions (org only) */}
+            {scope === 'org' && currentOrg && (
+              <AIChampionsList orgId={currentOrg.id} />
             )}
 
             {/* Categories */}
