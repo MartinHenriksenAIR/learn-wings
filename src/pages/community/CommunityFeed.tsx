@@ -18,6 +18,7 @@ import { PostForm } from '@/components/community/PostForm';
 import { UpcomingEvents } from '@/components/community/UpcomingEvents';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { CategoryBadge } from '@/components/community/CategoryBadge';
+import { AIChampionsList } from '@/components/community/AIChampionsList';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -280,6 +281,11 @@ export default function CommunityFeed() {
 
           {/* Sidebar */}
           <div className="space-y-4">
+            {/* AI Champions (org only) */}
+            {scope === 'org' && currentOrg && (
+              <AIChampionsList orgId={currentOrg.id} />
+            )}
+
             {/* Upcoming Events */}
             {eventPosts.length > 0 && (
               <UpcomingEvents
@@ -293,7 +299,7 @@ export default function CommunityFeed() {
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-amber-500" />
+                    <Lightbulb className="h-4 w-4 text-warning" />
                     Idea Library
                   </CardTitle>
                 </CardHeader>

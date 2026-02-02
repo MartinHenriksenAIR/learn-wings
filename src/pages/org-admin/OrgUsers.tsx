@@ -51,7 +51,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
-import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX, UserCog, ShieldCheck, User, FileSpreadsheet, GraduationCap } from 'lucide-react';
+import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX, UserCog, ShieldCheck, User, FileSpreadsheet, GraduationCap, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import { getInviteLink } from '@/lib/config';
@@ -69,6 +69,7 @@ export default function OrgUsers() {
   const { toast } = useToast();
   const [members, setMembers] = useState<(OrgMembership & { profile: Profile })[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [aiChampions, setAiChampions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -112,6 +113,16 @@ export default function OrgUsers() {
 
     if (inviteData) {
       setInvitations(inviteData as Invitation[]);
+    }
+
+    // Fetch AI Champions
+    const { data: championsData } = await supabase
+      .from('ai_champions')
+      .select('user_id')
+      .eq('org_id', currentOrg.id);
+
+    if (championsData) {
+      setAiChampions(new Set(championsData.map((c) => c.user_id)));
     }
 
     setLoading(false);
@@ -298,6 +309,62 @@ export default function OrgUsers() {
     }
 
     setUpdatingRole(null);
+  };
+
+  const handleToggleAiChampion = async (member: OrgMembership & { profile: Profile }) => {
+    if (!currentOrg || !user) return;
+    
+    const isCurrentlyChampion = aiChampions.has(member.user_id);
+    
+    if (isCurrentlyChampion) {
+      // Remove AI Champion status
+      const { error } = await supabase
+        .from('ai_champions')
+        .delete()
+        .eq('user_id', member.user_id)
+        .eq('org_id', currentOrg.id);
+
+      if (error) {
+        toast({
+          title: 'Failed to remove AI Champion status',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'AI Champion status removed',
+          description: `${member.profile?.full_name} is no longer an AI Champion.`,
+        });
+        setAiChampions((prev) => {
+          const next = new Set(prev);
+          next.delete(member.user_id);
+          return next;
+        });
+      }
+    } else {
+      // Add AI Champion status
+      const { error } = await supabase
+        .from('ai_champions')
+        .insert({
+          user_id: member.user_id,
+          org_id: currentOrg.id,
+          assigned_by: user.id,
+        });
+
+      if (error) {
+        toast({
+          title: 'Failed to assign AI Champion status',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'AI Champion assigned!',
+          description: `${member.profile?.full_name} is now an AI Champion.`,
+        });
+        setAiChampions((prev) => new Set([...prev, member.user_id]));
+      }
+    }
   };
 
   const roleColors = {
@@ -578,8 +645,14 @@ export default function OrgUsers() {
               {filteredMembers.map((member) => (
                 <TableRow key={member.id}>
                   <TableCell>
-                    <div>
+                    <div className="flex items-center gap-2">
                       <p className="font-medium">{member.profile?.full_name}</p>
+                      {aiChampions.has(member.user_id) && (
+                        <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          AI Champion
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
@@ -638,6 +711,14 @@ export default function OrgUsers() {
                               Change to Learner
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuItem
+                            onClick={() => handleToggleAiChampion(member)}
+                          >
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            {aiChampions.has(member.user_id)
+                              ? 'Remove AI Champion'
+                              : 'Make AI Champion'}
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => setRemoveMemberDialog({ open: true, member })}
