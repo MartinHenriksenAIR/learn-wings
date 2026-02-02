@@ -352,6 +352,63 @@ export type Database = {
           },
         ]
       }
+      community_resources: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_pinned: boolean
+          org_id: string
+          resource_type: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_pinned?: boolean
+          org_id: string
+          resource_type?: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_pinned?: boolean
+          org_id?: string
+          resource_type?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_resources_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_resources_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_modules: {
         Row: {
           course_id: string

@@ -32,6 +32,7 @@ import PostDetail from "./pages/community/PostDetail";
 import IdeaLibrary from "./pages/community/IdeaLibrary";
 import IdeaSubmit from "./pages/community/IdeaSubmit";
 import IdeaDetail from "./pages/community/IdeaDetail";
+import ResourceLibrary from "./pages/community/ResourceLibrary";
 import OrgIdeasManagement from "./pages/org-admin/OrgIdeasManagement";
 import OrgCommunityModeration from "./pages/org-admin/OrgCommunityModeration";
 import PlatformCommunityModeration from "./pages/platform-admin/PlatformCommunityModeration";
@@ -60,6 +61,7 @@ function AppRoutes() {
       <Route path="/app/community/org/ideas/new" element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
       <Route path="/app/community/org/ideas/edit/:ideaId" element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
       <Route path="/app/community/org/ideas/:ideaId" element={<ProtectedRoute><IdeaDetail /></ProtectedRoute>} />
+      <Route path="/app/community/org/resources" element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
       <Route path="/app/admin/org" element={<ProtectedRoute requireOrgAdmin><OrgDashboard /></ProtectedRoute>} />

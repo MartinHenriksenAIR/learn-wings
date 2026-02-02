@@ -36,6 +36,7 @@ import {
   Building2,
   Loader2,
   X,
+  FolderOpen,
 } from 'lucide-react';
 import type { CommunityScope, CommunityCategory, CommunityPost } from '@/lib/community-types';
 
@@ -313,6 +314,30 @@ export default function CommunityFeed() {
                     onClick={() => navigate('/app/community/org/ideas')}
                   >
                     View Ideas
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Resource Library link (org only) */}
+            {scope === 'org' && currentOrg && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <FolderOpen className="h-4 w-4 text-primary" />
+                    Resources
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Helpful templates, guides, and links shared by your team.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate('/app/community/org/resources')}
+                  >
+                    View Resources
                   </Button>
                 </CardContent>
               </Card>

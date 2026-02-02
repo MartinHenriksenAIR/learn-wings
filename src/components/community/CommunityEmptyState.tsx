@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Lightbulb, Users, Calendar, FileEdit } from 'lucide-react';
+import { MessageSquare, Lightbulb, Users, Calendar, FileEdit, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type EmptyStateVariant = 'posts' | 'ideas' | 'comments' | 'events' | 'reports' | 'drafts';
+type EmptyStateVariant = 'posts' | 'ideas' | 'comments' | 'events' | 'reports' | 'drafts' | 'resources';
 
 interface CommunityEmptyStateProps {
   variant: EmptyStateVariant;
@@ -42,6 +42,11 @@ const variants: Record<EmptyStateVariant, { icon: typeof MessageSquare; title: s
     icon: Users,
     title: 'No reports to review',
     description: 'All clear! There are no pending content reports at this time.',
+  },
+  resources: {
+    icon: FolderOpen,
+    title: 'No resources yet',
+    description: 'Share helpful links, templates, and guides with your team.',
   },
 };
 
