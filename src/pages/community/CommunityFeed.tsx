@@ -6,13 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { PostCard } from '@/components/community/PostCard';
 import { PostForm } from '@/components/community/PostForm';
 import { UpcomingEvents } from '@/components/community/UpcomingEvents';
@@ -178,52 +171,52 @@ export default function CommunityFeed() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main content */}
           <div className="lg:col-span-3 space-y-4">
-            {/* Filters */}
+            {/* Search and Category Tabs */}
             <Card>
-              <CardContent className="pt-4">
-                <div className="flex flex-col md:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search posts..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Select
-                    value={selectedCategory || 'all'}
-                    onValueChange={(v) => setSelectedCategory(v === 'all' ? '' : v)}
-                  >
-                    <SelectTrigger className="w-full md:w-[200px]">
-                      <SelectValue placeholder="All categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All categories</SelectItem>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <CardContent className="pt-4 space-y-4">
+                {/* Search bar */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search posts..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
 
-                {/* Active filters */}
-                {(selectedCategory || selectedTags.length > 0) && (
-                  <div className="flex items-center gap-2 mt-3 flex-wrap">
-                    <span className="text-sm text-muted-foreground">Filters:</span>
-                    {selectedCategory && (
-                      <Button
-                        variant="secondary"
+                {/* Category tabs */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={!selectedCategory ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedCategory('')}
+                    className="h-8"
+                  >
+                    All
+                  </Button>
+                  {categories.map((cat) => (
+                    <Button
+                      key={cat.id}
+                      variant={selectedCategory === cat.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedCategory(cat.id === selectedCategory ? '' : cat.id)}
+                      className="h-8"
+                    >
+                      <CategoryBadge
+                        name={cat.name}
+                        icon={cat.icon}
+                        isRestricted={cat.is_restricted}
                         size="sm"
-                        onClick={() => setSelectedCategory('')}
-                        className="h-6 text-xs"
-                      >
-                        {categories.find((c) => c.id === selectedCategory)?.name}
-                        <X className="h-3 w-3 ml-1" />
-                      </Button>
-                    )}
+                      />
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Active tag filters */}
+                {selectedTags.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-muted-foreground">Tags:</span>
                     {selectedTags.map((tag) => (
                       <Button
                         key={tag}
@@ -239,13 +232,10 @@ export default function CommunityFeed() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        setSelectedCategory('');
-                        setSelectedTags([]);
-                      }}
+                      onClick={() => setSelectedTags([])}
                       className="h-6 text-xs"
                     >
-                      Clear all
+                      Clear tags
                     </Button>
                   </div>
                 )}
@@ -343,32 +333,6 @@ export default function CommunityFeed() {
               <AIChampionsList orgId={currentOrg.id} />
             )}
 
-            {/* Categories */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-semibold">Categories</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id === selectedCategory ? '' : cat.id)}
-                    className={`w-full text-left p-2 rounded-md transition-colors ${
-                      selectedCategory === cat.id
-                        ? 'bg-primary/10'
-                        : 'hover:bg-muted'
-                    }`}
-                  >
-                    <CategoryBadge
-                      name={cat.name}
-                      icon={cat.icon}
-                      isRestricted={cat.is_restricted}
-                      size="sm"
-                    />
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
 
             {/* Popular tags */}
             {allTags.length > 0 && (
