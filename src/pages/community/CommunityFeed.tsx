@@ -169,100 +169,8 @@ export default function CommunityFeed() {
         </Tabs>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar - Left */}
-          <div className="space-y-4 order-2 lg:order-1">
-            {/* Upcoming Events */}
-            {eventPosts.length > 0 && (
-              <UpcomingEvents
-                events={eventPosts}
-                onEventClick={(event) => navigate(`/app/community/${scope}/posts/${event.id}`)}
-              />
-            )}
-
-            {/* Idea Library link (org only) */}
-            {scope === 'org' && currentOrg && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-warning" />
-                    Idea Library
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Browse AI and process improvement ideas submitted by your team.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => navigate('/app/community/org/ideas')}
-                  >
-                    View Ideas
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Resource Library link (org only) */}
-            {scope === 'org' && currentOrg && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <FolderOpen className="h-4 w-4 text-primary" />
-                    Resources
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Helpful templates, guides, and links shared by your team.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => navigate('/app/community/org/resources')}
-                  >
-                    View Resources
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* AI Champions (org only) */}
-            {scope === 'org' && currentOrg && (
-              <AIChampionsList orgId={currentOrg.id} />
-            )}
-
-            {/* Popular tags */}
-            {allTags.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold">Popular Tags</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-1">
-                    {allTags.slice(0, 10).map((tag) => (
-                      <Button
-                        key={tag}
-                        variant={selectedTags.includes(tag) ? 'secondary' : 'outline'}
-                        size="sm"
-                        className="h-6 text-xs"
-                        onClick={() =>
-                          setSelectedTags((t) =>
-                            t.includes(tag) ? t.filter((x) => x !== tag) : [...t, tag]
-                          )
-                        }
-                      >
-                        #{tag}
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Main content - Right */}
-          <div className="lg:col-span-3 space-y-4 order-1 lg:order-2">
+          {/* Main content */}
+          <div className="lg:col-span-3 space-y-4">
             {/* Search and Category Tabs */}
             <Card>
               <CardContent className="pt-4 space-y-4">
@@ -359,6 +267,99 @@ export default function CommunityFeed() {
                   />
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-4">
+            {/* Upcoming Events */}
+            {eventPosts.length > 0 && (
+              <UpcomingEvents
+                events={eventPosts}
+                onEventClick={(event) => navigate(`/app/community/${scope}/posts/${event.id}`)}
+              />
+            )}
+
+            {/* Idea Library link (org only) */}
+            {scope === 'org' && currentOrg && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-warning" />
+                    Idea Library
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Browse AI and process improvement ideas submitted by your team.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate('/app/community/org/ideas')}
+                  >
+                    View Ideas
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Resource Library link (org only) */}
+            {scope === 'org' && currentOrg && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <FolderOpen className="h-4 w-4 text-primary" />
+                    Resources
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Helpful templates, guides, and links shared by your team.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate('/app/community/org/resources')}
+                  >
+                    View Resources
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* AI Champions (org only) */}
+            {scope === 'org' && currentOrg && (
+              <AIChampionsList orgId={currentOrg.id} />
+            )}
+
+
+            {/* Popular tags */}
+            {allTags.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold">Popular Tags</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-1">
+                    {allTags.slice(0, 10).map((tag) => (
+                      <Button
+                        key={tag}
+                        variant={selectedTags.includes(tag) ? 'secondary' : 'outline'}
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() =>
+                          setSelectedTags((t) =>
+                            t.includes(tag) ? t.filter((x) => x !== tag) : [...t, tag]
+                          )
+                        }
+                      >
+                        #{tag}
+                      </Button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         </div>
