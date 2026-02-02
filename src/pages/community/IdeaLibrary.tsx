@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IdeaCard } from '@/components/community/IdeaCard';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { useAuth } from '@/hooks/useAuth';
-import { fetchIdeas } from '@/lib/ideas-api';
+import { fetchIdeas, deleteIdea } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { IdeaStatusExtended, BusinessArea } from '@/lib/community-types';
 import {
@@ -26,9 +26,11 @@ import {
   Loader2,
   FileEdit,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function IdeaLibrary() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { currentOrg, user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<string>('all');
@@ -54,6 +56,19 @@ export default function IdeaLibrary() {
       user_id: activeTab === 'drafts' ? user?.id : undefined,
     }),
     enabled: !!currentOrg,
+  });
+
+  // Delete idea mutation
+  const deleteMutation = useMutation({
+    mutationFn: deleteIdea,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ideas'] });
+      toast.success('Idea deleted successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete idea');
+      console.error('Delete error:', error);
+    },
   });
 
   // Filter out drafts for non-owners in the library view (except in drafts tab)
@@ -173,6 +188,7 @@ export default function IdeaLibrary() {
                     navigate(`/app/community/org/ideas/${idea.id}`);
                   }
                 }}
+                onDelete={() => deleteMutation.mutate(idea.id)}
               />
             ))}
           </div>
