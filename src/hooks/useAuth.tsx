@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Only auto-select for non-platform-admins who have no org set yet
         // Platform admins manage their org selection via OrgSelector
-        if (typedMemberships.length > 0 && !currentOrg && !profileData?.is_platform_admin) {
+        if (typedMemberships.length > 0 && !currentOrg && !(profileData as Profile)?.is_platform_admin) {
           setCurrentOrg(typedMemberships[0].organization!);
         }
       }
