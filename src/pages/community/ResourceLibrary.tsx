@@ -61,11 +61,12 @@ export default function ResourceLibrary() {
 
   // Fetch resources
   const { data: resources = [], isLoading } = useQuery({
-    queryKey: ['community-resources', currentOrg?.id, searchQuery, selectedType],
+    queryKey: ['community-resources', currentOrg?.id, searchQuery, selectedType, selectedTag],
     queryFn: () =>
       fetchResources(currentOrg!.id, {
         search: searchQuery || undefined,
         resource_type: selectedType || undefined,
+        tags: selectedTag ? [selectedTag] : undefined,
       }),
     enabled: !!currentOrg,
   });
