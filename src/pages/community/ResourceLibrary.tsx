@@ -59,7 +59,21 @@ export default function ResourceLibrary() {
 
   const isAdmin = effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
-  // Fetch resources
+  // Fetch all resources (for tag extraction)
+  const { data: allResources = [] } = useQuery({
+    queryKey: ['community-resources-all', currentOrg?.id],
+    queryFn: () => fetchResources(currentOrg!.id),
+    enabled: !!currentOrg,
+  });
+
+  // Unique tags from all resources
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    allResources.forEach((r) => r.tags?.forEach((t) => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [allResources]);
+
+  // Fetch filtered resources
   const { data: resources = [], isLoading } = useQuery({
     queryKey: ['community-resources', currentOrg?.id, searchQuery, selectedType, selectedTag],
     queryFn: () =>
