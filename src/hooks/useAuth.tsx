@@ -70,8 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })) as OrgMembership[];
         setMemberships(typedMemberships);
 
-        // Set current org to the first one if not set
-        if (typedMemberships.length > 0 && !currentOrg) {
+        // Only auto-select for non-platform-admins who have no org set yet
+        // Platform admins manage their org selection via OrgSelector
+        if (typedMemberships.length > 0 && !currentOrg && !profileData?.is_platform_admin) {
           setCurrentOrg(typedMemberships[0].organization!);
         }
       }
