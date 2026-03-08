@@ -30,7 +30,7 @@ export function OrgSelector() {
 
       if (data) {
         setOrgs(data as Organization[]);
-        // Auto-select first org if none selected
+        // Only auto-select first org if none is currently selected
         if (!currentOrg && data.length > 0) {
           setCurrentOrg(data[0] as Organization);
         }
@@ -39,7 +39,9 @@ export function OrgSelector() {
     };
 
     fetchOrgs();
-  }, [isPlatformAdmin, currentOrg, setCurrentOrg]);
+    // Only depend on isPlatformAdmin — not currentOrg, to avoid resetting user's choice
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlatformAdmin]);
 
   // Only show for platform admins viewing as org_admin or learner
   if (!isPlatformAdmin || viewMode === 'platform_admin') {
