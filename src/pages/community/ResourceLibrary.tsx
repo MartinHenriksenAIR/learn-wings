@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -55,16 +55,32 @@ export default function ResourceLibrary() {
   const [deleteConfirm, setDeleteConfirm] = useState<CommunityResource | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('');
+  const [selectedTag, setSelectedTag] = useState('');
 
   const isAdmin = effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
-  // Fetch resources
+  // Fetch all resources (for tag extraction)
+  const { data: allResources = [] } = useQuery({
+    queryKey: ['community-resources-all', currentOrg?.id],
+    queryFn: () => fetchResources(currentOrg!.id),
+    enabled: !!currentOrg,
+  });
+
+  // Unique tags from all resources
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    allResources.forEach((r) => r.tags?.forEach((t) => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [allResources]);
+
+  // Fetch filtered resources
   const { data: resources = [], isLoading } = useQuery({
-    queryKey: ['community-resources', currentOrg?.id, searchQuery, selectedType],
+    queryKey: ['community-resources', currentOrg?.id, searchQuery, selectedType, selectedTag],
     queryFn: () =>
       fetchResources(currentOrg!.id, {
         search: searchQuery || undefined,
         resource_type: selectedType || undefined,
+        tags: selectedTag ? [selectedTag] : undefined,
       }),
     enabled: !!currentOrg,
   });
@@ -192,6 +208,24 @@ export default function ResourceLibrary() {
                   ))}
                 </SelectContent>
               </Select>
+              {allTags.length > 0 && (
+                <Select
+                  value={selectedTag || 'all'}
+                  onValueChange={(v) => setSelectedTag(v === 'all' ? '' : v)}
+                >
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="All tags" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All tags</SelectItem>
+                    {allTags.map((tag) => (
+                      <SelectItem key={tag} value={tag}>
+                        #{tag}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </CardContent>
         </Card>
