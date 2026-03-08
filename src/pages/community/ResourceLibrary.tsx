@@ -208,6 +208,24 @@ export default function ResourceLibrary() {
                   ))}
                 </SelectContent>
               </Select>
+              {allTags.length > 0 && (
+                <Select
+                  value={selectedTag || 'all'}
+                  onValueChange={(v) => setSelectedTag(v === 'all' ? '' : v)}
+                >
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="All tags" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All tags</SelectItem>
+                    {allTags.map((tag) => (
+                      <SelectItem key={tag} value={tag}>
+                        #{tag}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </CardContent>
         </Card>
