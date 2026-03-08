@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -33,11 +33,28 @@ export function ResourceForm({
   editResource,
 }: ResourceFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [title, setTitle] = useState(editResource?.title || '');
-  const [description, setDescription] = useState(editResource?.description || '');
-  const [resourceType, setResourceType] = useState(editResource?.resource_type || 'link');
-  const [url, setUrl] = useState(editResource?.url || '');
-  const [tagsInput, setTagsInput] = useState(editResource?.tags?.join(', ') || '');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [resourceType, setResourceType] = useState('link');
+  const [url, setUrl] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+
+  // Sync form fields when editResource changes
+  useEffect(() => {
+    if (editResource) {
+      setTitle(editResource.title || '');
+      setDescription(editResource.description || '');
+      setResourceType(editResource.resource_type || 'link');
+      setUrl(editResource.url || '');
+      setTagsInput(editResource.tags?.join(', ') || '');
+    } else if (open) {
+      setTitle('');
+      setDescription('');
+      setResourceType('link');
+      setUrl('');
+      setTagsInput('');
+    }
+  }, [editResource, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
