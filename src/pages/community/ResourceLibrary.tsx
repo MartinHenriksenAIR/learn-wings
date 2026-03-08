@@ -55,6 +55,7 @@ export default function ResourceLibrary() {
   const [deleteConfirm, setDeleteConfirm] = useState<CommunityResource | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('');
+  const [selectedTag, setSelectedTag] = useState('');
 
   const isAdmin = effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
