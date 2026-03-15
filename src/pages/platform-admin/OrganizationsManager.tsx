@@ -254,7 +254,16 @@ export default function OrganizationsManager() {
                   bucket="org-logos"
                   accept="image"
                   value={logoUrl}
-                  onChange={(url) => setLogoUrl(url)}
+                  onChange={(url, storagePath) => {
+                    if (url && storagePath) {
+                      const { data: { publicUrl } } = supabase.storage
+                        .from('org-logos')
+                        .getPublicUrl(storagePath);
+                      setLogoUrl(publicUrl);
+                    } else {
+                      setLogoUrl(null);
+                    }
+                  }}
                   maxSizeMB={5}
                 />
               </div>
