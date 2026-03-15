@@ -270,7 +270,14 @@ export default function LearnerCourses() {
 
             return (
               <Card key={course.id} className="overflow-hidden transition-shadow hover:shadow-card-hover">
-                <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative">
+                <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
+                  {course.thumbnail_url && (
+                    <img
+                      src={course.thumbnail_url}
+                      alt={course.title}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  )}
                   {enrollment?.status === 'completed' && (
                     <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-success px-2 py-1 text-xs font-medium text-success-foreground">
                       <CheckCircle2 className="h-3 w-3" />
