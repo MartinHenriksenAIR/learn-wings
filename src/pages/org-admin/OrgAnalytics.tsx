@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { FileUpload } from '@/components/ui/file-upload';
 import {
   Select,
   SelectContent,
@@ -13,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization } from '@/lib/types';
-import { Loader2, Users, BarChart3, BookOpen } from 'lucide-react';
+import { Loader2, Users, BarChart3, BookOpen, Building2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
 import { TeamPerformanceTab } from '@/components/org-admin/analytics/TeamPerformanceTab';
@@ -32,7 +36,7 @@ export default function OrgAnalytics() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isGlobalView = location.pathname === '/app/admin/analytics/global';
-  const { currentOrg, isPlatformAdmin } = useAuth();
+  const { currentOrg, isPlatformAdmin, refreshUserContext } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [loading, setLoading] = useState(true);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -48,6 +52,8 @@ export default function OrgAnalytics() {
   const [userStats, setUserStats] = useState<UserStats[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [logoDialogOpen, setLogoDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Sync tab with URL
   const handleTabChange = (value: string) => {
@@ -269,6 +275,33 @@ export default function OrgAnalytics() {
     }
   };
 
+  const handleLogoUpload = async (_url: string | null, storagePath: string | null) => {
+    if (!currentOrg || !storagePath) return;
+
+    setUploading(true);
+    try {
+      const { data: { publicUrl } } = supabase.storage
+        .from('org-logos')
+        .getPublicUrl(storagePath);
+
+      const { error } = await supabase
+        .from('organizations')
+        .update({ logo_url: publicUrl })
+        .eq('id', currentOrg.id);
+
+      if (error) throw error;
+
+      toast.success('Logo updated successfully');
+      setLogoDialogOpen(false);
+      await refreshUserContext();
+    } catch (error: any) {
+      console.error('Error updating logo:', error);
+      toast.error(error.message || 'Failed to update logo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // Redirect if analytics are disabled
   if (!settingsLoading && !features.analytics_enabled) {
     return <Navigate to="/app/dashboard" replace />;
@@ -297,13 +330,75 @@ export default function OrgAnalytics() {
     );
   }
 
-  const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization Analytics';
+  const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization';
   const breadcrumbs = isGlobalView 
     ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
-    : [{ label: 'Analytics' }];
+    : [{ label: 'Organization' }];
 
   return (
     <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
+      {!isGlobalView && currentOrg && (
+        <Card className="mb-6">
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="relative group shrink-0">
+              {currentOrg.logo_url ? (
+                <img
+                  src={currentOrg.logo_url}
+                  alt={`${currentOrg.name} logo`}
+                  className="h-16 w-16 rounded-xl object-contain bg-muted"
+                />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
+                  <Building2 className="h-8 w-8 text-primary" />
+                </div>
+              )}
+              <Dialog open={logoDialogOpen} onOpenChange={setLogoDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Update Organization Logo</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted">
+                          <Building2 className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Recommended specifications</p>
+                          <p className="text-xs text-muted-foreground">Square image, 256×256px or larger</p>
+                          <p className="text-xs text-muted-foreground">PNG or JPG format, max 2MB</p>
+                        </div>
+                      </div>
+                    </div>
+                    <FileUpload
+                      bucket="org-logos"
+                      folder={currentOrg.id}
+                      accept="image"
+                      maxSizeMB={2}
+                      onChange={handleLogoUpload}
+                      disabled={uploading}
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div>
+              <h2 className="font-display text-xl font-bold">{currentOrg.name}</h2>
+              <p className="text-sm text-muted-foreground">Organization ID: {currentOrg.slug}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Organization Filter for Global View */}
       {isGlobalView && isPlatformAdmin && (
         <div className="mb-6 flex items-center gap-3">

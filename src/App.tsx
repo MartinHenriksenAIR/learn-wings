@@ -16,13 +16,11 @@ import LearnerDashboard from "./pages/learner/Dashboard";
 import LearnerCourses from "./pages/learner/Courses";
 import CoursePlayer from "./pages/learner/CoursePlayer";
 import Certificates from "./pages/learner/Certificates";
-import OrgDashboard from "./pages/org-admin/OrgDashboard";
 import OrgUsers from "./pages/org-admin/OrgUsers";
 import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
 import OrganizationsManager from "./pages/platform-admin/OrganizationsManager";
 import OrganizationDetail from "./pages/platform-admin/OrganizationDetail";
 import CoursesManager from "./pages/platform-admin/CoursesManager";
-import UsersManager from "./pages/platform-admin/UsersManager";
 import CourseEditor from "./pages/platform-admin/CourseEditor";
 import PlatformSettings from "./pages/platform-admin/PlatformSettings";
 import Settings from "./pages/Settings";
@@ -64,7 +62,6 @@ function AppRoutes() {
       <Route path="/app/community/org/resources" element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
-      <Route path="/app/admin/org" element={<ProtectedRoute requireOrgAdmin><OrgDashboard /></ProtectedRoute>} />
       <Route path="/app/admin/org/users" element={<ProtectedRoute requireOrgAdmin><OrgUsers /></ProtectedRoute>} />
       <Route path="/app/admin/analytics" element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
       <Route path="/app/admin/org/ideas" element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />
@@ -75,7 +72,6 @@ function AppRoutes() {
       <Route path="/app/admin/organizations/:orgId" element={<ProtectedRoute requirePlatformAdmin><OrganizationDetail /></ProtectedRoute>} />
       <Route path="/app/admin/courses" element={<ProtectedRoute requirePlatformAdmin><CoursesManager /></ProtectedRoute>} />
       <Route path="/app/admin/courses/:courseId" element={<ProtectedRoute requirePlatformAdmin><CourseEditor /></ProtectedRoute>} />
-      <Route path="/app/admin/users" element={<ProtectedRoute requirePlatformAdmin><UsersManager /></ProtectedRoute>} />
       <Route path="/app/admin/analytics/global" element={<ProtectedRoute requirePlatformAdmin><OrgAnalytics /></ProtectedRoute>} />
       <Route path="/app/admin/platform/settings" element={<ProtectedRoute requirePlatformAdmin><PlatformSettings /></ProtectedRoute>} />
       <Route path="/app/admin/platform/moderation" element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
