@@ -532,6 +532,7 @@ export function OrgMembersTab({ orgId, orgName }: OrgMembersTabProps) {
         onOpenChange={setBulkInviteOpen}
         orgId={orgId}
         orgName={orgName}
+        userId={user?.id || ''}
         onSuccess={fetchData}
       />
 
