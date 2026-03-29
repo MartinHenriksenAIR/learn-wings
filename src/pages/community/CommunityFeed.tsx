@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { PostCard } from '@/components/community/PostCard';
 import { PostForm } from '@/components/community/PostForm';
 import { UpcomingEvents } from '@/components/community/UpcomingEvents';
@@ -168,15 +169,13 @@ export default function CommunityFeed() {
                 {currentOrg.name}
               </TabsTrigger>
             )}
-            <TabsTrigger value="global" className="gap-2">
-              <Globe className="h-4 w-4" />
-              Global Community
-            </TabsTrigger>
             <Tooltip>
               <TooltipTrigger asChild>
                 <span>
-                  <TabsTrigger value="events_coming_soon" disabled className="gap-2">
-                    Events & Office Hours
+                  <TabsTrigger value="global" className="gap-2" disabled>
+                    <Globe className="h-4 w-4" />
+                    Global Community
+                    <Badge variant="outline" className="ml-1 text-[10px] px-1.5 py-0">Coming Soon</Badge>
                   </TabsTrigger>
                 </span>
               </TooltipTrigger>

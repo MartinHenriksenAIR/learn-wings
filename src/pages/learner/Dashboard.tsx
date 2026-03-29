@@ -11,8 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedLmsAssetUrl } from '@/lib/storage';
 import { Enrollment, Course } from '@/lib/types';
-import { BookOpen, Clock, Award, Play, ArrowRight, Loader2 } from 'lucide-react';
+import { BookOpen, Clock, Award, Play, ArrowRight, Loader2, TrendingUp } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
 import { toast } from '@/components/ui/sonner';
 
@@ -43,7 +44,17 @@ export default function LearnerDashboard() {
         .eq('org_id', currentOrg.id);
 
       if (enrollmentData) {
-        setEnrollments(enrollmentData as any);
+        // Re-sign thumbnail URLs for each enrollment's course
+        const enrollmentsWithThumbnails = await Promise.all(
+          (enrollmentData as any[]).map(async (enrollment: any) => ({
+            ...enrollment,
+            course: enrollment.course ? {
+              ...enrollment.course,
+              thumbnail_url: await getSignedLmsAssetUrl(enrollment.course.thumbnail_url),
+            } : enrollment.course,
+          }))
+        );
+        setEnrollments(enrollmentsWithThumbnails as any);
 
         // Bulk-fetch progress data for all enrolled courses
         const progressMap: Record<string, { total: number; completed: number }> = {};
@@ -212,7 +223,7 @@ export default function LearnerDashboard() {
         <StatCard
           title={t('dashboard.overallProgress')}
           value={`${Math.round(totalProgress)}%`}
-          icon={<ProgressRing progress={totalProgress} size={40} showLabel={false} />}
+          icon={<TrendingUp className="h-5 w-5" />}
         />
       </div>
 
@@ -249,7 +260,15 @@ export default function LearnerDashboard() {
 
               return (
                 <Card key={enrollment.id} className="overflow-hidden transition-shadow hover:shadow-card-hover">
-                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary" />
+                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
+                    {enrollment.course?.thumbnail_url && (
+                      <img
+                        src={enrollment.course.thumbnail_url}
+                        alt={enrollment.course.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
                   <CardContent className="p-4">
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <h3 className="font-display font-semibold leading-tight">

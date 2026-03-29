@@ -91,7 +91,7 @@ export default function PostEdit() {
             navigate(`/app/community/${scope}/posts/${postId}`);
           }
         }}
-        onSubmit={(data) => updatePostMutation.mutateAsync(data)}
+        onSubmit={async (data) => { await updatePostMutation.mutateAsync(data); }}
         categories={categories}
         scope={scope}
         orgId={scope === 'org' ? post.org_id || undefined : undefined}
