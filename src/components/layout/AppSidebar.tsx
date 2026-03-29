@@ -92,7 +92,7 @@ export function AppSidebar() {
       { title: t('nav.ideasOverview'), url: '/app/admin/org/ideas', icon: Lightbulb },
       { title: t('nav.moderation'), url: '/app/admin/org/moderation', icon: Flag },
     ] : []),
-    { title: 'Settings', url: '/app/admin/org/settings', icon: SettingsIcon },
+    { title: t('nav.settings'), url: '/app/admin/org/settings', icon: SettingsIcon },
   ];
 
   // Build platform admin items based on feature toggles
