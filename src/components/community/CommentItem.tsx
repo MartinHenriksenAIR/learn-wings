@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, Reply, Edit2, Trash2, Flag, EyeOff, Eye } from 'lucide-react';
+import { MoreHorizontal, Reply, Edit2, Trash2, Flag, EyeOff, Eye, Link2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,8 @@ interface CommentItemProps {
   onDelete?: (commentId: string) => void;
   onReport?: (commentId: string) => void;
   onToggleHide?: (commentId: string, hidden: boolean) => void;
+  onCopyLink?: (commentId: string) => void;
+  highlightedCommentId?: string | null;
   depth?: number;
 }
 
@@ -35,6 +37,8 @@ export function CommentItem({
   onDelete,
   onReport,
   onToggleHide,
+  onCopyLink,
+  highlightedCommentId = null,
   depth = 0,
 }: CommentItemProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -60,10 +64,12 @@ export function CommentItem({
 
   return (
     <div
+      id={`comment-${comment.id}`}
       className={cn(
-        'flex gap-3',
+        'flex gap-3 rounded-md transition-colors',
         depth > 0 && 'ml-8 border-l-2 border-muted pl-4',
-        comment.is_hidden && 'opacity-60'
+        comment.is_hidden && 'opacity-60',
+        highlightedCommentId === comment.id && 'bg-accent/20'
       )}
     >
       <Avatar className="h-8 w-8 flex-shrink-0">
@@ -105,6 +111,12 @@ export function CommentItem({
                 <DropdownMenuItem onClick={() => onReport(comment.id)}>
                   <Flag className="h-4 w-4 mr-2" />
                   Report
+                </DropdownMenuItem>
+              )}
+              {onCopyLink && (
+                <DropdownMenuItem onClick={() => onCopyLink(comment.id)}>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Copy link
                 </DropdownMenuItem>
               )}
               {isAdmin && onToggleHide && (
@@ -170,6 +182,8 @@ export function CommentItem({
                 onDelete={onDelete}
                 onReport={onReport}
                 onToggleHide={onToggleHide}
+                onCopyLink={onCopyLink}
+                highlightedCommentId={highlightedCommentId}
                 depth={depth + 1}
               />
             ))}

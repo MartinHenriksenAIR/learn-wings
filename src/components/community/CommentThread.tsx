@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { CommentItem } from './CommentItem';
 import { CommunityEmptyState } from './CommunityEmptyState';
+import { useToast } from '@/hooks/use-toast';
 import { Loader2, Send } from 'lucide-react';
 import type { CommunityComment } from '@/lib/community-types';
 
@@ -13,6 +14,7 @@ interface CommentThreadProps {
   isAdmin?: boolean;
   isLocked?: boolean;
   isLoading?: boolean;
+  highlightedCommentId?: string | null;
   onAddComment: (content: string, parentId?: string) => Promise<void>;
   onEditComment?: (commentId: string, content: string) => Promise<void>;
   onDeleteComment?: (commentId: string) => Promise<void>;
@@ -27,12 +29,14 @@ export function CommentThread({
   isAdmin = false,
   isLocked = false,
   isLoading = false,
+  highlightedCommentId = null,
   onAddComment,
   onEditComment,
   onDeleteComment,
   onReportComment,
   onToggleHideComment,
 }: CommentThreadProps) {
+  const { toast } = useToast();
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
@@ -96,6 +100,12 @@ export function CommentThread({
     if (onDeleteComment) {
       await onDeleteComment(commentId);
     }
+  };
+
+  const handleCopyCommentLink = async (commentId: string) => {
+    const commentUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#comment-${commentId}`;
+    await navigator.clipboard.writeText(commentUrl);
+    toast({ title: 'Comment link copied' });
   };
 
   return (
@@ -190,6 +200,8 @@ export function CommentThread({
               onDelete={onDeleteComment ? handleDelete : undefined}
               onReport={onReportComment}
               onToggleHide={onToggleHideComment}
+              onCopyLink={handleCopyCommentLink}
+              highlightedCommentId={highlightedCommentId}
             />
           ))}
         </div>

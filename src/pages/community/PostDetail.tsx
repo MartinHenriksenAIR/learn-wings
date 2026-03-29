@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -44,17 +44,17 @@ import { format } from 'date-fns';
 import type { CommunityScope } from '@/lib/community-types';
 
 export default function PostDetail() {
-  const { postId } = useParams<{ postId: string }>();
+  const { postId, scope: routeScope } = useParams<{ postId: string; scope: CommunityScope }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const scope = (searchParams.get('scope') || 'org') as CommunityScope;
-  const { profile, currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const scope = (routeScope || 'org') as CommunityScope;
+  const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [reportTargetId, setReportTargetId] = useState<string>('');
   const [reportTargetType, setReportTargetType] = useState<'post' | 'comment'>('post');
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
 
   // Fetch post
   const { data: post, isLoading: postLoading } = useQuery({
@@ -165,6 +165,20 @@ export default function PostDetail() {
     setReportTargetType('comment');
     setShowReportDialog(true);
   };
+
+  useEffect(() => {
+    if (!comments.length || !window.location.hash.startsWith('#comment-')) return;
+
+    const commentId = window.location.hash.replace('#comment-', '');
+    const el = document.getElementById(`comment-${commentId}`);
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedCommentId(commentId);
+    const timer = window.setTimeout(() => setHighlightedCommentId(null), 2500);
+
+    return () => window.clearTimeout(timer);
+  }, [comments]);
 
   if (postLoading) {
     return (
@@ -385,6 +399,7 @@ export default function PostDetail() {
               isAdmin={isAdmin}
               isLocked={post.is_locked}
               isLoading={commentsLoading}
+              highlightedCommentId={highlightedCommentId}
               onAddComment={async (content, parentId) => {
                 await createCommentMutation.mutateAsync({ content, parentId });
               }}

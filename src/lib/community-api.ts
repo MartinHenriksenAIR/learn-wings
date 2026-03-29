@@ -220,6 +220,19 @@ export async function createReport(input: CreateReportInput): Promise<CommunityR
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new Error('Not authenticated');
 
+  const { data: existingReport, error: existingError } = await supabase
+    .from('community_reports')
+    .select('id')
+    .eq('reporter_user_id', user.user.id)
+    .eq('target_id', input.target_id)
+    .eq('target_type', input.target_type)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existingReport) {
+    throw new Error('You have already reported this content.');
+  }
+
   const { data, error } = await supabase
     .from('community_reports')
     .insert({
@@ -232,7 +245,12 @@ export async function createReport(input: CreateReportInput): Promise<CommunityR
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('You have already reported this content.');
+    }
+    throw error;
+  }
   return data as CommunityReport;
 }
 

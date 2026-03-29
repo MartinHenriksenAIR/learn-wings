@@ -27,6 +27,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import CommunityFeed from "./pages/community/CommunityFeed";
 import PostDetail from "./pages/community/PostDetail";
+import PostEdit from "./pages/community/PostEdit";
 import IdeaLibrary from "./pages/community/IdeaLibrary";
 import IdeaSubmit from "./pages/community/IdeaSubmit";
 import IdeaDetail from "./pages/community/IdeaDetail";
@@ -54,6 +55,7 @@ function AppRoutes() {
       
       {/* Community routes */}
       <Route path="/app/community" element={<ProtectedRoute><CommunityFeed /></ProtectedRoute>} />
+      <Route path="/app/community/:scope/posts/:postId/edit" element={<ProtectedRoute><PostEdit /></ProtectedRoute>} />
       <Route path="/app/community/:scope/posts/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
       <Route path="/app/community/org/ideas" element={<ProtectedRoute><IdeaLibrary /></ProtectedRoute>} />
       <Route path="/app/community/org/ideas/new" element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
