@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { CommentItem } from './CommentItem';
 import { CommunityEmptyState } from './CommunityEmptyState';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { Loader2, Send } from 'lucide-react';
 import type { CommunityComment } from '@/lib/community-types';
 
@@ -36,7 +36,6 @@ export function CommentThread({
   onReportComment,
   onToggleHideComment,
 }: CommentThreadProps) {
-  const { toast } = useToast();
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');

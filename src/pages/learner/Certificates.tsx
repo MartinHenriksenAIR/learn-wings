@@ -10,12 +10,11 @@ import { Enrollment, Course } from '@/lib/types';
 import { Award, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Navigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 
 export default function Certificates() {
   const { user, currentOrg, profile } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
-  const { toast } = useToast();
   const { t } = useTranslation();
   const [completedEnrollments, setCompletedEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
   const [loading, setLoading] = useState(true);

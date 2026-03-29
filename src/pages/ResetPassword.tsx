@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
 import { z } from 'zod';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import logoLight from '@/assets/logo-light.png';
 
 const passwordSchema = z.object({
@@ -28,7 +28,6 @@ export default function ResetPassword() {
   const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string }>({});
   const [validSession, setValidSession] = useState<boolean | null>(null);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   useEffect(() => {
     // Check if we have a valid session from the reset link

@@ -4,7 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PostForm } from '@/components/community/PostForm';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { fetchCategories, fetchPost, updatePost } from '@/lib/community-api';
 import { Loader2 } from 'lucide-react';
 import type { CommunityScope, CreatePostInput } from '@/lib/community-types';
@@ -13,7 +13,6 @@ export default function PostEdit() {
   const navigate = useNavigate();
   const { scope: routeScope, postId } = useParams<{ scope: CommunityScope; postId: string }>();
   const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
-  const { toast } = useToast();
 
   const scope = (routeScope || 'org') as CommunityScope;
 

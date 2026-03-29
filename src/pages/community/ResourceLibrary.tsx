@@ -27,7 +27,7 @@ import { ResourceForm } from '@/components/community/ResourceForm';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import {
   fetchResources,
   createResource,
@@ -49,7 +49,6 @@ export default function ResourceLibrary() {
   const navigate = useNavigate();
   const { currentOrg, user, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);

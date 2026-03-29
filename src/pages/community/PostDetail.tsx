@@ -13,7 +13,7 @@ import { CommentThread } from '@/components/community/CommentThread';
 import { ReportDialog } from '@/components/community/ReportDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import {
   fetchPost,
   fetchComments,
@@ -50,7 +50,6 @@ export default function PostDetail() {
   const scope = (routeScope || 'org') as CommunityScope;
   const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [showReportDialog, setShowReportDialog] = useState(false);

@@ -23,7 +23,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { CourseCompletionDialog } from '@/components/course/CourseCompletionDialog';
 import { CourseReviewDialog } from '@/components/course/CourseReviewDialog';
 
@@ -31,7 +31,6 @@ export default function CoursePlayer() {
   const { courseId } = useParams<{ courseId: string }>();
   const { user, currentOrg } = useAuth();
   const { features } = usePlatformSettings();
-  const { toast } = useToast();
   const navigate = useNavigate();
 
   const [course, setCourse] = useState<Course | null>(null);

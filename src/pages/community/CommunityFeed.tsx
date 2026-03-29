@@ -14,7 +14,7 @@ import { CategoryBadge } from '@/components/community/CategoryBadge';
 import { AIChampionsList } from '@/components/community/AIChampionsList';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   fetchCategories,
@@ -40,7 +40,6 @@ export default function CommunityFeed() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const scopeParam = searchParams.get('scope') as CommunityScope | null;

@@ -52,7 +52,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
 import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX, UserCog, ShieldCheck, User, FileSpreadsheet, GraduationCap, Sparkles } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { z } from 'zod';
 import { getInviteLink } from '@/lib/config';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
@@ -66,7 +66,6 @@ const inviteSchema = z.object({
 
 export default function OrgUsers() {
   const { user, currentOrg } = useAuth();
-  const { toast } = useToast();
   const [members, setMembers] = useState<(OrgMembership & { profile: Profile })[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [aiChampions, setAiChampions] = useState<Set<string>>(new Set());

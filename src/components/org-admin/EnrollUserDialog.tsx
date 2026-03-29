@@ -20,7 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { Loader2, BookOpen, Users, GraduationCap } from 'lucide-react';
 import { Course, OrgMembership, Profile } from '@/lib/types';
 
@@ -45,7 +45,6 @@ export function EnrollUserDialog({
   members,
   onSuccess,
 }: EnrollUserDialogProps) {
-  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [courses, setCourses] = useState<AvailableCourse[]>([]);

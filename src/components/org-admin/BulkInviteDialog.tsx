@@ -21,7 +21,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { Upload, Download, FileSpreadsheet, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
@@ -55,7 +55,6 @@ export function BulkInviteDialog({
   userId,
   onSuccess,
 }: BulkInviteDialogProps) {
-  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsedData, setParsedData] = useState<ParsedInvite[]>([]);
   const [uploading, setUploading] = useState(false);

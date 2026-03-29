@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { Loader2, Palette, Users, Mail, ToggleLeft, Save } from 'lucide-react';
 
 interface BrandingSettings {
@@ -83,7 +83,6 @@ const defaultFeatures: FeatureSettings = {
 };
 
 export default function PlatformSettings() {
-  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<SettingsKey | null>(null);
   const [testingSmtp, setTestingSmtp] = useState(false);

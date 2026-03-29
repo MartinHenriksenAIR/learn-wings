@@ -34,11 +34,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseLevel, Organization, OrgCourseAccess } from '@/lib/types';
 import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 
 export default function CoursesManager() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 

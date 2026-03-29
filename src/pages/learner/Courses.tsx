@@ -28,11 +28,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Course, Enrollment, CourseLevel } from '@/lib/types';
 import { getSignedLmsAssetUrl } from '@/lib/storage';
 import { BookOpen, Play, Clock, CheckCircle2, Loader2, MoreVertical, LogOut } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 
 export default function LearnerCourses() {
   const { user, currentOrg } = useAuth();
-  const { toast } = useToast();
   const { t } = useTranslation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
