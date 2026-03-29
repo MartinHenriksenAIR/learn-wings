@@ -14,9 +14,9 @@ import ResetPassword from "./pages/ResetPassword";
 import LearnerDashboard from "./pages/learner/Dashboard";
 import LearnerCourses from "./pages/learner/Courses";
 import CoursePlayer from "./pages/learner/CoursePlayer";
-import Certificates from "./pages/learner/Certificates";
 import OrgUsers from "./pages/org-admin/OrgUsers";
 import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
+import OrgSettings from "./pages/org-admin/OrgSettings";
 import OrganizationsManager from "./pages/platform-admin/OrganizationsManager";
 import OrganizationDetail from "./pages/platform-admin/OrganizationDetail";
 import CoursesManager from "./pages/platform-admin/CoursesManager";
@@ -50,7 +50,7 @@ function AppRoutes() {
       <Route path="/app/dashboard" element={<ProtectedRoute learnerOnly><LearnerDashboard /></ProtectedRoute>} />
       <Route path="/app/courses" element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
       <Route path="/app/learn/:courseId" element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
-      <Route path="/app/certificates" element={<ProtectedRoute learnerOnly><Certificates /></ProtectedRoute>} />
+      <Route path="/app/certificates" element={<Navigate to="/app/dashboard" replace />} />
       
       {/* Community routes */}
       <Route path="/app/community" element={<ProtectedRoute><CommunityFeed /></ProtectedRoute>} />
@@ -65,6 +65,7 @@ function AppRoutes() {
       {/* Protected org admin routes */}
       <Route path="/app/admin/org/users" element={<ProtectedRoute requireOrgAdmin><OrgUsers /></ProtectedRoute>} />
       <Route path="/app/admin/analytics" element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
+      <Route path="/app/admin/org/settings" element={<ProtectedRoute requireOrgAdmin><OrgSettings /></ProtectedRoute>} />
       <Route path="/app/admin/org/ideas" element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />
       <Route path="/app/admin/org/moderation" element={<ProtectedRoute requireOrgAdmin><OrgCommunityModeration /></ProtectedRoute>} />
       

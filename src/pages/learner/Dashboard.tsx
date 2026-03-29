@@ -9,15 +9,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
-import { Enrollment, Course, LessonProgress } from '@/lib/types';
+import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Clock, Award, Play, ArrowRight, Loader2 } from 'lucide-react';
+import { CertificateCard } from '@/components/learner/CertificateCard';
+import { toast } from '@/components/ui/sonner';
 
 export default function LearnerDashboard() {
-  const { user, currentOrg } = useAuth();
+  const { user, currentOrg, profile } = useAuth();
+  const { features } = usePlatformSettings();
   const { t } = useTranslation();
   const [enrollments, setEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
   const [progressData, setProgressData] = useState<Record<string, { total: number; completed: number }>>({});
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -116,9 +121,52 @@ export default function LearnerDashboard() {
 
   const inProgressCourses = enrollments.filter(e => e.status === 'enrolled');
   const completedCourses = enrollments.filter(e => e.status === 'completed');
+  const completedEnrollments = completedCourses;
   const totalProgress = enrollments.length > 0
     ? (completedCourses.length / enrollments.length) * 100
     : 0;
+
+  const handleDownloadCertificate = async (enrollmentId: string, courseTitle: string) => {
+    setDownloadingId(enrollmentId);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-certificate', {
+        body: { enrollmentId },
+      });
+
+      if (error) {
+        toast({
+          title: t('certificates.generateFailed'),
+          description: error.message || t('certificates.generateFailedDescription'),
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `certificate-${courseTitle.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: t('certificates.downloadSuccess'),
+        description: t('certificates.downloadSuccessDescription'),
+      });
+    } catch (_err) {
+      toast({
+        title: t('certificates.downloadFailed'),
+        description: t('certificates.downloadFailedDescription'),
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -238,7 +286,7 @@ export default function LearnerDashboard() {
 
       {/* Completed Courses */}
       {completedCourses.length > 0 && (
-        <div>
+        <div className="mb-8">
           <h2 className="mb-4 font-display text-lg font-semibold">{t('dashboard.completedCourses')}</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {completedCourses.map((enrollment) => (
@@ -257,6 +305,32 @@ export default function LearnerDashboard() {
               </Card>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Certificates */}
+      {features.certificates_enabled && (
+        <div id="certificates">
+          <h2 className="mb-4 font-display text-lg font-semibold">{t('certificates.title')}</h2>
+          {completedEnrollments.length === 0 ? (
+            <EmptyState
+              icon={<Award className="h-6 w-6" />}
+              title={t('certificates.noCertificates')}
+              description={t('certificates.noCertificatesDescription')}
+            />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2">
+              {completedEnrollments.map((enrollment) => (
+                <CertificateCard
+                  key={enrollment.id}
+                  enrollment={enrollment}
+                  profile={profile}
+                  downloading={downloadingId === enrollment.id}
+                  onDownload={handleDownloadCertificate}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </AppLayout>

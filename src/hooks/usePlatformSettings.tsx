@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface FeatureSettings {
   certificates_enabled: boolean;
@@ -21,6 +22,8 @@ interface BrandingSettings {
 
 interface PlatformSettingsContextType {
   features: FeatureSettings;
+  platformFeatures: FeatureSettings;
+  orgFeatures: Partial<FeatureSettings> | null;
   branding: BrandingSettings;
   isLoading: boolean;
   refetch: () => Promise<void>;
@@ -74,38 +77,61 @@ const hexToHslValue = (hex: string, fallback: string) => {
 
 const PlatformSettingsContext = createContext<PlatformSettingsContextType>({
   features: defaultFeatures,
+  platformFeatures: defaultFeatures,
+  orgFeatures: null,
   branding: defaultBranding,
   isLoading: true,
   refetch: async () => {},
 });
 
 export function PlatformSettingsProvider({ children }: { children: ReactNode }) {
-  const [features, setFeatures] = useState<FeatureSettings>(defaultFeatures);
+  const { currentOrg } = useAuth();
+  const [platformFeatures, setPlatformFeatures] = useState<FeatureSettings>(defaultFeatures);
+  const [orgFeatures, setOrgFeatures] = useState<Partial<FeatureSettings> | null>(null);
   const [branding, setBranding] = useState<BrandingSettings>(defaultBranding);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = async () => {
-    const { data } = await supabase
-      .from('platform_settings')
-      .select('key, value');
+    setIsLoading(true);
+    const [platformRes, orgRes] = await Promise.all([
+      supabase.from('platform_settings').select('key, value'),
+      currentOrg
+        ? supabase.from('org_settings').select('features').eq('org_id', currentOrg.id).maybeSingle()
+        : Promise.resolve({ data: null, error: null } as any),
+    ]);
 
+    const data = platformRes.data;
     if (data) {
+      let nextFeatures = defaultFeatures;
+      let nextBranding = defaultBranding;
       data.forEach((setting) => {
         const value = setting.value as Record<string, unknown>;
         if (setting.key === 'features') {
-          // Merge with defaults to ensure new feature flags are included
-          setFeatures(prev => ({ ...prev, ...value as unknown as Partial<FeatureSettings> }));
+          nextFeatures = { ...nextFeatures, ...(value as Partial<FeatureSettings>) };
         } else if (setting.key === 'branding') {
-          setBranding(prev => ({ ...prev, ...value as unknown as Partial<BrandingSettings> }));
+          nextBranding = { ...nextBranding, ...(value as Partial<BrandingSettings>) };
         }
       });
+      setPlatformFeatures(nextFeatures);
+      setBranding(nextBranding);
     }
+
+    const nextOrgFeatures = (orgRes?.data?.features as Partial<FeatureSettings> | undefined) || null;
+    setOrgFeatures(nextOrgFeatures);
     setIsLoading(false);
   };
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [currentOrg?.id]);
+
+  const features: FeatureSettings = {
+    certificates_enabled: platformFeatures.certificates_enabled && (orgFeatures?.certificates_enabled ?? true),
+    quizzes_enabled: platformFeatures.quizzes_enabled && (orgFeatures?.quizzes_enabled ?? true),
+    analytics_enabled: platformFeatures.analytics_enabled && (orgFeatures?.analytics_enabled ?? true),
+    course_reviews_enabled: platformFeatures.course_reviews_enabled && (orgFeatures?.course_reviews_enabled ?? true),
+    community_enabled: platformFeatures.community_enabled && (orgFeatures?.community_enabled ?? true),
+  };
 
   useEffect(() => {
     const root = document.documentElement;
@@ -127,6 +153,8 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
     <PlatformSettingsContext.Provider
       value={{
         features,
+        platformFeatures,
+        orgFeatures,
         branding,
         isLoading,
         refetch: fetchSettings,
