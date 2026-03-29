@@ -40,40 +40,71 @@ export default function LearnerDashboard() {
       if (enrollmentData) {
         setEnrollments(enrollmentData as any);
 
-        // Fetch progress for each course
+        // Bulk-fetch progress data for all enrolled courses
         const progressMap: Record<string, { total: number; completed: number }> = {};
-        
-        for (const enrollment of enrollmentData) {
-          // Get total lessons for the course
-          const { data: modules } = await supabase
-            .from('course_modules')
-            .select('id')
-            .eq('course_id', enrollment.course_id);
+        const courseIds = enrollmentData.map((e) => e.course_id);
 
-          if (modules) {
-            const moduleIds = modules.map(m => m.id);
-            const { count: totalLessons } = await supabase
-              .from('lessons')
-              .select('*', { count: 'exact', head: true })
-              .in('module_id', moduleIds);
-
-            const { count: completedLessons } = await supabase
-              .from('lesson_progress')
-              .select('*', { count: 'exact', head: true })
-              .eq('user_id', user.id)
-              .eq('org_id', currentOrg.id)
-              .eq('status', 'completed')
-              .in('lesson_id', (await supabase
-                .from('lessons')
-                .select('id')
-                .in('module_id', moduleIds)).data?.map(l => l.id) || []);
-
-            progressMap[enrollment.course_id] = {
-              total: totalLessons || 0,
-              completed: completedLessons || 0,
-            };
-          }
+        if (courseIds.length === 0) {
+          setProgressData({});
+          setLoading(false);
+          return;
         }
+
+        const { data: modules } = await supabase
+          .from('course_modules')
+          .select('id, course_id')
+          .in('course_id', courseIds);
+
+        const moduleToCourse = new Map<string, string>();
+        const moduleIds: string[] = [];
+        (modules || []).forEach((m) => {
+          moduleToCourse.set(m.id, m.course_id);
+          moduleIds.push(m.id);
+        });
+
+        const { data: lessons } = moduleIds.length > 0
+          ? await supabase
+            .from('lessons')
+            .select('id, module_id')
+            .in('module_id', moduleIds)
+          : { data: [] };
+
+        const lessonToCourse = new Map<string, string>();
+        (lessons || []).forEach((lesson) => {
+          const courseId = moduleToCourse.get(lesson.module_id);
+          if (courseId) {
+            lessonToCourse.set(lesson.id, courseId);
+            const existing = progressMap[courseId] || { total: 0, completed: 0 };
+            existing.total += 1;
+            progressMap[courseId] = existing;
+          }
+        });
+
+        const lessonIds = Array.from(lessonToCourse.keys());
+        const { data: completedProgress } = lessonIds.length > 0
+          ? await supabase
+            .from('lesson_progress')
+            .select('lesson_id')
+            .eq('user_id', user.id)
+            .eq('org_id', currentOrg.id)
+            .eq('status', 'completed')
+            .in('lesson_id', lessonIds)
+          : { data: [] };
+
+        (completedProgress || []).forEach((p) => {
+          const courseId = lessonToCourse.get(p.lesson_id);
+          if (!courseId) return;
+          const existing = progressMap[courseId] || { total: 0, completed: 0 };
+          existing.completed += 1;
+          progressMap[courseId] = existing;
+        });
+
+        courseIds.forEach((courseId) => {
+          if (!progressMap[courseId]) {
+            progressMap[courseId] = { total: 0, completed: 0 };
+          }
+        });
+
         setProgressData(progressMap);
       }
 

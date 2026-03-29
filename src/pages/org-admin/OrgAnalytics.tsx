@@ -184,32 +184,63 @@ export default function OrgAnalytics() {
             .filter((d): d is string => Boolean(d));
           uniqueDepartments = [...new Set(depts)];
 
+          const memberIds = members
+            .map((m) => (m.profile as any)?.id as string | undefined)
+            .filter((id): id is string => Boolean(id));
+
+          let allEnrollments: { user_id: string; status: string }[] = [];
+          let allAttempts: { user_id: string; score: number }[] = [];
+          if (memberIds.length > 0) {
+            const enrollmentPromise = supabase
+              .from('enrollments')
+              .select('user_id, status')
+              .eq('org_id', orgFilter)
+              .in('user_id', memberIds);
+            const attemptsPromise = supabase
+              .from('quiz_attempts')
+              .select('user_id, score')
+              .eq('org_id', orgFilter)
+              .in('user_id', memberIds);
+            const [{ data: enrollmentData }, { data: attemptsData }] = await Promise.all([
+              enrollmentPromise,
+              attemptsPromise,
+            ]);
+            allEnrollments = enrollmentData || [];
+            allAttempts = attemptsData || [];
+          }
+
+          const enrollmentMap = new Map<string, { total: number; completed: number }>();
+          allEnrollments.forEach((e) => {
+            const existing = enrollmentMap.get(e.user_id) || { total: 0, completed: 0 };
+            existing.total += 1;
+            if (e.status === 'completed') existing.completed += 1;
+            enrollmentMap.set(e.user_id, existing);
+          });
+
+          const attemptMap = new Map<string, { totalScore: number; attempts: number }>();
+          allAttempts.forEach((a) => {
+            const existing = attemptMap.get(a.user_id) || { totalScore: 0, attempts: 0 };
+            existing.totalScore += a.score;
+            existing.attempts += 1;
+            attemptMap.set(a.user_id, existing);
+          });
+
           for (const member of members) {
             const profile = member.profile as any;
             if (!profile) continue;
 
-            const { data: userEnrollments } = await supabase
-              .from('enrollments')
-              .select('status')
-              .eq('org_id', orgFilter)
-              .eq('user_id', profile.id);
-
-            const { data: userAttempts } = await supabase
-              .from('quiz_attempts')
-              .select('score')
-              .eq('org_id', orgFilter)
-              .eq('user_id', profile.id);
-
-            const avgScore = userAttempts && userAttempts.length > 0
-              ? Math.round(userAttempts.reduce((acc, a) => acc + a.score, 0) / userAttempts.length)
+            const enrollmentStats = enrollmentMap.get(profile.id) || { total: 0, completed: 0 };
+            const attemptStats = attemptMap.get(profile.id) || { totalScore: 0, attempts: 0 };
+            const avgScore = attemptStats.attempts > 0
+              ? Math.round(attemptStats.totalScore / attemptStats.attempts)
               : 0;
 
             userStatsData.push({
               id: profile.id,
               name: profile.full_name,
               department: profile.department || null,
-              enrollments: userEnrollments?.length || 0,
-              completed: userEnrollments?.filter(e => e.status === 'completed').length || 0,
+              enrollments: enrollmentStats.total,
+              completed: enrollmentStats.completed,
               avgQuizScore: avgScore,
             });
           }
