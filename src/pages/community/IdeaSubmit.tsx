@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,6 +38,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { createIdea, submitIdea, updateIdea, fetchIdea, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { BusinessArea } from '@/lib/community-types';
@@ -74,6 +75,7 @@ export default function IdeaSubmit() {
   const navigate = useNavigate();
   const { ideaId } = useParams<{ ideaId?: string }>();
   const { currentOrg, user } = useAuth();
+  const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
   const [draftId, setDraftId] = useState<string | null>(ideaId || null);
@@ -242,6 +244,10 @@ export default function IdeaSubmit() {
     { title: 'Details', description: 'Optional additional context' },
   ];
 
+  if (!settingsLoading && !features.community_enabled) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
   if (!currentOrg) {
     return (
       <AppLayout>
@@ -264,7 +270,7 @@ export default function IdeaSubmit() {
   }
 
   return (
-    <AppLayout>
+    <AppLayout title="Submit Idea" breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: isEditMode ? 'Edit Draft' : 'Submit Idea' }]}>
       <div className="container max-w-3xl mx-auto py-6 px-4">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">

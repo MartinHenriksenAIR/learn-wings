@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { TagList } from '@/components/community/TagList';
 import { CommentThread } from '@/components/community/CommentThread';
 import { ReportDialog } from '@/components/community/ReportDialog';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useToast } from '@/hooks/use-toast';
 import {
   fetchPost,
@@ -48,6 +49,7 @@ export default function PostDetail() {
   const navigate = useNavigate();
   const scope = (routeScope || 'org') as CommunityScope;
   const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const { features, isLoading: settingsLoading } = usePlatformSettings();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -180,9 +182,13 @@ export default function PostDetail() {
     return () => window.clearTimeout(timer);
   }, [comments]);
 
+  if (!settingsLoading && !features.community_enabled) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
   if (postLoading) {
     return (
-      <AppLayout>
+      <AppLayout title="Post" breadcrumbs={[{ label: 'Community' }, { label: 'Post' }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -192,7 +198,7 @@ export default function PostDetail() {
 
   if (!post) {
     return (
-      <AppLayout>
+      <AppLayout title="Post Not Found" breadcrumbs={[{ label: 'Community' }]}>
         <div className="container mx-auto py-12 text-center">
           <h1 className="text-2xl font-bold mb-2">Post not found</h1>
           <p className="text-muted-foreground mb-4">This post may have been deleted or you don't have access.</p>
@@ -215,7 +221,7 @@ export default function PostDetail() {
   const isEvent = post.category?.slug === 'events';
 
   return (
-    <AppLayout>
+    <AppLayout title={post.title} breadcrumbs={[{ label: 'Community' }, { label: 'Post' }]}>
       <div className="container mx-auto py-6 px-4 max-w-4xl">
         {/* Back button */}
         <Button

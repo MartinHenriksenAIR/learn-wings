@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { IdeaStatusBadge } from '@/components/community/IdeaStatusBadge';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import {
   fetchIdea,
   fetchIdeaComments,
@@ -58,6 +59,7 @@ export default function IdeaDetail() {
   const { ideaId } = useParams<{ ideaId: string }>();
   const navigate = useNavigate();
   const { profile, currentOrg, effectiveIsOrgAdmin } = useAuth();
+  const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
   const [newComment, setNewComment] = useState('');
@@ -165,9 +167,13 @@ export default function IdeaDetail() {
     return BUSINESS_AREAS.find((a) => a.value === value)?.label || value;
   };
 
+  if (!settingsLoading && !features.community_enabled) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
   if (ideaLoading) {
     return (
-      <AppLayout>
+      <AppLayout title="Idea" breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -177,7 +183,7 @@ export default function IdeaDetail() {
 
   if (!idea) {
     return (
-      <AppLayout>
+      <AppLayout title="Idea Not Found" breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }]}>
         <div className="container mx-auto py-12 text-center">
           <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Idea Not Found</h1>
@@ -195,7 +201,7 @@ export default function IdeaDetail() {
   const isAuthor = idea.user_id === profile?.id;
 
   return (
-    <AppLayout>
+    <AppLayout title={idea.title} breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
       <div className="container max-w-4xl mx-auto py-6 px-4">
         {/* Header */}
         <div className="flex items-start gap-4 mb-6">

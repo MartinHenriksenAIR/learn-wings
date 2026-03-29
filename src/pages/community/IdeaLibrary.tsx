@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IdeaCard } from '@/components/community/IdeaCard';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { fetchIdeas, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { IdeaStatusExtended, BusinessArea } from '@/lib/community-types';
@@ -33,6 +34,7 @@ export default function IdeaLibrary() {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { currentOrg, user, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const { features, isLoading: settingsLoading } = usePlatformSettings();
 
   const initialTab = searchParams.get('tab') || 'all';
   const [activeTab, setActiveTab] = useState<string>(initialTab);
@@ -96,6 +98,12 @@ export default function IdeaLibrary() {
     ? ideas.filter((i) => i.user_id === user?.id) // Extra safety check
     : ideas;
 
+  const hasActiveFilters = Boolean(searchQuery || selectedBusinessArea || selectedTags.length > 0);
+
+  if (!settingsLoading && !features.community_enabled) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
   if (!currentOrg) {
     return (
       <AppLayout>
@@ -108,7 +116,7 @@ export default function IdeaLibrary() {
   }
 
   return (
-    <AppLayout>
+    <AppLayout title="Idea Library" breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }]}>
       <div className="container mx-auto py-6 px-4">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -226,6 +234,13 @@ export default function IdeaLibrary() {
             variant={safeTab === 'drafts' ? 'drafts' : 'ideas'}
             onAction={() => navigate('/app/community/org/ideas/new')}
             actionLabel={safeTab === 'drafts' ? 'Start New Idea' : 'Submit First Idea'}
+            hasActiveFilters={hasActiveFilters}
+            filterDescription="No ideas match your current filters."
+            onClearFilters={() => {
+              setSearchQuery('');
+              setSelectedBusinessArea('');
+              setSelectedTags([]);
+            }}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

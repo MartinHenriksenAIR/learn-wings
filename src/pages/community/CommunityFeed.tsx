@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,9 @@ import { CommunityEmptyState } from '@/components/community/CommunityEmptyState'
 import { CategoryBadge } from '@/components/community/CategoryBadge';
 import { AIChampionsList } from '@/components/community/AIChampionsList';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useToast } from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   fetchCategories,
   fetchPosts,
@@ -37,6 +39,7 @@ export default function CommunityFeed() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const { features, isLoading: settingsLoading } = usePlatformSettings();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -116,9 +119,14 @@ export default function CommunityFeed() {
 
   // Get all unique tags from posts
   const allTags = [...new Set(posts.flatMap((p) => p.tags || []))];
+  const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedTags.length > 0);
+
+  if (!settingsLoading && !features.community_enabled) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
 
   return (
-    <AppLayout>
+    <AppLayout title="Community" breadcrumbs={[{ label: 'Community' }]}>
       <div className="container mx-auto py-6 px-4">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -165,6 +173,16 @@ export default function CommunityFeed() {
               <Globe className="h-4 w-4" />
               Global Community
             </TabsTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <TabsTrigger value="events_coming_soon" disabled className="gap-2">
+                    Events & Office Hours
+                  </TabsTrigger>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Coming soon</TooltipContent>
+            </Tooltip>
           </TabsList>
         </Tabs>
 
@@ -253,6 +271,13 @@ export default function CommunityFeed() {
                 scope={scope}
                 onAction={() => setShowPostForm(true)}
                 actionLabel="Create First Post"
+                hasActiveFilters={hasActiveFilters}
+                filterDescription="No posts match your current search/category/tag filters."
+                onClearFilters={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('');
+                  setSelectedTags([]);
+                }}
               />
             ) : (
               <div className="space-y-4">
