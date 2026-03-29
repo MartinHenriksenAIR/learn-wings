@@ -44,7 +44,17 @@ export default function LearnerDashboard() {
         .eq('org_id', currentOrg.id);
 
       if (enrollmentData) {
-        setEnrollments(enrollmentData as any);
+        // Re-sign thumbnail URLs for each enrollment's course
+        const enrollmentsWithThumbnails = await Promise.all(
+          (enrollmentData as any[]).map(async (enrollment: any) => ({
+            ...enrollment,
+            course: enrollment.course ? {
+              ...enrollment.course,
+              thumbnail_url: await getSignedLmsAssetUrl(enrollment.course.thumbnail_url),
+            } : enrollment.course,
+          }))
+        );
+        setEnrollments(enrollmentsWithThumbnails as any);
 
         // Bulk-fetch progress data for all enrolled courses
         const progressMap: Record<string, { total: number; completed: number }> = {};
