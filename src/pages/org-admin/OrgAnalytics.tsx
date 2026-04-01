@@ -17,12 +17,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization } from '@/lib/types';
-import { Loader2, Users, BarChart3, BookOpen, Building2, Pencil, Plus, FileSpreadsheet, GraduationCap } from 'lucide-react';
+import { Loader2, Users, BarChart3, BookOpen, Building2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
 import { TeamPerformanceTab } from '@/components/org-admin/analytics/TeamPerformanceTab';
 import { CourseProgressTab } from '@/components/org-admin/analytics/CourseProgressTab';
-import { OrgMembersTab } from '@/components/org-admin/analytics/OrgMembersTab';
 
 interface UserStats {
   id: string;
@@ -452,20 +451,14 @@ export default function OrgAnalytics() {
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className={`grid w-full max-w-lg ${isGlobalView ? 'grid-cols-3' : 'grid-cols-4'}`}>
+        <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="overview" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
           </TabsTrigger>
-          {!isGlobalView && (
-            <TabsTrigger value="members" className="gap-2">
-              <Users className="h-4 w-4" />
-              Organization Members
-            </TabsTrigger>
-          )}
           <TabsTrigger value="team" className="gap-2">
             <Users className="h-4 w-4" />
-            Learning Progress
+            Team
           </TabsTrigger>
           <TabsTrigger value="courses" className="gap-2">
             <BookOpen className="h-4 w-4" />
@@ -483,18 +476,6 @@ export default function OrgAnalytics() {
             onGenerateReport={handleGenerateReport}
           />
         </TabsContent>
-
-        {!isGlobalView && (
-          <TabsContent value="members">
-            {currentOrg ? (
-              <OrgMembersTab orgId={currentOrg.id} orgName={currentOrg.name} />
-            ) : (
-              <div className="py-12 text-center text-muted-foreground">
-                No organization selected.
-              </div>
-            )}
-          </TabsContent>
-        )}
 
         <TabsContent value="team">
           {effectiveOrgId ? (
