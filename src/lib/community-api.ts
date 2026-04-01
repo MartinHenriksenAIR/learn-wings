@@ -114,9 +114,6 @@ export async function createPost(input: CreatePostInput): Promise<CommunityPost>
       title: input.title,
       content: input.content,
       tags: input.tags || [],
-      event_date: input.event_date || null,
-      event_location: input.event_location || null,
-      event_registration_url: input.event_registration_url || null,
     })
     .select()
     .single();
