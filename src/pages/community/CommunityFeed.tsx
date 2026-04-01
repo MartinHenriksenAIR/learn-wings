@@ -172,16 +172,6 @@ export default function CommunityFeed() {
               <Globe className="h-4 w-4" />
               Global Community
             </TabsTrigger>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <TabsTrigger value="events_coming_soon" disabled className="gap-2">
-                    Events & Office Hours
-                  </TabsTrigger>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Coming soon</TooltipContent>
-            </Tooltip>
           </TabsList>
         </Tabs>
 
