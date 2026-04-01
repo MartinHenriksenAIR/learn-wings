@@ -452,14 +452,20 @@ export default function OrgAnalytics() {
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className={`grid w-full max-w-lg ${isGlobalView ? 'grid-cols-3' : 'grid-cols-4'}`}>
           <TabsTrigger value="overview" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
           </TabsTrigger>
+          {!isGlobalView && (
+            <TabsTrigger value="members" className="gap-2">
+              <Users className="h-4 w-4" />
+              Organization Members
+            </TabsTrigger>
+          )}
           <TabsTrigger value="team" className="gap-2">
             <Users className="h-4 w-4" />
-            Team
+            Learning Progress
           </TabsTrigger>
           <TabsTrigger value="courses" className="gap-2">
             <BookOpen className="h-4 w-4" />
@@ -477,6 +483,18 @@ export default function OrgAnalytics() {
             onGenerateReport={handleGenerateReport}
           />
         </TabsContent>
+
+        {!isGlobalView && (
+          <TabsContent value="members">
+            {currentOrg ? (
+              <OrgMembersTab orgId={currentOrg.id} orgName={currentOrg.name} />
+            ) : (
+              <div className="py-12 text-center text-muted-foreground">
+                No organization selected.
+              </div>
+            )}
+          </TabsContent>
+        )}
 
         <TabsContent value="team">
           {effectiveOrgId ? (

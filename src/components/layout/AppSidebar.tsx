@@ -86,7 +86,6 @@ export function AppSidebar() {
 
   // Build org admin items based on feature toggles
   const orgAdminItems = [
-    { title: t('nav.teamMembers'), url: '/app/admin/org/users', icon: Users },
     ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: '/app/admin/analytics', icon: BarChart3 }] : []),
     ...(features.community_enabled ? [
       { title: t('nav.ideasOverview'), url: '/app/admin/org/ideas', icon: Lightbulb },
