@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignedLmsAssetUrl } from '@/lib/storage';
 import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Clock, Award, Play, ArrowRight, Loader2, TrendingUp } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
@@ -22,6 +23,7 @@ export default function LearnerDashboard() {
   const { t } = useTranslation();
   const [enrollments, setEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
   const [progressData, setProgressData] = useState<Record<string, { total: number; completed: number }>>({});
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -111,6 +113,18 @@ export default function LearnerDashboard() {
         });
 
         setProgressData(progressMap);
+
+        // Resolve thumbnail signed URLs
+        const thumbMap: Record<string, string> = {};
+        await Promise.all(
+          enrollmentData.map(async (e: any) => {
+            if (e.course?.thumbnail_url) {
+              const url = await getSignedLmsAssetUrl(e.course.thumbnail_url);
+              if (url) thumbMap[e.course_id] = url;
+            }
+          })
+        );
+        setThumbnailUrls(thumbMap);
       }
 
       setLoading(false);
@@ -253,7 +267,15 @@ export default function LearnerDashboard() {
 
               return (
                 <Card key={enrollment.id} className="overflow-hidden transition-shadow hover:shadow-card-hover">
-                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary" />
+                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
+                    {thumbnailUrls[enrollment.course_id] && (
+                      <img
+                        src={thumbnailUrls[enrollment.course_id]}
+                        alt={enrollment.course?.title || ''}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
                   <CardContent className="p-4">
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <h3 className="font-display font-semibold leading-tight">
