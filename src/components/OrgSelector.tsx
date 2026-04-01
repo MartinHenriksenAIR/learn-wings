@@ -43,7 +43,7 @@ export function OrgSelector() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlatformAdmin]);
 
-  // Only show for platform admins viewing as org_admin or learner
+  // Only show for platform admins NOT in platform_admin view
   if (!isPlatformAdmin || viewMode === 'platform_admin') {
     return null;
   }
@@ -57,6 +57,19 @@ export function OrgSelector() {
     );
   }
 
+  // Org admin view: show static org name (locked to selected org)
+  if (viewMode === 'org_admin') {
+    return (
+      <div className="px-3 py-2">
+        <div className="flex items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/50 px-3 py-2 text-sm text-sidebar-foreground">
+          <Building2 className="h-4 w-4 shrink-0" />
+          <span className="truncate">{currentOrg?.name || 'No organization selected'}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Learner view: allow switching orgs
   return (
     <div className="px-3 py-2">
       <Select
