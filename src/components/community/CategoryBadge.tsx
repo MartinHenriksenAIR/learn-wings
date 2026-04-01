@@ -27,7 +27,6 @@ const iconMap: Record<string, LucideIcon> = {
   Trophy,
   FileText,
   Megaphone,
-  Calendar,
 };
 
 const colorMap: Record<string, string> = {
