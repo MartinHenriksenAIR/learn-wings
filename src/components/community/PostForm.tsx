@@ -93,11 +93,6 @@ export function PostForm({
         title: values.title,
         content: values.content,
         tags: values.tags,
-        event_date: isEventCategory ? values.event_date : undefined,
-        event_location: isEventCategory ? values.event_location : undefined,
-        event_registration_url: isEventCategory && values.event_registration_url 
-          ? values.event_registration_url 
-          : undefined,
       });
       form.reset();
       onOpenChange(false);
