@@ -51,7 +51,7 @@ export default function OrgSettings() {
   const handleSave = async () => {
     if (!currentOrg) return;
     setSaving(true);
-    const { error } = await (supabase as any).from('org_settings').upsert({
+    const { error } = await supabase.from('org_settings').upsert({
       org_id: currentOrg.id,
       features: localFeatures,
     });

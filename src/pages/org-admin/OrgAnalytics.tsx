@@ -22,7 +22,6 @@ import { toast } from 'sonner';
 import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
 import { TeamPerformanceTab } from '@/components/org-admin/analytics/TeamPerformanceTab';
 import { CourseProgressTab } from '@/components/org-admin/analytics/CourseProgressTab';
-import { OrgMembersTab } from '@/components/org-admin/OrgMembersTab';
 
 interface UserStats {
   id: string;
@@ -452,20 +451,14 @@ export default function OrgAnalytics() {
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full max-w-lg grid-cols-4">
+        <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="overview" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
           </TabsTrigger>
-          {!isGlobalView && (
-            <TabsTrigger value="members" className="gap-2">
-              <Users className="h-4 w-4" />
-              Members
-            </TabsTrigger>
-          )}
           <TabsTrigger value="team" className="gap-2">
             <Users className="h-4 w-4" />
-            Learning Progress
+            Team
           </TabsTrigger>
           <TabsTrigger value="courses" className="gap-2">
             <BookOpen className="h-4 w-4" />
@@ -483,12 +476,6 @@ export default function OrgAnalytics() {
             onGenerateReport={handleGenerateReport}
           />
         </TabsContent>
-
-        {!isGlobalView && currentOrg && (
-          <TabsContent value="members">
-            <OrgMembersTab orgId={currentOrg.id} orgName={currentOrg.name} />
-          </TabsContent>
-        )}
 
         <TabsContent value="team">
           {effectiveOrgId ? (

@@ -96,7 +96,7 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
     const [platformRes, orgRes] = await Promise.all([
       supabase.from('platform_settings').select('key, value'),
       currentOrg
-        ? (supabase as any).from('org_settings').select('features').eq('org_id', currentOrg.id).maybeSingle()
+        ? supabase.from('org_settings').select('features').eq('org_id', currentOrg.id).maybeSingle()
         : Promise.resolve({ data: null, error: null } as any),
     ]);
 
