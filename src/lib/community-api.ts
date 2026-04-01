@@ -135,7 +135,7 @@ export async function updatePost(
     .single();
 
   if (error) throw error;
-  return data as CommunityPost;
+  return data as unknown as CommunityPost;
 }
 
 // Delete post
