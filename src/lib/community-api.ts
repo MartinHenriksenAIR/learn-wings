@@ -75,7 +75,7 @@ export async function fetchPosts(filters: PostFilters): Promise<CommunityPost[]>
     })) as unknown as CommunityPost[];
   }
 
-  return (data || []) as CommunityPost[];
+  return (data || []) as unknown as CommunityPost[];
 }
 
 // Fetch single post
