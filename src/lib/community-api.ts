@@ -96,7 +96,7 @@ export async function fetchPost(postId: string): Promise<CommunityPost | null> {
     throw error;
   }
 
-  return data as CommunityPost;
+  return data as unknown as CommunityPost;
 }
 
 // Create post
