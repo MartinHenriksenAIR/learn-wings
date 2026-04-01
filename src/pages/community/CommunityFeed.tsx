@@ -15,7 +15,7 @@ import { AIChampionsList } from '@/components/community/AIChampionsList';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { toast } from '@/components/ui/sonner';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
 import {
   fetchCategories,
   fetchPosts,
