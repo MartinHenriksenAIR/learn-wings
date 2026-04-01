@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { CategoryBadge } from './CategoryBadge';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, Calendar } from 'lucide-react';
 import type { CommunityCategory, CommunityScope, CreatePostInput } from '@/lib/community-types';
 
 const postSchema = z.object({
@@ -37,6 +37,9 @@ const postSchema = z.object({
   content: z.string().min(10, 'Content must be at least 10 characters'),
   category_id: z.string().min(1, 'Please select a category'),
   tags: z.array(z.string()).max(5, 'Maximum 5 tags allowed'),
+  event_date: z.string().optional(),
+  event_location: z.string().optional(),
+  event_registration_url: z.string().url().optional().or(z.literal('')),
 });
 
 type PostFormValues = z.infer<typeof postSchema>;
@@ -74,9 +77,16 @@ export function PostForm({
       content: '',
       category_id: '',
       tags: [],
+      event_date: '',
+      event_location: '',
+      event_registration_url: '',
       ...initialData,
     },
   });
+
+  const selectedCategoryId = form.watch('category_id');
+  const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
+  const isEventCategory = selectedCategory?.slug === 'events';
 
   // Filter categories based on permissions
   const availableCategories = categories.filter(
@@ -93,6 +103,11 @@ export function PostForm({
         title: values.title,
         content: values.content,
         tags: values.tags,
+        event_date: isEventCategory ? values.event_date : undefined,
+        event_location: isEventCategory ? values.event_location : undefined,
+        event_registration_url: isEventCategory && values.event_registration_url 
+          ? values.event_registration_url 
+          : undefined,
       });
       form.reset();
       onOpenChange(false);
@@ -199,6 +214,68 @@ export function PostForm({
                 </FormItem>
               )}
             />
+
+            {/* Event-specific fields */}
+            {isEventCategory && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="event_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Event Date & Time</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="datetime-local"
+                            className="pl-10"
+                            {...field}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="event_location"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Zoom, Conference Room A, or full address"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>Physical location or virtual meeting platform</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="event_registration_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Registration URL (optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="url"
+                          placeholder="https://..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
 
             {/* Tags */}
             <FormField

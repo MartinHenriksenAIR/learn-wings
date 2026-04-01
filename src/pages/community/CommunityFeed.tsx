@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostCard } from '@/components/community/PostCard';
 import { PostForm } from '@/components/community/PostForm';
-
+import { UpcomingEvents } from '@/components/community/UpcomingEvents';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { CategoryBadge } from '@/components/community/CategoryBadge';
 import { AIChampionsList } from '@/components/community/AIChampionsList';
@@ -113,6 +113,9 @@ export default function CommunityFeed() {
     ? effectiveIsPlatformAdmin 
     : effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
+  // Filter event posts for the widget
+  const eventPosts = posts.filter((p) => p.category?.slug === 'events');
+
   // Get all unique tags from posts
   const allTags = [...new Set(posts.flatMap((p) => p.tags || []))];
   const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedTags.length > 0);
@@ -169,6 +172,16 @@ export default function CommunityFeed() {
               <Globe className="h-4 w-4" />
               Global Community
             </TabsTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <TabsTrigger value="events_coming_soon" disabled className="gap-2">
+                    Events & Office Hours
+                  </TabsTrigger>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Coming soon</TooltipContent>
+            </Tooltip>
           </TabsList>
         </Tabs>
 
@@ -283,6 +296,14 @@ export default function CommunityFeed() {
 
           {/* Sidebar */}
           <div className="space-y-4">
+            {/* Upcoming Events */}
+            {eventPosts.length > 0 && (
+              <UpcomingEvents
+                events={eventPosts}
+                onEventClick={(event) => navigate(`/app/community/${scope}/posts/${event.id}`)}
+              />
+            )}
+
             {/* Idea Library link (org only) */}
             {scope === 'org' && currentOrg && (
               <Card>

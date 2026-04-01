@@ -34,6 +34,9 @@ export default function PostEdit() {
         title: data.title,
         content: data.content,
         tags: data.tags || [],
+        event_date: data.event_date || null,
+        event_location: data.event_location || null,
+        event_registration_url: data.event_registration_url || null,
       });
     },
     onSuccess: () => {
@@ -55,6 +58,9 @@ export default function PostEdit() {
       title: post.title,
       content: post.content,
       tags: post.tags || [],
+      event_date: post.event_date || '',
+      event_location: post.event_location || '',
+      event_registration_url: post.event_registration_url || '',
     };
   }, [post]);
 

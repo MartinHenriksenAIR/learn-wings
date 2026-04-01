@@ -72,10 +72,10 @@ export async function fetchPosts(filters: PostFilters): Promise<CommunityPost[]>
     return (data || []).map((p) => ({
       ...p,
       comment_count: countMap[p.id] || 0,
-    })) as unknown as CommunityPost[];
+    })) as CommunityPost[];
   }
 
-  return (data || []) as unknown as CommunityPost[];
+  return (data || []) as CommunityPost[];
 }
 
 // Fetch single post
@@ -96,7 +96,7 @@ export async function fetchPost(postId: string): Promise<CommunityPost | null> {
     throw error;
   }
 
-  return data as unknown as CommunityPost;
+  return data as CommunityPost;
 }
 
 // Create post
@@ -114,12 +114,15 @@ export async function createPost(input: CreatePostInput): Promise<CommunityPost>
       title: input.title,
       content: input.content,
       tags: input.tags || [],
+      event_date: input.event_date || null,
+      event_location: input.event_location || null,
+      event_registration_url: input.event_registration_url || null,
     })
     .select()
     .single();
 
   if (error) throw error;
-  return data as unknown as CommunityPost;
+  return data as CommunityPost;
 }
 
 // Update post
@@ -135,7 +138,7 @@ export async function updatePost(
     .single();
 
   if (error) throw error;
-  return data as unknown as CommunityPost;
+  return data as CommunityPost;
 }
 
 // Delete post
