@@ -28,9 +28,6 @@ import {
 } from '@/lib/community-api';
 import {
   ArrowLeft,
-  Calendar,
-  MapPin,
-  ExternalLink,
   Edit2,
   Trash2,
   Flag,
