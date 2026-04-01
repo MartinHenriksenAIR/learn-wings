@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
 import { TeamPerformanceTab } from '@/components/org-admin/analytics/TeamPerformanceTab';
 import { CourseProgressTab } from '@/components/org-admin/analytics/CourseProgressTab';
+import { OrgMembersTab } from '@/components/org-admin/analytics/OrgMembersTab';
 
 interface UserStats {
   id: string;
