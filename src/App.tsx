@@ -14,7 +14,7 @@ import ResetPassword from "./pages/ResetPassword";
 import LearnerDashboard from "./pages/learner/Dashboard";
 import LearnerCourses from "./pages/learner/Courses";
 import CoursePlayer from "./pages/learner/CoursePlayer";
-import OrgUsers from "./pages/org-admin/OrgUsers";
+
 import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
 import OrgSettings from "./pages/org-admin/OrgSettings";
 import OrganizationsManager from "./pages/platform-admin/OrganizationsManager";
@@ -63,7 +63,7 @@ function AppRoutes() {
       <Route path="/app/community/org/resources" element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
-      <Route path="/app/admin/org/users" element={<ProtectedRoute requireOrgAdmin><OrgUsers /></ProtectedRoute>} />
+      <Route path="/app/admin/org/users" element={<Navigate to="/app/admin/analytics?tab=members" replace />} />
       <Route path="/app/admin/analytics" element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
       <Route path="/app/admin/org/settings" element={<ProtectedRoute requireOrgAdmin><OrgSettings /></ProtectedRoute>} />
       <Route path="/app/admin/org/ideas" element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />
