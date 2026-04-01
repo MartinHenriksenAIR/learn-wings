@@ -212,7 +212,11 @@ export default function LearnerDashboard() {
         <StatCard
           title={t('dashboard.overallProgress')}
           value={`${Math.round(totalProgress)}%`}
-          icon={<ProgressRing progress={totalProgress} size={40} showLabel={false} />}
+          icon={
+            totalProgress > 0
+              ? <ProgressRing progress={totalProgress} size={24} strokeWidth={3} showLabel={false} />
+              : <Award className="h-5 w-5" />
+          }
         />
       </div>
 
