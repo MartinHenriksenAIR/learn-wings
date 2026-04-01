@@ -15,7 +15,7 @@ import { AIChampionsList } from '@/components/community/AIChampionsList';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { toast } from '@/components/ui/sonner';
-
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   fetchCategories,
   fetchPosts,
@@ -172,6 +172,16 @@ export default function CommunityFeed() {
               <Globe className="h-4 w-4" />
               Global Community
             </TabsTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <TabsTrigger value="events_coming_soon" disabled className="gap-2">
+                    Events & Office Hours
+                  </TabsTrigger>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Coming soon</TooltipContent>
+            </Tooltip>
           </TabsList>
         </Tabs>
 
