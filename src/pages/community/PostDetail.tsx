@@ -28,9 +28,6 @@ import {
 } from '@/lib/community-api';
 import {
   ArrowLeft,
-  Calendar,
-  MapPin,
-  ExternalLink,
   Edit2,
   Trash2,
   Flag,
@@ -217,8 +214,6 @@ export default function PostDetail() {
     .toUpperCase()
     .slice(0, 2) || 'U';
 
-  const isEvent = post.category?.slug === 'events';
-
   return (
     <AppLayout title={post.title} breadcrumbs={[{ label: 'Community' }, { label: 'Post' }]}>
       <div className="container mx-auto py-6 px-4 max-w-4xl">
@@ -276,46 +271,6 @@ export default function PostDetail() {
 
             {/* Title */}
             <h1 className="text-2xl font-bold">{post.title}</h1>
-
-            {/* Event details */}
-            {isEvent && post.event_date && (
-              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  <span className="font-medium">
-                    {format(new Date(post.event_date), 'EEEE, MMMM d, yyyy · h:mm a')}
-                  </span>
-                </div>
-                {post.event_location && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>{post.event_location}</span>
-                  </div>
-                )}
-                {post.event_registration_url && (
-                  <a
-                    href={post.event_registration_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Register for this event
-                  </a>
-                )}
-                {post.event_recording_url && (
-                  <a
-                    href={post.event_recording_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Watch recording
-                  </a>
-                )}
-              </div>
-            )}
 
             {/* Content */}
             <div className="prose prose-sm max-w-none">
