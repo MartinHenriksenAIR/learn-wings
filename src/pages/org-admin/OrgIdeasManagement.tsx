@@ -88,21 +88,22 @@ export default function OrgIdeasManagement() {
     all: [],
   };
 
-  // Fetch ideas
-  const { data: ideas = [], isLoading } = useQuery({
-    queryKey: ['ideas-admin', currentOrg?.id, activeTab, searchQuery, selectedBusinessArea],
+  // Fetch ALL ideas (no status filter) so tab counters stay accurate
+  const { data: allIdeas = [], isLoading } = useQuery({
+    queryKey: ['ideas-admin', currentOrg?.id, searchQuery, selectedBusinessArea],
     queryFn: () => fetchIdeas(currentOrg!.id, {
-      status: tabStatusFilters[activeTab].length > 0 ? tabStatusFilters[activeTab] : undefined,
       search: searchQuery || undefined,
       business_area: selectedBusinessArea ? [selectedBusinessArea as BusinessArea] : undefined,
     }),
     enabled: !!currentOrg,
   });
 
-  // Filter out drafts for all view
-  const filteredIdeas = activeTab === 'all' 
-    ? ideas.filter((i) => i.status !== 'draft')
-    : ideas;
+  // Filter ideas for the active tab
+  const filteredIdeas = (() => {
+    const statuses = tabStatusFilters[activeTab];
+    if (statuses.length === 0) return allIdeas.filter((i) => i.status !== 'draft');
+    return allIdeas.filter((i) => statuses.includes(i.status));
+  })();
 
   // Status update mutation
   const statusMutation = useMutation({
