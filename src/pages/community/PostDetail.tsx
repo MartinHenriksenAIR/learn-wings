@@ -214,8 +214,6 @@ export default function PostDetail() {
     .toUpperCase()
     .slice(0, 2) || 'U';
 
-  const isEvent = post.category?.slug === 'events';
-
   return (
     <AppLayout title={post.title} breadcrumbs={[{ label: 'Community' }, { label: 'Post' }]}>
       <div className="container mx-auto py-6 px-4 max-w-4xl">
