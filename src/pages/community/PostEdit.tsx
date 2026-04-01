@@ -34,9 +34,6 @@ export default function PostEdit() {
         title: data.title,
         content: data.content,
         tags: data.tags || [],
-        event_date: data.event_date || null,
-        event_location: data.event_location || null,
-        event_registration_url: data.event_registration_url || null,
       });
     },
     onSuccess: () => {
