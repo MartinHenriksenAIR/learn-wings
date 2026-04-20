@@ -1533,10 +1533,9 @@ export type Database = {
         }
         Returns: boolean
       }
-      can_user_access_lms_asset: {
-        Args: { file_path: string; p_user_id: string }
-        Returns: boolean
-      }
+      can_user_access_lms_asset:
+        | { Args: { file_path: string; p_user_id: string }; Returns: boolean }
+        | { Args: { file_path: string; p_user_id: string }; Returns: boolean }
       can_view_idea_admin_fields: {
         Args: { p_org_id: string }
         Returns: boolean
