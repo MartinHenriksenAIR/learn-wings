@@ -19,12 +19,23 @@ interface AppLayoutProps {
   title?: string;
 }
 
+// Default href map for common breadcrumb labels that don't have an explicit href
+const DEFAULT_BREADCRUMB_HREFS: Record<string, string> = {
+  'Community': '/app/community',
+  'Courses': '/app/courses',
+  'Idea Library': '/app/community/ideas',
+  'Resources': '/app/community/resources',
+  'Organizations': '/app/admin/organizations',
+  'Team Members': '/app/team',
+  'Organization Settings': '/app/org/settings',
+};
+
 export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps) {
   const { effectiveIsPlatformAdmin } = useAuth();
-  
+
   // Platform admins go to Organizations, others go to Dashboard
   const homeHref = effectiveIsPlatformAdmin ? '/app/admin/organizations' : '/app/dashboard';
-  
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -40,18 +51,22 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
                     <Link to={homeHref}>Home</Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                {breadcrumbs.map((crumb, index) => (
-                  <BreadcrumbItem key={index}>
-                    <BreadcrumbSeparator />
-                    {crumb.href ? (
-                      <BreadcrumbLink asChild>
-                        <Link to={crumb.href}>{crumb.label}</Link>
-                      </BreadcrumbLink>
-                    ) : (
-                      <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                    )}
-                  </BreadcrumbItem>
-                ))}
+                {breadcrumbs.map((crumb, index) => {
+                  const isLast = index === breadcrumbs.length - 1;
+                  const resolvedHref = crumb.href ?? DEFAULT_BREADCRUMB_HREFS[crumb.label];
+                  return (
+                    <BreadcrumbItem key={index}>
+                      <BreadcrumbSeparator />
+                      {!isLast && resolvedHref ? (
+                        <BreadcrumbLink asChild>
+                          <Link to={resolvedHref}>{crumb.label}</Link>
+                        </BreadcrumbLink>
+                      ) : (
+                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                      )}
+                    </BreadcrumbItem>
+                  );
+                })}
               </BreadcrumbList>
             </Breadcrumb>
           </header>
