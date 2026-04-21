@@ -62,7 +62,30 @@ This project is built with:
 
 ## How can I deploy this project?
 
+### Option 1: Deploy with Lovable (Easiest)
+
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+
+### Option 2: Deploy to Microsoft Azure (Production)
+
+For enterprise deployments with full control, we provide comprehensive Azure deployment guides:
+
+📚 **[Azure Deployment Guide](./AZURE_DEPLOYMENT_GUIDE.md)** - Complete production deployment guide
+- Full architecture analysis and Azure service mapping
+- Step-by-step deployment instructions for all resources
+- GitHub Actions CI/CD pipeline setup
+- Monitoring, troubleshooting, and cost optimization
+- Multi-tenant EntraID/MSAL authentication integration
+
+⚡ **[Quick Start Guide](./QUICK_START.md)** - Get started in 30 minutes
+- Rapid development environment setup
+- Condensed commands for quick deployment
+- Common troubleshooting fixes
+
+📊 **[Deployment Summary](./DEPLOYMENT_SUMMARY.md)** - Project overview
+- Architecture decisions and rationale
+- Validation checklist
+- Usage instructions by role
 
 ## Can I connect a custom domain to my Lovable project?
 
