@@ -262,10 +262,13 @@ For production, upgrade:
 Development setup: **~$50-80/month**
 - PostgreSQL Burstable B2s: ~$25
 - Blob Storage (100GB): ~$5
-- Static Web Apps Standard: ~$9
+- Static Web Apps Standard (includes CDN): ~$9
 - Misc (Key Vault, bandwidth): ~$10-40
 
-Production setup: **~$300-500/month** (without Front Door)
+Production setup: **~$300-550/month**
+- With high availability and Premium Functions
+- **Includes built-in global CDN at no extra cost**
+- No need for separate CDN service ($420/month savings vs Azure Front Door)
 
 See [AZURE_DEPLOYMENT_GUIDE.md](./AZURE_DEPLOYMENT_GUIDE.md) Section 11 for full cost breakdown.
 

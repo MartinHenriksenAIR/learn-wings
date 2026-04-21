@@ -28,13 +28,17 @@ This document summarizes the comprehensive Azure deployment analysis and tutoria
 **Core Infrastructure:**
 | Component | Azure Service | Rationale |
 |-----------|---------------|-----------|
-| Frontend | Azure Static Web Apps | Native React/Vite support, CDN, SSL, preview environments |
+| Frontend | Azure Static Web Apps | Native React/Vite support, built-in global CDN, SSL, preview environments |
 | API Functions | Azure Functions (Container) | Custom container for Deno runtime |
 | Database | Azure PostgreSQL Flexible Server | Managed PostgreSQL with RLS, zone-redundant HA |
 | File Storage | Azure Blob Storage | Already integrated, cost-effective |
 | Secrets | Azure Key Vault | Secure credential management |
-| CDN/WAF | Azure Front Door | Global distribution, DDoS protection |
 | Monitoring | Application Insights | Comprehensive observability |
+
+**Key Architecture Decision:**
+- Azure Static Web Apps includes global CDN distribution at no extra cost
+- **No separate CDN service needed** - saves $420/month compared to Azure Front Door
+- Built-in DDoS protection and edge caching suitable for most production workloads
 
 ### 3. Deployment Order and Dependencies ✅
 
@@ -42,10 +46,10 @@ This document summarizes the comprehensive Azure deployment analysis and tutoria
 ```
 Resource Group → Key Vault → VNet → PostgreSQL →
 Blob Storage → Container Registry → Azure Functions →
-Static Web Apps → Front Door → Monitoring → CI/CD
+Static Web Apps (includes CDN) → Monitoring → CI/CD
 ```
 
-**Rationale:** Each step builds on previous infrastructure, minimizing deployment failures and ensuring proper network connectivity and security configuration.
+**Rationale:** Each step builds on previous infrastructure, minimizing deployment failures and ensuring proper network connectivity and security configuration. Azure Static Web Apps provides built-in global CDN, eliminating the need for a separate CDN service.
 
 ### 4. Complete MECE Tutorial ✅
 
@@ -122,8 +126,9 @@ Static Web Apps → Front Door → Monitoring → CI/CD
 - Comprehensive monitoring and alerting
 
 ### 2. Cost-Conscious Design
-- Detailed cost breakdown (~$942/month standard config)
-- Cost optimization strategies (save up to $450/month)
+- Optimized cost structure (~$522/month standard config)
+- **$420/month savings** by using Static Web Apps built-in CDN instead of Azure Front Door
+- Cost optimization strategies (save up to $300/month additional)
 - Lifecycle management for blob storage
 - Autoscaling configurations
 

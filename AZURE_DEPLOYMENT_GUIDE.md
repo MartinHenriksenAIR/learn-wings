@@ -54,31 +54,37 @@ The learn-wings repository is a **multi-tenant Learning Management System (LMS)*
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                          Azure Front Door                         │
-│                    (Global CDN + SSL/TLS)                        │
+│              Azure Static Web Apps (with built-in CDN)           │
+│                     (React Frontend + Global CDN)                │
 └────────────────────────┬────────────────────────────────────────┘
                          │
-            ┌────────────┴─────────────┐
-            │                          │
-┌───────────▼──────────┐    ┌─────────▼──────────┐
-│  Azure Static Web    │    │   Azure Functions  │
-│      Apps            │    │  (Deno Container)  │
-│   (React Frontend)   │    │   (Edge Functions) │
-└──────────────────────┘    └─────────┬──────────┘
-                                      │
-                         ┌────────────┴────────────┐
-                         │                         │
-              ┌──────────▼─────────┐    ┌─────────▼──────────┐
-              │  Azure PostgreSQL  │    │  Azure Blob       │
-              │  Flexible Server   │    │  Storage          │
-              │  (with RLS)        │    │  (Videos/Docs)    │
-              └────────────────────┘    └────────────────────┘
+                         │ API Calls
                          │
               ┌──────────▼─────────┐
-              │   Azure Key Vault  │
-              │   (Secrets Mgmt)   │
-              └────────────────────┘
+              │  Azure Functions   │
+              │ (Deno Container)   │
+              │  (Edge Functions)  │
+              └──────────┬─────────┘
+                         │
+            ┌────────────┴────────────┐
+            │                         │
+┌───────────▼──────────┐    ┌─────────▼──────────┐
+│  Azure PostgreSQL    │    │  Azure Blob        │
+│  Flexible Server     │    │  Storage           │
+│  (with RLS)          │    │  (Videos/Docs)     │
+└──────────────────────┘    └────────────────────┘
+            │
+┌───────────▼──────────┐
+│   Azure Key Vault    │
+│   (Secrets Mgmt)     │
+└──────────────────────┘
 ```
+
+**Key Benefits:**
+- Azure Static Web Apps includes global CDN distribution at no extra cost
+- Automatic SSL/TLS certificates and custom domain support
+- Built-in DDoS protection and edge caching
+- No need for separate CDN service, reducing complexity and cost
 
 ---
 
@@ -88,13 +94,12 @@ The learn-wings repository is a **multi-tenant Learning Management System (LMS)*
 
 | Learn-Wings Component | Azure Service | Purpose | Rationale |
 |----------------------|---------------|---------|-----------|
-| React Frontend | Azure Static Web Apps | Host static website | Optimized for SPA with built-in CDN, SSL, preview environments |
+| React Frontend | Azure Static Web Apps | Host static website | Optimized for SPA with built-in global CDN, SSL, preview environments |
 | Supabase Edge Functions | Azure Functions (Container) | Serverless API endpoints | Custom container support allows Deno runtime |
 | PostgreSQL Database | Azure Database for PostgreSQL Flexible Server | Relational database | Managed PostgreSQL with RLS support, high availability |
 | Authentication | Supabase Auth → Azure EntraID (future) | User authentication | Current: Supabase Auth; Future: EntraID multi-tenant |
 | File Storage | Azure Blob Storage | Video/document storage | Already integrated, scalable object storage |
 | Secrets Management | Azure Key Vault | Store sensitive credentials | Secure storage for connection strings, API keys |
-| CDN/Global Distribution | Azure Front Door | Content delivery | Low latency, DDoS protection, SSL offloading |
 | Monitoring | Azure Monitor + Application Insights | Observability | Performance monitoring, logging, alerts |
 | CI/CD | GitHub Actions | Automated deployments | Native integration with Azure services |
 
@@ -104,8 +109,11 @@ The learn-wings repository is a **multi-tenant Learning Management System (LMS)*
 - Perfect for React/Vite applications
 - Built-in staging environments for pull requests
 - Automatic SSL certificates
-- Global CDN distribution
+- **Global CDN distribution included at no extra cost**
 - Seamless GitHub Actions integration
+- Eliminates need for separate CDN service
+- Built-in DDoS protection and edge caching
+- Custom domain support with automatic certificate management
 
 **Azure Functions with Custom Containers:**
 - Allows Deno runtime (required for Supabase Edge Functions)
@@ -184,15 +192,13 @@ The following order ensures dependencies are met and reduces deployment failures
    ↓
 6. Azure Functions (Container)
    ↓
-7. Azure Static Web Apps
+7. Azure Static Web Apps (includes CDN)
    ↓
-8. Azure Front Door (optional but recommended)
+8. Azure Monitor + Application Insights
    ↓
-9. Azure Monitor + Application Insights
-   ↓
-10. Configure GitHub Actions Secrets
+9. Configure GitHub Actions Secrets
     ↓
-11. Deploy Application via CI/CD
+10. Deploy Application via CI/CD
 ```
 
 ### 4.2 Why This Order?
@@ -203,11 +209,10 @@ The following order ensures dependencies are met and reduces deployment failures
 4. **PostgreSQL** - Database must exist before functions can connect
 5. **Blob Storage** - File storage needed by the application
 6. **Azure Functions** - API layer depends on database and storage
-7. **Static Web Apps** - Frontend depends on API being available
-8. **Front Door** - Sits in front of all services for global distribution
-9. **Monitoring** - Can be added anytime but best early for visibility
-10. **GitHub Secrets** - Needed before CI/CD can deploy
-11. **CI/CD Pipeline** - Final step to automate future deployments
+7. **Static Web Apps** - Frontend with built-in global CDN; depends on API being available
+8. **Monitoring** - Can be added anytime but best early for visibility
+9. **GitHub Secrets** - Needed before CI/CD can deploy
+10. **CI/CD Pipeline** - Final step to automate future deployments
 
 ---
 
@@ -709,63 +714,64 @@ Create `staticwebapp.config.json` in your repository root:
 
 **Reference:** [Static Web Apps Configuration](https://learn.microsoft.com/en-us/azure/static-web-apps/configuration)
 
-### 5.11 Setup Azure Front Door (Optional but Recommended)
+### 5.11 Understanding Static Web Apps Built-in CDN
 
-```bash
-# Set variables
-FRONTDOOR_NAME="fd-learnwings-prod"
-CUSTOM_DOMAIN="app.yourdomain.com"
+Azure Static Web Apps includes a global Content Delivery Network (CDN) at no additional cost, eliminating the need for a separate CDN service like Azure Front Door.
 
-# Create Front Door
-az afd profile create \
-  --profile-name $FRONTDOOR_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --sku Premium_AzureFrontDoor
+**Key Features:**
 
-# Get Static Web App hostname
-STATIC_APP_HOSTNAME=$(az staticwebapp show \
-  --name $STATIC_APP_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --query "defaultHostname" -o tsv)
+1. **Global Edge Distribution**
+   - Automatic content replication to Microsoft's global edge network
+   - Low-latency content delivery worldwide
+   - No configuration required
 
-# Create endpoint
-az afd endpoint create \
-  --resource-group $RESOURCE_GROUP \
-  --profile-name $FRONTDOOR_NAME \
-  --endpoint-name "learnwings-endpoint" \
-  --enabled-state Enabled
+2. **Automatic Caching**
+   - Static assets (HTML, CSS, JS, images) cached at edge locations
+   - Cache-Control headers respected
+   - Configurable via `staticwebapp.config.json`
 
-# Create origin group
-az afd origin-group create \
-  --resource-group $RESOURCE_GROUP \
-  --profile-name $FRONTDOOR_NAME \
-  --origin-group-name "static-web-app-origin" \
-  --probe-request-type GET \
-  --probe-protocol Https \
-  --probe-interval-in-seconds 30 \
-  --probe-path / \
-  --sample-size 4 \
-  --successful-samples-required 3 \
-  --additional-latency-in-milliseconds 50
+3. **SSL/TLS Management**
+   - Automatic SSL certificate provisioning and renewal
+   - HTTPS enforced by default
+   - Custom domain support with automatic certificates
 
-# Add origin
-az afd origin create \
-  --resource-group $RESOURCE_GROUP \
-  --profile-name $FRONTDOOR_NAME \
-  --origin-group-name "static-web-app-origin" \
-  --origin-name "static-web-app" \
-  --origin-host-header $STATIC_APP_HOSTNAME \
-  --host-name $STATIC_APP_HOSTNAME \
-  --http-port 80 \
-  --https-port 443 \
-  --priority 1 \
-  --weight 1000 \
-  --enabled-state Enabled
-```
+4. **DDoS Protection**
+   - Built-in protection against distributed denial-of-service attacks
+   - No additional configuration needed
+   - Enterprise-grade security included
 
-**Hot Tip:** Azure Front Door Premium tier includes Web Application Firewall (WAF) for enhanced security.
+5. **Custom Domain Configuration**
+   ```bash
+   # Add custom domain to Static Web App
+   az staticwebapp hostname set \
+     --name $STATIC_APP_NAME \
+     --resource-group $RESOURCE_GROUP \
+     --hostname "app.yourdomain.com"
+   ```
 
-**Reference:** [Azure Front Door](https://learn.microsoft.com/en-us/azure/frontdoor/)
+**Performance Optimization Tips:**
+
+1. **Enable Compression** - Automatically enabled for text-based content
+2. **Configure Cache Headers** - Set appropriate cache-control headers in your build
+3. **Use Image Optimization** - Optimize images before deployment
+4. **Leverage Browser Caching** - Configure long cache times for versioned assets
+
+**Cost Advantage:**
+- No additional CDN costs beyond Static Web Apps pricing ($9/month for Standard tier)
+- Eliminates $330-420/month cost of Azure Front Door Premium
+- Suitable for most production workloads with minimal attack surface
+
+**When You Might Need More:**
+If you require advanced features like:
+- Web Application Firewall (WAF) with custom rules
+- Advanced geo-filtering or routing
+- Multi-origin load balancing
+
+Consider third-party CDN providers like Cloudflare (free tier available) as a cost-effective alternative to Azure Front Door.
+
+**Reference:**
+- [Static Web Apps CDN](https://learn.microsoft.com/en-us/azure/static-web-apps/apis)
+- [Custom Domains](https://learn.microsoft.com/en-us/azure/static-web-apps/custom-domain)
 
 ### 5.12 Configure Monitoring
 
@@ -1365,21 +1371,24 @@ WHERE status = 'enrolled';
 
 ### 11.1 Cost Breakdown (Estimated Monthly)
 
-Based on a medium-sized deployment:
+Based on a medium-sized production deployment:
 
 | Service | Configuration | Est. Monthly Cost (USD) |
 |---------|--------------|-------------------------|
-| Azure Static Web Apps | Standard tier | $9 |
+| Azure Static Web Apps | Standard tier (includes CDN) | $9 |
 | Azure Functions | Premium P1V3 (1 instance) | $150 |
 | Azure PostgreSQL Flexible Server | Standard_D2ds_v4, 128GB, HA | $300 |
 | Azure Blob Storage | 500GB Hot + 1TB Cool | $45 |
 | Azure Container Registry | Basic | $5 |
 | Azure Key Vault | Secrets | $1 |
 | Application Insights | 5GB/day | $12 |
-| Azure Front Door | Premium, 1TB egress | $420 |
-| **Total** | | **~$942/month** |
+| **Total** | | **~$522/month** |
 
-**Note:** Front Door is optional but adds significant cost. Use only if you need global distribution, WAF, or advanced routing.
+**Key Benefits:**
+- No separate CDN costs - included with Static Web Apps
+- **$420/month savings** compared to using Azure Front Door Premium
+- Built-in global distribution and DDoS protection
+- Enterprise-ready for most use cases
 
 ### 11.2 Cost Optimization Strategies
 
@@ -1463,7 +1472,7 @@ az consumption budget create \
 
 ### 11.3 Cost Optimization Checklist
 
-- [ ] Remove Azure Front Door if not needed (saves ~$420/month)
+- [x] Using Static Web Apps built-in CDN (saves $420/month vs Azure Front Door)
 - [ ] Use Basic tier for non-production environments
 - [ ] Enable autoscaling to reduce idle capacity
 - [ ] Implement storage lifecycle policies
@@ -1473,10 +1482,15 @@ az consumption budget create \
 - [ ] Set up cost alerts at 80% and 100% of budget
 - [ ] Review cost analysis reports monthly
 
-**Hot Tip:** For small teams (<100 users), you can save ~$450/month by using:
-- Azure Functions Consumption plan instead of Premium
-- Single-zone PostgreSQL instead of zone-redundant HA
-- Skipping Azure Front Door
+**Hot Tip:** For small teams (<100 users), you can save additional costs by using:
+- Azure Functions Consumption plan instead of Premium (~$150/month savings)
+- Single-zone PostgreSQL instead of zone-redundant HA (~$150/month savings)
+- Total potential savings for small deployments: **~$300/month**
+
+**Production Deployment Cost Summary:**
+- **Recommended (this guide):** ~$522/month with high availability
+- **Small team optimized:** ~$220/month without HA
+- **Enterprise with external CDN:** Add $20-50/month for Cloudflare Pro if advanced WAF needed
 
 ---
 
