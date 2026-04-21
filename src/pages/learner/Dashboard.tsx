@@ -9,15 +9,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
-import { Enrollment, Course, LessonProgress } from '@/lib/types';
-import { BookOpen, Clock, Award, Play, ArrowRight, Loader2 } from 'lucide-react';
+import { getSignedLmsAssetUrl } from '@/lib/storage';
+import { Enrollment, Course } from '@/lib/types';
+import { BookOpen, Clock, Award, Play, ArrowRight, Loader2, TrendingUp } from 'lucide-react';
+import { CertificateCard } from '@/components/learner/CertificateCard';
+import { toast } from '@/components/ui/sonner';
 
 export default function LearnerDashboard() {
-  const { user, currentOrg } = useAuth();
+  const { user, currentOrg, profile } = useAuth();
+  const { features } = usePlatformSettings();
   const { t } = useTranslation();
   const [enrollments, setEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
   const [progressData, setProgressData] = useState<Record<string, { total: number; completed: number }>>({});
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,41 +47,84 @@ export default function LearnerDashboard() {
       if (enrollmentData) {
         setEnrollments(enrollmentData as any);
 
-        // Fetch progress for each course
+        // Bulk-fetch progress data for all enrolled courses
         const progressMap: Record<string, { total: number; completed: number }> = {};
-        
-        for (const enrollment of enrollmentData) {
-          // Get total lessons for the course
-          const { data: modules } = await supabase
-            .from('course_modules')
-            .select('id')
-            .eq('course_id', enrollment.course_id);
+        const courseIds = enrollmentData.map((e) => e.course_id);
 
-          if (modules) {
-            const moduleIds = modules.map(m => m.id);
-            const { count: totalLessons } = await supabase
-              .from('lessons')
-              .select('*', { count: 'exact', head: true })
-              .in('module_id', moduleIds);
-
-            const { count: completedLessons } = await supabase
-              .from('lesson_progress')
-              .select('*', { count: 'exact', head: true })
-              .eq('user_id', user.id)
-              .eq('org_id', currentOrg.id)
-              .eq('status', 'completed')
-              .in('lesson_id', (await supabase
-                .from('lessons')
-                .select('id')
-                .in('module_id', moduleIds)).data?.map(l => l.id) || []);
-
-            progressMap[enrollment.course_id] = {
-              total: totalLessons || 0,
-              completed: completedLessons || 0,
-            };
-          }
+        if (courseIds.length === 0) {
+          setProgressData({});
+          setLoading(false);
+          return;
         }
+
+        const { data: modules } = await supabase
+          .from('course_modules')
+          .select('id, course_id')
+          .in('course_id', courseIds);
+
+        const moduleToCourse = new Map<string, string>();
+        const moduleIds: string[] = [];
+        (modules || []).forEach((m) => {
+          moduleToCourse.set(m.id, m.course_id);
+          moduleIds.push(m.id);
+        });
+
+        const { data: lessons } = moduleIds.length > 0
+          ? await supabase
+            .from('lessons')
+            .select('id, module_id')
+            .in('module_id', moduleIds)
+          : { data: [] };
+
+        const lessonToCourse = new Map<string, string>();
+        (lessons || []).forEach((lesson) => {
+          const courseId = moduleToCourse.get(lesson.module_id);
+          if (courseId) {
+            lessonToCourse.set(lesson.id, courseId);
+            const existing = progressMap[courseId] || { total: 0, completed: 0 };
+            existing.total += 1;
+            progressMap[courseId] = existing;
+          }
+        });
+
+        const lessonIds = Array.from(lessonToCourse.keys());
+        const { data: completedProgress } = lessonIds.length > 0
+          ? await supabase
+            .from('lesson_progress')
+            .select('lesson_id')
+            .eq('user_id', user.id)
+            .eq('org_id', currentOrg.id)
+            .eq('status', 'completed')
+            .in('lesson_id', lessonIds)
+          : { data: [] };
+
+        (completedProgress || []).forEach((p) => {
+          const courseId = lessonToCourse.get(p.lesson_id);
+          if (!courseId) return;
+          const existing = progressMap[courseId] || { total: 0, completed: 0 };
+          existing.completed += 1;
+          progressMap[courseId] = existing;
+        });
+
+        courseIds.forEach((courseId) => {
+          if (!progressMap[courseId]) {
+            progressMap[courseId] = { total: 0, completed: 0 };
+          }
+        });
+
         setProgressData(progressMap);
+
+        // Resolve thumbnail signed URLs
+        const thumbMap: Record<string, string> = {};
+        await Promise.all(
+          enrollmentData.map(async (e: any) => {
+            if (e.course?.thumbnail_url) {
+              const url = await getSignedLmsAssetUrl(e.course.thumbnail_url);
+              if (url) thumbMap[e.course_id] = url;
+            }
+          })
+        );
+        setThumbnailUrls(thumbMap);
       }
 
       setLoading(false);
@@ -85,9 +135,52 @@ export default function LearnerDashboard() {
 
   const inProgressCourses = enrollments.filter(e => e.status === 'enrolled');
   const completedCourses = enrollments.filter(e => e.status === 'completed');
+  const completedEnrollments = completedCourses;
   const totalProgress = enrollments.length > 0
     ? (completedCourses.length / enrollments.length) * 100
     : 0;
+
+  const handleDownloadCertificate = async (enrollmentId: string, courseTitle: string) => {
+    setDownloadingId(enrollmentId);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-certificate', {
+        body: { enrollmentId },
+      });
+
+      if (error) {
+        toast({
+          title: t('certificates.generateFailed'),
+          description: error.message || t('certificates.generateFailedDescription'),
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `certificate-${courseTitle.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: t('certificates.downloadSuccess'),
+        description: t('certificates.downloadSuccessDescription'),
+      });
+    } catch (_err) {
+      toast({
+        title: t('certificates.downloadFailed'),
+        description: t('certificates.downloadFailedDescription'),
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -133,7 +226,11 @@ export default function LearnerDashboard() {
         <StatCard
           title={t('dashboard.overallProgress')}
           value={`${Math.round(totalProgress)}%`}
-          icon={<ProgressRing progress={totalProgress} size={40} showLabel={false} />}
+          icon={
+            totalProgress > 0
+              ? <ProgressRing progress={totalProgress} size={24} strokeWidth={3} showLabel={false} />
+              : <TrendingUp className="h-5 w-5" />
+          }
         />
       </div>
 
@@ -170,7 +267,15 @@ export default function LearnerDashboard() {
 
               return (
                 <Card key={enrollment.id} className="overflow-hidden transition-shadow hover:shadow-card-hover">
-                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary" />
+                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
+                    {thumbnailUrls[enrollment.course_id] && (
+                      <img
+                        src={thumbnailUrls[enrollment.course_id]}
+                        alt={enrollment.course?.title || ''}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
                   <CardContent className="p-4">
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <h3 className="font-display font-semibold leading-tight">
@@ -207,7 +312,7 @@ export default function LearnerDashboard() {
 
       {/* Completed Courses */}
       {completedCourses.length > 0 && (
-        <div>
+        <div className="mb-8">
           <h2 className="mb-4 font-display text-lg font-semibold">{t('dashboard.completedCourses')}</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {completedCourses.map((enrollment) => (
@@ -226,6 +331,32 @@ export default function LearnerDashboard() {
               </Card>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Certificates */}
+      {features.certificates_enabled && (
+        <div id="certificates">
+          <h2 className="mb-4 font-display text-lg font-semibold">{t('certificates.title')}</h2>
+          {completedEnrollments.length === 0 ? (
+            <EmptyState
+              icon={<Award className="h-6 w-6" />}
+              title={t('certificates.noCertificates')}
+              description={t('certificates.noCertificatesDescription')}
+            />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2">
+              {completedEnrollments.map((enrollment) => (
+                <CertificateCard
+                  key={enrollment.id}
+                  enrollment={enrollment}
+                  profile={profile}
+                  downloading={downloadingId === enrollment.id}
+                  onDownload={handleDownloadCertificate}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </AppLayout>

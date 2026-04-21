@@ -9,6 +9,9 @@ interface CommunityEmptyStateProps {
   scope?: 'org' | 'global';
   onAction?: () => void;
   actionLabel?: string;
+  hasActiveFilters?: boolean;
+  filterDescription?: string;
+  onClearFilters?: () => void;
   className?: string;
 }
 
@@ -55,6 +58,9 @@ export function CommunityEmptyState({
   scope,
   onAction,
   actionLabel,
+  hasActiveFilters = false,
+  filterDescription,
+  onClearFilters,
   className,
 }: CommunityEmptyStateProps) {
   const config = variants[variant];
@@ -67,8 +73,15 @@ export function CommunityEmptyState({
       </div>
       <h3 className="text-lg font-semibold mb-2">{config.title}</h3>
       <p className="text-muted-foreground max-w-sm mb-4">
-        {config.description}
+        {hasActiveFilters
+          ? filterDescription || 'No items match your current filters.'
+          : config.description}
       </p>
+      {hasActiveFilters && onClearFilters && (
+        <Button variant="outline" onClick={onClearFilters} className="mb-3">
+          Clear filters
+        </Button>
+      )}
       {onAction && actionLabel && (
         <Button onClick={onAction}>
           {actionLabel}

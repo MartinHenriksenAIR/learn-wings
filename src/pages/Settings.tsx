@@ -13,7 +13,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { Loader2, User, Lock, Mail, Calendar, Shield, Building2, Globe } from 'lucide-react';
 import { z } from 'zod';
 import { format } from 'date-fns';
@@ -36,7 +36,6 @@ const passwordSchema = z.object({
 
 export default function Settings() {
   const { profile, user, memberships, isPlatformAdmin, refreshUserContext } = useAuth();
-  const { toast } = useToast();
   const { t, i18n } = useTranslation();
   
   // Profile state

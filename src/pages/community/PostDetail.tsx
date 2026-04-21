@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -12,7 +12,8 @@ import { TagList } from '@/components/community/TagList';
 import { CommentThread } from '@/components/community/CommentThread';
 import { ReportDialog } from '@/components/community/ReportDialog';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { toast } from '@/components/ui/sonner';
 import {
   fetchPost,
   fetchComments,
@@ -44,17 +45,17 @@ import { format } from 'date-fns';
 import type { CommunityScope } from '@/lib/community-types';
 
 export default function PostDetail() {
-  const { postId } = useParams<{ postId: string }>();
+  const { postId, scope: routeScope } = useParams<{ postId: string; scope: CommunityScope }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const scope = (searchParams.get('scope') || 'org') as CommunityScope;
-  const { profile, currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
-  const { toast } = useToast();
+  const scope = (routeScope || 'org') as CommunityScope;
+  const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [reportTargetId, setReportTargetId] = useState<string>('');
   const [reportTargetType, setReportTargetType] = useState<'post' | 'comment'>('post');
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
 
   // Fetch post
   const { data: post, isLoading: postLoading } = useQuery({
@@ -166,9 +167,27 @@ export default function PostDetail() {
     setShowReportDialog(true);
   };
 
+  useEffect(() => {
+    if (!comments.length || !window.location.hash.startsWith('#comment-')) return;
+
+    const commentId = window.location.hash.replace('#comment-', '');
+    const el = document.getElementById(`comment-${commentId}`);
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedCommentId(commentId);
+    const timer = window.setTimeout(() => setHighlightedCommentId(null), 2500);
+
+    return () => window.clearTimeout(timer);
+  }, [comments]);
+
+  if (!settingsLoading && !features.community_enabled) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
   if (postLoading) {
     return (
-      <AppLayout>
+      <AppLayout title="Post" breadcrumbs={[{ label: 'Community' }, { label: 'Post' }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -178,7 +197,7 @@ export default function PostDetail() {
 
   if (!post) {
     return (
-      <AppLayout>
+      <AppLayout title="Post Not Found" breadcrumbs={[{ label: 'Community' }]}>
         <div className="container mx-auto py-12 text-center">
           <h1 className="text-2xl font-bold mb-2">Post not found</h1>
           <p className="text-muted-foreground mb-4">This post may have been deleted or you don't have access.</p>
@@ -201,7 +220,7 @@ export default function PostDetail() {
   const isEvent = post.category?.slug === 'events';
 
   return (
-    <AppLayout>
+    <AppLayout title={post.title} breadcrumbs={[{ label: 'Community' }, { label: 'Post' }]}>
       <div className="container mx-auto py-6 px-4 max-w-4xl">
         {/* Back button */}
         <Button
@@ -385,6 +404,7 @@ export default function PostDetail() {
               isAdmin={isAdmin}
               isLocked={post.is_locked}
               isLoading={commentsLoading}
+              highlightedCommentId={highlightedCommentId}
               onAddComment={async (content, parentId) => {
                 await createCommentMutation.mutateAsync({ content, parentId });
               }}

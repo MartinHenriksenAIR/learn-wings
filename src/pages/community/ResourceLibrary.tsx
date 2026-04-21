@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,7 +26,8 @@ import { ResourceCard } from '@/components/community/ResourceCard';
 import { ResourceForm } from '@/components/community/ResourceForm';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { toast } from '@/components/ui/sonner';
 import {
   fetchResources,
   createResource,
@@ -47,7 +48,7 @@ import {
 export default function ResourceLibrary() {
   const navigate = useNavigate();
   const { currentOrg, user, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
-  const { toast } = useToast();
+  const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);
@@ -138,6 +139,10 @@ export default function ResourceLibrary() {
     },
   });
 
+  if (!settingsLoading && !features.community_enabled) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
   if (!currentOrg) {
     return (
       <AppLayout>
@@ -150,7 +155,7 @@ export default function ResourceLibrary() {
   }
 
   return (
-    <AppLayout>
+    <AppLayout title="Resource Library" breadcrumbs={[{ label: 'Community' }, { label: 'Resources' }]}>
       <div className="container mx-auto py-6 px-4">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">

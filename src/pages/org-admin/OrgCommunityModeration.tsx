@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,13 +15,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
@@ -30,7 +26,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Loader2,
-  MoreHorizontal,
   Eye,
   EyeOff,
   Lock,
@@ -48,7 +43,6 @@ interface ReportWithDetails extends Omit<CommunityReport, 'reporter'> {
 }
 
 export default function OrgCommunityModeration() {
-  const navigate = useNavigate();
   const { currentOrg, profile } = useAuth();
   const queryClient = useQueryClient();
 
@@ -186,6 +180,11 @@ export default function OrgCommunityModeration() {
     return type === 'post' ? <FileText className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />;
   };
 
+  const openContentInNewTab = (report: ReportWithDetails) => {
+    const path = `/app/community/org/posts/${report.target_id}`;
+    window.open(path, '_blank', 'noopener,noreferrer');
+  };
+
   if (!currentOrg) {
     return (
       <AppLayout>
@@ -266,83 +265,136 @@ export default function OrgCommunityModeration() {
                         </CardDescription>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                          onClick={() => navigate(`/app/community/org/posts/${report.target_id}`)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Content
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => toggleContentVisibility.mutate({
-                            type: report.target_type,
-                            id: report.target_id,
-                            hide: true,
-                          })}
-                        >
-                          <EyeOff className="h-4 w-4 mr-2" />
-                          Hide Content
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => toggleContentVisibility.mutate({
-                            type: report.target_type,
-                            id: report.target_id,
-                            hide: false,
-                          })}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Show Content
-                        </DropdownMenuItem>
-                        {report.target_type === 'post' && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={() => togglePostLock.mutate({
-                                postId: report.target_id,
-                                lock: true,
-                              })}
-                            >
-                              <Lock className="h-4 w-4 mr-2" />
-                              Lock Comments
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => togglePostLock.mutate({
-                                postId: report.target_id,
-                                lock: false,
-                              })}
-                            >
-                              <Unlock className="h-4 w-4 mr-2" />
-                              Unlock Comments
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        <DropdownMenuSeparator />
-                        {report.status === 'pending' && (
-                          <>
-                            <DropdownMenuItem onClick={() => openReviewDialog(report)}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Mark Reviewed
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => updateReportMutation.mutate({
-                                reportId: report.id,
-                                status: 'dismissed',
-                              })}
-                            >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Dismiss
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openContentInNewTab(report)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>View content</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => toggleContentVisibility.mutate({
+                              type: report.target_type,
+                              id: report.target_id,
+                              hide: true,
+                            })}
+                            disabled={toggleContentVisibility.isPending}
+                          >
+                            <EyeOff className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Hide content</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => toggleContentVisibility.mutate({
+                              type: report.target_type,
+                              id: report.target_id,
+                              hide: false,
+                            })}
+                            disabled={toggleContentVisibility.isPending}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Show content</TooltipContent>
+                      </Tooltip>
+
+                      {report.target_type === 'post' && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => togglePostLock.mutate({
+                                  postId: report.target_id,
+                                  lock: true,
+                                })}
+                                disabled={togglePostLock.isPending}
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Lock comments</TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => togglePostLock.mutate({
+                                  postId: report.target_id,
+                                  lock: false,
+                                })}
+                                disabled={togglePostLock.isPending}
+                              >
+                                <Unlock className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Unlock comments</TooltipContent>
+                          </Tooltip>
+                        </>
+                      )}
+
+                      {report.status === 'pending' && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openReviewDialog(report)}
+                                disabled={updateReportMutation.isPending}
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Mark reviewed</TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => updateReportMutation.mutate({
+                                  reportId: report.id,
+                                  status: 'dismissed',
+                                })}
+                                disabled={updateReportMutation.isPending}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Dismiss report</TooltipContent>
+                          </Tooltip>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>

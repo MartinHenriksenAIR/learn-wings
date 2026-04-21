@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Star, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 
 interface CourseReviewDialogProps {
   open: boolean;
@@ -39,7 +39,6 @@ export function CourseReviewDialog({
   existingReview,
   onReviewSubmitted,
 }: CourseReviewDialogProps) {
-  const { toast } = useToast();
   const [rating, setRating] = useState(existingReview?.rating || 0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState(existingReview?.comment || '');

@@ -36,7 +36,7 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization, Profile, OrgRole } from '@/lib/types';
 import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail, UsersRound } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
@@ -49,7 +49,6 @@ const orgSchema = z.object({
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { user } = useAuth();
   const [orgs, setOrgs] = useState<(Organization & { memberCount: number })[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);

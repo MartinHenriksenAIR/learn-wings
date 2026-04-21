@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SearchFilter, FilterConfig } from '@/components/ui/search-filter';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Dialog,
   DialogContent,
@@ -51,7 +50,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
-import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX, UserCog, ShieldCheck, User, FileSpreadsheet, GraduationCap, Sparkles } from 'lucide-react';
+import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX, ShieldCheck, User, FileSpreadsheet, GraduationCap, Sparkles } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { z } from 'zod';
 import { getInviteLink } from '@/lib/config';
@@ -64,7 +63,7 @@ const inviteSchema = z.object({
   role: z.enum(['org_admin', 'learner']),
 });
 
-export default function OrgUsers() {
+export function OrgMembersTab() {
   const { user, currentOrg } = useAuth();
   const [members, setMembers] = useState<(OrgMembership & { profile: Profile })[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -88,6 +87,10 @@ export default function OrgUsers() {
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [removeMemberDialog, setRemoveMemberDialog] = useState<{
+    open: boolean;
+    member: (OrgMembership & { profile: Profile }) | null;
+  } | null>(null);
 
   const fetchData = async () => {
     if (!currentOrg) {
@@ -95,7 +98,6 @@ export default function OrgUsers() {
       return;
     }
 
-    // Fetch members
     const { data: memberData } = await supabase
       .from('org_memberships')
       .select('*, profile:profiles(*)')
@@ -106,7 +108,6 @@ export default function OrgUsers() {
       setMembers(memberData as any);
     }
 
-    // Fetch pending invitations using the secure RPC function
     const { data: inviteData } = await supabase
       .rpc('get_org_invitations_safe', { p_org_id: currentOrg.id });
 
@@ -114,7 +115,6 @@ export default function OrgUsers() {
       setInvitations(inviteData as Invitation[]);
     }
 
-    // Fetch AI Champions
     const { data: championsData } = await supabase
       .from('ai_champions')
       .select('user_id')
@@ -146,7 +146,6 @@ export default function OrgUsers() {
 
     setInviting(true);
 
-    // Check if user already exists in org
     const { data: existingMember } = await supabase
       .from('org_memberships')
       .select('id')
@@ -164,7 +163,6 @@ export default function OrgUsers() {
       return;
     }
 
-    // Create invitation with metadata
     const { data: invitation, error } = await supabase
       .from('invitations')
       .insert({
@@ -186,7 +184,6 @@ export default function OrgUsers() {
         variant: 'destructive',
       });
     } else {
-      // Send invitation email
       let emailSent = false;
       if (invitation?.id) {
         const { data: linkId } = await supabase
@@ -232,11 +229,6 @@ export default function OrgUsers() {
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
-  const [removeMemberDialog, setRemoveMemberDialog] = useState<{
-    open: boolean;
-    member: (OrgMembership & { profile: Profile }) | null;
-  } | null>(null);
-
   const handleRemoveMember = async () => {
     if (!removeMemberDialog?.member) return;
     
@@ -274,9 +266,7 @@ export default function OrgUsers() {
         variant: 'destructive',
       });
     } else {
-      toast({
-        title: 'Invitation cancelled',
-      });
+      toast({ title: 'Invitation cancelled' });
       fetchData();
     }
   };
@@ -316,7 +306,6 @@ export default function OrgUsers() {
     const isCurrentlyChampion = aiChampions.has(member.user_id);
     
     if (isCurrentlyChampion) {
-      // Remove AI Champion status
       const { error } = await supabase
         .from('ai_champions')
         .delete()
@@ -324,43 +313,20 @@ export default function OrgUsers() {
         .eq('org_id', currentOrg.id);
 
       if (error) {
-        toast({
-          title: 'Failed to remove AI Champion status',
-          description: error.message,
-          variant: 'destructive',
-        });
+        toast({ title: 'Failed to remove AI Champion status', description: error.message, variant: 'destructive' });
       } else {
-        toast({
-          title: 'AI Champion status removed',
-          description: `${member.profile?.full_name} is no longer an AI Champion.`,
-        });
-        setAiChampions((prev) => {
-          const next = new Set(prev);
-          next.delete(member.user_id);
-          return next;
-        });
+        toast({ title: 'AI Champion status removed', description: `${member.profile?.full_name} is no longer an AI Champion.` });
+        setAiChampions((prev) => { const next = new Set(prev); next.delete(member.user_id); return next; });
       }
     } else {
-      // Add AI Champion status
       const { error } = await supabase
         .from('ai_champions')
-        .insert({
-          user_id: member.user_id,
-          org_id: currentOrg.id,
-          assigned_by: user.id,
-        });
+        .insert({ user_id: member.user_id, org_id: currentOrg.id, assigned_by: user.id });
 
       if (error) {
-        toast({
-          title: 'Failed to assign AI Champion status',
-          description: error.message,
-          variant: 'destructive',
-        });
+        toast({ title: 'Failed to assign AI Champion status', description: error.message, variant: 'destructive' });
       } else {
-        toast({
-          title: 'AI Champion assigned!',
-          description: `${member.profile?.full_name} is now an AI Champion.`,
-        });
+        toast({ title: 'AI Champion assigned!', description: `${member.profile?.full_name} is now an AI Champion.` });
         setAiChampions((prev) => new Set([...prev, member.user_id]));
       }
     }
@@ -399,40 +365,31 @@ export default function OrgUsers() {
   };
 
   const filteredMembers = members.filter(member => {
-    // Search filter
     const matchesSearch = searchQuery === '' ||
       member.profile?.full_name.toLowerCase().includes(searchQuery.toLowerCase());
-
-    // Role filter
     const matchesRole = roleFilter === 'all' || member.role === roleFilter;
-
     return matchesSearch && matchesRole;
   });
 
   if (loading) {
     return (
-      <AppLayout title="Team Members" breadcrumbs={[{ label: 'Team Members' }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
-      </AppLayout>
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
     );
   }
 
   if (!currentOrg) {
     return (
-      <AppLayout title="Team Members" breadcrumbs={[{ label: 'Team Members' }]}>
-        <div className="flex h-64 flex-col items-center justify-center text-center">
-          <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">No organization selected.</p>
-          <p className="text-sm text-muted-foreground">Join an organization to manage team members.</p>
-        </div>
-      </AppLayout>
+      <div className="flex h-64 flex-col items-center justify-center text-center">
+        <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+        <p className="text-muted-foreground">No organization selected.</p>
+      </div>
     );
   }
 
   return (
-    <AppLayout title="Team Members" breadcrumbs={[{ label: 'Team Members' }]}>
+    <div>
       {/* Search and Actions */}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <SearchFilter
@@ -454,88 +411,88 @@ export default function OrgUsers() {
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             Bulk Invite
           </Button>
-        <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Invite Member
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Invite Team Member</DialogTitle>
-              <DialogDescription>
-                Send an invitation to join {currentOrg?.name}.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="colleague@company.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+          <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Invite Member
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Invite Team Member</DialogTitle>
+                <DialogDescription>
+                  Send an invitation to join {currentOrg?.name}.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="first-name">First Name</Label>
+                  <Label htmlFor="email">Email Address</Label>
                   <Input
-                    id="first-name"
-                    placeholder="John"
-                    value={inviteFirstName}
-                    onChange={(e) => setInviteFirstName(e.target.value)}
+                    id="email"
+                    type="email"
+                    placeholder="colleague@company.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="first-name">First Name</Label>
+                    <Input
+                      id="first-name"
+                      placeholder="John"
+                      value={inviteFirstName}
+                      onChange={(e) => setInviteFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="last-name">Last Name</Label>
+                    <Input
+                      id="last-name"
+                      placeholder="Doe"
+                      value={inviteLastName}
+                      onChange={(e) => setInviteLastName(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Input
+                    id="department"
+                    placeholder="Engineering"
+                    value={inviteDepartment}
+                    onChange={(e) => setInviteDepartment(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="last-name">Last Name</Label>
-                  <Input
-                    id="last-name"
-                    placeholder="Doe"
-                    value={inviteLastName}
-                    onChange={(e) => setInviteLastName(e.target.value)}
-                  />
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as OrgRole)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="learner">Learner</SelectItem>
+                      <SelectItem value="org_admin">Organization Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
-                <Input
-                  id="department"
-                  placeholder="Engineering"
-                  value={inviteDepartment}
-                  onChange={(e) => setInviteDepartment(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as OrgRole)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="learner">Learner</SelectItem>
-                    <SelectItem value="org_admin">Organization Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setInviteOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleInvite} disabled={inviting}>
-                {inviting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Mail className="mr-2 h-4 w-4" />
-                )}
-                Create Invitation
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setInviteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleInvite} disabled={inviting}>
+                  {inviting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mail className="mr-2 h-4 w-4" />
+                  )}
+                  Create Invitation
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -685,38 +642,22 @@ export default function OrgUsers() {
                         <DropdownMenuContent align="end">
                           {member.role === 'learner' ? (
                             <DropdownMenuItem
-                              onClick={() =>
-                                setRoleChangeDialog({
-                                  open: true,
-                                  member,
-                                  newRole: 'org_admin',
-                                })
-                              }
+                              onClick={() => setRoleChangeDialog({ open: true, member, newRole: 'org_admin' })}
                             >
                               <ShieldCheck className="mr-2 h-4 w-4" />
                               Promote to Admin
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem
-                              onClick={() =>
-                                setRoleChangeDialog({
-                                  open: true,
-                                  member,
-                                  newRole: 'learner',
-                                })
-                              }
+                              onClick={() => setRoleChangeDialog({ open: true, member, newRole: 'learner' })}
                             >
                               <User className="mr-2 h-4 w-4" />
                               Change to Learner
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem
-                            onClick={() => handleToggleAiChampion(member)}
-                          >
+                          <DropdownMenuItem onClick={() => handleToggleAiChampion(member)}>
                             <Sparkles className="mr-2 h-4 w-4" />
-                            {aiChampions.has(member.user_id)
-                              ? 'Remove AI Champion'
-                              : 'Make AI Champion'}
+                            {aiChampions.has(member.user_id) ? 'Remove AI Champion' : 'Make AI Champion'}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -797,6 +738,6 @@ export default function OrgUsers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AppLayout>
+    </div>
   );
 }

@@ -31,7 +31,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { Profile, OrgMembership, Organization, OrgRole } from '@/lib/types';
 import { Loader2, Trash2, Plus, Shield, Building2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 
 interface UserWithDetails extends Profile {
   memberships: (OrgMembership & { organization: Organization })[];
@@ -54,7 +54,6 @@ export function UserDetailDialog({
   onOpenChange,
   onUserUpdated,
 }: UserDetailDialogProps) {
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [memberships, setMemberships] = useState<(OrgMembership & { organization: Organization })[]>([]);

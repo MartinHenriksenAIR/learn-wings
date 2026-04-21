@@ -28,13 +28,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil, Settings } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 
 export default function CourseEditor() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { features } = usePlatformSettings();
 
   const [course, setCourse] = useState<Course | null>(null);

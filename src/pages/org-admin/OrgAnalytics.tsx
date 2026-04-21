@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { FileUpload } from '@/components/ui/file-upload';
 import {
   Select,
   SelectContent,
@@ -13,11 +17,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { Organization } from '@/lib/types';
-import { Loader2, Users, BarChart3, BookOpen } from 'lucide-react';
+import { Loader2, Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
 import { TeamPerformanceTab } from '@/components/org-admin/analytics/TeamPerformanceTab';
 import { CourseProgressTab } from '@/components/org-admin/analytics/CourseProgressTab';
+import { OrgMembersTab } from '@/components/org-admin/OrgMembersTab';
 
 interface UserStats {
   id: string;
@@ -32,7 +37,7 @@ export default function OrgAnalytics() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isGlobalView = location.pathname === '/app/admin/analytics/global';
-  const { currentOrg, isPlatformAdmin } = useAuth();
+  const { currentOrg, isPlatformAdmin, refreshUserContext } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [loading, setLoading] = useState(true);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -48,6 +53,8 @@ export default function OrgAnalytics() {
   const [userStats, setUserStats] = useState<UserStats[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [logoDialogOpen, setLogoDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Sync tab with URL
   const handleTabChange = (value: string) => {
@@ -178,32 +185,63 @@ export default function OrgAnalytics() {
             .filter((d): d is string => Boolean(d));
           uniqueDepartments = [...new Set(depts)];
 
+          const memberIds = members
+            .map((m) => (m.profile as any)?.id as string | undefined)
+            .filter((id): id is string => Boolean(id));
+
+          let allEnrollments: { user_id: string; status: string }[] = [];
+          let allAttempts: { user_id: string; score: number }[] = [];
+          if (memberIds.length > 0) {
+            const enrollmentPromise = supabase
+              .from('enrollments')
+              .select('user_id, status')
+              .eq('org_id', orgFilter)
+              .in('user_id', memberIds);
+            const attemptsPromise = supabase
+              .from('quiz_attempts')
+              .select('user_id, score')
+              .eq('org_id', orgFilter)
+              .in('user_id', memberIds);
+            const [{ data: enrollmentData }, { data: attemptsData }] = await Promise.all([
+              enrollmentPromise,
+              attemptsPromise,
+            ]);
+            allEnrollments = enrollmentData || [];
+            allAttempts = attemptsData || [];
+          }
+
+          const enrollmentMap = new Map<string, { total: number; completed: number }>();
+          allEnrollments.forEach((e) => {
+            const existing = enrollmentMap.get(e.user_id) || { total: 0, completed: 0 };
+            existing.total += 1;
+            if (e.status === 'completed') existing.completed += 1;
+            enrollmentMap.set(e.user_id, existing);
+          });
+
+          const attemptMap = new Map<string, { totalScore: number; attempts: number }>();
+          allAttempts.forEach((a) => {
+            const existing = attemptMap.get(a.user_id) || { totalScore: 0, attempts: 0 };
+            existing.totalScore += a.score;
+            existing.attempts += 1;
+            attemptMap.set(a.user_id, existing);
+          });
+
           for (const member of members) {
             const profile = member.profile as any;
             if (!profile) continue;
 
-            const { data: userEnrollments } = await supabase
-              .from('enrollments')
-              .select('status')
-              .eq('org_id', orgFilter)
-              .eq('user_id', profile.id);
-
-            const { data: userAttempts } = await supabase
-              .from('quiz_attempts')
-              .select('score')
-              .eq('org_id', orgFilter)
-              .eq('user_id', profile.id);
-
-            const avgScore = userAttempts && userAttempts.length > 0
-              ? Math.round(userAttempts.reduce((acc, a) => acc + a.score, 0) / userAttempts.length)
+            const enrollmentStats = enrollmentMap.get(profile.id) || { total: 0, completed: 0 };
+            const attemptStats = attemptMap.get(profile.id) || { totalScore: 0, attempts: 0 };
+            const avgScore = attemptStats.attempts > 0
+              ? Math.round(attemptStats.totalScore / attemptStats.attempts)
               : 0;
 
             userStatsData.push({
               id: profile.id,
               name: profile.full_name,
               department: profile.department || null,
-              enrollments: userEnrollments?.length || 0,
-              completed: userEnrollments?.filter(e => e.status === 'completed').length || 0,
+              enrollments: enrollmentStats.total,
+              completed: enrollmentStats.completed,
               avgQuizScore: avgScore,
             });
           }
@@ -269,6 +307,33 @@ export default function OrgAnalytics() {
     }
   };
 
+  const handleLogoUpload = async (_url: string | null, storagePath: string | null) => {
+    if (!currentOrg || !storagePath) return;
+
+    setUploading(true);
+    try {
+      const { data: { publicUrl } } = supabase.storage
+        .from('org-logos')
+        .getPublicUrl(storagePath);
+
+      const { error } = await supabase
+        .from('organizations')
+        .update({ logo_url: publicUrl })
+        .eq('id', currentOrg.id);
+
+      if (error) throw error;
+
+      toast.success('Logo updated successfully');
+      setLogoDialogOpen(false);
+      await refreshUserContext();
+    } catch (error: any) {
+      console.error('Error updating logo:', error);
+      toast.error(error.message || 'Failed to update logo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // Redirect if analytics are disabled
   if (!settingsLoading && !features.analytics_enabled) {
     return <Navigate to="/app/dashboard" replace />;
@@ -297,13 +362,75 @@ export default function OrgAnalytics() {
     );
   }
 
-  const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization Analytics';
+  const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization';
   const breadcrumbs = isGlobalView 
     ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
-    : [{ label: 'Analytics' }];
+    : [{ label: 'Organization' }];
 
   return (
     <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
+      {!isGlobalView && currentOrg && (
+        <Card className="mb-6">
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="relative group shrink-0">
+              {currentOrg.logo_url ? (
+                <img
+                  src={currentOrg.logo_url}
+                  alt={`${currentOrg.name} logo`}
+                  className="h-16 w-16 rounded-xl object-contain bg-muted"
+                />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
+                  <Building2 className="h-8 w-8 text-primary" />
+                </div>
+              )}
+              <Dialog open={logoDialogOpen} onOpenChange={setLogoDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Update Organization Logo</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted">
+                          <Building2 className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Recommended specifications</p>
+                          <p className="text-xs text-muted-foreground">Square image, 256×256px or larger</p>
+                          <p className="text-xs text-muted-foreground">PNG or JPG format, max 2MB</p>
+                        </div>
+                      </div>
+                    </div>
+                    <FileUpload
+                      bucket="org-logos"
+                      folder={currentOrg.id}
+                      accept="image"
+                      maxSizeMB={2}
+                      onChange={handleLogoUpload}
+                      disabled={uploading}
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div>
+              <h2 className="font-display text-xl font-bold">{currentOrg.name}</h2>
+              <p className="text-sm text-muted-foreground">Organization ID: {currentOrg.slug}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Organization Filter for Global View */}
       {isGlobalView && isPlatformAdmin && (
         <div className="mb-6 flex items-center gap-3">
@@ -325,14 +452,20 @@ export default function OrgAnalytics() {
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className={`inline-flex h-11 w-auto gap-1 ${isGlobalView ? '' : ''}`}>
           <TabsTrigger value="overview" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
           </TabsTrigger>
+          {!isGlobalView && (
+            <TabsTrigger value="members" className="gap-2">
+              <Users className="h-4 w-4 shrink-0" />
+              Organization Members
+            </TabsTrigger>
+          )}
           <TabsTrigger value="team" className="gap-2">
-            <Users className="h-4 w-4" />
-            Team
+            <GraduationCap className="h-4 w-4" />
+            Learning Progress
           </TabsTrigger>
           <TabsTrigger value="courses" className="gap-2">
             <BookOpen className="h-4 w-4" />
@@ -350,6 +483,12 @@ export default function OrgAnalytics() {
             onGenerateReport={handleGenerateReport}
           />
         </TabsContent>
+
+        {!isGlobalView && (
+          <TabsContent value="members">
+            <OrgMembersTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="team">
           {effectiveOrgId ? (

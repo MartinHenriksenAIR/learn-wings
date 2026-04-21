@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,7 +38,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
-import { createIdea, submitIdea, updateIdea, fetchIdea, deleteIdea } from '@/lib/ideas-api';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { createIdea, submitIdea, updateIdea, fetchIdea, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { BusinessArea } from '@/lib/community-types';
 import { toast } from 'sonner';
@@ -74,6 +75,7 @@ export default function IdeaSubmit() {
   const navigate = useNavigate();
   const { ideaId } = useParams<{ ideaId?: string }>();
   const { currentOrg, user } = useAuth();
+  const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
   const [draftId, setDraftId] = useState<string | null>(ideaId || null);
@@ -105,6 +107,12 @@ export default function IdeaSubmit() {
     queryKey: ['idea', ideaId],
     queryFn: () => fetchIdea(ideaId!),
     enabled: !!ideaId,
+  });
+
+  const { data: orgTags = [] } = useQuery({
+    queryKey: ['idea-tags', currentOrg?.id],
+    queryFn: () => fetchOrgTags(currentOrg!.id),
+    enabled: !!currentOrg,
   });
 
   // Populate form when draft data loads
@@ -149,6 +157,7 @@ export default function IdeaSubmit() {
       setDraftId(data.id);
       queryClient.invalidateQueries({ queryKey: ['ideas'] });
       toast.success('Draft saved! You can find it in the "My Drafts" tab of the Idea Library.');
+      navigate('/app/community/org/ideas?tab=drafts');
     },
     onError: () => {
       toast.error('Failed to save draft');
@@ -211,6 +220,7 @@ export default function IdeaSubmit() {
   };
 
   const handleSubmit = (values: IdeaFormValues) => {
+    if (currentStep < steps.length - 1) return;
     submitMutation.mutate(values);
   };
 
@@ -234,6 +244,10 @@ export default function IdeaSubmit() {
     { title: 'Details', description: 'Optional additional context' },
   ];
 
+  if (!settingsLoading && !features.community_enabled) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+
   if (!currentOrg) {
     return (
       <AppLayout>
@@ -245,8 +259,18 @@ export default function IdeaSubmit() {
     );
   }
 
+  if (isEditMode && isLoadingIdea) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto py-12 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
-    <AppLayout>
+    <AppLayout title="Submit Idea" breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: isEditMode ? 'Edit Draft' : 'Submit Idea' }]}>
       <div className="container max-w-3xl mx-auto py-6 px-4">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -362,6 +386,7 @@ export default function IdeaSubmit() {
                             placeholder="Add a tag..."
                             value={tagInput}
                             onChange={(e) => setTagInput(e.target.value)}
+                            list="org-idea-tags"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -369,6 +394,11 @@ export default function IdeaSubmit() {
                               }
                             }}
                           />
+                          <datalist id="org-idea-tags">
+                            {orgTags.map((tag) => (
+                              <option key={tag} value={tag} />
+                            ))}
+                          </datalist>
                           <Button type="button" variant="outline" onClick={addTag}>
                             Add
                           </Button>
@@ -707,7 +737,10 @@ export default function IdeaSubmit() {
                 {currentStep < steps.length - 1 ? (
                   <Button
                     type="button"
-                    onClick={() => setCurrentStep(currentStep + 1)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentStep(currentStep + 1);
+                    }}
                   >
                     Next
                   </Button>

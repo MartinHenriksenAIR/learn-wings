@@ -43,7 +43,14 @@ export function OrgSelector() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlatformAdmin]);
 
-  // Only show for platform admins viewing as org_admin or learner
+  // Ensure an org is selected when entering org_admin mode
+  useEffect(() => {
+    if (viewMode === 'org_admin' && !currentOrg && orgs.length > 0) {
+      setCurrentOrg(orgs[0] as Organization);
+    }
+  }, [viewMode, currentOrg, orgs, setCurrentOrg]);
+
+  // Only show for platform admins NOT in platform_admin view
   if (!isPlatformAdmin || viewMode === 'platform_admin') {
     return null;
   }
@@ -57,13 +64,20 @@ export function OrgSelector() {
     );
   }
 
+  // Org admin / learner view: allow switching orgs
+  // In org_admin mode, don't allow clearing the org
+  const isOrgAdminMode = viewMode === 'org_admin';
+
   return (
     <div className="px-3 py-2">
       <Select
         value={currentOrg?.id || 'none'}
         onValueChange={(value) => {
+          // Prevent clearing org in org_admin mode
           if (value === 'none') {
-            setCurrentOrg(null as unknown as Organization);
+            if (!isOrgAdminMode) {
+              setCurrentOrg(null as unknown as Organization);
+            }
           } else {
             const org = orgs.find((o) => o.id === value);
             if (org) setCurrentOrg(org);
@@ -77,9 +91,11 @@ export function OrgSelector() {
           </div>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">
-            <span className="text-muted-foreground">Platform-wide (no org)</span>
-          </SelectItem>
+          {!isOrgAdminMode && (
+            <SelectItem value="none">
+              <span className="text-muted-foreground">Platform-wide (no org)</span>
+            </SelectItem>
+          )}
           {orgs.map((org) => (
             <SelectItem key={org.id} value={org.id}>
               {org.name}

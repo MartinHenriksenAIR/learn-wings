@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { z } from 'zod';
 import { Invitation } from '@/lib/types';
@@ -28,7 +28,6 @@ export default function Login() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const { signIn, user, isPlatformAdmin, isOrgAdmin, isLoading, refreshUserContext } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get('invite');

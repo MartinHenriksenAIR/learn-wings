@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.azure-document-upload-url]
 verify_jwt = false
+
+[functions.test-smtp-connection]
+verify_jwt = false

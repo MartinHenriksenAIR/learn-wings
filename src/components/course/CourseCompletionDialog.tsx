@@ -34,7 +34,7 @@ export function CourseCompletionDialog({
 
   const handleGoToCertificates = () => {
     onOpenChange(false);
-    navigate('/app/certificates');
+    navigate('/app/dashboard#certificates');
   };
 
   return (

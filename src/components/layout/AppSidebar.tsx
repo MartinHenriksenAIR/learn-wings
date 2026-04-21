@@ -39,7 +39,6 @@ import {
   Settings as SettingsIcon,
   LogOut,
   ChevronDown,
-  Award,
   Eye,
   Lightbulb,
   Flag,
@@ -82,25 +81,23 @@ export function AppSidebar() {
   const learnerItems = [
     { title: t('nav.dashboard'), url: '/app/dashboard', icon: LayoutDashboard },
     { title: t('nav.courses'), url: '/app/courses', icon: BookOpen },
-    ...(features.certificates_enabled ? [{ title: t('nav.certificates'), url: '/app/certificates', icon: Award }] : []),
     ...(features.community_enabled ? [{ title: t('nav.community'), url: '/app/community', icon: MessageSquare }] : []),
   ];
 
   // Build org admin items based on feature toggles
   const orgAdminItems = [
-    { title: t('nav.organization'), url: '/app/admin/org', icon: Building2 },
-    { title: t('nav.teamMembers'), url: '/app/admin/org/users', icon: Users },
-    ...(features.analytics_enabled ? [{ title: t('nav.analytics'), url: '/app/admin/analytics', icon: BarChart3 }] : []),
+    
+    ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: '/app/admin/analytics', icon: BarChart3 }] : []),
     ...(features.community_enabled ? [
       { title: t('nav.ideasOverview'), url: '/app/admin/org/ideas', icon: Lightbulb },
       { title: t('nav.moderation'), url: '/app/admin/org/moderation', icon: Flag },
     ] : []),
+    { title: t('nav.settings'), url: '/app/admin/org/settings', icon: SettingsIcon },
   ];
 
   // Build platform admin items based on feature toggles
   const platformAdminItems = [
     { title: t('nav.organizations'), url: '/app/admin/organizations', icon: Building2 },
-    { title: t('nav.users'), url: '/app/admin/users', icon: Users },
     { title: t('nav.courseManager'), url: '/app/admin/courses', icon: GraduationCap },
     ...(features.analytics_enabled ? [{ title: t('nav.globalAnalytics'), url: '/app/admin/analytics/global', icon: BarChart3 }] : []),
     ...(features.community_enabled ? [{ title: t('nav.communityModeration'), url: '/app/admin/platform/moderation', icon: Flag }] : []),

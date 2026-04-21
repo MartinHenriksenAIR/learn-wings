@@ -1,4 +1,3 @@
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -15,20 +14,19 @@ import ResetPassword from "./pages/ResetPassword";
 import LearnerDashboard from "./pages/learner/Dashboard";
 import LearnerCourses from "./pages/learner/Courses";
 import CoursePlayer from "./pages/learner/CoursePlayer";
-import Certificates from "./pages/learner/Certificates";
-import OrgDashboard from "./pages/org-admin/OrgDashboard";
-import OrgUsers from "./pages/org-admin/OrgUsers";
+
 import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
+import OrgSettings from "./pages/org-admin/OrgSettings";
 import OrganizationsManager from "./pages/platform-admin/OrganizationsManager";
 import OrganizationDetail from "./pages/platform-admin/OrganizationDetail";
 import CoursesManager from "./pages/platform-admin/CoursesManager";
-import UsersManager from "./pages/platform-admin/UsersManager";
 import CourseEditor from "./pages/platform-admin/CourseEditor";
 import PlatformSettings from "./pages/platform-admin/PlatformSettings";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import CommunityFeed from "./pages/community/CommunityFeed";
 import PostDetail from "./pages/community/PostDetail";
+import PostEdit from "./pages/community/PostEdit";
 import IdeaLibrary from "./pages/community/IdeaLibrary";
 import IdeaSubmit from "./pages/community/IdeaSubmit";
 import IdeaDetail from "./pages/community/IdeaDetail";
@@ -52,10 +50,11 @@ function AppRoutes() {
       <Route path="/app/dashboard" element={<ProtectedRoute learnerOnly><LearnerDashboard /></ProtectedRoute>} />
       <Route path="/app/courses" element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
       <Route path="/app/learn/:courseId" element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
-      <Route path="/app/certificates" element={<ProtectedRoute learnerOnly><Certificates /></ProtectedRoute>} />
+      <Route path="/app/certificates" element={<Navigate to="/app/dashboard" replace />} />
       
       {/* Community routes */}
       <Route path="/app/community" element={<ProtectedRoute><CommunityFeed /></ProtectedRoute>} />
+      <Route path="/app/community/:scope/posts/:postId/edit" element={<ProtectedRoute><PostEdit /></ProtectedRoute>} />
       <Route path="/app/community/:scope/posts/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
       <Route path="/app/community/org/ideas" element={<ProtectedRoute><IdeaLibrary /></ProtectedRoute>} />
       <Route path="/app/community/org/ideas/new" element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
@@ -64,9 +63,9 @@ function AppRoutes() {
       <Route path="/app/community/org/resources" element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
-      <Route path="/app/admin/org" element={<ProtectedRoute requireOrgAdmin><OrgDashboard /></ProtectedRoute>} />
-      <Route path="/app/admin/org/users" element={<ProtectedRoute requireOrgAdmin><OrgUsers /></ProtectedRoute>} />
+      <Route path="/app/admin/org/users" element={<Navigate to="/app/admin/analytics?tab=members" replace />} />
       <Route path="/app/admin/analytics" element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
+      <Route path="/app/admin/org/settings" element={<ProtectedRoute requireOrgAdmin><OrgSettings /></ProtectedRoute>} />
       <Route path="/app/admin/org/ideas" element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />
       <Route path="/app/admin/org/moderation" element={<ProtectedRoute requireOrgAdmin><OrgCommunityModeration /></ProtectedRoute>} />
       
@@ -75,7 +74,6 @@ function AppRoutes() {
       <Route path="/app/admin/organizations/:orgId" element={<ProtectedRoute requirePlatformAdmin><OrganizationDetail /></ProtectedRoute>} />
       <Route path="/app/admin/courses" element={<ProtectedRoute requirePlatformAdmin><CoursesManager /></ProtectedRoute>} />
       <Route path="/app/admin/courses/:courseId" element={<ProtectedRoute requirePlatformAdmin><CourseEditor /></ProtectedRoute>} />
-      <Route path="/app/admin/users" element={<ProtectedRoute requirePlatformAdmin><UsersManager /></ProtectedRoute>} />
       <Route path="/app/admin/analytics/global" element={<ProtectedRoute requirePlatformAdmin><OrgAnalytics /></ProtectedRoute>} />
       <Route path="/app/admin/platform/settings" element={<ProtectedRoute requirePlatformAdmin><PlatformSettings /></ProtectedRoute>} />
       <Route path="/app/admin/platform/moderation" element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
@@ -94,7 +92,6 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
       <Sonner />
       <BrowserRouter>
         <AuthProvider>

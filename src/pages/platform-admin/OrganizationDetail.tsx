@@ -71,7 +71,7 @@ import {
   Trash2,
   UsersRound,
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
 import { z } from 'zod';
 
 const addUserSchema = z.object({
@@ -93,7 +93,6 @@ const editOrgSchema = z.object({
 export default function OrganizationDetail() {
   const { orgId } = useParams<{ orgId: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { user } = useAuth();
 
   const [org, setOrg] = useState<Organization | null>(null);

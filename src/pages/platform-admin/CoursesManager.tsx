@@ -28,17 +28,19 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseLevel, Organization, OrgCourseAccess } from '@/lib/types';
-import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check, ChevronsUpDown } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
+import { cn } from '@/lib/utils';
 
 export default function CoursesManager() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -68,6 +70,7 @@ export default function CoursesManager() {
   const [accessRecords, setAccessRecords] = useState<OrgCourseAccess[]>([]);
   const [orgSearchQuery, setOrgSearchQuery] = useState('');
   const [selectedOrg, setSelectedOrg] = useState<string>('all');
+  const [orgComboboxOpen, setOrgComboboxOpen] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -448,19 +451,49 @@ export default function CoursesManager() {
             </div>
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedOrg} onValueChange={setSelectedOrg}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="All Organizations" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Organizations</SelectItem>
-                  {orgs.map((org) => (
-                    <SelectItem key={org.id} value={org.id}>
-                      {org.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={orgComboboxOpen} onOpenChange={setOrgComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={orgComboboxOpen} className="w-[240px] justify-between">
+                    {selectedOrg === 'all'
+                      ? 'All Organizations'
+                      : orgs.find((org) => org.id === selectedOrg)?.name || 'Select organization'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[240px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search organization..." />
+                    <CommandList>
+                      <CommandEmpty>No organization found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="All Organizations"
+                          onSelect={() => {
+                            setSelectedOrg('all');
+                            setOrgComboboxOpen(false);
+                          }}
+                        >
+                          <Check className={cn('mr-2 h-4 w-4', selectedOrg === 'all' ? 'opacity-100' : 'opacity-0')} />
+                          All Organizations
+                        </CommandItem>
+                        {orgs.map((org) => (
+                          <CommandItem
+                            key={org.id}
+                            value={org.name}
+                            onSelect={() => {
+                              setSelectedOrg(org.id);
+                              setOrgComboboxOpen(false);
+                            }}
+                          >
+                            <Check className={cn('mr-2 h-4 w-4', selectedOrg === org.id ? 'opacity-100' : 'opacity-0')} />
+                            {org.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 

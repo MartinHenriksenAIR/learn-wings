@@ -273,3 +273,22 @@ export async function createIdeaComment(
   if (error) throw error;
   return data;
 }
+
+// Fetch unique tags used by ideas in an organization
+export async function fetchOrgTags(orgId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('ideas')
+    .select('tags')
+    .eq('org_id', orgId);
+
+  if (error) throw error;
+
+  const tagSet = new Set<string>();
+  (data || []).forEach((row: any) => {
+    (row.tags || []).forEach((tag: string) => {
+      if (tag) tagSet.add(tag);
+    });
+  });
+
+  return [...tagSet].sort((a, b) => a.localeCompare(b));
+}
