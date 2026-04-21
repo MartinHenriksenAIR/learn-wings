@@ -43,6 +43,13 @@ export function OrgSelector() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlatformAdmin]);
 
+  // Ensure an org is selected when entering org_admin mode
+  useEffect(() => {
+    if (viewMode === 'org_admin' && !currentOrg && orgs.length > 0) {
+      setCurrentOrg(orgs[0] as Organization);
+    }
+  }, [viewMode, currentOrg, orgs, setCurrentOrg]);
+
   // Only show for platform admins NOT in platform_admin view
   if (!isPlatformAdmin || viewMode === 'platform_admin') {
     return null;
