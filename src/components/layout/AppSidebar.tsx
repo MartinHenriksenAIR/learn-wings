@@ -80,14 +80,14 @@ export function AppSidebar() {
   // Build learner items based on feature toggles
   const learnerItems = [
     { title: t('nav.dashboard'), url: '/app/dashboard', icon: LayoutDashboard },
-    { title: t('nav.courses'), url: '/app/courses', icon: BookOpen },
+    { title: t('nav.courses'), url: '/app/courses', icon: BookOpen, matchPrefix: true },
     ...(features.community_enabled ? [{ title: t('nav.community'), url: '/app/community', icon: MessageSquare }] : []),
   ];
 
   // Build org admin items based on feature toggles
   const orgAdminItems = [
     
-    ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: '/app/admin/analytics', icon: BarChart3 }] : []),
+    ...(features.analytics_enabled ? [{ title: t('nav.analytics'), url: '/app/admin/analytics', icon: BarChart3 }] : []),
     ...(features.community_enabled ? [
       { title: t('nav.ideasOverview'), url: '/app/admin/org/ideas', icon: Lightbulb },
       { title: t('nav.moderation'), url: '/app/admin/org/moderation', icon: Flag },
@@ -150,7 +150,7 @@ export function AppSidebar() {
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild
-                      isActive={location.pathname === item.url}
+                      isActive={item.matchPrefix ? location.pathname.startsWith(item.url) : location.pathname === item.url}
                       tooltip={collapsed ? item.title : undefined}
                     >
                       <NavLink

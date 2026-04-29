@@ -267,7 +267,7 @@ export default function LearnerDashboard() {
 
               return (
                 <Card key={enrollment.id} className="overflow-hidden transition-shadow hover:shadow-card-hover">
-                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
+                  <Link to={`/app/learn/${enrollment.course_id}`} className="block aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden cursor-pointer">
                     {thumbnailUrls[enrollment.course_id] && (
                       <img
                         src={thumbnailUrls[enrollment.course_id]}
@@ -275,12 +275,14 @@ export default function LearnerDashboard() {
                         className="absolute inset-0 w-full h-full object-cover"
                       />
                     )}
-                  </div>
+                  </Link>
                   <CardContent className="p-4">
                     <div className="mb-2 flex items-start justify-between gap-2">
-                      <h3 className="font-display font-semibold leading-tight">
-                        {enrollment.course?.title}
-                      </h3>
+                      <Link to={`/app/learn/${enrollment.course_id}`} className="cursor-pointer hover:underline">
+                        <h3 className="font-display font-semibold leading-tight">
+                          {enrollment.course?.title}
+                        </h3>
+                      </Link>
                       <Badge variant="secondary" className="shrink-0">
                         {enrollment.course?.level}
                       </Badge>

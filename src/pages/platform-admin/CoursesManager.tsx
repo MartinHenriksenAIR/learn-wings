@@ -35,9 +35,68 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseLevel, Organization, OrgCourseAccess } from '@/lib/types';
-import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check, ChevronsUpDown } from 'lucide-react';
+import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check, ChevronsUpDown, Eye, EyeOff } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
+
+// ========== CourseCard sub-component ==========
+interface CourseCardProps {
+  course: Course;
+  levelColors: Record<string, string>;
+  onNavigate: () => void;
+  onTogglePublish: () => void;
+  onDelete: () => void;
+}
+
+function CourseCard({ course, levelColors, onNavigate, onTogglePublish, onDelete }: CourseCardProps) {
+  return (
+    <Card
+      className="cursor-pointer transition-shadow hover:shadow-md"
+      onClick={onNavigate}
+    >
+      {course.thumbnail_url ? (
+        <img src={course.thumbnail_url} alt={course.title} className="aspect-video object-cover" />
+      ) : (
+        <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary" />
+      )}
+      <CardContent className="p-4">
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <h3 className="font-display font-semibold">{course.title}</h3>
+          <Badge className={levelColors[course.level]}>{course.level}</Badge>
+        </div>
+        <p className="mb-4 text-sm text-muted-foreground line-clamp-2">{course.description}</p>
+        <div className="flex items-center justify-between">
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn(
+              'flex items-center gap-1.5 px-2 text-sm font-medium',
+              course.is_published
+                ? 'text-green-700 hover:text-green-800 hover:bg-green-50'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+            onClick={(e) => { e.stopPropagation(); onTogglePublish(); }}
+          >
+            {course.is_published ? (
+              <Eye className="h-4 w-4 shrink-0" />
+            ) : (
+              <EyeOff className="h-4 w-4 shrink-0" />
+            )}
+            <span>{course.is_published ? 'Published' : 'Draft'}</span>
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function CoursesManager() {
   const { user } = useAuth();
@@ -128,8 +187,22 @@ export default function CoursesManager() {
   };
 
   const togglePublish = async (course: Course) => {
-    await supabase.from('courses').update({ is_published: !course.is_published }).eq('id', course.id);
-    fetchData();
+    const newValue = !course.is_published;
+    // Optimistic update — update local state in-place so the course keeps its relative position
+    setCourses((prev) =>
+      prev.map((c) => (c.id === course.id ? { ...c, is_published: newValue } : c))
+    );
+    const { error } = await supabase
+      .from('courses')
+      .update({ is_published: newValue })
+      .eq('id', course.id);
+    if (error) {
+      // Revert on failure
+      setCourses((prev) =>
+        prev.map((c) => (c.id === course.id ? { ...c, is_published: course.is_published } : c))
+      );
+      toast({ title: 'Failed to update course', description: error.message, variant: 'destructive' });
+    }
   };
 
   const openDeleteDialog = (course: Course) => {
@@ -284,6 +357,14 @@ export default function CoursesManager() {
     return matchesSearch && matchesLevel && matchesStatus;
   });
 
+  // Split into two groups: published first, then drafts. Each group is sorted by
+  // created_at descending (stable). Toggling publish state uses optimistic local
+  // updates so the course keeps its relative position within its new group.
+  const byCreatedAtDesc = (a: Course, b: Course) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  const publishedFilteredCourses = filteredCourses.filter((c) => c.is_published).sort(byCreatedAtDesc);
+  const draftFilteredCourses = filteredCourses.filter((c) => !c.is_published).sort(byCreatedAtDesc);
+
   const filteredOrgs = orgs.filter((o) => {
     const matchesSelection = selectedOrg === 'all' || o.id === selectedOrg;
     const matchesSearch = orgSearchQuery === '' || o.name.toLowerCase().includes(orgSearchQuery.toLowerCase());
@@ -375,48 +456,59 @@ export default function CoursesManager() {
           </div>
 
           {filteredCourses.length === 0 ? (
-            <EmptyState 
-              icon={<BookOpen className="h-6 w-6" />} 
-              title={searchQuery || levelFilter !== 'all' || statusFilter !== 'all' ? "No matching courses" : "No courses yet"} 
-              description={searchQuery || levelFilter !== 'all' || statusFilter !== 'all' ? "Try adjusting your filters." : "Create your first course."} 
-              action={!searchQuery && levelFilter === 'all' && statusFilter === 'all' ? <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />Create Course</Button> : undefined} 
+            <EmptyState
+              icon={<BookOpen className="h-6 w-6" />}
+              title={searchQuery || levelFilter !== 'all' || statusFilter !== 'all' ? "No matching courses" : "No courses yet"}
+              description={searchQuery || levelFilter !== 'all' || statusFilter !== 'all' ? "Try adjusting your filters." : "Create your first course."}
+              action={!searchQuery && levelFilter === 'all' && statusFilter === 'all' ? <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />Create Course</Button> : undefined}
             />
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredCourses.map((course) => (
-                <Card
-                  key={course.id}
-                  className="cursor-pointer transition-shadow hover:shadow-md"
-                  onClick={() => navigate(`/app/admin/courses/${course.id}`)}
-                >
-                  {course.thumbnail_url ? (
-                    <img src={course.thumbnail_url} alt={course.title} className="aspect-video object-cover" />
-                  ) : (
-                    <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary" />
-                  )}
-                  <CardContent className="p-4">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <h3 className="font-display font-semibold">{course.title}</h3>
-                      <Badge className={levelColors[course.level]}>{course.level}</Badge>
-                    </div>
-                    <p className="mb-4 text-sm text-muted-foreground line-clamp-2">{course.description}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Switch checked={course.is_published} onCheckedChange={() => togglePublish(course)} />
-                        <span className="text-sm">{course.is_published ? 'Published' : 'Draft'}</span>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); openDeleteDialog(course); }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="space-y-8">
+              {/* Published section */}
+              {publishedFilteredCourses.length > 0 && (
+                <div>
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Published</span>
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted-foreground">{publishedFilteredCourses.length}</span>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {publishedFilteredCourses.map((course) => (
+                      <CourseCard
+                        key={course.id}
+                        course={course}
+                        levelColors={levelColors}
+                        onNavigate={() => navigate(`/app/admin/courses/${course.id}`)}
+                        onTogglePublish={() => togglePublish(course)}
+                        onDelete={() => openDeleteDialog(course)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Drafts section */}
+              {draftFilteredCourses.length > 0 && (
+                <div>
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Drafts</span>
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted-foreground">{draftFilteredCourses.length}</span>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {draftFilteredCourses.map((course) => (
+                      <CourseCard
+                        key={course.id}
+                        course={course}
+                        levelColors={levelColors}
+                        onNavigate={() => navigate(`/app/admin/courses/${course.id}`)}
+                        onTogglePublish={() => togglePublish(course)}
+                        onDelete={() => openDeleteDialog(course)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>

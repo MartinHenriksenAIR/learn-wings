@@ -277,31 +277,51 @@ export default function LearnerCourses() {
 
             return (
               <Card key={course.id} className="overflow-hidden transition-shadow hover:shadow-card-hover">
-                <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
-                  {course.thumbnail_url && (
-                    <img
-                      src={course.thumbnail_url}
-                      alt={course.title}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  )}
-                  {enrollment?.status === 'completed' && (
-                    <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-success px-2 py-1 text-xs font-medium text-success-foreground">
-                      <CheckCircle2 className="h-3 w-3" />
-                      {t('dashboard.completed')}
-                    </div>
-                  )}
-                  {enrollment && enrollment.status !== 'completed' && (
-                    <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-accent-foreground">
-                      {t('common.enrolled')}
-                    </div>
-                  )}
-                </div>
+                {enrollment ? (
+                  <Link to={`/app/learn/${course.id}`} className="block aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden cursor-pointer">
+                    {course.thumbnail_url && (
+                      <img
+                        src={course.thumbnail_url}
+                        alt={course.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                    {enrollment.status === 'completed' && (
+                      <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-success px-2 py-1 text-xs font-medium text-success-foreground">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {t('dashboard.completed')}
+                      </div>
+                    )}
+                    {enrollment.status !== 'completed' && (
+                      <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-accent-foreground">
+                        {t('common.enrolled')}
+                      </div>
+                    )}
+                  </Link>
+                ) : (
+                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
+                    {course.thumbnail_url && (
+                      <img
+                        src={course.thumbnail_url}
+                        alt={course.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
+                )}
                 <CardContent className="p-4">
                   <div className="mb-2 flex items-start justify-between gap-2">
-                    <h3 className="font-display font-semibold leading-tight">
-                      {course.title}
-                    </h3>
+                    {enrollment ? (
+                      <Link to={`/app/learn/${course.id}`} className="cursor-pointer hover:underline">
+                        <h3 className="font-display font-semibold leading-tight">
+                          {course.title}
+                        </h3>
+                      </Link>
+                    ) : (
+                      <h3 className="font-display font-semibold leading-tight">
+                        {course.title}
+                      </h3>
+                    )}
                     <div className="flex items-center gap-1">
                       <Badge className={levelColors[course.level]}>
                         {course.level}
