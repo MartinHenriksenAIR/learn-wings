@@ -141,7 +141,7 @@
   "dashboard": {
     "title": "Mit dashboard",
     "welcome": "Velkommen tilbage",
-    "myCourses": "Mine kurser",
+    "myCourses": "Kursusoversigt",
     "coursesEnrolled": "Tilmeldte kurser",
     "inProgress": "I gang",
     "completed": "Afsluttet",
@@ -150,13 +150,13 @@
     "viewAllCourses": "Se alle kurser",
     "recentActivity": "Seneste aktivitet",
     "noCoursesInProgress": "Ingen kurser i gang",
-    "startLearning": "Start din læring ved at tilmelde dig et kursus fra kataloget.",
+    "startLearning": "Start din læring ved at tilmelde dig et kursus fra Kursusoversigten.",
     "browseCourses": "Gennemse kurser",
     "completedCourses": "Afsluttede kurser"
   },
   "courses": {
-    "title": "Kursuskatalog",
-    "myCourses": "Mine kurser",
+    "title": "Kursusoversigt",
+    "myCourses": "Kursusoversigt",
     "allCourses": "Alle kurser",
     "enrolled": "Tilmeldt",
     "notEnrolled": "Ikke tilmeldt",
