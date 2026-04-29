@@ -299,7 +299,10 @@ export default function LearnerCourses() {
                     )}
                   </Link>
                 ) : (
-                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
+                  <div
+                    className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden cursor-pointer"
+                    onClick={() => handleEnroll(course.id)}
+                  >
                     {course.thumbnail_url && (
                       <img
                         src={course.thumbnail_url}
@@ -318,7 +321,10 @@ export default function LearnerCourses() {
                         </h3>
                       </Link>
                     ) : (
-                      <h3 className="font-display font-semibold leading-tight">
+                      <h3
+                        className="font-display font-semibold leading-tight cursor-pointer hover:underline"
+                        onClick={() => handleEnroll(course.id)}
+                      >
                         {course.title}
                       </h3>
                     )}
