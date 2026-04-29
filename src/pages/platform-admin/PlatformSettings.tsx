@@ -149,7 +149,9 @@ export default function PlatformSettings() {
     email.smtp_host.trim() !== '' &&
     email.smtp_port > 0 &&
     email.smtp_username.trim() !== '' &&
-    email.smtp_password.trim() !== '';
+    email.smtp_password.trim() !== '' &&
+    email.from_name.trim() !== '' &&
+    (email.from_email ?? '').trim() !== '';
 
   const handleTestSmtpConnection = async () => {
     setTestingSmtp(true);
