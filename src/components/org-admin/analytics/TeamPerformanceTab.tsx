@@ -38,12 +38,12 @@ interface UserStats {
 interface TeamPerformanceTabProps {
   userStats: UserStats[];
   departments: string[];
-  orgId: string;
+  orgId?: string;
 }
 
 const ITEMS_PER_PAGE = 20;
 
-export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerformanceTabProps) {
+export function TeamPerformanceTab({ userStats, departments, orgId = '' }: TeamPerformanceTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'completed' | 'score'>('name');

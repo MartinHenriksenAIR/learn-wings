@@ -145,6 +145,12 @@ export default function PlatformSettings() {
     setSaving(null);
   };
 
+  const isSmtpFormValid =
+    email.smtp_host.trim() !== '' &&
+    email.smtp_port > 0 &&
+    email.smtp_username.trim() !== '' &&
+    email.smtp_password.trim() !== '';
+
   const handleTestSmtpConnection = async () => {
     setTestingSmtp(true);
     try {
@@ -482,7 +488,13 @@ export default function PlatformSettings() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <Button type="button" variant="outline" onClick={handleTestSmtpConnection} disabled={testingSmtp}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleTestSmtpConnection}
+                  disabled={testingSmtp || !isSmtpFormValid}
+                  className="disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   {testingSmtp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Test Connection
                 </Button>

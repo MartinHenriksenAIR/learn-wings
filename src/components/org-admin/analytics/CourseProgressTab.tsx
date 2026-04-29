@@ -44,7 +44,7 @@ interface CourseStats {
 }
 
 interface CourseProgressTabProps {
-  orgId: string;
+  orgId?: string;
 }
 
 interface CourseEnrollee {
@@ -68,45 +68,61 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
   // Fetch course data
   useEffect(() => {
     const fetchCourseStats = async () => {
-      if (!orgId) return;
-      
       setLoading(true);
-      
-      const { data: orgCourses } = await supabase
-        .from('org_course_access')
-        .select('course_id, course:courses(id, title, level)')
-        .eq('org_id', orgId)
-        .eq('access', 'enabled');
 
-      if (orgCourses) {
-        const statsData: CourseStats[] = [];
-        
-        for (const access of orgCourses) {
-          const course = access.course as any;
-          if (!course) continue;
+      // When orgId is provided, use org_course_access to get enabled courses for that org.
+      // When orgId is absent (all-orgs view), fetch all distinct courses directly.
+      let coursesToProcess: { id: string; title: string; level: CourseLevel }[] = [];
 
-          const { data: courseEnrollments } = await supabase
-            .from('enrollments')
-            .select('status')
-            .eq('org_id', orgId)
-            .eq('course_id', course.id);
+      if (orgId) {
+        const { data: orgCourses } = await supabase
+          .from('org_course_access')
+          .select('course_id, course:courses(id, title, level)')
+          .eq('org_id', orgId)
+          .eq('access', 'enabled');
 
-          const enrolled = courseEnrollments?.length || 0;
-          const completed = courseEnrollments?.filter(e => e.status === 'completed').length || 0;
-
-          statsData.push({
-            id: course.id,
-            title: course.title,
-            level: course.level,
-            enrolled,
-            completed,
-            avgProgress: enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0,
-          });
+        if (orgCourses) {
+          coursesToProcess = orgCourses
+            .map((a) => a.course as any)
+            .filter(Boolean);
         }
-        
-        setCourseStats(statsData);
+      } else {
+        const { data: allCourses } = await supabase
+          .from('courses')
+          .select('id, title, level')
+          .order('title');
+
+        if (allCourses) {
+          coursesToProcess = allCourses as { id: string; title: string; level: CourseLevel }[];
+        }
       }
-      
+
+      const statsData: CourseStats[] = [];
+
+      for (const course of coursesToProcess) {
+        let enrollmentsQuery = supabase
+          .from('enrollments')
+          .select('status')
+          .eq('course_id', course.id);
+        if (orgId) {
+          enrollmentsQuery = enrollmentsQuery.eq('org_id', orgId);
+        }
+        const { data: courseEnrollments } = await enrollmentsQuery;
+
+        const enrolled = courseEnrollments?.length || 0;
+        const completed = courseEnrollments?.filter(e => e.status === 'completed').length || 0;
+
+        statsData.push({
+          id: course.id,
+          title: course.title,
+          level: course.level,
+          enrolled,
+          completed,
+          avgProgress: enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0,
+        });
+      }
+
+      setCourseStats(statsData);
       setLoading(false);
     };
 
@@ -116,12 +132,15 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
   // Fetch enrollees for selected course
   const fetchEnrollees = async (courseId: string) => {
     setLoadingEnrollees(true);
-    
-    const { data: enrollments } = await supabase
+
+    let enrollmentsQuery = supabase
       .from('enrollments')
       .select('user_id, status, enrolled_at, completed_at, profile:profiles(full_name)')
-      .eq('org_id', orgId)
       .eq('course_id', courseId);
+    if (orgId) {
+      enrollmentsQuery = enrollmentsQuery.eq('org_id', orgId);
+    }
+    const { data: enrollments } = await enrollmentsQuery;
 
     if (enrollments) {
       setEnrollees(
