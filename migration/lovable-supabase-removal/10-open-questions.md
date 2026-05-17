@@ -4,16 +4,21 @@ Questions remaining after exhaustive repository and Azure verification. Each inc
 
 ---
 
-## Q1 — AUTH PROVIDER: What replaces Supabase Auth? ⚠️ CRITICAL BLOCKER
+## Q1 — AUTH PROVIDER: What replaces Supabase Auth? ✅ RESOLVED
 
-**Why it matters:** All 10 replacement functions verify JWTs. The JWT validation code, the public key or shared secret, the user ID extraction, and the session management in the frontend all depend on which auth system is chosen. No function implementation can be written until this decision is made. Additionally, all ~N existing users in Supabase Auth must be migrated to the new provider — this affects user passwords, sessions, OAuth connections, and email verification state.
+**Decision:** Multi-tenant Microsoft Entra ID (standard enterprise Entra ID, NOT Azure AD B2C).
 
-**Options:**
-- **Azure AD B2C** — Managed, enterprise-grade, MSAL.js on frontend, JWKS endpoint for validation. Additional cost. Complex to configure.
-- **Custom JWT in Azure Functions** — Full control, no external dependency. More code to maintain. Requires secure key management.
-- **Auth0 or similar** — Third-party managed, similar to Supabase Auth but not tied to Supabase DB.
+**Why multi-tenant:** Future use cases require users from external organizations (other Azure subscriptions/tenants) to sign in. Multi-tenant Entra ID handles this natively — no per-tenant configuration required. Users from any Entra tenant can sign in to the app registration.
 
-**Safest next step:** Schedule a 1-hour architecture decision session with the team. Review current Supabase user count, OAuth providers in use, and MFA requirements before choosing.
+**Implementation:**
+- Frontend: `@azure/msal-browser` + `@azure/msal-react`, `loginRedirect` flow, authority `https://login.microsoftonline.com/common`
+- Backend: `jwks-rsa` + `jsonwebtoken`, RS256 validation, issuer validated by regex pattern (multi-tenant issuers vary by tenant)
+- User identity: `oid` (object ID) + `tid` (tenant ID) — both required for global uniqueness
+- Profile storage: `profiles` table gains `entra_oid` + `entra_tid` columns with unique constraint; `profiles.id` remains an internal UUID
+- First-login: `user-context` endpoint provisions a profile row on first sign-in
+- No custom password endpoints needed
+
+**No password migration needed:** Existing Supabase users re-authenticate via Microsoft SSO. If they need their existing data (course progress, memberships) linked, a one-time email-based identity merge script can match old `profiles.email` to new Entra `preferred_username`.
 
 ---
 
@@ -68,21 +73,20 @@ az staticwebapp appsettings list --name stapp-ai-education-migration --resource-
 
 ---
 
-## Q6 — FUNCTION APP VNet INTEGRATION: Is `func-ai-education-migration` integrated with the VNet?
+## Q6 — FUNCTION APP VNet INTEGRATION: Is `func-ai-education-migration` integrated with the VNet? ✅ RESOLVED
 
-**Why it matters:** The Azure PostgreSQL Flexible Server (`psql-ai-education-migration`) is on a private endpoint accessible only within the VNet `ai-education-migration`. If the Function App is not VNet-integrated, it cannot connect to PostgreSQL.
+**Finding:** VNet integration is NOT configured (`az webapp vnet-integration list` returns `[]`). However, this is not a blocker.
 
-**Limitation:** VNet integration status was not visible in the `az functionapp show` output.
+**Why not a blocker:** Azure PostgreSQL Flexible Server `psql-ai-education-migration` has `publicNetworkAccess: Enabled` with firewall rule `AllowAllAzureServicesAndResourcesWithinAzureIps` (0.0.0.0/0.0.0.0). The function app connects to PostgreSQL over the Azure backbone without VNet integration.
 
-**Safest next step:**
+**Security note:** The `AllowAllAzureServicesAndResourcesWithinAzureIps` rule permits any Azure resource in any subscription to attempt to connect. After the migration is stable, harden by replacing with the function app's specific outbound IP allowlist:
 ```bash
-az functionapp vnet-integration list --name func-ai-education-migration --resource-group AI-Education
+az postgres flexible-server firewall-rule create \
+  --name func-outbound-1 --resource-group AI-Education \
+  --server-name psql-ai-education-migration \
+  --start-ip-address <outbound-ip> --end-ip-address <outbound-ip>
 ```
-If not integrated, add it:
-```bash
-# DO NOT RUN without review
-az functionapp vnet-integration add --name func-ai-education-migration --resource-group AI-Education --vnet ai-education-migration --subnet [SUBNET_NAME]
-```
+Then remove the `AllowAllAzureServicesAndResourcesWithinAzureIps` rule.
 
 ---
 

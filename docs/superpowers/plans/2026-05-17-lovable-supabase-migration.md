@@ -4,11 +4,11 @@
 
 **Goal:** Remove every Lovable and Supabase dependency from the learn-wings application, replacing with Azure Functions (Node.js 22) + Azure PostgreSQL Flexible Server.
 
-**Architecture:** Frontend (Vite/React SPA on Azure Static Web Apps) calls Azure Functions at `func-ai-education-migration` via Bearer-JWT-authenticated POST endpoints. Functions share `functions/shared/` utilities for auth, DB (pg Pool), Azure Blob SAS generation (Node.js crypto), and CORS. All Supabase Edge Functions, the Supabase SDK, and Lovable build tooling are removed.
+**Architecture:** Frontend (Vite/React SPA on Azure Static Web Apps) calls Azure Functions at `func-ai-education-migration` via Bearer-JWT-authenticated POST endpoints. Functions share `functions/shared/` utilities for auth, DB (pg Pool), Azure Blob SAS generation (Node.js crypto), and CORS. Auth is **multi-tenant Microsoft Entra ID**: MSAL.js v3 on the frontend (`@azure/msal-browser` + `@azure/msal-react`), RS256 JWT validation with `jwks-rsa` on the backend. Users from any Entra tenant (including external orgs with their own Azure subscriptions) can sign in. All Supabase Edge Functions, the Supabase SDK, and Lovable build tooling are removed.
 
-**Tech Stack:** Azure Functions v4 (`@azure/functions`), Node.js 22, TypeScript, `pg` (PostgreSQL), `node:crypto` (SAS), `node:net`/`node:tls` (SMTP test), Resend API (email), Vitest (tests)
+**Tech Stack:** Azure Functions v4 (`@azure/functions`), Node.js 22, TypeScript, `pg` (PostgreSQL), `node:crypto` (SAS), `node:net`/`node:tls` (SMTP test), `jwks-rsa` + `jsonwebtoken` (Entra ID JWT validation), `@azure/msal-browser` + `@azure/msal-react` (frontend SSO), Resend API (email), Vitest (tests)
 
-**Auth gate:** Tasks 1–8 have no auth dependency and can be executed immediately. Tasks 9+ require a human decision on auth provider (Azure AD B2C vs custom JWT). See `migration/lovable-supabase-removal/10-open-questions.md` Q1. Code is provided for both options at the gate.
+**Auth:** Multi-tenant Microsoft Entra ID — Q1 resolved. Tasks 1–8.5 have no auth dependency. Task 8.5 configures the Azure App Registration (required before Task 9).
 
 ---
 
@@ -21,7 +21,7 @@ functions/
 ├── package.json                      ← pg, @azure/functions (NOT root package.json)
 ├── tsconfig.json
 ├── shared/
-│   ├── auth.ts                       ← JWT validation (two options provided at gate)
+│   ├── auth.ts                       ← Entra ID RS256 multi-tenant JWT validation (jwks-rsa)
 │   ├── db.ts                         ← pg Pool singleton
 │   ├── sas.ts                        ← Azure Blob SAS (Node.js crypto.createHmac port)
 │   └── cors.ts                       ← CORS headers, ai-uddannelse.dk allowlist
@@ -45,7 +45,8 @@ functions/
 ├── admin-user-actions/index.ts       ← NEW: replaces UserDetailDialog.tsx:81,105,129,153
 └── invitation-link/index.ts          ← NEW: replaces get_invitation_link_id RPC
 src/lib/
-└── api-client.ts                     ← NEW: replaces supabase.functions.invoke everywhere
+├── api-client.ts                     ← NEW: replaces supabase.functions.invoke everywhere
+└── msal-config.ts                    ← NEW: MSAL singleton, multi-tenant config, API scopes
 ```
 
 ### Modified files
@@ -261,9 +262,12 @@ mkdir -p functions/shared
   },
   "dependencies": {
     "@azure/functions": "^4.5.0",
+    "jwks-rsa": "^3.1.0",
+    "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.3"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.6",
     "typescript": "^5.4.0",
@@ -862,80 +866,152 @@ git commit -m "feat(functions): implement 4 Azure Blob SAS functions (upload/vie
 
 ---
 
-## ⛔ GATE: Auth Provider Decision Required
+## Auth Decision: Multi-tenant Microsoft Entra ID
 
-**Stop here.** Tasks 9–44 require a JWT auth provider. Choose one:
+**Decision made.** Auth is multi-tenant Entra ID. Users from any Entra tenant (including organizations in external Azure subscriptions) sign in via Microsoft SSO. The operator's app registration is multi-tenant; each user's `oid` + `tid` together form the unique identity. No custom password endpoints. No B2C.
 
-**Option A — Azure AD B2C** (managed, enterprise-grade)
-- Frontend: replace `supabase.auth` with `@azure/msal-browser`
-- Functions: validate JWT against Azure AD JWKS endpoint with `jwks-rsa`
-- User IDs: Azure AD object IDs (UUIDs — compatible with existing FK schema)
-- Setup: 2–4 hours for Azure AD B2C tenant config
-
-**Option B — Custom JWT** (full control, one Key Vault secret)
-- Frontend: custom auth hook using `fetch` to new `/api/auth/login` endpoint
-- Functions: validate HS256 JWT with `JWT_SECRET` from Key Vault
-- User IDs: keep existing PostgreSQL profile UUIDs
-- Setup: ~1 day to implement auth endpoints
-
-Implement the auth decision in `functions/shared/auth.ts` per the chosen option, then continue to Task 9.
+Task 8.5 creates the App Registration. Task 9 implements the JWKS validator.
 
 ---
 
-### Task 9: shared/auth.ts — implement for chosen provider
+### Task 8.5: Create Azure App Registration (multi-tenant)
+
+**This is a portal task, not a code task.** Complete before running `npm test` for Task 9.
+
+- [ ] **Step 1: Create App Registration**
+
+In Azure Portal → Microsoft Entra ID → App registrations → New registration:
+- Name: `learn-wings`
+- Supported account types: **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant)**
+- Redirect URI: Platform = **Single-page application (SPA)**, URI = `http://localhost:5173`
+
+Click Register. Note the **Application (client) ID** — this is `VITE_ENTRA_CLIENT_ID`.
+
+- [ ] **Step 2: Add production redirect URIs**
+
+In the app registration → Authentication → Add URI:
+- `https://ai-uddannelse.dk`
+- `https://black-forest-0d7f96c03.7.azurestaticapps.net`
+
+- [ ] **Step 3: Expose an API scope**
+
+In Expose an API → Add a scope:
+- Application ID URI: accept default `api://<client-id>`
+- Scope name: `access_as_user`
+- Who can consent: Admins and users
+- Admin consent display name: `Access learn-wings as user`
+- State: Enabled
+
+Note the full scope string: `api://<client-id>/access_as_user` — this is `VITE_ENTRA_SCOPE`.
+
+- [ ] **Step 4: Add API permissions**
+
+In API permissions → Add a permission → Microsoft Graph → Delegated:
+- `User.Read` (already present by default)
+
+Click "Grant admin consent" for your tenant.
+
+- [ ] **Step 5: Store in Key Vault + env files**
+
+The client ID is not a secret but must be consistent between frontend and backend:
+```bash
+# Frontend .env (not a secret — included in bundle)
+VITE_ENTRA_CLIENT_ID=<application-client-id>
+VITE_ENTRA_SCOPE=api://<application-client-id>/access_as_user
+
+# Azure Functions app settings (set in Azure Portal or via Key Vault reference)
+ENTRA_CLIENT_ID=<application-client-id>
+```
+
+- [ ] **Step 6: Commit env template update**
+
+```bash
+# Update .env.example (NOT .env — never commit real values)
+git add .env.example
+git commit -m "chore: add VITE_ENTRA_CLIENT_ID and VITE_ENTRA_SCOPE to env template"
+```
+
+---
+
+### Task 9: shared/auth.ts — multi-tenant Entra ID JWKS validation
 
 **Files:**
 - Create: `functions/shared/auth.ts`
 - Create: `functions/shared/auth.test.ts`
 
-#### Option B — Custom HS256 JWT (implement this if Option A is chosen, replace the body with JWKS validation)
+**Note:** `authenticate` is now `async` — all calling functions from Task 10 onward must `await authenticate(req)`.
 
 - [ ] **Step 1: Write failing test**
 
 `functions/shared/auth.test.ts`:
 ```ts
-import { describe, it, expect } from 'vitest';
-import { createHmac } from 'node:crypto';
+import { describe, it, expect, vi } from 'vitest';
 
-// Set test secret before importing auth module
-process.env.JWT_SECRET = 'test-secret-32-bytes-minimum-len!';
+vi.mock('jwks-rsa', () => ({
+  default: () => ({
+    getSigningKey: (_kid: string, cb: (err: Error | null, key?: any) => void) => {
+      cb(null, { getPublicKey: () => 'mock-public-key' });
+    },
+  }),
+}));
+
+const VALID_ISSUER = 'https://login.microsoftonline.com/11111111-1111-1111-1111-111111111111/v2.0';
+
+vi.mock('jsonwebtoken', () => ({
+  verify: (_token: string, _getKey: unknown, _opts: unknown, cb: Function) => {
+    const parts = _token.split('.');
+    if (parts.length !== 3) return cb(new Error('invalid token'));
+    try {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+      if (payload._forceError) return cb(new Error('invalid signature'));
+      cb(null, payload);
+    } catch {
+      cb(new Error('decode error'));
+    }
+  },
+}));
+
+process.env.ENTRA_CLIENT_ID = 'test-client-id';
 
 import { authenticate, AuthError } from './auth';
 
-function makeToken(payload: object, secret = process.env.JWT_SECRET!): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const body = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url');
-  const sig = createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
-  return `${header}.${body}.${sig}`;
+function makeToken(claims: Record<string, unknown>): string {
+  const h = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'k1' })).toString('base64url');
+  const p = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  return `${h}.${p}.fakesig`;
 }
 
 describe('authenticate', () => {
-  it('returns user from valid token', () => {
-    const token = makeToken({ sub: 'user-uuid', email: 'a@b.com' });
+  it('returns user from valid Entra token', async () => {
+    const token = makeToken({ oid: 'oid-abc', tid: '11111111-1111-1111-1111-111111111111', preferred_username: 'user@contoso.com', iss: VALID_ISSUER });
     const req = { headers: { get: (k: string) => k === 'authorization' ? `Bearer ${token}` : null } };
-    const user = authenticate(req as any);
-    expect(user.id).toBe('user-uuid');
-    expect(user.email).toBe('a@b.com');
+    const user = await authenticate(req as any);
+    expect(user.id).toBe('oid-abc');
+    expect(user.tid).toBe('11111111-1111-1111-1111-111111111111');
+    expect(user.email).toBe('user@contoso.com');
   });
 
-  it('throws on missing Bearer header', () => {
+  it('throws AuthError on missing Bearer header', async () => {
     const req = { headers: { get: () => null } };
-    expect(() => authenticate(req as any)).toThrow(AuthError);
+    await expect(authenticate(req as any)).rejects.toBeInstanceOf(AuthError);
   });
 
-  it('throws on wrong signature', () => {
-    const token = makeToken({ sub: 'u', email: 'x@y.com' }, 'wrong-secret!!!!!!!!!!!!!!!!!!!');
+  it('throws AuthError on invalid issuer pattern', async () => {
+    const token = makeToken({ oid: 'o', tid: 't', iss: 'https://evil.com/token' });
     const req = { headers: { get: () => `Bearer ${token}` } };
-    expect(() => authenticate(req as any)).toThrow(AuthError);
+    await expect(authenticate(req as any)).rejects.toBeInstanceOf(AuthError);
   });
 
-  it('throws on expired token', () => {
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-    const body = Buffer.from(JSON.stringify({ sub: 'u', email: 'x@y.com', exp: 1000 })).toString('base64url');
-    const sig = createHmac('sha256', process.env.JWT_SECRET!).update(`${header}.${body}`).digest('base64url');
-    const token = `${header}.${body}.${sig}`;
+  it('throws AuthError on invalid signature', async () => {
+    const token = makeToken({ _forceError: true });
     const req = { headers: { get: () => `Bearer ${token}` } };
-    expect(() => authenticate(req as any)).toThrow(AuthError);
+    await expect(authenticate(req as any)).rejects.toBeInstanceOf(AuthError);
+  });
+
+  it('throws AuthError on missing oid or tid', async () => {
+    const token = makeToken({ iss: VALID_ISSUER, email: 'x@y.com' });
+    const req = { headers: { get: () => `Bearer ${token}` } };
+    await expect(authenticate(req as any)).rejects.toBeInstanceOf(AuthError);
   });
 });
 ```
@@ -945,49 +1021,69 @@ describe('authenticate', () => {
 ```bash
 cd functions && npm test -- auth
 ```
+Expected: FAIL (module not found)
 
-- [ ] **Step 3: Implement (Option B — HS256)**
+- [ ] **Step 3: Implement**
 
 `functions/shared/auth.ts`:
 ```ts
-import { createHmac } from 'node:crypto';
+import jwksClient from 'jwks-rsa';
+import { verify } from 'jsonwebtoken';
 import type { HttpRequest } from '@azure/functions';
 
-export interface AuthUser {
-  id: string;
-  email: string;
-}
-
 export class AuthError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AuthError';
-  }
+  constructor(message: string) { super(message); this.name = 'AuthError'; }
 }
 
-export function verifyToken(token: string): AuthUser {
-  const parts = token.split('.');
-  if (parts.length !== 3) throw new AuthError('Invalid token format');
-  const [header, payload, sig] = parts;
-
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new AuthError('JWT_SECRET not configured');
-
-  const expected = createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
-  if (expected !== sig) throw new AuthError('Invalid token signature');
-
-  let data: { sub: string; email: string; exp: number };
-  try {
-    data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-  } catch {
-    throw new AuthError('Invalid token payload');
-  }
-
-  if (data.exp < Math.floor(Date.now() / 1000)) throw new AuthError('Token expired');
-  return { id: data.sub, email: data.email };
+export interface AuthUser {
+  id: string;    // Entra oid claim
+  tid: string;   // Entra tenant ID
+  email: string; // preferred_username or email claim
 }
 
-export function authenticate(req: Pick<HttpRequest, 'headers'>): AuthUser {
+const client = jwksClient({
+  jwksUri: 'https://login.microsoftonline.com/common/discovery/v2.0/keys',
+  cache: true,
+  cacheMaxEntries: 5,
+  cacheMaxAge: 600_000,
+});
+
+function getKey(header: any, callback: (err: Error | null, key?: string) => void): void {
+  client.getSigningKey(header.kid, (err, key) => {
+    if (err) return callback(err);
+    callback(null, key?.getPublicKey());
+  });
+}
+
+// Multi-tenant: issuer varies per tenant — validate pattern, not fixed value
+const ISSUER_RE = /^https:\/\/login\.microsoftonline\.com\/[0-9a-f-]{36}\/v2\.0$/;
+
+export function verifyToken(token: string): Promise<AuthUser> {
+  return new Promise((resolve, reject) => {
+    verify(
+      token,
+      getKey as any,
+      {
+        audience: process.env.ENTRA_CLIENT_ID,
+        algorithms: ['RS256'],
+        // issuer intentionally omitted — multi-tenant tokens have per-tenant issuers
+      },
+      (err, decoded) => {
+        if (err) return reject(new AuthError(err.message));
+        const d = decoded as Record<string, string>;
+        if (!ISSUER_RE.test(d.iss)) return reject(new AuthError('Invalid token issuer'));
+        if (!d.oid || !d.tid) return reject(new AuthError('Missing oid or tid claims'));
+        resolve({
+          id: d.oid,
+          tid: d.tid,
+          email: d.preferred_username ?? d.email ?? d.upn ?? '',
+        });
+      },
+    );
+  });
+}
+
+export async function authenticate(req: Pick<HttpRequest, 'headers'>): Promise<AuthUser> {
   const auth = req.headers.get('authorization') ?? '';
   if (!auth.startsWith('Bearer ')) throw new AuthError('Missing Bearer token');
   return verifyToken(auth.slice(7));
@@ -999,13 +1095,13 @@ export function authenticate(req: Pick<HttpRequest, 'headers'>): AuthUser {
 ```bash
 cd functions && npm test -- auth
 ```
-Expected: PASS (4 tests)
+Expected: PASS (5 tests)
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add functions/shared/auth.ts functions/shared/auth.test.ts
-git commit -m "feat(functions/shared): implement HS256 JWT authentication"
+git commit -m "feat(functions/shared): implement multi-tenant Entra ID JWKS authentication"
 ```
 
 ---
@@ -1204,19 +1300,31 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
 
   try {
-    const user = authenticate(req);
+    // authenticate is async (Entra ID JWKS fetch)
+    const user = await authenticate(req);
 
-    const profile = await queryOne(
-      'SELECT id, full_name, email, is_platform_admin, avatar_url FROM profiles WHERE id = $1',
-      [user.id]
+    // First-login provisioning: look up by Entra oid+tid, create profile if absent
+    let profile = await queryOne<{ id: string; full_name: string; email: string; is_platform_admin: boolean; avatar_url: string | null }>(
+      'SELECT id, full_name, email, is_platform_admin, avatar_url FROM profiles WHERE entra_oid = $1 AND entra_tid = $2',
+      [user.id, user.tid]
     );
+
+    if (!profile) {
+      // First login from this Entra identity — provision a profile row
+      profile = await queryOne(
+        `INSERT INTO profiles (full_name, email, entra_oid, entra_tid)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, full_name, email, is_platform_admin, avatar_url`,
+        [user.email.split('@')[0], user.email, user.id, user.tid]
+      );
+    }
 
     const memberships = await query(
       `SELECT om.*, row_to_json(o.*) AS organization
        FROM org_memberships om
        JOIN organizations o ON o.id = om.org_id
        WHERE om.user_id = $1 AND om.status = 'active'`,
-      [user.id]
+      [profile!.id]
     );
 
     return corsResponse(origin, 200, { profile, memberships }) as HttpResponseInit;
@@ -1831,31 +1939,64 @@ git commit -m "feat(functions): implement remaining 3 business logic Azure Funct
 
 ## Phase 5: Frontend Migration
 
-### Task 17: Create src/lib/api-client.ts
+### Task 17: Create src/lib/msal-config.ts and src/lib/api-client.ts
 
 **Files:**
+- Create: `src/lib/msal-config.ts`
 - Create: `src/lib/api-client.ts`
 
-- [ ] **Step 1: Implement**
+- [ ] **Step 1: Add frontend deps**
+
+```bash
+npm install @azure/msal-browser @azure/msal-react
+```
+
+- [ ] **Step 2: Create msal-config.ts**
+
+`src/lib/msal-config.ts`:
+```ts
+import { PublicClientApplication, type Configuration } from '@azure/msal-browser';
+
+const msalConfig: Configuration = {
+  auth: {
+    clientId: import.meta.env.VITE_ENTRA_CLIENT_ID as string,
+    // 'common' authority allows any Entra tenant (multi-tenant)
+    authority: 'https://login.microsoftonline.com/common',
+    redirectUri: import.meta.env.VITE_REDIRECT_URI as string ?? window.location.origin,
+  },
+  cache: {
+    cacheLocation: 'sessionStorage',
+    storeAuthStateInCookie: false,
+  },
+};
+
+// Exported singleton — import this wherever MSAL is needed
+export const msalInstance = new PublicClientApplication(msalConfig);
+
+// Scope exposed via App Registration → Expose an API → access_as_user
+export const apiScopes = [`api://${import.meta.env.VITE_ENTRA_CLIENT_ID}/access_as_user`];
+```
+
+- [ ] **Step 3: Create api-client.ts**
 
 `src/lib/api-client.ts`:
 ```ts
+import { msalInstance, apiScopes } from './msal-config';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string;
 
-function getAuthToken(): string | null {
-  // Reads token stored by useAuth on sign-in. Key matches what auth hook writes.
-  return localStorage.getItem('auth_token');
-}
-
-function authHeader(): Record<string, string> {
-  const token = getAuthToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+async function getAccessToken(): Promise<string> {
+  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
+  if (!account) throw new Error('Not authenticated');
+  const result = await msalInstance.acquireTokenSilent({ scopes: apiScopes, account });
+  return result.accessToken;
 }
 
 export async function callApi<T = unknown>(path: string, body: unknown): Promise<T> {
+  const token = await getAccessToken();
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeader() },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -1866,9 +2007,10 @@ export async function callApi<T = unknown>(path: string, body: unknown): Promise
 }
 
 export async function callApiRaw(path: string, body: unknown): Promise<Response> {
+  const token = await getAccessToken();
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeader() },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);
@@ -1876,54 +2018,76 @@ export async function callApiRaw(path: string, body: unknown): Promise<Response>
 }
 ```
 
-- [ ] **Step 2: Update .env**
+- [ ] **Step 4: Wrap app in MsalProvider in src/main.tsx**
+
+```ts
+// src/main.tsx — add these imports and initialization
+import { MsalProvider } from '@azure/msal-react';
+import { msalInstance } from '@/lib/msal-config';
+
+// Initialize before render (handles redirect response)
+await msalInstance.initialize();
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <MsalProvider instance={msalInstance}>
+      <App />
+    </MsalProvider>
+  </React.StrictMode>
+);
+```
+
+- [ ] **Step 5: Update .env**
 
 ```diff
 -VITE_SUPABASE_PROJECT_ID=cairuxpyfshugwjrrqha
 -VITE_SUPABASE_PUBLISHABLE_KEY=[anon key]
 -VITE_SUPABASE_URL=https://cairuxpyfshugwjrrqha.supabase.co
++VITE_ENTRA_CLIENT_ID=<from Task 8.5 Step 1>
++VITE_ENTRA_SCOPE=api://<client-id>/access_as_user
 +VITE_API_BASE_URL=https://func-ai-education-migration-c0fgeqdnfvd6h0cf.swedencentral-01.azurewebsites.net
 +VITE_STORAGE_BASE_URL=https://staieducationmigration.blob.core.windows.net
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/api-client.ts .env
-git commit -m "feat(frontend): add api-client.ts replacing supabase.functions.invoke"
+git add src/lib/msal-config.ts src/lib/api-client.ts src/main.tsx .env
+git commit -m "feat(frontend): add MSAL config singleton and api-client.ts with Entra token acquisition"
 ```
 
 ---
 
-### Task 18: Replace useAuth.tsx
+### Task 18: Replace useAuth.tsx with MSAL-based implementation
 
 **Files:**
 - Modify: `src/hooks/useAuth.tsx`
 
-- [ ] **Step 1: Replace supabase.auth.* with new auth provider calls**
+Replace the file entirely. The new implementation uses `useMsal()` from `@azure/msal-react`. There is no email/password sign-in — users sign in via Microsoft SSO (`loginRedirect`). First-login profile provisioning is handled server-side in the `user-context` endpoint (Task 11).
 
-The auth operations in `useAuth.tsx` (`signInWithPassword`, `signUp`, `signOut`, `onAuthStateChange`, `getSession`) must be replaced with calls to new auth endpoints (if using Option B custom JWT) or MSAL.js calls (if using Option A Azure AD B2C).
+- [ ] **Step 1: Replace src/hooks/useAuth.tsx entirely**
 
-**Option B implementation** (custom JWT — `POST /api/auth/login`, `POST /api/auth/logout`):
-
-Replace `src/hooks/useAuth.tsx` entirely:
 ```ts
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useMsal, useAccount } from '@azure/msal-react';
+import { InteractionStatus } from '@azure/msal-browser';
+import { apiScopes } from '@/lib/msal-config';
 import { callApi } from '@/lib/api-client';
-import { Profile, OrgMembership, Organization, UserContext } from '@/lib/types';
+import type { Profile, OrgMembership, Organization } from '@/lib/types';
 
-// Local type replacing @supabase/supabase-js User/Session
-export interface AppUser { id: string; email: string; }
-export interface AppSession { access_token: string; }
-
+export interface AppUser { id: string; tid: string; email: string; name: string; }
 export type ViewMode = 'learner' | 'org_admin' | 'platform_admin';
 
-interface AuthContextType extends UserContext {
+interface AuthContextType {
   user: AppUser | null;
-  session: AppSession | null;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
+  profile: Profile | null;
+  memberships: OrgMembership[];
+  currentOrg: Organization | null;
+  isPlatformAdmin: boolean;
+  isOrgAdmin: boolean;
+  isLoading: boolean;
+  signIn: () => void;
+  signOut: () => void;
   refreshUserContext: () => Promise<void>;
   setCurrentOrg: (org: Organization) => void;
   viewMode: ViewMode;
@@ -1935,20 +2099,36 @@ interface AuthContextType extends UserContext {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(null);
-  const [session, setSession] = useState<AppSession | null>(null);
+  const { instance, accounts, inProgress } = useMsal();
+  // useAccount tracks the active account reactively
+  const account = useAccount(accounts[0] ?? null);
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [memberships, setMemberships] = useState<OrgMembership[]>([]);
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('platform_admin');
+
+  // isLoading is true while MSAL is processing a redirect or popup interaction
+  const isLoading = inProgress !== InteractionStatus.None;
+
+  const user: AppUser | null = account
+    ? {
+        id: (account.idTokenClaims?.oid as string) ?? account.localAccountId,
+        tid: account.tenantId,
+        email: account.username,
+        name: account.name ?? '',
+      }
+    : null;
 
   const isPlatformAdmin = profile?.is_platform_admin ?? false;
   const isOrgAdmin = memberships.some(m => m.role === 'org_admin' && m.status === 'active');
   const effectiveIsPlatformAdmin = isPlatformAdmin && viewMode === 'platform_admin';
-  const effectiveIsOrgAdmin = isPlatformAdmin ? viewMode === 'org_admin' || viewMode === 'platform_admin' : isOrgAdmin;
+  const effectiveIsOrgAdmin = isPlatformAdmin
+    ? viewMode === 'org_admin' || viewMode === 'platform_admin'
+    : isOrgAdmin;
 
   const fetchUserContext = async () => {
+    if (!account) return;
     try {
       const { profile: p, memberships: m } = await callApi<{ profile: Profile; memberships: OrgMembership[] }>('/api/user-context', {});
       setProfile(p);
@@ -1962,62 +2142,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const refreshUserContext = fetchUserContext;
-
+  // Fetch profile whenever account changes or MSAL finishes an interaction
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.exp > Math.floor(Date.now() / 1000)) {
-          setUser({ id: payload.sub, email: payload.email });
-          setSession({ access_token: token });
-          fetchUserContext();
-        } else {
-          localStorage.removeItem('auth_token');
-        }
-      } catch { localStorage.removeItem('auth_token'); }
+    if (account && inProgress === InteractionStatus.None) {
+      fetchUserContext();
     }
-    setIsLoading(false);
-  }, []);
+    if (!account && inProgress === InteractionStatus.None) {
+      setProfile(null);
+      setMemberships([]);
+      setCurrentOrg(null);
+    }
+  }, [account?.localAccountId, inProgress]);
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      const { token, user: u } = await callApi<{ token: string; user: AppUser }>('/api/auth/login', { email, password });
-      localStorage.setItem('auth_token', token);
-      setUser(u);
-      setSession({ access_token: token });
-      await fetchUserContext();
-      return { error: null };
-    } catch (e) {
-      return { error: e instanceof Error ? e : new Error('Sign in failed') };
-    }
+  // loginRedirect sends user to Microsoft login page; MSAL handles the redirect back
+  const signIn = () => {
+    instance.loginRedirect({ scopes: apiScopes });
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    try {
-      const { token, user: u } = await callApi<{ token: string; user: AppUser }>('/api/auth/register', { email, password, fullName });
-      localStorage.setItem('auth_token', token);
-      setUser(u);
-      setSession({ access_token: token });
-      await fetchUserContext();
-      return { error: null };
-    } catch (e) {
-      return { error: e instanceof Error ? e : new Error('Sign up failed') };
-    }
-  };
-
-  const signOut = async () => {
-    localStorage.removeItem('auth_token');
-    setUser(null);
-    setSession(null);
+  const signOut = () => {
     setProfile(null);
     setMemberships([]);
     setCurrentOrg(null);
+    instance.logoutRedirect();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, memberships, currentOrg, isPlatformAdmin, isOrgAdmin, isLoading, signIn, signUp, signOut, refreshUserContext, setCurrentOrg, viewMode, setViewMode, effectiveIsPlatformAdmin, effectiveIsOrgAdmin }}>
+    <AuthContext.Provider value={{
+      user, profile, memberships, currentOrg,
+      isPlatformAdmin, isOrgAdmin, isLoading,
+      signIn, signOut, refreshUserContext: fetchUserContext,
+      setCurrentOrg, viewMode, setViewMode,
+      effectiveIsPlatformAdmin, effectiveIsOrgAdmin,
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -2025,22 +2181,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
 ```
 
-**If Option A (Azure AD B2C):** Replace `signIn`/`signUp`/`signOut` with MSAL `loginPopup`/`logout`. Replace `fetchUserContext` JWT parsing with `msalInstance.getActiveAccount()`.
-
-- [ ] **Step 2: Add auth endpoints to functions/ (Option B only)**
-
-If using Option B, add `functions/auth/index.ts` with `POST /api/auth/login` (validates email/password against hashed password in `profiles`, issues HS256 JWT) and `POST /api/auth/register`.
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
 git add src/hooks/useAuth.tsx
-git commit -m "feat(frontend): replace useAuth Supabase auth with new auth provider"
+git commit -m "feat(frontend): replace useAuth with MSAL-based Entra ID SSO implementation"
 ```
 
 ---
@@ -2210,7 +2360,41 @@ const data = await callApi<{ linkId: string }>('/api/invitation-link', { orgId }
 
 - [ ] **Step 5: Update Login.tsx, Signup.tsx, ForgotPassword.tsx, ResetPassword.tsx, Settings.tsx**
 
-These use `supabase.auth.*` only. Replace with `useAuth()` hook calls (signIn, signUp, signOut, etc.) — the hook now encapsulates the auth provider. No direct supabase SDK calls remain in these files.
+**Auth is now entirely delegated to Microsoft Entra ID — no email/password forms remain in the app.**
+
+`Login.tsx` — replace the form body with a single button:
+```tsx
+import { useAuth } from '@/hooks/useAuth';
+export default function Login() {
+  const { signIn } = useAuth();
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <button onClick={signIn} className="btn-primary">
+        Sign in with Microsoft
+      </button>
+    </div>
+  );
+}
+```
+
+`Signup.tsx` — new accounts are created in Entra ID (by IT admin or self-service if tenant allows). Redirect to login:
+```tsx
+import { Navigate } from 'react-router-dom';
+export default function Signup() { return <Navigate to="/login" replace />; }
+```
+
+`ForgotPassword.tsx` and `ResetPassword.tsx` — password management is in Entra ID. Replace with a redirect and message:
+```tsx
+export default function ForgotPassword() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <p>Password reset is managed by your organization's IT administrator via Microsoft Entra ID.</p>
+    </div>
+  );
+}
+```
+
+`Settings.tsx` — remove the "Change password" section entirely. Password changes happen in Entra ID. Keep all other settings (name, avatar, org preferences) using `callApi('/api/user-context', ...)` for profile updates if applicable.
 
 - [ ] **Step 6: Update src/lib/storage.ts and file-upload.tsx**
 
@@ -2281,6 +2465,37 @@ Edit `supabase-schema-export.sql`:
 - Remove all `CREATE POLICY ... USING (auth.uid() = ...)` lines (RLS replaced by app-layer auth)
 - Remove `is_platform_admin()` and `current_org_ids_for_user()` functions — these are now inline in Azure Functions
 - Keep `can_user_access_lms_asset` and `user_can_access_quiz` as helper functions (they reference `profiles` not `auth.uid()` in the final version)
+
+- [ ] **Step 2b: Add Entra ID identity columns to profiles**
+
+The `profiles` table needs two columns to support multi-tenant Entra ID. User identity is `(entra_oid, entra_tid)` — both are required for uniqueness across tenants.
+
+Add to `supabase-schema-export.sql` immediately after the `CREATE TABLE profiles (...)` statement:
+
+```sql
+-- Entra ID identity columns (multi-tenant: oid is unique per tenant, not globally)
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS entra_oid TEXT,
+  ADD COLUMN IF NOT EXISTS entra_tid TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_entra_identity
+  ON profiles (entra_oid, entra_tid)
+  WHERE entra_oid IS NOT NULL AND entra_tid IS NOT NULL;
+
+-- First-login provisioning: profiles.id is now a server-generated UUID, not tied to auth.users.id
+-- The user-context function does: SELECT by (entra_oid, entra_tid); INSERT if not found.
+```
+
+**Existing user migration** (run once after schema apply, before cutover):
+```sql
+-- Existing profiles from Supabase have no entra_oid — they must re-login via Entra
+-- to link their Entra identity. If you want to pre-link by email:
+-- UPDATE profiles SET entra_oid = '<known-oid>', entra_tid = '<known-tid>'
+-- WHERE email = '<email>';
+-- Otherwise: users log in via Microsoft SSO, user-context creates a new profile row.
+-- Pre-existing org_memberships and progress data are associated with the old profile UUID.
+-- Run a one-time script to merge old profile UUID → new Entra-linked profile UUID if required.
+```
 
 - [ ] **Step 3: Apply schema to Azure PostgreSQL**
 
@@ -2376,8 +2591,26 @@ git commit -m "docs: update all docs removing Supabase/Lovable references"
 
 ### 3. Type consistency
 
-- `AppUser` defined in Task 18 (`useAuth.tsx`) — used consistently in Tasks 19–21
-- `callApi` / `callApiRaw` defined in Task 17 — used consistently in Tasks 19–21
+- `AppUser` defined in Task 18 (`useAuth.tsx`) — fields: `{ id, tid, email, name }` (Entra claims)
+- `callApi` / `callApiRaw` defined in Task 17 — acquire Entra access token via MSAL before each call
 - `corsResponse` / `corsPreflightResponse` defined in Task 5 — used in all function tasks
-- `authenticate` defined in Task 9 — used in all function tasks from Task 10 onward
+- `authenticate` defined in Task 9 — `async`, returns `Promise<AuthUser>` — all callers from Task 10 onward must `await authenticate(req)`
 - `query` / `queryOne` defined in Task 7 — used in all function tasks from Task 10 onward
+- `AuthUser.id` = Entra `oid` claim. All function DB queries that previously used `user.id` as `profiles.id` now look up profile via `(entra_oid, entra_tid)` or use the internal `profiles.id` returned from that lookup. The `user-context` endpoint (Task 11) is the authoritative source of `profiles.id` for all per-user DB operations.
+- Profile lookup pattern in functions that need `profiles.id`:
+  ```ts
+  const profile = await queryOne<{ id: string }>(
+    'SELECT id FROM profiles WHERE entra_oid = $1 AND entra_tid = $2',
+    [user.id, user.tid]
+  );
+  if (!profile) return corsResponse(origin, 401, { error: 'Profile not found — sign in again' });
+  // use profile.id for all subsequent queries
+  ```
+  Functions that only need auth (not the internal profile UUID) can use `user.id` and `user.tid` directly.
+
+### 4. VNet / infrastructure (confirmed via Azure MCP)
+
+- **PostgreSQL** (`psql-ai-education-migration`): `publicNetworkAccess: Enabled`, firewall rule `AllowAllAzureServicesAndResourcesWithinAzureIps` allows function app connectivity without VNet integration.
+- **Function App** (`func-ai-education-migration`): VNet integration = NOT configured. Not required given public postgres access. S1 Standard plan — VNet integration can be added later if postgres is locked down.
+- **App Service Plan**: S1 Standard (`ASP-AIEducation-bfca`, `swedencentral`) — always-on, no cold starts.
+- **Security note:** `AllowAllAzureServicesAndResourcesWithinAzureIps` permits any Azure resource in any subscription to attempt connection. After migration is stable, replace with function app's specific outbound IP allowlist.
