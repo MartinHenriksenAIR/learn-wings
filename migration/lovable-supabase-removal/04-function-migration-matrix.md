@@ -16,7 +16,7 @@ Verified contracts for all 10 Supabase edge functions. Decision codes: A=merge e
 | **Request Body** | `{ quiz_id: string, answers: Record<string, string> }` (question_id → option_id) |
 | **Response** | `{ score: number, passed: boolean, passing_score: number, correct_count: number, total_questions: number }` |
 | **CORS** | `*` wildcard (NOT Lovable-restricted) |
-| **Database** | Tables: `quizzes`, `quiz_questions`, `quiz_options` (via service role for is_correct); RPC: `user_can_access_quiz` |
+| **Database** | Tables: `quizzes`, `quiz_questions`, `quiz_options` (via service role for is_correct); RPC: `user_can_access_quiz`; **INSERT** into `quiz_attempts` (server-side — see below) |
 | **Env Vars** | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
 | **Security Critical** | `quiz_options.is_correct` read via service role ONLY. Never returned to client. |
 | **Frontend Caller** | `src/pages/learner/CoursePlayer.tsx:335` — `supabase.functions.invoke('grade-quiz', { body: { quiz_id, answers } })` |
@@ -25,9 +25,10 @@ Verified contracts for all 10 Supabase edge functions. Decision codes: A=merge e
 | **Proposed Route** | `POST /api/grade-quiz` |
 | **Auth in Replacement** | Validate JWT from new auth provider; check quiz access via DB query |
 | **DB in Replacement** | Azure PostgreSQL — query `quiz_options` with privileged DB user (no RLS bypass needed if app-layer auth is enforced) |
-| **Code Changes** | Update CoursePlayer.tsx:335 to call Azure Function URL |
+| **quiz_attempts ownership** | **⚠️ CRITICAL CHANGE:** Currently `CoursePlayer.tsx:357` inserts `quiz_attempts` from the browser. Supabase RLS prevents score manipulation. Azure PostgreSQL has no RLS. The replacement grade-quiz function MUST insert into `quiz_attempts` server-side (after grading) — return `{ score, passed, passing_score, correct_count, total_questions }` as before but include `attemptId`. Remove `quiz_attempts.insert` from CoursePlayer.tsx:357 entirely. |
+| **Code Changes** | Update CoursePlayer.tsx:335 to call Azure Function URL; **remove** CoursePlayer.tsx:357 (quiz_attempts insert) |
 | **Azure Changes** | Deploy function; add DB connection string |
-| **Test Required** | Unit: score calculation; integration: DB query; security: is_correct never in response |
+| **Test Required** | Unit: score calculation; integration: DB query; security: is_correct never in response; quiz_attempts insert happens server-side and cannot be spoofed from browser |
 | **Rollback** | Keep Supabase function until Azure Function verified |
 | **Confidence** | High |
 
@@ -280,17 +281,33 @@ Verified contracts for all 10 Supabase edge functions. Decision codes: A=merge e
 
 ---
 
-## Summary Table
+## Summary Table — Original 10 Functions
 
-| Function | Decision | Target Route | Caller Update | DB Needed | Azure Secrets Needed | Binary Response |
-|----------|---------|-------------|--------------|-----------|---------------------|----------------|
-| grade-quiz | B | POST /api/grade-quiz | CoursePlayer.tsx:335 | Yes (quiz_options) | DB connection | No |
-| generate-certificate | B | POST /api/generate-certificate | Dashboard.tsx:147 | Yes (enrollments) | DB connection | **PDF** |
-| delete-user | B | POST /api/delete-user | UserDetailDialog.tsx:186 | Yes (profiles) | DB + auth admin API | No |
-| send-invitation-email | B | POST /api/send-invitation-email | sendInvitationEmail.ts:24 | Yes (profiles, memberships) | DB + RESEND_API_KEY | No |
-| azure-upload-url | C | POST /api/azure-upload-url | azure-video-upload.tsx:75 | Yes (profiles) | DB + storage | No |
-| azure-view-url | C | POST /api/azure-view-url | CoursePlayer.tsx:208,233 + azure-video-upload.tsx:38 | Yes (RPC equivalent) | DB + storage | No |
-| azure-delete-blob | C | POST /api/azure-delete-blob | CourseEditor.tsx:262 | Yes (profiles) | DB + storage | No |
-| generate-compliance-report | B | POST /api/generate-compliance-report | OrgAnalytics.tsx:275 | Yes (multi-table) | DB connection | **PDF** |
-| azure-document-upload-url | C | POST /api/azure-document-upload-url | azure-document-upload.tsx:65 | Yes (profiles) | DB + storage | No |
-| test-smtp-connection | B | POST /api/test-smtp-connection | PlatformSettings.tsx:151 | Yes (profiles for auth) | DB connection | No |
+| Function | Decision | Target Route | Caller Update | DB Needed | Azure Secrets | Binary |
+|----------|---------|-------------|--------------|-----------|--------------|--------|
+| grade-quiz | B | POST /api/grade-quiz | CoursePlayer.tsx:335, **remove** line 357 | Yes | DB | No |
+| generate-certificate | B | POST /api/generate-certificate | Dashboard.tsx:147 | Yes | DB | **PDF** |
+| delete-user | B | POST /api/delete-user | UserDetailDialog.tsx:186 | Yes | DB + auth admin | No |
+| send-invitation-email | B | POST /api/send-invitation-email | sendInvitationEmail.ts:24 | Yes | DB + RESEND_API_KEY | No |
+| azure-upload-url | C | POST /api/azure-upload-url | azure-video-upload.tsx:75 | Yes | DB + storage | No |
+| azure-view-url | C | POST /api/azure-view-url | CoursePlayer.tsx:208,233 + azure-video-upload.tsx:38 | Yes | DB + storage | No |
+| azure-delete-blob | C | POST /api/azure-delete-blob | CourseEditor.tsx:262 | Yes | DB + storage | No |
+| generate-compliance-report | B | POST /api/generate-compliance-report | OrgAnalytics.tsx:275 | Yes | DB | **PDF** |
+| azure-document-upload-url | C | POST /api/azure-document-upload-url | azure-document-upload.tsx:65 | Yes | DB + storage | No |
+| test-smtp-connection | B | POST /api/test-smtp-connection | PlatformSettings.tsx:151 | Yes | DB | No |
+
+## Summary Table — Additional Endpoints Required (frontend DB/RPC calls)
+
+These endpoints were not in the original 10. All frontend direct `supabase.from()` and `supabase.rpc()` calls need HTTP equivalents. Without these, removing `@supabase/supabase-js` breaks these call sites silently.
+
+| Endpoint | Route | Caller | Purpose |
+|----------|-------|--------|---------|
+| course-player-data | GET /api/course-player-data | CoursePlayer.tsx:68-176 | Load course+modules+lessons+progress+review |
+| lesson-progress | POST /api/lesson-progress | CoursePlayer.tsx:276 | Upsert lesson_progress |
+| enrollment-complete | POST /api/enrollment-complete | CoursePlayer.tsx:310 | Mark enrollment completed |
+| quiz-options | POST /api/quiz-options | CoursePlayer.tsx:177 | Learner quiz options (no is_correct) |
+| quiz-options-admin | POST /api/quiz-options-admin | QuizEditorDialog.tsx:100 | Admin quiz options (with is_correct) |
+| user-context | GET /api/user-context | useAuth.tsx:fetchUserContext | Profile + memberships on auth state change |
+| org-analytics-data | POST /api/org-analytics-data | OrgAnalytics.tsx:70-200 | Analytics dashboard data |
+| admin-user-actions | POST /api/admin/user-actions | UserDetailDialog.tsx:81,105,129,153 | Toggle admin, role, membership |
+| invitation-link | POST /api/invitation-link | OrganizationDetail.tsx | get_invitation_link_id RPC |

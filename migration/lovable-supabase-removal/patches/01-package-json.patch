@@ -1,6 +1,13 @@
-# PATCH 01 — package.json: Remove Supabase + Lovable dependencies
+# PATCH 01 — package.json changes
 # DRAFT ONLY — DO NOT APPLY without completing auth/DB migration
+#
+# CORRECTED: pg belongs in functions/package.json, NOT in the root package.json.
+# Root package.json is the Vite frontend — pg is a Node.js TCP client and
+# cannot be bundled into a browser build. Adding it to the root would either
+# fail the Vite build or silently bundle raw TCP socket stubs.
 
+# --- ROOT package.json ---
+# Remove Supabase runtime dep and Lovable devDep. Nothing added.
 --- a/package.json
 +++ b/package.json
 @@ -38,7 +38,6 @@
@@ -9,16 +16,34 @@
      "@tanstack/react-query": "^5.83.0",
      "@types/papaparse": "^5.5.2",
      "class-variance-authority": "^0.7.1",
-@@ -60,6 +59,7 @@
-     "react-router-dom": "^6.30.1",
-     "recharts": "^2.15.4",
-     "sonner": "^1.7.4",
-+    "pg": "^8.11.3",
-     "tailwind-merge": "^2.6.0",
-     "tailwindcss-animate": "^1.0.7",
-     "vaul": "^0.9.9",
 @@ -79,7 +79,6 @@
      "jsdom": "^20.0.3",
 -    "lovable-tagger": "^1.1.13",
      "postcss": "^8.5.6",
      "tailwindcss": "^3.4.17",
+
+# --- NEW FILE: functions/package.json ---
+# Created as part of the functions/ directory (see patches/03-azure-functions-src.patch).
+# pg ^8.11 is the Node.js PostgreSQL client for Azure PostgreSQL Flexible Server.
++++ b/functions/package.json
+@@ -0,0 +1,18 @@
++{
++  "name": "func-ai-education-migration",
++  "version": "1.0.0",
++  "description": "Azure Functions backend for learn-wings",
++  "main": "dist/index.js",
++  "scripts": {
++    "build": "tsc",
++    "start": "func start",
++    "test": "vitest run"
++  },
++  "dependencies": {
++    "@azure/functions": "^4.0.0",
++    "pg": "^8.11.3"
++  },
++  "devDependencies": {
++    "@types/pg": "^8.11.6",
++    "typescript": "^5.4.0",
++    "vitest": "^1.6.0"
++  }
++}
