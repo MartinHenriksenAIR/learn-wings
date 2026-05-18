@@ -54,31 +54,30 @@ Questions remaining after exhaustive repository and Azure verification. Each inc
 
 ---
 
-## Q3 — KEY VAULT SECRETS: What secrets already exist in `ai-education-migration` Key Vault? ⚠️ ACCESS BLOCKED
+## Q3 — KEY VAULT SECRETS: What secrets already exist in `ai-education-migration` Key Vault? ✅ RESOLVED
 
-**Finding:** Key Vault is accessible over the network (public endpoint), but the current CLI identity lacks the `Key Vault Secrets User` (or `Key Vault Reader`) RBAC role on this vault. Error: `ForbiddenByRbac` — `Microsoft.KeyVault/vaults/secrets/readMetadata/action` denied.
+**Secrets confirmed in vault:**
 
-**Why it matters:** Before deploying functions, the following secrets must exist in the vault:
-- `DATABASE-URL` — PostgreSQL connection string for `psql-ai-education-migration`
-- `STORAGE-ACCOUNT-KEY` — key for `staieducationmigration` blob storage
-- `RESEND-API-KEY` — for `send-invitation-email` function
-- `ENTRA-CLIENT-ID` — app registration client ID (not secret but stored for consistency)
+| Secret name | Status | Migration relevance |
+|-------------|--------|-------------------|
+| `storage-account-key` | ✅ Enabled | Already exists — reference in functions as `@Microsoft.KeyVault(...)` |
+| `postgresql-admin-password` | ✅ Enabled | Already exists — use to construct `DATABASE-URL` |
+| `acr-password` | ✅ Enabled | Container Registry — not migration-relevant |
 
-If any already exist under different names, deploying with conflicting names creates duplicate secrets.
+**Secrets that must be ADDED before function deployment:**
 
-**Safest next step:** An account with `Key Vault Administrator` or `Key Vault Secrets Officer` role must:
-```bash
-# Grant CLI identity access first (run as Owner/Contributor):
-az role assignment create \
-  --role "Key Vault Secrets User" \
-  --assignee 9ef1ffaa-a74e-423a-8adb-d695808f12b2 \
-  --scope /subscriptions/35cd9c6c-0c00-4efe-bd03-21549de140e4/resourceGroups/AI-Education/providers/Microsoft.KeyVault/vaults/ai-education-migration
+| Secret name | Value source |
+|-------------|-------------|
+| `database-url` | Construct: `postgresql://AIUadmin:<postgresql-admin-password>@psql-ai-education-migration.postgres.database.azure.com:5432/<db-name>?sslmode=require` |
+| `resend-api-key` | Get from Resend dashboard |
 
-# Then list secrets:
-az keyvault secret list --vault-name ai-education-migration --query "[].name" -o tsv
-```
+**Note:** `ENTRA-CLIENT-ID` is not a secret — put it in the Function App application settings directly (not Key Vault), alongside `ENTRA_CLIENT_ID=<app-registration-client-id>`.
 
-Alternatively: check via Azure Portal → ai-education-migration → Secrets.
+**Additional findings:**
+- PostgreSQL admin user: `AIUadmin`
+- Storage containers already in `staieducationmigration`: `lms-videos`, `lms-documents`, `azure-webjobs-hosts`, `azure-webjobs-secrets`
+- `email-assets` container does NOT exist yet — must be created for Q10
+- Function app outbound IPs (19 IPs) for postgres firewall hardening: `135.225.240.98`, `135.225.240.152`, `135.225.240.223`, `135.225.241.23`, `135.225.241.104`, `135.225.241.111`, `135.225.247.217`, `135.225.246.3`, `135.225.247.92`, `135.225.247.93`, `74.241.232.142`, `74.241.232.146`, `74.241.233.57`, `74.241.233.85`, `74.241.233.206`, `74.241.234.45`, `74.241.234.242`, `74.241.235.114`, `51.12.31.10`
 
 ---
 
@@ -198,17 +197,24 @@ https://cairuxpyfshugwjrrqha.supabase.co/storage/v1/object/public/email-assets/l
 
 New URL: `https://staieducationmigration.blob.core.windows.net/email-assets/logo-light.png`
 
+**Confirmed:** `email-assets` container does NOT yet exist in `staieducationmigration` (existing containers: `lms-videos`, `lms-documents`, `azure-webjobs-hosts`, `azure-webjobs-secrets`). Must be created.
+
 **Steps (part of Task 16):**
 ```bash
-# Create public container
-az storage container create --name email-assets --account-name staieducationmigration --public-access blob
+# Create public container (blobs readable without auth — logo must be public for email clients)
+az storage container create \
+  --name email-assets \
+  --account-name staieducationmigration \
+  --public-access blob \
+  --auth-mode login
 
 # Upload logo
 az storage blob upload \
   --account-name staieducationmigration \
   --container-name email-assets \
   --name logo-light.png \
-  --file public/logo-light.png
+  --file public/logo-light.png \
+  --auth-mode login
 ```
 
 Update the hardcoded URL in `functions/send-invitation-email/index.ts` to the new URL. This is a one-line change already tracked in Task 16.
