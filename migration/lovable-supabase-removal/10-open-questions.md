@@ -22,54 +22,89 @@ Questions remaining after exhaustive repository and Azure verification. Each inc
 
 ---
 
-## Q2 — DATABASE MIGRATION: How does the Supabase PostgreSQL schema migrate to Azure PostgreSQL? ⚠️ CRITICAL BLOCKER
+## Q2 — DATABASE MIGRATION: How does the Supabase PostgreSQL schema migrate to Azure PostgreSQL? ⚠️ BLOCKER FOR TASK 23 ONLY
 
-**Why it matters:** The Supabase PostgreSQL has 30+ migrations, Supabase-specific SQL functions (`auth.uid()`, Supabase storage hooks), and Row Level Security policies that use `auth.uid()`. Azure PostgreSQL Flexible Server does not have `auth.uid()`. All RLS policies must be translated to application-layer authorization. The `can_user_access_lms_asset` and `user_can_access_quiz` RPCs must be recreated.
+**Findings from repo analysis (42 migrations, PostgreSQL 15 target):**
 
-**Sub-questions:**
-- Are there Supabase-specific PostgreSQL extensions in use (e.g., `pgcrypto`, `uuid-ossp`, Supabase-specific functions)?
-- How many rows are in each table (data migration volume)?
-- Is there a staging Azure PostgreSQL available for schema testing?
-- Which PostgreSQL user/role will application functions use on Azure?
+| Item | Count | Disposition |
+|------|-------|-------------|
+| Total migration files | 42 | Export all via pg_dump |
+| RLS / `auth.uid()` references | 190 lines | **Drop all** — replaced by app-layer auth in Azure Functions |
+| `CREATE POLICY` statements | 30+ | **Drop all** |
+| Custom SQL functions | 25 | See table below |
+| `CREATE EXTENSION` statements | **0** | None declared; Supabase provides extensions by default |
+| `gen_random_uuid()` usages | many | **Safe** — native in PostgreSQL 13+, no extension needed |
+| `profiles.id REFERENCES auth.users(id)` | 1 | Change to plain `UUID PRIMARY KEY DEFAULT gen_random_uuid()` |
+| `AFTER INSERT ON auth.users` trigger | 1 | **Drop** — replaced by user-context first-login provisioning |
+| Storage policies (`auth.role()`) | 2 | **Drop** — Azure Blob uses SAS |
 
-**Safest next step:** Run `pg_dump --schema-only` from Supabase and review for Supabase-specific constructs. Test schema import against Azure PostgreSQL in a dev environment.
+**Functions to drop** (all use `auth.uid()` internally):
+- `handle_new_user()` + `on_auth_user_created` trigger
+- `is_platform_admin()`, `is_org_admin()`, `is_org_member()`, `current_org_ids_for_user()`
+- `can_access_lms_asset(file_path TEXT)` (old single-arg version using `auth.role()`)
+
+**Functions to keep** (parameterized, no `auth.uid()`):
+- `can_user_access_lms_asset(p_user_id, file_path)` — used in azure-view-url function
+- `user_can_access_quiz(p_quiz_id)` — verify body doesn't call `auth.uid()` before keeping
+- `get_quiz_options_for_learner`, `get_quiz_options_with_answers`, `get_invitation_link_id`, `get_invitation_by_token`, `accept_invitation`, `hash_invitation_token`, `get_org_invitations_safe`, `get_platform_invitations_safe`, `get_post_org_id`
+
+**Not a blocker for Tasks 1–22.** Task 23 (schema apply) requires pg_dump + cleanup + apply to Azure. Estimated effort: 4–6 hours including testing.
+
+**Still unknown:** row counts (data volume), PostgreSQL admin credentials, staging DB availability. These are needed for Task 23 execution, not planning.
 
 ---
 
-## Q3 — KEY VAULT SECRETS: What secrets already exist in `ai-education-migration` Key Vault?
+## Q3 — KEY VAULT SECRETS: What secrets already exist in `ai-education-migration` Key Vault? ⚠️ ACCESS BLOCKED
 
-**Why it matters:** If `AZURE_STORAGE_ACCOUNT_KEY`, `RESEND_API_KEY`, or other migration-relevant secrets are already stored in the Key Vault, the proposed-iac commands to add them would conflict. If they are absent, they must be added before deploying replacement functions.
+**Finding:** Key Vault is accessible over the network (public endpoint), but the current CLI identity lacks the `Key Vault Secrets User` (or `Key Vault Reader`) RBAC role on this vault. Error: `ForbiddenByRbac` — `Microsoft.KeyVault/vaults/secrets/readMetadata/action` denied.
 
-**Limitation:** Key Vault is behind a private endpoint. Secret names were unreachable from the local machine (`Network unreachable` error).
+**Why it matters:** Before deploying functions, the following secrets must exist in the vault:
+- `DATABASE-URL` — PostgreSQL connection string for `psql-ai-education-migration`
+- `STORAGE-ACCOUNT-KEY` — key for `staieducationmigration` blob storage
+- `RESEND-API-KEY` — for `send-invitation-email` function
+- `ENTRA-CLIENT-ID` — app registration client ID (not secret but stored for consistency)
 
-**Safest next step:** Access Key Vault via Azure Portal from a machine on the VNet (or via Azure Bastion/VPN), or via:
+If any already exist under different names, deploying with conflicting names creates duplicate secrets.
+
+**Safest next step:** An account with `Key Vault Administrator` or `Key Vault Secrets Officer` role must:
 ```bash
-az keyvault secret list --vault-name ai-education-migration
+# Grant CLI identity access first (run as Owner/Contributor):
+az role assignment create \
+  --role "Key Vault Secrets User" \
+  --assignee 9ef1ffaa-a74e-423a-8adb-d695808f12b2 \
+  --scope /subscriptions/35cd9c6c-0c00-4efe-bd03-21549de140e4/resourceGroups/AI-Education/providers/Microsoft.KeyVault/vaults/ai-education-migration
+
+# Then list secrets:
+az keyvault secret list --vault-name ai-education-migration --query "[].name" -o tsv
 ```
-from within the VNet.
+
+Alternatively: check via Azure Portal → ai-education-migration → Secrets.
 
 ---
 
-## Q4 — STATIC WEB APP APP SETTINGS: Are any `VITE_SUPABASE_*` variables currently configured in Azure SWA?
+## Q4 — STATIC WEB APP APP SETTINGS: Are any `VITE_SUPABASE_*` variables currently configured in Azure SWA? ✅ RESOLVED
 
-**Why it matters:** If Supabase env vars are configured in the Static Web App's Azure settings (in addition to the `.env` file), they will override the `.env` during CI/CD builds and must be explicitly removed from Azure.
+**Finding:** `properties: {}` — no app settings configured at all in the SWA. The build uses `.env` file only.
 
-**Limitation:** `az staticwebapp appsettings list` was not attempted (could not confirm credentials scope for this resource).
+**Impact:** Nothing to remove. When deploying the migration, add new settings here:
+- `VITE_ENTRA_CLIENT_ID`
+- `VITE_API_BASE_URL`
+- `VITE_STORAGE_BASE_URL`
+- `VITE_ENTRA_SCOPE`
 
-**Safest next step:**
+These go in Azure Portal → stapp-ai-education-migration → Configuration, or via:
 ```bash
-az staticwebapp appsettings list --name stapp-ai-education-migration --resource-group AI-Education
+az staticwebapp appsettings set --name stapp-ai-education-migration --resource-group AI-Education \
+  --setting-names VITE_ENTRA_CLIENT_ID=<value> VITE_API_BASE_URL=<value> VITE_STORAGE_BASE_URL=<value>
 ```
 
 ---
 
-## Q5 — STORAGE CORS: Are Lovable domains in the Azure Storage Account CORS rules?
+## Q5 — STORAGE CORS: Are Lovable domains in the Azure Storage Account CORS rules? ✅ RESOLVED
 
-**Why it matters:** If `learn-wings.lovable.app` or other Lovable domains are in the blob service CORS allowlist, they could allow Lovable to directly access blobs. These must be removed.
+**Finding:** `[]` — no CORS rules configured on `staieducationmigration` blob service. No Lovable domains present.
 
-**Limitation:** Storage blob CORS API was unreachable from local machine.
-
-**Safest next step:** From Azure Portal → `staieducationmigration` → Settings → Resource Sharing (CORS), inspect and update blob CORS rules. Or use the Azure CLI from within the VNet.
+**Impact:** Nothing to remove. SAS-based blob access (the pattern used by azure-upload-url/azure-view-url functions) does not require CORS rules on the storage account — the browser posts to the Azure Function, not directly to blob storage. If direct browser-to-blob uploads are ever needed (presigned PUT), CORS rules will need to be added at that point.
 
 ---
 
@@ -90,43 +125,90 @@ Then remove the `AllowAllAzureServicesAndResourcesWithinAzureIps` rule.
 
 ---
 
-## Q7 — CUSTOM DOMAIN: Is `ai-uddannelse.dk` linked to the Static Web App in Azure?
+## Q7 — CUSTOM DOMAIN: Is `ai-uddannelse.dk` linked to the Static Web App in Azure? ⚠️ NOT LINKED
 
-**Why it matters:** `src/lib/config.ts` defines `PLATFORM_BASE_URL = 'https://ai-uddannelse.dk'` as the production domain. Invite links use this domain. If the domain is not linked in Azure, the links will not resolve.
+**Finding:** `customDomains: []` — domain not configured. App only reachable at `black-forest-0d7f96c03.7.azurestaticapps.net`.
 
-**Finding:** `stapp-ai-education-migration` has `customDomains: []` — no custom domain is currently configured.
+**Impact:** Invitation links generated by `send-invitation-email` use `PLATFORM_BASE_URL = 'https://ai-uddannelse.dk'` — these links are currently broken in production. This is a pre-existing issue independent of the migration.
 
-**Safest next step:** Add the custom domain in Azure Portal → stapp-ai-education-migration → Custom Domains, then update DNS CNAME to point to `black-forest-0d7f96c03.7.azurestaticapps.net`.
+**Also impacts:** Entra ID app registration redirect URIs must include the custom domain (Task 8.5 Step 2). If domain is not linked when users try to log in, the MSAL redirect will fail because `ai-uddannelse.dk` won't resolve to the SWA.
 
----
-
-## Q8 — SUPABASE AUTH USERS: How many users exist in Supabase Auth and what migration approach?
-
-**Why it matters:** Migrating users from Supabase Auth to a new provider requires either:
-- Exporting user emails + hashed passwords (Supabase format may differ from new provider)
-- Forcing password reset emails to all users
-- OAuth token migration if OAuth providers are in use
-
-**Safest next step:** Export user list from Supabase Dashboard → Authentication → Users. Count users and identify OAuth providers. Plan migration with minimal user disruption (e.g., send password reset emails to all users when new auth is live).
+**Action required before cutover:**
+1. Azure Portal → stapp-ai-education-migration → Custom Domains → Add
+2. Create DNS CNAME: `ai-uddannelse.dk` → `black-forest-0d7f96c03.7.azurestaticapps.net`
+3. Azure verifies domain ownership (TXT record)
+4. Confirm redirect URI `https://ai-uddannelse.dk` is in Entra app registration (Task 8.5 Step 2 already includes this)
 
 ---
 
-## Q9 — SEED-MOCK-USERS FUNCTION: Is `seed-mock-users` a blocker?
+## Q8 — SUPABASE AUTH USERS: How many users exist and what is the data migration approach? ⚠️ NEEDS COUNT
 
-**Why it matters:** The 11th function (`supabase/functions/seed-mock-users/index.ts`) is not in the main 10 but uses `SUPABASE_SERVICE_ROLE_KEY` and `supabase.auth.admin.createUser`. It has no CORS restriction and no auth gate.
+**Auth migration approach decided (no password migration needed):** With Entra ID, users re-authenticate via Microsoft SSO. No password export, no reset emails.
 
-**Assessment:** This is a dev/test seeding tool, not a production function. It should be removed entirely (not migrated). However, if it is exposed on the Supabase hosted endpoint, it represents a security risk.
+**The real problem:** Existing `profiles` rows have UUIDs from Supabase `auth.users`. After cutover, Entra users get new profile rows (provisioned by user-context endpoint). Their old data — course progress, org memberships, quiz attempts — is linked to old profile UUIDs and becomes orphaned.
 
-**Safest next step:** Verify this function is only deployed to development Supabase environments and not production. Remove it from `supabase/functions/` as part of the cleanup phase.
+**Mitigation plan:**
+1. Before cutover: export `profiles` table with `(id, email)` pairs
+2. After users first log in via Entra: run one-time merge script:
+   ```sql
+   -- Match old profile to new by email, reassign FK references
+   UPDATE org_memberships SET user_id = new.id
+   FROM profiles old, profiles new
+   WHERE old.email = new.entra_oid_email  -- use email as bridge
+     AND old.entra_oid IS NULL            -- old Supabase profile
+     AND new.entra_oid IS NOT NULL;       -- new Entra profile
+   -- Repeat for lesson_progress, quiz_attempts, course_reviews, etc.
+   ```
+
+**Still needed:** User count from Supabase Dashboard → Authentication → Users. If under ~50 users, merge can be done manually or skipped (users just re-enroll). If hundreds+, the automated merge script becomes essential.
+
+**Not a blocker** for code tasks. Blocker only for production cutover timing decision.
 
 ---
 
-## Q10 — EMAIL LOGO: Where does the `send-invitation-email` logo move to?
+## Q9 — SEED-MOCK-USERS FUNCTION: Is `seed-mock-users` a security risk? ⚠️ SECURITY RISK IF DEPLOYED
 
-**Why it matters:** The email HTML contains a hardcoded URL to `cairuxpyfshugwjrrqha.supabase.co/storage/v1/object/public/email-assets/logo-light.png`. After Supabase is removed, this URL will return 404 and the logo will break in invitation emails.
+**Findings:**
+- `CORS: '*'` — any origin can call it
+- No auth gate whatsoever
+- Uses `SUPABASE_SERVICE_ROLE_KEY` + `supabase.auth.admin.createUser`
+- Hardcoded test user emails + passwords visible in source (`Test1234!`)
+- **Not referenced in any CI/CD YAML or deployment config** — likely dev-only
 
-**Safest next step:** Upload `public/logo-light.png` (already in the repo) to either:
-- Azure Blob Storage public container on `staieducationmigration`
-- The Static Web App's static assets path (e.g., `https://black-forest-0d7f96c03.7.azurestaticapps.net/logo-light.png` or the custom domain equivalent)
+**Risk:** If deployed to the production Supabase project (`cairuxpyfshugwjrrqha`), anyone who knows the function URL can create arbitrary users with known passwords in your production auth system.
 
-Update the `send-invitation-email` replacement function to use the new URL.
+**Action — do this now, not at migration time:**
+1. Supabase Dashboard → Edge Functions → check if `seed-mock-users` is listed
+2. If deployed: `supabase functions delete seed-mock-users --project-ref cairuxpyfshugwjrrqha`
+3. Remove from `supabase/functions/` in the repo cleanup (Task 24)
+
+**Not a migration blocker** — but should be verified and deleted before any production traffic.
+
+---
+
+## Q10 — EMAIL LOGO: Where does the `send-invitation-email` logo move to? ✅ DECISION MADE
+
+**Finding:** `supabase/functions/send-invitation-email/index.ts` contains:
+```
+https://cairuxpyfshugwjrrqha.supabase.co/storage/v1/object/public/email-assets/logo-light.png
+```
+`public/logo-light.png` exists in the repo.
+
+**Decision:** Upload to `staieducationmigration` blob storage in a new public container `email-assets`.
+
+New URL: `https://staieducationmigration.blob.core.windows.net/email-assets/logo-light.png`
+
+**Steps (part of Task 16):**
+```bash
+# Create public container
+az storage container create --name email-assets --account-name staieducationmigration --public-access blob
+
+# Upload logo
+az storage blob upload \
+  --account-name staieducationmigration \
+  --container-name email-assets \
+  --name logo-light.png \
+  --file public/logo-light.png
+```
+
+Update the hardcoded URL in `functions/send-invitation-email/index.ts` to the new URL. This is a one-line change already tracked in Task 16.
