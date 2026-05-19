@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_at": "2026-05-19T18:26:36.966941",
+    "generated_at": "2026-05-19T18:53:05.591635",
     "total_adrs": 9,
     "adr_directory": "docs/adr",
     "validation_errors": [
@@ -8,6 +8,12 @@
         "file": "docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md",
         "errors": [
           "[ERROR] docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md: Parse error in docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      rationales: ['Secrets committed  ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 8, column 317:\n     ... for all production credentials']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      },
+      {
+        "file": "docs/adr/ADR-0011-blob-name-url-encoding-responsibility-in-sas-generation.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0011-blob-name-url-encoding-responsibility-in-sas-generation.md: Parse error in docs/adr/ADR-0011-blob-name-url-encoding-responsibility-in-sas-generation.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      rationales: ['Encoding inside ge ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 8, column 241:\n     ... hen passed to generateSasToken']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
         ]
       }
     ],

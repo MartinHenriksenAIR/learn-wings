@@ -6,7 +6,8 @@ date: 2026-05-19
 deciders: ['le-dawg']
 tags: ['security', 'secrets', 'environment', 'gitignore']
 policy:
-  rationales: ['Secrets committed to git are permanently exposed in history, CI artifacts, and clones — rotation alone does not remediate', 'VITE_ prefixed variables are bundled into the browser bundle and must never contain secrets', 'Azure Key Vault is the designated secrets store for all production credentials']approval_date: 2026-05-19
+  rationales: ['Secrets committed to git are permanently exposed in history, CI artifacts, and clones — rotation alone does not remediate', 'VITE_ prefixed variables are bundled into the browser bundle and must never contain secrets', 'Azure Key Vault is the designated secrets store for all production credentials']
+approval_date: 2026-05-19
 approval_notes: "HIGH severity finding from differential security review 2026-05-19 (F-01). .env tracked since commit 43a079e. Immediate mitigation: git rm --cached .env, .gitignore updated (commit 8c292bb). Full remediation: Supabase project decommission at migration cutover."
 
 ---
