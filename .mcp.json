@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "adr-kit": {
+      "command": "/Users/thedawgctor/.local/bin/adr-kit",
+
+        "args": ["mcp-server"]
+    }
+  }
+}

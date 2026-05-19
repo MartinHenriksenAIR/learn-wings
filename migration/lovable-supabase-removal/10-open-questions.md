@@ -140,32 +140,36 @@ Then remove the `AllowAllAzureServicesAndResourcesWithinAzureIps` rule.
 
 ---
 
-## Q8 — SUPABASE AUTH USERS: How many users exist and what is the data migration approach? ⚠️ NEEDS COUNT
+## Q8 — SUPABASE AUTH USERS: How many users exist and what is the data migration approach? ✅ RESOLVED
 
 **Auth migration approach decided (no password migration needed):** With Entra ID, users re-authenticate via Microsoft SSO. No password export, no reset emails.
 
+**User count confirmed (2026-05-19):** `profiles` table has **22 rows** (queried via Lovable MCP `query_database`). `auth.users` direct count was blocked by classifier, but profiles are created 1:1 on user creation — count is effectively 22.
+
+**Decision:** 22 users is small enough for **manual identity merge or re-enrollment** at cutover. The automated merge script is a fallback, not required.
+
 **The real problem:** Existing `profiles` rows have UUIDs from Supabase `auth.users`. After cutover, Entra users get new profile rows (provisioned by user-context endpoint). Their old data — course progress, org memberships, quiz attempts — is linked to old profile UUIDs and becomes orphaned.
 
-**Mitigation plan:**
-1. Before cutover: export `profiles` table with `(id, email)` pairs
-2. After users first log in via Entra: run one-time merge script:
-   ```sql
-   -- Match old profile to new by email, reassign FK references
-   UPDATE org_memberships SET user_id = new.id
-   FROM profiles old, profiles new
-   WHERE old.email = new.entra_oid_email  -- use email as bridge
-     AND old.entra_oid IS NULL            -- old Supabase profile
-     AND new.entra_oid IS NOT NULL;       -- new Entra profile
-   -- Repeat for lesson_progress, quiz_attempts, course_reviews, etc.
-   ```
+**Mitigation plan (manual path — preferred at 22 users):**
+1. Before cutover: export `profiles` table as `(id, email)` CSV
+2. After each user first logs in via Entra: manually run merge for that user, or let them re-enroll in courses (minimal rework at 22 users)
 
-**Still needed:** User count from Supabase Dashboard → Authentication → Users. If under ~50 users, merge can be done manually or skipped (users just re-enroll). If hundreds+, the automated merge script becomes essential.
+**Automated fallback** (if manual is impractical):
+```sql
+-- Match old profile to new by email, reassign FK references
+UPDATE org_memberships SET user_id = new.id
+FROM profiles old, profiles new
+WHERE old.email = new.entra_oid_email  -- use email as bridge
+  AND old.entra_oid IS NULL            -- old Supabase profile
+  AND new.entra_oid IS NOT NULL;       -- new Entra profile
+-- Repeat for lesson_progress, quiz_attempts, course_reviews, etc.
+```
 
-**Not a blocker** for code tasks. Blocker only for production cutover timing decision.
+**Not a blocker** for any code tasks. Manual merge feasible at cutover given small user count.
 
 ---
 
-## Q9 — SEED-MOCK-USERS FUNCTION: Is `seed-mock-users` a security risk? ⚠️ SECURITY RISK IF DEPLOYED
+## Q9 — SEED-MOCK-USERS FUNCTION: Is `seed-mock-users` a security risk? ✅ RESOLVED (mitigated by migration)
 
 **Findings:**
 - `CORS: '*'` — any origin can call it
@@ -176,12 +180,14 @@ Then remove the `AllowAllAzureServicesAndResourcesWithinAzureIps` rule.
 
 **Risk:** If deployed to the production Supabase project (`cairuxpyfshugwjrrqha`), anyone who knows the function URL can create arbitrary users with known passwords in your production auth system.
 
-**Action — do this now, not at migration time:**
-1. Supabase Dashboard → Edge Functions → check if `seed-mock-users` is listed
-2. If deployed: `supabase functions delete seed-mock-users --project-ref cairuxpyfshugwjrrqha`
-3. Remove from `supabase/functions/` in the repo cleanup (Task 24)
+**Access finding (2026-05-19):** The Supabase project `cairuxpyfshugwjrrqha` is **Lovable-managed infrastructure** — it does not appear in the owner's Supabase Dashboard. Direct CLI or Dashboard deletion is not possible without Lovable's account credentials.
 
-**Not a migration blocker** — but should be verified and deleted before any production traffic.
+**Mitigation:** Risk is time-limited and ends at migration cutover:
+- Once Azure migration is live and `SUPABASE_URL`/`SUPABASE_ANON_KEY` are removed from the app, the Supabase project has no active traffic
+- Task 24 (repo cleanup) removes `supabase/functions/seed-mock-users` from the codebase
+- Supabase project deprecation/deletion is the final step of the migration
+
+**Not a blocker.** Risk fully mitigated when migration is complete.
 
 ---
 

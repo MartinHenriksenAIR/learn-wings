@@ -1,0 +1,12 @@
+{
+  "rules": {},
+  "settings": {},
+  "env": {},
+  "extends": [],
+  "__adr_metadata": {
+    "generated_by": "ADR Kit",
+    "source_adrs": [],
+    "generation_timestamp": "2026-05-19T14:37:01.796288",
+    "preferred_libraries": null
+  }
+}

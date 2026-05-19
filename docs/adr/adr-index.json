@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "generated_at": "2026-05-19T14:37:01.841009",
+    "total_adrs": 0,
+    "adr_directory": "docs/adr",
+    "validation_errors": [
+      {
+        "file": "docs/adr/ADR-0001-react-vite-as-frontend-framework-spa.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0001-react-vite-as-frontend-framework-spa.md: Parse error in docs/adr/ADR-0001-react-vite-as-frontend-framework-spa.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['vue', '@ ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 87:\n     ... k; no SSR frameworks permitted']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      },
+      {
+        "file": "docs/adr/ADR-0002-typescript-strict-mode-as-primary-language.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0002-typescript-strict-mode-as-primary-language.md: Parse error in docs/adr/ADR-0002-typescript-strict-mode-as-primary-language.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': [], 'prefe ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 100:\n     ... plain JS in src/ or functions/']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      },
+      {
+        "file": "docs/adr/ADR-0003-shadcnui-radix-ui-tailwind-css-as-ui-component-system.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0003-shadcnui-radix-ui-tailwind-css-as-ui-component-system.md: Parse error in docs/adr/ADR-0003-shadcnui-radix-ui-tailwind-css-as-ui-component-system.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['@mui/mat ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 98:\n     ... tem; no competing UI libraries']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      },
+      {
+        "file": "docs/adr/ADR-0004-tanstack-query-v5-for-server-state-management.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0004-tanstack-query-v5-for-server-state-management.md: Parse error in docs/adr/ADR-0004-tanstack-query-v5-for-server-state-management.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['swr', '@ ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 100:\n     ... ; no SWR or Redux alongside it']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      },
+      {
+        "file": "docs/adr/ADR-0005-multi-tenant-microsoft-entra-id-for-authentication.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0005-multi-tenant-microsoft-entra-id-for-authentication.md: Parse error in docs/adr/ADR-0005-multi-tenant-microsoft-entra-id-for-authentication.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['@supabas ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 117:\n     ... ustom JWT endpoints are banned']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      },
+      {
+        "file": "docs/adr/ADR-0006-azure-functions-v4-nodejs-22-for-backend-api.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0006-azure-functions-v4-nodejs-22-for-backend-api.md: Parse error in docs/adr/ADR-0006-azure-functions-v4-nodejs-22-for-backend-api.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['express' ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 118:\n     ... ers or Supabase Edge Functions']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      },
+      {
+        "file": "docs/adr/ADR-0007-azure-postgresql-flexible-server-as-database.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0007-azure-postgresql-flexible-server-as-database.md: Parse error in docs/adr/ADR-0007-azure-postgresql-flexible-server-as-database.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['@supabas ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 155:\n     ... se client, no other DB engines']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      },
+      {
+        "file": "docs/adr/ADR-0008-azure-blob-storage-with-sas-tokens-for-file-storage.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0008-azure-blob-storage-with-sas-tokens-for-file-storage.md: Parse error in docs/adr/ADR-0008-azure-blob-storage-with-sas-tokens-for-file-storage.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['@supabas ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 128:\n     ... orage or S3-compatible clients']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      },
+      {
+        "file": "docs/adr/ADR-0009-resend-for-transactional-email.md",
+        "errors": [
+          "[ERROR] docs/adr/ADR-0009-resend-for-transactional-email.md: Parse error in docs/adr/ADR-0009-resend-for-transactional-email.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['nodemail ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 100:\n     ... mailer or competing email SDKs']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+        ]
+      }
+    ],
+    "status_counts": {},
+    "tag_counts": {}
+  },
+  "adrs": []
+}
