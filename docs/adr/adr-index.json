@@ -1,66 +1,211 @@
 {
   "metadata": {
-    "generated_at": "2026-05-19T14:37:01.841009",
-    "total_adrs": 0,
+    "generated_at": "2026-05-19T18:26:36.966941",
+    "total_adrs": 9,
     "adr_directory": "docs/adr",
     "validation_errors": [
       {
-        "file": "docs/adr/ADR-0001-react-vite-as-frontend-framework-spa.md",
+        "file": "docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md",
         "errors": [
-          "[ERROR] docs/adr/ADR-0001-react-vite-as-frontend-framework-spa.md: Parse error in docs/adr/ADR-0001-react-vite-as-frontend-framework-spa.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['vue', '@ ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 87:\n     ... k; no SSR frameworks permitted']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
-        ]
-      },
-      {
-        "file": "docs/adr/ADR-0002-typescript-strict-mode-as-primary-language.md",
-        "errors": [
-          "[ERROR] docs/adr/ADR-0002-typescript-strict-mode-as-primary-language.md: Parse error in docs/adr/ADR-0002-typescript-strict-mode-as-primary-language.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': [], 'prefe ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 100:\n     ... plain JS in src/ or functions/']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
-        ]
-      },
-      {
-        "file": "docs/adr/ADR-0003-shadcnui-radix-ui-tailwind-css-as-ui-component-system.md",
-        "errors": [
-          "[ERROR] docs/adr/ADR-0003-shadcnui-radix-ui-tailwind-css-as-ui-component-system.md: Parse error in docs/adr/ADR-0003-shadcnui-radix-ui-tailwind-css-as-ui-component-system.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['@mui/mat ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 98:\n     ... tem; no competing UI libraries']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
-        ]
-      },
-      {
-        "file": "docs/adr/ADR-0004-tanstack-query-v5-for-server-state-management.md",
-        "errors": [
-          "[ERROR] docs/adr/ADR-0004-tanstack-query-v5-for-server-state-management.md: Parse error in docs/adr/ADR-0004-tanstack-query-v5-for-server-state-management.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['swr', '@ ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 100:\n     ... ; no SWR or Redux alongside it']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
-        ]
-      },
-      {
-        "file": "docs/adr/ADR-0005-multi-tenant-microsoft-entra-id-for-authentication.md",
-        "errors": [
-          "[ERROR] docs/adr/ADR-0005-multi-tenant-microsoft-entra-id-for-authentication.md: Parse error in docs/adr/ADR-0005-multi-tenant-microsoft-entra-id-for-authentication.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['@supabas ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 117:\n     ... ustom JWT endpoints are banned']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
-        ]
-      },
-      {
-        "file": "docs/adr/ADR-0006-azure-functions-v4-nodejs-22-for-backend-api.md",
-        "errors": [
-          "[ERROR] docs/adr/ADR-0006-azure-functions-v4-nodejs-22-for-backend-api.md: Parse error in docs/adr/ADR-0006-azure-functions-v4-nodejs-22-for-backend-api.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['express' ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 118:\n     ... ers or Supabase Edge Functions']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
-        ]
-      },
-      {
-        "file": "docs/adr/ADR-0007-azure-postgresql-flexible-server-as-database.md",
-        "errors": [
-          "[ERROR] docs/adr/ADR-0007-azure-postgresql-flexible-server-as-database.md: Parse error in docs/adr/ADR-0007-azure-postgresql-flexible-server-as-database.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['@supabas ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 155:\n     ... se client, no other DB engines']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
-        ]
-      },
-      {
-        "file": "docs/adr/ADR-0008-azure-blob-storage-with-sas-tokens-for-file-storage.md",
-        "errors": [
-          "[ERROR] docs/adr/ADR-0008-azure-blob-storage-with-sas-tokens-for-file-storage.md: Parse error in docs/adr/ADR-0008-azure-blob-storage-with-sas-tokens-for-file-storage.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['@supabas ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 128:\n     ... orage or S3-compatible clients']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
-        ]
-      },
-      {
-        "file": "docs/adr/ADR-0009-resend-for-transactional-email.md",
-        "errors": [
-          "[ERROR] docs/adr/ADR-0009-resend-for-transactional-email.md: Parse error in docs/adr/ADR-0009-resend-for-transactional-email.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      imports: {'disallow': ['nodemail ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 9, column 100:\n     ... mailer or competing email SDKs']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+          "[ERROR] docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md: Parse error in docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      rationales: ['Secrets committed  ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 8, column 317:\n     ... for all production credentials']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
         ]
       }
     ],
-    "status_counts": {},
-    "tag_counts": {}
+    "status_counts": {
+      "accepted": 9
+    },
+    "tag_counts": {
+      "frontend": 3,
+      "framework": 1,
+      "build-tool": 1,
+      "language": 1,
+      "typescript": 1,
+      "tooling": 1,
+      "ui": 1,
+      "components": 1,
+      "design-system": 1,
+      "state-management": 1,
+      "data-fetching": 1,
+      "authentication": 1,
+      "security": 2,
+      "azure": 4,
+      "migration": 4,
+      "backend": 2,
+      "functions": 1,
+      "database": 1,
+      "postgresql": 1,
+      "storage": 1,
+      "email": 1,
+      "integration": 1
+    }
   },
-  "adrs": []
+  "adrs": [
+    {
+      "id": "ADR-0001",
+      "title": "React + Vite as Frontend Framework (SPA)",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "frontend",
+        "framework",
+        "build-tool"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0001-react-vite-as-frontend-framework-spa.md",
+      "content_preview": "learn-wings is an LMS platform requiring a responsive, component-rich UI with role-based views (platform admin, org admin, learner). The project was originally scaffolded by Lovable (an AI app..."
+    },
+    {
+      "id": "ADR-0002",
+      "title": "TypeScript Strict Mode as Primary Language",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "language",
+        "typescript",
+        "tooling"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0002-typescript-strict-mode-as-primary-language.md",
+      "content_preview": "The codebase spans frontend (React components, hooks, pages) and backend (Azure Functions). Type safety is critical for a multi-role platform where data contracts between frontend and backend must be..."
+    },
+    {
+      "id": "ADR-0003",
+      "title": "shadcn/ui + Radix UI + Tailwind CSS as UI Component System",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "frontend",
+        "ui",
+        "components",
+        "design-system"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0003-shadcnui-radix-ui-tailwind-css-as-ui-component-system.md",
+      "content_preview": "The platform has rich UI needs: modals, tables, tabs, tooltips, dropdowns, forms with validation. A consistent component library is needed that doesn't lock in a heavyweight dependency and allows..."
+    },
+    {
+      "id": "ADR-0004",
+      "title": "TanStack Query v5 for Server State Management",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "frontend",
+        "state-management",
+        "data-fetching"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0004-tanstack-query-v5-for-server-state-management.md",
+      "content_preview": "The frontend makes frequent async calls to fetch course data, org memberships, quiz results, and user profiles. These calls need caching, background refetch, loading/error states, and optimistic..."
+    },
+    {
+      "id": "ADR-0005",
+      "title": "Multi-Tenant Microsoft Entra ID for Authentication",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "authentication",
+        "security",
+        "azure",
+        "migration"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0005-multi-tenant-microsoft-entra-id-for-authentication.md",
+      "content_preview": "The platform originally used Supabase Auth (email/password). The migration to Azure requires replacing this. Users include learners from external organizations (different Azure tenants), so the auth..."
+    },
+    {
+      "id": "ADR-0006",
+      "title": "Azure Functions v4 (Node.js 22) for Backend API",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "backend",
+        "azure",
+        "functions",
+        "migration"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0006-azure-functions-v4-nodejs-22-for-backend-api.md",
+      "content_preview": "The original backend consisted of Supabase Edge Functions (Deno runtime). The migration requires replacing these with Azure-native compute. The backend handles: SAS token generation for blob storage,..."
+    },
+    {
+      "id": "ADR-0007",
+      "title": "Azure PostgreSQL Flexible Server as Database",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "database",
+        "azure",
+        "postgresql",
+        "migration"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0007-azure-postgresql-flexible-server-as-database.md",
+      "content_preview": "The application uses a PostgreSQL database (42 migration files, PostgreSQL 15 target) with tables for profiles, courses, org memberships, quiz attempts, lesson progress, invitations, and..."
+    },
+    {
+      "id": "ADR-0008",
+      "title": "Azure Blob Storage with SAS Tokens for File Storage",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "storage",
+        "azure",
+        "security",
+        "migration"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0008-azure-blob-storage-with-sas-tokens-for-file-storage.md",
+      "content_preview": "The platform stores LMS video and document assets, and email logo assets. Originally stored in Supabase Storage. The migration moves all binary assets to Azure. Access control for protected assets..."
+    },
+    {
+      "id": "ADR-0009",
+      "title": "Resend for Transactional Email",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "email",
+        "backend",
+        "integration"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0009-resend-for-transactional-email.md",
+      "content_preview": "The platform sends invitation emails with tokenized links for org and platform admin workflows. Originally sent via Supabase Edge Function using SMTP or a third-party email API. The Azure migration..."
+    }
+  ]
 }
