@@ -7,7 +7,8 @@ deciders: ['le-dawg']
 tags: ['frontend', 'state-management', 'data-fetching']
 policy:
   imports: {'disallow': ['swr', '@reduxjs/toolkit', 'redux', 'zustand'], 'prefer': ['@tanstack/react-query']}
-  rationales: ['TanStack Query v5 is the only server-state solution; no SWR or Redux alongside it']approval_date: 2026-05-19
+  rationales: ['TanStack Query v5 is the only server-state solution; no SWR or Redux alongside it']
+approval_date: 2026-05-19
 approval_notes: "Baseline approval"
 
 ---

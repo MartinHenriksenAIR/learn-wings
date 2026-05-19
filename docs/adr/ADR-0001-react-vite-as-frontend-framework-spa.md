@@ -7,7 +7,8 @@ deciders: ['le-dawg']
 tags: ['frontend', 'framework', 'build-tool']
 policy:
   imports: {'disallow': ['vue', '@angular/core', 'next', 'remix'], 'prefer': ['react', 'react-dom']}
-  rationales: ['React 18 + Vite chosen as SPA framework; no SSR frameworks permitted']approval_date: 2026-05-19
+  rationales: ['React 18 + Vite chosen as SPA framework; no SSR frameworks permitted']
+approval_date: 2026-05-19
 approval_notes: "Baseline approval"
 
 ---

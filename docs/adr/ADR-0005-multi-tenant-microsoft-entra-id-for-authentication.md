@@ -7,7 +7,8 @@ deciders: ['le-dawg']
 tags: ['authentication', 'security', 'azure', 'migration']
 policy:
   imports: {'disallow': ['@supabase/supabase-js', 'passport', 'jsonwebtoken-express', 'express-jwt'], 'prefer': ['@azure/msal-browser', '@azure/msal-react', 'jwks-rsa', 'jsonwebtoken']}
-  rationales: ['Multi-tenant Entra ID is the only auth provider; Supabase Auth and custom JWT endpoints are banned']approval_date: 2026-05-19
+  rationales: ['Multi-tenant Entra ID is the only auth provider; Supabase Auth and custom JWT endpoints are banned']
+approval_date: 2026-05-19
 approval_notes: "Baseline approval"
 
 ---
@@ -18,7 +19,7 @@ The platform originally used Supabase Auth (email/password). The migration to Az
 
 ## Decision
 
-Use multi-tenant Microsoft Entra ID (standard Entra ID app registration with signInAudience: AzureADandPersonalMicrosoftAccount or AzureADMultipleOrgs) for all authentication. Frontend uses @azure/msal-browser + @azure/msal-react with loginRedirect flow and authority https://login.microsoftonline.com/common. Backend validates RS256 JWT tokens using jwks-rsa + jsonwebtoken with issuer regex pattern (multi-tenant issuers vary by tenant). Don't use Azure AD B2C. Don't use custom username/password endpoints. Don't use Supabase Auth.
+Use multi-tenant Microsoft Entra ID (standard Entra ID app registration with signInAudience: AzureADMultipleOrgs) for all authentication. Frontend uses @azure/msal-browser + @azure/msal-react with loginRedirect flow and authority https://login.microsoftonline.com/common. Backend validates RS256 JWT tokens using jwks-rsa + jsonwebtoken with issuer regex pattern (multi-tenant issuers vary by tenant). Don't use Azure AD B2C. Don't use custom username/password endpoints. Don't use Supabase Auth.
 
 ## Consequences
 

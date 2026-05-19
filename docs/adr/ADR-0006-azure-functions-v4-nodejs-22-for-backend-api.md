@@ -7,7 +7,8 @@ deciders: ['le-dawg']
 tags: ['backend', 'azure', 'functions', 'migration']
 policy:
   imports: {'disallow': ['express', 'fastify', 'koa', 'hono', '@supabase/functions-js'], 'prefer': ['@azure/functions']}
-  rationales: ['Azure Functions v4 Node.js 22 is the backend runtime; no Express servers or Supabase Edge Functions']approval_date: 2026-05-19
+  rationales: ['Azure Functions v4 Node.js 22 is the backend runtime; no Express servers or Supabase Edge Functions']
+approval_date: 2026-05-19
 approval_notes: "Baseline approval"
 
 ---
@@ -22,7 +23,7 @@ Use Azure Functions v4 programming model with Node.js 22 runtime for all backend
 
 ## Consequences
 
-Positive: Serverless scaling, consumption billing model, native Key Vault reference support, Node.js 22 LTS with full npm ecosystem. Negative: Cold starts on consumption plan (mitigated by S1 Standard plan with always-on); functions must remain stateless.
+Positive: Dedicated App Service Plan (S1, `ASP-AIEducation-bfca`) eliminates cold starts, native Key Vault reference support, Node.js 22 LTS with full npm ecosystem. Negative: Always-on billing regardless of traffic volume; functions must remain stateless.
 
 ## Alternatives
 

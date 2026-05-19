@@ -7,7 +7,8 @@ deciders: ['le-dawg']
 tags: ['language', 'typescript', 'tooling']
 policy:
   imports: {'disallow': [], 'prefer': ['typescript']}
-  rationales: ['TypeScript strict mode required for all source; no plain JS in src/ or functions/']approval_date: 2026-05-19
+  rationales: ['TypeScript strict mode required for all source; no plain JS in src/ or functions/']
+approval_date: 2026-05-19
 approval_notes: "Baseline approval"
 
 ---

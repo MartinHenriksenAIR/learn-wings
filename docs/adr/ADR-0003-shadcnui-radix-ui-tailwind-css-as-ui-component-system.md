@@ -7,7 +7,8 @@ deciders: ['le-dawg']
 tags: ['frontend', 'ui', 'components', 'design-system']
 policy:
   imports: {'disallow': ['@mui/material', 'antd', '@chakra-ui/react', '@mantine/core'], 'prefer': ['@radix-ui', 'tailwind-merge', 'class-variance-authority']}
-  rationales: ['shadcn/ui + Radix + Tailwind is the component system; no competing UI libraries']approval_date: 2026-05-19
+  rationales: ['shadcn/ui + Radix + Tailwind is the component system; no competing UI libraries']
+approval_date: 2026-05-19
 approval_notes: "Baseline approval"
 
 ---

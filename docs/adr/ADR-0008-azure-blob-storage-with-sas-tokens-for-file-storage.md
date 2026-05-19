@@ -7,7 +7,8 @@ deciders: ['le-dawg']
 tags: ['storage', 'azure', 'security', 'migration']
 policy:
   imports: {'disallow': ['@supabase/storage-js', 'aws-sdk', '@aws-sdk/client-s3'], 'prefer': ['@azure/storage-blob']}
-  rationales: ['Azure Blob Storage with SAS tokens is the file storage solution; no Supabase Storage or S3-compatible clients']approval_date: 2026-05-19
+  rationales: ['Azure Blob Storage with SAS tokens is the file storage solution; no Supabase Storage or S3-compatible clients']
+approval_date: 2026-05-19
 approval_notes: "Baseline approval"
 
 ---

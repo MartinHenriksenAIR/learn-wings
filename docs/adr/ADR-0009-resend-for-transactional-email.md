@@ -7,7 +7,8 @@ deciders: ['le-dawg']
 tags: ['email', 'backend', 'integration']
 policy:
   imports: {'disallow': ['nodemailer', '@sendgrid/mail', 'mailgun.js'], 'prefer': ['resend']}
-  rationales: ['Resend is the transactional email provider; no Nodemailer or competing email SDKs']approval_date: 2026-05-19
+  rationales: ['Resend is the transactional email provider; no Nodemailer or competing email SDKs']
+approval_date: 2026-05-19
 approval_notes: "Baseline approval"
 
 ---

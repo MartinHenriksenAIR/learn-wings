@@ -7,7 +7,8 @@ deciders: ['le-dawg']
 tags: ['database', 'azure', 'postgresql', 'migration']
 policy:
   imports: {'disallow': ['@supabase/supabase-js', 'mssql', '@azure/cosmos', 'mongoose', 'prisma'], 'prefer': ['pg']}
-  rationales: ['Azure PostgreSQL Flexible Server is the database; pg (node-postgres) is the only client; no ORM, no Supabase client, no other DB engines']approval_date: 2026-05-19
+  rationales: ['Azure PostgreSQL Flexible Server is the database; pg (node-postgres) is the only client; no ORM, no Supabase client, no other DB engines']
+approval_date: 2026-05-19
 approval_notes: "Baseline approval"
 
 ---
