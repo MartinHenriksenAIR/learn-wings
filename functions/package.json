@@ -1,0 +1,26 @@
+{
+  "name": "func-ai-education-migration",
+  "version": "1.0.0",
+  "description": "Azure Functions backend for learn-wings",
+  "main": "dist/{functionName}/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "start": "npm run build && func start",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0",
+    "jwks-rsa": "^3.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.6",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
