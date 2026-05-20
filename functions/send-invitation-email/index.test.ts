@@ -1,0 +1,73 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('../shared/auth', () => ({
+  authenticate: () => ({ id: 'entra-oid-123', email: 'admin@test.com' }),
+  AuthError: class AuthError extends Error {},
+}));
+
+const { mockQueryOne, mockEmailSend } = vi.hoisted(() => ({
+  mockQueryOne: vi.fn(),
+  mockEmailSend: vi.fn(),
+}));
+vi.mock('../shared/db', () => ({ queryOne: mockQueryOne }));
+vi.mock('resend', () => ({
+  Resend: class {
+    emails = { send: mockEmailSend };
+  },
+}));
+
+import handler from './index';
+
+const makeReq = (body: object) => ({
+  method: 'POST',
+  headers: { get: (k: string) => k === 'origin' ? 'https://ai-uddannelse.dk' : 'Bearer tok' },
+  json: async () => body,
+});
+
+const validBody = {
+  email: 'invitee@example.com',
+  orgName: 'Test Org',
+  role: 'learner',
+  inviteLink: 'https://ai-uddannelse.dk/invite/abc123',
+};
+
+describe('send-invitation-email', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns 403 for users who are not admin or org admin', async () => {
+    // not platform admin, not org admin
+    mockQueryOne.mockResolvedValueOnce({ is_platform_admin: false, is_org_admin: false });
+
+    const res = await handler(makeReq(validBody) as any, {} as any);
+
+    expect(res.status).toBe(403);
+  });
+
+  it('sends email and returns success for platform admin', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_platform_admin: true });
+    mockEmailSend.mockResolvedValueOnce({ id: 'email-id-123' });
+
+    const res = await handler(makeReq(validBody) as any, {} as any);
+    const body = JSON.parse(res.body);
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(mockEmailSend).toHaveBeenCalledOnce();
+    // Verify logo does not reference supabase storage
+    const callArgs = mockEmailSend.mock.calls[0][0];
+    expect(callArgs.html).not.toContain('supabase.co');
+  });
+
+  it('returns 400 for invite links from non-allowed domains', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_platform_admin: true });
+
+    const res = await handler(
+      makeReq({ ...validBody, inviteLink: 'https://evil.com/invite/abc' }) as any,
+      {} as any
+    );
+
+    expect(res.status).toBe(400);
+  });
+});
