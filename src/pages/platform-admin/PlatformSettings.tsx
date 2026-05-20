@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 import { Loader2, Palette, Users, Mail, ToggleLeft, Save } from 'lucide-react';
 
@@ -148,19 +149,17 @@ export default function PlatformSettings() {
   const handleTestSmtpConnection = async () => {
     setTestingSmtp(true);
     try {
-      const { data, error } = await supabase.functions.invoke('test-smtp-connection', {
-        body: {
-          host: email.smtp_host,
-          port: email.smtp_port,
-          username: email.smtp_username,
-          password: email.smtp_password,
-          encryption: email.smtp_encryption,
-          fromEmail: email.from_email,
-        },
+      const data = await callApi<{ success: boolean; message?: string; error?: string }>('/api/test-smtp-connection', {
+        host: email.smtp_host,
+        port: email.smtp_port,
+        username: email.smtp_username,
+        password: email.smtp_password,
+        encryption: email.smtp_encryption,
+        fromEmail: email.from_email,
       });
 
-      if (error || !data?.success) {
-        throw new Error(error?.message || data?.error || 'Connection test failed');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Connection test failed');
       }
 
       toast({

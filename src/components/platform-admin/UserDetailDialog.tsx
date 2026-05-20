@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Profile, OrgMembership, Organization, OrgRole } from '@/lib/types';
 import { Loader2, Trash2, Plus, Shield, Building2 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
@@ -180,26 +181,7 @@ export function UserDetailDialog({
     setDeleting(true);
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ userId: user.id }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to delete user');
-      }
-
+      await callApi('/api/delete-user', { userId: user.id });
       toast({ title: 'User deleted' });
       setShowDeleteConfirm(false);
       onOpenChange(false);

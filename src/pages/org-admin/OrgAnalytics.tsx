@@ -16,6 +16,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
+import { callApiRaw } from '@/lib/api-client';
 import { Organization } from '@/lib/types';
 import { Loader2, Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -265,29 +266,7 @@ export default function OrgAnalytics() {
 
     setGeneratingReport(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Please log in to generate reports');
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-compliance-report`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ orgId: effectiveOrgId }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate report');
-      }
-
+      const response = await callApiRaw('/api/generate-compliance-report', { orgId: effectiveOrgId });
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

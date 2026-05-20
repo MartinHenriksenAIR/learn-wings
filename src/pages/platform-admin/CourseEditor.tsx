@@ -25,6 +25,7 @@ import { AzureDocumentUpload } from '@/components/ui/azure-document-upload';
 import { QuizEditorDialog } from '@/components/platform-admin/QuizEditorDialog';
 
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil, Settings } from 'lucide-react';
@@ -258,25 +259,16 @@ export default function CourseEditor() {
     // If lesson has an Azure blob, delete it first
     if (lesson?.azure_blob_path) {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const response = await supabase.functions.invoke('azure-delete-blob', {
-          body: { blobPath: lesson.azure_blob_path },
-        });
-
-        if (response.error) {
-          console.error('Failed to delete Azure blob:', response.error);
-          // Continue with lesson deletion even if blob deletion fails
-          toast({ 
-            title: 'Warning', 
-            description: 'Could not delete video file from storage, but lesson will be removed.',
-            variant: 'destructive' 
-          });
-        } else {
-          console.log('Azure blob deleted successfully:', lesson.azure_blob_path);
-        }
+        await callApi('/api/azure-delete-blob', { blobPath: lesson.azure_blob_path });
+        console.log('Azure blob deleted successfully:', lesson.azure_blob_path);
       } catch (err) {
         console.error('Error calling azure-delete-blob:', err);
-        // Continue with lesson deletion
+        // Continue with lesson deletion even if blob deletion fails
+        toast({
+          title: 'Warning',
+          description: 'Could not delete video file from storage, but lesson will be removed.',
+          variant: 'destructive'
+        });
       }
     }
 

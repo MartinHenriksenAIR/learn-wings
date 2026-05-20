@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { getInviteLink } from '@/lib/config';
 
 interface SendInvitationEmailParams {
@@ -21,19 +21,12 @@ export async function sendInvitationEmail({
   try {
     const inviteLink = getInviteLink(linkId);
     
-    const { data, error } = await supabase.functions.invoke('send-invitation-email', {
-      body: {
-        email,
-        orgName,
-        role,
-        inviteLink,
-      },
+    const data = await callApi<{ success: boolean; error?: string }>('/api/send-invitation-email', {
+      email,
+      orgName,
+      role,
+      inviteLink,
     });
-
-    if (error) {
-      console.error('Failed to send invitation email:', error);
-      return { success: false, error: error.message };
-    }
 
     if (data && !data.success) {
       console.error('Email service returned error:', data.error);

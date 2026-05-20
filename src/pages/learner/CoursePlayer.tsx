@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
 import { 
@@ -205,14 +206,13 @@ export default function CoursePlayer() {
       try {
         // Check for Azure blob path first (preferred for videos)
         if (currentLesson.azure_blob_path) {
-          const { data, error } = await supabase.functions.invoke('azure-view-url', {
-            body: { blobPath: currentLesson.azure_blob_path, lessonId: currentLesson.id },
+          const data = await callApi<{ viewUrl: string }>('/api/azure-view-url', {
+            blobPath: currentLesson.azure_blob_path, lessonId: currentLesson.id,
           });
-          
-          if (!error && data?.viewUrl) {
+
+          if (data?.viewUrl) {
             setAzureVideoUrl(data.viewUrl);
           } else {
-            console.error('Error getting Azure view URL:', error);
             setAzureVideoUrl(null);
           }
           setSignedVideoUrl(null);
@@ -230,14 +230,13 @@ export default function CoursePlayer() {
         if (currentLesson.document_storage_path) {
           if (currentLesson.document_storage_path.startsWith('documents/')) {
             // Azure-stored document
-            const { data, error } = await supabase.functions.invoke('azure-view-url', {
-              body: { blobPath: currentLesson.document_storage_path, lessonId: currentLesson.id },
+            const data = await callApi<{ viewUrl: string }>('/api/azure-view-url', {
+              blobPath: currentLesson.document_storage_path, lessonId: currentLesson.id,
             });
-            
-            if (!error && data?.viewUrl) {
+
+            if (data?.viewUrl) {
               setAzureDocUrl(data.viewUrl);
             } else {
-              console.error('Error getting Azure document URL:', error);
               setAzureDocUrl(null);
             }
             setSignedDocUrl(null);
@@ -331,15 +330,14 @@ export default function CoursePlayer() {
   const handleSubmitQuiz = async () => {
     if (!quiz || !user || !currentOrg) return;
 
-    // Grade quiz server-side using edge function
-    const { data: gradeResult, error: gradeError } = await supabase.functions.invoke('grade-quiz', {
-      body: {
+    // Grade quiz server-side — attempts inserted server-side, never trust client score
+    let gradeResult: { score: number; passed: boolean };
+    try {
+      gradeResult = await callApi<{ score: number; passed: boolean }>('/api/grade-quiz', {
         quiz_id: quiz.id,
         answers,
-      },
-    });
-
-    if (gradeError || !gradeResult) {
+      });
+    } catch {
       toast({
         title: 'Failed to grade quiz',
         description: 'An error occurred while grading your quiz. Please try again.',

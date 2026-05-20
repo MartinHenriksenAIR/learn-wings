@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
+import { callApiRaw } from '@/lib/api-client';
 import { getSignedLmsAssetUrl } from '@/lib/storage';
 import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Clock, Award, Play, ArrowRight, Loader2, TrendingUp } from 'lucide-react';
@@ -144,20 +145,8 @@ export default function LearnerDashboard() {
     setDownloadingId(enrollmentId);
 
     try {
-      const { data, error } = await supabase.functions.invoke('generate-certificate', {
-        body: { enrollmentId },
-      });
-
-      if (error) {
-        toast({
-          title: t('certificates.generateFailed'),
-          description: error.message || t('certificates.generateFailedDescription'),
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const blob = new Blob([data], { type: 'application/pdf' });
+      const response = await callApiRaw('/api/generate-certificate', { enrollmentId });
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
