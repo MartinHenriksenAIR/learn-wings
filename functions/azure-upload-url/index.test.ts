@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('../shared/auth', () => ({
+  authenticate: () => ({ id: 'admin-uuid', email: 'admin@test.com' }),
+  AuthError: class AuthError extends Error {},
+}));
+
 // Mock DB and env before import
 vi.mock('../shared/db', () => ({
   queryOne: vi.fn().mockResolvedValue({ is_platform_admin: true }),

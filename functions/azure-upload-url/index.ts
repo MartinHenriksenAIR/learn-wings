@@ -9,7 +9,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
 
   try {
-    const user = authenticate(req);
+    const user = await authenticate(req);
 
     const isAdmin = await queryOne<{ is_platform_admin: boolean }>(
       'SELECT is_platform_admin FROM profiles WHERE id = $1',
