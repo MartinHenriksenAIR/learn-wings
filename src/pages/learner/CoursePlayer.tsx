@@ -65,83 +65,26 @@ export default function CoursePlayer() {
     const fetchData = async () => {
       if (!user || !currentOrg || !courseId) return;
 
-      // Fetch course
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('id', courseId)
-        .single();
+      const data = await callApi<{
+        course: Course;
+        modules: Array<CourseModule & { lessons: Lesson[] }>;
+        progressMap: Record<string, { status: string; completed_at: string }>;
+        review: { id: string; rating: number; comment: string } | null;
+      }>('/api/course-player-data', { courseId, orgId: currentOrg.id });
 
-      if (courseData) {
-        setCourse(courseData as Course);
-      }
+      setCourse(data.course);
+      setModules(data.modules as any);
+      setProgress(data.progressMap as any);
+      setExistingReview(data.review as any);
 
-      // Fetch modules with lessons
-      const { data: modulesData } = await supabase
-        .from('course_modules')
-        .select('*')
-        .eq('course_id', courseId)
-        .order('sort_order');
-
-      if (modulesData) {
-        const modulesWithLessons = await Promise.all(
-          modulesData.map(async (module) => {
-            const { data: lessons } = await supabase
-              .from('lessons')
-              .select('*')
-              .eq('module_id', module.id)
-              .order('sort_order');
-            return { ...module, lessons: lessons || [] };
-          })
-        );
-        setModules(modulesWithLessons as any);
-
-        // Set first lesson as current if none selected
-        if (modulesWithLessons.length > 0 && modulesWithLessons[0].lessons.length > 0) {
-          setCurrentLesson(modulesWithLessons[0].lessons[0] as Lesson);
-        }
-      }
-
-      // Fetch progress
-      const { data: progressData } = await supabase
-        .from('lesson_progress')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('org_id', currentOrg.id);
-
-      if (progressData) {
-        const progressMap: Record<string, LessonProgress> = {};
-        progressData.forEach(p => {
-          progressMap[p.lesson_id] = p as LessonProgress;
-        });
-        setProgress(progressMap);
+      if (data.modules.length > 0 && data.modules[0].lessons.length > 0) {
+        setCurrentLesson(data.modules[0].lessons[0] as Lesson);
       }
 
       setLoading(false);
     };
 
     fetchData();
-  }, [user, currentOrg, courseId]);
-
-  // Load existing review
-  useEffect(() => {
-    const loadExistingReview = async () => {
-      if (!user || !currentOrg || !courseId) return;
-
-      const { data } = await supabase
-        .from('course_reviews')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('org_id', currentOrg.id)
-        .eq('course_id', courseId)
-        .maybeSingle();
-
-      if (data) {
-        setExistingReview(data as CourseReview);
-      }
-    };
-
-    loadExistingReview();
   }, [user, currentOrg, courseId]);
 
   // Load quiz when lesson changes - uses public view to hide is_correct
@@ -173,14 +116,8 @@ export default function CoursePlayer() {
         if (questionsData) {
           const questionsWithOptions = await Promise.all(
             questionsData.map(async (q) => {
-              // Use the secure RPC function that checks access and excludes is_correct
-              const { data: options } = await supabase
-                .rpc('get_quiz_options_for_learner', { p_question_id: q.id });
-              // Add is_correct as undefined since we don't have access to it
-              return { 
-                ...q, 
-                options: (options || []).map(o => ({ ...o, is_correct: false })) 
-              };
+              const options = await callApi<QuizOption[]>('/api/quiz-options', { questionId: q.id });
+              return { ...q, options: options || [] };
             })
           );
           setQuestions(questionsWithOptions as any);
@@ -272,17 +209,14 @@ export default function CoursePlayer() {
     setCompletingLesson(true);
 
     // Upsert progress
-    const { error } = await supabase.from('lesson_progress').upsert({
-      org_id: currentOrg.id,
-      user_id: user.id,
-      lesson_id: currentLesson.id,
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-    }, {
-      onConflict: 'org_id,user_id,lesson_id',
-    });
+    try {
+      await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
+    } catch {
+      setCompletingLesson(false);
+      return;
+    }
 
-    if (!error) {
+    {
       const newProgress = {
         ...progress,
         [currentLesson.id]: {
@@ -306,10 +240,7 @@ export default function CoursePlayer() {
         setShowCompletionDialog(true);
         
         // Update enrollment status to completed
-        await supabase.from('enrollments').update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        }).eq('user_id', user.id).eq('org_id', currentOrg.id).eq('course_id', courseId);
+        await callApi('/api/enrollment-complete', { orgId: currentOrg.id, courseId });
       } else {
         toast({
           title: 'Lesson completed!',
@@ -350,16 +281,6 @@ export default function CoursePlayer() {
 
     setQuizScore(score);
     setQuizSubmitted(true);
-
-    // Save attempt
-    await supabase.from('quiz_attempts').insert({
-      org_id: currentOrg.id,
-      user_id: user.id,
-      quiz_id: quiz.id,
-      score,
-      passed,
-      finished_at: new Date().toISOString(),
-    });
 
     if (!passed) {
       toast({
@@ -776,17 +697,9 @@ export default function CoursePlayer() {
             comment: existingReview.comment,
           } : undefined}
           onReviewSubmitted={() => {
-            // Refresh existing review
-            supabase
-              .from('course_reviews')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('org_id', currentOrg.id)
-              .eq('course_id', course.id)
-              .maybeSingle()
-              .then(({ data }) => {
-                if (data) setExistingReview(data as CourseReview);
-              });
+            callApi<{ course: Course; modules: any; progressMap: any; review: any } | null>(
+              '/api/course-player-data', { courseId: course.id, orgId: currentOrg.id }
+            ).then(data => { if (data?.review) setExistingReview(data.review as any); });
           }}
         />
       )}
