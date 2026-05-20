@@ -329,9 +329,103 @@
         ],
         "title": "Resend for Transactional Email"
       }
+    },
+    {
+      "content": "## Context\n\nOn 2026-01-27 (commit 43a079e), a .env file containing VITE_SUPABASE_PROJECT_ID, VITE_SUPABASE_PUBLISHABLE_KEY, and VITE_SUPABASE_URL was committed to git by the Lovable platform bot. The file was tracked for ~4 months before detection via differential security review on 2026-05-19. CI/CD workflows uploading the full repo checkout (path: .) meant the .env was included in every GitHub Actions artifact (90-day retention). Although the Supabase anon key is a low-privilege client credential by design, tracking secrets in git creates permanent exposure in commit history, CI artifacts, and any clone of the repository. Full remediation requires decommissioning the Supabase project at migration cutover.\n\n## Decision\n\nNever commit .env files or any file containing secrets, API keys, tokens, passwords, or credentials to git. All secrets live in Azure Key Vault (production) or local .env files (development). .env and .env.* are added to .gitignore. Don't commit .env.local, .env.development, .env.production, or any variant. Don't store secrets in vite.config.ts, source files, or GitHub Actions workflow YAML. Don't use VITE_ prefixed env vars for secrets \u2014 VITE_ vars are bundled into the browser. Runtime secrets (DATABASE_URL, RESEND_API_KEY, storage keys) go in Azure Key Vault referenced via @Microsoft.KeyVault(...) in Function App application settings. Development secrets go in .env (gitignored) only.\n\n## Consequences\n\nPositive: Secrets never appear in git history, CI artifacts, or clones. Key rotation is possible without rewriting git history. Azure Key Vault provides audit trail and RBAC for all production secrets. Negative: Developers must manually create .env from .env.example on first checkout. CI/CD must use GitHub Actions secrets or Key Vault references \u2014 no plaintext in workflow YAML. Historical exposure of commit 43a079e persists in git history; full remediation requires Supabase project decommission at cutover.\n\n## Alternatives\n\n1. git-crypt / SOPS \u2014 rejected: adds key management overhead; Key Vault already available in Azure subscription. 2. Allow anon keys in git (treat as public) \u2014 rejected: normalises secrets-in-git pattern, creates precedent for committing higher-privilege keys. 3. GitHub secret scanning only \u2014 rejected: detection after the fact; prevention via .gitignore is the correct control.",
+      "file_path": "docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md",
+      "front_matter": {
+        "approval_date": "2026-05-19",
+        "approval_notes": "HIGH severity finding from differential security review 2026-05-19 (F-01). .env tracked since commit 43a079e. Immediate mitigation: git rm --cached .env, .gitignore updated (commit 8c292bb). Full remediation: Supabase project decommission at migration cutover.",
+        "date": "2026-05-19",
+        "deciders": [
+          "le-dawg"
+        ],
+        "id": "ADR-0010",
+        "policy": {
+          "rationales": [
+            "Secrets committed to git are permanently exposed in history, CI artifacts, and clones \u2014 rotation alone does not remediate",
+            "VITE_ prefixed variables are bundled into the browser bundle and must never contain secrets",
+            "Azure Key Vault is the designated secrets store for all production credentials"
+          ]
+        },
+        "status": "accepted",
+        "tags": [
+          "security",
+          "secrets",
+          "environment",
+          "gitignore"
+        ],
+        "title": "Secrets and Environment Variables Must Never Be Committed to Git"
+      }
+    },
+    {
+      "content": "## Context\n\nfunctions/shared/sas.ts generates Azure Blob SAS tokens. Neither generateSasToken nor buildBlobUrl applies encodeURIComponent to the blobName parameter. The canonicalResource string and the URL path are both built from the raw value \u2014 keeping them consistent so the HMAC signature verifies \u2014 but a caller passing a blob name with spaces, percent characters, or other URL-unsafe chars would produce a broken URL at the HTTP layer rather than a signature mismatch. Surfaced as a suggestion in the Task 6 security review (2026-05-19). Current callers (azure-upload-url, azure-document-upload-url) construct blob names as UUID + extension only \u2014 all URL-safe \u2014 so there is no current breakage.\n\n## Decision\n\nEncoding is the caller's responsibility. generateSasToken and buildBlobUrl accept raw blob names and do not apply encodeURIComponent internally. Callers must pass URL-safe blob names (alphanumeric, hyphens, underscores, dots, forward slashes only). Don't encode inside sas.ts \u2014 encoding in both canonicalResource and the URL path must be identical; centralising it inside the function risks double-encoding if callers also encode. Document the input contract in sas.ts with a JSDoc comment on the blobName parameter.\n\n## Consequences\n\nPositive: No double-encoding risk. Signature always verifies because canonicalResource and URL path use identical raw value. Simple implementation. Negative: Callers that pass blob names with spaces or special characters will produce silently broken URLs rather than an explicit error. Requires input validation or documentation discipline at call sites.\n\n## Alternatives\n\n1. Encode inside sas.ts \u2014 rejected: creates double-encoding if caller also encodes; requires encoding in both canonicalResource and URL path identically, which is brittle. 2. Validate and throw on unsafe characters \u2014 considered: adds safety but adds complexity for a constraint that current and planned callers (UUID-based names) will never hit. Deferred; can be added if a future caller needs arbitrary filenames.",
+      "file_path": "docs/adr/ADR-0011-blob-name-url-encoding-responsibility-in-sas-generation.md",
+      "front_matter": {
+        "approval_date": "2026-05-19",
+        "approval_notes": "Surfaced by Task 6 security review. Caller-responsibility pattern chosen to avoid double-encoding risk. Current callers (UUID-based blob names) are safe. Add JSDoc contract comment in Task 8 when sas.ts is wired into real functions.",
+        "date": "2026-05-19",
+        "deciders": [
+          "le-dawg"
+        ],
+        "id": "ADR-0011",
+        "policy": {
+          "rationales": [
+            "Encoding inside generateSasToken risks double-encoding; caller is responsible for URL-safe blob names",
+            "Blob names must be alphanumeric, hyphens, underscores, dots, and forward slashes only when passed to generateSasToken"
+          ]
+        },
+        "status": "accepted",
+        "tags": [
+          "storage",
+          "sas",
+          "security",
+          "api-contract"
+        ],
+        "title": "Blob Name URL Encoding Responsibility in SAS Generation"
+      }
+    },
+    {
+      "content": "## Context\n\nTasks 1\u20138 implement four Azure Blob SAS functions (azure-upload-url, azure-view-url, azure-delete-blob, azure-document-upload-url) that all call authenticate(req) from shared/auth.ts. Real multi-tenant Entra ID JWKS validation (jwks-rsa + jsonwebtoken) is not implemented until Task 9. Shipping the four functions with a real validator would block all testing progress; shipping them with a permissive stub would be a security hole. A deliberate throwing stub is the correct intermediate state.\n\n## Decision\n\nshared/auth.ts is a deliberate stub until Task 9 completes. The stub throws 'Token validation not yet implemented' for any real Bearer token. For unit tests, inject a mock user via (req as any)._mockUser = { id: string, email: string } on the request object before calling the handler \u2014 the stub returns this mock user without validating any token. Don't replace the stub with a permissive implementation (e.g. returning a hardcoded user without checking _mockUser). Don't deploy the four SAS functions to production until Task 9 lands and shared/auth.ts is replaced by real JWKS validation. The stub is superseded by ADR-0005 implementation details once Task 9 is complete.\n\n## Consequences\n\nPositive: all four SAS functions are fully testable in isolation without a real Entra ID token. Test pattern is consistent \u2014 every function test sets _mockUser before calling the handler. Negative: the four SAS endpoints return 401 for every real request until Task 9 is deployed. CI will deploy the functions on merge to main \u2014 they must not receive production traffic until Task 9 is also deployed. Deployment gate: Task 9 (shared/auth.ts JWKS replacement) must be merged and deployed before the four SAS functions are wired to the frontend.\n\n## Alternatives\n\n1. Deploy with permissive stub (return hardcoded user) \u2014 rejected: security hole, any request would be treated as admin. 2. Block Task 8 until Task 9 is complete \u2014 rejected: unnecessarily serialises independent work. 3. Feature-flag the functions \u2014 rejected: adds complexity for a short-lived intermediate state.",
+      "file_path": "docs/adr/ADR-0012-auth-stub-pattern-sas-functions-deferred-until-task-9-jwks-validation.md",
+      "front_matter": {
+        "date": "2026-05-20",
+        "deciders": [
+          "dawid@ai-raadgivning.dk"
+        ],
+        "id": "ADR-0012",
+        "policy": {
+          "boundaries": {
+            "rules": [
+              {
+                "forbid": "shared/auth.ts stub -> production traffic before Task 9"
+              }
+            ]
+          },
+          "rationales": [
+            "stub throws for real tokens to prevent accidental permissive auth",
+            "_mockUser injection is the only test contract until JWKS lands"
+          ]
+        },
+        "status": "accepted",
+        "tags": [
+          "auth",
+          "azure-functions",
+          "testing",
+          "deployment-gate"
+        ],
+        "title": "Auth stub pattern \u2014 SAS functions deferred until Task 9 JWKS validation"
+      }
     }
   ],
   "constraints": {
+    "boundaries": {
+      "rules": [
+        {
+          "forbid": "shared/auth.ts stub -> production traffic before Task 9"
+        }
+      ]
+    },
     "imports": {
       "disallow": [
         "express-jwt",
@@ -387,8 +481,8 @@
   },
   "metadata": {
     "adr_directory": "docs/adr",
-    "generated_at": "2026-05-19 16:53:05.548163+00:00",
-    "hash": "44c60857e18dd020883328697d4a97f6fc5c2b7ddbbf7a3ed9ee82926bb7e864",
+    "generated_at": "2026-05-20 10:25:15.706295+00:00",
+    "hash": "1ab7ed30f6178869e1b15be642f29b47f86d2d99bf7c3890eb677125bc750dd8",
     "source_adrs": [
       "ADR-0001",
       "ADR-0002",
@@ -398,11 +492,20 @@
       "ADR-0006",
       "ADR-0007",
       "ADR-0008",
-      "ADR-0009"
+      "ADR-0009",
+      "ADR-0010",
+      "ADR-0011",
+      "ADR-0012"
     ],
     "version": "1.0"
   },
   "provenance": {
+    "boundaries.rules.shared/auth.ts stub -> production traffic before Task 9": {
+      "adr_id": "ADR-0012",
+      "adr_title": "Auth stub pattern \u2014 SAS functions deferred until Task 9 JWKS validation",
+      "effective_date": "2026-05-20 00:00:00",
+      "rule_path": "boundaries.rules.shared/auth.ts stub -> production traffic before Task 9"
+    },
     "imports.disallow.@angular/core": {
       "adr_id": "ADR-0001",
       "adr_title": "React + Vite as Frontend Framework (SPA)",

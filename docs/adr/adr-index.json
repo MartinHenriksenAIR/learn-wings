@@ -1,24 +1,18 @@
 {
   "metadata": {
-    "generated_at": "2026-05-19T18:53:05.591635",
-    "total_adrs": 9,
+    "generated_at": "2026-05-20T12:25:15.795071",
+    "total_adrs": 11,
     "adr_directory": "docs/adr",
     "validation_errors": [
       {
-        "file": "docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md",
-        "errors": [
-          "[ERROR] docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md: Parse error in docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      rationales: ['Secrets committed  ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 8, column 317:\n     ... for all production credentials']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
-        ]
-      },
-      {
         "file": "docs/adr/ADR-0011-blob-name-url-encoding-responsibility-in-sas-generation.md",
         "errors": [
-          "[ERROR] docs/adr/ADR-0011-blob-name-url-encoding-responsibility-in-sas-generation.md: Parse error in docs/adr/ADR-0011-blob-name-url-encoding-responsibility-in-sas-generation.md: Invalid YAML in front-matter: while parsing a block mapping\n  in \"<unicode string>\", line 8, column 3:\n      rationales: ['Encoding inside ge ... \n      ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 8, column 241:\n     ... hen passed to generateSasToken']approval_date: 2026-05-19\n                                         ^ (rule: parse_error)"
+          "[ERROR] docs/adr/ADR-0011-blob-name-url-encoding-responsibility-in-sas-generation.md: ADR ADR-0011 is accepted but has no extractable policy. Add structured policy in front-matter or include decision rationales in content. (rule: policy_required_for_accepted)"
         ]
       }
     ],
     "status_counts": {
-      "accepted": 9
+      "accepted": 11
     },
     "tag_counts": {
       "frontend": 3,
@@ -33,7 +27,7 @@
       "state-management": 1,
       "data-fetching": 1,
       "authentication": 1,
-      "security": 2,
+      "security": 3,
       "azure": 4,
       "migration": 4,
       "backend": 2,
@@ -42,7 +36,14 @@
       "postgresql": 1,
       "storage": 1,
       "email": 1,
-      "integration": 1
+      "integration": 1,
+      "secrets": 1,
+      "environment": 1,
+      "gitignore": 1,
+      "auth": 1,
+      "azure-functions": 1,
+      "testing": 1,
+      "deployment-gate": 1
     }
   },
   "adrs": [
@@ -212,6 +213,44 @@
       "superseded_by": [],
       "file_path": "docs/adr/ADR-0009-resend-for-transactional-email.md",
       "content_preview": "The platform sends invitation emails with tokenized links for org and platform admin workflows. Originally sent via Supabase Edge Function using SMTP or a third-party email API. The Azure migration..."
+    },
+    {
+      "id": "ADR-0010",
+      "title": "Secrets and Environment Variables Must Never Be Committed to Git",
+      "status": "accepted",
+      "date": "2026-05-19",
+      "deciders": [
+        "le-dawg"
+      ],
+      "tags": [
+        "security",
+        "secrets",
+        "environment",
+        "gitignore"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0010-secrets-and-environment-variables-must-never-be-committed-to-git.md",
+      "content_preview": "On 2026-01-27 (commit 43a079e), a .env file containing VITE_SUPABASE_PROJECT_ID, VITE_SUPABASE_PUBLISHABLE_KEY, and VITE_SUPABASE_URL was committed to git by the Lovable platform bot. The file was..."
+    },
+    {
+      "id": "ADR-0012",
+      "title": "Auth stub pattern \u2014 SAS functions deferred until Task 9 JWKS validation",
+      "status": "accepted",
+      "date": "2026-05-20",
+      "deciders": [
+        "dawid@ai-raadgivning.dk"
+      ],
+      "tags": [
+        "auth",
+        "azure-functions",
+        "testing",
+        "deployment-gate"
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "file_path": "docs/adr/ADR-0012-auth-stub-pattern-sas-functions-deferred-until-task-9-jwks-validation.md",
+      "content_preview": "Tasks 1\u20138 implement four Azure Blob SAS functions (azure-upload-url, azure-view-url, azure-delete-blob, azure-document-upload-url) that all call authenticate(req) from shared/auth.ts. Real..."
     }
   ]
 }

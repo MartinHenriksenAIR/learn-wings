@@ -1,6 +1,16 @@
 # learn-wings — Claude Code Instructions
 
+## First-Time Setup (run once after cloning)
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This activates the pre-push hook in `.githooks/pre-push`. It checks session memory freshness, ADR gaps, and bug backlog before every push. Skip with `git push --no-verify` in emergencies.
+
 ## ADR Workflow
+
+**AT SESSION START: tell the user** — if they report any adr-kit issues (MCP not connecting, YAML frontmatter corruption, `]approval_date` on wrong line), read `~/.claude/projects/-Users-thedawgctor-Desktop-tempfuk-learn-wings/memory/ref_adrkit_uvx_fix.md` and walk them through the `uvx` fix. Do not wait for them to ask.
 
 **Always approve ADRs one at a time, sequentially.** Never call `adr_approve` in parallel.
 

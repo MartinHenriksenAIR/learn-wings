@@ -1,8 +1,8 @@
 {
-  "adr_content_hash": "78eb311ef70675984893c5b33ff6742a59457c589a92e55d2e8a719d25d49ccc",
+  "adr_content_hash": "80c05f17185dbf5e53edbe0a0f760286ba1862c9d3f36db5b773a254d0c7fdc4",
   "adr_directory": "docs/adr",
-  "cached_at": "2026-05-19T16:53:05.550828+00:00",
-  "contract_hash": "44c60857e18dd020883328697d4a97f6fc5c2b7ddbbf7a3ed9ee82926bb7e864",
+  "cached_at": "2026-05-20T10:25:15.707921+00:00",
+  "contract_hash": "1ab7ed30f6178869e1b15be642f29b47f86d2d99bf7c3890eb677125bc750dd8",
   "source_adrs": [
     "ADR-0001",
     "ADR-0002",
@@ -12,6 +12,9 @@
     "ADR-0006",
     "ADR-0007",
     "ADR-0008",
-    "ADR-0009"
+    "ADR-0009",
+    "ADR-0010",
+    "ADR-0011",
+    "ADR-0012"
   ]
 }

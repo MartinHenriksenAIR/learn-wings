@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__adr-kit__adr_approve"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command // empty' | grep -q 'git push' && printf '{\"systemMessage\":\"Pre-push reminder: (1) run /cavemem if session state has changed, (2) confirm no new ADR is needed for recent decisions, (3) check bug backlog in memory is current.\"}' || printf '{}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "TaskUpdate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -e '.tool_input.status == \"completed\"' > /dev/null 2>&1 && printf '{\"systemMessage\":\"Task marked complete — run /cavemem to persist migration state to memory\"}' || printf '{}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
