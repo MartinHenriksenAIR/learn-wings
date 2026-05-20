@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Loader2, Plus, Trash2, GripVertical, CheckCircle2, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -97,9 +98,7 @@ export function QuizEditorDialog({
       // Fetch options for each question using the RPC that includes is_correct
       const questionsWithOptions: QuizQuestion[] = [];
       for (const q of questionsData || []) {
-        const { data: optionsData } = await supabase.rpc('get_quiz_options_with_answers', {
-          p_question_id: q.id,
-        });
+        const optionsData = await callApi<any[]>('/api/quiz-options-admin', { questionId: q.id });
         
         questionsWithOptions.push({
           ...q,

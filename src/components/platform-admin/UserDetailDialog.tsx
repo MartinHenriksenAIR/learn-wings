@@ -28,7 +28,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api-client';
 import { Profile, OrgMembership, Organization, OrgRole } from '@/lib/types';
 import { Loader2, Trash2, Plus, Shield, Building2 } from 'lucide-react';
@@ -78,101 +77,61 @@ export function UserDetailDialog({
   const handleTogglePlatformAdmin = async () => {
     setLoading(true);
     const newValue = !isPlatformAdmin;
-    
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_platform_admin: newValue })
-      .eq('id', user.id);
 
-    if (error) {
-      toast({
-        title: 'Failed to update user',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/admin-user-actions', { type: 'toggle-platform-admin', targetUserId: user.id, value: newValue });
       setIsPlatformAdmin(newValue);
-      toast({
-        title: newValue ? 'Platform admin granted' : 'Platform admin revoked',
-      });
+      toast({ title: newValue ? 'Platform admin granted' : 'Platform admin revoked' });
       onUserUpdated();
+    } catch (error: any) {
+      toast({ title: 'Failed to update user', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
   const handleChangeRole = async (membershipId: string, newRole: OrgRole) => {
     setLoading(true);
-    
-    const { error } = await supabase
-      .from('org_memberships')
-      .update({ role: newRole })
-      .eq('id', membershipId);
 
-    if (error) {
-      toast({
-        title: 'Failed to update role',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      setMemberships(prev => 
-        prev.map(m => m.id === membershipId ? { ...m, role: newRole } : m)
-      );
+    try {
+      await callApi('/api/admin-user-actions', { type: 'update-member-role', membershipId, role: newRole });
+      setMemberships(prev => prev.map(m => m.id === membershipId ? { ...m, role: newRole } : m));
       toast({ title: 'Role updated' });
       onUserUpdated();
+    } catch (error: any) {
+      toast({ title: 'Failed to update role', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
   const handleRemoveMembership = async (membershipId: string) => {
     setLoading(true);
-    
-    const { error } = await supabase
-      .from('org_memberships')
-      .delete()
-      .eq('id', membershipId);
 
-    if (error) {
-      toast({
-        title: 'Failed to remove membership',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/admin-user-actions', { type: 'remove-membership', membershipId });
       setMemberships(prev => prev.filter(m => m.id !== membershipId));
       toast({ title: 'Membership removed' });
       onUserUpdated();
+    } catch (error: any) {
+      toast({ title: 'Failed to remove membership', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
   const handleAddMembership = async () => {
     if (!newOrgId) return;
-    
-    setLoading(true);
-    
-    const { error } = await supabase
-      .from('org_memberships')
-      .insert({
-        org_id: newOrgId,
-        user_id: user.id,
-        role: newOrgRole,
-        status: 'active',
-      });
 
-    if (error) {
-      toast({
-        title: 'Failed to add membership',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    setLoading(true);
+
+    try {
+      await callApi('/api/admin-user-actions', { type: 'add-membership', targetUserId: user.id, orgId: newOrgId, role: newOrgRole });
       toast({ title: 'Membership added' });
       setShowAddOrg(false);
       setNewOrgId('');
       setNewOrgRole('learner');
       onUserUpdated();
       onOpenChange(false);
+    } catch (error: any) {
+      toast({ title: 'Failed to add membership', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };

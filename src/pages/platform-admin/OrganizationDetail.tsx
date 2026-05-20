@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Organization, OrgMembership, Profile, OrgRole, Invitation } from '@/lib/types';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { useAuth } from '@/hooks/useAuth';
@@ -333,10 +334,8 @@ export default function OrganizationDetail() {
         variant: 'destructive',
       });
     } else {
-      // Get the link_id from the invitation using the RPC
-      const { data: linkId } = await supabase.rpc('get_invitation_link_id', {
-        invitation_id: invitation.id,
-      });
+      // Get the active invitation link ID for this org
+      const { linkId } = await callApi<{ linkId: string }>('/api/invitation-link', { orgId });
       
       // Send invitation email
       if (linkId) {

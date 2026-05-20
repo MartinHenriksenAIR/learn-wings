@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -63,31 +63,31 @@ export function FileUpload({
     setFileName(file.name);
 
     try {
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const storagePath = folder ? `${folder}/${uniqueName}` : uniqueName;
+      // Get a signed Azure upload URL
+      const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>(
+        '/api/azure-upload-url',
+        { fileName: file.name, contentType: file.type }
+      );
 
-      // Upload file
-      const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(storagePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+      if (!uploadData?.uploadUrl) throw new Error('Failed to get upload URL');
 
-      if (uploadError) throw uploadError;
-
-      // Get signed URL (expires in 1 hour) for secure access
-      const { data: signedData, error: signedError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(storagePath, 3600);
-
-      if (signedError) throw signedError;
+      // Upload directly to Azure via XHR for progress tracking
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
+        };
+        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed with status ${xhr.status}`)));
+        xhr.onerror = () => reject(new Error('Upload failed'));
+        xhr.open('PUT', uploadData.uploadUrl);
+        xhr.setRequestHeader('Content-Type', uploadData.contentType);
+        xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
+        xhr.send(file);
+      });
 
       setProgress(100);
-      // Store the signed URL for display, and the storage path for persistence
-      onChange(signedData.signedUrl, storagePath);
+      // Store the blob path; use it as both the display value and storage path
+      onChange(uploadData.blobPath, uploadData.blobPath);
     } catch (err: any) {
       setError(err.message || 'Upload failed');
       onChange(null, null);
