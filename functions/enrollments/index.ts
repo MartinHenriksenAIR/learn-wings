@@ -26,6 +26,11 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 400, { error: 'courseId must be a string' }) as HttpResponseInit;
     }
 
+    // Narrowed typed locals — runtime guards above guarantee these are string | undefined
+    const vOrgId = orgId as string | undefined;
+    const vUserId = userId as string | undefined;
+    const vCourseId = courseId as string | undefined;
+
     const conditions: string[] = [];
     const params: unknown[] = [];
     const add = (col: string, val: unknown) => {
@@ -35,19 +40,20 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     if (profile.is_platform_admin) {
       // Tier 1: Platform admin — apply filters exactly as given
-      if (orgId) add('org_id', orgId);
-      if (userId) add('user_id', userId);
-      if (courseId) add('course_id', courseId);
-    } else if (orgId && await isOrgAdmin(profile.id, orgId as string)) {
-      // Tier 2: Org admin scope — scoped to that org
-      add('org_id', orgId);
-      if (userId) add('user_id', userId);
-      if (courseId) add('course_id', courseId);
+      if (vOrgId) add('org_id', vOrgId);
+      if (vUserId) add('user_id', vUserId);
+      if (vCourseId) add('course_id', vCourseId);
+    } else if (vOrgId && await isOrgAdmin(profile.id, vOrgId)) {
+      // Tier 2: Org admin scope — vOrgId is guaranteed non-empty by the branch condition
+      add('org_id', vOrgId);
+      if (vUserId) add('user_id', vUserId);
+      if (vCourseId) add('course_id', vCourseId);
     } else {
-      // Tier 3: Self scope — force user_id = profile.id, ignore client-supplied userId
+      // Tier 3: Self scope — force user_id = profile.id, ignore client-supplied userId.
+      // No 403 for unrecognised tiers: READ endpoint uses scoped-down access rather than rejection.
       add('user_id', profile.id);
-      if (orgId) add('org_id', orgId);
-      if (courseId) add('course_id', courseId);
+      if (vOrgId) add('org_id', vOrgId);
+      if (vCourseId) add('course_id', vCourseId);
     }
 
     const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';

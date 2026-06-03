@@ -3,9 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsOrgAdmin } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
-    mockAuthenticate: vi.fn(), MockAuthError,
+    mockAuthenticate: vi.fn(),
+    MockAuthError,
     mockQuery: vi.fn(),
-    mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
+    mockGetProfile: vi.fn(),
+    mockIsOrgAdmin: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -137,9 +139,10 @@ describe('enrollments', () => {
 
     expect(res.status).toBe(200);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain('user_id = $');
-    expect(params).toContain('p1');
-    expect(params).toContain('org-1');
+    // user_id is added first (profile.id forced), then org_id — pinned positional order
+    expect(sql).toContain('user_id = $1');
+    expect(sql).toContain('org_id = $2');
+    expect(params).toEqual(['p1', 'org-1']);
     expect(params).not.toContain('evil-user');
     expect(sql).toContain(ORDER_CLAUSE);
     expect(sql).toContain(EXPLICIT_COLS);
