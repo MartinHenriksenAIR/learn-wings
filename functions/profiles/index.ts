@@ -1,8 +1,8 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { query, queryOne } from '../shared/db';
+import { query } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { getProfile } from '../shared/profile';
+import { getProfile, isOrgAdminOfAny } from '../shared/profile';
 
 const PROFILE_COLUMNS = 'id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, created_at';
 const PROFILE_COLUMNS_PREFIXED = 'p.id, p.full_name, p.first_name, p.last_name, p.department, p.email, p.avatar_url, p.is_platform_admin, p.created_at';
@@ -25,15 +25,15 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       }
     }
 
-    const filteredUserIds = userIds as string[] | undefined;
+    const validatedUserIds = userIds as string[] | undefined;
 
     // Tier 1: Platform admin
     if (profile.is_platform_admin) {
       let rows: unknown[];
-      if (filteredUserIds) {
+      if (validatedUserIds) {
         rows = await query(
           `SELECT ${PROFILE_COLUMNS} FROM profiles WHERE id = ANY($1::uuid[]) ORDER BY full_name`,
-          [filteredUserIds],
+          [validatedUserIds],
         );
       } else {
         rows = await query(
@@ -44,29 +44,24 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     }
 
     // Tier 2: Org admin of at least one org
-    const orgAdminCheck = await queryOne<{ ok: boolean }>(
-      `SELECT EXISTS(SELECT 1 FROM org_memberships WHERE user_id = $1 AND role = 'org_admin' AND status = 'active') AS ok`,
-      [profile.id],
-    );
-
-    if (orgAdminCheck?.ok) {
+    if (await isOrgAdminOfAny(profile.id)) {
       let rows: unknown[];
-      if (filteredUserIds) {
+      if (validatedUserIds) {
         rows = await query(
           `SELECT DISTINCT ${PROFILE_COLUMNS_PREFIXED}
            FROM profiles p
-           JOIN org_memberships om ON om.user_id = p.id
+           JOIN org_memberships om ON om.user_id = p.id  -- no status filter: org admins manage their full roster incl. invited/disabled members
            JOIN org_memberships my ON my.org_id = om.org_id
            WHERE my.user_id = $1 AND my.role = 'org_admin' AND my.status = 'active'
            AND p.id = ANY($2::uuid[])
            ORDER BY p.full_name`,
-          [profile.id, filteredUserIds],
+          [profile.id, validatedUserIds],
         );
       } else {
         rows = await query(
           `SELECT DISTINCT ${PROFILE_COLUMNS_PREFIXED}
            FROM profiles p
-           JOIN org_memberships om ON om.user_id = p.id
+           JOIN org_memberships om ON om.user_id = p.id  -- no status filter: org admins manage their full roster incl. invited/disabled members
            JOIN org_memberships my ON my.org_id = om.org_id
            WHERE my.user_id = $1 AND my.role = 'org_admin' AND my.status = 'active'
            ORDER BY p.full_name`,

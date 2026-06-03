@@ -34,3 +34,15 @@ export async function isOrgAdmin(profileId: string, orgId: string): Promise<bool
   );
   return row?.ok ?? false;
 }
+
+/** True if profileId is an active org_admin of at least one organization. */
+export async function isOrgAdminOfAny(profileId: string): Promise<boolean> {
+  const row = await queryOne<{ ok: boolean }>(
+    `SELECT EXISTS(
+       SELECT 1 FROM org_memberships
+       WHERE user_id = $1 AND role = 'org_admin' AND status = 'active'
+     ) AS ok`,
+    [profileId]
+  );
+  return row?.ok ?? false;
+}

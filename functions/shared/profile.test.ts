@@ -6,7 +6,7 @@ const { mockQuery, mockQueryOne } = vi.hoisted(() => ({
 }));
 vi.mock('./db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
 
-import { getProfile, isActiveMember, isOrgAdmin } from './profile';
+import { getProfile, isActiveMember, isOrgAdmin, isOrgAdminOfAny } from './profile';
 
 const user = { id: 'entra-oid-abc', tid: 'entra-tid-xyz', email: 'user@contoso.com' };
 
@@ -111,5 +111,45 @@ describe('isOrgAdmin', () => {
 
     const [sql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toMatch(/role\s*=\s*'org_admin'/);
+  });
+});
+
+describe('isOrgAdminOfAny', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns true when row.ok is true', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ok: true });
+
+    const result = await isOrgAdminOfAny('profile-uuid');
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when row.ok is false', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ok: false });
+
+    const result = await isOrgAdminOfAny('profile-uuid');
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false when queryOne returns null', async () => {
+    mockQueryOne.mockResolvedValueOnce(null);
+
+    const result = await isOrgAdminOfAny('profile-uuid');
+
+    expect(result).toBe(false);
+  });
+
+  it("SQL contains role = 'org_admin' AND status = 'active'", async () => {
+    mockQueryOne.mockResolvedValueOnce({ ok: true });
+
+    await isOrgAdminOfAny('profile-uuid');
+
+    const [sql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toMatch(/role\s*=\s*'org_admin'/);
+    expect(sql).toMatch(/status\s*=\s*'active'/);
   });
 });
