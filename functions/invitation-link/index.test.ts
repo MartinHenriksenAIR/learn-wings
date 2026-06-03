@@ -131,6 +131,6 @@ describe('invitation-link', () => {
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
 
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'Unknown error' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
   });
 });

@@ -38,7 +38,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     return corsResponse(origin, 200, { linkId: row?.link_id ?? null }) as HttpResponseInit;
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: 'Unknown error' }) as HttpResponseInit;
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
   }
 }
 
