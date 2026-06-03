@@ -1,0 +1,92 @@
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { authenticate, AuthError } from '../shared/auth';
+import { query, queryOne } from '../shared/db';
+import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { getProfile } from '../shared/profile';
+
+const PROFILE_COLUMNS = 'id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, created_at';
+const PROFILE_COLUMNS_PREFIXED = 'p.id, p.full_name, p.first_name, p.last_name, p.department, p.email, p.avatar_url, p.is_platform_admin, p.created_at';
+
+async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+  const origin = req.headers.get('origin');
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  try {
+    const user = await authenticate(req);
+    const profile = await getProfile(user);
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+
+    const body = await req.json() as { userIds?: unknown };
+    const { userIds } = body;
+
+    // Validate userIds if present
+    if (userIds !== undefined) {
+      if (!Array.isArray(userIds) || !userIds.every((v) => typeof v === 'string')) {
+        return corsResponse(origin, 400, { error: 'userIds must be an array of strings' }) as HttpResponseInit;
+      }
+    }
+
+    const filteredUserIds = userIds as string[] | undefined;
+
+    // Tier 1: Platform admin
+    if (profile.is_platform_admin) {
+      let rows: unknown[];
+      if (filteredUserIds) {
+        rows = await query(
+          `SELECT ${PROFILE_COLUMNS} FROM profiles WHERE id = ANY($1::uuid[]) ORDER BY full_name`,
+          [filteredUserIds],
+        );
+      } else {
+        rows = await query(
+          `SELECT ${PROFILE_COLUMNS} FROM profiles ORDER BY full_name`,
+        );
+      }
+      return corsResponse(origin, 200, { profiles: rows }) as HttpResponseInit;
+    }
+
+    // Tier 2: Org admin of at least one org
+    const orgAdminCheck = await queryOne<{ ok: boolean }>(
+      `SELECT EXISTS(SELECT 1 FROM org_memberships WHERE user_id = $1 AND role = 'org_admin' AND status = 'active') AS ok`,
+      [profile.id],
+    );
+
+    if (orgAdminCheck?.ok) {
+      let rows: unknown[];
+      if (filteredUserIds) {
+        rows = await query(
+          `SELECT DISTINCT ${PROFILE_COLUMNS_PREFIXED}
+           FROM profiles p
+           JOIN org_memberships om ON om.user_id = p.id
+           JOIN org_memberships my ON my.org_id = om.org_id
+           WHERE my.user_id = $1 AND my.role = 'org_admin' AND my.status = 'active'
+           AND p.id = ANY($2::uuid[])
+           ORDER BY p.full_name`,
+          [profile.id, filteredUserIds],
+        );
+      } else {
+        rows = await query(
+          `SELECT DISTINCT ${PROFILE_COLUMNS_PREFIXED}
+           FROM profiles p
+           JOIN org_memberships om ON om.user_id = p.id
+           JOIN org_memberships my ON my.org_id = om.org_id
+           WHERE my.user_id = $1 AND my.role = 'org_admin' AND my.status = 'active'
+           ORDER BY p.full_name`,
+          [profile.id],
+        );
+      }
+      return corsResponse(origin, 200, { profiles: rows }) as HttpResponseInit;
+    }
+
+    // Tier 3: Plain learner — own profile only
+    const rows = await query(
+      `SELECT ${PROFILE_COLUMNS} FROM profiles WHERE id = $1`,
+      [profile.id],
+    );
+    return corsResponse(origin, 200, { profiles: rows }) as HttpResponseInit;
+  } catch (err: unknown) {
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+  }
+}
+
+export default handler;
+app.http('profiles', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
