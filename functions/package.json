@@ -2,7 +2,7 @@
   "name": "func-ai-education-migration",
   "version": "1.0.0",
   "description": "Azure Functions backend for learn-wings",
-  "main": "dist/{functionName}/index.js",
+  "main": "dist/*/index.js",
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
