@@ -19,5 +19,8 @@ export function corsResponse(origin: string | null, status: number, body: unknow
 }
 
 export function corsPreflightResponse(origin: string | null): object {
-  return { status: 204, headers: getCorsHeaders(origin), body: '' };
+  // 204 must NOT carry a body — the worker's undici Response constructor throws
+  // "Invalid response status code 204" if one is present (even an empty string),
+  // turning every browser CORS preflight into a 500.
+  return { status: 204, headers: getCorsHeaders(origin) };
 }
