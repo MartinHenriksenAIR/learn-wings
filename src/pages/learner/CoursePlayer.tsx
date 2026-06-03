@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api-client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
@@ -87,7 +86,7 @@ export default function CoursePlayer() {
     fetchData();
   }, [user, currentOrg, courseId]);
 
-  // Load quiz when lesson changes - uses public view to hide is_correct
+  // Load quiz when lesson changes - single endpoint, no is_correct exposed
   useEffect(() => {
     const loadQuiz = async () => {
       if (!currentLesson || currentLesson.lesson_type !== 'quiz') {
@@ -98,30 +97,27 @@ export default function CoursePlayer() {
         return;
       }
 
-      const { data: quizData } = await supabase
-        .from('quizzes')
-        .select('*')
-        .eq('lesson_id', currentLesson.id)
-        .single();
+      try {
+        const data = await callApi<{
+          quiz: Quiz | null;
+          questions: Array<QuizQuestion & { options: QuizOption[] }>;
+        }>('/api/quiz-by-lesson', { lessonId: currentLesson.id });
 
-      if (quizData) {
-        setQuiz(quizData as Quiz);
-
-        const { data: questionsData } = await supabase
-          .from('quiz_questions')
-          .select('*')
-          .eq('quiz_id', quizData.id)
-          .order('sort_order');
-
-        if (questionsData) {
-          const questionsWithOptions = await Promise.all(
-            questionsData.map(async (q) => {
-              const options = await callApi<QuizOption[]>('/api/quiz-options', { questionId: q.id });
-              return { ...q, options: options || [] };
-            })
-          );
-          setQuestions(questionsWithOptions as any);
+        if (data.quiz) {
+          setQuiz(data.quiz as Quiz);
+          setQuestions(data.questions as any);
+        } else {
+          setQuiz(null);
+          setQuestions([]);
+          setAnswers({});
+          setQuizSubmitted(false);
         }
+      } catch (error) {
+        console.error('Error loading quiz:', error);
+        setQuiz(null);
+        setQuestions([]);
+        setAnswers({});
+        setQuizSubmitted(false);
       }
     };
 
