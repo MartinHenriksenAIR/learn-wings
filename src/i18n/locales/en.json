@@ -141,7 +141,7 @@
   "dashboard": {
     "title": "My Dashboard",
     "welcome": "Welcome back",
-    "myCourses": "My Courses",
+    "myCourses": "Course Overview",
     "coursesEnrolled": "Courses Enrolled",
     "inProgress": "In Progress",
     "completed": "Completed",
@@ -150,13 +150,13 @@
     "viewAllCourses": "View all courses",
     "recentActivity": "Recent Activity",
     "noCoursesInProgress": "No courses in progress",
-    "startLearning": "Start learning by enrolling in a course from the catalog.",
+    "startLearning": "Start learning by enrolling in a course from the Course Overview.",
     "browseCourses": "Browse Courses",
     "completedCourses": "Completed Courses"
   },
   "courses": {
-    "title": "Course Catalog",
-    "myCourses": "My Courses",
+    "title": "Course Overview",
+    "myCourses": "Course Overview",
     "allCourses": "All Courses",
     "enrolled": "Enrolled",
     "notEnrolled": "Not Enrolled",

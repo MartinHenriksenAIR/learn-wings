@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../shared/auth', () => ({
   authenticate: () => ({ id: 'entra-oid-123', tid: 'entra-tid-456', email: 'user@contoso.com' }),
@@ -19,6 +19,10 @@ const baseReq = {
 };
 
 describe('user-context', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('returns existing profile and memberships', async () => {
     const existingProfile = { id: 'profile-uuid', full_name: 'Test User', email: 'user@contoso.com', is_platform_admin: false, avatar_url: null };
     const memberships = [{ org_id: 'org-1', role: 'member', organization: { name: 'Org One' } }];
