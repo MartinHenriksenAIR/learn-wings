@@ -15,6 +15,7 @@ import './generate-certificate/index';
 import './generate-compliance-report/index';
 import './grade-quiz/index';
 import './invitation-link/index';
+import './learner-courses/index';
 import './learner-dashboard/index';
 import './lesson-progress/index';
 import './org-analytics-data/index';
