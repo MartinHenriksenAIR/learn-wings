@@ -116,7 +116,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 403, { error: 'Forbidden: Only admins can send invitations' }) as HttpResponseInit;
     }
 
-    const { email, orgName, role, inviteLink }: InvitationEmailRequest = await req.json();
+    const { email, orgName, role, inviteLink } = await req.json() as InvitationEmailRequest;
 
     if (!email || !inviteLink) {
       return corsResponse(origin, 400, { error: 'Missing required fields: email and inviteLink' }) as HttpResponseInit;

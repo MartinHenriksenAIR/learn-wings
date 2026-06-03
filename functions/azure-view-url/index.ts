@@ -29,7 +29,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
 
   try {
-    const user = authenticate(req);
+    const user = await authenticate(req);
     const { blobPath } = await req.json() as { blobPath: string };
     if (!blobPath) return corsResponse(origin, 400, { error: 'blobPath is required' }) as HttpResponseInit;
 
