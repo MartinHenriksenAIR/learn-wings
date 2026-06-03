@@ -15,6 +15,7 @@ import './grade-quiz/index';
 import './invitation-link/index';
 import './lesson-progress/index';
 import './org-analytics-data/index';
+import './organizations/index';
 import './quiz-options/index';
 import './quiz-options-admin/index';
 import './send-invitation-email/index';
