@@ -3,12 +3,12 @@ import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { queryOne } from '../shared/db';
 import { authenticate } from '../shared/auth';
+import { getProfile } from '../shared/profile';
 
-async function canAccessAsset(userId: string, filePath: string): Promise<boolean> {
+async function canAccessAsset(profileId: string, filePath: string): Promise<boolean> {
   const result = await queryOne<{ can_access: boolean }>(
     `SELECT (
-      EXISTS(SELECT 1 FROM profiles WHERE id = $1 AND is_platform_admin = TRUE)
-      OR EXISTS (
+      EXISTS (
         SELECT 1 FROM lessons l
         JOIN course_modules cm ON cm.id = l.module_id
         JOIN courses c ON c.id = cm.course_id
@@ -19,7 +19,7 @@ async function canAccessAsset(userId: string, filePath: string): Promise<boolean
           AND (l.video_storage_path = $2 OR l.document_storage_path = $2)
       )
     ) AS can_access`,
-    [userId, filePath]
+    [profileId, filePath]
   );
   return result?.can_access ?? false;
 }
@@ -30,11 +30,17 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
   try {
     const user = await authenticate(req);
+    const profile = await getProfile(user);
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+
     const { blobPath } = await req.json() as { blobPath: string };
     if (!blobPath) return corsResponse(origin, 400, { error: 'blobPath is required' }) as HttpResponseInit;
 
-    const hasAccess = await canAccessAsset(user.id, blobPath);
-    if (!hasAccess) return corsResponse(origin, 403, { error: 'Access denied' }) as HttpResponseInit;
+    // Access check — short-circuit for platform admins; otherwise check org membership
+    if (!profile.is_platform_admin) {
+      const hasAccess = await canAccessAsset(profile.id, blobPath);
+      if (!hasAccess) return corsResponse(origin, 403, { error: 'Access denied' }) as HttpResponseInit;
+    }
 
     const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME!;
     const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY!;
