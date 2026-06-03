@@ -7,6 +7,7 @@ import './azure-document-upload-url/index';
 import './azure-upload-url/index';
 import './azure-view-url/index';
 import './course-player-data/index';
+import './course-review/index';
 import './courses/index';
 import './delete-user/index';
 import './enroll/index';
