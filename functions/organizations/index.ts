@@ -20,7 +20,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
 
       const organization = await queryOne(
-        `SELECT * FROM organizations WHERE id = $1`,
+        `SELECT id, name, slug, logo_url, seat_limit, created_at FROM organizations WHERE id = $1`,
         [orgId],
       );
       if (!organization) return corsResponse(origin, 404, { error: 'Organization not found' }) as HttpResponseInit;
@@ -31,19 +31,19 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // List orgs
     if (profile.is_platform_admin) {
       const organizations = await query(
-        `SELECT * FROM organizations ORDER BY name`,
+        `SELECT id, name, slug, logo_url, seat_limit, created_at FROM organizations ORDER BY name`,
       );
       return corsResponse(origin, 200, { organizations }) as HttpResponseInit;
     }
 
     const organizations = await query(
-      `SELECT o.* FROM organizations o JOIN org_memberships om ON om.org_id = o.id WHERE om.user_id = $1 AND om.status = 'active' ORDER BY o.name`,
+      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at FROM organizations o JOIN org_memberships om ON om.org_id = o.id WHERE om.user_id = $1 AND om.status = 'active' ORDER BY o.name`,
       [profile.id],
     );
     return corsResponse(origin, 200, { organizations }) as HttpResponseInit;
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'error' }) as HttpResponseInit;
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
   }
 }
 
