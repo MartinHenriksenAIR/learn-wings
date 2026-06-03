@@ -90,6 +90,14 @@ describe('course-review', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'comment must be at most 1000 characters' });
   });
 
+  // 6b. 400 comment present but not a string
+  it('returns 400 when comment is not a string', async () => {
+    const res = await handler(baseReq({ orgId: 'org-1', courseId: 'c-1', rating: 4, comment: 42 }), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'comment must be a string' });
+  });
+
   // 7. 403 non-member — isActiveMember called with ('p1','org-1'); no INSERT ran
   it('returns 403 for non-member and does not call INSERT', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
