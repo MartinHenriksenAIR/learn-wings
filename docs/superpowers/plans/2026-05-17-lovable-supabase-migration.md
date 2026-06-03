@@ -43,7 +43,19 @@ functions/
 ├── user-context/index.ts             ← NEW: replaces useAuth fetchUserContext DB reads
 ├── org-analytics-data/index.ts       ← NEW: replaces OrgAnalytics.tsx:70–200 DB reads
 ├── admin-user-actions/index.ts       ← NEW: replaces UserDetailDialog.tsx:81,105,129,153
-└── invitation-link/index.ts          ← NEW: replaces get_invitation_link_id RPC
+├── invitation-link/index.ts          ← NEW: replaces get_invitation_link_id RPC
+├── platform-settings/index.ts        ← NEW (Task 21.2): platform_settings + org_settings reads/writes
+├── learner-data/index.ts             ← NEW (Task 21.3): enrolled + available + dashboard
+├── submit-review/index.ts            ← NEW (Task 21.3): course_reviews upsert
+├── org-members/index.ts              ← NEW (Task 21.5): list + lookup + status + invitation
+├── user-progress/index.ts            ← NEW (Task 21.6): admin view of a user's progress
+├── enroll/index.ts                   ← NEW (Task 21.6): enrollment insert (self + admin)
+├── admin-courses/index.ts            ← NEW (Task 21.7): courses list + CRUD + org access
+├── admin-course-editor/index.ts      ← NEW (Task 21.8): course/module/lesson/quiz CRUD (txn)
+├── admin-organizations/index.ts      ← NEW (Task 21.9): organizations CRUD + logo update
+├── course-progress-analytics/index.ts ← NEW (Task 21.10): per-course progress + active users
+├── community-moderation/index.ts     ← NEW (Task 21.11): flagged-post management
+└── resources/index.ts                ← NEW (Task 21.13): resources library CRUD
 src/lib/
 ├── api-client.ts                     ← NEW: replaces supabase.functions.invoke everywhere
 └── msal-config.ts                    ← NEW: MSAL singleton, multi-tenant config, API scopes
@@ -53,23 +65,45 @@ src/lib/
 ```
 package.json                          ← remove @supabase/supabase-js, lovable-tagger
 vite.config.ts                        ← remove lovable-tagger import + plugin
+src/main.tsx                          ← MSAL init (NOTE: use .then(), not top-level await)
 src/hooks/useAuth.tsx                 ← replace supabase.auth.* + fetchUserContext DB reads
+src/hooks/usePlatformSettings.tsx     ← Task 21.2
 src/pages/Login.tsx
 src/pages/Signup.tsx
 src/pages/ForgotPassword.tsx
 src/pages/ResetPassword.tsx
 src/pages/Settings.tsx
-src/pages/learner/CoursePlayer.tsx    ← 15 supabase calls → API calls
-src/pages/learner/Dashboard.tsx
-src/pages/org-admin/OrgAnalytics.tsx
-src/components/platform-admin/UserDetailDialog.tsx
-src/components/platform-admin/QuizEditorDialog.tsx
-src/components/ui/azure-video-upload.tsx
-src/components/ui/azure-document-upload.tsx
-src/pages/platform-admin/CourseEditor.tsx
-src/pages/platform-admin/PlatformSettings.tsx
-src/pages/platform-admin/OrganizationDetail.tsx
-src/lib/sendInvitationEmail.ts
+src/pages/learner/CoursePlayer.tsx    ← 15 supabase calls → API calls (Tasks 20, 21.4)
+src/pages/learner/Courses.tsx         ← Task 21.3
+src/pages/learner/Dashboard.tsx       ← Tasks 19, 21.3
+src/pages/org-admin/OrgAnalytics.tsx  ← Tasks 19, 21.10
+src/pages/org-admin/OrgSettings.tsx   ← Task 21.2
+src/pages/org-admin/OrgUsers.tsx      ← Task 21.5
+src/pages/org-admin/OrgCommunityModeration.tsx ← Task 21.11
+src/components/platform-admin/UserDetailDialog.tsx     ← Tasks 19, 21.1 (also covered Task 21 Step 1)
+src/components/platform-admin/QuizEditorDialog.tsx     ← Tasks 21, 21.8
+src/components/org-admin/OrgMembersTab.tsx             ← Task 21.5
+src/components/org-admin/EnrollUserDialog.tsx          ← Task 21.6
+src/components/org-admin/BulkInviteDialog.tsx          ← Task 21.6
+src/components/org-admin/UserProgressDialog.tsx        ← Task 21.6
+src/components/org-admin/analytics/CourseProgressTab.tsx ← Task 21.10
+src/components/community/AIChampionsList.tsx           ← Task 21.13 (only if 21.12 ≠ Option C)
+src/components/course/CourseReviewDialog.tsx           ← Task 21.3
+src/components/OrgSelector.tsx                         ← Task 21.13
+src/components/ui/azure-video-upload.tsx               ← Task 19
+src/components/ui/azure-document-upload.tsx            ← Task 19
+src/components/ui/file-upload.tsx                      ← Task 21 (Step 6)
+src/pages/platform-admin/CourseEditor.tsx              ← Tasks 19, 21.8
+src/pages/platform-admin/CoursesManager.tsx            ← Task 21.7
+src/pages/platform-admin/OrganizationsManager.tsx      ← Task 21.9
+src/pages/platform-admin/OrganizationDetail.tsx        ← Tasks 21, 21.5
+src/pages/platform-admin/PlatformSettings.tsx          ← Tasks 19, 21.2
+src/pages/platform-admin/PlatformCommunityModeration.tsx ← Task 21.11
+src/lib/sendInvitationEmail.ts                         ← Task 19
+src/lib/storage.ts                                     ← Task 21.15 (content migration required)
+src/lib/resources-api.ts                               ← Task 21.13
+src/lib/ideas-api.ts                                   ← Task 21.12 (if Option A)
+src/lib/community-api.ts                               ← Task 21.12 (if Option A)
 .github/workflows/main_func-ai-education-migration.yml
 ```
 
@@ -2409,6 +2443,798 @@ git commit -m "feat(frontend): replace all remaining direct supabase.from/auth/s
 
 ---
 
+## Phase 5.5: Scope Correction (post-audit, 2026-06-03)
+
+### Task 21.1: Re-audit remaining frontend files
+
+**Context:** Task 21 was scoped against an undercount. A `grep "supabase\."` audit missed multi-line chained calls (`await supabase\n  .from(...)`), which is the dominant pattern in this codebase. The corrected audit found 27 files (not 9–13) and 166 total call sites. This task records the corrected scope so subsequent tasks can be planned.
+
+- [ ] **Step 1: Run the corrected audit**
+
+```bash
+for f in $(grep -rl "integrations/supabase" src/ --include="*.ts" --include="*.tsx" | grep -v "^src/integrations/" | sort); do
+  total=$(grep -c "\bsupabase\b" "$f")
+  imports=$(grep -c "^import.*supabase" "$f")
+  echo "$((total - imports))  $f"
+done | sort -rn
+```
+
+Expected current output (refresh as work progresses):
+
+| Calls | File | Covered by task |
+|------:|------|-----------------|
+| 22 | `src/lib/community-api.ts` | 21.13 |
+| 21 | `src/lib/ideas-api.ts` | 21.13 |
+| 13 | `src/pages/platform-admin/OrganizationDetail.tsx` | 21.5 |
+| 12 | `src/pages/platform-admin/CourseEditor.tsx` | 21.8 |
+| 12 | `src/pages/org-admin/OrgUsers.tsx` | 21.5 |
+| 12 | `src/components/org-admin/OrgMembersTab.tsx` | 21.5 |
+| 10 | `src/pages/platform-admin/CoursesManager.tsx` | 21.7 |
+| 9 | `src/components/platform-admin/QuizEditorDialog.tsx` | 21.8 |
+| 8 | `src/pages/platform-admin/OrganizationsManager.tsx` | 21.10 |
+| 5 | `src/pages/learner/Courses.tsx` | 21.3 |
+| 5 | `src/lib/resources-api.ts` | 21.14 |
+| 5 | `src/components/org-admin/UserProgressDialog.tsx` | 21.6 |
+| 4 | `src/pages/platform-admin/PlatformCommunityModeration.tsx` | 21.12 |
+| 4 | `src/pages/org-admin/OrgCommunityModeration.tsx` | 21.12 |
+| 4 | `src/pages/learner/Dashboard.tsx` | 21.3 |
+| 4 | `src/components/org-admin/EnrollUserDialog.tsx` | 21.6 |
+| 3 | `src/components/org-admin/analytics/CourseProgressTab.tsx` | 21.11 |
+| 2 | `src/pages/platform-admin/PlatformSettings.tsx` | 21.2 |
+| 2 | `src/pages/org-admin/OrgAnalytics.tsx` | 21.11 |
+| 2 | `src/pages/learner/CoursePlayer.tsx` | 21.4 |
+| 2 | `src/hooks/usePlatformSettings.tsx` | 21.2 |
+| 2 | `src/components/org-admin/BulkInviteDialog.tsx` | 21.6 |
+| 1 | `src/pages/org-admin/OrgSettings.tsx` | 21.2 |
+| 1 | `src/lib/storage.ts` | 21.15 (deferred) |
+| 1 | `src/components/OrgSelector.tsx` | 21.14 |
+| 1 | `src/components/course/CourseReviewDialog.tsx` | 21.3 |
+| 1 | `src/components/community/AIChampionsList.tsx` | 21.14 |
+
+- [ ] **Step 2: Commit the corrected audit**
+
+```bash
+git add docs/superpowers/plans/2026-05-17-lovable-supabase-migration.md
+git commit -m "docs(plan): correct Task 21 scope after re-audit (27 files, 166 calls)"
+```
+
+---
+
+### Task 21.2: platform-settings endpoint + settings frontend
+
+**Files:**
+- Create: `functions/platform-settings/index.ts`, `functions/platform-settings/index.test.ts`
+- Modify: `src/hooks/usePlatformSettings.tsx`, `src/pages/org-admin/OrgSettings.tsx`, `src/pages/platform-admin/PlatformSettings.tsx`
+
+- [ ] **Step 1: Write failing test**
+
+`functions/platform-settings/index.test.ts`:
+```ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { mockQuery, mockQueryOne } = vi.hoisted(() => ({
+  mockQuery: vi.fn(),
+  mockQueryOne: vi.fn(),
+}));
+vi.mock('../shared/auth', () => ({
+  authenticate: async () => ({ id: 'entra-oid', tid: 'entra-tid', email: 'u@test.com' }),
+  AuthError: class AuthError extends Error {},
+}));
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
+
+import handler from './index';
+
+const req = (body: unknown) => ({
+  method: 'POST',
+  headers: { get: () => 'Bearer tok' },
+  json: async () => body,
+}) as any;
+
+describe('platform-settings', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns platform + org features for member', async () => {
+    mockQuery.mockResolvedValueOnce([{ key: 'platform_name', value: 'X' }]);
+    mockQueryOne.mockResolvedValueOnce({ features: { community: true } });
+    const res = await handler(req({ action: 'get', orgId: 'org-1' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(res.jsonBody.platform.platform_name).toBe('X');
+    expect(res.jsonBody.org.features.community).toBe(true);
+  });
+
+  it('rejects non-admin platform update with 403', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_platform_admin: false });
+    const res = await handler(req({ action: 'update-platform', updates: { x: 1 } }), {} as any);
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects org_settings write without org_admin role', async () => {
+    mockQueryOne.mockResolvedValueOnce({ can_write: false });
+    const res = await handler(req({ action: 'update-org', orgId: 'org-1', features: {} }), {} as any);
+    expect(res.status).toBe(403);
+  });
+});
+```
+
+- [ ] **Step 2: Implement**
+
+`functions/platform-settings/index.ts`:
+```ts
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { authenticate, AuthError } from '../shared/auth';
+import { query, queryOne } from '../shared/db';
+import { corsPreflightResponse, corsResponse } from '../shared/cors';
+
+type Body =
+  | { action: 'get'; orgId?: string }
+  | { action: 'update-platform'; updates: Record<string, unknown> }
+  | { action: 'update-org'; orgId: string; features: Record<string, unknown> };
+
+async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+  const origin = req.headers.get('origin');
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+
+  try {
+    const user = await authenticate(req);
+    const body = await req.json() as Body;
+
+    if (body.action === 'get') {
+      const platform = await query<{ key: string; value: unknown }>(
+        'SELECT key, value FROM platform_settings', []
+      );
+      const platformMap = Object.fromEntries(platform.map(r => [r.key, r.value]));
+      let org: { features: Record<string, unknown> } | null = null;
+      if (body.orgId) {
+        org = await queryOne<{ features: Record<string, unknown> }>(
+          'SELECT features FROM org_settings WHERE org_id = $1', [body.orgId]
+        );
+      }
+      return corsResponse(origin, 200, { platform: platformMap, org }) as HttpResponseInit;
+    }
+
+    if (body.action === 'update-platform') {
+      const isAdmin = await queryOne<{ is_platform_admin: boolean }>(
+        'SELECT is_platform_admin FROM profiles WHERE entra_oid = $1', [user.id]
+      );
+      if (!isAdmin?.is_platform_admin) {
+        return corsResponse(origin, 403, { error: 'Platform admin required' }) as HttpResponseInit;
+      }
+      for (const [key, value] of Object.entries(body.updates)) {
+        await query(
+          `INSERT INTO platform_settings (key, value) VALUES ($1, $2)
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+          [key, value]
+        );
+      }
+      return corsResponse(origin, 200, { success: true }) as HttpResponseInit;
+    }
+
+    // update-org
+    const can = await queryOne<{ can_write: boolean }>(
+      `SELECT (
+        EXISTS(SELECT 1 FROM profiles WHERE entra_oid = $1 AND is_platform_admin = TRUE)
+        OR EXISTS(
+          SELECT 1 FROM org_memberships om
+          JOIN profiles p ON p.id = om.user_id
+          WHERE p.entra_oid = $1 AND om.org_id = $2 AND om.role = 'org_admin' AND om.status = 'active'
+        )
+      ) AS can_write`,
+      [user.id, body.orgId]
+    );
+    if (!can?.can_write) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    await query(
+      `INSERT INTO org_settings (org_id, features) VALUES ($1, $2)
+       ON CONFLICT (org_id) DO UPDATE SET features = EXCLUDED.features`,
+      [body.orgId, body.features]
+    );
+    return corsResponse(origin, 200, { success: true }) as HttpResponseInit;
+  } catch (err: unknown) {
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return corsResponse(origin, 500, { error: msg }) as HttpResponseInit;
+  }
+}
+
+export default handler;
+app.http('platform-settings', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+```
+
+- [ ] **Step 3: Verify tests pass**
+
+```bash
+cd functions && npm test -- platform-settings
+```
+
+- [ ] **Step 4: Migrate `src/hooks/usePlatformSettings.tsx`**
+
+```ts
+// BEFORE:
+const [platformRes, orgRes] = await Promise.all([
+  supabase.from('platform_settings').select('key, value'),
+  currentOrg ? supabase.from('org_settings').select('features').eq('org_id', currentOrg.id).maybeSingle() : Promise.resolve({ data: null }),
+]);
+// AFTER:
+const data = await callApi<{ platform: Record<string, unknown>; org: { features: Record<string, unknown> } | null }>(
+  '/api/platform-settings', { action: 'get', orgId: currentOrg?.id }
+);
+```
+
+- [ ] **Step 5: Migrate `src/pages/org-admin/OrgSettings.tsx`**
+
+```ts
+// BEFORE:
+const { error } = await supabase.from('org_settings').upsert({ org_id, features });
+// AFTER:
+await callApi('/api/platform-settings', { action: 'update-org', orgId: org_id, features });
+```
+
+- [ ] **Step 6: Migrate `src/pages/platform-admin/PlatformSettings.tsx` reads + writes**
+
+Replace the two remaining `supabase.from('platform_settings')` calls with the `get` / `update-platform` actions on `/api/platform-settings`.
+
+- [ ] **Step 7: Remove the now-unused supabase import from each file**
+
+Verify with `grep -c "\bsupabase\b" <file>` — should equal `grep -c "^import.*supabase" <file>` before the import line is removed, and 0 after.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add functions/platform-settings/ src/hooks/usePlatformSettings.tsx src/pages/org-admin/OrgSettings.tsx src/pages/platform-admin/PlatformSettings.tsx
+git commit -m "feat: platform-settings endpoint + migrate 3 frontend settings call sites"
+```
+
+---
+
+### Task 21.3: learner-data endpoint + Courses/Dashboard/Review migrations
+
+**Files:**
+- Create: `functions/learner-data/index.ts`, `functions/learner-data/index.test.ts`
+- Create: `functions/submit-review/index.ts`, `functions/submit-review/index.test.ts`
+- Modify: `src/pages/learner/Courses.tsx`, `src/pages/learner/Dashboard.tsx`, `src/components/course/CourseReviewDialog.tsx`
+
+- [ ] **Step 1: Write failing test for learner-data**
+
+Pattern as in Task 12 (`vi.hoisted()`, `beforeEach(vi.clearAllMocks)`). Cover three actions:
+- `{ action: 'enrolled-courses', orgId }` → returns enrollments with course data + computed progress
+- `{ action: 'available-courses', orgId }` → returns courses the user has org access to but is not yet enrolled in
+- `{ action: 'dashboard', orgId }` → returns enrollments grouped (in-progress vs completed) + course thumbnails
+
+Test cases:
+- happy path returns expected shape
+- enrolled-courses excludes courses not in `org_course_access`
+- 401 if profile not found by `entra_oid`
+
+- [ ] **Step 2: Implement learner-data**
+
+`functions/learner-data/index.ts`:
+```ts
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { authenticate, AuthError } from '../shared/auth';
+import { query, queryOne } from '../shared/db';
+import { corsPreflightResponse, corsResponse } from '../shared/cors';
+
+type Body =
+  | { action: 'enrolled-courses'; orgId: string }
+  | { action: 'available-courses'; orgId: string }
+  | { action: 'dashboard'; orgId: string };
+
+async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+  const origin = req.headers.get('origin');
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  try {
+    const user = await authenticate(req);
+    const profile = await queryOne<{ id: string }>(
+      'SELECT id FROM profiles WHERE entra_oid = $1', [user.id]
+    );
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    const body = await req.json() as Body;
+
+    if (body.action === 'enrolled-courses' || body.action === 'dashboard') {
+      const enrollments = await query<any>(
+        `SELECT e.*, c.* FROM enrollments e JOIN courses c ON c.id = e.course_id
+         WHERE e.user_id = $1 AND e.org_id = $2`,
+        [profile.id, body.orgId]
+      );
+      // Compute progress per course (total lessons + completed)
+      const courseIds = enrollments.map(e => e.course_id);
+      const progressMap: Record<string, { total: number; completed: number }> = {};
+      if (courseIds.length > 0) {
+        const counts = await query<{ course_id: string; total: number; completed: number }>(
+          `SELECT cm.course_id,
+                  COUNT(l.id)::int AS total,
+                  COUNT(lp.lesson_id)::int FILTER (WHERE lp.status = 'completed') AS completed
+           FROM course_modules cm
+           JOIN lessons l ON l.module_id = cm.id
+           LEFT JOIN lesson_progress lp ON lp.lesson_id = l.id AND lp.user_id = $1 AND lp.org_id = $2
+           WHERE cm.course_id = ANY($3)
+           GROUP BY cm.course_id`,
+          [profile.id, body.orgId, courseIds]
+        );
+        for (const c of counts) progressMap[c.course_id] = { total: c.total, completed: c.completed };
+      }
+      return corsResponse(origin, 200, { enrollments, progressMap }) as HttpResponseInit;
+    }
+
+    // available-courses
+    const courses = await query(
+      `SELECT c.* FROM courses c
+       JOIN org_course_access oca ON oca.course_id = c.id
+       WHERE oca.org_id = $1 AND c.is_published = TRUE
+         AND NOT EXISTS (
+           SELECT 1 FROM enrollments e
+           WHERE e.user_id = $2 AND e.course_id = c.id AND e.org_id = $1
+         )`,
+      [body.orgId, profile.id]
+    );
+    return corsResponse(origin, 200, { courses }) as HttpResponseInit;
+  } catch (err: unknown) {
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'error' }) as HttpResponseInit;
+  }
+}
+
+export default handler;
+app.http('learner-data', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+```
+
+- [ ] **Step 3: Implement submit-review (same TDD pattern)**
+
+Pattern: action `{ courseId, orgId, rating, comment }`. Auth: user must have an active enrollment in `(courseId, orgId)`. UPSERT into `course_reviews` on `(course_id, user_id, org_id)`.
+
+- [ ] **Step 4: Migrate `Dashboard.tsx`**
+
+Replace the 4 supabase reads (enrollments, modules, lessons, lesson_progress) with `callApi<{ enrollments, progressMap }>('/api/learner-data', { action: 'dashboard', orgId })`.
+
+- [ ] **Step 5: Migrate `Courses.tsx`**
+
+Replace the 5 supabase reads with two calls: `enrolled-courses` and `available-courses`. The enrollment-insert call (line 107) becomes `callApi('/api/enroll', { courseId, orgId })` — endpoint added in Task 21.6.
+
+- [ ] **Step 6: Migrate `CourseReviewDialog.tsx`**
+
+Replace the single `supabase.from('course_reviews').upsert(...)` with `callApi('/api/submit-review', { courseId, orgId, rating, comment })`.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add functions/learner-data/ functions/submit-review/ src/pages/learner/Dashboard.tsx src/pages/learner/Courses.tsx src/components/course/CourseReviewDialog.tsx
+git commit -m "feat: learner-data + submit-review endpoints, migrate 10 learner call sites"
+```
+
+---
+
+### Task 21.4: Extend course-player-data with quiz fixtures + CoursePlayer cleanup
+
+**Context:** Task 20 left two `supabase.from` reads in CoursePlayer.tsx for `quizzes` and `quiz_questions`. The `course-player-data` endpoint did not return quiz fixtures. Extend it.
+
+**Files:**
+- Modify: `functions/course-player-data/index.ts` + its test
+- Modify: `src/pages/learner/CoursePlayer.tsx`
+
+- [ ] **Step 1: Extend the endpoint test**
+
+Add a case asserting the response now includes `quizzes: Array<{ id, lesson_id, passing_score, ... }>` and `quizQuestions: Array<{ id, quiz_id, sort_order, prompt }>` (NO `is_correct` — that stays in `quiz-options` only).
+
+- [ ] **Step 2: Extend the implementation**
+
+Add to the Promise.all:
+```ts
+query('SELECT q.* FROM quizzes q JOIN lessons l ON l.id = q.lesson_id JOIN course_modules cm ON cm.id = l.module_id WHERE cm.course_id = $1', [courseId]),
+query('SELECT qq.id, qq.quiz_id, qq.sort_order, qq.prompt FROM quiz_questions qq JOIN quizzes q ON q.id = qq.quiz_id JOIN lessons l ON l.id = q.lesson_id JOIN course_modules cm ON cm.id = l.module_id WHERE cm.course_id = $1', [courseId]),
+```
+
+Return them in the response body.
+
+- [ ] **Step 3: Migrate CoursePlayer.tsx**
+
+Remove the `loadQuiz` effect's two `supabase.from('quizzes')` / `supabase.from('quiz_questions')` reads. Read from the new fields on `course-player-data` response (cached in component state from `fetchData`). Filter by `lesson_id` client-side.
+
+- [ ] **Step 4: Remove supabase import from CoursePlayer.tsx**
+
+```ts
+// Delete this line:
+import { supabase } from '@/integrations/supabase/client';
+```
+
+Verify: `grep -c "\bsupabase\b" src/pages/learner/CoursePlayer.tsx` returns 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add functions/course-player-data/ src/pages/learner/CoursePlayer.tsx
+git commit -m "feat: extend course-player-data with quiz fixtures, remove supabase from CoursePlayer"
+```
+
+---
+
+### Task 21.5: org-members endpoint + member-admin frontend migrations
+
+**Files:**
+- Create: `functions/org-members/index.ts`, `functions/org-members/index.test.ts`
+- Modify: `src/components/org-admin/OrgMembersTab.tsx`, `src/pages/org-admin/OrgUsers.tsx`, `src/pages/platform-admin/OrganizationDetail.tsx`
+
+**Endpoint shape:** action-discriminated POST. Actions:
+- `{ action: 'list', orgId, includeInactive?: boolean }` → members with profiles
+- `{ action: 'lookup-by-name', name }` → `{ id, full_name, email } | null`
+- `{ action: 'set-status', membershipId, status }` → active/inactive (already-disabled members can be reactivated)
+- `{ action: 'create-invitation', orgId, email, role, firstName?, lastName?, department? }` → returns `{ invitationId, linkId }` for the email send
+
+**Auth:** all actions require platform admin OR `org_admin` of the targeted org. The `lookup-by-name` action additionally requires that the looked-up user share at least one org with the requester.
+
+- [ ] **Step 1: Write failing tests** (same pattern as Task 12; cover one happy path per action plus the 403 case)
+
+- [ ] **Step 2: Implement** — pattern as in `admin-user-actions` (Task 12). Use the profile-lookup boilerplate from §3 of the Self-Review.
+
+- [ ] **Step 3: Migrate `OrgMembersTab.tsx`** — 12 calls collapse to ~4 `callApi` calls:
+  - member list → `{ action: 'list', orgId }`
+  - profile lookup by name → `{ action: 'lookup-by-name', name }`
+  - status changes (enable/disable) → `{ action: 'set-status', membershipId, status }`
+  - invite creation → `{ action: 'create-invitation', ... }` then call `sendInvitationEmail`
+
+- [ ] **Step 4: Migrate `OrgUsers.tsx`** — same 12 calls, same shape (the two files share UI patterns).
+
+- [ ] **Step 5: Migrate `OrganizationDetail.tsx`** — 13 calls. The platform-admin-only invitation-create still flows through this endpoint. The `supabase.storage.getPublicUrl` on line 1009 becomes the same `VITE_STORAGE_BASE_URL`-based pattern used in `OrgAnalytics.tsx`.
+
+- [ ] **Step 6: Remove supabase import from each file**
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add functions/org-members/ src/components/org-admin/OrgMembersTab.tsx src/pages/org-admin/OrgUsers.tsx src/pages/platform-admin/OrganizationDetail.tsx
+git commit -m "feat: org-members endpoint + migrate 37 member-admin call sites"
+```
+
+---
+
+### Task 21.6: user-progress + enroll endpoints + dialog migrations
+
+**Files:**
+- Create: `functions/user-progress/index.ts`, `functions/user-progress/index.test.ts`
+- Create: `functions/enroll/index.ts`, `functions/enroll/index.test.ts`
+- Modify: `src/components/org-admin/UserProgressDialog.tsx`, `src/components/org-admin/EnrollUserDialog.tsx`, `src/components/org-admin/BulkInviteDialog.tsx`
+
+**`user-progress` endpoint:** body `{ targetUserId, orgId }`. Returns the target user's enrollments + lesson_progress + quiz_attempts for the org. Auth: platform admin OR org_admin of `orgId`.
+
+**`enroll` endpoint:** body `{ targetUserId?, courseId, orgId }`. If `targetUserId` omitted, enrolls the requesting user (learner self-enroll). If provided, admin enrollment — requires platform admin OR org_admin of `orgId`. Inserts into `enrollments` with `status = 'enrolled'`. Idempotent on `(user_id, course_id, org_id)`.
+
+- [ ] **Step 1: TDD both endpoints** (same pattern)
+
+- [ ] **Step 2: Migrate `UserProgressDialog.tsx`** — 5 calls → 1 `callApi('/api/user-progress', { targetUserId, orgId })`
+
+- [ ] **Step 3: Migrate `EnrollUserDialog.tsx`** — 4 calls. The reads (which users + which courses are eligible) reuse `/api/org-members` and `/api/learner-data`; the enrollment insert (line 138) → `callApi('/api/enroll', { targetUserId, courseId, orgId })`.
+
+- [ ] **Step 4: Migrate `BulkInviteDialog.tsx`** — 2 calls → `callApi('/api/org-members', { action: 'create-invitation', ... })` in a loop. Email sends remain via existing `sendInvitationEmail`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add functions/user-progress/ functions/enroll/ src/components/org-admin/UserProgressDialog.tsx src/components/org-admin/EnrollUserDialog.tsx src/components/org-admin/BulkInviteDialog.tsx
+git commit -m "feat: user-progress + enroll endpoints, migrate 11 dialog call sites"
+```
+
+---
+
+### Task 21.7: admin-courses endpoint + CoursesManager migration
+
+**Files:**
+- Create: `functions/admin-courses/index.ts`, `functions/admin-courses/index.test.ts`
+- Modify: `src/pages/platform-admin/CoursesManager.tsx`
+
+**Endpoint shape:** all actions require platform admin.
+- `{ action: 'list' }` → returns courses + organizations + org_course_access in one payload (matches the current CoursesManager fetch)
+- `{ action: 'create', course: { title, description, level, ... } }` → returns new row
+- `{ action: 'toggle-published', courseId }` → flips `is_published`
+- `{ action: 'delete', courseId }` → cascade-deletes course
+- `{ action: 'set-org-access', courseId, orgIds: string[] }` → replaces `org_course_access` rows for the course
+
+- [ ] **Step 1: TDD** (one test per action; cover 403 for non-platform-admin)
+- [ ] **Step 2: Implement** — pattern as in Task 12. Use `is_platform_admin` gate at the top.
+- [ ] **Step 3: Migrate `CoursesManager.tsx`** — 10 calls → 5 `callApi` calls (one per action).
+- [ ] **Step 4: Remove supabase import**
+- [ ] **Step 5: Commit**
+
+```bash
+git add functions/admin-courses/ src/pages/platform-admin/CoursesManager.tsx
+git commit -m "feat: admin-courses endpoint + migrate CoursesManager (10 calls)"
+```
+
+---
+
+### Task 21.8: admin-course-editor endpoints + CourseEditor/QuizEditor migrations
+
+**Files:**
+- Create: `functions/admin-course-editor/index.ts`, `functions/admin-course-editor/index.test.ts`
+- Modify: `src/pages/platform-admin/CourseEditor.tsx`, `src/components/platform-admin/QuizEditorDialog.tsx`
+
+**Endpoint shape:** single action-discriminated endpoint to keep the surface small. All actions require platform admin.
+
+- `{ action: 'get-course', courseId }` → course + modules + lessons (admin view: includes unpublished fields)
+- `{ action: 'update-course', courseId, updates }`
+- `{ action: 'save-module', module: { id?, course_id, title, sort_order } }` → upsert
+- `{ action: 'delete-module', moduleId }`
+- `{ action: 'save-lesson', lesson: { id?, module_id, ... } }` → upsert
+- `{ action: 'delete-lesson', lessonId }` — note: video deletion via existing `/api/azure-delete-blob` happens client-side first, then this endpoint handles the row delete
+- `{ action: 'save-quiz', quiz: { id?, lesson_id, passing_score, questions: [...] } }` → full transactional upsert: quiz + questions + options (replace-all semantics)
+- `{ action: 'delete-course', courseId }`
+
+- [ ] **Step 1: TDD each action** — at least 8 happy-path tests + the 403 case + one transactional rollback test for `save-quiz`
+- [ ] **Step 2: Implement** — use `pg` transactions (`BEGIN`/`COMMIT`/`ROLLBACK`) for `save-quiz`
+- [ ] **Step 3: Migrate `CourseEditor.tsx`** — 12 calls → ~7 `callApi` calls
+- [ ] **Step 4: Migrate `QuizEditorDialog.tsx`** — 9 remaining calls collapse into one `save-quiz` call + one `get-course` for the read path
+- [ ] **Step 5: Remove supabase import from both files**
+- [ ] **Step 6: Commit**
+
+```bash
+git add functions/admin-course-editor/ src/pages/platform-admin/CourseEditor.tsx src/components/platform-admin/QuizEditorDialog.tsx
+git commit -m "feat: admin-course-editor endpoint + migrate CourseEditor + QuizEditorDialog (21 calls)"
+```
+
+---
+
+### Task 21.9: admin-organizations endpoint + OrganizationsManager migration
+
+**Files:**
+- Create: `functions/admin-organizations/index.ts`, `functions/admin-organizations/index.test.ts`
+- Modify: `src/pages/platform-admin/OrganizationsManager.tsx`
+
+**Endpoint shape:** platform-admin only.
+- `{ action: 'list' }` → all organizations
+- `{ action: 'create', org: { name, slug, ... }, initialOwnerUserId? }` → inserts org + first `org_memberships` row (owner = `org_admin`)
+- `{ action: 'update', orgId, updates }` → updates org metadata (incl. `logo_url`)
+
+The `supabase.storage.getPublicUrl` on line 258 becomes the same `VITE_STORAGE_BASE_URL`-based pattern.
+
+- [ ] **Steps 1–5:** TDD → implement → migrate → remove import → commit (~8 calls → 3 `callApi` calls)
+
+```bash
+git commit -m "feat: admin-organizations endpoint + migrate OrganizationsManager (8 calls)"
+```
+
+---
+
+### Task 21.10: course-progress-analytics endpoint + analytics migrations
+
+**Files:**
+- Create: `functions/course-progress-analytics/index.ts`, `functions/course-progress-analytics/index.test.ts`
+- Modify: `src/components/org-admin/analytics/CourseProgressTab.tsx`, `src/pages/org-admin/OrgAnalytics.tsx`
+
+**Endpoint shape:**
+- `{ action: 'org-courses-progress', orgId }` → per-course completion stats for the org
+- `{ action: 'lesson-progress-breakdown', orgId, courseId }` → per-lesson completion stats
+
+This unblocks the active-users-7/30 counters that `OrgAnalytics.tsx` currently has stubbed at 0. Add `recent-activity` action returning `{ activeUsers7Days, activeUsers30Days }` derived from `lesson_progress.completed_at`.
+
+- [ ] **Steps 1–5** — same shape as Task 21.7. `OrgAnalytics.tsx`'s remaining 2 calls (`organizations` list + `org logo_url update`) become `callApi('/api/admin-organizations', { action: 'list' })` and `callApi('/api/admin-organizations', { action: 'update', ... })` respectively (reusing Task 21.9's endpoint).
+
+```bash
+git commit -m "feat: course-progress-analytics endpoint + finish OrgAnalytics migration"
+```
+
+---
+
+### Task 21.11: moderation endpoint + community moderation pages
+
+**Files:**
+- Create: `functions/community-moderation/index.ts`, `functions/community-moderation/index.test.ts`
+- Modify: `src/pages/platform-admin/PlatformCommunityModeration.tsx`, `src/pages/org-admin/OrgCommunityModeration.tsx`
+
+**Endpoint shape:**
+- `{ action: 'list-flagged', scope: 'platform' | 'org', orgId? }`
+- `{ action: 'approve', postId }`
+- `{ action: 'remove', postId, reason? }`
+- `{ action: 'restore', postId }`
+
+Auth: platform scope requires platform admin; org scope requires platform admin OR `org_admin` of `orgId`.
+
+- [ ] **Steps 1–5** — TDD → implement → migrate both pages (4 calls each) → remove imports → commit
+
+```bash
+git commit -m "feat: community-moderation endpoint + migrate 8 moderation call sites"
+```
+
+**Note:** This task migrates only the *moderation* pages. The community *posting/voting* features in `ideas-api.ts` and `community-api.ts` are deferred to Task 21.12 (decision required).
+
+---
+
+### Task 21.12: Community/Ideas feature — decision and migration
+
+**Status:** Decision required from product owner before implementation.
+
+**The three live options:**
+
+#### Option A: Full migration
+
+Build endpoints for:
+- `/api/ideas` (list, create, vote, comment, delete) — replaces 21 calls in `ideas-api.ts`
+- `/api/community-posts` (list, create, react, comment, delete) — replaces 22 calls in `community-api.ts`
+- `/api/champions` (list AI champions) — 1 call in `AIChampionsList.tsx`
+
+Estimated 8–12 endpoint actions across 3 endpoints. Each requires the standard TDD cycle. The user-id-from-MSAL pattern below applies to every call site.
+
+#### Option B: Feature-flag off
+
+Wrap all routes that mount these pages behind `features.community_enabled` (already in `org_settings`). When the flag is off, the components do not mount and the supabase code never executes. Add a TODO and ship without removing the code.
+
+The supabase imports still need to resolve for the build to succeed — `storage.ts` keeps the supabase client alive in the bundle until Task 21.15.
+
+#### Option C: Delete the feature
+
+`git rm src/lib/ideas-api.ts src/lib/community-api.ts src/components/community/ src/pages/*/OrgCommunityModeration.tsx src/pages/*/PlatformCommunityModeration.tsx` plus the route entries. Zero-cost cleanup. Recoverable from git history if reinstated later.
+
+- [ ] **Step 1: Owner decision recorded in ADR** (`docs/adr/`) — `ADR-XXXX: Community/Ideas feature direction in Azure migration`
+
+- [ ] **Step 2 (Option A only): Implement endpoints**
+
+For each `supabase.auth.getUser()` call (4 in community-api, 4 in ideas-api), replace with the MSAL-derived user id at the call site:
+```ts
+// BEFORE:
+const { data: user } = await supabase.auth.getUser();
+const userId = user?.user?.id;
+// AFTER:
+import { msalInstance } from '@/lib/msal-config';
+const userId = msalInstance.getActiveAccount()?.localAccountId; // Entra oid
+```
+
+For DB reads/writes, replace each `supabase.from(...)` chain with a `callApi` to the relevant new endpoint.
+
+- [ ] **Step 2 (Option B only): Add feature-flag gates**
+
+In `App.tsx` or the router, wrap community routes:
+```tsx
+{features.community_enabled && <Route path="/app/community" element={<CommunityPage />} />}
+```
+
+Verify `grep -r "community" src/App.tsx` shows only gated mounts.
+
+- [ ] **Step 2 (Option C only): Delete the files and routes**
+
+```bash
+git rm src/lib/ideas-api.ts src/lib/community-api.ts
+git rm -r src/components/community/
+git rm src/pages/platform-admin/PlatformCommunityModeration.tsx
+git rm src/pages/org-admin/OrgCommunityModeration.tsx
+# remove route entries from App.tsx
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git commit -m "feat(community): <chosen option> — community/ideas migration"
+```
+
+---
+
+### Task 21.13: Remaining loose ends — OrgSelector, AIChampionsList, resources-api
+
+**Files:**
+- Modify: `src/components/OrgSelector.tsx`, `src/components/community/AIChampionsList.tsx` (only if Task 21.12 chose Option A or B), `src/lib/resources-api.ts`
+
+- [ ] **Step 1: OrgSelector.tsx (1 call)**
+
+The single read fetches the user's available orgs. Already returned by `/api/user-context`. Replace:
+```ts
+// BEFORE:
+const { data } = await supabase.from('organizations').select('*').in('id', orgIds);
+// AFTER:
+const { memberships } = await callApi<UserContext>('/api/user-context', {});
+const orgs = memberships.map(m => m.organization);
+```
+
+- [ ] **Step 2: AIChampionsList.tsx**
+
+If Task 21.12 chose Option C, skip (already deleted). Otherwise migrate the single read to `/api/champions` or fold into community endpoints.
+
+- [ ] **Step 3: resources-api.ts (5 calls)**
+
+Create `functions/resources/index.ts` with the standard pattern (list, create, update, delete). Same TDD cycle. Migrate the 5 call sites.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git commit -m "feat: migrate OrgSelector + resources-api + AIChampions (7 calls)"
+```
+
+---
+
+### Task 21.14: Verify supabase usage is fully drained (except storage.ts)
+
+- [ ] **Step 1: Re-run the audit**
+
+```bash
+for f in $(grep -rl "integrations/supabase" src/ --include="*.ts" --include="*.tsx" | grep -v "^src/integrations/" | sort); do
+  total=$(grep -c "\bsupabase\b" "$f")
+  imports=$(grep -c "^import.*supabase" "$f")
+  echo "$((total - imports))  $f"
+done
+```
+
+Expected: only `src/lib/storage.ts` remains, with 1 call. Every other file should show 0 calls and the supabase import should have been removed.
+
+- [ ] **Step 2: Build to verify no broken imports**
+
+```bash
+npm run build
+```
+Expected: build succeeds.
+
+- [ ] **Step 3: Run the full test suite**
+
+```bash
+cd functions && npm test
+npm test  # if any frontend tests exist
+```
+
+- [ ] **Step 4: Commit checkpoint (no code change, just CI sanity)**
+
+If any of the above failed, fix in a new commit before continuing to Task 21.15.
+
+---
+
+### Task 21.15: Content migration prerequisite for storage.ts
+
+**Context:** `src/lib/storage.ts` calls `supabase.storage.createSignedUrl` to serve thumbnails and legacy video/document content that is physically stored in Supabase Storage (`lms-assets` bucket). It cannot be removed until the content is moved to Azure Blob Storage. This task is the data migration, not a code change.
+
+**Files:**
+- Create: `scripts/migrate-lms-assets-to-azure.ts` (one-time script)
+- Modify: `src/lib/storage.ts` (after migration completes)
+
+- [ ] **Step 1: Inventory Supabase Storage contents**
+
+```bash
+# Run once to capture the current file list
+npx supabase storage ls lms-assets -r > lms-assets-inventory.txt
+```
+
+- [ ] **Step 2: Write the migration script**
+
+`scripts/migrate-lms-assets-to-azure.ts`:
+- Stream each blob from Supabase Storage
+- Upload to Azure Blob (`lms-assets` container, same key path)
+- Verify byte length matches
+- Write the new Azure URL into `courses.thumbnail_url` / `lessons.video_storage_path` / `lessons.document_storage_path` (replacing the Supabase path)
+
+Pattern: use `@supabase/supabase-js` storage client + `@azure/storage-blob` SDK in a Node script (not in the Function App).
+
+- [ ] **Step 3: Run the migration in a dry-run mode first**
+
+```bash
+node scripts/migrate-lms-assets-to-azure.ts --dry-run > migration.log
+# Review migration.log: file count, total bytes, any errors
+```
+
+- [ ] **Step 4: Run the migration for real**
+
+```bash
+node scripts/migrate-lms-assets-to-azure.ts
+```
+
+- [ ] **Step 5: Update `storage.ts` to call `/api/azure-view-url`**
+
+```ts
+// BEFORE:
+export async function getSignedUrl(bucket: string, path: string, expiresIn = 3600) {
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn);
+  return data?.signedUrl ?? null;
+}
+// AFTER:
+export async function getSignedUrl(_bucket: string, path: string) {
+  const { viewUrl } = await callApi<{ viewUrl: string }>('/api/azure-view-url', { blobPath: path });
+  return viewUrl ?? null;
+}
+```
+
+- [ ] **Step 6: Remove the supabase import from `storage.ts`**
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add scripts/migrate-lms-assets-to-azure.ts src/lib/storage.ts
+git commit -m "feat: migrate lms-assets content to Azure Blob + remove supabase from storage.ts"
+```
+
+After this commit, `grep -r "integrations/supabase" src/ --include="*.ts" --include="*.tsx"` returns no matches. Task 22 (remove package) is now unblocked.
+
+---
+
 ### Task 22: Remove @supabase/supabase-js from root package.json
 
 Only after ALL frontend files no longer import from `@/integrations/supabase/` or `@supabase/supabase-js`.
@@ -2576,14 +3402,26 @@ git commit -m "docs: update all docs removing Supabase/Lovable references"
 |-----------------|-----------------|
 | `pg` in wrong package.json | Task 4 (functions/package.json) |
 | `quiz_attempts.insert` client-side | Task 10 (grade-quiz server-side insert) |
-| CoursePlayer 12 uncovered calls | Tasks 13, 14, 20 |
+| CoursePlayer 12 uncovered calls | Tasks 13, 14, 20, 21.4 (quiz fixtures) |
 | UserDetailDialog privilege writes | Task 12 (admin-user-actions) |
 | `get_quiz_options_for_learner` no replacement | Task 14 (quiz-options endpoint) |
 | `useAuth.tsx` DB reads in fetchUserContext | Task 11 (user-context endpoint), Task 18 |
-| OrgAnalytics DB reads | Task 15 (org-analytics-data endpoint) |
+| OrgAnalytics DB reads | Task 15 (org-analytics-data endpoint), Task 21.10 (active-users + remaining 2 calls) |
 | `profiles.is_platform_admin` direct write | Task 12 (admin-user-actions with server-side guard) |
-| `supabase.storage.getPublicUrl` | Task 21 (direct URL construction) |
+| `supabase.storage.getPublicUrl` | Task 21 (OrgAnalytics) + Task 21.5 (OrganizationDetail) + Task 21.9 (OrganizationsManager) |
 | test-smtp-connection no auth | Task 16 (auth gate added) |
+| Platform/org settings reads + writes | Task 21.2 (platform-settings endpoint) |
+| Learner Courses + Dashboard supabase reads | Task 21.3 (learner-data endpoint) |
+| Org member admin (12+12+13 calls) | Task 21.5 (org-members endpoint) |
+| User progress dialog + enroll + bulk-invite | Task 21.6 (user-progress + enroll endpoints) |
+| Platform-admin course CRUD (10 calls) | Task 21.7 (admin-courses) |
+| Course/module/lesson/quiz CRUD (21 calls) | Task 21.8 (admin-course-editor) |
+| Organizations CRUD (8 calls) | Task 21.9 (admin-organizations) |
+| Course-progress analytics + active users | Task 21.10 |
+| Community moderation (8 calls) | Task 21.11 (community-moderation) |
+| Community/Ideas posting features (44 calls) | Task 21.12 (decision required) |
+| OrgSelector / resources-api / AIChampions | Task 21.13 |
+| `storage.ts` Supabase content | Task 21.15 (content migration prerequisite) |
 
 ### 2. Placeholder scan
 
@@ -2614,3 +3452,52 @@ git commit -m "docs: update all docs removing Supabase/Lovable references"
 - **Function App** (`func-ai-education-migration`): VNet integration = NOT configured. Not required given public postgres access. S1 Standard plan — VNet integration can be added later if postgres is locked down.
 - **App Service Plan**: S1 Standard (`ASP-AIEducation-bfca`, `swedencentral`) — always-on, no cold starts.
 - **Security note:** `AllowAllAzureServicesAndResourcesWithinAzureIps` permits any Azure resource in any subscription to attempt connection. After migration is stable, replace with function app's specific outbound IP allowlist.
+
+### 5. Discovered gotchas (post-implementation, 2026-06-03)
+
+These are issues found during Task 19–21 execution that the plan as originally written did not flag. Subsequent tasks (21.1–21.15) account for them.
+
+- **Multi-line supabase chains are invisible to `grep "supabase\."`** The codebase uses `await supabase\n  .from(...)` extensively. The dot is on the next line, so naive grep undercounts call sites. Use this audit pattern instead:
+  ```bash
+  for f in $(grep -rl "integrations/supabase" src/ --include="*.ts" --include="*.tsx" | grep -v "^src/integrations/"); do
+    total=$(grep -c "\bsupabase\b" "$f"); imports=$(grep -c "^import.*supabase" "$f"); echo "$((total - imports))  $f"
+  done | sort -rn
+  ```
+  This bug caused the original Task 21 scope to be set at ~9 files when the reality was 27.
+
+- **Top-level await is not available in Vite's default target.** Task 17's pattern `await msalInstance.initialize();` at module scope causes `vite build` to fail with: *"Top-level await is not available in the configured target environment (\"chrome87\", \"edge88\", \"es2020\", \"firefox78\", \"safari14\")"*. Wrap in `.then()` or bump `build.target` in `vite.config.ts`. The plan's `main.tsx` example must be:
+  ```ts
+  msalInstance.initialize().then(() => {
+    createRoot(document.getElementById('root')!).render(
+      <MsalProvider instance={msalInstance}>
+        <App />
+      </MsalProvider>
+    );
+  });
+  ```
+
+- **Plan's `profiles WHERE id = $1` pattern is wrong with Entra OID.** Several task code samples (notably Task 12, 13, 15, 16) use `'SELECT ... FROM profiles WHERE id = $1', [user.id]` where `user.id` is the Entra `oid`. This silently returns no rows because `profiles.id` is a UUID, not the OID. The correct pattern is documented in §3 above (lookup by `entra_oid`). Every endpoint implementation has been corrected; new endpoints (21.2–21.15) must follow §3.
+
+- **`authenticate(req)` is async — always `await`.** The plan's Task 9 declares `authenticate` as `async`. Several task code samples (Task 12, 13, 14, etc.) wrote `const user = authenticate(req);` without `await`. This produces an unhandled Promise that the function rejects when the JSON parser tries to use `user.id`. All implementations have been corrected.
+
+- **`vi.hoisted()` is mandatory for vitest mock variables.** Patterns like `const mockQuery = vi.fn(); vi.mock(...)` fail with "Cannot access before initialization" because `vi.mock` hoists above the const. Use:
+  ```ts
+  const { mockQuery, mockQueryOne } = vi.hoisted(() => ({ mockQuery: vi.fn(), mockQueryOne: vi.fn() }));
+  vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
+  beforeEach(() => vi.clearAllMocks());
+  ```
+  Without `beforeEach(vi.clearAllMocks)`, mock call history leaks across tests and produces false positives.
+
+- **`get_invitation_link_id` RPC takes `invitation_id`, not `org_id`.** Plan Task 21 Step 4 shows `supabase.rpc('get_invitation_link_id', { p_org_id: orgId })`. The actual codebase call is `{ invitation_id: invitation.id }`. The new `/api/invitation-link` endpoint takes `{ orgId }` and returns the org's *active* invitation link, which is the semantically correct replacement (links are org-wide). Migration is unaffected — just don't be misled by the wrong signature in the BEFORE block.
+
+- **`@import url(...)` ordering warning in CSS.** Vite warns about Google Fonts `@import` appearing after the file header comment. Non-blocking, but worth fixing in a small follow-up by moving the `@import` to the top of `index.css`.
+
+### 6. Task ordering hints
+
+- Tasks 21.2 → 21.6 can be done in any order; none depend on each other.
+- Task 21.7 should run after 21.6 (admin-course-editor uses the same auth pattern that 21.6's tests exercise).
+- Task 21.4 (CoursePlayer quiz fixtures) requires Task 13's endpoint already exists — it extends, not creates.
+- Task 21.10 reuses Task 21.9's admin-organizations endpoint — do 21.9 first.
+- Task 21.12 is the single highest-leverage decision: deferring 21.12-A or choosing 21.12-B/C removes ~44 calls from the remaining scope.
+- Task 21.14 is a CI checkpoint — run it twice: once after 21.13 (expect: only `storage.ts` remains), and once after 21.15 (expect: zero supabase usage anywhere in `src/`).
+- Task 22 cannot start until 21.14 passes cleanly twice.
