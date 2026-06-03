@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsOrgAdmin } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsOrgAdmin } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQuery: vi.fn(), mockQueryOne: vi.fn(),
+    mockQuery: vi.fn(),
     mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: vi.fn() }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isOrgAdmin: mockIsOrgAdmin }));
 
 import handler from './index';
@@ -92,6 +92,7 @@ describe('org-memberships', () => {
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('JOIN profiles');
     expect(sql).toContain('WHERE om.org_id = $1');
+    expect(sql).toContain('ORDER BY p.full_name');
     expect(params).toEqual(['org-1']);
     expect(sql).not.toContain('entra_oid');
     // Roster semantics: no status filter in WHERE clause
