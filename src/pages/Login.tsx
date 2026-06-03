@@ -14,9 +14,9 @@ export default function Login() {
   useEffect(() => {
     if (!isLoading && user) {
       if (isPlatformAdmin) {
-        navigate('/app/admin/platform');
+        navigate('/app/admin/organizations');
       } else if (isOrgAdmin) {
-        navigate('/app/admin/org');
+        navigate('/app/admin/analytics');
       } else {
         navigate('/app/dashboard');
       }
