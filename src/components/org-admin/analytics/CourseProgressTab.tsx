@@ -31,7 +31,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Search, BookOpen, ChevronRight, Users, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { CourseLevel } from '@/lib/types';
 
 interface CourseStats {
@@ -69,45 +69,29 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
   useEffect(() => {
     const fetchCourseStats = async () => {
       if (!orgId) return;
-      
+
       setLoading(true);
-      
-      const { data: orgCourses } = await supabase
-        .from('org_course_access')
-        .select('course_id, course:courses(id, title, level)')
-        .eq('org_id', orgId)
-        .eq('access', 'enabled');
 
-      if (orgCourses) {
-        const statsData: CourseStats[] = [];
-        
-        for (const access of orgCourses) {
-          const course = access.course as any;
-          if (!course) continue;
+      try {
+        const data = await callApi<{
+          courses: Array<{ id: string; title: string; level: CourseLevel; enrolled: number; completed: number }>;
+        }>('/api/org-course-progress', { orgId });
 
-          const { data: courseEnrollments } = await supabase
-            .from('enrollments')
-            .select('status')
-            .eq('org_id', orgId)
-            .eq('course_id', course.id);
-
-          const enrolled = courseEnrollments?.length || 0;
-          const completed = courseEnrollments?.filter(e => e.status === 'completed').length || 0;
-
-          statsData.push({
+        setCourseStats(
+          data.courses.map((course) => ({
             id: course.id,
             title: course.title,
             level: course.level,
-            enrolled,
-            completed,
-            avgProgress: enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0,
-          });
-        }
-        
-        setCourseStats(statsData);
+            enrolled: course.enrolled,
+            completed: course.completed,
+            avgProgress: course.enrolled > 0 ? Math.round((course.completed / course.enrolled) * 100) : 0,
+          }))
+        );
+      } catch (error) {
+        console.error('Error loading course stats:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
 
     fetchCourseStats();
@@ -116,26 +100,26 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
   // Fetch enrollees for selected course
   const fetchEnrollees = async (courseId: string) => {
     setLoadingEnrollees(true);
-    
-    const { data: enrollments } = await supabase
-      .from('enrollments')
-      .select('user_id, status, enrolled_at, completed_at, profile:profiles(full_name)')
-      .eq('org_id', orgId)
-      .eq('course_id', courseId);
 
-    if (enrollments) {
+    try {
+      const data = await callApi<{
+        enrollees: Array<{ user_id: string; full_name: string; status: 'enrolled' | 'completed'; enrolled_at: string; completed_at: string | null }>;
+      }>('/api/org-course-enrollees', { orgId, courseId });
+
       setEnrollees(
-        enrollments.map((e) => ({
+        data.enrollees.map((e) => ({
           userId: e.user_id,
-          name: (e.profile as any)?.full_name || 'Unknown',
-          status: e.status as 'enrolled' | 'completed',
+          name: e.full_name || 'Unknown',
+          status: e.status,
           enrolledAt: e.enrolled_at,
           completedAt: e.completed_at,
         }))
       );
+    } catch (error) {
+      console.error('Error loading enrollees:', error);
+    } finally {
+      setLoadingEnrollees(false);
     }
-    
-    setLoadingEnrollees(false);
   };
 
   // Filter courses
