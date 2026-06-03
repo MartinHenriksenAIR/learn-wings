@@ -1,6 +1,9 @@
 import type { AuthUser } from './auth';
 import { queryOne } from './db';
 
+/**
+ * Deliberately minimal — endpoints needing more profile fields (full_name, email, avatar_url) must query them explicitly; widening this interface requires widening getProfile's SELECT in lockstep.
+ */
 export interface CallerProfile {
   id: string;
   is_platform_admin: boolean;

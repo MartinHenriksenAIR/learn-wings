@@ -66,6 +66,13 @@ describe('isActiveMember', () => {
 
     expect(result).toBe(false);
   });
+
+  it("queries with status = 'active' predicate", async () => {
+    mockQueryOne.mockResolvedValueOnce({ ok: true });
+    await isActiveMember('profile-uuid', 'org-uuid');
+    const [sql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toMatch(/status\s*=\s*'active'/);
+  });
 });
 
 describe('isOrgAdmin', () => {
