@@ -686,7 +686,6 @@ export default function CoursePlayer() {
           courseId={course.id}
           courseTitle={course.title}
           orgId={currentOrg.id}
-          userId={user.id}
           existingReview={existingReview ? {
             id: existingReview.id,
             rating: existingReview.rating,

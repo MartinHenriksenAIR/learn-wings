@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Star, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 
 interface CourseReviewDialogProps {
@@ -20,7 +20,6 @@ interface CourseReviewDialogProps {
   courseId: string;
   courseTitle: string;
   orgId: string;
-  userId: string;
   existingReview?: {
     id: string;
     rating: number;
@@ -35,7 +34,6 @@ export function CourseReviewDialog({
   courseId,
   courseTitle,
   orgId,
-  userId,
   existingReview,
   onReviewSubmitted,
 }: CourseReviewDialogProps) {
@@ -55,37 +53,26 @@ export function CourseReviewDialog({
     }
 
     setSubmitting(true);
-
-    const reviewData = {
-      org_id: orgId,
-      user_id: userId,
-      course_id: courseId,
-      rating,
-      comment: comment.trim() || null,
-    };
-
-    const { error } = await supabase
-      .from('course_reviews')
-      .upsert(reviewData, { onConflict: 'org_id,user_id,course_id' });
-
-    setSubmitting(false);
-
-    if (error) {
+    try {
+      await callApi('/api/course-review', {
+        orgId, courseId, rating,
+        comment: comment.trim() || null,
+      });
+      toast({
+        title: existingReview ? 'Review updated!' : 'Thank you for your review!',
+        description: 'Your feedback helps us improve.',
+      });
+      onOpenChange(false);
+      onReviewSubmitted?.();
+    } catch (error) {
       toast({
         title: 'Error submitting review',
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
-      return;
+    } finally {
+      setSubmitting(false);
     }
-
-    toast({
-      title: existingReview ? 'Review updated!' : 'Thank you for your review!',
-      description: 'Your feedback helps us improve.',
-    });
-
-    onOpenChange(false);
-    onReviewSubmitted?.();
   };
 
   const displayRating = hoveredRating || rating;
