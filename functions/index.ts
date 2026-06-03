@@ -10,6 +10,7 @@ import './course-player-data/index';
 import './courses/index';
 import './delete-user/index';
 import './enrollment-complete/index';
+import './enrollments/index';
 import './generate-certificate/index';
 import './generate-compliance-report/index';
 import './grade-quiz/index';
