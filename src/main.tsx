@@ -6,10 +6,10 @@ import "./index.css";
 import "./i18n";
 
 // Initialize before render — handles redirect response from Entra login
-await msalInstance.initialize();
-
-createRoot(document.getElementById("root")!).render(
-  <MsalProvider instance={msalInstance}>
-    <App />
-  </MsalProvider>
-);
+msalInstance.initialize().then(() => {
+  createRoot(document.getElementById("root")!).render(
+    <MsalProvider instance={msalInstance}>
+      <App />
+    </MsalProvider>
+  );
+});
