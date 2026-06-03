@@ -40,7 +40,8 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 403, { error: 'Course not available for this organization' }) as HttpResponseInit;
     }
 
-    // Insert enrollment — idempotent via unique constraint
+    // Insert enrollment — duplicate-safe via the unique constraint: ON CONFLICT
+    // DO NOTHING returns no row, which we surface as 409 (re-enroll is rejected, not silently idempotent)
     const enrollment = await queryOne(
       `INSERT INTO enrollments (org_id, user_id, course_id, status)
 VALUES ($1, $2, $3, 'enrolled')
