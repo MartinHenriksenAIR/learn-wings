@@ -79,7 +79,7 @@ export function UserDetailDialog({
     const newValue = !isPlatformAdmin;
 
     try {
-      await callApi('/api/admin-user-actions', { type: 'toggle-platform-admin', targetUserId: user.id, value: newValue });
+      await callApi('/api/user-actions-admin', { type: 'toggle-platform-admin', targetUserId: user.id, value: newValue });
       setIsPlatformAdmin(newValue);
       toast({ title: newValue ? 'Platform admin granted' : 'Platform admin revoked' });
       onUserUpdated();
@@ -93,7 +93,7 @@ export function UserDetailDialog({
     setLoading(true);
 
     try {
-      await callApi('/api/admin-user-actions', { type: 'update-member-role', membershipId, role: newRole });
+      await callApi('/api/user-actions-admin', { type: 'update-member-role', membershipId, role: newRole });
       setMemberships(prev => prev.map(m => m.id === membershipId ? { ...m, role: newRole } : m));
       toast({ title: 'Role updated' });
       onUserUpdated();
@@ -107,7 +107,7 @@ export function UserDetailDialog({
     setLoading(true);
 
     try {
-      await callApi('/api/admin-user-actions', { type: 'remove-membership', membershipId });
+      await callApi('/api/user-actions-admin', { type: 'remove-membership', membershipId });
       setMemberships(prev => prev.filter(m => m.id !== membershipId));
       toast({ title: 'Membership removed' });
       onUserUpdated();
@@ -123,7 +123,7 @@ export function UserDetailDialog({
     setLoading(true);
 
     try {
-      await callApi('/api/admin-user-actions', { type: 'add-membership', targetUserId: user.id, orgId: newOrgId, role: newOrgRole });
+      await callApi('/api/user-actions-admin', { type: 'add-membership', targetUserId: user.id, orgId: newOrgId, role: newOrgRole });
       toast({ title: 'Membership added' });
       setShowAddOrg(false);
       setNewOrgId('');

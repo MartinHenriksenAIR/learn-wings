@@ -4,7 +4,13 @@ import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy init — constructing Resend without an API key throws, which would
+// crash the worker entry point at load time and deregister ALL functions.
+let resendClient: Resend | null = null;
+function getResend(): Resend {
+  if (!resendClient) resendClient = new Resend(process.env.RESEND_API_KEY);
+  return resendClient;
+}
 
 // Only production domain allowed — Lovable preview URLs removed
 const ALLOWED_LINK_DOMAINS = ['ai-uddannelse.dk'];
@@ -140,7 +146,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     const html = generateEmailHtml({ email, orgName, roleLabel, inviteLink, isPlatformAdmin: isPlatformAdminInvite });
 
-    const emailResponse = await resend.emails.send({
+    const emailResponse = await getResend().emails.send({
       from: 'AI Uddannelse <no-reply@ai-uddannelse.dk>',
       to: [email],
       subject,
