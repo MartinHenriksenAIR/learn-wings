@@ -1,8 +1,8 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { queryOne } from '../shared/db';
 import { authenticate } from '../shared/auth';
+import { getProfile } from '../shared/profile';
 
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
@@ -11,11 +11,9 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
   try {
     const user = await authenticate(req);
 
-    const isAdmin = await queryOne<{ is_platform_admin: boolean }>(
-      'SELECT is_platform_admin FROM profiles WHERE id = $1',
-      [user.id]
-    );
-    if (!isAdmin?.is_platform_admin) {
+    const profile = await getProfile(user);
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile.is_platform_admin) {
       return corsResponse(origin, 403, { error: 'Only platform admins can upload videos' }) as HttpResponseInit;
     }
 

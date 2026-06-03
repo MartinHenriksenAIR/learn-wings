@@ -8,7 +8,7 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockGener
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
     mockGenerateSasToken: vi.fn().mockReturnValue('sp=cw&sig=abc'),
-    mockBuildBlobUrl: vi.fn().mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/uuid.mp4?sp=cw&sig=abc'),
+    mockBuildBlobUrl: vi.fn().mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/documents/uuid.pdf?sp=cw&sig=abc'),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -26,25 +26,26 @@ import { default as handler } from './index';
 const baseReq = {
   method: 'POST',
   headers: { get: (k: string) => k === 'origin' ? 'https://ai-uddannelse.dk' : 'Bearer tok' },
-  json: async () => ({ fileName: 'test-video.mp4', contentType: 'video/mp4' }),
+  json: async () => ({ fileName: 'curriculum.pdf', contentType: 'application/pdf' }),
 };
 
-describe('azure-upload-url', () => {
+describe('azure-document-upload-url', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'admin@test.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
     mockGenerateSasToken.mockReturnValue('sp=cw&sig=abc');
-    mockBuildBlobUrl.mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/uuid.mp4?sp=cw&sig=abc');
+    mockBuildBlobUrl.mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/documents/uuid.pdf?sp=cw&sig=abc');
   });
 
-  it('returns uploadUrl, blobPath, contentType for admin user', async () => {
+  it('returns uploadUrl, blobPath with documents/ prefix, and contentType for admin user', async () => {
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body as string);
+
     expect(res.status).toBe(200);
     expect(body.uploadUrl).toMatch(/https:\/\/testaccount\.blob\.core\.windows\.net/);
-    expect(body.blobPath).toMatch(/\.mp4$/);
-    expect(body.contentType).toBe('video/mp4');
+    expect(body.blobPath).toContain('documents/');
+    expect(body.contentType).toBe('application/pdf');
   });
 
   it('returns 403 when getProfile returns non-admin', async () => {
@@ -53,7 +54,7 @@ describe('azure-upload-url', () => {
     const res = await handler(baseReq as any, {} as any);
 
     expect(res.status).toBe(403);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'Only platform admins can upload videos' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
   it('returns 401 when getProfile returns null', async () => {
@@ -68,13 +69,26 @@ describe('azure-upload-url', () => {
   it('returns 400 when fileName is missing', async () => {
     const req = {
       ...baseReq,
-      json: async () => ({ contentType: 'video/mp4' }),
+      json: async () => ({ contentType: 'application/pdf' }),
     };
 
     const res = await handler(req as any, {} as any);
 
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'fileName is required' });
+  });
+
+  it('defaults contentType to application/pdf when not provided', async () => {
+    const req = {
+      ...baseReq,
+      json: async () => ({ fileName: 'doc.pdf' }),
+    };
+
+    const res = await handler(req as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    expect(body.contentType).toBe('application/pdf');
   });
 
   it('returns 401 on auth token error', async () => {

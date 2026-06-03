@@ -7,8 +7,8 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockGener
     MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
-    mockGenerateSasToken: vi.fn().mockReturnValue('sp=cw&sig=abc'),
-    mockBuildBlobUrl: vi.fn().mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/uuid.mp4?sp=cw&sig=abc'),
+    mockGenerateSasToken: vi.fn().mockReturnValue('sp=d&sig=abc'),
+    mockBuildBlobUrl: vi.fn().mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/some-blob?sp=d&sig=abc'),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -26,25 +26,37 @@ import { default as handler } from './index';
 const baseReq = {
   method: 'POST',
   headers: { get: (k: string) => k === 'origin' ? 'https://ai-uddannelse.dk' : 'Bearer tok' },
-  json: async () => ({ fileName: 'test-video.mp4', contentType: 'video/mp4' }),
+  json: async () => ({ blobPath: 'some-uuid.mp4' }),
 };
 
-describe('azure-upload-url', () => {
+describe('azure-delete-blob', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'admin@test.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
-    mockGenerateSasToken.mockReturnValue('sp=cw&sig=abc');
-    mockBuildBlobUrl.mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/uuid.mp4?sp=cw&sig=abc');
+    mockGenerateSasToken.mockReturnValue('sp=d&sig=abc');
+    mockBuildBlobUrl.mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/some-blob?sp=d&sig=abc');
+    // Mock global fetch for DELETE request
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
   });
 
-  it('returns uploadUrl, blobPath, contentType for admin user', async () => {
+  it('returns success when admin deletes existing blob', async () => {
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body as string);
+
     expect(res.status).toBe(200);
-    expect(body.uploadUrl).toMatch(/https:\/\/testaccount\.blob\.core\.windows\.net/);
-    expect(body.blobPath).toMatch(/\.mp4$/);
-    expect(body.contentType).toBe('video/mp4');
+    expect(body.success).toBe(true);
+    expect(body.message).toBe('Blob deleted');
+  });
+
+  it('returns 200 when blob not found (404 from storage is acceptable)', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 404 });
+
+    const res = await handler(baseReq as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
   });
 
   it('returns 403 when getProfile returns non-admin', async () => {
@@ -53,7 +65,7 @@ describe('azure-upload-url', () => {
     const res = await handler(baseReq as any, {} as any);
 
     expect(res.status).toBe(403);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'Only platform admins can upload videos' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
   it('returns 401 when getProfile returns null', async () => {
@@ -65,16 +77,16 @@ describe('azure-upload-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  it('returns 400 when fileName is missing', async () => {
+  it('returns 400 when blobPath is missing', async () => {
     const req = {
       ...baseReq,
-      json: async () => ({ contentType: 'video/mp4' }),
+      json: async () => ({}),
     };
 
     const res = await handler(req as any, {} as any);
 
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'fileName is required' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'blobPath is required' });
   });
 
   it('returns 401 on auth token error', async () => {
@@ -84,6 +96,15 @@ describe('azure-upload-url', () => {
 
     expect(res.status).toBe(401);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid token' });
+  });
+
+  it('returns 500 when blob delete fails with non-404 status', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 500 });
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.body as string).error).toContain('Blob delete failed');
   });
 
   it('regression: no db query contains FROM profiles WHERE id =', async () => {
