@@ -22,6 +22,17 @@ jobs:
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
+        env:
+          # Vite inlines VITE_* at build time. None of these are secrets:
+          # the Entra client id and Supabase anon key are public client identifiers.
+          VITE_ENTRA_CLIENT_ID: 2f2f3964-fa8b-4ecc-97fe-85b969c0855a
+          VITE_ENTRA_SCOPE: api://2f2f3964-fa8b-4ecc-97fe-85b969c0855a/access_as_user
+          VITE_API_BASE_URL: "" # same-origin /api via the linked SWA backend
+          VITE_STORAGE_BASE_URL: https://staieducationmigration.blob.core.windows.net
+          # Still required by the not-yet-migrated pages (slices 2-8); removed in the decommission slice.
+          VITE_SUPABASE_URL: https://cairuxpyfshugwjrrqha.supabase.co
+          VITE_SUPABASE_PROJECT_ID: cairuxpyfshugwjrrqha
+          VITE_SUPABASE_PUBLISHABLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhaXJ1eHB5ZnNodWd3anJycWhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjExMzQsImV4cCI6MjA4NTA5NzEzNH0.r0yFxoW3VAr8ZfWYWv9pGkwNWThA8Np3CKMHm1ZYwQw
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_BLACK_FOREST_0D7F96C03 }}
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments and preview environments)
