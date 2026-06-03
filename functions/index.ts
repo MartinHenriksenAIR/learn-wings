@@ -21,6 +21,7 @@ import './org-course-access/index';
 import './org-memberships/index';
 import './organizations/index';
 import './profiles/index';
+import './quiz-by-lesson/index';
 import './quiz-options/index';
 import './quiz-options-admin/index';
 import './send-invitation-email/index';
