@@ -22,6 +22,7 @@ import './learner-dashboard/index';
 import './lesson-progress/index';
 import './org-analytics-data/index';
 import './org-course-access/index';
+import './org-course-enrollees/index';
 import './org-course-progress/index';
 import './org-memberships/index';
 import './organizations/index';
