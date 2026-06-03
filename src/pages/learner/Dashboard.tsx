@@ -10,8 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { supabase } from '@/integrations/supabase/client';
-import { callApiRaw } from '@/lib/api-client';
+import { callApi, callApiRaw } from '@/lib/api-client';
 import { getSignedLmsAssetUrl } from '@/lib/storage';
 import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Clock, Award, Play, ArrowRight, Loader2, TrendingUp } from 'lucide-react';
@@ -38,87 +37,19 @@ export default function LearnerDashboard() {
         return;
       }
 
-      // Fetch enrollments with courses
-      const { data: enrollmentData } = await supabase
-        .from('enrollments')
-        .select('*, course:courses(*)')
-        .eq('user_id', user.id)
-        .eq('org_id', currentOrg.id);
+      try {
+        const data = await callApi<{
+          enrollments: Array<Enrollment & { course: Course }>;
+          progress: Record<string, { total: number; completed: number }>;
+        }>('/api/learner-dashboard', { orgId: currentOrg.id });
 
-      if (enrollmentData) {
-        setEnrollments(enrollmentData as any);
-
-        // Bulk-fetch progress data for all enrolled courses
-        const progressMap: Record<string, { total: number; completed: number }> = {};
-        const courseIds = enrollmentData.map((e) => e.course_id);
-
-        if (courseIds.length === 0) {
-          setProgressData({});
-          setLoading(false);
-          return;
-        }
-
-        const { data: modules } = await supabase
-          .from('course_modules')
-          .select('id, course_id')
-          .in('course_id', courseIds);
-
-        const moduleToCourse = new Map<string, string>();
-        const moduleIds: string[] = [];
-        (modules || []).forEach((m) => {
-          moduleToCourse.set(m.id, m.course_id);
-          moduleIds.push(m.id);
-        });
-
-        const { data: lessons } = moduleIds.length > 0
-          ? await supabase
-            .from('lessons')
-            .select('id, module_id')
-            .in('module_id', moduleIds)
-          : { data: [] };
-
-        const lessonToCourse = new Map<string, string>();
-        (lessons || []).forEach((lesson) => {
-          const courseId = moduleToCourse.get(lesson.module_id);
-          if (courseId) {
-            lessonToCourse.set(lesson.id, courseId);
-            const existing = progressMap[courseId] || { total: 0, completed: 0 };
-            existing.total += 1;
-            progressMap[courseId] = existing;
-          }
-        });
-
-        const lessonIds = Array.from(lessonToCourse.keys());
-        const { data: completedProgress } = lessonIds.length > 0
-          ? await supabase
-            .from('lesson_progress')
-            .select('lesson_id')
-            .eq('user_id', user.id)
-            .eq('org_id', currentOrg.id)
-            .eq('status', 'completed')
-            .in('lesson_id', lessonIds)
-          : { data: [] };
-
-        (completedProgress || []).forEach((p) => {
-          const courseId = lessonToCourse.get(p.lesson_id);
-          if (!courseId) return;
-          const existing = progressMap[courseId] || { total: 0, completed: 0 };
-          existing.completed += 1;
-          progressMap[courseId] = existing;
-        });
-
-        courseIds.forEach((courseId) => {
-          if (!progressMap[courseId]) {
-            progressMap[courseId] = { total: 0, completed: 0 };
-          }
-        });
-
-        setProgressData(progressMap);
+        setEnrollments(data.enrollments as any);
+        setProgressData(data.progress);
 
         // Resolve thumbnail signed URLs
         const thumbMap: Record<string, string> = {};
         await Promise.all(
-          enrollmentData.map(async (e: any) => {
+          data.enrollments.map(async (e: any) => {
             if (e.course?.thumbnail_url) {
               const url = await getSignedLmsAssetUrl(e.course.thumbnail_url);
               if (url) thumbMap[e.course_id] = url;
@@ -126,9 +57,11 @@ export default function LearnerDashboard() {
           })
         );
         setThumbnailUrls(thumbMap);
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchData();
