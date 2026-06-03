@@ -17,6 +17,7 @@ import './grade-quiz/index';
 import './invitation-link/index';
 import './lesson-progress/index';
 import './org-analytics-data/index';
+import './org-course-access/index';
 import './org-memberships/index';
 import './organizations/index';
 import './profiles/index';
