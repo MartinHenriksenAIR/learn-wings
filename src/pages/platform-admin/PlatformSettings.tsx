@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 import { Loader2, Palette, Users, Mail, ToggleLeft, Save } from 'lucide-react';
@@ -95,12 +94,9 @@ export default function PlatformSettings() {
 
   useEffect(() => {
     const fetchSettings = async () => {
-      const { data } = await supabase
-        .from('platform_settings')
-        .select('key, value');
-
-      if (data) {
-        data.forEach((setting) => {
+      try {
+        const { settings } = await callApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>('/api/platform-settings', {});
+        settings.forEach((setting) => {
           const value = (setting.value as Record<string, unknown>) || {};
           switch (setting.key) {
             case 'branding':
@@ -117,8 +113,15 @@ export default function PlatformSettings() {
               break;
           }
         });
+      } catch (error) {
+        toast({
+          title: 'Failed to load settings',
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchSettings();
@@ -126,24 +129,21 @@ export default function PlatformSettings() {
 
   const saveSetting = async (key: SettingsKey, value: BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings) => {
     setSaving(key);
-    const { error } = await supabase
-      .from('platform_settings')
-      .update({ value: JSON.parse(JSON.stringify(value)) })
-      .eq('key', key);
-
-    if (error) {
-      toast({
-        title: 'Failed to save',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/platform-settings-update', { key, value });
       toast({
         title: 'Settings saved',
         description: 'Your changes have been applied.',
       });
+    } catch (error) {
+      toast({
+        title: 'Failed to save',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(null);
     }
-    setSaving(null);
   };
 
   const handleTestSmtpConnection = async () => {

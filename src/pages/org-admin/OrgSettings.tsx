@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 
 type FeatureSettings = {
@@ -51,18 +51,19 @@ export default function OrgSettings() {
   const handleSave = async () => {
     if (!currentOrg) return;
     setSaving(true);
-    const { error } = await supabase.from('org_settings').upsert({
-      org_id: currentOrg.id,
-      features: localFeatures,
-    });
-
-    if (error) {
-      toast({ title: 'Failed to save settings', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      await callApi('/api/org-settings-update', { orgId: currentOrg.id, features: localFeatures });
       toast({ title: 'Organization settings saved' });
       await refetch();
+    } catch (error) {
+      toast({
+        title: 'Failed to save settings',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   return (
