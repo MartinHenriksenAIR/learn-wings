@@ -72,7 +72,7 @@ export default function Settings() {
     } catch (error) {
       toast({
         title: t('settings.languageUpdateFailed'),
-        description: (error as Error).message,
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
@@ -108,7 +108,7 @@ export default function Settings() {
     } catch (error) {
       toast({
         title: t('settings.profileUpdateFailed'),
-        description: (error as Error).message,
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
