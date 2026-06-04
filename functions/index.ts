@@ -25,6 +25,8 @@ import './org-course-access/index';
 import './org-course-enrollees/index';
 import './org-course-progress/index';
 import './org-memberships/index';
+import './org-settings/index';
+import './org-settings-update/index';
 import './organizations/index';
 import './platform-settings/index';
 import './platform-settings-update/index';
