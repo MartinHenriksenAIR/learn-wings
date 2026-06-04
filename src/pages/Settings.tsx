@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from 'react-i18next';
+import { callApi } from '@/lib/api-client';
 
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required').max(50, 'First name is too long'),
@@ -62,24 +63,21 @@ export default function Settings() {
     localStorage.setItem('preferred_language', newLanguage);
     
     // Persist to database
-    const { error } = await supabase
-      .from('profiles')
-      .update({ preferred_language: newLanguage })
-      .eq('id', profile.id);
-
-    if (error) {
-      toast({
-        title: t('settings.languageUpdateFailed'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/profile-update', { preferred_language: newLanguage });
       toast({
         title: t('settings.languageUpdated'),
       });
       await refreshUserContext();
+    } catch (error) {
+      toast({
+        title: t('settings.languageUpdateFailed'),
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLanguageSaving(false);
     }
-    setLanguageSaving(false);
   };
 
   const handleProfileSave = async () => {
@@ -97,36 +95,25 @@ export default function Settings() {
     }
 
     if (!profile) return;
-    
-    setSaving(true);
-    
-    // Build full_name from first and last name
-    const fullName = lastName ? `${firstName.trim()} ${lastName.trim()}` : firstName.trim();
-    
-    const { error } = await supabase
-      .from('profiles')
-      .update({ 
-        full_name: fullName,
-        first_name: firstName.trim() || null,
-        last_name: lastName.trim() || null,
-        department: department.trim() || null,
-      })
-      .eq('id', profile.id);
 
-    if (error) {
-      toast({
-        title: t('settings.profileUpdateFailed'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    setSaving(true);
+
+    try {
+      await callApi('/api/profile-update', { first_name: firstName.trim(), last_name: lastName.trim(), department: department.trim() });
       toast({
         title: t('settings.profileUpdated'),
         description: t('settings.profileUpdatedDescription'),
       });
       await refreshUserContext();
+    } catch (error) {
+      toast({
+        title: t('settings.profileUpdateFailed'),
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   // Determine role display
