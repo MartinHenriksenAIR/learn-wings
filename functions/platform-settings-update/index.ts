@@ -41,7 +41,8 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const value = body.value as Record<string, unknown>;
 
     // updated_at is managed by a DB trigger on UPDATE; updated_by is the authenticated caller's profile id.
-    // JSON.stringify is used for the jsonb param because pg accepts a JSON string for jsonb columns.
+    // JSON.stringify is deliberate, not required: pg would auto-stringify a plain object, but explicit
+    // serialization sidesteps pg's array-vs-jsonb param footgun if the value guard ever loosens.
     const setting = await queryOne(
       `UPDATE platform_settings SET value = $2, updated_by = $3 WHERE key = $1 RETURNING key, value`,
       [key, JSON.stringify(value), profile.id],
