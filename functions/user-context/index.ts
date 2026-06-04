@@ -12,8 +12,8 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const user = await authenticate(req);
 
     // First-login provisioning: look up by Entra oid+tid, create profile if absent
-    let profile = await queryOne<{ id: string; full_name: string; email: string; is_platform_admin: boolean; avatar_url: string | null }>(
-      'SELECT id, full_name, email, is_platform_admin, avatar_url FROM profiles WHERE entra_oid = $1 AND entra_tid = $2',
+    let profile = await queryOne<{ id: string; full_name: string; first_name: string | null; last_name: string | null; department: string | null; email: string; avatar_url: string | null; is_platform_admin: boolean; preferred_language: string; created_at: string }>(
+      'SELECT id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at FROM profiles WHERE entra_oid = $1 AND entra_tid = $2',
       [user.id, user.tid]
     );
 
@@ -22,7 +22,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       profile = await queryOne(
         `INSERT INTO profiles (full_name, email, entra_oid, entra_tid)
          VALUES ($1, $2, $3, $4)
-         RETURNING id, full_name, email, is_platform_admin, avatar_url`,
+         RETURNING id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at`,
         [user.email.split('@')[0], user.email, user.id, user.tid]
       );
     }

@@ -26,6 +26,7 @@ import './org-course-enrollees/index';
 import './org-course-progress/index';
 import './org-memberships/index';
 import './organizations/index';
+import './profile-update/index';
 import './profiles/index';
 import './quiz-by-lesson/index';
 import './quiz-options/index';
