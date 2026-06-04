@@ -2,6 +2,7 @@
 // The host loads this file (package.json "main": "dist/index.js"); importing
 // each function module executes its app.http(...) registration.
 import './admin-user-actions/index';
+import './asset-signed-url/index';
 import './azure-delete-blob/index';
 import './azure-document-upload-url/index';
 import './azure-upload-url/index';
