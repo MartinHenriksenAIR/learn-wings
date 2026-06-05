@@ -152,7 +152,9 @@
     "noCoursesInProgress": "Ingen kurser i gang",
     "startLearning": "Start din læring ved at tilmelde dig et kursus fra kataloget.",
     "browseCourses": "Gennemse kurser",
-    "completedCourses": "Afsluttede kurser"
+    "completedCourses": "Afsluttede kurser",
+    "noMembershipTitle": "Endnu intet organisationsmedlemskab",
+    "noMembershipDescription": "Du er endnu ikke medlem af nogen organisation. Bed din administrator om en invitation for at komme i gang."
   },
   "courses": {
     "title": "Kursuskatalog",

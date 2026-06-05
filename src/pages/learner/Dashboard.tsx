@@ -18,7 +18,7 @@ import { CertificateCard } from '@/components/learner/CertificateCard';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerDashboard() {
-  const { user, currentOrg, profile } = useAuth();
+  const { user, currentOrg, profile, memberships } = useAuth();
   const { features } = usePlatformSettings();
   const { t } = useTranslation();
   const [enrollments, setEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
@@ -30,10 +30,15 @@ export default function LearnerDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       if (!user || !currentOrg) {
-        // Don't set loading to false if user exists but currentOrg isn't loaded yet
         if (!user) {
+          // No authenticated user — nothing to load
+          setLoading(false);
+        } else if (profile) {
+          // User context has resolved (profile is non-null) but no org is available
+          // (e.g. no memberships, or platform admin with none selected) — done loading
           setLoading(false);
         }
+        // else: user exists but profile not yet fetched — keep spinner
         return;
       }
 
@@ -65,7 +70,7 @@ export default function LearnerDashboard() {
     };
 
     fetchData();
-  }, [user, currentOrg]);
+  }, [user, currentOrg, profile]);
 
   const inProgressCourses = enrollments.filter(e => e.status === 'enrolled');
   const completedCourses = enrollments.filter(e => e.status === 'completed');
@@ -115,12 +120,15 @@ export default function LearnerDashboard() {
   }
 
   if (!currentOrg) {
+    const isNoMembership = memberships.length === 0;
     return (
       <AppLayout title={t('dashboard.title')}>
-        <div className="flex h-64 flex-col items-center justify-center text-center">
-          <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
-          <p className="text-sm text-muted-foreground">{t('common.joinOrgToContinue')}</p>
+        <div className="flex h-64 items-center justify-center">
+          <EmptyState
+            icon={<BookOpen className="h-6 w-6" />}
+            title={isNoMembership ? t('dashboard.noMembershipTitle') : t('common.noOrgSelected')}
+            description={isNoMembership ? t('dashboard.noMembershipDescription') : t('common.joinOrgToContinue')}
+          />
         </div>
       </AppLayout>
     );

@@ -152,7 +152,9 @@
     "noCoursesInProgress": "No courses in progress",
     "startLearning": "Start learning by enrolling in a course from the Course Overview.",
     "browseCourses": "Browse Courses",
-    "completedCourses": "Completed Courses"
+    "completedCourses": "Completed Courses",
+    "noMembershipTitle": "No organization membership yet",
+    "noMembershipDescription": "You're not a member of any organization yet. Ask your administrator for an invitation to get started."
   },
   "courses": {
     "title": "Course Overview",
