@@ -214,22 +214,52 @@ Getting an authenticated end-to-end test environment up surfaced a chain of issu
 - `msal-config.ts` dropped `storeAuthStateInCookie` (removed in msal-browser v5; was a TS2353). `npx tsc --noEmit -p tsconfig.app.json` now exits 0 (the other two errors were the Settings.tsx `supabase` TS2304s).
 - PlatformSettings/OrgSettings pages can't be manually exercised until a profile is elevated — expected; this slice is code-cutover only, authed e2e on the PR-6 preview is the user's gate.
 
+**✅ Gate 4 PASSED 2026-06-05:** user-verified on the PR-6 preview — profile name save persists and the language change applies with the spinner resolving cleanly. PlatformSettings/OrgSettings manual testing stays deferred until admin elevation (tracked test debt).
+
 ---
 
-## Known Issues & Open Items (as of 2026-06-04)
+## 2026-06-05 — Slice 5: Community (commits dbf1c71 → 595e49f)
+
+**Who:** emil & martin (subagent-driven session)
+
+**16 new endpoints (55 functions total once deployed):** `community-categories`, `community-posts` (list — server-side joins + per-post comment counts, replacing the old client N+1), `community-post`, `community-post-create`, `community-post-update`, `community-post-delete`, `community-comments`, `community-comment-create`, `community-comment-update`, `community-comment-delete`, `community-report-create`, `community-reports`, `community-report-update`, `community-post-moderate`, `community-comment-moderate`, `ai-champions` (read-only — champion writes stay in Slice 3c). Each with mock contract tests (functions suite 284 → 538 passing; tests mock `shared/auth`, `shared/db`, `shared/profile`; never touch a real DB).
+
+**Authorization parity** was derived per-endpoint from the original RLS policies in `supabase/migrations/` (the slice's plan carried a per-endpoint authz table with policy provenance). Highlights:
+- Restricted categories: create gated (global → platform admin only; org → org/platform admin); authors cannot edit posts in — or move posts into — restricted categories; author edits blocked on hidden posts (RLS `USING`-as-`WITH CHECK` parity).
+- Comments preserve the RLS UPDATE/DELETE asymmetry: an author can DELETE but not EDIT their own hidden comment.
+- Org-admin overrides never apply to global-scope content (`is_org_admin(get_post_org_id(...))` is false for NULL org) — global moderation is platform-admin-only.
+- Reports: per-reporter+target dedupe → 409 "You have already reported this content." (check-then-insert with the unique-index backstop — same accepted TOCTOU pattern as `enroll`); `reviewed_by`/`reviewed_at` now server-set (was client-supplied).
+
+**4 frontend files cut over (zero `supabase.*`):** `lib/community-api.ts` (full rewrite over `callApi`; exported signatures preserved — `fetchReports` gained an optional `opts` param, `updateReport.admin_notes` widened to nullable), `AIChampionsList.tsx`, `org-admin/OrgCommunityModeration.tsx`, `platform-admin/PlatformCommunityModeration.tsx`. `CommunityFeed`/`PostDetail`/`PostEdit` untouched (lib-only consumers; compile unchanged). Frontend typecheck/build/tests green.
+
+**FIXED (moved from Known Issues, was confirmed manually 2026-06-04):**
+- **Creating ANY post failed "Not authenticated" — community and org posts alike.** Root cause: every write in `community-api.ts` gated on `supabase.auth.getUser()`, always null under MSAL. Fixed by the `callApi` rewrite; the server now derives identity from the token (`getProfile`).
+- **Dashboard infinite spinner for users with NO org membership.** The data effect early-returned without resolving `loading` when `user` existed but `currentOrg` never arrived, so the existing `!currentOrg` empty state was unreachable. Fixed: profile-gated three-way loading guard (`profile` = user-context-resolved marker) + `EmptyState` fork on `memberships.length === 0` (new `dashboard.noMembership*` i18n keys, en+da) + a 3-case component test proving loading resolves (root suite 10 → 13).
+
+**Deploy status (2026-06-05):** the GitHub Actions deploy was blocked by GitHub's ToS block on `Azure/functions-action` (run 27031634593: build job green, deploy job dead at action download — see Operational quirks). **Deployed manually instead** (emil): `func azure functionapp publish func-ai-education-migration` from `functions/` (after `npm install`/`build`/`test` — 538 passing locally). **Smoke: all 16 new endpoints return 401 unauthenticated (0/16 failures)** against the regionalized hostname. 55 functions live. This also closed the transient "community categories are gone" preview observation from earlier today (the preview frontend was calling endpoints that weren't deployed yet).
+
+**Decisions / notes:**
+- `comment_count` counts only comments the caller could see (hidden excluded for non-admins) — deliberate improvement over the old client, which counted hidden comments for everyone. The single-post endpoint returns no `comment_count` (parity — only the feed renders it; PostDetail renders the live thread).
+- `community-reports` with neither `orgId` nor `scope:'global'` is platform-admin-only — deliberate tightening vs RLS (which would have let org admins see their orgs' reports); no frontend caller uses that mode.
+- Embedded `profile`/`organization` JSON is narrower (`id`+`full_name` / `id`+`name`) than the full TS `Profile`/`Organization` interfaces — matches the old Supabase embedded selects; consumers only read those fields.
+- Review nits (explicitly non-blocking): report-update tests assert param membership not index order; Dashboard test name implies an admin-flag coupling that doesn't exist; vi.hoisted factories return superset mock objects in the comment suites.
+
+---
+
+## Known Issues & Open Items (as of 2026-06-05)
 
 ### Broken — expected, slice-scoped
 
 Shared root cause for all of these: the page/API layer still uses the Supabase client, which has NO auth session under MSAL — `supabase.auth.getUser()` returns null and RLS rejects/strands writes. Fixed per-slice as each area is cut over to `callApi`.
 
-- KNOWN BUG (confirmed manually 2026-06-04): **creating ANY post fails as "Not authenticated" — community and org posts alike.** Every write in `src/lib/community-api.ts` (`createPost`, `createComment`, `createReport`, …) gates on `supabase.auth.getUser()`, which is always null under MSAL, so it throws before reaching the network. Fix = **Slice 5**.
-- KNOWN BUG (confirmed manually 2026-06-04): **submitting an idea or saving an idea draft fails** the same way — `src/lib/ideas-api.ts` (`createIdea` incl. drafts, `voteForIdea`, `removeVoteFromIdea`, `createIdeaComment`) has the identical `supabase.auth.getUser()` gate. Fix = **Slice 6**.
+- KNOWN BUG (confirmed manually 2026-06-04, re-confirmed by emil 2026-06-05): **submitting an idea or saving an idea draft fails** the same way — `src/lib/ideas-api.ts` (`createIdea` incl. drafts, `voteForIdea`, `removeVoteFromIdea`, `createIdeaComment`) has the identical `supabase.auth.getUser()` gate. Fix = **Slice 6**.
 - KNOWN BUG: the remaining still-Supabase areas (admin pages, resources — 23 files in total across Slices 2–8) fail or hang writes for the same root cause; not yet individually confirmed by manual testing.
 - KNOWN BUG: `send-invitation-email` 500s when invoked — `RESEND_API_KEY` + `STATIC_ASSETS_BASE_URL` app settings unset.
 
 ### Broken — small, unscoped
-- KNOWN BUG: Dashboard shows an infinite spinner for users with NO org membership (fetch never fires) — needs a frontend empty state.
+- KNOWN BUG (found by emil, manual testing): the unenroll confirmation dialog renders raw markup — `Are you sure you want to unenroll from <strong>"AI Fundamentals"</strong>? …` (the i18n string's HTML shown literally) — AND its copy claims "This will remove all your progress", but unenrolling does NOT actually remove progress. Fix the markup rendering and reconcile copy vs behavior (decide: wipe progress on unenroll, or correct the text).
 - KNOWN BUG: `grade-quiz` silently records no `quiz_attempts` row for platform admins without a membership (pre-existing quirk, kept as-is).
+- `Courses.tsx:51-53` uses the unguarded `!user || !currentOrg → setLoading(false)` loading variant — no stranded spinner, but it briefly renders its no-org branch for normal members before `currentOrg` arrives. Align with the Dashboard's profile-gated pattern (Slice 5 follow-up note).
 - KNOWN BUG: `course-player-data` has no per-course access gate — any authenticated user with a profile can pull any published course's player payload. Inconsistent with `quiz-by-lesson`, which gates on org access. Align in a future slice.
 
 ### Accepted trade-offs (reviewed, deliberately kept)
@@ -238,6 +268,13 @@ Shared root cause for all of these: the page/API layer still uses the Supabase c
 
 ### Operational quirks (not bugs, recurring)
 - Post-deploy the function host can park in `Error` (worker-restart exhaustion during zipdeploy file churn) — run `az functionapp restart` after the ~3 min file sync settles.
+- `gh workflow run` failing 403 "Must have admin rights to Repository" = wrong ACTIVE gh account (found switched to the work account mid-Slice-5) — fix with `gh auth switch --user emkataumre`.
+- 2026-06-05: GitHub placed a **ToS block on the `Azure/functions-action` repository** (during a GitHub-wide "Disruption with some GitHub services" incident; the incident later resolved WITHOUT lifting the block) — the deploy job dies at "Set up job: Repository access blocked" while the build job passes. External. **CI deploys stay broken until the block lifts** — check with `gh api repos/Azure/functions-action`, then `gh run rerun <run-id> --failed`. Workaround used for Slice 5: manual `func azure functionapp publish func-ai-education-migration` (same Kudu zipdeploy mechanism, same publish target).
+- One-off anomaly (2026-06-05): `functions/index.ts` found modified in the working tree mid-session — all 16 community barrel imports removed, uncommitted, not produced by any session commit. Restored to HEAD after user confirmation. If it recurs, suspect local tooling.
+
+### CI debt
+- The functions deploy workflow runs deprecated Node 20 actions (`actions/checkout@v4`, `setup-node@v3`, `upload-artifact@v4` per GitHub's run annotation); GitHub forces Node 24 from **2026-06-16** — bump action versions before then.
+- Idea (emil): build a more involved CI/CD pipeline with test gates — would force tests to be written for areas that lack them (frontend pages, e2e). The functions workflow already runs `npm test --if-present`; the SWA workflow has no test step.
 
 ### Hardening / debt
 - TODO security: 500 bodies propagate `err.message` suite-wide (CWE-209 per automated review) — candidate ADR: generic 500 + context logging.
@@ -260,13 +297,13 @@ Shared root cause for all of these: the page/API layer still uses the Supabase c
 
 ---
 
-## Current State (post-e2e checkpoint — 2026-06-04)
+## Current State (post-Slice-5 checkpoint — 2026-06-05)
 
 **Branch:** `feature/lovable-migration` (PR #6 open; preview env is the live test surface)
 
-**Done:** Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow) — proven by a full authenticated e2e run. Slice 4 (settings & profile — code cutover + deploy + unauth smoke done; fixed the two live Settings.tsx bugs; authed e2e on the PR-6 preview is the user's gate).
+**Done:** Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings & profile) — all user-verified end-to-end on the PR-6 preview (Slice 4 Gate 4 passed 2026-06-05; PlatformSettings/OrgSettings pages carry deferred test debt until admin elevation). Slice 5 (community) code-complete with both review stages passed per task, deployed (manual `func publish` — CI blocked externally), and 401-smoked 16/16; user e2e on the preview pending (moderation pages additionally deferred until admin elevation, same as Slice 4's settings pages).
 
-**Remaining slices:** 2 (course authoring), 3a/3b/3c (org & user admin), 5/6/7 (community / ideas / resources), 8 (decommission Supabase).
+**Remaining slices:** 2 (course authoring), 3a/3b/3c (org & user admin), 6/7 (ideas / resources), 8 (decommission Supabase).
 
 ---
 
