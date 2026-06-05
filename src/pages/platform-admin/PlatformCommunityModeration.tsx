@@ -19,8 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -44,7 +43,6 @@ interface ReportWithDetails extends Omit<CommunityReport, 'reporter'> {
 }
 
 export default function PlatformCommunityModeration() {
-  const { profile } = useAuth();
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<ReportStatus>('pending');
@@ -56,43 +54,23 @@ export default function PlatformCommunityModeration() {
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ['platform-reports', activeTab],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('community_reports')
-        .select(`
-          *,
-          reporter:profiles!community_reports_reporter_user_id_fkey(id, full_name)
-        `)
-        .is('org_id', null)
-        .eq('status', activeTab)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await fetchReports(undefined, { scope: 'global', status: activeTab });
       return data as ReportWithDetails[];
     },
   });
 
   // Update report status
   const updateReportMutation = useMutation({
-    mutationFn: async ({ 
-      reportId, 
-      status, 
-      notes 
-    }: { 
-      reportId: string; 
-      status: ReportStatus; 
+    mutationFn: async ({
+      reportId,
+      status,
+      notes,
+    }: {
+      reportId: string;
+      status: 'reviewed' | 'dismissed';
       notes?: string;
     }) => {
-      const { error } = await supabase
-        .from('community_reports')
-        .update({
-          status,
-          admin_notes: notes || null,
-          reviewed_by: profile?.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', reportId);
-
-      if (error) throw error;
+      await updateReport(reportId, { status, admin_notes: notes || null });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-reports'] });
@@ -107,22 +85,20 @@ export default function PlatformCommunityModeration() {
 
   // Hide/show content
   const toggleContentVisibility = useMutation({
-    mutationFn: async ({ 
-      type, 
-      id, 
-      hide 
-    }: { 
-      type: 'post' | 'comment'; 
-      id: string; 
+    mutationFn: async ({
+      type,
+      id,
+      hide,
+    }: {
+      type: 'post' | 'comment';
+      id: string;
       hide: boolean;
     }) => {
-      const table = type === 'post' ? 'community_posts' : 'community_comments';
-      const { error } = await supabase
-        .from(table)
-        .update({ is_hidden: hide })
-        .eq('id', id);
-
-      if (error) throw error;
+      if (type === 'post') {
+        await togglePostHidden(id, hide);
+      } else {
+        await toggleCommentHidden(id, hide);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-reports'] });
@@ -136,12 +112,7 @@ export default function PlatformCommunityModeration() {
   // Lock/unlock post comments
   const togglePostLock = useMutation({
     mutationFn: async ({ postId, lock }: { postId: string; lock: boolean }) => {
-      const { error } = await supabase
-        .from('community_posts')
-        .update({ is_locked: lock })
-        .eq('id', postId);
-
-      if (error) throw error;
+      await togglePostLocked(postId, lock);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-reports'] });

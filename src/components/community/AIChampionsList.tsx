@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 
 interface ChampionProfile {
   id: string;
@@ -27,17 +27,8 @@ export function AIChampionsList({ orgId }: AIChampionsListProps) {
   const { data: champions = [], isLoading } = useQuery({
     queryKey: ['ai-champions', orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('ai_champions')
-        .select(`
-          *,
-          profile:profiles!ai_champions_user_id_fkey(id, full_name, department)
-        `)
-        .eq('org_id', orgId)
-        .order('assigned_at', { ascending: false });
-
-      if (error) throw error;
-      return data as unknown as AIChampion[];
+      const data = await callApi<{ champions: AIChampion[] }>('/api/ai-champions', { orgId });
+      return data.champions;
     },
     enabled: !!orgId,
   });

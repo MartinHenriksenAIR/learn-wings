@@ -1,329 +1,169 @@
-import { supabase } from '@/integrations/supabase/client';
-import type { 
-  CommunityPost, 
-  CommunityComment, 
-  CommunityCategory, 
+import { callApi } from '@/lib/api-client';
+import type {
+  CommunityPost,
+  CommunityComment,
+  CommunityCategory,
   CommunityReport,
-  CommunityScope,
   CreatePostInput,
   CreateCommentInput,
   CreateReportInput,
   PostFilters,
+  ReportStatus,
 } from '@/lib/community-types';
 
 // Fetch categories
 export async function fetchCategories(): Promise<CommunityCategory[]> {
-  const { data, error } = await supabase
-    .from('community_categories')
-    .select('*')
-    .order('sort_order');
-
-  if (error) throw error;
-  return data as CommunityCategory[];
+  const res = await callApi<{ categories: CommunityCategory[] }>('/api/community-categories', {});
+  return res.categories;
 }
 
 // Fetch posts with filters
 export async function fetchPosts(filters: PostFilters): Promise<CommunityPost[]> {
-  let query = supabase
-    .from('community_posts')
-    .select(`
-      *,
-      category:community_categories(*),
-      profile:profiles!community_posts_user_id_fkey(id, full_name),
-      organization:organizations(id, name)
-    `)
-    .eq('scope', filters.scope)
-    .order('is_pinned', { ascending: false })
-    .order('created_at', { ascending: false });
-
-  if (filters.scope === 'org' && filters.org_id) {
-    query = query.eq('org_id', filters.org_id);
-  }
-
-  if (filters.category_id) {
-    query = query.eq('category_id', filters.category_id);
-  }
-
-  if (filters.search) {
-    query = query.or(`title.ilike.%${filters.search}%,content.ilike.%${filters.search}%`);
-  }
-
-  if (filters.tags && filters.tags.length > 0) {
-    query = query.overlaps('tags', filters.tags);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-
-  // Get comment counts
-  const postIds = (data || []).map((p) => p.id);
-  if (postIds.length > 0) {
-    const { data: commentCounts } = await supabase
-      .from('community_comments')
-      .select('post_id')
-      .in('post_id', postIds);
-
-    const countMap = (commentCounts || []).reduce((acc, c) => {
-      acc[c.post_id] = (acc[c.post_id] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return (data || []).map((p) => ({
-      ...p,
-      comment_count: countMap[p.id] || 0,
-    })) as CommunityPost[];
-  }
-
-  return (data || []) as CommunityPost[];
+  const res = await callApi<{ posts: CommunityPost[] }>('/api/community-posts', {
+    scope: filters.scope,
+    orgId: filters.scope === 'org' ? filters.org_id : undefined,
+    categoryId: filters.category_id,
+    search: filters.search,
+    tags: filters.tags,
+  });
+  return res.posts;
 }
 
 // Fetch single post
 export async function fetchPost(postId: string): Promise<CommunityPost | null> {
-  const { data, error } = await supabase
-    .from('community_posts')
-    .select(`
-      *,
-      category:community_categories(*),
-      profile:profiles!community_posts_user_id_fkey(id, full_name),
-      organization:organizations(id, name)
-    `)
-    .eq('id', postId)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') return null;
-    throw error;
-  }
-
-  return data as CommunityPost;
+  const res = await callApi<{ post: CommunityPost | null }>('/api/community-post', { postId });
+  return res.post;
 }
 
 // Create post
 export async function createPost(input: CreatePostInput): Promise<CommunityPost> {
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) throw new Error('Not authenticated');
-
-  const { data, error } = await supabase
-    .from('community_posts')
-    .insert({
-      scope: input.scope,
-      org_id: input.org_id || null,
-      user_id: user.user.id,
-      category_id: input.category_id,
-      title: input.title,
-      content: input.content,
-      tags: input.tags || [],
-      event_date: input.event_date || null,
-      event_location: input.event_location || null,
-      event_registration_url: input.event_registration_url || null,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as CommunityPost;
+  const res = await callApi<{ post: CommunityPost }>('/api/community-post-create', {
+    scope: input.scope,
+    orgId: input.scope === 'org' ? input.org_id : undefined,
+    categoryId: input.category_id,
+    title: input.title,
+    content: input.content,
+    tags: input.tags || [],
+    eventDate: input.event_date || null,
+    eventLocation: input.event_location || null,
+    eventRegistrationUrl: input.event_registration_url || null,
+  });
+  return res.post;
 }
 
 // Update post
 export async function updatePost(
-  postId: string, 
+  postId: string,
   updates: Partial<CommunityPost>
 ): Promise<CommunityPost> {
-  const { data, error } = await supabase
-    .from('community_posts')
-    .update(updates)
-    .eq('id', postId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as CommunityPost;
+  const payload: Record<string, unknown> = {};
+  const allowedKeys = [
+    'category_id',
+    'title',
+    'content',
+    'tags',
+    'event_date',
+    'event_location',
+    'event_registration_url',
+  ] as const;
+  for (const key of allowedKeys) {
+    if (updates[key] !== undefined) {
+      payload[key] = updates[key];
+    }
+  }
+  const res = await callApi<{ post: CommunityPost }>('/api/community-post-update', {
+    postId,
+    updates: payload,
+  });
+  return res.post;
 }
 
 // Delete post
 export async function deletePost(postId: string): Promise<void> {
-  const { error } = await supabase
-    .from('community_posts')
-    .delete()
-    .eq('id', postId);
-
-  if (error) throw error;
+  await callApi('/api/community-post-delete', { postId });
 }
 
 // Fetch comments for a post
 export async function fetchComments(postId: string): Promise<CommunityComment[]> {
-  const { data, error } = await supabase
-    .from('community_comments')
-    .select(`
-      *,
-      profile:profiles!community_comments_user_id_fkey(id, full_name)
-    `)
-    .eq('post_id', postId)
-    .order('created_at', { ascending: true });
-
-  if (error) throw error;
-  return (data || []) as CommunityComment[];
+  const res = await callApi<{ comments: CommunityComment[] }>('/api/community-comments', { postId });
+  return res.comments;
 }
 
 // Create comment
 export async function createComment(input: CreateCommentInput): Promise<CommunityComment> {
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) throw new Error('Not authenticated');
-
-  const { data, error } = await supabase
-    .from('community_comments')
-    .insert({
-      post_id: input.post_id,
-      user_id: user.user.id,
-      content: input.content,
-      parent_comment_id: input.parent_comment_id || null,
-    })
-    .select(`
-      *,
-      profile:profiles!community_comments_user_id_fkey(id, full_name)
-    `)
-    .single();
-
-  if (error) throw error;
-  return data as CommunityComment;
+  const res = await callApi<{ comment: CommunityComment }>('/api/community-comment-create', {
+    postId: input.post_id,
+    content: input.content,
+    parentCommentId: input.parent_comment_id ?? undefined,
+  });
+  return res.comment;
 }
 
 // Update comment
 export async function updateComment(
-  commentId: string, 
+  commentId: string,
   content: string
 ): Promise<CommunityComment> {
-  const { data, error } = await supabase
-    .from('community_comments')
-    .update({ content })
-    .eq('id', commentId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as CommunityComment;
+  const res = await callApi<{ comment: CommunityComment }>('/api/community-comment-update', {
+    commentId,
+    content,
+  });
+  return res.comment;
 }
 
 // Delete comment
 export async function deleteComment(commentId: string): Promise<void> {
-  const { error } = await supabase
-    .from('community_comments')
-    .delete()
-    .eq('id', commentId);
-
-  if (error) throw error;
+  await callApi('/api/community-comment-delete', { commentId });
 }
 
 // Create report
 export async function createReport(input: CreateReportInput): Promise<CommunityReport> {
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) throw new Error('Not authenticated');
-
-  const { data: existingReport, error: existingError } = await supabase
-    .from('community_reports')
-    .select('id')
-    .eq('reporter_user_id', user.user.id)
-    .eq('target_id', input.target_id)
-    .eq('target_type', input.target_type)
-    .maybeSingle();
-
-  if (existingError) throw existingError;
-  if (existingReport) {
-    throw new Error('You have already reported this content.');
-  }
-
-  const { data, error } = await supabase
-    .from('community_reports')
-    .insert({
-      reporter_user_id: user.user.id,
-      target_type: input.target_type,
-      target_id: input.target_id,
-      org_id: input.org_id || null,
-      reason: input.reason,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    if (error.code === '23505') {
-      throw new Error('You have already reported this content.');
-    }
-    throw error;
-  }
-  return data as CommunityReport;
+  const res = await callApi<{ report: CommunityReport }>('/api/community-report-create', {
+    targetType: input.target_type,
+    targetId: input.target_id,
+    orgId: input.org_id ?? null,
+    reason: input.reason,
+  });
+  return res.report;
 }
 
 // Fetch reports (admin)
-export async function fetchReports(orgId?: string): Promise<CommunityReport[]> {
-  let query = supabase
-    .from('community_reports')
-    .select(`
-      *,
-      reporter:profiles!community_reports_reporter_user_id_fkey(id, full_name),
-      reviewer:profiles!community_reports_reviewed_by_fkey(id, full_name)
-    `)
-    .order('created_at', { ascending: false });
-
-  if (orgId) {
-    query = query.eq('org_id', orgId);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return (data || []) as CommunityReport[];
+export async function fetchReports(
+  orgId?: string,
+  opts?: { scope?: 'global'; status?: ReportStatus }
+): Promise<CommunityReport[]> {
+  const res = await callApi<{ reports: CommunityReport[] }>('/api/community-reports', {
+    orgId,
+    scope: opts?.scope,
+    status: opts?.status,
+  });
+  return res.reports;
 }
 
 // Update report (admin)
 export async function updateReport(
   reportId: string,
-  updates: { status?: 'reviewed' | 'dismissed'; admin_notes?: string }
+  updates: { status?: 'reviewed' | 'dismissed'; admin_notes?: string | null }
 ): Promise<CommunityReport> {
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) throw new Error('Not authenticated');
-
-  const { data, error } = await supabase
-    .from('community_reports')
-    .update({
-      ...updates,
-      reviewed_by: user.user.id,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq('id', reportId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as CommunityReport;
+  const res = await callApi<{ report: CommunityReport }>('/api/community-report-update', {
+    reportId,
+    status: updates.status,
+    adminNotes: updates.admin_notes,
+  });
+  return res.report;
 }
 
 // Toggle post visibility (admin)
 export async function togglePostHidden(postId: string, hidden: boolean): Promise<void> {
-  const { error } = await supabase
-    .from('community_posts')
-    .update({ is_hidden: hidden })
-    .eq('id', postId);
-
-  if (error) throw error;
+  await callApi('/api/community-post-moderate', { postId, isHidden: hidden });
 }
 
 // Toggle post lock (admin)
 export async function togglePostLocked(postId: string, locked: boolean): Promise<void> {
-  const { error } = await supabase
-    .from('community_posts')
-    .update({ is_locked: locked })
-    .eq('id', postId);
-
-  if (error) throw error;
+  await callApi('/api/community-post-moderate', { postId, isLocked: locked });
 }
 
 // Toggle comment visibility (admin)
 export async function toggleCommentHidden(commentId: string, hidden: boolean): Promise<void> {
-  const { error } = await supabase
-    .from('community_comments')
-    .update({ is_hidden: hidden })
-    .eq('id', commentId);
-
-  if (error) throw error;
+  await callApi('/api/community-comment-moderate', { commentId, isHidden: hidden });
 }
