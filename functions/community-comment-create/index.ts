@@ -2,7 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { getProfile, isActiveMember, isOrgAdmin } from '../shared/profile';
+import { getProfile, isActiveMember } from '../shared/profile';
 
 interface PostRow {
   scope: 'org' | 'global';

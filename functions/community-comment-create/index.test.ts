@@ -196,6 +196,15 @@ describe('community-comment-create', () => {
     expect(mockIsActiveMember).not.toHaveBeenCalled();
   });
 
+  it('platform admin commenting on a locked post gets 403 Post is locked (no admin bypass for locked check)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQueryOne.mockResolvedValueOnce(lockedPost);
+    const res = await handler(baseReq({ postId: 'post-1', content: 'A comment' }), {} as any);
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Post is locked' });
+    expect(mockIsActiveMember).not.toHaveBeenCalled();
+  });
+
   it('asserts CTE SQL fragment in insert query', async () => {
     mockQueryOne.mockResolvedValueOnce(globalPost);
     mockQueryOne.mockResolvedValueOnce(newComment);
