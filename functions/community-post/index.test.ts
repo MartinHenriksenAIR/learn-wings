@@ -101,7 +101,6 @@ describe('community-post', () => {
   it('returns 200 { post: null } for org post when caller is not a member', async () => {
     mockQueryOne.mockResolvedValueOnce(orgPost);
     mockIsActiveMember.mockResolvedValueOnce(false);
-    mockIsOrgAdmin.mockResolvedValueOnce(false);
     const res = await handler(baseReq({ postId: 'post-2' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ post: null });
@@ -115,13 +114,14 @@ describe('community-post', () => {
     expect(JSON.parse(res.body as string)).toEqual({ post: orgPost });
   });
 
-  it('returns 200 with org post when caller is org admin (even if not member)', async () => {
+  it('returns 200 { post: null } for org post when caller is org admin but not an active member', async () => {
+    // isOrgAdmin is no longer checked for the basic org-access path; isActiveMember is required
     mockQueryOne.mockResolvedValueOnce(orgPost);
     mockIsActiveMember.mockResolvedValueOnce(false);
-    mockIsOrgAdmin.mockResolvedValueOnce(true);
     const res = await handler(baseReq({ postId: 'post-2' }), {} as any);
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.body as string)).toEqual({ post: orgPost });
+    expect(JSON.parse(res.body as string)).toEqual({ post: null });
+    expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
   it('returns 200 { post: null } for hidden post when caller is not org admin', async () => {
@@ -138,8 +138,7 @@ describe('community-post', () => {
     const hiddenPost = { ...orgPost, is_hidden: true };
     mockQueryOne.mockResolvedValueOnce(hiddenPost);
     mockIsActiveMember.mockResolvedValueOnce(true);
-    mockIsOrgAdmin.mockResolvedValueOnce(true);
-    // isOrgAdmin called again for hidden check
+    // isOrgAdmin called once: for the hidden-visibility check only
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     const res = await handler(baseReq({ postId: 'post-2' }), {} as any);
     expect(res.status).toBe(200);

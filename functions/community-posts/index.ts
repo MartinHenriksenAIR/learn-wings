@@ -62,10 +62,6 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // Build dynamic WHERE + params
     const conditions: string[] = [];
     const params: unknown[] = [];
-    const add = (fragment: string, val: unknown) => {
-      params.push(val);
-      conditions.push(fragment.replace('$?', `$${params.length}`));
-    };
 
     // scope is always required
     params.push(vScope);

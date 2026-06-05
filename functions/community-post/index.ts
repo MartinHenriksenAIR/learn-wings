@@ -47,8 +47,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // Scope visibility check
     if (post.scope === 'org') {
       const canAccess = profile.is_platform_admin ||
-        await isActiveMember(profile.id, post.org_id!) ||
-        await isOrgAdmin(profile.id, post.org_id!);
+        await isActiveMember(profile.id, post.org_id!);
       if (!canAccess) return corsResponse(origin, 200, { post: null }) as HttpResponseInit;
     }
 

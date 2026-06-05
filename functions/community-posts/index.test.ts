@@ -173,6 +173,33 @@ describe('community-posts', () => {
     expect(sql).not.toContain('p.is_hidden = false');
   });
 
+  it('combined filter: org scope + categoryId + search + tags as org admin (includeHidden=true)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQuery.mockResolvedValueOnce([]);
+
+    const res = await handler(
+      baseReq({ scope: 'org', orgId: 'org-1', categoryId: 'cat-1', search: 'foo', tags: ['a', 'b'] }),
+      {} as any,
+    );
+
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+
+    // Full params array in builder order:
+    // $1=scope, $2=orgId, $3=categoryId, $4=search, $5=tags, $6=includeHidden
+    expect(params).toEqual(['org', 'org-1', 'cat-1', 'foo', ['a', 'b'], true]);
+
+    // SQL must contain ILIKE and && fragments
+    expect(sql).toContain('ILIKE');
+    expect(sql).toContain('&&');
+
+    // includeHidden=true means p.is_hidden = false must NOT appear in the WHERE clause
+    // (the comment_count subquery's cc.is_hidden = false will still be present)
+    expect(sql).not.toContain('p.is_hidden = false');
+  });
+
   it('returns 500 on db error', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
