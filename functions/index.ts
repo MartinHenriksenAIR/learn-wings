@@ -2,6 +2,7 @@
 // The host loads this file (package.json "main": "dist/index.js"); importing
 // each function module executes its app.http(...) registration.
 import './admin-user-actions/index';
+import './ai-champions/index';
 import './asset-signed-url/index';
 import './azure-delete-blob/index';
 import './azure-document-upload-url/index';
@@ -10,13 +11,18 @@ import './azure-view-url/index';
 import './community-categories/index';
 import './community-comment-create/index';
 import './community-comment-delete/index';
+import './community-comment-moderate/index';
 import './community-comment-update/index';
 import './community-comments/index';
 import './community-post/index';
 import './community-post-create/index';
 import './community-post-delete/index';
+import './community-post-moderate/index';
 import './community-post-update/index';
 import './community-posts/index';
+import './community-report-create/index';
+import './community-report-update/index';
+import './community-reports/index';
 import './course-player-data/index';
 import './course-review/index';
 import './courses/index';
