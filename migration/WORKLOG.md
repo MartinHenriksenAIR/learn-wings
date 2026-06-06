@@ -405,3 +405,18 @@ Smoke against `func-ai-education-migration-c0fgeqdnfvd6h0cf.swedencentral-01.azu
 **Lesson for remaining slices (2, 3a–3c, 8):**
 - Run `/code-review` BEFORE marking the cutover PR ready — the 9-finding sweep here would have grown the diff if caught post-merge. Subagent-driven development handled the fix sweep cleanly (extract task list, one implementer per task with spec + quality review, controller preserves context).
 - The Slice 6 lesson (audit `=== user?.id` → `profile?.id`) hit exactly where predicted (`ResourceLibrary.tsx:255`). Keep the audit-for-OID-vs-UUID step in every cutover.
+
+---
+
+## 2026-06-06 — OrgSelector → /api/organizations (issue #37, PR #44)
+
+Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from `supabase.from('organizations').select('*').order('name')` to `callApi('/api/organizations', {})` (the endpoint already shipped with Slice 0.5). Out of scope per #37: the four other `from('organizations')` call sites (`CoursesManager` #8, `OrgAnalytics`/`OrganizationsManager`/`OrganizationDetail` #9) — they'll cut over with their owning slices.
+
+**Diff:** `OrgSelector.tsx` (+18 / −12) and new `OrgSelector.test.tsx` (+109; 5 tests — endpoint path, auto-select on empty, no-auto-select-when-set, non-admin skips fetch, spinner lifecycle).
+
+**Code-review fixes (3 findings, all in-PR):**
+- `catch` added so callApi rejections (network / 401 / 403 / 500 / MSAL `acquireTokenSilent` interaction-required) log via `console.error` instead of becoming unhandled rejections — frontend.md's "silent failures were a recurring migration bug class" rule.
+- `if (organizations)` upgraded to `if (Array.isArray(organizations))` plus a `console.warn` on the else branch, so a backend shape regression is observable rather than silent (the typed generic doesn't validate at runtime).
+- Dropped the unused `React` import in the new test file (Vite's automatic JSX runtime).
+
+**Verify:** `npx tsc --noEmit -p tsconfig.app.json` exit 0; `npm run build` ok; `npm test` 27/27 (8 files); zero `supabase.*` on the two touched files. No backend / functions changes → no deploy.
