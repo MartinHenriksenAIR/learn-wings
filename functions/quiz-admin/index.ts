@@ -33,27 +33,29 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 200, { quiz: null, questions: [] }) as HttpResponseInit;
     }
 
-    const questions = await query<{ id: string; quiz_id: string; question_text: string; sort_order: number }>(
-      'SELECT id, quiz_id, question_text, sort_order FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order',
-      [quiz.id],
-    );
-
-    // Batched options fetch using JOIN on quiz_id — eliminates N+1.
-    // Admin editor receives is_correct (this is the platform-admin endpoint; RLS parity).
-    const options = await query<{
-      id: string;
-      question_id: string;
-      option_text: string;
-      is_correct: boolean;
-      sort_order: number;
-    }>(
-      `SELECT o.id, o.question_id, o.option_text, o.is_correct, o.sort_order
-         FROM quiz_options o
-         JOIN quiz_questions q ON q.id = o.question_id
-        WHERE q.quiz_id = $1
-        ORDER BY o.sort_order`,
-      [quiz.id],
-    );
+    // Both queries are keyed solely on quiz.id — run them in parallel.
+    const [questions, options] = await Promise.all([
+      query<{ id: string; quiz_id: string; question_text: string; sort_order: number }>(
+        'SELECT id, quiz_id, question_text, sort_order FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order',
+        [quiz.id],
+      ),
+      // Batched options fetch using JOIN on quiz_id — eliminates N+1.
+      // Admin editor receives is_correct (this is the platform-admin endpoint; RLS parity).
+      query<{
+        id: string;
+        question_id: string;
+        option_text: string;
+        is_correct: boolean;
+        sort_order: number;
+      }>(
+        `SELECT o.id, o.question_id, o.option_text, o.is_correct, o.sort_order
+           FROM quiz_options o
+           JOIN quiz_questions q ON q.id = o.question_id
+          WHERE q.quiz_id = $1
+          ORDER BY o.sort_order`,
+        [quiz.id],
+      ),
+    ]);
 
     // Group options by question_id in JS — course-structure-admin Map-grouping pattern
     const optionsByQuestion = new Map<string, typeof options>();

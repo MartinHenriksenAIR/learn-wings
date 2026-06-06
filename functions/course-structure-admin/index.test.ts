@@ -122,20 +122,28 @@ describe('course-structure-admin', () => {
 
   it('happy path: passes correct SQL and params for modules and lessons queries', async () => {
     mockQueryOne.mockResolvedValueOnce(fakeCourse);
-    mockQuery
-      .mockResolvedValueOnce([fakeModule1])
-      .mockResolvedValueOnce([fakeLesson1]);
+    // Dispatch by SQL so the test is order-agnostic with respect to Promise.all parallelism
+    mockQuery.mockImplementation((sql: string) => {
+      if (sql.includes('lessons')) return Promise.resolve([fakeLesson1]);
+      return Promise.resolve([fakeModule1]); // course_modules query
+    });
 
     await handler(baseReq(validBody), {} as any);
 
-    // Modules query
-    const [modulesSql, modulesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+    const allCalls = mockQuery.mock.calls as [string, unknown[]][];
+
+    // Modules query — order-agnostic lookup
+    const modulesCall = allCalls.find(([sql]) => sql.includes('course_modules') && !sql.includes('lessons'));
+    expect(modulesCall).toBeDefined();
+    const [modulesSql, modulesParams] = modulesCall!;
     expect(modulesSql).toContain('course_modules');
     expect(modulesSql).toContain('ORDER BY sort_order');
     expect(modulesParams).toContain('course-1');
 
     // Lessons query — single query for all lessons via JOIN
-    const [lessonsSql, lessonsParams] = mockQuery.mock.calls[1] as [string, unknown[]];
+    const lessonsCall = allCalls.find(([sql]) => sql.includes('lessons') && sql.includes('JOIN course_modules'));
+    expect(lessonsCall).toBeDefined();
+    const [lessonsSql, lessonsParams] = lessonsCall!;
     expect(lessonsSql).toContain('lessons');
     expect(lessonsSql).toContain('JOIN course_modules');
     expect(lessonsSql).toContain('ORDER BY');

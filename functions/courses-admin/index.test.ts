@@ -72,19 +72,20 @@ describe('courses-admin', () => {
   });
 
   it('happy path: returns courses and accessRecords', async () => {
-    mockQuery
-      .mockResolvedValueOnce(fakeCourses)
-      .mockResolvedValueOnce(fakeAccessRecords);
+    // Dispatch by SQL so the test is order-agnostic with respect to Promise.all parallelism
+    mockQuery.mockImplementation((sql: string) => {
+      if (sql.includes('FROM courses')) return Promise.resolve(fakeCourses);
+      if (sql.includes('FROM org_course_access')) return Promise.resolve(fakeAccessRecords);
+      return Promise.resolve([]);
+    });
     const res = await handler(baseReq(), {} as any);
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
     expect(body).toEqual({ courses: fakeCourses, accessRecords: fakeAccessRecords });
-    // Verify SQL queries
-    const [sql1] = mockQuery.mock.calls[0] as [string, unknown[]?];
-    expect(sql1).toContain('FROM courses');
-    expect(sql1).toContain('ORDER BY created_at DESC');
-    const [sql2] = mockQuery.mock.calls[1] as [string, unknown[]?];
-    expect(sql2).toContain('FROM org_course_access');
+    // Verify both SQL queries were made (order-agnostic)
+    const allSqls = mockQuery.mock.calls.map(([sql]: [string]) => sql);
+    expect(allSqls.some((s) => s.includes('FROM courses') && s.includes('ORDER BY created_at DESC'))).toBe(true);
+    expect(allSqls.some((s) => s.includes('FROM org_course_access'))).toBe(true);
   });
 
   it('returns 500 on db error propagating err.message', async () => {

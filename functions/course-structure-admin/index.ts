@@ -28,11 +28,13 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 200, { course: null, modules: [] }) as HttpResponseInit;
     }
 
-    const modules = await query('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order', [courseId]);
-    const lessons = await query(
-      `SELECT l.* FROM lessons l JOIN course_modules m ON m.id = l.module_id WHERE m.course_id = $1 ORDER BY l.sort_order`,
-      [courseId],
-    );
+    const [modules, lessons] = await Promise.all([
+      query('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order', [courseId]),
+      query(
+        `SELECT l.* FROM lessons l JOIN course_modules m ON m.id = l.module_id WHERE m.course_id = $1 ORDER BY l.sort_order`,
+        [courseId],
+      ),
+    ]);
 
     // Group lessons by module_id in JS — no N+1
     const lessonsByModule = new Map<string, Record<string, unknown>[]>();

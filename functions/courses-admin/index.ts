@@ -16,8 +16,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
     }
 
-    const courses = await query(`SELECT * FROM courses ORDER BY created_at DESC`);
-    const accessRecords = await query(`SELECT * FROM org_course_access`);
+    const [courses, accessRecords] = await Promise.all([
+      query(`SELECT * FROM courses ORDER BY created_at DESC`),
+      query(`SELECT * FROM org_course_access`),
+    ]);
 
     return corsResponse(origin, 200, { courses, accessRecords }) as HttpResponseInit;
   } catch (err: unknown) {

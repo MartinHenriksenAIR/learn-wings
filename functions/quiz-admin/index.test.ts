@@ -126,26 +126,34 @@ describe('quiz-admin', () => {
 
   it('happy path: quiz fetch uses correct SQL and options query uses JOIN on quiz_id', async () => {
     mockQueryOne.mockResolvedValueOnce(fakeQuiz);
-    mockQuery
-      .mockResolvedValueOnce([fakeQ1])
-      .mockResolvedValueOnce([fakeOpts[0], fakeOpts[1]]);
+    // Dispatch by SQL so the test is order-agnostic with respect to Promise.all parallelism
+    mockQuery.mockImplementation((sql: string) => {
+      if (sql.includes('quiz_options')) return Promise.resolve([fakeOpts[0], fakeOpts[1]]);
+      return Promise.resolve([fakeQ1]); // quiz_questions query
+    });
 
     await handler(baseReq(validBody), {} as any);
 
-    // Quiz query
+    // Quiz queryOne — serial gate, unaffected by Promise.all
     const [quizSql, quizParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(quizSql).toContain('quizzes');
     expect(quizSql).toContain('lesson_id = $1');
     expect(quizParams).toEqual(['lesson-1']);
 
-    // Questions query
-    const [qSql, qParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+    const allCalls = mockQuery.mock.calls as [string, unknown[]][];
+
+    // Questions query — order-agnostic lookup
+    const questionsCall = allCalls.find(([sql]) => sql.includes('quiz_questions') && !sql.includes('quiz_options'));
+    expect(questionsCall).toBeDefined();
+    const [qSql, qParams] = questionsCall!;
     expect(qSql).toContain('quiz_questions');
     expect(qSql).toContain('ORDER BY sort_order');
     expect(qParams).toContain('quiz-1');
 
     // Options query — must use JOIN not ANY to avoid N+1; must include is_correct
-    const [optSql, optParams] = mockQuery.mock.calls[1] as [string, unknown[]];
+    const optionsCall = allCalls.find(([sql]) => sql.includes('quiz_options'));
+    expect(optionsCall).toBeDefined();
+    const [optSql, optParams] = optionsCall!;
     expect(optSql).toContain('quiz_options');
     expect(optSql).toContain('is_correct');
     expect(optSql).toContain('quiz_questions');
