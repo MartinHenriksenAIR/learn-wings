@@ -320,6 +320,23 @@ Per a new global preference (human-facing documents as styled HTML instead of ma
 
 ---
 
+## 2026-06-06 — Pre-Elevation Playwright Regression Sweep (verdict: GO)
+
+**Who:** emil & martin (Playwright MCP session driving the PR-6 preview as learner Martinh)
+
+Full learner-surface regression sweep (Suites A–F: shell/auth, course flow, settings, community, ideas, expected-degradation spot checks) run via browser automation as the **final learner-state snapshot before platform-admin elevation**. **Every learner-flow step PASSED** — including all historic regressions re-verified: language-save spinner resolves, empty-select idea drafts save (no 400), drafts visible to their author, unenroll dialog renders real bold with honest progress-kept copy, duplicate-report 409 correct server-side.
+
+**Key outputs (all filed in STATUS.html):**
+- 🎯 `azure-view-url` 403 repro captured (was "needs repro"): video blob 403 vs PDF blob 200 for the same lesson/caller → per-path authz in the function. Candidate Slice 2 rider.
+- NEW (medium): storage-account CORS blocks SAS'd PDF fetch from the app origin — Phase-1 Q5's "SAS pattern doesn't need CORS" was wrong for fetch()-based viewers.
+- NEW (low): profile-save toast never appears; duplicate-report 409 swallowed by the UI.
+- Observations: completion semantics unclear ("Completed 0" despite passed quiz); no course-review entry point despite CourseReviewDialog's Slice 1 cutover; idea authors CAN delete own submitted ideas (contradicts Slice 6's "deletes are admin-owned" doc — reconcile).
+- Deep-links also redirect to dashboard — extends the human-logged refresh bug; "Copy link" unusable until fixed.
+- Resources (Slice 7 pending): reads serve STALE Lovable-Supabase data on the anon key; writes fail 401 silently.
+- Left behind: one PW-SWEEP report record on a seeded post (learners can't retract reports) — in the post-elevation queue to dismiss.
+
+---
+
 ## Live sections moved (2026-06-05)
 
 "Known Issues & Open Items", "Current State", and "Picking Up From Here" now live in `migration/STATUS.html` (originally created as `STATUS.md`, converted 2026-06-06).
