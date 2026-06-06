@@ -113,7 +113,7 @@
 </header>
 
 <section id="known-issues">
-  <h2>Known Issues &amp; Open Items <span class="asof">(as of 2026-06-06)</span></h2>
+  <h2>Known Issues &amp; Open Items <span class="asof">(as of 2026-06-06, post-Slice-7)</span></h2>
 
   <p class="note"><strong>Actionable work now lives on the GitHub issue board</strong>
   (<code>gh issue list</code>) — slices, bugs, hardening, CI debt each have an issue carrying
@@ -131,9 +131,9 @@
   <ul class="items">
     <li class="quirk"><span class="badge quirk">QUIRK</span>Post-deploy the function host can park in <code>Error</code> (worker-restart exhaustion during zipdeploy file churn) — run <code>az functionapp restart</code> after the ~3 min file sync settles.</li>
     <li class="quirk"><span class="badge quirk">QUIRK</span><code>gh workflow run</code> failing 403 "Must have admin rights to Repository" = wrong ACTIVE gh account (found switched to the work account mid-Slice-5) — fix with <code>gh auth switch --user emkataumre</code>.</li>
-    <li class="quirk"><span class="badge quirk">QUIRK</span>2026-06-05: GitHub placed a <strong>ToS block on the <code>Azure/functions-action</code> repository</strong> (during a GitHub-wide "Disruption with some GitHub services" incident; the incident later resolved WITHOUT lifting the block) — the deploy job dies at "Set up job: Repository access blocked" while the build job passes. External. <strong>CI deploys stay broken until the block lifts</strong> — check with <code>gh api repos/Azure/functions-action</code>, then <code>gh run rerun &lt;run-id&gt; --failed</code>. Workaround used for Slice 5: manual <code>func azure functionapp publish func-ai-education-migration</code> (same Kudu zipdeploy mechanism, same publish target).</li>
+    <li class="quirk"><span class="badge quirk">QUIRK</span>2026-06-05: GitHub placed a ToS block on three <code>Azure/*</code> repos — <strong><code>Azure/functions-action</code> lifted 2026-06-06</strong> (Slice 7 deploy used CI again; verify with <code>gh api repos/Azure/functions-action</code> before assuming a deploy will fail). <code>Azure/azure-functions-core-tools</code> and <code>Azure/homebrew-functions</code> remain blocked — fresh installs of the <code>func</code> CLI via brew or its release tarball still fail. Falls back to manual <code>func publish</code> only if <code>functions-action</code> re-blocks; otherwise <code>gh workflow run main_func-ai-education-migration.yml --ref feature/lovable-migration</code> is the path.</li>
     <li class="quirk"><span class="badge quirk">QUIRK</span>One-off anomaly (2026-06-05): <code>functions/index.ts</code> found modified in the working tree mid-session — all 16 community barrel imports removed, uncommitted, not produced by any session commit. Restored to HEAD after user confirmation. If it recurs, suspect local tooling.</li>
-    <li class="quirk"><span class="badge quirk">QUIRK</span>(2026-06-06) Manual <code>func publish</code> deploys set <code>WEBSITE_RUN_FROM_PACKAGE=1</code> — <code>wwwroot</code> is now a READ-ONLY zip mount (the old gh-workflow zipdeploys left it writable). Consequence for the in-app SQL channel: Kudu VFS writes to <code>site/wwwroot</code> fail with a misleading FileNotFound — write scripts to <code>/api/vfs/data/</code> (→ <code>C:\home\data</code>, writable) instead and <code>require()</code> deps by absolute path (<code>C:/home/site/wwwroot/node_modules/…</code>), since the walk-up from <code>data</code> never reaches wwwroot's node_modules.</li>
+    <li class="quirk"><span class="badge quirk">QUIRK</span>(2026-06-06) Manual <code>func publish</code> deploys set <code>WEBSITE_RUN_FROM_PACKAGE=1</code> — <code>wwwroot</code> is now a READ-ONLY zip mount (the old gh-workflow zipdeploys left it writable). Consequence for the in-app SQL channel: Kudu VFS writes to <code>site/wwwroot</code> fail with a misleading FileNotFound — write scripts to <code>/api/vfs/data/</code> (→ <code>C:\home\data</code>, writable) instead and <code>require()</code> deps by absolute path (<code>C:/home/site/wwwroot/node_modules/…</code>), since the walk-up from <code>data</code> never reaches wwwroot's node_modules. Only operative if <code>functions-action</code> re-blocks and a manual publish is used; CI deploys leave <code>wwwroot</code> writable.</li>
   </ul>
 
   <h3>Blocked until merge-to-main</h3>
@@ -153,14 +153,14 @@
 </section>
 
 <section id="current-state">
-  <h2>Current State <span class="asof">(post-sweep, pre-elevation checkpoint — 2026-06-06)</span></h2>
+  <h2>Current State <span class="asof">(post-Slice-7 checkpoint — 2026-06-06)</span></h2>
   <dl class="checkpoint">
     <dt>Branch</dt>
-    <dd><code>feature/lovable-migration</code> (PR #6 open; preview env is the live test surface)</dd>
+    <dd><code>feature/lovable-migration</code> @ <code>1887d75</code> (PR #6 open; preview env is the live test surface)</dd>
     <dt>Done</dt>
-    <dd>Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings &amp; profile), Slice 5 (community), Slice 6 (ideas) — ALL user-verified on the PR-6 preview: manual Gates 4 (Slice 4 on 2026-06-05, Slices 5+6 on 2026-06-06) <strong>plus a full pre-elevation Playwright regression sweep (2026-06-06, verdict GO</strong> — see the WORKLOG entry; new findings filed above). 67 functions live, suite at 720 tests. Admin-page test debt (Slice 4 settings pages, Slice 5 moderation pages, Slice 6 kanban) clears after profile elevation — see the Post-elevation queue.</dd>
+    <dd>Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings &amp; profile), Slice 5 (community), Slice 6 (ideas), <strong>Slice 7 (resources — 2026-06-06)</strong> — ALL user-verified on the PR-6 preview except Slice 7's Gate 4 (pending; Gate 2 unauth-401 smoke ok). 71 functions live, suite at 788 tests. Slice 7 follow-up #41 (search-keystroke tags refetch — non-blocking polish).</dd>
     <dt>Remaining</dt>
-    <dd>Slices 2 (course authoring), 3a/3b/3c (org &amp; user admin), 7 (resources), 8 (decommission Supabase) — all on the issue board (#8–#13).</dd>
+    <dd>Slices 2 (course authoring), 3a/3b/3c (org &amp; user admin), 8 (decommission Supabase) — all on the issue board (#8–#11, #13).</dd>
     <dt>Collaboration</dt>
     <dd>Two-person system implemented on PR #34 (issue #7): PR-only trunk (guard hook + ruleset), issue-board ledger (#8–#33), <code>pickup</code>/<code>handoff</code>/<code>slice-workflow</code> skills. Pending: Martin's ruleset creation + cross-review of PR #34.</dd>
   </dl>
