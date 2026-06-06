@@ -8,6 +8,8 @@
 
 **Tech Stack:** git, gh CLI, Node ≥18 (hook script), Claude Code project config (settings/skills/rules/hooks), GitHub issue forms + rulesets.
 
+> **Execution status (2026-06-06):** Tasks 1–10 and 12 executed and committed on `emil/7-collab-setup`; setup issue #7, backlog issues #8–#33 live (incl. a user-requested addition beyond the original list: #33 "Post-cutover: re-point the collaboration system at main"). Remaining: Task 11 Step 2 (ruleset — Martin, after the PR opens) and Task 14 (review/merge).
+
 **Execution context:** Run from `I:\Personal\learn-wings` on Emil's machine, active gh account `emkataumre` (push, NOT admin). Remote: `MartinHenriksenAIR/learn-wings`. Current branch: `feature/lovable-migration` with uncommitted files: `migration/WORKLOG.md` (modified), `migration/STATUS.html` (untracked), `docs/superpowers/specs/*` (untracked ×2), `docs/superpowers/plans/2026-06-06-slice-6-ideas.md` (untracked — **belongs to the Slice 6 effort; do NOT add it in this plan's commits**).
 
 ---
@@ -668,7 +670,7 @@ gh issue create --label polish --title "Cosmetic / test polish nits backlog (non
 
 - [ ] **Step 4: Verify**
 
-Run: `gh issue list --limit 40` — Expected: 26 open issues (1 setup + 6 slice + 11 bug/polish-bug + 4 hardening + 2 ci + 2 polish) with correct labels.
+Run: `gh issue list --limit 40` — Expected: 27 open issues (1 setup + 6 slice + 11 bug/polish-bug + 4 hardening + 2 ci + 2 polish + 1 post-cutover transition) with correct labels. Verified: #7–#33.
 
 ---
 
