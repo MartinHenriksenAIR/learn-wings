@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 
 export interface CommunityResource {
   id: string;
@@ -19,9 +19,10 @@ export interface CommunityResource {
   } | null;
 }
 
+// `user_id` is server-derived from the bearer token — never client-supplied (parity
+// constraint from the RLS policy `user_id = auth.uid()` on create).
 export interface CreateResourceInput {
   org_id: string;
-  user_id: string;
   title: string;
   description?: string;
   resource_type: string;
@@ -45,6 +46,11 @@ export const RESOURCE_TYPES = [
   { value: 'guide', label: 'Guide', icon: 'BookOpen' },
 ] as const;
 
+export interface FetchResourcesResult {
+  resources: CommunityResource[];
+  allTags: string[];
+}
+
 export async function fetchResources(
   orgId: string,
   options?: {
@@ -52,81 +58,43 @@ export async function fetchResources(
     resource_type?: string;
     tags?: string[];
   }
-): Promise<CommunityResource[]> {
-  let query = supabase
-    .from('community_resources')
-    .select(`
-      *,
-      profile:profiles!community_resources_user_id_fkey(id, full_name, department)
-    `)
-    .eq('org_id', orgId)
-    .order('is_pinned', { ascending: false })
-    .order('created_at', { ascending: false });
-
-  if (options?.search) {
-    query = query.or(`title.ilike.%${options.search}%,description.ilike.%${options.search}%`);
-  }
-
-  if (options?.resource_type) {
-    query = query.eq('resource_type', options.resource_type);
-  }
-
-  if (options?.tags && options.tags.length > 0) {
-    query = query.overlaps('tags', options.tags);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return data as CommunityResource[];
+): Promise<FetchResourcesResult> {
+  const res = await callApi<FetchResourcesResult>('/api/resources', {
+    orgId,
+    search: options?.search,
+    resource_type: options?.resource_type,
+    tags: options?.tags,
+  });
+  return { resources: res.resources ?? [], allTags: res.allTags ?? [] };
 }
 
 export async function createResource(input: CreateResourceInput): Promise<CommunityResource> {
-  const { data, error } = await supabase
-    .from('community_resources')
-    .insert(input)
-    .select(`
-      *,
-      profile:profiles!community_resources_user_id_fkey(id, full_name, department)
-    `)
-    .single();
-
-  if (error) throw error;
-  return data as CommunityResource;
+  const res = await callApi<{ resource: CommunityResource }>('/api/resource-create', {
+    orgId: input.org_id,
+    title: input.title,
+    description: input.description,
+    resource_type: input.resource_type,
+    url: input.url,
+    tags: input.tags,
+  });
+  return res.resource;
 }
 
 export async function updateResource(
   id: string,
   input: UpdateResourceInput
 ): Promise<CommunityResource> {
-  const { data, error } = await supabase
-    .from('community_resources')
-    .update(input)
-    .eq('id', id)
-    .select(`
-      *,
-      profile:profiles!community_resources_user_id_fkey(id, full_name, department)
-    `)
-    .single();
-
-  if (error) throw error;
-  return data as CommunityResource;
+  const res = await callApi<{ resource: CommunityResource }>('/api/resource-update', {
+    resourceId: id,
+    updates: input,
+  });
+  return res.resource;
 }
 
 export async function deleteResource(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('community_resources')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
+  await callApi('/api/resource-delete', { resourceId: id });
 }
 
 export async function toggleResourcePinned(id: string, pinned: boolean): Promise<void> {
-  const { error } = await supabase
-    .from('community_resources')
-    .update({ is_pinned: pinned })
-    .eq('id', id);
-
-  if (error) throw error;
+  await callApi('/api/resource-update', { resourceId: id, updates: { is_pinned: pinned } });
 }
