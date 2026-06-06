@@ -28,3 +28,6 @@ local.settings.json
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright MCP session artifacts
+.playwright-mcp/

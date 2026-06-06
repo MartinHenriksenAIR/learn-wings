@@ -2,7 +2,7 @@
 
 Chronological log of all planning and decision work. Picks up where git log leaves off.
 
-**This file is append-only history** — dated entries recording what happened and why. The LIVE state (known-issues ledger, current checkpoint, pickup pointers) lives in **`migration/STATUS.html`** — load that at session start, not this; where a dated entry here and STATUS.html disagree, STATUS.html wins. The May-era 25-task plan (`docs/superpowers/plans/2026-05-17-lovable-supabase-migration.md`) was superseded on 2026-06-03 by the vertical-slice spec (`docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md`, untracked/disk-only).
+**This file is append-only history** — dated entries recording what happened and why. The LIVE state (known-issues ledger, current checkpoint, pickup pointers) lives in **`migration/STATUS.html`** — load that at session start, not this; where a dated entry here and STATUS.html disagree, STATUS.html wins. The May-era 25-task plan (`docs/superpowers/plans/2026-05-17-lovable-supabase-migration.md`) was superseded on 2026-06-03 by the vertical-slice spec (`docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md` — disk-only until 2026-06-06, tracked since).
 
 ---
 
@@ -320,7 +320,38 @@ Per a new global preference (human-facing documents as styled HTML instead of ma
 
 ---
 
+## 2026-06-06 — Pre-Elevation Playwright Regression Sweep (verdict: GO)
+
+**Who:** emil & martin (Playwright MCP session driving the PR-6 preview as learner Martinh)
+
+Full learner-surface regression sweep (Suites A–F: shell/auth, course flow, settings, community, ideas, expected-degradation spot checks) run via browser automation as the **final learner-state snapshot before platform-admin elevation**. **Every learner-flow step PASSED** — including all historic regressions re-verified: language-save spinner resolves, empty-select idea drafts save (no 400), drafts visible to their author, unenroll dialog renders real bold with honest progress-kept copy, duplicate-report 409 correct server-side.
+
+**Key outputs (all filed in STATUS.html):**
+- 🎯 `azure-view-url` 403 repro captured (was "needs repro"): video blob 403 vs PDF blob 200 for the same lesson/caller → per-path authz in the function. Candidate Slice 2 rider.
+- NEW (medium): storage-account CORS blocks SAS'd PDF fetch from the app origin — Phase-1 Q5's "SAS pattern doesn't need CORS" was wrong for fetch()-based viewers.
+- NEW (low): profile-save toast never appears; duplicate-report 409 swallowed by the UI.
+- Observations: completion semantics unclear ("Completed 0" despite passed quiz); no course-review entry point despite CourseReviewDialog's Slice 1 cutover; idea authors CAN delete own submitted ideas (contradicts Slice 6's "deletes are admin-owned" doc — reconcile).
+- Deep-links also redirect to dashboard — extends the human-logged refresh bug; "Copy link" unusable until fixed.
+- Resources (Slice 7 pending): reads serve STALE Lovable-Supabase data on the anon key; writes fail 401 silently.
+- Left behind: one PW-SWEEP report record on a seeded post (learners can't retract reports) — in the post-elevation queue to dismiss.
+
+---
+
 ## Live sections moved (2026-06-05)
 
 "Known Issues & Open Items", "Current State", and "Picking Up From Here" now live in `migration/STATUS.html` (originally created as `STATUS.md`, converted 2026-06-06).
 Update the live ledger THERE; append dated history entries HERE.
+
+## 2026-06-06 — Two-Person Collaboration System (issue #7, PR #34)
+
+**Who:** emil & Claude ("cowork brainstorm" session)
+
+Researched (4 parallel web agents over Anthropic docs + practitioner accounts) and designed a two-developer Claude Code collaboration system — spec at `docs/superpowers/specs/2026-06-06-two-person-claude-code-collaboration-design.md` — then implemented it on `emil/7-collab-setup`:
+
+- **Trunk goes PR-only:** local Node PreToolUse guard hook (`.claude/hooks/guard-trunk.mjs`, verified exit-2 on a trunk checkout, exit-0 elsewhere) + a `trunk-pr-only` GitHub ruleset (Martin creates — admin-only; verbatim command in the plan, Task 11).
+- **Ledger moved to GitHub Issues** (#8–#33: 6 slices, 11 bugs incl. every Playwright-sweep finding, 4 hardening, 2 CI, 2 polish, 1 post-cutover transition). Claims = assignee (soft) + draft PR (hard); the issue template carries a "Files touched" field for the parallel-safety overlap check.
+- **Committed shared config:** CLAUDE.md/AGENTS.md rewritten (collab rules; stale macOS adr-kit memory pointer replaced by `docs/tooling/adr-kit.md`); `.claude/rules/{functions,frontend}.md` path-scoped conventions; `pickup`/`handoff`/`slice-workflow` skills; `settings.json` hooks-only (stale jq/`cavemem` hooks dropped; a shared permission allowlist was proposed and REJECTED by user decision — permissions stay in each developer's `settings.local.json`).
+- **Specs now tracked** (the cutover spec was disk-only — owner-approved reversal). STATUS.html slimmed to non-issue-shaped content only.
+- **Review gate:** cross-review by convention; the server enforces PR-only with 0 required approvals, so solo stretches self-merge after a clean `/code-review`. **Deploys:** trunk-only, post-merge, announced on the merged PR.
+
+Pending: Martin's onboarding (ruleset creation, trust prompts, .env handoff, adr-kit doc enrichment) + his cross-review of PR #34 — the system's first end-to-end exercise.

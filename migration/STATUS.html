@@ -115,33 +115,16 @@
 <section id="known-issues">
   <h2>Known Issues &amp; Open Items <span class="asof">(as of 2026-06-06)</span></h2>
 
-  <h3>Human logged</h3>
-  <ul class="items">
-    <li class="obs">Refresh anywhere brings you back to the dashboard — should stick to the page of refresh origin.</li>
-    <li class="obs">Be able to close toasts manually; they take too long to auto-discard.</li>
-  </ul>
-
-  <h3>Broken — expected, slice-scoped</h3>
-  <p class="note">Shared root cause for all of these: the page/API layer still uses the Supabase client,
-  which has NO auth session under MSAL — <code>supabase.auth.getUser()</code> returns null and RLS
-  rejects/strands writes. Fixed per-slice as each area is cut over to <code>callApi</code>.</p>
-  <ul class="items">
-    <li class="bug"><span class="badge bug">KNOWN BUG</span>The remaining still-Supabase areas (admin pages, resources — 13 files importing the supabase client, across Slices 2, 3a–3c, 7) fail or hang writes for the same root cause; not yet individually confirmed by manual testing.</li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span>(same class, found 2026-06-06 via the Slice 6 drafts bug): <code>ResourceLibrary.tsx:255</code> compares <code>resource.user_id === user?.id</code> — <code>user.id</code> is the Entra OID, row <code>user_id</code> is the profiles UUID; never matches post-migration. Fix in <strong>Slice 7</strong> (use <code>profile?.id</code>). <strong>Cutover checklist item for ALL remaining slices: audit the slice's pages for <code>user?.id</code> ownership comparisons.</strong></li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span><code>send-invitation-email</code> 500s when invoked — <code>RESEND_API_KEY</code> + <code>STATIC_ASSETS_BASE_URL</code> app settings unset.</li>
-  </ul>
-
-  <h3>Broken — small, unscoped</h3>
-  <ul class="items">
-    <li class="obs"><span class="badge obs">OBSERVATION</span>(2026-06-06, unconfirmed/needs repro): during idea-draft preview testing the console showed <code>azure-view-url</code> → 403 + "Error loading signed URLs: Access denied" on a learner session. Not from Slice 6 (endpoint and <code>storage.ts</code> untouched). Possibly the known lesson-asset authz gate firing on a thumbnail for a non-enrolled course. Capture which page/asset triggers it next time it appears.</li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span><code>grade-quiz</code> silently records no <code>quiz_attempts</code> row for platform admins without a membership (pre-existing quirk, kept as-is).</li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span><code>course-player-data</code> has no per-course access gate — any authenticated user with a profile can pull any published course's player payload. Inconsistent with <code>quiz-by-lesson</code>, which gates on org access. Align in a future slice.</li>
-  </ul>
+  <p class="note"><strong>Actionable work now lives on the GitHub issue board</strong>
+  (<code>gh issue list</code>) — slices, bugs, hardening, CI debt each have an issue carrying
+  file scope and acceptance criteria. Claims = assignee + draft PR (see <code>AGENTS.md</code>
+  collaboration rules). This section keeps only what is NOT issue-shaped.</p>
 
   <h3>Accepted trade-offs (reviewed, deliberately kept)</h3>
   <ul class="items">
     <li><span class="badge tradeoff">TRADE-OFF</span><code>enroll</code> check-then-insert TOCTOU on course availability — harmless; the <code>UNIQUE(org_id,user_id,course_id)</code> constraint backstops it.</li>
     <li><span class="badge tradeoff">TRADE-OFF</span>Platform admins can write <code>course_reviews</code> in orgs they're not members of — consequence of the suite-wide admin-bypass convention.</li>
+    <li><span class="badge tradeoff">TRADE-OFF</span><code>grade-quiz</code> silently records no <code>quiz_attempts</code> row for platform admins without a membership (pre-existing quirk, kept as-is).</li>
   </ul>
 
   <h3>Operational quirks (not bugs, recurring)</h3>
@@ -150,20 +133,7 @@
     <li class="quirk"><span class="badge quirk">QUIRK</span><code>gh workflow run</code> failing 403 "Must have admin rights to Repository" = wrong ACTIVE gh account (found switched to the work account mid-Slice-5) — fix with <code>gh auth switch --user emkataumre</code>.</li>
     <li class="quirk"><span class="badge quirk">QUIRK</span>2026-06-05: GitHub placed a <strong>ToS block on the <code>Azure/functions-action</code> repository</strong> (during a GitHub-wide "Disruption with some GitHub services" incident; the incident later resolved WITHOUT lifting the block) — the deploy job dies at "Set up job: Repository access blocked" while the build job passes. External. <strong>CI deploys stay broken until the block lifts</strong> — check with <code>gh api repos/Azure/functions-action</code>, then <code>gh run rerun &lt;run-id&gt; --failed</code>. Workaround used for Slice 5: manual <code>func azure functionapp publish func-ai-education-migration</code> (same Kudu zipdeploy mechanism, same publish target).</li>
     <li class="quirk"><span class="badge quirk">QUIRK</span>One-off anomaly (2026-06-05): <code>functions/index.ts</code> found modified in the working tree mid-session — all 16 community barrel imports removed, uncommitted, not produced by any session commit. Restored to HEAD after user confirmation. If it recurs, suspect local tooling.</li>
-  </ul>
-
-  <h3>CI debt</h3>
-  <ul class="items">
-    <li class="resolved"><span class="badge resolved">RESOLVED</span><span class="struck">Deprecated Node 20 actions</span> — RESOLVED 2026-06-06: action versions bumped to Node 24-compatible majors (commit <code>7545cb2</code>) ahead of GitHub's 2026-06-16 cutoff. The <code>Azure/functions-action</code> ToS block (see Operational quirks) is unaffected and still blocks the deploy job.</li>
-    <li class="idea"><span class="badge idea">IDEA</span>(emil): build a more involved CI/CD pipeline with test gates — would force tests to be written for areas that lack them (frontend pages, e2e). The functions workflow already runs <code>npm test --if-present</code>; the SWA workflow has no test step.</li>
-  </ul>
-
-  <h3>Hardening / debt</h3>
-  <ul class="items">
-    <li class="todo"><span class="badge todo">TODO</span>security: 500 bodies propagate <code>err.message</code> suite-wide (CWE-209 per automated review) — candidate ADR: generic 500 + context logging.</li>
-    <li class="todo"><span class="badge todo">TODO</span>auth: <code>functions/shared/db.ts</code> uses <code>ssl: { rejectUnauthorized: false }</code> — move to verify-full with the Azure CA bundle.</li>
-    <li class="todo"><span class="badge todo">TODO</span>ADR-0006 says Node.js 22 but the live runtime is pinned <code>~20</code> (Node 22 worker gRPC crash) — ADR needs amending.</li>
-    <li class="todo"><span class="badge todo">TODO</span>Rotate the Postgres admin password before prod cutover (exposed once in a terminal session; DB is a disposable sandbox until cutover).</li>
+    <li class="quirk"><span class="badge quirk">QUIRK</span>(2026-06-06) Manual <code>func publish</code> deploys set <code>WEBSITE_RUN_FROM_PACKAGE=1</code> — <code>wwwroot</code> is now a READ-ONLY zip mount (the old gh-workflow zipdeploys left it writable). Consequence for the in-app SQL channel: Kudu VFS writes to <code>site/wwwroot</code> fail with a misleading FileNotFound — write scripts to <code>/api/vfs/data/</code> (→ <code>C:\home\data</code>, writable) instead and <code>require()</code> deps by absolute path (<code>C:/home/site/wwwroot/node_modules/…</code>), since the walk-up from <code>data</code> never reaches wwwroot's node_modules.</li>
   </ul>
 
   <h3>Blocked until merge-to-main</h3>
@@ -179,23 +149,20 @@
     <li class="todo"><span class="badge todo">USER</span>Add <code>resend-api-key</code> (and set the two missing app settings above).</li>
   </ul>
 
-  <h3>Cosmetic / test polish (review nits, explicitly approved as non-blocking)</h3>
-  <ul class="items">
-    <li>Minor test-suite nits in the courses/profiles tests; <code>!access?.ok</code> style in <code>quiz-by-lesson</code>; similar style-level comments from the quality reviewers on Slices 0.5+1.</li>
-    <li>Slice 4 reviewer notes (non-blocking): <code>profile-update</code> would return <code>200 {profile: null}</code> if the row vanished between getProfile and UPDATE (theoretical race; mirrors the suite pattern — candidate for the hardening pass); the <code>usePlatformSettings</code> provider's outer catch is silent (no toast) — nearly unreachable since each call has its own fallback.</li>
-    <li>Slice 6 reviewer notes (non-blocking): <code>idea-update</code>'s happy-path test asserts param membership, not index order (a <code>$n</code> transposition would slip past it); <code>idea-comments</code>' own-draft-but-non-member case is unpinned (returns <code>[]</code> today); <code>fetchIdeaComments</code> keeps the legacy loose <code>any[]</code> return type (an <code>IdeaComment</code> interface is a future-typing candidate); Courses.test.tsx's keep-spinner case only pins initial render (a dropped <code>profile</code> effect-dep wouldn't be caught).</li>
-  </ul>
+
 </section>
 
 <section id="current-state">
-  <h2>Current State <span class="asof">(post-Slice-6 checkpoint — 2026-06-06)</span></h2>
+  <h2>Current State <span class="asof">(post-sweep, pre-elevation checkpoint — 2026-06-06)</span></h2>
   <dl class="checkpoint">
     <dt>Branch</dt>
     <dd><code>feature/lovable-migration</code> (PR #6 open; preview env is the live test surface)</dd>
     <dt>Done</dt>
-    <dd>Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings &amp; profile) — all user-verified end-to-end on the PR-6 preview (Slice 4 Gate 4 passed 2026-06-05; PlatformSettings/OrgSettings pages carry deferred test debt until admin elevation). Slice 5 (community) code-complete with both review stages passed per task, deployed (manual <code>func publish</code> — CI blocked externally), and 401-smoked 16/16; user e2e on the preview pending (moderation pages additionally deferred until admin elevation, same as Slice 4's settings pages). Slice 6 (ideas) code-complete with both review stages passed per task + a final integration review, deployed (manual <code>func publish</code> — CI still ToS-blocked), 401-smoked 12/12 (67 functions live); user e2e on the preview pending (learner flow: create draft → save → submit → vote/unvote → comment; plus the fixed unenroll dialog).</dd>
+    <dd>Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings &amp; profile), Slice 5 (community), Slice 6 (ideas) — ALL user-verified on the PR-6 preview: manual Gates 4 (Slice 4 on 2026-06-05, Slices 5+6 on 2026-06-06) <strong>plus a full pre-elevation Playwright regression sweep (2026-06-06, verdict GO</strong> — see the WORKLOG entry; new findings filed above). 67 functions live, suite at 720 tests. Admin-page test debt (Slice 4 settings pages, Slice 5 moderation pages, Slice 6 kanban) clears after profile elevation — see the Post-elevation queue.</dd>
     <dt>Remaining</dt>
-    <dd>Slices 2 (course authoring), 3a/3b/3c (org &amp; user admin), 7 (resources), 8 (decommission Supabase).</dd>
+    <dd>Slices 2 (course authoring), 3a/3b/3c (org &amp; user admin), 7 (resources), 8 (decommission Supabase) — all on the issue board (#8–#13).</dd>
+    <dt>Collaboration</dt>
+    <dd>Two-person system implemented on PR #34 (issue #7): PR-only trunk (guard hook + ruleset), issue-board ledger (#8–#33), <code>pickup</code>/<code>handoff</code>/<code>slice-workflow</code> skills. Pending: Martin's ruleset creation + cross-review of PR #34.</dd>
   </dl>
 </section>
 
@@ -203,10 +170,12 @@
   <h2>Picking Up From Here</h2>
   <ol class="pickup">
     <li>Read this file in full — it supersedes anything dated in <code>migration/WORKLOG.md</code> (the append-only history)</li>
-    <li>Read <code>docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md</code> (untracked, disk-only) — slice definitions, conventions (§7), Definition of Done gates</li>
+    <li>Read <code>docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md</code> (tracked) — slice definitions, conventions (§7), Definition of Done gates</li>
     <li>Read <code>migration/azure/README.md</code> — seeded UUIDs and how to elevate a profile</li>
     <li>Read <code>docs/adr/</code> — 12 ADRs define what is and isn't allowed</li>
-    <li>Check <code>CLAUDE.md</code> for agent constraints before taking any action</li>
+    <li>Check <code>AGENTS.md</code> for agent constraints before taking any action (<code>CLAUDE.md</code> is just its import shim)</li>
+    <li>Check claims: <code>gh issue list --state open</code> + <code>gh pr list --state open</code> (draft PRs = active claims) — collaboration rules in <code>AGENTS.md</code></li>
+    <li>Starting work → invoke the <code>pickup</code> skill; ending a session → <code>handoff</code>; slice execution → <code>slice-workflow</code></li>
   </ol>
 </section>
 

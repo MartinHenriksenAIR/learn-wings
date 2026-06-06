@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "adr-kit": {
-      "command": "uvx",
-      "args": ["adr-kit", "mcp-server"]
-    }
-  }
-}
