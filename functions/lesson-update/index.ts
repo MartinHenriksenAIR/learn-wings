@@ -3,6 +3,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile } from '../shared/profile';
+import { validateLessonFields } from '../shared/validate';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
@@ -30,49 +31,15 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     const { lessonId, moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath } = body;
 
-    // Required: lessonId
+    // Required: lessonId (update-only field)
     if (!lessonId || typeof lessonId !== 'string') {
       return corsResponse(origin, 400, { error: 'lessonId is required' }) as HttpResponseInit;
     }
 
-    // Required: moduleId
-    if (!moduleId || typeof moduleId !== 'string') {
-      return corsResponse(origin, 400, { error: 'moduleId is required' }) as HttpResponseInit;
-    }
-
-    // Required: title (trim-validate, store raw)
-    if (!title || typeof title !== 'string' || (title as string).trim() === '') {
-      return corsResponse(origin, 400, { error: 'title is required' }) as HttpResponseInit;
-    }
-
-    // Required: lessonType ∈ ('video','document','quiz')
-    if (!lessonType || !['video', 'document', 'quiz'].includes(lessonType as string)) {
-      return corsResponse(origin, 400, { error: "lessonType must be 'video', 'document', or 'quiz'" }) as HttpResponseInit;
-    }
-
-    // Optional: contentText — string or null
-    if (contentText !== undefined && contentText !== null && typeof contentText !== 'string') {
-      return corsResponse(origin, 400, { error: 'contentText must be a string or null' }) as HttpResponseInit;
-    }
-
-    // Optional: durationMinutes — integer or null
-    if (durationMinutes !== undefined && durationMinutes !== null && !Number.isInteger(durationMinutes)) {
-      return corsResponse(origin, 400, { error: 'durationMinutes must be an integer or null' }) as HttpResponseInit;
-    }
-
-    // Optional: videoStoragePath — string or null
-    if (videoStoragePath !== undefined && videoStoragePath !== null && typeof videoStoragePath !== 'string') {
-      return corsResponse(origin, 400, { error: 'videoStoragePath must be a string or null' }) as HttpResponseInit;
-    }
-
-    // Optional: azureBlobPath — string or null
-    if (azureBlobPath !== undefined && azureBlobPath !== null && typeof azureBlobPath !== 'string') {
-      return corsResponse(origin, 400, { error: 'azureBlobPath must be a string or null' }) as HttpResponseInit;
-    }
-
-    // Optional: documentStoragePath — string or null
-    if (documentStoragePath !== undefined && documentStoragePath !== null && typeof documentStoragePath !== 'string') {
-      return corsResponse(origin, 400, { error: 'documentStoragePath must be a string or null' }) as HttpResponseInit;
+    // Shared field validation (moduleId, title, lessonType, and all optional fields)
+    const sharedError = validateLessonFields(body);
+    if (sharedError) {
+      return corsResponse(origin, 400, { error: sharedError }) as HttpResponseInit;
     }
 
     // Full-row UPDATE (old client always sent full payload — not a sparse patch).

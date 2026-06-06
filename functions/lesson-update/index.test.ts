@@ -162,19 +162,37 @@ describe('lesson-update', () => {
   it('returns 400 when videoStoragePath is not a string', async () => {
     const res = await handler(baseReq({ ...validBody, videoStoragePath: 123 }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'videoStoragePath must be a string or null' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'videoStoragePath must be a non-empty string or null' });
+  });
+
+  it('returns 400 when videoStoragePath is empty string', async () => {
+    const res = await handler(baseReq({ ...validBody, videoStoragePath: '' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'videoStoragePath must be a non-empty string or null' });
   });
 
   it('returns 400 when azureBlobPath is not a string', async () => {
     const res = await handler(baseReq({ ...validBody, azureBlobPath: false }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'azureBlobPath must be a string or null' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'azureBlobPath must be a non-empty string or null' });
+  });
+
+  it('returns 400 when azureBlobPath is empty string', async () => {
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: '' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'azureBlobPath must be a non-empty string or null' });
   });
 
   it('returns 400 when documentStoragePath is not a string', async () => {
     const res = await handler(baseReq({ ...validBody, documentStoragePath: [] }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'documentStoragePath must be a string or null' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'documentStoragePath must be a non-empty string or null' });
+  });
+
+  it('returns 400 when documentStoragePath is empty string', async () => {
+    const res = await handler(baseReq({ ...validBody, documentStoragePath: '' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'documentStoragePath must be a non-empty string or null' });
   });
 
   it('returns 404 when lesson not found', async () => {
