@@ -26,26 +26,29 @@ export async function fetchIdea(ideaId: string): Promise<EnhancedIdea | null> {
 }
 
 // Create idea
+// `|| null` coercions are old-lib parity: IdeaSubmit's form defaults every field
+// to '' (incl. business_area, a PG enum server-side) — '' would 400 the endpoint's
+// enum validation, and the old Supabase lib stored null, not ''.
 export async function createIdea(input: CreateIdeaInput): Promise<EnhancedIdea> {
   const res = await callApi<{ idea: EnhancedIdea }>('/api/idea-create', {
     orgId: input.org_id,
     title: input.title,
-    business_area: input.business_area,
-    tags: input.tags,
-    current_process: input.current_process,
-    pain_points: input.pain_points,
-    affected_roles: input.affected_roles,
-    frequency_volume: input.frequency_volume,
-    proposed_improvement: input.proposed_improvement,
-    desired_process: input.desired_process,
-    data_inputs: input.data_inputs,
-    systems_involved: input.systems_involved,
-    constraints_risks: input.constraints_risks,
-    success_metrics: input.success_metrics,
-    description: input.description,
-    problem_statement: input.problem_statement,
-    proposed_solution: input.proposed_solution,
-    expected_impact: input.expected_impact,
+    business_area: input.business_area || null,
+    tags: input.tags || [],
+    current_process: input.current_process || null,
+    pain_points: input.pain_points || null,
+    affected_roles: input.affected_roles || null,
+    frequency_volume: input.frequency_volume || null,
+    proposed_improvement: input.proposed_improvement || null,
+    desired_process: input.desired_process || null,
+    data_inputs: input.data_inputs || null,
+    systems_involved: input.systems_involved || null,
+    constraints_risks: input.constraints_risks || null,
+    success_metrics: input.success_metrics || null,
+    description: input.description || null,
+    problem_statement: input.problem_statement || null,
+    proposed_solution: input.proposed_solution || null,
+    expected_impact: input.expected_impact || null,
   });
   return res.idea;
 }
@@ -55,7 +58,14 @@ export async function updateIdea(
   ideaId: string,
   updates: Partial<CreateIdeaInput>
 ): Promise<EnhancedIdea> {
-  const res = await callApi<{ idea: EnhancedIdea }>('/api/idea-update', { ideaId, updates });
+  // The form's unselected business-area <Select> sends '' — a PG enum server-side;
+  // coerce to null ('' would 400 the endpoint's enum validation). Other fields stay
+  // verbatim (old-lib update behavior).
+  const payload =
+    updates.business_area !== undefined
+      ? { ...updates, business_area: updates.business_area || null }
+      : updates;
+  const res = await callApi<{ idea: EnhancedIdea }>('/api/idea-update', { ideaId, updates: payload });
   return res.idea;
 }
 
