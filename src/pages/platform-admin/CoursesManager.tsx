@@ -31,8 +31,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { FileUpload } from '@/components/ui/file-upload';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { callApi } from '@/lib/api-client';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseLevel, Organization, OrgCourseAccess } from '@/lib/types';
 import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check, ChevronsUpDown } from 'lucide-react';
@@ -40,7 +39,6 @@ import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 
 export default function CoursesManager() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -74,24 +72,20 @@ export default function CoursesManager() {
   const [updating, setUpdating] = useState<string | null>(null);
 
   const fetchData = async () => {
-    const [coursesRes, orgsRes, accessRes] = await Promise.all([
-      supabase.from('courses').select('*').order('created_at', { ascending: false }),
-      supabase.from('organizations').select('*').order('name'),
-      supabase.from('org_course_access').select('*'),
+    const [adminRes, orgsRes] = await Promise.all([
+      callApi<{ courses: Course[]; accessRecords: OrgCourseAccess[] }>('/api/courses-admin', {}),
+      callApi<{ organizations: Organization[] }>('/api/organizations', {}),
     ]);
 
-    if (coursesRes.data) {
-      const coursesWithFreshThumbnails = await Promise.all(
-        (coursesRes.data as Course[]).map(async (course) => ({
-          ...course,
-          thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
-        })),
-      );
-      setCourses(coursesWithFreshThumbnails);
-    }
-
-    if (orgsRes.data) setOrgs(orgsRes.data as Organization[]);
-    if (accessRes.data) setAccessRecords(accessRes.data as OrgCourseAccess[]);
+    const coursesWithFreshThumbnails = await Promise.all(
+      adminRes.courses.map(async (course) => ({
+        ...course,
+        thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
+      })),
+    );
+    setCourses(coursesWithFreshThumbnails);
+    setAccessRecords(adminRes.accessRecords);
+    setOrgs(orgsRes.organizations);
     setLoading(false);
   };
 
@@ -108,28 +102,34 @@ export default function CoursesManager() {
 
     const thumbnailToPersist = extractLmsAssetPath(thumbnailUrl) ?? thumbnailUrl;
 
-    const { error } = await supabase.from('courses').insert({
-      title,
-      description,
-      level,
-      thumbnail_url: thumbnailToPersist,
-      created_by_user_id: user?.id,
-      is_published: false,
-    });
-
-    if (error) {
-      toast({ title: 'Failed to create course', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      await callApi<{ course: Course }>('/api/course-create', {
+        title,
+        description,
+        level,
+        thumbnailUrl: thumbnailToPersist,
+      });
       toast({ title: 'Course created!' });
       setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic'); setThumbnailUrl(null);
       fetchData();
+    } catch (err) {
+      toast({ title: 'Failed to create course', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setCreating(false);
     }
-    setCreating(false);
   };
 
   const togglePublish = async (course: Course) => {
-    await supabase.from('courses').update({ is_published: !course.is_published }).eq('id', course.id);
-    fetchData();
+    try {
+      await callApi<{ course: Course }>('/api/course-update', {
+        courseId: course.id,
+        updates: { isPublished: !course.is_published },
+      });
+    } catch (err) {
+      toast({ title: 'Failed to update course', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      await fetchData();
+    }
   };
 
   const openDeleteDialog = (course: Course) => {
@@ -140,16 +140,17 @@ export default function CoursesManager() {
   const handleDeleteCourse = async () => {
     if (!courseToDelete) return;
     setDeleting(true);
-    const { error } = await supabase.from('courses').delete().eq('id', courseToDelete.id);
-    if (error) {
-      toast({ title: 'Failed to delete course', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      await callApi<{ success: boolean }>('/api/course-delete', { courseId: courseToDelete.id });
       toast({ title: 'Course deleted' });
       setDeleteOpen(false);
       setCourseToDelete(null);
       fetchData();
+    } catch (err) {
+      toast({ title: 'Failed to delete course', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setDeleting(false);
     }
-    setDeleting(false);
   };
 
   // ========== Course Access ==========
@@ -164,74 +165,43 @@ export default function CoursesManager() {
     const key = `${orgId}-${courseId}`;
     setUpdating(key);
 
-    const existingRecord = accessRecords.find(
-      (r) => r.org_id === orgId && r.course_id === courseId
-    );
-
-    if (existingRecord) {
-      const { error } = await supabase
-        .from('org_course_access')
-        .update({ access: currentEnabled ? 'disabled' : 'enabled' })
-        .eq('id', existingRecord.id);
-
-      if (error) {
-        toast({
-          title: 'Failed to update access',
-          description: error.message,
-          variant: 'destructive',
-        });
-      }
-    } else {
-      const { error } = await supabase.from('org_course_access').insert({
-        org_id: orgId,
-        course_id: courseId,
-        access: 'enabled',
+    try {
+      await callApi<{ record: OrgCourseAccess }>('/api/course-access-set', {
+        orgId,
+        courseId,
+        access: currentEnabled ? 'disabled' : 'enabled',
       });
-
-      if (error) {
-        toast({
-          title: 'Failed to grant access',
-          description: error.message,
-          variant: 'destructive',
-        });
-      }
+    } catch (err) {
+      toast({
+        title: 'Failed to update access',
+        description: (err as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      await fetchData();
+      setUpdating(null);
     }
-
-    await fetchData();
-    setUpdating(null);
   };
 
   const enableAllForOrg = async (orgId: string) => {
     setUpdating(`all-${orgId}`);
-    
-    const publishedCourses = courses.filter((c) => c.is_published);
-    const existingAccess = accessRecords.filter((r) => r.org_id === orgId);
-    
-    for (const course of publishedCourses) {
-      const existing = existingAccess.find((r) => r.course_id === course.id);
-      if (existing) {
-        if (existing.access !== 'enabled') {
-          await supabase
-            .from('org_course_access')
-            .update({ access: 'enabled' })
-            .eq('id', existing.id);
-        }
-      } else {
-        await supabase.from('org_course_access').insert({
-          org_id: orgId,
-          course_id: course.id,
-          access: 'enabled',
-        });
-      }
-    }
 
-    toast({
-      title: 'Access granted',
-      description: 'All published courses are now accessible to this organization.',
-    });
-    
-    await fetchData();
-    setUpdating(null);
+    try {
+      await callApi<{ records: OrgCourseAccess[] }>('/api/course-access-bulk', { orgId });
+      toast({
+        title: 'Access granted',
+        description: 'All published courses are now accessible to this organization.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Failed to enable all courses',
+        description: (err as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      await fetchData();
+      setUpdating(null);
+    }
   };
 
   // ========== Filtering ==========
