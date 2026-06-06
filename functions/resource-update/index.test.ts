@@ -67,22 +67,52 @@ describe('resource-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'updates must be an object' });
   });
 
-  it('returns 400 when updates has no whitelisted fields', async () => {
+  it('returns 400 when updates includes a non-whitelisted key', async () => {
     const res = await handler(baseReq({ resourceId: 'r1', updates: { user_id: 'evil', org_id: 'other' } }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'No valid update fields provided' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid update field: user_id' });
   });
 
   it('returns 400 when updates is empty', async () => {
     const res = await handler(baseReq({ resourceId: 'r1', updates: {} }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'No valid update fields provided' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'No update fields provided' });
   });
 
   it('returns 400 when title is wrong type', async () => {
     const res = await handler(baseReq({ resourceId: 'r1', updates: { title: 42 } }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'title must be a string' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'title must be a non-empty string' });
+  });
+
+  it('returns 400 when title is null', async () => {
+    const res = await handler(baseReq({ resourceId: 'r1', updates: { title: null } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'title must be a non-empty string' });
+  });
+
+  it('returns 400 when title is empty string', async () => {
+    const res = await handler(baseReq({ resourceId: 'r1', updates: { title: '' } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'title must be a non-empty string' });
+  });
+
+  it('allows null for description (nullable in schema)', async () => {
+    mockQueryOne.mockResolvedValueOnce(myResource); // SELECT
+    mockQueryOne.mockResolvedValueOnce({ id: 'r1', description: null, profile: null }); // UPDATE
+    const res = await handler(baseReq({ resourceId: 'r1', updates: { description: null } }), {} as any);
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(params).toEqual([null, 'r1']);
+  });
+
+  it('allows null for url (nullable in schema)', async () => {
+    mockQueryOne.mockResolvedValueOnce(myResource); // SELECT
+    mockQueryOne.mockResolvedValueOnce({ id: 'r1', url: null, profile: null }); // UPDATE
+    const res = await handler(baseReq({ resourceId: 'r1', updates: { url: null } }), {} as any);
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(params).toEqual([null, 'r1']);
   });
 
   it('returns 400 when is_pinned is not boolean', async () => {
@@ -112,11 +142,12 @@ describe('resource-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Resource not found' });
   });
 
-  it('returns 403 when a non-author plain member tries to update', async () => {
+  it('returns 404 when caller is not authorized (no 403/404 distinction)', async () => {
     mockQueryOne.mockResolvedValueOnce(othersResource);
     mockIsOrgAdmin.mockResolvedValueOnce(false);
     const res = await handler(baseReq({ resourceId: 'r1', updates: { title: 'x' } }), {} as any);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Resource not found' });
   });
 
   it('happy path: author updates their own resource', async () => {
@@ -148,20 +179,15 @@ describe('resource-update', () => {
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
-  it('ignores non-whitelisted keys like user_id / org_id / id', async () => {
-    mockQueryOne.mockResolvedValueOnce(myResource);
-    mockQueryOne.mockResolvedValueOnce({ id: 'r1', profile: null });
-    await handler(baseReq({
+  it('returns 400 when updates mixes whitelisted key with non-whitelisted key', async () => {
+    const res = await handler(baseReq({
       resourceId: 'r1',
-      updates: { title: 'new', user_id: 'evil', org_id: 'other', id: 'spoof' },
+      updates: { title: 'new', user_id: 'evil' },
     }), {} as any);
-    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
-    expect(sql).toMatch(/SET title = \$1/);
-    expect(sql).not.toContain('user_id =');
-    expect(sql).not.toContain('org_id =');
-    expect(params).not.toContain('evil');
-    expect(params).not.toContain('other');
-    expect(params).not.toContain('spoof');
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid update field: user_id' });
+    // SELECT must not have been issued — rejection happens before DB.
+    expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
   it('returns 500 on db error', async () => {

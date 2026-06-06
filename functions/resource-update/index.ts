@@ -34,9 +34,14 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     }
 
     const updatesObj = updates as Record<string, unknown>;
-    const updateKeys = Object.keys(updatesObj).filter((k) => ALLOWED_UPDATE_FIELDS.has(k));
+    const updateKeys = Object.keys(updatesObj);
+    for (const key of updateKeys) {
+      if (!ALLOWED_UPDATE_FIELDS.has(key)) {
+        return corsResponse(origin, 400, { error: `Invalid update field: ${key}` }) as HttpResponseInit;
+      }
+    }
     if (updateKeys.length === 0) {
-      return corsResponse(origin, 400, { error: 'No valid update fields provided' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'No update fields provided' }) as HttpResponseInit;
     }
 
     for (const key of updateKeys) {
@@ -55,10 +60,15 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
             error: `resource_type must be one of: ${RESOURCE_TYPES.join(', ')}`,
           }) as HttpResponseInit;
         }
+      } else if (key === 'title') {
+        // title is NOT NULL in schema — must be a non-empty string
+        if (!v || typeof v !== 'string') {
+          return corsResponse(origin, 400, { error: 'title must be a non-empty string' }) as HttpResponseInit;
+        }
       } else {
-        // title, description, url — string or null
+        // description, url — string or null (nullable in schema)
         if (v !== null && typeof v !== 'string') {
-          return corsResponse(origin, 400, { error: `${key} must be a string` }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: `${key} must be a string or null` }) as HttpResponseInit;
         }
       }
     }
@@ -81,7 +91,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     } else if (await isOrgAdmin(profile.id, resource.org_id)) {
       authorized = true;
     }
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    // Return 404 (not 403) so an authenticated caller can't distinguish
+    // "exists but I'm not allowed" from "doesn't exist" and enumerate
+    // resource IDs across orgs.
+    if (!authorized) return corsResponse(origin, 404, { error: 'Resource not found' }) as HttpResponseInit;
 
     // Dynamic UPDATE over the whitelisted keys + return shape with embedded profile (CTE).
     const params: unknown[] = [];
