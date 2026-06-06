@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Organization } from '@/lib/types';
 import {
   Select,
@@ -23,19 +23,21 @@ export function OrgSelector() {
         return;
       }
 
-      const { data } = await supabase
-        .from('organizations')
-        .select('*')
-        .order('name');
-
-      if (data) {
-        setOrgs(data as Organization[]);
-        // Only auto-select first org if none is currently selected
-        if (!currentOrg && data.length > 0) {
-          setCurrentOrg(data[0] as Organization);
+      try {
+        const { organizations } = await callApi<{ organizations: Organization[] }>(
+          '/api/organizations',
+          {},
+        );
+        if (organizations) {
+          setOrgs(organizations);
+          // Only auto-select first org if none is currently selected
+          if (!currentOrg && organizations.length > 0) {
+            setCurrentOrg(organizations[0]);
+          }
         }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchOrgs();
