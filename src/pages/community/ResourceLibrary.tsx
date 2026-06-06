@@ -47,7 +47,7 @@ import {
 
 export default function ResourceLibrary() {
   const navigate = useNavigate();
-  const { currentOrg, user, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
@@ -88,11 +88,10 @@ export default function ResourceLibrary() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: Omit<Parameters<typeof createResource>[0], 'org_id' | 'user_id'>) =>
+    mutationFn: (data: Omit<Parameters<typeof createResource>[0], 'org_id'>) =>
       createResource({
         ...data,
         org_id: currentOrg!.id,
-        user_id: user!.id,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['community-resources'] });
@@ -252,7 +251,7 @@ export default function ResourceLibrary() {
               <ResourceCard
                 key={resource.id}
                 resource={resource}
-                isOwner={resource.user_id === user?.id}
+                isOwner={resource.user_id === profile?.id}
                 isAdmin={isAdmin}
                 onEdit={() => {
                   setEditingResource(resource);
