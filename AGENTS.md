@@ -1,24 +1,28 @@
 # learn-wings — Agent Instructions
 
-Mirror of `CLAUDE.md` for non-Claude agents. The rules below are identical in substance — `CLAUDE.md` is the maintained original; update both together.
+Single source of truth for all coding agents. `CLAUDE.md` imports this file — edit HERE, never there.
 
 ## Session start
-Read `migration/STATUS.html` first. Check claims via `gh issue list --state open` and `gh pr list --state open` (draft PRs = active claims).
+1. Read `migration/STATUS.html` — the live ledger (checkpoint, operational quirks, pointers).
+2. Check claims: `gh issue list --state open` (backlog) + `gh pr list --state open` (draft PRs = active claims).
+3. Starting work → invoke the `pickup` skill. Ending a session → `handoff`. Executing a slice → `slice-workflow`.
 
 ## Collaboration rules (two developers + their agents)
-- Trunk = `feature/lovable-migration`; changes land ONLY via pull requests. Work branches: `<firstname>/<issue#>-<slug>`; a draft PR opened at start is the claim.
-- Check claimed issues/draft PRs for file-scope overlap before starting. Hub-file appends (barrel imports, routes, i18n keys) don't block parallel work; editing the same logic or shared-contract semantics (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `CLAUDE.md`, `.claude/*`) does — serialize or land the contract change first. Grading details: `pickup` skill.
-- Review: cross-review when both developers active; agent review + self-merge when solo.
-- Deploys ONLY from fresh trunk after merge; announce on the merged PR.
-- Merged PRs append to `migration/WORKLOG.md` (append-only) and update `migration/STATUS.html`.
+- **Trunk = `feature/lovable-migration`.** It receives changes ONLY via pull requests (server-enforced ruleset + local guard hook). PR #6 to `main` stays open until full cutover.
+- **Work branches:** `<firstname>/<issue#>-<slug>` off fresh trunk (e.g. `emil/7-collab-setup`). Open a draft PR immediately — the draft PR is the claim.
+- **Before claiming:** check the other developer's claimed issues / draft PRs for file-scope overlap ("Files touched" on the issue). Hub-file APPENDS (barrel imports, routes, i18n keys) don't block parallel work — rebase and keep both. Editing the SAME logic or changing shared-contract semantics (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `AGENTS.md`/`CLAUDE.md`, `.claude/*`) does — serialize, or land the contract change first as its own small PR. Full grading in the `pickup` skill.
+- **Review:** cross-review when both developers are active; `/code-review` + self-merge allowed when solo. Rebase work branches on trunk when it moves.
+- **Deploys: ONLY from fresh trunk after a merge** — never from work branches (one shared function app/DB/preview). Procedure in `slice-workflow`. Announce on the merged PR.
+- **Bookkeeping:** merged PRs append a dated `migration/WORKLOG.md` entry (append-only) and update `migration/STATUS.html`'s checkpoint.
 
 ## ADR Workflow
-Approve ADRs sequentially — never parallel `adr_approve` (simultaneous permission prompts auto-reject). Troubleshooting: `docs/tooling/adr-kit.md`.
+**Approve ADRs one at a time, sequentially** — never call `adr_approve` in parallel (parallel MCP permission prompts auto-reject all but the first). Applies to all `mcp__adr-kit__adr_approve` calls. adr-kit issues (MCP not connecting, YAML `]approval_date` corruption)? See `docs/tooling/adr-kit.md`.
 
 ## Lovable Source Reference
-Workspace **AIR** (`Q7aTXTRh50LxV00N6SRQ`) is read-only — no mutating Lovable tools without explicit user instruction.
+Lovable workspace **AIR** (`Q7aTXTRh50LxV00N6SRQ`) holds the original project. **Read-only** — no mutating Lovable tools without explicit user instruction.
 
-## Migration Safety Constraints
-- Source changes via work branch + PR only; no direct-to-trunk edits.
-- No Azure resource mutations; no secret deletion/rotation/printing.
-- No applying `migration/lovable-supabase-removal/patches/`; planning artifacts only under `migration/lovable-supabase-removal/`.
+## Migration Safety Constraints (until migration completes)
+- Application source changes follow the collaboration workflow above (work branch + PR) — no direct-to-trunk edits.
+- Do not mutate Azure resources (no `az` create/delete/update) — deploys via the documented procedure only.
+- Do not delete, rotate, overwrite, or print secrets.
+- Do not apply patches from `migration/lovable-supabase-removal/patches/` to live source; planning artifacts only under `migration/lovable-supabase-removal/`.
