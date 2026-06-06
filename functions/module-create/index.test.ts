@@ -129,7 +129,7 @@ describe('module-create', () => {
     expect(sql).toContain('INSERT INTO course_modules');
     expect(sql).toContain('RETURNING *');
     expect(params[0]).toBe('course-1'); // course_id
-    expect(params[1]).toBe('Module 1'); // title (trimmed)
+    expect(params[1]).toBe('Module 1'); // title (stored raw)
     expect(params[2]).toBe(0);           // sort_order
   });
 

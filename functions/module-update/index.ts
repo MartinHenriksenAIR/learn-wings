@@ -29,7 +29,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     const module_ = await queryOne(
       `UPDATE course_modules SET title = $1 WHERE id = $2 RETURNING *`,
-      [(title as string).trim(), moduleId],
+      [title, moduleId], // title stored raw — trim is validation-only (course-create parity)
     );
 
     if (!module_) {

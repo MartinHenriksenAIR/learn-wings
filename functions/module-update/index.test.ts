@@ -119,7 +119,7 @@ describe('module-update', () => {
     expect(sql).toContain('SET title = $1');
     expect(sql).toContain('WHERE id = $2');
     expect(sql).toContain('RETURNING *');
-    expect(params[0]).toBe('Updated Module'); // title (trimmed)
+    expect(params[0]).toBe('Updated Module'); // title (stored raw)
     expect(params[1]).toBe('mod-1');           // moduleId
   });
 

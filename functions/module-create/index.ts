@@ -33,7 +33,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     const module_ = await queryOne(
       `INSERT INTO course_modules (course_id, title, sort_order) VALUES ($1, $2, $3) RETURNING *`,
-      [courseId, (title as string).trim(), sortOrder],
+      [courseId, title, sortOrder], // title stored raw — trim is validation-only (course-create parity)
     );
 
     return corsResponse(origin, 200, { module: module_ }) as HttpResponseInit;
