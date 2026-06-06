@@ -355,3 +355,53 @@ Researched (4 parallel web agents over Anthropic docs + practitioner accounts) a
 - **Review gate:** cross-review by convention; the server enforces PR-only with 0 required approvals, so solo stretches self-merge after a clean `/code-review`. **Deploys:** trunk-only, post-merge, announced on the merged PR.
 
 Pending: Martin's onboarding (ruleset creation, trust prompts, .env handoff, adr-kit doc enrichment) + his cross-review of PR #34 — the system's first end-to-end exercise.
+
+---
+
+## 2026-06-06 — Slice 7: Resources Cutover (issue #12, PR #36)
+
+**Who:** martin & Claude (solo, post-PR-34 collaboration system live)
+
+First slice executed entirely on the new two-developer workflow: claim PR (#36) on `martin/12-resources-cutover` off fresh trunk, cutover work, `/code-review`-driven hardening, self-merge after a clean review (Emil's PR #35 carried no overlapping file scope), CI deploy from fresh trunk.
+
+**Endpoints (4 live; pin folded into update):**
+- `/api/resources` (POST) — list + filter (search/type/tags) + the org's distinct tag list in one round trip. Authz: platform admin OR active org member.
+- `/api/resource-create` (POST) — `user_id` server-derived from the bearer token (never client-supplied); RESOURCE_TYPES validated against the form's `<Select>` options since the column has no DB CHECK constraint.
+- `/api/resource-update` (POST) — whitelist update (`title`, `description`, `resource_type`, `url`, `tags`, `is_pinned`); platform admin OR author OR org admin.
+- `/api/resource-delete` (POST) — same authz; hard delete (cascade kills no children — community_resources is a leaf).
+
+`/api/resource-pin` was deployed in the initial cutover commit (`286fd5a`) and **deleted during code-review hardening** — same authz as `/api/resource-update`, `is_pinned` already in its whitelist, and the client's `toggleResourcePinned` was discarding the embedded-profile payload the pin endpoint computed. Frontend now routes pin/unpin through `/api/resource-update` (signature unchanged).
+
+**Frontend cutover (zero `supabase.*` on the four touched files):**
+- `src/lib/resources-api.ts` rewritten over `callApi`. `user_id` dropped from `CreateResourceInput`. `fetchResources` returns `{ resources, allTags }`.
+- `src/pages/community/ResourceLibrary.tsx` — ownership compare moved from `user?.id` (Entra OID) to `profile?.id` (the Slice 6 bug class, hit at the predicted spot); two `useQuery`s collapsed into one.
+- `src/components/community/{ResourceCard,ResourceForm}.tsx` — already on the post-cutover surface; no changes needed.
+
+**Code-review hardening (9 findings → 7 commits stacked on `286fd5a`, net −100 LOC):**
+
+Post-cutover `/code-review` (extra-high effort, 9 finder angles + verify + sweep) surfaced 9 findings; all addressed in-PR before merge via subagent-driven development (implementer + spec-compliance review + code-quality review per task, sequentially). Commits in order:
+- `97f6ed7` — **delete `/api/resource-pin`** (71 LOC handler + 109 LOC tests).
+- `8787c0d` — **`resource-update` validation tightening**: reject `title: null` (was leaking PG NOT NULL error as 500), explicitly reject unknown update keys (parity with `community-post-update`), return **404 instead of 403** for the unauthorized branch so cross-org resource IDs can't be enumerated. +7 tests. `35cd1e1` follows up with two narrative-scar nits from the reviewer.
+- `214fc03` — same 403→404 swap in `/api/resource-delete`.
+- `12d4433` — **escape LIKE metacharacters** (`%`, `_`, `\`) in `/api/resources` search input — a search of `snake_case` previously matched every non-empty row. +1 test.
+- `c253543` — single-fetch `ResourceLibrary` + server returns `allTags` via `array_agg(DISTINCT unnest(tags))` regardless of filters (preserves the UX: tag dropdown stays unfiltered).
+- `1810324` — extracted `RESOURCE_PROFILE_PROJECTION` to `functions/shared/resources.ts` — the embedded-profile JSON shape lived in three call sites and tests only asserted `LEFT JOIN profiles` as a substring, so drift would have silently changed the API contract.
+
+**Deploy + smoke (CI restored — ToS block lifted!):**
+
+The GitHub ToS block on `Azure/functions-action` listed as a current quirk in STATUS.html has **lifted since the 2026-06-05 outage** (verified mid-session via `gh api repos/Azure/functions-action` returning the repo data, not a 403). CI deploy works again — used `gh workflow run main_func-ai-education-migration.yml --ref feature/lovable-migration` (run 27073659044, build 32s + deploy 40s) instead of the manual `func publish` workaround. The related `Azure/azure-functions-core-tools` and `Azure/homebrew-functions` repos remain blocked; the lift is partial.
+
+Smoke against `func-ai-education-migration-c0fgeqdnfvd6h0cf.swedencentral-01.azurewebsites.net`: all 4 endpoints return 401 + `Missing Bearer token` unauthenticated; `/api/resource-pin` correctly returns 404 (endpoint absent post-deletion). Authed 200 deferred to Gate 4 (user-verified e2e against the PR-6 preview).
+
+**Counts:** functions 67 → **71** (added 5, deleted 1); test suite 720 → **788** (+73 new, then −11 pin tests, +6 hardening tests, net **+68**). PR #36 final diff: 12 files, +1,078 / −85.
+
+**Decisions / notes:**
+- The 403→404 swap on update/delete is deliberate info-disclosure mitigation — it costs admins the ability to distinguish "doesn't exist" from "exists but you can't touch it" when debugging. Accepted; UUIDs are unguessable so the trade-off cost is theoretical, the leak was concrete.
+- Silent-drop of unknown update keys was changed to explicit 400 rejection (parity with `community-post-update` which surfaces typos rather than letting them no-op). The original silent-drop was an artifact of mirroring Supabase's permissive upsert; the explicit version is the suite's preferred shape.
+- `RESOURCE_PROFILE_PROJECTION` is the first shared SQL fragment in `functions/shared/`. Future endpoints returning embedded profiles should use it.
+
+**Follow-up filed (#41, label `polish`, non-blocking):** the single-fetch refactor in `c253543` made `/api/resources` part of the per-keystroke search query, so the tags query refetches per character (was per-org cached before). Two fix options laid out — debounce `searchQuery` (a new `useDebouncedValue` hook) or split tags into its own endpoint — plus a companion GIN-index migration matching the pattern `community_posts` and `ideas` already have. Migration-era data volumes make this invisible in practice.
+
+**Lesson for remaining slices (2, 3a–3c, 8):**
+- Run `/code-review` BEFORE marking the cutover PR ready — the 9-finding sweep here would have grown the diff if caught post-merge. Subagent-driven development handled the fix sweep cleanly (extract task list, one implementer per task with spec + quality review, controller preserves context).
+- The Slice 6 lesson (audit `=== user?.id` → `profile?.id`) hit exactly where predicted (`ResourceLibrary.tsx:255`). Keep the audit-for-OID-vs-UUID step in every cutover.
