@@ -12,6 +12,7 @@ Shared root cause for all of these: the page/API layer still uses the Supabase c
 - KNOWN BUG: `send-invitation-email` 500s when invoked — `RESEND_API_KEY` + `STATIC_ASSETS_BASE_URL` app settings unset.
 
 ### Broken — small, unscoped
+- OBSERVATION (2026-06-06, unconfirmed/needs repro): during idea-draft preview testing the console showed `azure-view-url` → 403 + "Error loading signed URLs: Access denied" on a learner session. Not from Slice 6 (endpoint and `storage.ts` untouched). Possibly the known lesson-asset authz gate firing on a thumbnail for a non-enrolled course. Capture which page/asset triggers it next time it appears.
 - KNOWN BUG: `grade-quiz` silently records no `quiz_attempts` row for platform admins without a membership (pre-existing quirk, kept as-is).
 - KNOWN BUG: `course-player-data` has no per-course access gate — any authenticated user with a profile can pull any published course's player payload. Inconsistent with `quiz-by-lesson`, which gates on org access. Align in a future slice.
 

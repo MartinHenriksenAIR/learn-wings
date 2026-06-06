@@ -290,6 +290,18 @@ Also reviewed `.githooks/pre-push` while at it: found it has **never been active
 
 ---
 
+## 2026-06-06 — Slice 6 addendum: draft-save 400 hotfix (commit 97dfaab)
+
+**Who:** emil & martin
+
+User preview-testing immediately caught a Slice 6 regression: **saving an idea draft failed** ("Failed to save draft"; console showed `idea-create` → 400) while fully submitting worked. Root cause (systematic-debugging session): `IdeaSubmit`'s form defaults every field to `''` — including `business_area`, a PG **enum** server-side. The old Supabase lib coerced with `|| null` in `createIdea`; the Slice 6 rewrite sent fields verbatim, so an unselected business area sent `business_area: ""` and the endpoint's enum validation 400'd. A completed form carries a real enum value — hence submit worked.
+
+Fix (lib layer, where the old architecture also did it; server stays strict): restored `createIdea`'s `|| null` coercions verbatim and added `''→null` for `business_area` in `updateIdea` (the second save of an existing draft hits the same validation; the OLD update path would actually have thrown a PG enum-cast error on this too — latent pre-migration bug, now fixed). New `src/lib/ideas-api.test.ts` pins the payload coercions (root suite 16 → 20). Frontend-only — no function redeploy needed.
+
+**Lesson for remaining slices (2, 3a–3c, 7):** when cutting a lib over to `callApi`, preserve the old lib's value coercions (`|| null`, `|| []`), not just its call shapes — forms in this codebase initialize selects/text fields as `''`, and the new endpoints validate enums strictly.
+
+---
+
 ## Live sections moved (2026-06-05)
 
 "Known Issues & Open Items", "Current State", and "Picking Up From Here" now live in `migration/STATUS.md`.
