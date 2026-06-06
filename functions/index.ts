@@ -23,6 +23,8 @@ import './community-posts/index';
 import './community-report-create/index';
 import './community-report-update/index';
 import './community-reports/index';
+import './course-access-bulk/index';
+import './course-access-set/index';
 import './course-create/index';
 import './course-delete/index';
 import './course-player-data/index';
