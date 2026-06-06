@@ -3,6 +3,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isActiveMember } from '../shared/profile';
+import { RESOURCE_PROFILE_PROJECTION } from '../shared/resources';
 
 // Mirrors RESOURCE_TYPES in src/lib/resources-api.ts. No DB CHECK constraint exists
 // (the column is plain TEXT DEFAULT 'link'); validating here keeps types consistent
@@ -56,9 +57,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         RETURNING *
       )
       SELECT ins.*,
-        CASE WHEN pr.id IS NULL THEN NULL ELSE
-          json_build_object('id', pr.id, 'full_name', pr.full_name, 'department', pr.department)
-        END AS profile
+        ${RESOURCE_PROFILE_PROJECTION}
       FROM ins
       LEFT JOIN profiles pr ON pr.id = ins.user_id`,
       [

@@ -3,6 +3,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
+import { RESOURCE_PROFILE_PROJECTION } from '../shared/resources';
 
 const RESOURCE_TYPES = ['link', 'document', 'template', 'guide'];
 const ALLOWED_UPDATE_FIELDS = new Set([
@@ -112,9 +113,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         RETURNING *
       )
       SELECT upd.*,
-        CASE WHEN pr.id IS NULL THEN NULL ELSE
-          json_build_object('id', pr.id, 'full_name', pr.full_name, 'department', pr.department)
-        END AS profile
+        ${RESOURCE_PROFILE_PROJECTION}
       FROM upd
       LEFT JOIN profiles pr ON pr.id = upd.user_id`,
       params,

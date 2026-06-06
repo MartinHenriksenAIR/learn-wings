@@ -3,6 +3,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isActiveMember } from '../shared/profile';
+import { RESOURCE_PROFILE_PROJECTION } from '../shared/resources';
 
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
@@ -71,9 +72,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     const resources = await query(`
       SELECT r.*,
-        CASE WHEN pr.id IS NULL THEN NULL ELSE
-          json_build_object('id', pr.id, 'full_name', pr.full_name, 'department', pr.department)
-        END AS profile
+        ${RESOURCE_PROFILE_PROJECTION}
       FROM community_resources r
       LEFT JOIN profiles pr ON pr.id = r.user_id
       ${where}
