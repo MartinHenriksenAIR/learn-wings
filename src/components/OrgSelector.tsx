@@ -28,13 +28,17 @@ export function OrgSelector() {
           '/api/organizations',
           {},
         );
-        if (organizations) {
+        if (Array.isArray(organizations)) {
           setOrgs(organizations);
           // Only auto-select first org if none is currently selected
           if (!currentOrg && organizations.length > 0) {
             setCurrentOrg(organizations[0]);
           }
+        } else {
+          console.warn('OrgSelector: unexpected response shape from /api/organizations', organizations);
         }
+      } catch (err) {
+        console.error('OrgSelector: failed to load organizations', err);
       } finally {
         setLoading(false);
       }
