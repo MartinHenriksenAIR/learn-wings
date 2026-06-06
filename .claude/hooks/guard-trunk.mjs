@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 // PreToolUse hook (matcher: Bash). Blocks history-writing git commands while the
-// checkout is on a protected branch — trunk receives changes via PR only.
+// checkout is on a protected branch, and pushes that explicitly target one.
 // Exit 0 = allow, exit 2 = block (stderr is shown to the agent).
+//
+// BEST-EFFORT fast feedback only — the actual guarantee is the server-side
+// "trunk-pr-only" / "main" rulesets (require PR, block force push). Known,
+// accepted gaps: detached HEAD reports "HEAD" (allowed); `git -C <elsewhere>`
+// is checked against the session cwd, not the -C target; exotic refspec forms
+// may slip through. All of these land on the server-side wall.
 import { execFileSync } from "node:child_process";
 
 const PROTECTED = ["feature/lovable-migration", "main"];
@@ -49,10 +55,32 @@ function gitSubcommand(segment) {
   return null;
 }
 
-const hit = command
-  .split(/[|;&\n]+/)
-  .map(gitSubcommand)
-  .some((sub) => sub !== null && BLOCKED_SUBCOMMANDS.has(sub));
+// A push that names a protected branch (refspec or bare) is blocked regardless
+// of the current branch — `git push origin feature/lovable-migration` and
+// `git push origin HEAD:main` are direct-to-trunk attempts from anywhere.
+function pushTargetsProtected(segment) {
+  return segment
+    .trim()
+    .split(/\s+/)
+    .some((t) => {
+      const ref = (t.includes(":") ? t.split(":").pop() : t).replace(/^refs\/heads\//, "");
+      return PROTECTED.includes(ref);
+    });
+}
+
+let hit = false;
+for (const segment of command.split(/[|;&\n]+/)) {
+  const sub = gitSubcommand(segment);
+  if (sub === null || !BLOCKED_SUBCOMMANDS.has(sub)) continue;
+  if (sub === "push" && pushTargetsProtected(segment)) {
+    console.error(
+      `BLOCKED by .claude/hooks/guard-trunk.mjs: that push explicitly targets a protected branch — ` +
+        `protected branches receive changes via pull request only (collaboration rules: AGENTS.md).`
+    );
+    process.exit(2);
+  }
+  hit = true;
+}
 if (!hit) process.exit(0);
 
 let branch = "";

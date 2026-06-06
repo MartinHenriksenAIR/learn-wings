@@ -24,7 +24,7 @@ Derive each endpoint's authz from the original RLS policies in `supabase/migrati
 - Work branches NEVER deploy. Deploys run only from fresh trunk after merge (collaboration rule).
 - CI deploy is blocked externally (GitHub ToS block on `Azure/functions-action` — check `gh api repos/Azure/functions-action`). Until lifted, deploy manually: `cd functions && npm install && npm run build && npm test && func azure functionapp publish func-ai-education-migration`.
 - Post-deploy: wait ~3 min file sync; if the host parks in `Error`, `az functionapp restart` (operational quirk, expected).
-- Smoke against the REGIONALIZED hostname `func-ai-education-migration-c0fgeqdnfvd6h0cf.swedencentral-01.azurewebsites.net` (SWA `/api/*` falls through to 404/405 until the post-merge re-link; the classic hostname does not resolve).
+- Smoke against the regionalized function hostname listed in STATUS.html's "Blocked until merge-to-main" section (the SWA `/api/*` route falls through to 404/405 until the post-merge re-link; the classic hostname does not resolve). The hostname lives in STATUS.html only — don't copy it here.
 - Announce on the merged PR: `deploying trunk @<short-sha>` → `deployed, smoke ok`.
 
 ## Bookkeeping
