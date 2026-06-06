@@ -153,14 +153,14 @@
 </section>
 
 <section id="current-state">
-  <h2>Current State <span class="asof">(post-Slice-7 checkpoint — 2026-06-06)</span></h2>
+  <h2>Current State <span class="asof">(post-#44 checkpoint — 2026-06-06)</span></h2>
   <dl class="checkpoint">
     <dt>Branch</dt>
-    <dd><code>feature/lovable-migration</code> @ <code>1887d75</code> (PR #6 open; preview env is the live test surface)</dd>
+    <dd><code>feature/lovable-migration</code> (PR #6 open; preview env is the live test surface). Tip moves after each merge — check <code>git log -1 origin/feature/lovable-migration</code> for the live SHA.</dd>
     <dt>Done</dt>
-    <dd>Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings &amp; profile), Slice 5 (community), Slice 6 (ideas), <strong>Slice 7 (resources — 2026-06-06)</strong> — ALL user-verified on the PR-6 preview except Slice 7's Gate 4 (pending; Gate 2 unauth-401 smoke ok). 71 functions live, suite at 788 tests. Slice 7 follow-up #41 (search-keystroke tags refetch — non-blocking polish).</dd>
+    <dd>Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings &amp; profile), Slice 5 (community), Slice 6 (ideas), Slice 7 (resources — 2026-06-06), <strong>#37 OrgSelector → /api/organizations (PR #44, 2026-06-06)</strong> — ALL user-verified on the PR-6 preview except Slice 7's Gate 4 (pending; Gate 2 unauth-401 smoke ok). 71 functions live, suite at 788 tests. Slice 7 follow-up #41 (search-keystroke tags refetch — non-blocking polish).</dd>
     <dt>Remaining</dt>
-    <dd>Slices 2 (course authoring), 3a/3b/3c (org &amp; user admin), 8 (decommission Supabase) — all on the issue board (#8–#11, #13).</dd>
+    <dd>Slices 2 (course authoring — incl. <code>CoursesManager</code>'s remaining <code>from('organizations')</code> #8), 3a/3b/3c (org &amp; user admin — incl. <code>OrgAnalytics</code>/<code>OrganizationsManager</code>/<code>OrganizationDetail</code>'s <code>from('organizations')</code> #9), 8 (decommission Supabase) — all on the issue board (#8–#11, #13).</dd>
     <dt>Collaboration</dt>
     <dd>Two-person system implemented on PR #34 (issue #7): PR-only trunk (guard hook + ruleset), issue-board ledger (#8–#33), <code>pickup</code>/<code>handoff</code>/<code>slice-workflow</code> skills. Pending: Martin's ruleset creation + cross-review of PR #34.</dd>
   </dl>
