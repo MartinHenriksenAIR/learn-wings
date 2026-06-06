@@ -341,3 +341,17 @@ Full learner-surface regression sweep (Suites A–F: shell/auth, course flow, se
 
 "Known Issues & Open Items", "Current State", and "Picking Up From Here" now live in `migration/STATUS.html` (originally created as `STATUS.md`, converted 2026-06-06).
 Update the live ledger THERE; append dated history entries HERE.
+
+## 2026-06-06 — Two-Person Collaboration System (issue #7, PR #34)
+
+**Who:** emil & Claude ("cowork brainstorm" session)
+
+Researched (4 parallel web agents over Anthropic docs + practitioner accounts) and designed a two-developer Claude Code collaboration system — spec at `docs/superpowers/specs/2026-06-06-two-person-claude-code-collaboration-design.md` — then implemented it on `emil/7-collab-setup`:
+
+- **Trunk goes PR-only:** local Node PreToolUse guard hook (`.claude/hooks/guard-trunk.mjs`, verified exit-2 on a trunk checkout, exit-0 elsewhere) + a `trunk-pr-only` GitHub ruleset (Martin creates — admin-only; verbatim command in the plan, Task 11).
+- **Ledger moved to GitHub Issues** (#8–#33: 6 slices, 11 bugs incl. every Playwright-sweep finding, 4 hardening, 2 CI, 2 polish, 1 post-cutover transition). Claims = assignee (soft) + draft PR (hard); the issue template carries a "Files touched" field for the parallel-safety overlap check.
+- **Committed shared config:** CLAUDE.md/AGENTS.md rewritten (collab rules; stale macOS adr-kit memory pointer replaced by `docs/tooling/adr-kit.md`); `.claude/rules/{functions,frontend}.md` path-scoped conventions; `pickup`/`handoff`/`slice-workflow` skills; `settings.json` hooks-only (stale jq/`cavemem` hooks dropped; a shared permission allowlist was proposed and REJECTED by user decision — permissions stay in each developer's `settings.local.json`).
+- **Specs now tracked** (the cutover spec was disk-only — owner-approved reversal). STATUS.html slimmed to non-issue-shaped content only.
+- **Review gate:** cross-review by convention; the server enforces PR-only with 0 required approvals, so solo stretches self-merge after a clean `/code-review`. **Deploys:** trunk-only, post-merge, announced on the merged PR.
+
+Pending: Martin's onboarding (ruleset creation, trust prompts, .env handoff, adr-kit doc enrichment) + his cross-review of PR #34 — the system's first end-to-end exercise.
