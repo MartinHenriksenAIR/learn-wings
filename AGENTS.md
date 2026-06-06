@@ -7,7 +7,7 @@ Read `migration/STATUS.html` first. Check claims via `gh issue list --state open
 
 ## Collaboration rules (two developers + their agents)
 - Trunk = `feature/lovable-migration`; changes land ONLY via pull requests. Work branches: `<firstname>/<issue#>-<slug>`; a draft PR opened at start is the claim.
-- Check claimed issues/draft PRs for file-scope overlap before starting; never parallelize overlapping scopes. Shared contracts (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `CLAUDE.md`, `.claude/*`) change in small dedicated PRs first.
+- Check claimed issues/draft PRs for file-scope overlap before starting. Hub-file appends (barrel imports, routes, i18n keys) don't block parallel work; editing the same logic or shared-contract semantics (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `CLAUDE.md`, `.claude/*`) does — serialize or land the contract change first. Grading details: `pickup` skill.
 - Review: cross-review when both developers active; agent review + self-merge when solo.
 - Deploys ONLY from fresh trunk after merge; announce on the merged PR.
 - Merged PRs append to `migration/WORKLOG.md` (append-only) and update `migration/STATUS.html`.

@@ -8,7 +8,7 @@
 ## Collaboration rules (two developers + their agents)
 - **Trunk = `feature/lovable-migration`.** It receives changes ONLY via pull requests (server-enforced ruleset + local guard hook). PR #6 to `main` stays open until full cutover.
 - **Work branches:** `<firstname>/<issue#>-<slug>` off fresh trunk (e.g. `emil/7-collab-setup`). Open a draft PR immediately — the draft PR is the claim.
-- **Before claiming:** check the other developer's claimed issues / draft PRs for file-scope overlap ("Files touched" on the issue). Never work overlapping scopes in parallel. Shared contracts (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `CLAUDE.md`, `.claude/*`) change in small dedicated PRs, merged before dependent work.
+- **Before claiming:** check the other developer's claimed issues / draft PRs for file-scope overlap ("Files touched" on the issue). Hub-file APPENDS (barrel imports, routes, i18n keys) don't block parallel work — rebase and keep both. Editing the SAME logic or changing shared-contract semantics (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `CLAUDE.md`, `.claude/*`) does — serialize, or land the contract change first as its own small PR. Full grading in the `pickup` skill.
 - **Review:** cross-review when both developers are active; `/code-review` + self-merge allowed when solo. Rebase work branches on trunk when it moves.
 - **Deploys: ONLY from fresh trunk after a merge** — never from work branches (one shared function app/DB/preview). Procedure in `slice-workflow`. Announce on the merged PR.
 - **Bookkeeping:** merged PRs append a dated `migration/WORKLOG.md` entry (append-only) and update `migration/STATUS.html`'s checkpoint.

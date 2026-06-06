@@ -9,7 +9,11 @@ description: Use at session start when beginning work on learn-wings — reads t
    - `gh issue list --state open` — the backlog
    - `gh pr list --state open` — draft PRs = active claims (branch names show who/what)
 2. **Choose an issue** that is unassigned AND has no associated branch/draft PR. Honor `Depends on:` references and the `blocked` label.
-3. **Overlap check (MANDATORY):** compare the issue's "Files touched" against every open draft PR's issue. Overlapping file scope → do NOT claim; pick something else or coordinate with the other developer first. Shared contracts (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `CLAUDE.md`, `.claude/*`) change in small dedicated PRs that merge before dependent work.
+3. **Overlap check (MANDATORY):** compare the issue's "Files touched" against every open draft PR's issue — then grade the overlap by KIND:
+   - **Disjoint files** → claim freely.
+   - **Hub-file appends** — `functions/index.ts` barrel imports, route registration (`src/App.tsx`), i18n key additions (en+da), additive exports — do NOT block a claim. Both sides append; expect at worst a trivial rebase conflict resolved by keeping both (same philosophy as WORKLOG.md).
+   - **Same logic** — both tasks would edit the same function/component/endpoint behavior, or change a shared contract's semantics (`functions/shared/*` signatures, `src/lib/api-client.ts` behavior, DB schema, `CLAUDE.md`/`.claude/*`) → do NOT parallelize. Serialize behind the other claim, or land the contract change first as its own small PR.
+   - Litmus test: "would the two diffs touch the same LINES for different reasons?" → serialize. "Same file, different regions, both additive?" → go.
 4. **Claim:**
    - `gh issue edit <n> --add-assignee <your-github-username>`
    - `git fetch origin && git switch -c <firstname>/<n>-<slug> origin/feature/lovable-migration`
