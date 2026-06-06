@@ -4,8 +4,8 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrg
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQuery: vi.fn(), mockQueryOne: vi.fn(),
-    mockGetProfile: vi.fn(), mockIsActiveMember: vi.fn(), mockIsOrgAdmin: vi.fn(),
+    mockQueryOne: vi.fn(),
+    mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -189,6 +189,16 @@ describe('idea-status-update', () => {
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('rejection_reason =');
     expect(params).toContain('duplicate');
+  });
+
+  it("sets rejection_reason to null when status is 'rejected' and no reason is supplied", async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQueryOne.mockResolvedValueOnce(ideaRow); // load
+    mockQueryOne.mockResolvedValueOnce({ ...ideaRow, status: 'rejected' });
+    await handler(baseReq({ ideaId: 'idea-1', status: 'rejected' }), {} as any);
+    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain('rejection_reason =');
+    expect(params).toContain(null);
   });
 
   it("forces rejection_reason to null when status is not 'rejected' even if a reason is supplied", async () => {
