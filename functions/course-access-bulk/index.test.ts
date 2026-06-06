@@ -96,7 +96,9 @@ describe('course-access-bulk', () => {
     expect(sql.toUpperCase()).toContain('ON CONFLICT');
     expect(sql.toUpperCase()).toContain('DO UPDATE SET');
     expect(sql).toContain('RETURNING *');
-    expect(params[0]).toBe('org-1');
+    // 'enabled' must be a server-side literal, never client-controlled
+    expect(sql).toContain("'enabled'");
+    expect(params).toEqual(['org-1']);
   });
 
   it('returns 200 with empty records array when no published courses exist', async () => {
