@@ -4,11 +4,7 @@ import type {
   CreateIdeaInput,
   UpdateIdeaStatusInput,
   IdeaFilters,
-  IdeaStatusExtended,
 } from '@/lib/community-types';
-
-// Re-export IdeaStatusExtended so callers that imported it from here still compile
-export type { IdeaStatusExtended };
 
 // Fetch ideas with filters
 export async function fetchIdeas(orgId: string, filters?: IdeaFilters): Promise<EnhancedIdea[]> {
