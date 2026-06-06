@@ -15,8 +15,8 @@ Single source of truth for all coding agents. `CLAUDE.md` imports this file — 
 - **Deploys: ONLY from fresh trunk after a merge** — never from work branches (one shared function app/DB/preview). Procedure in `slice-workflow`. Announce on the merged PR.
 - **Bookkeeping:** merged PRs append a dated `migration/WORKLOG.md` entry (append-only) and update `migration/STATUS.html`'s checkpoint.
 
-## ADR Workflow
-**Approve ADRs one at a time, sequentially** — never call `adr_approve` in parallel (parallel MCP permission prompts auto-reject all but the first). Applies to all `mcp__adr-kit__adr_approve` calls. adr-kit issues (MCP not connecting, YAML `]approval_date` corruption)? See `docs/tooling/adr-kit.md`.
+## ADRs
+`docs/adr/` holds the 12 architecture decision records — they define what is and isn't allowed; read them before structural changes. Plain markdown, edited by hand (the adr-kit tooling was removed 2026-06-06).
 
 ## Lovable Source Reference
 Lovable workspace **AIR** (`Q7aTXTRh50LxV00N6SRQ`) holds the original project. **Read-only** — no mutating Lovable tools without explicit user instruction.

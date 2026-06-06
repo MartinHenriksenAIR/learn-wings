@@ -1,9 +1,4 @@
 {
-  "permissions": {
-    "allow": [
-      "mcp__adr-kit__adr_approve"
-    ]
-  },
   "hooks": {
     "PreToolUse": [
       {

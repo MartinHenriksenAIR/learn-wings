@@ -70,7 +70,7 @@ Everything below is committed, so both machines' sessions behave identically and
 
 - **Keeps:** ADR sequential-approval rule, Lovable AIR read-only rule, migration safety constraints (updated: the "do not mutate application source outside migration/" constraint is superseded by the normal work-branch flow now that slices land via reviewed PRs — constraint text revised to "follow the collaboration workflow" + the remaining Azure/secrets/patches constraints).
 - **Adds:** collaboration rules — branch naming, claim rule, deploy-from-trunk rule, file-exclusivity check, cross-review gate, WORKLOG append rule. Each one line; details live in the skills.
-- **Drops:** the stale macOS memory path for the adr-kit fix. The adr-kit `uvx` fix content is recovered from the original machine (colleague's Mac) into `docs/tooling/adr-kit.md`; CLAUDE.md points there. If unrecoverable, the pointer is dropped and the fix re-documented when next needed.
+- **Drops:** the stale macOS memory path for the adr-kit fix. The adr-kit `uvx` fix content is recovered from the original machine (colleague's Mac) into `docs/tooling/adr-kit.md`; CLAUDE.md points there. If unrecoverable, the pointer is dropped and the fix re-documented when next needed. **[Superseded 2026-06-06, PR #34 review: adr-kit was removed from the project entirely (the tool, not the ADRs — `docs/adr/` stays as plain markdown). The tooling doc, `.mcp.json`, `.claude-mcp-config.json`, the sequential-approval rule, and the settings.json allow entry were all deleted; no recovery/enrichment happened.]**
 - `AGENTS.md` kept in sync (same collaboration rules).
 
 ### `.claude/rules/` (path-scoped conventions)
@@ -111,7 +111,7 @@ Everything propagates via `git pull`. One-time steps, in order:
 3. Approve the project `.mcp.json` server prompt (adr-kit) and the project hook prompt when first triggered.
 4. Receive `.env` values via a secure channel (never via git; values exist on Emil's machine and in the SWA workflow config).
 5. `gh auth status` — confirm the account with repo push rights is active.
-6. Recover `ref_adrkit_uvx_fix.md` from the original macOS setup into `docs/tooling/adr-kit.md` (PR it) — he is the only one with access to that file.
+6. ~~Recover `ref_adrkit_uvx_fix.md` from the original macOS setup into `docs/tooling/adr-kit.md`~~ **[Resolved 2026-06-06: closed with no action — adr-kit removed entirely; the memory note no longer exists on Martin's machine.]**
 7. First real task = cross-review the setup PR itself (validates the whole loop end-to-end).
 
 ## 8. Out of scope (revisit later)

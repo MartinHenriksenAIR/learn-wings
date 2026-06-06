@@ -91,6 +91,8 @@ Run: `git status --short` — Expected: only `?? docs/superpowers/plans/2026-06-
 
 ### Task 4: adr-kit troubleshooting doc
 
+> **Superseded 2026-06-06 (PR #34 review, agreed in person):** adr-kit was removed from the project entirely — this doc was deleted again in the same PR, along with `.mcp.json`, `.claude-mcp-config.json`, the AGENTS.md ADR Workflow section (replaced by a plain-markdown ADR pointer), and the settings.json `adr_approve` allow entry. The ADR records under `docs/adr/` remain and are edited by hand.
+
 Replaces CLAUDE.md's stale macOS memory-file pointer. Content reconstructed from `migration/WORKLOG.md` (2026-05-19 entry); Martin enriches from his machine's `ref_adrkit_uvx_fix.md` during onboarding.
 
 **Files:**
