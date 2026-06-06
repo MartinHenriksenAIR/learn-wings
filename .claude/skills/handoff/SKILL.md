@@ -15,6 +15,6 @@ description: Use at session end on learn-wings — pushes state, updates the iss
 2. Append the dated entry to `migration/WORKLOG.md` (append-only; keep both entries on conflict) and update `migration/STATUS.html`'s checkpoint section. Commit.
 3. Mark the PR ready: `gh pr ready`. Run `/code-review` on it.
 4. Review gate: cross-review by the other developer when available; when solo, self-merge is allowed AFTER the `/code-review` pass is clean.
-5. Merge, then `git switch feature/lovable-migration && git pull`, delete the branch.
+5. Merge, then `git switch <trunk> && git pull` (`<trunk>` = the `trunk` value in `.claude/collab.json`), delete the branch.
 6. **Deploy (only if functions changed, only from fresh trunk):** see the deploy section of `slice-workflow`. Announce on the merged PR: `deploying trunk @<short-sha>` … then `deployed, smoke ok`.
 7. Close the issue: `gh issue close <n> --comment "merged in #<pr>"`.

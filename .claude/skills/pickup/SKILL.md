@@ -14,11 +14,11 @@ description: Use at session start when beginning work on learn-wings — reads t
    - **Hub-file appends** — `functions/index.ts` barrel imports, route registration (`src/App.tsx`), i18n key additions (en+da), additive exports, `package.json` dependency ADDITIONS — do NOT block a claim. Both sides append; expect at worst a trivial rebase conflict resolved by keeping both (same philosophy as WORKLOG.md). EXCEPTION within this category: never hand-merge `package-lock.json` — resolve `package.json`, then regenerate the lockfile (`npm install`).
    - **Same logic** — both tasks would edit the same function/component/endpoint behavior, or change a shared contract's semantics (`functions/shared/*` signatures, `src/lib/api-client.ts` behavior, DB schema, `AGENTS.md`/`CLAUDE.md`/`.claude/*`) → do NOT parallelize. Serialize behind the other claim, or land the contract change first as its own small PR.
    - Litmus test: "would the two diffs touch the same LINES for different reasons?" → serialize. "Same file, different regions, both additive?" → go.
-4. **Claim:**
+4. **Claim:** (`<trunk>` = the `trunk` value in `.claude/collab.json` — the single source of truth for branch topology; read it, don't assume)
    - `gh issue edit <n> --add-assignee @me`
-   - `git fetch origin && git switch -c <firstname>/<n>-<slug> origin/feature/lovable-migration`
+   - `git fetch origin && git switch -c <firstname>/<n>-<slug> origin/<trunk>`
    - Commit something minimal if needed, then open the claim PR immediately:
-     `gh pr create --draft --base feature/lovable-migration --title "<type>: <slug> (#<n>)" --body "Claims #<n>. Files: <scope from issue>."`
+     `gh pr create --draft --base <trunk> --title "<type>: <slug> (#<n>)" --body "Claims #<n>. Files: <scope from issue>."`
 5. **Stale claims:** an assigned issue with no branch push for 7 days is fair game after a ping to the other developer.
 6. **Multiple claims per person are fine** — one branch + draft PR each, worked in separate git worktrees (`git worktree add ../lw-issue-<n> <branch>` or `claude --worktree`; each needs its own `npm install` + `.env` copy). The overlap check applies between YOUR OWN claims too. Practical ceiling: 2–3 active claims per person — review bandwidth is the bottleneck.
 7. For slice work, now invoke the `slice-workflow` skill.

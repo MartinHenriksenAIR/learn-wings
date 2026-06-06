@@ -3,14 +3,29 @@
 // checkout is on a protected branch, and pushes that explicitly target one.
 // Exit 0 = allow, exit 2 = block (stderr is shown to the agent).
 //
+// Protected branches are read from .claude/collab.json ("protectedBranches") —
+// the single source of truth for branch topology. Cutover day edits that file
+// only (see issue #33).
+//
 // BEST-EFFORT fast feedback only — the actual guarantee is the server-side
 // "trunk-pr-only" / "main" rulesets (require PR, block force push). Known,
 // accepted gaps: detached HEAD reports "HEAD" (allowed); `git -C <elsewhere>`
 // is checked against the session cwd, not the -C target; exotic refspec forms
-// may slip through. All of these land on the server-side wall.
+// may slip through; an unreadable collab.json stands the hook down. All of
+// these land on the server-side wall.
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
-const PROTECTED = ["feature/lovable-migration", "main"];
+let PROTECTED;
+try {
+  const cfg = JSON.parse(
+    readFileSync(new URL("../collab.json", import.meta.url), "utf8")
+  );
+  PROTECTED = cfg.protectedBranches;
+  if (!Array.isArray(PROTECTED) || PROTECTED.length === 0) throw new Error("invalid");
+} catch {
+  process.exit(0); // config unreadable — stand down; the server ruleset is the guarantee
+}
 // History-writing subcommands. `pull` is deliberately allowed — the handoff
 // flow updates the trunk with `git pull` after a PR merge.
 const BLOCKED_SUBCOMMANDS = new Set([
@@ -56,8 +71,8 @@ function gitSubcommand(segment) {
 }
 
 // A push that names a protected branch (refspec or bare) is blocked regardless
-// of the current branch — `git push origin feature/lovable-migration` and
-// `git push origin HEAD:main` are direct-to-trunk attempts from anywhere.
+// of the current branch — `git push origin <trunk>` and
+// `git push origin HEAD:<trunk>` are direct-to-trunk attempts from anywhere.
 function pushTargetsProtected(segment) {
   return segment
     .trim()
