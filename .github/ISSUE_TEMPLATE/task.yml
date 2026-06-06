@@ -2,6 +2,22 @@ name: Task
 description: A unit of work — slice, bug, hardening, CI, or polish
 title: "<short imperative title>"
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **After creating: apply the matching type label** (`slice`/`bug`/`hardening`/`ci`/`polish`, plus `blocked` if applicable) — the pickup protocol filters on labels. GitHub forms cannot apply a label from a dropdown automatically.
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - slice
+        - bug
+        - hardening
+        - ci
+        - polish
+    validations:
+      required: true
   - type: textarea
     id: summary
     attributes:
@@ -30,3 +46,8 @@ body:
     attributes:
       label: Depends on
       placeholder: "#12, #14"
+  - type: input
+    id: blocked-by
+    attributes:
+      label: Blocked by (external action)
+      description: If waiting on something outside the repo (secrets, Azure config, third party), name it — pickup treats this as blocked even without the label.
