@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQuery: vi.fn(),
+    mockQuery: vi.fn(), mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(), mockIsActiveMember: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: vi.fn() }));
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember, isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -92,10 +92,11 @@ describe('resources (list)', () => {
       { id: 'r2', org_id: 'org-1', is_pinned: false, profile: null },
     ];
     mockQuery.mockResolvedValueOnce(rows);
+    mockQueryOne.mockResolvedValueOnce({ all_tags: ['ai', 'tooling'] });
 
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.body as string)).toEqual({ resources: rows });
+    expect(JSON.parse(res.body as string)).toEqual({ resources: rows, allTags: ['ai', 'tooling'] });
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('FROM community_resources');
@@ -104,9 +105,24 @@ describe('resources (list)', () => {
     expect(params).toEqual(['org-1']);
   });
 
+  it('returns distinct sorted tags for the org regardless of filters', async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    mockQueryOne.mockResolvedValueOnce({ all_tags: ['x', 'y'] });
+
+    const res = await handler(baseReq({ orgId: 'org-1', search: 'whatever', resource_type: 'guide' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ resources: [], allTags: ['x', 'y'] });
+
+    const [tagsSql, tagsParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(tagsSql).toContain('unnest');
+    expect(tagsSql).toContain('array_agg(DISTINCT t ORDER BY t)');
+    expect(tagsParams).toEqual(['org-1']);
+  });
+
   it('platform admin lists without membership', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([]);
+    mockQueryOne.mockResolvedValueOnce({ all_tags: [] });
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
     expect(res.status).toBe(200);
     expect(mockIsActiveMember).not.toHaveBeenCalled();
@@ -114,6 +130,7 @@ describe('resources (list)', () => {
 
   it('applies resource_type filter', async () => {
     mockQuery.mockResolvedValueOnce([]);
+    mockQueryOne.mockResolvedValueOnce({ all_tags: [] });
     await handler(baseReq({ orgId: 'org-1', resource_type: 'guide' }), {} as any);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('r.resource_type = $');
@@ -122,6 +139,7 @@ describe('resources (list)', () => {
 
   it('applies tags filter (overlap)', async () => {
     mockQuery.mockResolvedValueOnce([]);
+    mockQueryOne.mockResolvedValueOnce({ all_tags: [] });
     await handler(baseReq({ orgId: 'org-1', tags: ['a', 'b'] }), {} as any);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('r.tags && $');
@@ -130,6 +148,7 @@ describe('resources (list)', () => {
 
   it('applies search filter against title OR description', async () => {
     mockQuery.mockResolvedValueOnce([]);
+    mockQueryOne.mockResolvedValueOnce({ all_tags: [] });
     await handler(baseReq({ orgId: 'org-1', search: 'prompt' }), {} as any);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toMatch(/r\.title ILIKE.+OR r\.description ILIKE/);
@@ -138,6 +157,7 @@ describe('resources (list)', () => {
 
   it('escapes LIKE metacharacters in search input', async () => {
     mockQuery.mockResolvedValueOnce([]);
+    mockQueryOne.mockResolvedValueOnce({ all_tags: [] });
     await handler(baseReq({ orgId: 'org-1', search: '100% snake_case \\path' }), {} as any);
     const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     // % _ \ are each prefixed with a literal backslash so PG treats them as literals

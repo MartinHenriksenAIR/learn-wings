@@ -1,6 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { query } from '../shared/db';
+import { query, queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isActiveMember } from '../shared/profile';
 
@@ -80,7 +80,15 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       ORDER BY r.is_pinned DESC, r.created_at DESC
     `, params);
 
-    return corsResponse(origin, 200, { resources }) as HttpResponseInit;
+    // Distinct tags for the org, regardless of search/type/tag filters — powers the tag dropdown.
+    const tagsRow = await queryOne<{ all_tags: string[] }>(
+      `SELECT COALESCE(array_agg(DISTINCT t ORDER BY t), '{}'::text[]) AS all_tags
+       FROM community_resources r, unnest(r.tags) AS t
+       WHERE r.org_id = $1`,
+      [orgId],
+    );
+
+    return corsResponse(origin, 200, { resources, allTags: tagsRow?.all_tags ?? [] }) as HttpResponseInit;
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
     return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;

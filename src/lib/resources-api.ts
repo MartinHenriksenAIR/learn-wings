@@ -46,6 +46,11 @@ export const RESOURCE_TYPES = [
   { value: 'guide', label: 'Guide', icon: 'BookOpen' },
 ] as const;
 
+export interface FetchResourcesResult {
+  resources: CommunityResource[];
+  allTags: string[];
+}
+
 export async function fetchResources(
   orgId: string,
   options?: {
@@ -53,14 +58,14 @@ export async function fetchResources(
     resource_type?: string;
     tags?: string[];
   }
-): Promise<CommunityResource[]> {
-  const res = await callApi<{ resources: CommunityResource[] }>('/api/resources', {
+): Promise<FetchResourcesResult> {
+  const res = await callApi<FetchResourcesResult>('/api/resources', {
     orgId,
     search: options?.search,
     resource_type: options?.resource_type,
     tags: options?.tags,
   });
-  return res.resources ?? [];
+  return { resources: res.resources ?? [], allTags: res.allTags ?? [] };
 }
 
 export async function createResource(input: CreateResourceInput): Promise<CommunityResource> {
