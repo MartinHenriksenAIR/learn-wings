@@ -24,7 +24,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 400, { error: 'lessonId is required' }) as HttpResponseInit;
     }
 
-    // Step 1: Delete the row first and retrieve the blob path in one atomic statement.
+    // Step 1: Delete the row first and retrieve the blob path in one statement (no separate SELECT).
     // Row-first ordering: if the DB fails here, no irreversible blob delete has happened yet.
     const deleted = await queryOne<{ id: string; azure_blob_path: string | null }>(
       `DELETE FROM lessons WHERE id = $1 RETURNING id, azure_blob_path`,
