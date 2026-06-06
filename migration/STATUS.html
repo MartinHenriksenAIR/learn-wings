@@ -115,39 +115,16 @@
 <section id="known-issues">
   <h2>Known Issues &amp; Open Items <span class="asof">(as of 2026-06-06)</span></h2>
 
-  <h3>Human logged</h3>
-  <ul class="items">
-    <li class="obs">Refresh anywhere brings you back to the dashboard — should stick to the page of refresh origin. <strong>Sweep evidence (2026-06-06): deep-links are affected too</strong> — direct URL navigation to <code>/app/courses</code> or a post URL also lands on the dashboard, so "Copy link" on posts/comments cannot work until this is fixed.</li>
-    <li class="obs">Be able to close toasts manually; they take too long to auto-discard.</li>
-  </ul>
-
-  <h3>Broken — expected, slice-scoped</h3>
-  <p class="note">Shared root cause for all of these: the page/API layer still uses the Supabase client,
-  which has NO auth session under MSAL — <code>supabase.auth.getUser()</code> returns null and RLS
-  rejects/strands writes. Fixed per-slice as each area is cut over to <code>callApi</code>.</p>
-  <ul class="items">
-    <li class="bug"><span class="badge bug">KNOWN BUG</span>The remaining still-Supabase areas (admin pages, resources — 13 files importing the supabase client, across Slices 2, 3a–3c, 7) fail or hang writes for the same root cause; not yet individually confirmed by manual testing. <strong>Sweep evidence (2026-06-06, resources):</strong> reads still hit the OLD Lovable Supabase directly and succeed on the anon key — those pages show STALE pre-migration data, not Azure PG; writes fail 401 <em>silently</em> (dialog stays open, console-only error).</li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span>(same class, found 2026-06-06 via the Slice 6 drafts bug): <code>ResourceLibrary.tsx:255</code> compares <code>resource.user_id === user?.id</code> — <code>user.id</code> is the Entra OID, row <code>user_id</code> is the profiles UUID; never matches post-migration. Fix in <strong>Slice 7</strong> (use <code>profile?.id</code>). <strong>Cutover checklist item for ALL remaining slices: audit the slice's pages for <code>user?.id</code> ownership comparisons.</strong></li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span><code>send-invitation-email</code> 500s when invoked — <code>RESEND_API_KEY</code> + <code>STATIC_ASSETS_BASE_URL</code> app settings unset.</li>
-  </ul>
-
-  <h3>Broken — small, unscoped</h3>
-  <ul class="items">
-    <li class="bug"><span class="badge bug">KNOWN BUG</span>(repro captured 2026-06-06 by the Playwright sweep — was "needs repro"): <code>azure-view-url</code> returns 403 "Access denied" for VIDEO blobs while PDF blobs get 200 + a valid SAS for the same lesson context and caller. Repro: open the seeded course player; the auto-opened "Welcome Video" lesson POSTs <code>azure-view-url</code> with <code>{"blobPath":"videos/welcome-1234abcd.mp4","lessonId":"61111111-…"}</code> → 403, while the PDF lesson's <code>documents/handbook-5678efgh.pdf</code> → 200. The per-path/per-lesson authorization in <code>azure-view-url</code> fails specifically for the video path — candidate rider for <strong>Slice 2</strong> (which touches course assets).</li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span>(sweep 2026-06-06, NF-1, medium): <strong>storage-account CORS blocks in-browser PDF viewing</strong> — <code>azure-view-url</code> issues a valid SAS, but the browser fetch to <code>staieducationmigration.blob.core.windows.net</code> dies with "No 'Access-Control-Allow-Origin' header" from the preview origin. Q5's Phase-1 "SAS pattern doesn't need CORS" assumption was wrong for fetch()-based viewers (plain <code>&lt;video src&gt;</code> embeds don't need CORS; fetch() does). Fix: add storage CORS rules for the app origins (user action — <code>az</code> mutation); verify the production origin is covered pre-cutover.</li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span>(sweep 2026-06-06, NF-2, low): profile-save success toast never appears (0/3 attempts) — the save works and persists; language-change toasts appear reliably. Slice 4 polish.</li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span>(sweep 2026-06-06, NF-3, low): duplicate-report 409 is swallowed by the UI — the server returns the correct "You have already reported this content" body but the Report dialog stays open with zero feedback. Slice 5 polish.</li>
-    <li class="obs"><span class="badge obs">OBSERVATION</span>(sweep 2026-06-06): completion semantics unclear — dashboard shows "Completed 0" despite 4/4 lessons + a passed quiz, and the course card still says "Continue" after "Finish Course". Intentional (certificate pending?) or an <code>enrollment-complete</code> wiring gap — investigate.</li>
-    <li class="obs"><span class="badge obs">OBSERVATION</span>(sweep 2026-06-06): no course-review entry point exists anywhere in the learner flow ("Finish Course" → courses list, no rating prompt) — yet <code>CourseReviewDialog</code> was cut over in Slice 1. Dead UI path or unreached state; decide whether to surface or remove.</li>
-    <li class="obs"><span class="badge obs">OBSERVATION</span>(sweep 2026-06-06, E8): idea authors CAN delete their own SUBMITTED ideas — the Slice 6 authz documentation said status transitions and deletes are admin-owned. Verify intended ("author OR admin" is plausible) and reconcile the docs either way.</li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span><code>grade-quiz</code> silently records no <code>quiz_attempts</code> row for platform admins without a membership (pre-existing quirk, kept as-is).</li>
-    <li class="bug"><span class="badge bug">KNOWN BUG</span><code>course-player-data</code> has no per-course access gate — any authenticated user with a profile can pull any published course's player payload. Inconsistent with <code>quiz-by-lesson</code>, which gates on org access. Align in a future slice.</li>
-  </ul>
+  <p class="note"><strong>Actionable work now lives on the GitHub issue board</strong>
+  (<code>gh issue list</code>) — slices, bugs, hardening, CI debt each have an issue carrying
+  file scope and acceptance criteria. Claims = assignee + draft PR (see <code>CLAUDE.md</code>
+  collaboration rules). This section keeps only what is NOT issue-shaped.</p>
 
   <h3>Accepted trade-offs (reviewed, deliberately kept)</h3>
   <ul class="items">
     <li><span class="badge tradeoff">TRADE-OFF</span><code>enroll</code> check-then-insert TOCTOU on course availability — harmless; the <code>UNIQUE(org_id,user_id,course_id)</code> constraint backstops it.</li>
     <li><span class="badge tradeoff">TRADE-OFF</span>Platform admins can write <code>course_reviews</code> in orgs they're not members of — consequence of the suite-wide admin-bypass convention.</li>
+    <li><span class="badge tradeoff">TRADE-OFF</span><code>grade-quiz</code> silently records no <code>quiz_attempts</code> row for platform admins without a membership (pre-existing quirk, kept as-is).</li>
   </ul>
 
   <h3>Operational quirks (not bugs, recurring)</h3>
@@ -156,20 +133,6 @@
     <li class="quirk"><span class="badge quirk">QUIRK</span><code>gh workflow run</code> failing 403 "Must have admin rights to Repository" = wrong ACTIVE gh account (found switched to the work account mid-Slice-5) — fix with <code>gh auth switch --user emkataumre</code>.</li>
     <li class="quirk"><span class="badge quirk">QUIRK</span>2026-06-05: GitHub placed a <strong>ToS block on the <code>Azure/functions-action</code> repository</strong> (during a GitHub-wide "Disruption with some GitHub services" incident; the incident later resolved WITHOUT lifting the block) — the deploy job dies at "Set up job: Repository access blocked" while the build job passes. External. <strong>CI deploys stay broken until the block lifts</strong> — check with <code>gh api repos/Azure/functions-action</code>, then <code>gh run rerun &lt;run-id&gt; --failed</code>. Workaround used for Slice 5: manual <code>func azure functionapp publish func-ai-education-migration</code> (same Kudu zipdeploy mechanism, same publish target).</li>
     <li class="quirk"><span class="badge quirk">QUIRK</span>One-off anomaly (2026-06-05): <code>functions/index.ts</code> found modified in the working tree mid-session — all 16 community barrel imports removed, uncommitted, not produced by any session commit. Restored to HEAD after user confirmation. If it recurs, suspect local tooling.</li>
-  </ul>
-
-  <h3>CI debt</h3>
-  <ul class="items">
-    <li class="resolved"><span class="badge resolved">RESOLVED</span><span class="struck">Deprecated Node 20 actions</span> — RESOLVED 2026-06-06: action versions bumped to Node 24-compatible majors (commit <code>7545cb2</code>) ahead of GitHub's 2026-06-16 cutoff. The <code>Azure/functions-action</code> ToS block (see Operational quirks) is unaffected and still blocks the deploy job.</li>
-    <li class="idea"><span class="badge idea">IDEA</span>(emil): build a more involved CI/CD pipeline with test gates — would force tests to be written for areas that lack them (frontend pages, e2e). The functions workflow already runs <code>npm test --if-present</code>; the SWA workflow has no test step.</li>
-  </ul>
-
-  <h3>Hardening / debt</h3>
-  <ul class="items">
-    <li class="todo"><span class="badge todo">TODO</span>security: 500 bodies propagate <code>err.message</code> suite-wide (CWE-209 per automated review) — candidate ADR: generic 500 + context logging.</li>
-    <li class="todo"><span class="badge todo">TODO</span>auth: <code>functions/shared/db.ts</code> uses <code>ssl: { rejectUnauthorized: false }</code> — move to verify-full with the Azure CA bundle.</li>
-    <li class="todo"><span class="badge todo">TODO</span>ADR-0006 says Node.js 22 but the live runtime is pinned <code>~20</code> (Node 22 worker gRPC crash) — ADR needs amending.</li>
-    <li class="todo"><span class="badge todo">TODO</span>Rotate the Postgres admin password before prod cutover (exposed once in a terminal session; DB is a disposable sandbox until cutover).</li>
   </ul>
 
   <h3>Blocked until merge-to-main</h3>
@@ -185,20 +148,7 @@
     <li class="todo"><span class="badge todo">USER</span>Add <code>resend-api-key</code> (and set the two missing app settings above).</li>
   </ul>
 
-  <h3>Post-elevation queue (do right after Martinh becomes platform admin)</h3>
-  <ul class="items">
-    <li class="todo"><span class="badge todo">TODO</span>Dismiss the PW-SWEEP report record left on the seeded post (reason "Other", description "PW-SWEEP automated regression test report — please ignore/dismiss") from the moderation queue — doubles as the first real moderation-page test.</li>
-    <li class="todo"><span class="badge todo">TODO</span>Clear the deferred admin-page test debt: Slice 4 PlatformSettings/OrgSettings, Slice 5 moderation pages, Slice 6 org-admin kanban.</li>
-    <li class="todo"><span class="badge todo">TODO</span>Delete the pre-existing junk idea drafts ("231321321321", "ha23123321321") spotted by the sweep, if unwanted.</li>
-  </ul>
 
-  <h3>Cosmetic / test polish (review nits, explicitly approved as non-blocking)</h3>
-  <ul class="items">
-    <li>Minor test-suite nits in the courses/profiles tests; <code>!access?.ok</code> style in <code>quiz-by-lesson</code>; similar style-level comments from the quality reviewers on Slices 0.5+1.</li>
-    <li>Slice 4 reviewer notes (non-blocking): <code>profile-update</code> would return <code>200 {profile: null}</code> if the row vanished between getProfile and UPDATE (theoretical race; mirrors the suite pattern — candidate for the hardening pass); the <code>usePlatformSettings</code> provider's outer catch is silent (no toast) — nearly unreachable since each call has its own fallback.</li>
-    <li>Slice 6 reviewer notes (non-blocking): <code>idea-update</code>'s happy-path test asserts param membership, not index order (a <code>$n</code> transposition would slip past it); <code>idea-comments</code>' own-draft-but-non-member case is unpinned (returns <code>[]</code> today); <code>fetchIdeaComments</code> keeps the legacy loose <code>any[]</code> return type (an <code>IdeaComment</code> interface is a future-typing candidate); Courses.test.tsx's keep-spinner case only pins initial render (a dropped <code>profile</code> effect-dep wouldn't be caught).</li>
-    <li>Playwright sweep nits (2026-06-06, NF-4/5/6): Radix a11y console errors (sidebar sheet + a dialog missing DialogTitle/Description); post deletion uses native <code>confirm()</code> while unenroll/idea-delete use styled AlertDialogs; Danish-mode i18n gaps ("Elev at Test Org" mixed-language strings, dates stay English-formatted) and avatar-initials inconsistency ("MA" in the idea-comment composer vs "MV" elsewhere).</li>
-  </ul>
 </section>
 
 <section id="current-state">
@@ -217,10 +167,12 @@
   <h2>Picking Up From Here</h2>
   <ol class="pickup">
     <li>Read this file in full — it supersedes anything dated in <code>migration/WORKLOG.md</code> (the append-only history)</li>
-    <li>Read <code>docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md</code> (untracked, disk-only) — slice definitions, conventions (§7), Definition of Done gates</li>
+    <li>Read <code>docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md</code> (tracked) — slice definitions, conventions (§7), Definition of Done gates</li>
     <li>Read <code>migration/azure/README.md</code> — seeded UUIDs and how to elevate a profile</li>
     <li>Read <code>docs/adr/</code> — 12 ADRs define what is and isn't allowed</li>
     <li>Check <code>CLAUDE.md</code> for agent constraints before taking any action</li>
+    <li>Check claims: <code>gh issue list --state open</code> + <code>gh pr list --state open</code> (draft PRs = active claims) — collaboration rules in <code>CLAUDE.md</code></li>
+    <li>Starting work → invoke the <code>pickup</code> skill; ending a session → <code>handoff</code>; slice execution → <code>slice-workflow</code></li>
   </ol>
 </section>
 

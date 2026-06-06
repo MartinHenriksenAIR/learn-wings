@@ -1,42 +1,26 @@
 # learn-wings — Claude Code Instructions
 
-## First-Time Setup (run once after cloning)
+## Session start
+1. Read `migration/STATUS.html` — the live ledger (checkpoint, operational quirks, pointers).
+2. Check claims: `gh issue list --state open` (backlog) + `gh pr list --state open` (draft PRs = active claims).
+3. Starting work → invoke the `pickup` skill. Ending a session → `handoff`. Executing a slice → `slice-workflow`.
 
-```bash
-git config core.hooksPath .githooks
-```
-
-This activates the pre-push hook in `.githooks/pre-push`. It checks session memory freshness, ADR gaps, and bug backlog before every push. Skip with `git push --no-verify` in emergencies.
+## Collaboration rules (two developers + their agents)
+- **Trunk = `feature/lovable-migration`.** It receives changes ONLY via pull requests (server-enforced ruleset + local guard hook). PR #6 to `main` stays open until full cutover.
+- **Work branches:** `<firstname>/<issue#>-<slug>` off fresh trunk (e.g. `emil/7-collab-setup`). Open a draft PR immediately — the draft PR is the claim.
+- **Before claiming:** check the other developer's claimed issues / draft PRs for file-scope overlap ("Files touched" on the issue). Never work overlapping scopes in parallel. Shared contracts (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `CLAUDE.md`, `.claude/*`) change in small dedicated PRs, merged before dependent work.
+- **Review:** cross-review when both developers are active; `/code-review` + self-merge allowed when solo. Rebase work branches on trunk when it moves.
+- **Deploys: ONLY from fresh trunk after a merge** — never from work branches (one shared function app/DB/preview). Procedure in `slice-workflow`. Announce on the merged PR.
+- **Bookkeeping:** merged PRs append a dated `migration/WORKLOG.md` entry (append-only) and update `migration/STATUS.html`'s checkpoint.
 
 ## ADR Workflow
-
-**AT SESSION START: tell the user** — if they report any adr-kit issues (MCP not connecting, YAML frontmatter corruption, `]approval_date` on wrong line), read `~/.claude/projects/-Users-thedawgctor-Desktop-tempfuk-learn-wings/memory/ref_adrkit_uvx_fix.md` and walk them through the `uvx` fix. Do not wait for them to ask.
-
-**Always approve ADRs one at a time, sequentially.** Never call `adr_approve` in parallel.
-
-Parallel MCP tool calls fire simultaneous permission prompts — only the first is clickable; the rest are auto-rejected by Claude Code's permission system. Sequential approval ensures each prompt is surfaced and confirmed.
-
-```
-# CORRECT — sequential
-adr_approve(ADR-0001) → wait → adr_approve(ADR-0002) → wait → ...
-
-# WRONG — parallel
-adr_approve(ADR-0001) + adr_approve(ADR-0002) + ... (simultaneous)
-```
-
-This applies to all `mcp__adr-kit__adr_approve` calls regardless of batch size.
+**Approve ADRs one at a time, sequentially** — never call `adr_approve` in parallel (parallel MCP permission prompts auto-reject all but the first). Applies to all `mcp__adr-kit__adr_approve` calls. adr-kit issues (MCP not connecting, YAML `]approval_date` corruption)? See `docs/tooling/adr-kit.md`.
 
 ## Lovable Source Reference
+Lovable workspace **AIR** (`Q7aTXTRh50LxV00N6SRQ`) holds the original project. **Read-only** — no mutating Lovable tools without explicit user instruction.
 
-Lovable workspace **AIR** (`Q7aTXTRh50LxV00N6SRQ`) contains the original learn-wings project.
-**Read-only** — do not call `send_message`, `create_project`, `set_project_knowledge`, `add_connector`, or any mutating Lovable tool against this workspace without explicit user instruction.
-
-## Migration Safety Constraints
-
-This repo is mid-migration (Lovable/Supabase → Azure). The following constraints apply until migration is complete:
-
-- Do not mutate application source code outside the `migration/` directory without explicit instruction
-- Do not mutate Azure resources (no `az` create/delete/update commands)
-- Do not delete, rotate, overwrite, or print secrets
-- Do not apply patches from `migration/lovable-supabase-removal/patches/` to the live source
-- Planning artifacts only under `migration/lovable-supabase-removal/`
+## Migration Safety Constraints (until migration completes)
+- Application source changes follow the collaboration workflow above (work branch + PR) — no direct-to-trunk edits.
+- Do not mutate Azure resources (no `az` create/delete/update) — deploys via the documented procedure only.
+- Do not delete, rotate, overwrite, or print secrets.
+- Do not apply patches from `migration/lovable-supabase-removal/patches/` to live source; planning artifacts only under `migration/lovable-supabase-removal/`.

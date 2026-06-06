@@ -1,32 +1,24 @@
 # learn-wings — Agent Instructions
 
+Mirror of `CLAUDE.md` for non-Claude agents. The rules below are identical in substance — `CLAUDE.md` is the maintained original; update both together.
+
+## Session start
+Read `migration/STATUS.html` first. Check claims via `gh issue list --state open` and `gh pr list --state open` (draft PRs = active claims).
+
+## Collaboration rules (two developers + their agents)
+- Trunk = `feature/lovable-migration`; changes land ONLY via pull requests. Work branches: `<firstname>/<issue#>-<slug>`; a draft PR opened at start is the claim.
+- Check claimed issues/draft PRs for file-scope overlap before starting; never parallelize overlapping scopes. Shared contracts (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `CLAUDE.md`, `.claude/*`) change in small dedicated PRs first.
+- Review: cross-review when both developers active; agent review + self-merge when solo.
+- Deploys ONLY from fresh trunk after merge; announce on the merged PR.
+- Merged PRs append to `migration/WORKLOG.md` (append-only) and update `migration/STATUS.html`.
+
 ## ADR Workflow
-
-**Always approve ADRs one at a time, sequentially.** Never call `adr_approve` in parallel.
-
-Parallel MCP tool calls fire simultaneous permission prompts — only the first is clickable; the rest are auto-rejected. Sequential approval ensures each prompt is surfaced and confirmed.
-
-```
-# CORRECT — sequential
-adr_approve(ADR-0001) → wait for result → adr_approve(ADR-0002) → wait → ...
-
-# WRONG — parallel
-adr_approve(ADR-0001) + adr_approve(ADR-0002) + ... (simultaneous calls)
-```
-
-This applies to all `mcp__adr-kit__adr_approve` calls regardless of batch size.
+Approve ADRs sequentially — never parallel `adr_approve` (simultaneous permission prompts auto-reject). Troubleshooting: `docs/tooling/adr-kit.md`.
 
 ## Lovable Source Reference
-
-Lovable workspace **AIR** (`Q7aTXTRh50LxV00N6SRQ`) contains the original learn-wings project.
-**Read-only** — no mutating Lovable tools (`send_message`, `create_project`, `set_project_knowledge`, `add_connector`) against this workspace without explicit user instruction.
+Workspace **AIR** (`Q7aTXTRh50LxV00N6SRQ`) is read-only — no mutating Lovable tools without explicit user instruction.
 
 ## Migration Safety Constraints
-
-This repo is mid-migration (Lovable/Supabase → Azure). Until migration is complete:
-
-- Do not mutate application source code outside the `migration/` directory without explicit instruction
-- Do not mutate Azure resources
-- Do not delete, rotate, overwrite, or print secrets
-- Do not apply patches from `migration/lovable-supabase-removal/patches/` to live source
-- Planning artifacts only under `migration/lovable-supabase-removal/`
+- Source changes via work branch + PR only; no direct-to-trunk edits.
+- No Azure resource mutations; no secret deletion/rotation/printing.
+- No applying `migration/lovable-supabase-removal/patches/`; planning artifacts only under `migration/lovable-supabase-removal/`.
