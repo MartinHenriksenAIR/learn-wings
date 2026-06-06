@@ -43,7 +43,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     } else if (await isOrgAdmin(profile.id, resource.org_id)) {
       authorized = true;
     }
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    // Returning 404 here keeps an authenticated caller from distinguishing
+    // "exists but I'm not allowed" from "doesn't exist" — prevents
+    // cross-org enumeration of resource IDs.
+    if (!authorized) return corsResponse(origin, 404, { error: 'Resource not found' }) as HttpResponseInit;
 
     await query(`DELETE FROM community_resources WHERE id = $1`, [resourceId]);
 

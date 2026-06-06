@@ -67,11 +67,12 @@ describe('resource-delete', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Resource not found' });
   });
 
-  it('returns 403 when a non-author plain member tries to delete', async () => {
+  it('returns 404 when caller is not authorized', async () => {
     mockQueryOne.mockResolvedValueOnce(othersResource);
     mockIsOrgAdmin.mockResolvedValueOnce(false);
     const res = await handler(baseReq({ resourceId: 'r1' }), {} as any);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Resource not found' });
   });
 
   it('happy path: author deletes their own resource', async () => {
