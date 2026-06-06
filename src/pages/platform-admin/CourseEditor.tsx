@@ -39,6 +39,7 @@ export default function CourseEditor() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Course edit state
@@ -78,6 +79,7 @@ export default function CourseEditor() {
 
   const fetchStructure = async () => {
     if (!courseId) return;
+    setLoadError(null);
     try {
       const res = await callApi<{ course: Course | null; modules: CourseModule[] }>(
         '/api/course-structure-admin',
@@ -94,6 +96,9 @@ export default function CourseEditor() {
         setCourse(null);
       }
       setModules(res.modules);
+    } catch (err) {
+      setLoadError((err as Error).message);
+      toast({ title: 'Failed to load course', description: (err as Error).message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -303,6 +308,26 @@ export default function CourseEditor() {
       <AppLayout title="Course Editor">
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!loading && loadError) {
+    return (
+      <AppLayout title="Course Editor">
+        <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
+          <p className="text-destructive font-medium">Failed to load course</p>
+          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setLoadError(null);
+              fetchStructure();
+            }}
+          >
+            Retry
+          </Button>
         </div>
       </AppLayout>
     );

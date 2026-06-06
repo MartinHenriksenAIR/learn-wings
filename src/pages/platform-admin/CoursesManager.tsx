@@ -48,6 +48,7 @@ export default function CoursesManager() {
   // Course list state
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -72,21 +73,29 @@ export default function CoursesManager() {
   const [updating, setUpdating] = useState<string | null>(null);
 
   const fetchData = async () => {
-    const [adminRes, orgsRes] = await Promise.all([
-      callApi<{ courses: Course[]; accessRecords: OrgCourseAccess[] }>('/api/courses-admin', {}),
-      callApi<{ organizations: Organization[] }>('/api/organizations', {}),
-    ]);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [adminRes, orgsRes] = await Promise.all([
+        callApi<{ courses: Course[]; accessRecords: OrgCourseAccess[] }>('/api/courses-admin', {}),
+        callApi<{ organizations: Organization[] }>('/api/organizations', {}),
+      ]);
 
-    const coursesWithFreshThumbnails = await Promise.all(
-      adminRes.courses.map(async (course) => ({
-        ...course,
-        thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
-      })),
-    );
-    setCourses(coursesWithFreshThumbnails);
-    setAccessRecords(adminRes.accessRecords);
-    setOrgs(orgsRes.organizations);
-    setLoading(false);
+      const coursesWithFreshThumbnails = await Promise.all(
+        adminRes.courses.map(async (course) => ({
+          ...course,
+          thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
+        })),
+      );
+      setCourses(coursesWithFreshThumbnails);
+      setAccessRecords(adminRes.accessRecords);
+      setOrgs(orgsRes.organizations);
+    } catch (err) {
+      setLoadError((err as Error).message);
+      toast({ title: 'Failed to load courses', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -270,6 +279,26 @@ export default function CoursesManager() {
       <AppLayout title="Course Manager">
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!loading && loadError) {
+    return (
+      <AppLayout title="Course Manager">
+        <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
+          <p className="text-destructive font-medium">Failed to load courses</p>
+          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setLoadError(null);
+              fetchData();
+            }}
+          >
+            Retry
+          </Button>
         </div>
       </AppLayout>
     );
