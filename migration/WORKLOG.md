@@ -1,7 +1,8 @@
 # Migration Worklog — Lovable/Supabase → Azure
 
 Chronological log of all planning and decision work. Picks up where git log leaves off.
-For implementation progress, see the implementation plan: `docs/superpowers/plans/2026-05-17-lovable-supabase-migration.md`.
+
+**This file is append-only history** — dated entries recording what happened and why. The LIVE state (known-issues ledger, current checkpoint, pickup pointers) lives in **`migration/STATUS.md`** — load that at session start, not this; where a dated entry here and STATUS.md disagree, STATUS.md wins. The May-era 25-task plan (`docs/superpowers/plans/2026-05-17-lovable-supabase-migration.md`) was superseded on 2026-06-03 by the vertical-slice spec (`docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md`, untracked/disk-only).
 
 ---
 
@@ -246,71 +247,50 @@ Getting an authenticated end-to-end test environment up surfaced a chain of issu
 
 ---
 
-## Known Issues & Open Items (as of 2026-06-05)
+## 2026-06-05 — Worklog Split: STATUS.md Created
 
-### Broken — expected, slice-scoped
+**Who:** emil & martin
 
-Shared root cause for all of these: the page/API layer still uses the Supabase client, which has NO auth session under MSAL — `supabase.auth.getUser()` returns null and RLS rejects/strands writes. Fixed per-slice as each area is cut over to `callApi`.
+This file had fused two documents with opposite lifecycles: an append-only history and a high-churn live ledger. Split by lifecycle:
+- **`migration/STATUS.md`** (new, ~70 lines) — Known Issues & Open Items, Current State, Picking Up From Here. The file sessions load and edit in place.
+- **`migration/WORKLOG.md`** (this file) — dated entries only, append-only. Slice sessions append their entry here AND move fixed ledger items out of STATUS.md.
 
-- KNOWN BUG (confirmed manually 2026-06-04, re-confirmed by emil 2026-06-05): **submitting an idea or saving an idea draft fails** the same way — `src/lib/ideas-api.ts` (`createIdea` incl. drafts, `voteForIdea`, `removeVoteFromIdea`, `createIdeaComment`) has the identical `supabase.auth.getUser()` gate. Fix = **Slice 6**.
-- KNOWN BUG: the remaining still-Supabase areas (admin pages, resources — 23 files in total across Slices 2–8) fail or hang writes for the same root cause; not yet individually confirmed by manual testing.
-- KNOWN BUG: `send-invitation-email` 500s when invoked — `RESEND_API_KEY` + `STATIC_ASSETS_BASE_URL` app settings unset.
-
-### Broken — small, unscoped
-- KNOWN BUG (found by emil, manual testing): the unenroll confirmation dialog renders raw markup — `Are you sure you want to unenroll from <strong>"AI Fundamentals"</strong>? …` (the i18n string's HTML shown literally) — AND its copy claims "This will remove all your progress", but unenrolling does NOT actually remove progress. Fix the markup rendering and reconcile copy vs behavior (decide: wipe progress on unenroll, or correct the text).
-- KNOWN BUG: `grade-quiz` silently records no `quiz_attempts` row for platform admins without a membership (pre-existing quirk, kept as-is).
-- `Courses.tsx:51-53` uses the unguarded `!user || !currentOrg → setLoading(false)` loading variant — no stranded spinner, but it briefly renders its no-org branch for normal members before `currentOrg` arrives. Align with the Dashboard's profile-gated pattern (Slice 5 follow-up note).
-- KNOWN BUG: `course-player-data` has no per-course access gate — any authenticated user with a profile can pull any published course's player payload. Inconsistent with `quiz-by-lesson`, which gates on org access. Align in a future slice.
-
-### Accepted trade-offs (reviewed, deliberately kept)
-- `enroll` check-then-insert TOCTOU on course availability — harmless; the `UNIQUE(org_id,user_id,course_id)` constraint backstops it.
-- Platform admins can write `course_reviews` in orgs they're not members of — consequence of the suite-wide admin-bypass convention.
-
-### Operational quirks (not bugs, recurring)
-- Post-deploy the function host can park in `Error` (worker-restart exhaustion during zipdeploy file churn) — run `az functionapp restart` after the ~3 min file sync settles.
-- `gh workflow run` failing 403 "Must have admin rights to Repository" = wrong ACTIVE gh account (found switched to the work account mid-Slice-5) — fix with `gh auth switch --user emkataumre`.
-- 2026-06-05: GitHub placed a **ToS block on the `Azure/functions-action` repository** (during a GitHub-wide "Disruption with some GitHub services" incident; the incident later resolved WITHOUT lifting the block) — the deploy job dies at "Set up job: Repository access blocked" while the build job passes. External. **CI deploys stay broken until the block lifts** — check with `gh api repos/Azure/functions-action`, then `gh run rerun <run-id> --failed`. Workaround used for Slice 5: manual `func azure functionapp publish func-ai-education-migration` (same Kudu zipdeploy mechanism, same publish target).
-- One-off anomaly (2026-06-05): `functions/index.ts` found modified in the working tree mid-session — all 16 community barrel imports removed, uncommitted, not produced by any session commit. Restored to HEAD after user confirmation. If it recurs, suspect local tooling.
-
-### CI debt
-- The functions deploy workflow runs deprecated Node 20 actions (`actions/checkout@v4`, `setup-node@v3`, `upload-artifact@v4` per GitHub's run annotation); GitHub forces Node 24 from **2026-06-16** — bump action versions before then.
-- Idea (emil): build a more involved CI/CD pipeline with test gates — would force tests to be written for areas that lack them (frontend pages, e2e). The functions workflow already runs `npm test --if-present`; the SWA workflow has no test step.
-
-### Hardening / debt
-- TODO security: 500 bodies propagate `err.message` suite-wide (CWE-209 per automated review) — candidate ADR: generic 500 + context logging.
-- TODO auth: `functions/shared/db.ts` uses `ssl: { rejectUnauthorized: false }` — move to verify-full with the Azure CA bundle.
-- ADR-0006 says Node.js 22 but the live runtime is pinned `~20` (Node 22 worker gRPC crash) — ADR needs amending.
-- Rotate the Postgres admin password before prod cutover (exposed once in a terminal session; DB is a disposable sandbox until cutover).
-
-### BLOCKED until merge-to-main
-- Re-link the SWA backend, set `VITE_API_BASE_URL=""` (back to same-origin `/api`), optionally restore the portal.azure.com platform CORS entry.
-- Until then, ALL smoke tests must hit the regionalized function hostname (`func-ai-education-migration-c0fgeqdnfvd6h0cf.swedencentral-01.azurewebsites.net`) — the SWA `/api/*` route falls through to static 404/405, and the classic `func-ai-education-migration.azurewebsites.net` hostname does not resolve.
-- Production redirect URIs on the Entra app registration as environments solidify.
-
-### Pre-cutover user actions (carried from Phase 1)
-- Q7: link `ai-uddannelse.dk` to the SWA + add it as an Entra redirect URI.
-- Add `resend-api-key` (and set the two missing app settings above).
-
-### Cosmetic / test polish (review nits, explicitly approved as non-blocking)
-- Minor test-suite nits in the courses/profiles tests; `!access?.ok` style in `quiz-by-lesson`; similar style-level comments from the quality reviewers on Slices 0.5+1.
-- Slice 4 reviewer notes (non-blocking): `profile-update` would return `200 {profile: null}` if the row vanished between getProfile and UPDATE (theoretical race; mirrors the suite pattern — candidate for the hardening pass); the `usePlatformSettings` provider's outer catch is silent (no toast) — nearly unreachable since each call has its own fallback.
+Also reviewed `.githooks/pre-push` while at it: found it has **never been active on this machine** (`core.hooksPath` unset; CLAUDE.md's first-time setup step was never run here), its memory-freshness check targets a file/path from the original macOS setup that doesn't exist here, and its bug-backlog grep doesn't scan `migration/`. **Decision: deliberately left dormant** — the ledger is maintained by process (overseer cross-checks each slice report), not enforcement. Don't re-suggest activating it.
 
 ---
 
-## Current State (post-Slice-5 checkpoint — 2026-06-05)
+## 2026-06-06 — Slice 6: Ideas (commits 33ca16e → ebed793)
 
-**Branch:** `feature/lovable-migration` (PR #6 open; preview env is the live test surface)
+**Who:** emil & martin (subagent-driven session)
 
-**Done:** Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings & profile) — all user-verified end-to-end on the PR-6 preview (Slice 4 Gate 4 passed 2026-06-05; PlatformSettings/OrgSettings pages carry deferred test debt until admin elevation). Slice 5 (community) code-complete with both review stages passed per task, deployed (manual `func publish` — CI blocked externally), and 401-smoked 16/16; user e2e on the preview pending (moderation pages additionally deferred until admin elevation, same as Slice 4's settings pages).
+**12 new endpoints (67 functions total deployed):** `ideas` (list — server-side comment AND vote counts + profile embed, replacing the old client N+1), `idea` (single — counts, `user_has_voted`, organization embed; `{idea:null}` maybeSingle parity), `idea-create` (forced `status='draft'`, server-set `user_id`), `idea-update` (author+draft-only, field whitelist), `idea-submit` (draft→submitted + `submitted_at`), `idea-status-update` (org/platform admin; supabase-js parity: `admin_notes` only-when-provided, `rejection_reason` forced null unless rejected), `idea-delete` (author ANY status OR org admin OR platform admin — per in-repo RLS), `idea-vote` (org derived from the idea row; `UNIQUE(idea_id,user_id)` → 23505 → 409), `idea-vote-remove` (idempotent own-vote delete), `idea-comments` (profile embed, ASC; zero-rows parity), `idea-comment-create` (CTE insert + profile join; same-idea parent check), `idea-tags` (distinct caller-visible tags). Each with mock contract tests (functions suite 538 → 720 passing; tests mock `shared/auth`, `shared/db`, `shared/profile`; never touch a real DB).
 
-**Remaining slices:** 2 (course authoring), 3a/3b/3c (org & user admin), 6/7 (ideas / resources), 8 (decommission Supabase).
+**Authorization parity** derived per-endpoint with policy provenance in the slice plan (`docs/superpowers/plans/2026-06-06-slice-6-ideas.md`, disk-only). **Key finding:** the `ideas`/`idea_votes`/`idea_comments` CREATE TABLE + base RLS never landed in `supabase/migrations/` (Lovable-managed migration gap; the Azure schema was reconstructed from generated types.ts — see `01-schema.sql:391`). Only the DELETE policies (20260202140817) and the org-admin UPDATE (20260401095857) are in-repo; base policies were reconstructed from UI behavior and marked `[R]` in the plan. Highlights:
+- **Drafts are author-private for every role** — no org/platform-admin visibility bypass (list/tags filter them, single returns `{idea:null}`, comments return `[]`, writes 404). Rationale: the admin-bypass convention covers org-membership checks, not author privacy of unpublished content; no UI path views another's draft.
+- `idea-update` is author+draft-only with NO admin path — org-admin writes go through `idea-status-update` (RLS 20260401095857 had no column/status restriction, so admins may set any status incl. back to draft).
+- `idea-delete` mirrors the in-repo RLS exactly: authors delete ANY status (the draft-only policy was explicitly replaced in 20260202140817).
+- Deliberate tightenings (documented in plan): updates cannot move ideas between orgs; parent comments must belong to the same idea; vote/comment writes 404 other-author drafts (old RLS likely allowed blind inserts).
+- `ideas.org_id` is NOT NULL — no global-scope ideas, so Slice 5's NULL-org admin-leak lesson doesn't apply here.
+
+**Frontend:** `src/lib/ideas-api.ts` fully rewritten over `callApi` — zero `supabase` references; all 12 exported signatures byte-compatible (`voteForIdea`/`createIdeaComment` keep their now-server-ignored `orgId` params; list functions keep the old `|| []` fallbacks). All four ideas pages (IdeaLibrary, IdeaSubmit, IdeaDetail, OrgIdeasManagement) are lib-only consumers — compile unchanged. Typecheck/build green; root suite 13 → 16.
+
+**FIXED (moved from STATUS.md Known Issues):**
+- **Submitting an idea / saving a draft / voting / commenting failed under MSAL** (confirmed 2026-06-04, re-confirmed 2026-06-05) — the `supabase.auth.getUser()` gate in ideas-api always returned null. The server now derives identity from the bearer token (`getProfile`).
+- **Unenroll dialog rendered literal `<strong>` markup AND claimed "This will remove all your progress"** — false: `unenroll` deletes only the `enrollments` row; per-lesson progress persists. Dialog now renders via react-i18next `<Trans>` (first use in the codebase; `strong` is in the default `transKeepBasicHtmlNodesFor`) with honest "progress will be kept" copy in en+da; the success toast's identical lie fixed too. Unenroll NOT made destructive.
+- **Courses.tsx no-org flash** — adopted Dashboard's profile-gated three-way loading guard (Slice 5 pattern) + new 3-case `Courses.test.tsx` (incl. the keep-spinner case Dashboard's tests don't pin).
+
+**Deploy status (2026-06-06):** the GitHub ToS block on `Azure/functions-action` is STILL active (`gh api` → 403 reason "tos") — CI deploys remain broken. Deployed manually (emil): `func azure functionapp publish func-ai-education-migration`. **Smoke: all 12 new endpoints return 401 unauthenticated (12/12)** against the regionalized hostname. 67 functions live. Separately, workflow action versions were bumped to Node 24-compatible majors mid-session (user commit 7545cb2) ahead of GitHub's 2026-06-16 cutoff.
+
+**Decisions / notes:**
+- `idea-comments` returns `{comments: []}` (not 404) for missing/invisible ideas — zero-rows RLS parity, mirrors `community-comments`; the slice plan's original 404 wording was corrected after the final integration review.
+- Write paths distinguish 404 (missing) from 403 (not author) for non-draft ideas — matches the community template; the existence-probe nuance was reviewed and accepted as suite convention.
+- `<Trans>` precedent established as the canonical mechanism for emphasis inside translated strings (the codebase previously had none; other dialogs hardcode untranslated JSX emphasis).
+- Mid-session the Anthropic API had a sustained overload (529s); Task 3's reviews were retried and all per-task review gates completed (several on Sonnet).
+- Review nits (explicitly non-blocking, filed in STATUS.md): order-insensitive param assertions in idea-update's happy-path test; idea-comments' own-draft-but-non-member case unpinned; `fetchIdeaComments` keeps the legacy loose `any[]` type.
 
 ---
 
-## Picking Up From Here
+## Live sections moved (2026-06-05)
 
-1. Read this file's Known Issues + Current State sections — they supersede the 2026-05-19 checkpoint
-2. Read `docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md` (untracked, disk-only) — slice definitions, conventions (§7), Definition of Done gates
-3. Read `migration/azure/README.md` — seeded UUIDs and how to elevate a profile
-4. Read `docs/adr/` — 12 ADRs define what is and isn't allowed
-5. Check `CLAUDE.md` for agent constraints before taking any action
+"Known Issues & Open Items", "Current State", and "Picking Up From Here" now live in `migration/STATUS.md`.
+Update the live ledger THERE; append dated history entries HERE.
