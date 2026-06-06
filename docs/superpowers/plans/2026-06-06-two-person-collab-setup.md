@@ -211,9 +211,11 @@ git commit -m "feat(claude): cross-platform trunk-guard PreToolUse hook"
 
 ---
 
-### Task 6: Rewrite `.claude/settings.json` (shared baseline + hook registration)
+### Task 6: Rewrite `.claude/settings.json` (hook registration; hooks-only)
 
-Replaces the stale jq/`/cavemem` hooks (reference a skill that no longer exists; `jq` pipe is not portable to Windows). Registers the guard hook. Adds a conservative shared allowlist (refine later with `/fewer-permission-prompts`).
+Replaces the stale jq/`/cavemem` hooks (reference a skill that no longer exists; `jq` pipe is not portable to Windows). Registers the guard hook.
+
+> **2026-06-06 revision:** the originally planned shared permission allowlist was dropped by user decision (the permission classifier rightly flagged agent-curated allow rules; permissions instead accumulate in each developer's `settings.local.json` via "always allow", promotable later with `/fewer-permission-prompts`). The pre-existing `adr_approve` allow is kept — it was already in the committed file.
 
 **Files:**
 - Modify: `.claude/settings.json` (full replacement)
@@ -224,18 +226,7 @@ Replaces the stale jq/`/cavemem` hooks (reference a skill that no longer exists;
 {
   "permissions": {
     "allow": [
-      "mcp__adr-kit__adr_approve",
-      "Bash(npm test:*)",
-      "Bash(npm run build:*)",
-      "Bash(npm run test:*)",
-      "Bash(npx tsc:*)",
-      "Bash(npx vitest run:*)",
-      "Bash(gh issue list:*)",
-      "Bash(gh issue view:*)",
-      "Bash(gh pr list:*)",
-      "Bash(gh pr view:*)",
-      "Bash(gh pr diff:*)",
-      "Bash(gh pr checks:*)"
+      "mcp__adr-kit__adr_approve"
     ]
   },
   "hooks": {
