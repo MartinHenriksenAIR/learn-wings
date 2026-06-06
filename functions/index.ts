@@ -66,7 +66,6 @@ import './quiz-options/index';
 import './quiz-options-admin/index';
 import './resource-create/index';
 import './resource-delete/index';
-import './resource-pin/index';
 import './resource-update/index';
 import './resources/index';
 import './send-invitation-email/index';

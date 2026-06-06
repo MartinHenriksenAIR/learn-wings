@@ -91,5 +91,5 @@ export async function deleteResource(id: string): Promise<void> {
 }
 
 export async function toggleResourcePinned(id: string, pinned: boolean): Promise<void> {
-  await callApi('/api/resource-pin', { resourceId: id, pinned });
+  await callApi('/api/resource-update', { resourceId: id, updates: { is_pinned: pinned } });
 }
