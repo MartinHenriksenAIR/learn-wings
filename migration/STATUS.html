@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Migration Status — Live Ledger (Lovable/Supabase → Azure)</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1c1f25;
+    --panel-2: #202329;
+    --ink: #e8e4da;
+    --ink-dim: #a8a294;
+    --ink-faint: #6f6a5e;
+    --hairline: #2e323a;
+    --red: #ff5c5c;
+    --amber: #ffb454;
+    --yellow: #e6c84e;
+    --green: #7fd486;
+    --cyan: #62c9d8;
+    --violet: #b58cf0;
+    --slate: #8b93a3;
+    --mono: "Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+    --display: Bahnschrift, "Arial Narrow", "Helvetica Neue", sans-serif;
+    --body: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.55;
+    /* hazard stripe — this ledger is live and under construction */
+    border-top: 6px solid;
+    border-image: repeating-linear-gradient(135deg,
+      var(--amber) 0 14px, #16181d 14px 28px) 6;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 28px 90px; }
+
+  /* ---------- header ---------- */
+  header { margin-bottom: 14px; }
+
+  .doc-kicker {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--ink-faint);
+    margin-bottom: 14px;
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+  h1 {
+    font-family: var(--display);
+    font-size: 34px; font-weight: 700; line-height: 1.12;
+    letter-spacing: .4px; text-transform: uppercase;
+  }
+  h1 .route {
+    display: block; font-size: 16px; font-weight: 400;
+    letter-spacing: 2.5px; color: var(--amber); margin-top: 6px;
+  }
+
+  .intent {
+    margin: 18px 0 0; padding: 14px 18px;
+    background: var(--panel); border-left: 3px solid var(--amber);
+    font-size: 15px; color: var(--ink-dim);
+  }
+  .intent strong { color: var(--ink); }
+
+  nav.toc {
+    display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0;
+    font-family: var(--mono); font-size: 12px;
+  }
+  nav.toc a {
+    color: var(--cyan); text-decoration: none;
+    border: 1px solid var(--hairline); border-radius: 3px;
+    padding: 4px 10px; background: var(--panel);
+  }
+  nav.toc a:hover { border-color: var(--cyan); }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 48px; }
+
+  h2 {
+    font-family: var(--display); font-size: 21px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  h2 .asof {
+    font-family: var(--mono); font-size: 11px; font-weight: 400;
+    letter-spacing: 1px; color: var(--ink-faint); text-transform: none;
+  }
+
+  h3 {
+    font-family: var(--display); font-size: 14px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.8px;
+    color: var(--ink-dim); margin: 30px 0 10px;
+  }
+  h3::before { content: "▸ "; color: var(--amber); }
+
+  p.note { color: var(--ink-dim); font-size: 15px; margin: 8px 0 12px; }
+
+  /* ---------- item lists ---------- */
+  ul.items { list-style: none; }
+  ul.items li {
+    background: var(--panel); border-left: 3px solid var(--slate);
+    padding: 11px 16px; margin: 8px 0; font-size: 15px;
+  }
+  ul.items li.bug      { border-left-color: var(--red); }
+  ul.items li.obs      { border-left-color: var(--amber); }
+  ul.items li.quirk    { border-left-color: var(--yellow); }
+  ul.items li.todo     { border-left-color: var(--amber); }
+  ul.items li.blocked  { border-left-color: var(--violet); }
+  ul.items li.idea     { border-left-color: var(--cyan); }
+  ul.items li.resolved { border-left-color: var(--green); }
+  ul.items li.resolved .struck { text-decoration: line-through; color: var(--ink-faint); }
+
+  .badge {
+    display: inline-block; font-family: var(--mono);
+    font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+    padding: 2px 7px; border-radius: 2px; margin-right: 8px;
+    position: relative; top: -1px;
+  }
+  .badge.bug      { background: rgba(255,92,92,.16);  color: var(--red); }
+  .badge.obs      { background: rgba(255,180,84,.16); color: var(--amber); }
+  .badge.quirk    { background: rgba(230,200,78,.14); color: var(--yellow); }
+  .badge.todo     { background: rgba(255,180,84,.16); color: var(--amber); }
+  .badge.blocked  { background: rgba(181,140,240,.16);color: var(--violet); }
+  .badge.idea     { background: rgba(98,201,216,.16); color: var(--cyan); }
+  .badge.resolved { background: rgba(127,212,134,.16);color: var(--green); }
+  .badge.tradeoff { background: rgba(139,147,163,.16);color: var(--slate); }
+
+  code {
+    font-family: var(--mono); font-size: 13px;
+    background: #14161a; border: 1px solid var(--hairline);
+    border-radius: 3px; padding: 1px 5px; color: var(--cyan);
+    overflow-wrap: anywhere;
+  }
+  strong { color: var(--ink); }
+  em { color: var(--ink-dim); }
+
+  /* ---------- checkpoint panel ---------- */
+  .checkpoint {
+    background: var(--panel-2); border: 1px solid var(--hairline);
+    border-top: 3px solid var(--green); padding: 20px 22px; margin-top: 16px;
+  }
+  .checkpoint dl { display: grid; grid-template-columns: 110px 1fr; row-gap: 12px; }
+  .checkpoint dt {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--ink-faint); padding-top: 3px;
+  }
+  .checkpoint dd { font-size: 15px; }
+
+  /* ---------- pickup steps ---------- */
+  ol.pickup { list-style: none; counter-reset: step; }
+  ol.pickup li {
+    counter-increment: step;
+    background: var(--panel); border: 1px solid var(--hairline);
+    padding: 12px 16px 12px 56px; margin: 8px 0;
+    position: relative; font-size: 15px;
+  }
+  ol.pickup li::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute; left: 14px; top: 11px;
+    font-family: var(--display); font-size: 19px; font-weight: 700;
+    color: var(--amber);
+  }
+
+  footer {
+    margin-top: 60px; padding-top: 14px;
+    border-top: 1px solid var(--hairline);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 26px; }
+    .checkpoint dl { grid-template-columns: 1fr; row-gap: 2px; }
+    .checkpoint dd { margin-bottom: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="doc-kicker"><span class="live-dot"></span> live ledger &middot; maintained in place</div>
+  <h1>Migration Status
+    <span class="route">Lovable / Supabase&ensp;&rarr;&ensp;Azure</span>
+  </h1>
+  <p class="intent">The LIVE state of the migration: known issues, current checkpoint, pickup pointers.
+  <strong>Load this file at session start</strong> — it is small on purpose. Maintained in place:
+  items move OUT of here when resolved, into a dated entry in <code>migration/WORKLOG.md</code>
+  (the append-only history — read that only when you need the <em>why</em> behind a decision).</p>
+  <nav class="toc">
+    <a href="#known-issues">Known issues</a>
+    <a href="#current-state">Current state</a>
+    <a href="#picking-up">Picking up</a>
+  </nav>
+</header>
+
+<section id="known-issues">
+  <h2>Known Issues &amp; Open Items <span class="asof">as of 2026-06-06</span></h2>
+
+  <h3>Human logged</h3>
+  <ul class="items">
+    <li class="obs">Refresh anywhere brings you back to the dashboard — should stick to the page of refresh origin.</li>
+    <li class="obs">Be able to close toasts manually; they take too long to auto-discard.</li>
+  </ul>
+
+  <h3>Broken — expected, slice-scoped</h3>
+  <p class="note">Shared root cause for all of these: the page/API layer still uses the Supabase client,
+  which has NO auth session under MSAL — <code>supabase.auth.getUser()</code> returns null and RLS
+  rejects/strands writes. Fixed per-slice as each area is cut over to <code>callApi</code>.</p>
+  <ul class="items">
+    <li class="bug"><span class="badge bug">KNOWN BUG</span>The remaining still-Supabase areas (admin pages, resources — 13 files importing the supabase client, across Slices 2, 3a–3c, 7) fail or hang writes for the same root cause; not yet individually confirmed by manual testing.</li>
+    <li class="bug"><span class="badge bug">KNOWN BUG</span>(same class, found 2026-06-06 via the Slice 6 drafts bug): <code>ResourceLibrary.tsx:255</code> compares <code>resource.user_id === user?.id</code> — <code>user.id</code> is the Entra OID, row <code>user_id</code> is the profiles UUID; never matches post-migration. Fix in <strong>Slice 7</strong> (use <code>profile?.id</code>). <strong>Cutover checklist item for ALL remaining slices: audit the slice's pages for <code>user?.id</code> ownership comparisons.</strong></li>
+    <li class="bug"><span class="badge bug">KNOWN BUG</span><code>send-invitation-email</code> 500s when invoked — <code>RESEND_API_KEY</code> + <code>STATIC_ASSETS_BASE_URL</code> app settings unset.</li>
+  </ul>
+
+  <h3>Broken — small, unscoped</h3>
+  <ul class="items">
+    <li class="obs"><span class="badge obs">OBSERVATION</span>(2026-06-06, unconfirmed/needs repro): during idea-draft preview testing the console showed <code>azure-view-url</code> → 403 + "Error loading signed URLs: Access denied" on a learner session. Not from Slice 6 (endpoint and <code>storage.ts</code> untouched). Possibly the known lesson-asset authz gate firing on a thumbnail for a non-enrolled course. Capture which page/asset triggers it next time it appears.</li>
+    <li class="bug"><span class="badge bug">KNOWN BUG</span><code>grade-quiz</code> silently records no <code>quiz_attempts</code> row for platform admins without a membership (pre-existing quirk, kept as-is).</li>
+    <li class="bug"><span class="badge bug">KNOWN BUG</span><code>course-player-data</code> has no per-course access gate — any authenticated user with a profile can pull any published course's player payload. Inconsistent with <code>quiz-by-lesson</code>, which gates on org access. Align in a future slice.</li>
+  </ul>
+
+  <h3>Accepted trade-offs (reviewed, deliberately kept)</h3>
+  <ul class="items">
+    <li><span class="badge tradeoff">TRADE-OFF</span><code>enroll</code> check-then-insert TOCTOU on course availability — harmless; the <code>UNIQUE(org_id,user_id,course_id)</code> constraint backstops it.</li>
+    <li><span class="badge tradeoff">TRADE-OFF</span>Platform admins can write <code>course_reviews</code> in orgs they're not members of — consequence of the suite-wide admin-bypass convention.</li>
+  </ul>
+
+  <h3>Operational quirks (not bugs, recurring)</h3>
+  <ul class="items">
+    <li class="quirk"><span class="badge quirk">QUIRK</span>Post-deploy the function host can park in <code>Error</code> (worker-restart exhaustion during zipdeploy file churn) — run <code>az functionapp restart</code> after the ~3 min file sync settles.</li>
+    <li class="quirk"><span class="badge quirk">QUIRK</span><code>gh workflow run</code> failing 403 "Must have admin rights to Repository" = wrong ACTIVE gh account (found switched to the work account mid-Slice-5) — fix with <code>gh auth switch --user emkataumre</code>.</li>
+    <li class="quirk"><span class="badge quirk">QUIRK</span>2026-06-05: GitHub placed a <strong>ToS block on the <code>Azure/functions-action</code> repository</strong> (during a GitHub-wide "Disruption with some GitHub services" incident; the incident later resolved WITHOUT lifting the block) — the deploy job dies at "Set up job: Repository access blocked" while the build job passes. External. <strong>CI deploys stay broken until the block lifts</strong> — check with <code>gh api repos/Azure/functions-action</code>, then <code>gh run rerun &lt;run-id&gt; --failed</code>. Workaround used for Slice 5: manual <code>func azure functionapp publish func-ai-education-migration</code> (same Kudu zipdeploy mechanism, same publish target).</li>
+    <li class="quirk"><span class="badge quirk">QUIRK</span>One-off anomaly (2026-06-05): <code>functions/index.ts</code> found modified in the working tree mid-session — all 16 community barrel imports removed, uncommitted, not produced by any session commit. Restored to HEAD after user confirmation. If it recurs, suspect local tooling.</li>
+  </ul>
+
+  <h3>CI debt</h3>
+  <ul class="items">
+    <li class="resolved"><span class="badge resolved">RESOLVED</span><span class="struck">Deprecated Node 20 actions</span> — RESOLVED 2026-06-06: action versions bumped to Node 24-compatible majors (commit <code>7545cb2</code>) ahead of GitHub's 2026-06-16 cutoff. The <code>Azure/functions-action</code> ToS block (see Operational quirks) is unaffected and still blocks the deploy job.</li>
+    <li class="idea"><span class="badge idea">IDEA</span>(emil): build a more involved CI/CD pipeline with test gates — would force tests to be written for areas that lack them (frontend pages, e2e). The functions workflow already runs <code>npm test --if-present</code>; the SWA workflow has no test step.</li>
+  </ul>
+
+  <h3>Hardening / debt</h3>
+  <ul class="items">
+    <li class="todo"><span class="badge todo">TODO</span>security: 500 bodies propagate <code>err.message</code> suite-wide (CWE-209 per automated review) — candidate ADR: generic 500 + context logging.</li>
+    <li class="todo"><span class="badge todo">TODO</span>auth: <code>functions/shared/db.ts</code> uses <code>ssl: { rejectUnauthorized: false }</code> — move to verify-full with the Azure CA bundle.</li>
+    <li class="todo"><span class="badge todo">TODO</span>ADR-0006 says Node.js 22 but the live runtime is pinned <code>~20</code> (Node 22 worker gRPC crash) — ADR needs amending.</li>
+    <li class="todo"><span class="badge todo">TODO</span>Rotate the Postgres admin password before prod cutover (exposed once in a terminal session; DB is a disposable sandbox until cutover).</li>
+  </ul>
+
+  <h3>Blocked until merge-to-main</h3>
+  <ul class="items">
+    <li class="blocked"><span class="badge blocked">BLOCKED</span>Re-link the SWA backend, set <code>VITE_API_BASE_URL=""</code> (back to same-origin <code>/api</code>), optionally restore the portal.azure.com platform CORS entry.</li>
+    <li class="blocked"><span class="badge blocked">BLOCKED</span>Until then, ALL smoke tests must hit the regionalized function hostname (<code>func-ai-education-migration-c0fgeqdnfvd6h0cf.swedencentral-01.azurewebsites.net</code>) — the SWA <code>/api/*</code> route falls through to static 404/405, and the classic <code>func-ai-education-migration.azurewebsites.net</code> hostname does not resolve.</li>
+    <li class="blocked"><span class="badge blocked">BLOCKED</span>Production redirect URIs on the Entra app registration as environments solidify.</li>
+  </ul>
+
+  <h3>Pre-cutover user actions (carried from Phase 1)</h3>
+  <ul class="items">
+    <li class="todo"><span class="badge todo">USER</span>Q7: link <code>ai-uddannelse.dk</code> to the SWA + add it as an Entra redirect URI.</li>
+    <li class="todo"><span class="badge todo">USER</span>Add <code>resend-api-key</code> (and set the two missing app settings above).</li>
+  </ul>
+
+  <h3>Cosmetic / test polish (review nits, explicitly approved as non-blocking)</h3>
+  <ul class="items">
+    <li>Minor test-suite nits in the courses/profiles tests; <code>!access?.ok</code> style in <code>quiz-by-lesson</code>; similar style-level comments from the quality reviewers on Slices 0.5+1.</li>
+    <li>Slice 4 reviewer notes (non-blocking): <code>profile-update</code> would return <code>200 {profile: null}</code> if the row vanished between getProfile and UPDATE (theoretical race; mirrors the suite pattern — candidate for the hardening pass); the <code>usePlatformSettings</code> provider's outer catch is silent (no toast) — nearly unreachable since each call has its own fallback.</li>
+    <li>Slice 6 reviewer notes (non-blocking): <code>idea-update</code>'s happy-path test asserts param membership, not index order (a <code>$n</code> transposition would slip past it); <code>idea-comments</code>' own-draft-but-non-member case is unpinned (returns <code>[]</code> today); <code>fetchIdeaComments</code> keeps the legacy loose <code>any[]</code> return type (an <code>IdeaComment</code> interface is a future-typing candidate); Courses.test.tsx's keep-spinner case only pins initial render (a dropped <code>profile</code> effect-dep wouldn't be caught).</li>
+  </ul>
+</section>
+
+<section id="current-state">
+  <h2>Current State <span class="asof">post-Slice-6 checkpoint — 2026-06-06</span></h2>
+  <div class="checkpoint">
+    <dl>
+      <dt>Branch</dt>
+      <dd><code>feature/lovable-migration</code> (PR #6 open; preview env is the live test surface)</dd>
+      <dt>Done</dt>
+      <dd>Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings &amp; profile) — all user-verified end-to-end on the PR-6 preview (Slice 4 Gate 4 passed 2026-06-05; PlatformSettings/OrgSettings pages carry deferred test debt until admin elevation). Slice 5 (community) code-complete with both review stages passed per task, deployed (manual <code>func publish</code> — CI blocked externally), and 401-smoked 16/16; user e2e on the preview pending (moderation pages additionally deferred until admin elevation, same as Slice 4's settings pages). Slice 6 (ideas) code-complete with both review stages passed per task + a final integration review, deployed (manual <code>func publish</code> — CI still ToS-blocked), 401-smoked 12/12 (67 functions live); user e2e on the preview pending (learner flow: create draft → save → submit → vote/unvote → comment; plus the fixed unenroll dialog).</dd>
+      <dt>Remaining</dt>
+      <dd>Slices 2 (course authoring), 3a/3b/3c (org &amp; user admin), 7 (resources), 8 (decommission Supabase).</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="picking-up">
+  <h2>Picking Up From Here</h2>
+  <ol class="pickup">
+    <li>Read this file in full — it supersedes anything dated in <code>migration/WORKLOG.md</code> (the append-only history)</li>
+    <li>Read <code>docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md</code> (untracked, disk-only) — slice definitions, conventions (§7), Definition of Done gates</li>
+    <li>Read <code>migration/azure/README.md</code> — seeded UUIDs and how to elevate a profile</li>
+    <li>Read <code>docs/adr/</code> — 12 ADRs define what is and isn't allowed</li>
+    <li>Check <code>CLAUDE.md</code> for agent constraints before taking any action</li>
+  </ol>
+</section>
+
+<footer>migration/STATUS.html &middot; converted from STATUS.md 2026-06-06 &middot; edit in place — move resolved items to WORKLOG.md</footer>
+
+</div>
+</body>
+</html>

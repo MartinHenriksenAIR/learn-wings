@@ -2,7 +2,7 @@
 
 Chronological log of all planning and decision work. Picks up where git log leaves off.
 
-**This file is append-only history** — dated entries recording what happened and why. The LIVE state (known-issues ledger, current checkpoint, pickup pointers) lives in **`migration/STATUS.md`** — load that at session start, not this; where a dated entry here and STATUS.md disagree, STATUS.md wins. The May-era 25-task plan (`docs/superpowers/plans/2026-05-17-lovable-supabase-migration.md`) was superseded on 2026-06-03 by the vertical-slice spec (`docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md`, untracked/disk-only).
+**This file is append-only history** — dated entries recording what happened and why. The LIVE state (known-issues ledger, current checkpoint, pickup pointers) lives in **`migration/STATUS.html`** — load that at session start, not this; where a dated entry here and STATUS.html disagree, STATUS.html wins. The May-era 25-task plan (`docs/superpowers/plans/2026-05-17-lovable-supabase-migration.md`) was superseded on 2026-06-03 by the vertical-slice spec (`docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md`, untracked/disk-only).
 
 ---
 
@@ -312,7 +312,15 @@ Second preview-testing catch: draft save now succeeded (`idea-create` 200) but t
 
 ---
 
+## 2026-06-06 — STATUS Ledger Converted to HTML
+
+**Who:** emil
+
+Per a new global preference (human-facing documents as styled HTML instead of markdown), `migration/STATUS.md` became `migration/STATUS.html` — same content, same in-place maintenance convention, now a self-contained styled page (severity-coded badges, no external dependencies). Forward-looking references in this file's preamble, the collab design spec, and the collab-setup/Slice-6 plans were updated to the `.html` path; dated history entries were left as written.
+
+---
+
 ## Live sections moved (2026-06-05)
 
-"Known Issues & Open Items", "Current State", and "Picking Up From Here" now live in `migration/STATUS.md`.
+"Known Issues & Open Items", "Current State", and "Picking Up From Here" now live in `migration/STATUS.html` (originally created as `STATUS.md`, converted 2026-06-06).
 Update the live ledger THERE; append dated history entries HERE.
