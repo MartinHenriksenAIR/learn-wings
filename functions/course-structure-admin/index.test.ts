@@ -124,7 +124,7 @@ describe('course-structure-admin', () => {
     mockQueryOne.mockResolvedValueOnce(fakeCourse);
     // Dispatch by SQL so the test is order-agnostic with respect to Promise.all parallelism
     mockQuery.mockImplementation((sql: string) => {
-      if (sql.includes('lessons')) return Promise.resolve([fakeLesson1]);
+      if (sql.includes('lessons') && sql.includes('JOIN course_modules')) return Promise.resolve([fakeLesson1]);
       return Promise.resolve([fakeModule1]); // course_modules query
     });
 
