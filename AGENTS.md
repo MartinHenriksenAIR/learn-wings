@@ -7,6 +7,13 @@ Single source of truth for all coding agents. `CLAUDE.md` imports this file — 
 2. Check claims: `gh issue list --state open` (backlog) + `gh pr list --state open` (draft PRs = active claims).
 3. Starting work → invoke the `pickup` skill. Ending a session → `handoff`. Executing a slice → `slice-workflow`.
 
+## Preferred development workflow
+Default to **subagent-driven development** (`superpowers:subagent-driven-development` skill) for any task with more than a small surface — multi-file refactors, code-review fix sweeps, implementation plans with several discrete pieces, anything where the work decomposes into independent tasks with clear handoffs.
+
+The pattern: extract tasks → dispatch one implementer subagent per task with full task text and scene-setting context → spec-compliance review → code-quality review → mark complete → next task. Sequential within a workstream (parallel implementers on overlapping files conflict). The controller (main session) preserves its own context for orchestration; each subagent gets a fresh, focused window.
+
+This is also the right default for tasks that feel small but have multiple steps — the two-stage review catches drift cheaper than fixing post-merge. For genuinely tiny single-edit changes, do them inline; the skill itself signals when it doesn't apply.
+
 ## Collaboration rules (two developers + their agents)
 - **Trunk = the `trunk` branch named in `.claude/collab.json`** (single source of truth — the guard hook and the pickup/handoff skills read it; cutover day edits that one file, see issue #33). The trunk receives changes ONLY via pull requests — guaranteed by the server-side `trunk-pr-only` ruleset; the local guard hook is best-effort fast feedback on top (its known gaps are documented in the hook header and all land on the server-side wall). PR #6 to `main` stays open until full cutover.
 - **Work branches:** `<firstname>/<issue#>-<slug>` off fresh trunk (e.g. `emil/7-collab-setup`). Open a draft PR immediately — the draft PR is the claim.
