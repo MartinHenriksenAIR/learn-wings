@@ -31,7 +31,7 @@ import { BookOpen, Play, Clock, CheckCircle2, Loader2, MoreVertical, LogOut } fr
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerCourses() {
-  const { user, currentOrg } = useAuth();
+  const { user, currentOrg, profile } = useAuth();
   const { t } = useTranslation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -49,7 +49,14 @@ export default function LearnerCourses() {
 
   const fetchData = async () => {
     if (!user || !currentOrg) {
-      setLoading(false);
+      if (!user) {
+        // No authenticated user — nothing to load
+        setLoading(false);
+      } else if (profile) {
+        // User context resolved (profile non-null) but no org available — done loading
+        setLoading(false);
+      }
+      // else: user exists but profile not yet fetched — keep spinner
       return;
     }
 
@@ -76,7 +83,7 @@ export default function LearnerCourses() {
 
   useEffect(() => {
     fetchData();
-  }, [user, currentOrg]);
+  }, [user, currentOrg, profile]);
 
   const handleEnroll = async (courseId: string) => {
     if (!user || !currentOrg) return;
