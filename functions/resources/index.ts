@@ -59,9 +59,12 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     }
 
     if (search) {
-      params.push(search);
+      // Escape LIKE metacharacters so user input like "100%" or "snake_case"
+      // is treated as a literal substring rather than a wildcard.
+      const escaped = search.replace(/[\\%_]/g, '\\$&');
+      params.push(`%${escaped}%`);
       const n = params.length;
-      conditions.push(`(r.title ILIKE '%'||$${n}||'%' OR r.description ILIKE '%'||$${n}||'%')`);
+      conditions.push(`(r.title ILIKE $${n} OR r.description ILIKE $${n})`);
     }
 
     const where = `WHERE ${conditions.join(' AND ')}`;

@@ -133,7 +133,15 @@ describe('resources (list)', () => {
     await handler(baseReq({ orgId: 'org-1', search: 'prompt' }), {} as any);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toMatch(/r\.title ILIKE.+OR r\.description ILIKE/);
-    expect(params).toContain('prompt');
+    expect(params).toContain('%prompt%');
+  });
+
+  it('escapes LIKE metacharacters in search input', async () => {
+    mockQuery.mockResolvedValueOnce([]);
+    await handler(baseReq({ orgId: 'org-1', search: '100% snake_case \\path' }), {} as any);
+    const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    // % _ \ are each prefixed with a literal backslash so PG treats them as literals
+    expect(params).toContain('%100\\% snake\\_case \\\\path%');
   });
 
   it('returns 500 on db error', async () => {
