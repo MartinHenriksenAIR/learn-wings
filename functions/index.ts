@@ -35,6 +35,8 @@ import './generate-compliance-report/index';
 import './grade-quiz/index';
 import './idea/index';
 import './idea-create/index';
+import './idea-delete/index';
+import './idea-status-update/index';
 import './idea-submit/index';
 import './idea-tags/index';
 import './idea-update/index';
