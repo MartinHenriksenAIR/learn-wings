@@ -1,16 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const {
-  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile,
-  mockGenerateSasToken, mockBuildBlobUrl,
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob,
 } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
-    mockGenerateSasToken: vi.fn(),
-    mockBuildBlobUrl: vi.fn(),
+    mockDeleteBlob: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -21,10 +19,7 @@ vi.mock('../shared/profile', () => ({
   isOrgAdmin: vi.fn(),
   isOrgAdminOfAny: vi.fn(),
 }));
-vi.mock('../shared/sas', () => ({
-  generateSasToken: mockGenerateSasToken,
-  buildBlobUrl: mockBuildBlobUrl,
-}));
+vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
 
 import handler from './index';
 
@@ -44,19 +39,11 @@ describe('lesson-delete', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
-    mockGenerateSasToken.mockReturnValue('sas-token-123');
-    mockBuildBlobUrl.mockReturnValue('https://storage.blob.core.windows.net/container/blob?sas-token-123');
-    // Restore env vars before each test
-    process.env.AZURE_STORAGE_ACCOUNT_NAME = 'testaccount';
-    process.env.AZURE_STORAGE_ACCOUNT_KEY = 'dGVzdGtleQ==';
-    process.env.AZURE_STORAGE_CONTAINER_NAME = 'lms-videos';
+    mockDeleteBlob.mockResolvedValue(true);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    delete process.env.AZURE_STORAGE_ACCOUNT_NAME;
-    delete process.env.AZURE_STORAGE_ACCOUNT_KEY;
-    delete process.env.AZURE_STORAGE_CONTAINER_NAME;
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -104,88 +91,65 @@ describe('lesson-delete', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'lessonId is required' });
   });
 
-  it('returns 404 when lesson not found (before any blob work)', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // SELECT returns null
+  it('returns 404 when lesson not found — DELETE RETURNING returns null, deleteBlob never called', async () => {
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Lesson not found' });
-    // No SAS or fetch work should have happened
-    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
-  it('(a) no blob path: skips SAS/fetch, deletes row, returns blobDeleted:false', async () => {
-    mockQueryOne.mockResolvedValueOnce({ azure_blob_path: null });   // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1' });           // DELETE RETURNING
+  it('DELETE SQL uses RETURNING azure_blob_path', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1', azure_blob_path: null });
+    await handler(baseReq(validBody), {} as any);
+    const sql = mockQueryOne.mock.calls[0][0] as string;
+    expect(sql).toMatch(/DELETE FROM lessons WHERE id = \$1/i);
+    expect(sql).toMatch(/RETURNING/i);
+    expect(sql).toMatch(/azure_blob_path/i);
+    // Single DB call — no separate SELECT before the DELETE
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+  });
+
+  it('no blob path: skips deleteBlob, deletes row, returns blobDeleted:null', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1', azure_blob_path: null });
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: false });
-    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+    expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: null });
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
-  it('(b) blob path + successful DELETE (202): blobDeleted:true, SAS called with permission "d"', async () => {
-    mockQueryOne.mockResolvedValueOnce({ azure_blob_path: 'videos/lesson-1.mp4' }); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1' });                           // DELETE RETURNING
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 202 }));
-
+  it('blob path + storage 404 (already gone): blobDeleted:true', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1', azure_blob_path: 'videos/lesson-1.mp4' });
+    mockDeleteBlob.mockResolvedValue(true); // helper returns true for 404
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: true });
-    expect(mockGenerateSasToken).toHaveBeenCalledWith(
-      'testaccount',
-      'dGVzdGtleQ==',
-      'lms-videos',
-      'videos/lesson-1.mp4',
-      'd',
-      10,
-    );
+    expect(mockDeleteBlob).toHaveBeenCalledWith('videos/lesson-1.mp4');
   });
 
-  it('(c) blob delete fetch rejects: warning logged, row still deleted, blobDeleted:false', async () => {
-    mockQueryOne.mockResolvedValueOnce({ azure_blob_path: 'videos/lesson-1.mp4' }); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1' });                           // DELETE RETURNING
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
+  it('blob path + storage 500: blobDeleted:false, still 200 success', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1', azure_blob_path: 'videos/lesson-1.mp4' });
+    mockDeleteBlob.mockResolvedValue(false);
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: false });
-    expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 
-  it('(d) blob delete non-2xx response: blobDeleted:false, row still deleted', async () => {
-    mockQueryOne.mockResolvedValueOnce({ azure_blob_path: 'videos/lesson-1.mp4' }); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1' });                           // DELETE RETURNING
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
+  it('blob path + fetch rejects: blobDeleted:false, still 200 success', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1', azure_blob_path: 'videos/lesson-1.mp4' });
+    mockDeleteBlob.mockResolvedValue(false); // helper swallows the rejection and returns false
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: false });
-    expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 
-  it('(e) missing storage env vars: blobDeleted:false, row still deleted', async () => {
-    delete process.env.AZURE_STORAGE_ACCOUNT_NAME;
-    delete process.env.AZURE_STORAGE_ACCOUNT_KEY;
-    mockQueryOne.mockResolvedValueOnce({ azure_blob_path: 'videos/lesson-1.mp4' }); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1' });                           // DELETE RETURNING
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
+  it('row deleted + blob path present: deleteBlob is called with the path', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1', azure_blob_path: 'videos/lesson-1.mp4' });
+    mockDeleteBlob.mockResolvedValue(true);
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: false });
-    expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
-  });
-
-  it('row delete race (DELETE returns null): 404', async () => {
-    mockQueryOne.mockResolvedValueOnce({ azure_blob_path: null }); // SELECT found
-    mockQueryOne.mockResolvedValueOnce(null);                       // DELETE returns null (race)
-    const res = await handler(baseReq(validBody), {} as any);
-    expect(res.status).toBe(404);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'Lesson not found' });
+    expect(mockDeleteBlob).toHaveBeenCalledWith('videos/lesson-1.mp4');
+    expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: true });
   });
 
   it('returns 500 on db error propagating err.message', async () => {

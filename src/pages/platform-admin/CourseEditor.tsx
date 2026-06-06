@@ -253,8 +253,12 @@ export default function CourseEditor() {
 
   const handleDeleteLesson = async (lessonId: string) => {
     try {
-      await callApi<{ success: boolean; blobDeleted: boolean }>('/api/lesson-delete', { lessonId });
-      toast({ title: 'Lesson deleted' });
+      const result = await callApi<{ success: boolean; blobDeleted: boolean | null }>('/api/lesson-delete', { lessonId });
+      if (result.blobDeleted === false) {
+        toast({ title: 'Lesson deleted', description: 'Could not delete the video file from storage.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Lesson deleted' });
+      }
       fetchStructure();
     } catch (err) {
       toast({ title: 'Failed to delete lesson', description: (err as Error).message, variant: 'destructive' });

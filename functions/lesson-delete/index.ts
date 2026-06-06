@@ -3,7 +3,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile } from '../shared/profile';
-import { generateSasToken, buildBlobUrl } from '../shared/sas';
+import { deleteBlob } from '../shared/blob';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
@@ -24,50 +24,22 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 400, { error: 'lessonId is required' }) as HttpResponseInit;
     }
 
-    // Step 1: Fetch lesson to get azure_blob_path (also confirms existence)
-    const lessonRow = await queryOne<{ azure_blob_path: string | null }>(
-      `SELECT azure_blob_path FROM lessons WHERE id = $1`,
-      [lessonId],
-    );
-
-    if (!lessonRow) {
-      return corsResponse(origin, 404, { error: 'Lesson not found' }) as HttpResponseInit;
-    }
-
-    // Step 2: Delete the blob if present (failure must NOT abort — old swallow-and-continue parity)
-    let blobDeleted = false;
-    if (lessonRow.azure_blob_path) {
-      const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
-      const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
-      const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME ?? 'lms-videos';
-
-      if (!accountName || !accountKey) {
-        console.warn('[lesson-delete] Missing storage env vars — skipping blob delete for', lessonRow.azure_blob_path);
-      } else {
-        try {
-          const sasToken = generateSasToken(accountName, accountKey, containerName, lessonRow.azure_blob_path, 'd', 10);
-          const deleteUrl = buildBlobUrl(accountName, containerName, lessonRow.azure_blob_path, sasToken);
-          const res = await fetch(deleteUrl, { method: 'DELETE' });
-          if (res.ok) {
-            blobDeleted = true;
-          } else {
-            console.warn(`[lesson-delete] Blob delete returned non-2xx ${res.status} for`, lessonRow.azure_blob_path);
-          }
-        } catch (blobErr: unknown) {
-          console.warn('[lesson-delete] Blob delete failed (continuing):', blobErr instanceof Error ? blobErr.message : blobErr);
-        }
-      }
-    }
-
-    // Step 3: Delete the row
-    const deleted = await queryOne(
-      `DELETE FROM lessons WHERE id = $1 RETURNING id`,
+    // Step 1: Delete the row first and retrieve the blob path in one atomic statement.
+    // Row-first ordering: if the DB fails here, no irreversible blob delete has happened yet.
+    const deleted = await queryOne<{ id: string; azure_blob_path: string | null }>(
+      `DELETE FROM lessons WHERE id = $1 RETURNING id, azure_blob_path`,
       [lessonId],
     );
 
     if (!deleted) {
-      // Race condition — row already gone
       return corsResponse(origin, 404, { error: 'Lesson not found' }) as HttpResponseInit;
+    }
+
+    // Step 2: Delete the blob only after the row is gone.
+    // blobDeleted is null when the lesson had no video — distinct from a real failure (false).
+    let blobDeleted: boolean | null = null;
+    if (deleted.azure_blob_path) {
+      blobDeleted = await deleteBlob(deleted.azure_blob_path);
     }
 
     return corsResponse(origin, 200, { success: true, blobDeleted }) as HttpResponseInit;
