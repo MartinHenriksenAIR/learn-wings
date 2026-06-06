@@ -74,7 +74,8 @@ type IdeaFormValues = z.infer<typeof ideaFormSchema>;
 export default function IdeaSubmit() {
   const navigate = useNavigate();
   const { ideaId } = useParams<{ ideaId?: string }>();
-  const { currentOrg, user } = useAuth();
+  // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
+  const { currentOrg, profile } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
@@ -117,7 +118,7 @@ export default function IdeaSubmit() {
 
   // Populate form when draft data loads
   useEffect(() => {
-    if (existingIdea && existingIdea.status === 'draft' && existingIdea.user_id === user?.id) {
+    if (existingIdea && existingIdea.status === 'draft' && existingIdea.user_id === profile?.id) {
       form.reset({
         title: existingIdea.title || '',
         business_area: existingIdea.business_area || '',
@@ -134,7 +135,7 @@ export default function IdeaSubmit() {
         success_metrics: existingIdea.success_metrics || '',
       });
     }
-  }, [existingIdea, user?.id, form]);
+  }, [existingIdea, profile?.id, form]);
 
   // Create or update draft mutation
   const saveDraftMutation = useMutation({
