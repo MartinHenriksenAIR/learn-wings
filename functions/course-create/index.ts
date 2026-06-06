@@ -38,9 +38,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 400, { error: 'level must be basic, intermediate, or advanced' }) as HttpResponseInit;
     }
 
-    // Validate description: if present, must be string (empty string allowed)
-    if (description !== undefined && typeof description !== 'string') {
-      return corsResponse(origin, 400, { error: 'description must be a string' }) as HttpResponseInit;
+    // Validate description: if present, must be string or null (empty string allowed;
+    // null accepted for consistency with course-update — the column is nullable)
+    if (description !== undefined && description !== null && typeof description !== 'string') {
+      return corsResponse(origin, 400, { error: 'description must be a string or null' }) as HttpResponseInit;
     }
 
     // Validate thumbnailUrl: if present, must be string or null

@@ -107,10 +107,18 @@ describe('course-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'level must be basic, intermediate, or advanced' });
   });
 
-  it('returns 400 when description is not a string', async () => {
+  it('returns 400 when description is not a string or null', async () => {
     const res = await handler(baseReq({ ...validBody, description: 123 }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'description must be a string' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'description must be a string or null' });
+  });
+
+  it('allows description as explicit null (consistency with course-update)', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeCourse);
+    const res = await handler(baseReq({ ...validBody, description: null }), {} as any);
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params[1]).toBeNull(); // description stored as null
   });
 
   it('allows description as empty string', async () => {

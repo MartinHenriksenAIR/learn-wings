@@ -4,7 +4,7 @@ const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile } = vi.hoiste
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQuery: vi.fn(), mockQueryOne: vi.fn(),
+    mockQuery: vi.fn(),
     mockGetProfile: vi.fn(),
   };
 });

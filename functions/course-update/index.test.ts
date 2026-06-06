@@ -142,6 +142,11 @@ describe('course-update', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when level is null (NOT NULL column, unlike description/thumbnailUrl)', async () => {
+    const res = await handler(baseReq({ courseId: 'c1', updates: { level: null } }), {} as any);
+    expect(res.status).toBe(400);
+  });
+
   it('returns 400 when thumbnailUrl is not string or null', async () => {
     const res = await handler(baseReq({ courseId: 'c1', updates: { thumbnailUrl: 123 } }), {} as any);
     expect(res.status).toBe(400);
