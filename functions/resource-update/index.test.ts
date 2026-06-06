@@ -142,7 +142,7 @@ describe('resource-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Resource not found' });
   });
 
-  it('returns 404 when caller is not authorized (no 403/404 distinction)', async () => {
+  it('returns 404 when caller is not authorized', async () => {
     mockQueryOne.mockResolvedValueOnce(othersResource);
     mockIsOrgAdmin.mockResolvedValueOnce(false);
     const res = await handler(baseReq({ resourceId: 'r1', updates: { title: 'x' } }), {} as any);

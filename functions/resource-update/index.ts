@@ -91,9 +91,9 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     } else if (await isOrgAdmin(profile.id, resource.org_id)) {
       authorized = true;
     }
-    // Return 404 (not 403) so an authenticated caller can't distinguish
-    // "exists but I'm not allowed" from "doesn't exist" and enumerate
-    // resource IDs across orgs.
+    // Returning 404 here keeps an authenticated caller from distinguishing
+    // "exists but I'm not allowed" from "doesn't exist" — prevents
+    // cross-org enumeration of resource IDs.
     if (!authorized) return corsResponse(origin, 404, { error: 'Resource not found' }) as HttpResponseInit;
 
     // Dynamic UPDATE over the whitelisted keys + return shape with embedded profile (CTE).
