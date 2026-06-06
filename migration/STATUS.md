@@ -2,7 +2,12 @@
 
 The LIVE state of the migration: known issues, current checkpoint, pickup pointers. **Load this file at session start** — it is small on purpose. Maintained in place: items move OUT of here when resolved, into a dated entry in `migration/WORKLOG.md` (the append-only history — read that only when you need the *why* behind a decision).
 
-## Known Issues & Open Items (as of 2026-06-06)
+## Known Issues & Open Items (as of 2026-06-06) 
+
+# human logged
+
+- refresh anywhere brings you back to the dashboard, should stick to page of refresh origin
+- be able to close toasts manually, they take too long to auto-discard
 
 ### Broken — expected, slice-scoped
 
