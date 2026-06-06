@@ -34,6 +34,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Organization, Profile, OrgRole } from '@/lib/types';
 import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail, UsersRound } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
@@ -68,25 +69,14 @@ export default function OrganizationsManager() {
   const [inviteEmail, setInviteEmail] = useState('');
 
   const fetchOrgs = async () => {
-    const { data } = await supabase
-      .from('organizations')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (data) {
-      const orgsWithCounts = await Promise.all(
-        data.map(async (org) => {
-          const { count } = await supabase
-            .from('org_memberships')
-            .select('*', { count: 'exact', head: true })
-            .eq('org_id', org.id)
-            .eq('status', 'active');
-          return { ...org, memberCount: count || 0 };
-        })
-      );
-      setOrgs(orgsWithCounts as any);
+    try {
+      const { organizations } = await callApi<{ organizations: Array<Organization & { member_count: number }> }>('/api/organizations', {});
+      setOrgs((organizations ?? []).map((o) => ({ ...o, memberCount: o.member_count })));
+    } catch (err) {
+      console.error('OrganizationsManager: failed to load organizations', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchProfiles = async () => {
@@ -116,73 +106,78 @@ export default function OrganizationsManager() {
     }
 
     setCreating(true);
-
-    // Create organization
-    const { data: newOrg, error } = await supabase.from('organizations').insert({
-      name,
-      slug,
-      logo_url: logoUrl,
-      seat_limit: seatLimit ? parseInt(seatLimit, 10) : null,
-    }).select().single();
-
-    if (error) {
-      if (error.message.includes('duplicate')) {
-        setErrors({ slug: 'This slug is already taken' });
-      } else {
-        toast({
-          title: 'Failed to create organization',
-          description: error.message,
-          variant: 'destructive',
+    try {
+      let newOrg: Organization;
+      try {
+        const result = await callApi<{ organization: Organization }>('/api/organization-create', {
+          name,
+          slug,
+          logo_url: logoUrl,
+          seat_limit: seatLimit ? parseInt(seatLimit, 10) : null,
         });
-      }
-      setCreating(false);
-      return;
-    }
-
-    // Assign initial admin if selected
-    if (adminTab === 'existing' && selectedUserId) {
-      await supabase.from('org_memberships').insert({
-        org_id: newOrg.id,
-        user_id: selectedUserId,
-        role: 'org_admin' as OrgRole,
-        status: 'active',
-      });
-    } else if (adminTab === 'invite' && inviteEmail.trim()) {
-      const { data: insertedInvitation } = await supabase
-        .from('invitations')
-        .insert({
-          org_id: newOrg.id,
-          email: inviteEmail.trim(),
-          role: 'org_admin' as OrgRole,
-          invited_by_user_id: user?.id,
-        })
-        .select('id')
-        .single();
-
-      // Send invitation email
-      if (insertedInvitation?.id) {
-        const { data: linkId } = await supabase
-          .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
-        
-        if (linkId) {
-          await sendInvitationEmail({
-            email: inviteEmail.trim(),
-            orgName: name,
-            role: 'org_admin',
-            linkId,
+        newOrg = result.organization;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to create organization';
+        // Exact 409 message from organization-create — substring matching against
+        // 'slug' also catches 400 validation messages like "slug must be a string".
+        if (message === 'Slug already in use') {
+          setErrors({ slug: 'This slug is already taken' });
+        } else {
+          toast({
+            title: 'Failed to create organization',
+            description: message,
+            variant: 'destructive',
           });
         }
+        return;
       }
-    }
 
-    toast({
-      title: 'Organization created!',
-      description: `${name} is now ready.`,
-    });
-    setCreateOpen(false);
-    resetForm();
-    fetchOrgs();
-    setCreating(false);
+      // Assign initial admin if selected
+      if (adminTab === 'existing' && selectedUserId) {
+        await supabase.from('org_memberships').insert({
+          org_id: newOrg.id,
+          user_id: selectedUserId,
+          role: 'org_admin' as OrgRole,
+          status: 'active',
+        });
+      } else if (adminTab === 'invite' && inviteEmail.trim()) {
+        const { data: insertedInvitation } = await supabase
+          .from('invitations')
+          .insert({
+            org_id: newOrg.id,
+            email: inviteEmail.trim(),
+            role: 'org_admin' as OrgRole,
+            invited_by_user_id: user?.id,
+          })
+          .select('id')
+          .single();
+
+        // Send invitation email
+        if (insertedInvitation?.id) {
+          const { data: linkId } = await supabase
+            .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
+
+          if (linkId) {
+            await sendInvitationEmail({
+              email: inviteEmail.trim(),
+              orgName: name,
+              role: 'org_admin',
+              linkId,
+            });
+          }
+        }
+      }
+
+      toast({
+        title: 'Organization created!',
+        description: `${name} is now ready.`,
+      });
+      setCreateOpen(false);
+      resetForm();
+      fetchOrgs();
+    } finally {
+      setCreating(false);
+    }
   };
 
   const resetForm = () => {
@@ -255,9 +250,7 @@ export default function OrganizationsManager() {
                   value={logoUrl}
                   onChange={(url, storagePath) => {
                     if (url && storagePath) {
-                      const { data: { publicUrl } } = supabase.storage
-                        .from('org-logos')
-                        .getPublicUrl(storagePath);
+                      const publicUrl = `${import.meta.env.VITE_STORAGE_BASE_URL ?? ''}/${storagePath}`;
                       setLogoUrl(publicUrl);
                     } else {
                       setLogoUrl(null);
