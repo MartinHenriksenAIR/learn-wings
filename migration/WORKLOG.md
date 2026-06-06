@@ -302,6 +302,16 @@ Fix (lib layer, where the old architecture also did it; server stays strict): re
 
 ---
 
+## 2026-06-06 — Slice 6 addendum 2: drafts invisible to their author (commit b5db7bb)
+
+**Who:** emil & martin
+
+Second preview-testing catch: draft save now succeeded (`idea-create` 200) but the draft never appeared in the Drafts tab (`ideas` 200 with an empty array). Root cause: **identity-domain mismatch** — `useAuth().user.id` is the Entra `oid` claim, while `ideas.user_id` is the profiles-row UUID. Pre-migration, Supabase's auth uid WAS profiles.id, so `idea.user_id === user?.id` comparisons worked; post-migration they never match. Four sites had it: IdeaLibrary's drafts-tab server filter (sent the OID as `user_id` → endpoint matched nothing), its client-side safety filter, IdeaSubmit's draft-load guard (editing an own draft refused to populate), and IdeaCard's `canDelete`. Sibling pages (PostDetail, PostEdit, IdeaDetail) already compare `profile?.id` — the stragglers are now aligned, with an IdeaLibrary component test pinning the wire-level filter (root suite 20 → 22). No data repair needed: the server always derives `user_id` from the token, so pre-fix drafts were stored correctly.
+
+**Lesson for remaining slices (recorded in STATUS):** after cutover, audit pages for `=== user?.id` / `user.id` ownership comparisons — the identity for DB-row ownership is `profile.id`. `ResourceLibrary.tsx:255` has the same bug class (Slice 7 scope).
+
+---
+
 ## Live sections moved (2026-06-05)
 
 "Known Issues & Open Items", "Current State", and "Picking Up From Here" now live in `migration/STATUS.md`.

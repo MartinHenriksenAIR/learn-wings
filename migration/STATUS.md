@@ -9,6 +9,7 @@ The LIVE state of the migration: known issues, current checkpoint, pickup pointe
 Shared root cause for all of these: the page/API layer still uses the Supabase client, which has NO auth session under MSAL — `supabase.auth.getUser()` returns null and RLS rejects/strands writes. Fixed per-slice as each area is cut over to `callApi`.
 
 - KNOWN BUG: the remaining still-Supabase areas (admin pages, resources — 13 files importing the supabase client, across Slices 2, 3a–3c, 7) fail or hang writes for the same root cause; not yet individually confirmed by manual testing.
+- KNOWN BUG (same class, found 2026-06-06 via the Slice 6 drafts bug): `ResourceLibrary.tsx:255` compares `resource.user_id === user?.id` — `user.id` is the Entra OID, row `user_id` is the profiles UUID; never matches post-migration. Fix in **Slice 7** (use `profile?.id`). **Cutover checklist item for ALL remaining slices: audit the slice's pages for `user?.id` ownership comparisons.**
 - KNOWN BUG: `send-invitation-email` 500s when invoked — `RESEND_API_KEY` + `STATIC_ASSETS_BASE_URL` app settings unset.
 
 ### Broken — small, unscoped
