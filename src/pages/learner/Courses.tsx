@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -344,7 +344,7 @@ export default function LearnerCourses() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('courses.unenrollConfirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('courses.unenrollConfirmDescription', { courseTitle: unenrollDialog.course?.title })}
+              <Trans i18nKey="courses.unenrollConfirmDescription" values={{ courseTitle: unenrollDialog.course?.title }} />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

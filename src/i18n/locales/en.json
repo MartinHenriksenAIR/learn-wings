@@ -191,10 +191,10 @@
     "startLearningNow": "You can now start learning.",
     "unenrollFromCourse": "Unenroll from course",
     "unenrollConfirmTitle": "Unenroll from course?",
-    "unenrollConfirmDescription": "Are you sure you want to unenroll from <strong>\"{{courseTitle}}\"</strong>? This will remove all your progress and you'll need to re-enroll to access the course again.",
+    "unenrollConfirmDescription": "Are you sure you want to unenroll from <strong>\"{{courseTitle}}\"</strong>? Your progress will be kept, and you can re-enroll at any time.",
     "unenrollFailed": "Failed to unenroll",
     "unenrolledFromCourse": "Unenrolled from course",
-    "unenrolledDescription": "You've been unenrolled from \"{{courseTitle}}\". Your progress has been removed.",
+    "unenrolledDescription": "You've been unenrolled from \"{{courseTitle}}\". Your progress has been kept.",
     "joinOrgToAccessCourses": "Join an organization to access courses."
   },
   "community": {

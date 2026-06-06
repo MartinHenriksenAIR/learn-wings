@@ -191,10 +191,10 @@
     "startLearningNow": "Du kan nu starte din læring.",
     "unenrollFromCourse": "Afmeld fra kursus",
     "unenrollConfirmTitle": "Afmeld fra kursus?",
-    "unenrollConfirmDescription": "Er du sikker på, at du vil afmelde fra <strong>\"{{courseTitle}}\"</strong>? Dette vil fjerne al din fremgang, og du skal tilmelde dig igen for at få adgang til kurset.",
+    "unenrollConfirmDescription": "Er du sikker på, at du vil afmelde fra <strong>\"{{courseTitle}}\"</strong>? Din fremgang bevares, og du kan tilmelde dig igen når som helst.",
     "unenrollFailed": "Kunne ikke afmelde",
     "unenrolledFromCourse": "Afmeldt fra kursus",
-    "unenrolledDescription": "Du er blevet afmeldt fra \"{{courseTitle}}\". Din fremgang er blevet fjernet.",
+    "unenrolledDescription": "Du er blevet afmeldt fra \"{{courseTitle}}\". Din fremgang er bevaret.",
     "joinOrgToAccessCourses": "Tilmeld dig en organisation for at få adgang til kurser."
   },
   "community": {
