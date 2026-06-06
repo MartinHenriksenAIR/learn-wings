@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQueryOne: vi.fn(),
+    mockQuery: vi.fn(),
     mockGetProfile: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: vi.fn() }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -60,13 +60,13 @@ describe('idea-vote-remove', () => {
   });
 
   it('happy path: deletes vote and returns 200 {ok:true}', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // DELETE returns null (no RETURNING)
+    mockQuery.mockResolvedValueOnce(null); // DELETE returns null (no RETURNING)
     const res = await handler(baseReq({ ideaId: 'idea-1' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
 
     // Verify DELETE SQL and params
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('DELETE FROM idea_votes');
     expect(sql).toContain('idea_id = $1');
     expect(sql).toContain('user_id = $2');
@@ -74,14 +74,14 @@ describe('idea-vote-remove', () => {
   });
 
   it('returns 200 {ok:true} even when no vote existed (idempotent)', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // no rows deleted
+    mockQuery.mockResolvedValueOnce(null); // no rows deleted
     const res = await handler(baseReq({ ideaId: 'idea-nonexistent' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
   });
 
   it('returns 500 on db error', async () => {
-    mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
+    mockQuery.mockRejectedValueOnce(new Error('connection refused'));
     const res = await handler(baseReq({ ideaId: 'idea-1' }), {} as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });

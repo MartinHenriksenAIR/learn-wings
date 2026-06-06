@@ -1,6 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne } from '../shared/db';
+import { query } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile } from '../shared/profile';
 
@@ -20,7 +20,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     }
 
     // Blind delete — no idea load; idempotent (parity with old client blind-delete)
-    await queryOne(
+    await query(
       `DELETE FROM idea_votes WHERE idea_id = $1 AND user_id = $2`,
       [ideaId, profile.id],
     );
