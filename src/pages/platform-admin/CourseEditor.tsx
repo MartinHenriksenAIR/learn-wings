@@ -642,6 +642,7 @@ export default function CourseEditor() {
       {/* Quiz Editor Dialog */}
       {quizLessonId && (
         <QuizEditorDialog
+          key={quizLessonId}
           lessonId={quizLessonId}
           lessonTitle={quizLessonTitle}
           open={quizEditorOpen}

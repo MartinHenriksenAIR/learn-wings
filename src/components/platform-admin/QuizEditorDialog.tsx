@@ -48,6 +48,7 @@ export function QuizEditorDialog({
 }: QuizEditorDialogProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [quizId, setQuizId] = useState<string | null>(null);
   const [passingScore, setPassingScore] = useState(70);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -61,6 +62,7 @@ export function QuizEditorDialog({
 
   const fetchQuiz = async () => {
     setLoading(true);
+    setLoadError(null);
 
     try {
       const res = await callApi<{
@@ -90,13 +92,15 @@ export function QuizEditorDialog({
           }))
         );
       } else {
-        // No quiz exists yet
+        // No quiz exists yet — reset all fields to defaults
         setQuizId(null);
+        setPassingScore(70);
         setQuestions([]);
       }
     } catch (error) {
       console.error('Error fetching quiz:', error);
       toast.error('Failed to load quiz');
+      setLoadError('Failed to load quiz data. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -248,6 +252,13 @@ export function QuizEditorDialog({
           <div className="flex h-48 items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : loadError ? (
+          <div className="flex h-48 flex-col items-center justify-center gap-4">
+            <p className="text-sm text-destructive">{loadError}</p>
+            <Button variant="outline" onClick={fetchQuiz}>
+              Retry
+            </Button>
+          </div>
         ) : (
           <div className="space-y-6 py-4">
             {/* Passing Score */}
@@ -258,7 +269,7 @@ export function QuizEditorDialog({
                 min={0}
                 max={100}
                 value={passingScore}
-                onChange={(e) => setPassingScore(parseInt(e.target.value) || 0)}
+                onChange={(e) => { const v = parseInt(e.target.value); setPassingScore(Number.isNaN(v) ? 0 : Math.max(0, Math.min(100, v))); }}
                 className="w-24"
               />
               <span className="text-sm text-muted-foreground">
@@ -392,7 +403,7 @@ export function QuizEditorDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || loading}>
+          <Button onClick={handleSave} disabled={saving || loading || !!loadError}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Quiz
           </Button>
