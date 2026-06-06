@@ -172,8 +172,12 @@ export default function CourseEditor() {
 
   const handleDeleteModule = async (modId: string) => {
     try {
-      await callApi<{ success: boolean }>('/api/module-delete', { moduleId: modId });
-      toast({ title: 'Module deleted' });
+      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/module-delete', { moduleId: modId });
+      if (result.blobsFailed > 0) {
+        toast({ title: 'Module deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
+      } else {
+        toast({ title: 'Module deleted' });
+      }
       fetchStructure();
     } catch (err) {
       toast({ title: 'Failed to delete module', description: (err as Error).message, variant: 'destructive' });
@@ -269,8 +273,12 @@ export default function CourseEditor() {
     if (!courseId) return;
     setDeleting(true);
     try {
-      await callApi<{ success: boolean }>('/api/course-delete', { courseId });
-      toast({ title: 'Course deleted' });
+      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId });
+      if (result.blobsFailed > 0) {
+        toast({ title: 'Course deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
+      } else {
+        toast({ title: 'Course deleted' });
+      }
       navigate('/app/admin/courses');
     } catch (err) {
       toast({ title: 'Failed to delete course', description: (err as Error).message, variant: 'destructive' });

@@ -1,8 +1,9 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne } from '../shared/db';
+import { query, queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile } from '../shared/profile';
+import { deleteBlob } from '../shared/blob';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
@@ -23,6 +24,18 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 400, { error: 'moduleId is required' }) as HttpResponseInit;
     }
 
+    // Collect descendant blob paths before deletion.
+    // Intentionally not transactional — blob deletes are irreversible and cannot join a DB
+    // transaction; the tiny race window (lesson created between SELECT and DELETE) is acceptable
+    // for an admin tool.
+    const blobRows = await query<{ azure_blob_path: string }>(
+      `SELECT azure_blob_path
+         FROM lessons
+        WHERE module_id = $1
+          AND azure_blob_path IS NOT NULL`,
+      [moduleId],
+    );
+
     const deleted = await queryOne(
       `DELETE FROM course_modules WHERE id = $1 RETURNING id`,
       [moduleId],
@@ -32,7 +45,13 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 404, { error: 'Module not found' }) as HttpResponseInit;
     }
 
-    return corsResponse(origin, 200, { success: true }) as HttpResponseInit;
+    // Best-effort blob cleanup — deleteBlob never throws; results are logged for transparency.
+    const blobPaths = blobRows.map((r) => r.azure_blob_path);
+    const results = await Promise.all(blobPaths.map((p) => deleteBlob(p)));
+    const blobsDeleted = results.filter(Boolean).length;
+    const blobsFailed = results.length - blobsDeleted;
+
+    return corsResponse(origin, 200, { success: true, blobsDeleted, blobsFailed }) as HttpResponseInit;
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
     return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;

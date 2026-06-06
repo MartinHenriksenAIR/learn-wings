@@ -141,8 +141,12 @@ export default function CoursesManager() {
     if (!courseToDelete) return;
     setDeleting(true);
     try {
-      await callApi<{ success: boolean }>('/api/course-delete', { courseId: courseToDelete.id });
-      toast({ title: 'Course deleted' });
+      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId: courseToDelete.id });
+      if (result.blobsFailed > 0) {
+        toast({ title: 'Course deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
+      } else {
+        toast({ title: 'Course deleted' });
+      }
       setDeleteOpen(false);
       setCourseToDelete(null);
       fetchData();
