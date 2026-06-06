@@ -16,7 +16,7 @@ export async function fetchIdeas(orgId: string, filters?: IdeaFilters): Promise<
     search: filters?.search,
     userId: filters?.user_id,
   });
-  return res.ideas;
+  return (res.ideas ?? []) as EnhancedIdea[];
 }
 
 // Fetch single idea
@@ -100,7 +100,7 @@ export async function removeVoteFromIdea(ideaId: string): Promise<void> {
 export async function fetchIdeaComments(ideaId: string): Promise<any[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res = await callApi<{ comments: any[] }>('/api/idea-comments', { ideaId });
-  return res.comments;
+  return res.comments ?? [];
 }
 
 // Create idea comment — orgId kept for signature compatibility; server derives org from the idea row
@@ -124,5 +124,5 @@ export async function createIdeaComment(
 // Client-side localeCompare sort kept for parity: SQL ASC collation can differ for non-ASCII chars (e.g. æøå)
 export async function fetchOrgTags(orgId: string): Promise<string[]> {
   const res = await callApi<{ tags: string[] }>('/api/idea-tags', { orgId });
-  return res.tags.sort((a, b) => a.localeCompare(b));
+  return (res.tags ?? []).sort((a, b) => a.localeCompare(b));
 }
