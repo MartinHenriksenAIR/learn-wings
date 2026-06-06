@@ -74,6 +74,8 @@ import './platform-settings/index';
 import './platform-settings-update/index';
 import './profile-update/index';
 import './profiles/index';
+import './quiz-admin/index';
+import './quiz-admin-save/index';
 import './quiz-by-lesson/index';
 import './quiz-options/index';
 import './quiz-options-admin/index';
