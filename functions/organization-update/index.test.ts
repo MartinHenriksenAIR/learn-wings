@@ -126,7 +126,7 @@ describe('organization-update', () => {
   });
 
   it('returns 404 when organization does not exist', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // SELECT
+    mockQueryOne.mockResolvedValueOnce(null); // UPDATE RETURNING null = no row matched
     const res = await handler(baseReq({ orgId: 'org-x', updates: { name: 'New Name' } }), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization not found' });
@@ -141,13 +141,12 @@ describe('organization-update', () => {
       seat_limit: 25,
       created_at: '2026-06-06T12:00:00.000Z',
     };
-    mockQueryOne.mockResolvedValueOnce(existingOrg); // SELECT
-    mockQueryOne.mockResolvedValueOnce(updated); // UPDATE
+    mockQueryOne.mockResolvedValueOnce(updated); // UPDATE RETURNING
     const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ organization: updated });
 
-    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('UPDATE organizations SET');
     expect(sql).toContain('name = $1');
     expect(sql).toContain('WHERE id = $2');
@@ -156,8 +155,7 @@ describe('organization-update', () => {
   });
 
   it('multi-field update: builds SET clauses + params in submission order', async () => {
-    mockQueryOne.mockResolvedValueOnce(existingOrg); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // UPDATE
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // UPDATE RETURNING
     const res = await handler(
       baseReq({
         orgId: 'org-1',
@@ -167,7 +165,7 @@ describe('organization-update', () => {
     );
     expect(res.status).toBe(200);
 
-    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('name = $1');
     expect(sql).toContain('slug = $2');
     expect(sql).toContain('logo_url = $3');
@@ -177,7 +175,6 @@ describe('organization-update', () => {
   });
 
   it('returns 409 on duplicate slug (Postgres 23505)', async () => {
-    mockQueryOne.mockResolvedValueOnce(existingOrg); // SELECT
     mockQueryOne.mockRejectedValueOnce(Object.assign(new Error('duplicate key value'), { code: '23505' }));
     const res = await handler(baseReq({ orgId: 'org-1', updates: { slug: 'taken-slug' } }), {} as any);
     expect(res.status).toBe(409);
@@ -185,7 +182,6 @@ describe('organization-update', () => {
   });
 
   it('returns 500 on generic db error', async () => {
-    mockQueryOne.mockResolvedValueOnce(existingOrg); // SELECT
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
     const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
     expect(res.status).toBe(500);

@@ -9,10 +9,6 @@ import { getProfile } from '../shared/profile';
 const SLUG_REGEX = /^[a-z0-9-]+$/;
 const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit']);
 
-interface OrgRow {
-  id: string;
-}
-
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
@@ -75,14 +71,9 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
     }
 
-    // Existence check — distinguish "not found" from "update succeeded with 0 rows".
-    const existing = await queryOne<OrgRow>(
-      `SELECT id FROM organizations WHERE id = $1`,
-      [orgId],
-    );
-    if (!existing) return corsResponse(origin, 404, { error: 'Organization not found' }) as HttpResponseInit;
-
     // Dynamic UPDATE over the whitelisted keys (pattern: resource-update:104-125).
+    // UPDATE ... RETURNING returns no row when WHERE matches nothing, giving us
+    // the 404 distinction without a separate existence SELECT.
     const params: unknown[] = [];
     const setClauses = updateKeys.map((key) => {
       params.push(updatesObj[key]);
@@ -99,6 +90,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         params,
       );
 
+      if (!organization) return corsResponse(origin, 404, { error: 'Organization not found' }) as HttpResponseInit;
       return corsResponse(origin, 200, { organization }) as HttpResponseInit;
     } catch (dbErr: unknown) {
       // Postgres unique_violation on the slug UNIQUE constraint.
