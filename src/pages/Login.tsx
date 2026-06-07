@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
+import { consumePostLoginRedirect } from '@/lib/post-login-redirect';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import logoLight from '@/assets/logo-light.png';
@@ -13,7 +14,12 @@ export default function Login() {
 
   useEffect(() => {
     if (!isLoading && user) {
-      if (isPlatformAdmin) {
+      // A guard stashed the originally requested URL before sending us here —
+      // restore it; otherwise fall back to the role home (#16).
+      const redirect = consumePostLoginRedirect();
+      if (redirect) {
+        navigate(redirect, { replace: true });
+      } else if (isPlatformAdmin) {
         navigate('/app/admin/organizations');
       } else if (isOrgAdmin) {
         navigate('/app/admin/analytics');
