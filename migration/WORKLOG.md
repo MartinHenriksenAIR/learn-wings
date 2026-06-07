@@ -465,3 +465,46 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 **Deferred to issues (deliberately not blocking #35):** #46 sort_order ownership (pre-existing, touches course-player-data), #47 `requirePlatformAdmin` sweep (24 endpoints; lands as its own PR right after #35 merges — functions/shared contract, serialize), #48 admin mutation architecture (useMutation + cache patching), #49 thumbnail_url SAS data audit (depends on #35).
 
 **Process notes:** the T6 spec reviewer caught a real regression green tests missed (`setLoading(true)` in fetchData blanked the page on every post-mutation refetch — fixed before it landed); the storage.ts task silently dropped out of the initial task extraction and was caught during handoff while writing the PR comment (completed as T7 through the same pipeline — lesson: diff the agreed scope list against the task list before dispatching). Review nits left as-is: two cosmetic casts in validate.ts; `deleteBlob` path-encoding precondition noted as a follow-up candidate; `course-player-data` is now the un-parallelized sibling (natural rider for #46–#48 work).
+
+
+---
+
+## 2026-06-07 — Slice 3a: Organizations cutover (issue #9, PR #45, branch martin/9-organizations-cutover)
+
+**Who:** martin & Claude (subagent-driven session for the post-review fix-pass; the prior Slice 3a slice work shipped earlier in this branch). PR #45 squash-merged as `a017bff` after a 15-finding `/code-review --max` pass and an 11-commit tactical fix-pass.
+
+**3 new endpoints (barrel at 89 post-merge):** `organization-create` (whitelisted body INSERT; 23505 → 409 on duplicate slug), `organization-update` (dynamic SET over a whitelisted key set name/slug/logo_url/seat_limit; single `UPDATE…RETURNING` after the fix-pass collapsed the prior SELECT+UPDATE round-trip; 404 on no-match, 409 on 23505), `organization-delete` (single `DELETE…RETURNING id` after the fix-pass; cascade FKs handle dependents). **1 existing endpoint modified:** `organizations` LIST branches gained a `member_count` correlated subquery (eliminating the per-org `count('*')` N+1 in `OrganizationsManager`) with a `::int` cast (BIGINT → JS number) and `om2` alias to avoid collision with the outer `JOIN org_memberships om` in the member branch. All 3 new endpoints are platform-admin-only with `getProfile()` + `is_platform_admin` checks; provenance from migration `20260127153401_*.sql:269-276` ("Platform admins can do everything with orgs" — the only DML-granting policy).
+
+**Authorization parity:** validate → authz → DML (no enumeration via 404-vs-403, since non-admins hit 403 before the row probe). After the fix-pass collapsed the SELECT existence checks, the 404 now comes from `RETURNING` returning null, which fires only after authz has passed — the property holds.
+
+**2 frontend files cut over** (org-table calls only; memberships/invitations/profiles remain on supabase pending Slice 3b/3c, tracked in issue #54): `OrganizationsManager.tsx` (list + create + logo-URL builder via `callApi`; snake→camel translation at the fetch boundary; `setCreating` cleared in `finally`), `OrganizationDetail.tsx` (read + update + delete + logo-URL via `callApi`; `setSaving`/`setDeleting` cleared in `finally`). New `src/lib/storage-url.ts` `buildPublicUrl(storagePath)` helper replaces three inline `${VITE_STORAGE_BASE_URL ?? ''}/${path}` compositions (`OrganizationsManager`, `OrganizationDetail`, `OrgAnalytics`); throws on missing env so a misconfigured environment surfaces an upload error rather than silently writing a broken URL.
+
+**FIXED in the original Slice 3a work** (commits `449ced5`, `486d5d0`): the recurring stranded-spinner bug class on the three handlers (now wrapped in `try/finally`); the per-org `count` N+1 in the manager.
+
+---
+
+## 2026-06-07 — PR #45 pre-merge fix-pass (commits 043e507 → 6b5c37f, 11 commits)
+
+**Who:** martin & Claude (subagent-driven; per-task implementer → spec review → code-quality review pipeline, plus a final whole-implementation review). xhigh `/code-review --max` over PR #45 returned 15 findings: 11 fixed in this fix-pass, 4 architectural items + 1 deferred UX filed as follow-up issues #50–#54.
+
+**Fixed on the branch (11 commits, all green-on-CI per the gates):**
+- **Sort regression (severe UX):** `ORDER BY o.name` had silently replaced the original `.order('created_at', { ascending: false })`. Restored to `ORDER BY o.created_at DESC` on both LIST branches; test pinned the SQL substring.
+- **`editOrgSchema` ↔ backend drift (the canary for #51):** front-end min(1) for name/slug accepted inputs the backend (min 2) rejected with a destructive toast after save. Now min(2) with matching error messages.
+- **`UPDATE…RETURNING` and `DELETE…RETURNING` collapses:** `organization-update` and `organization-delete` each dropped the existence-check SELECT, halving the DB round-trips and closing the TOCTOU window where a concurrent delete between SELECT and UPDATE produced `{ organization: null }` in the response. Test mock chains collapsed accordingly; `OrgRow` interface removed from update (only used in delete's RETURNING generic now).
+- **`Organization.member_count?: number`** added (snake_case to mirror the API; optional because the single-org branch doesn't return it). Fetch-boundary intersection in `OrganizationsManager` simplified to `Organization[]`; `OrgSelector`'s typing is now accurate without intersection gymnastics.
+- **Silent-fail UX × 3:** destructive toasts on `fetchOrgs`, `fetchData` (org), and **partial post-create failures**. The `handleCreate` restructure was the largest single change — `let postCreateError: string | null = null` first-failure-wins chain across the supabase membership/invitation/RPC/email steps; on any failure a "Organization created, but follow-up step failed: <reason>" destructive toast replaces the green one, dialog still closes, list still refreshes (the org exists either way). Each remaining `supabase.*` call carries an inline `TODO(slice-3b):` comment naming the future callApi endpoint.
+- **`buildPublicUrl` helper + 3 callsite migrations** (see Slice 3a entry above).
+- **Partial index** `org_memberships_org_id_active_idx ON org_memberships (org_id) WHERE status = 'active'` — supports the new `member_count` correlated subquery and the existing `isActiveMember` lookup. `IF NOT EXISTS` keeps re-runs idempotent.
+
+**Deferred to follow-up issues** (each captures a specific finding plus its acceptance criteria):
+- **#50** (structured error codes for 4xx + `isUniqueViolation` helper) — replaces the exact-string slug-conflict match in `handleCreate` and dedups the 23505 → 409 mapping that appears in `organization-create` and `organization-update`.
+- **#51** (shared org-validation module) — single source of truth for slug regex + name/slug length; the editOrgSchema drift above is exactly the bug class this prevents.
+- **#52** (`corsResponse` return type → `HttpResponseInit` + cast cleanup) — ~100 `as HttpResponseInit` casts across the function tree; touches files outside any single slice, lands as its own PR.
+- **#53** ('Try again' button on the OrganizationDetail empty state) — with the new toast the failure is no longer silent, but full-page reload is still the only retry; deferred UX polish.
+- **#54** (scope clarification for the remaining `supabase.*` in cut-over files) — memberships/invitations/profiles still call Supabase in `OrganizationsManager`/`OrganizationDetail`; explicit slice assignment so the grep gate doesn't trip.
+
+**Gates** (post-merge on fresh trunk): functions suite **1156 passing / 3 skipped** (Slice 3a's +51 endpoint tests + 2 new ORDER BY assertions added inline; test mock-chain collapses in update/delete kept the test count flat); root suite **65 passing** (the 5 new `storage-url.test.ts` cases); `npx tsc --noEmit -p tsconfig.app.json` exit 0; `npm run build` ok. Zero `supabase.from('organizations')` / `org-logos getPublicUrl` matches in the two cut-over files; zero inline `VITE_STORAGE_BASE_URL` compositions in `src/` outside the helper.
+
+**Process notes:** the per-task two-stage review caught one cosmetic finding (unused `existingOrg` constant in `organization-update/index.test.ts` post-collapse) explicitly flagged non-blocking and left as-is; the final whole-implementation review noted one unused `beforeEach` import in `storage-url.test.ts` at sub-threshold confidence (also left). The `gh issue create` heredoc commands hit a backtick-in-heredoc parse conflict on issue #52's body; resolved by switching that issue (and the two after it) to `--body-file` with the body in a temp file. Spec at `docs/superpowers/specs/2026-06-07-pr-45-fix-pass-design.md`; implementation plan at `docs/superpowers/plans/2026-06-07-pr-45-fix-pass.md` (both tracked in the bookkeeping PR alongside this entry).
+
+**Deploy status:** trunk-deploy from `a017bff` pending; the new `org_memberships_org_id_active_idx` migration applies via the deploy workflow's migration step. Gate 4 user-e2e on the PR-6 preview pending post-deploy.
