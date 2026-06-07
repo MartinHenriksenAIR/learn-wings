@@ -37,7 +37,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at,
           (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count
          FROM organizations o
-         ORDER BY o.name`,
+         ORDER BY o.created_at DESC`,
       );
       return corsResponse(origin, 200, { organizations }) as HttpResponseInit;
     }
@@ -48,7 +48,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
        FROM organizations o
        JOIN org_memberships om ON om.org_id = o.id
        WHERE om.user_id = $1 AND om.status = 'active'
-       ORDER BY o.name`,
+       ORDER BY o.created_at DESC`,
       [profile.id],
     );
     return corsResponse(origin, 200, { organizations }) as HttpResponseInit;

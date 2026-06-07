@@ -68,6 +68,7 @@ describe('organizations', () => {
     expect(sql).not.toContain('JOIN org_memberships');
     expect(sql).toContain('member_count');
     expect(sql).toContain('org_memberships om2');
+    expect(sql).toContain('ORDER BY o.created_at DESC');
     expect(params ?? []).toEqual([]);
   });
 
@@ -88,6 +89,7 @@ describe('organizations', () => {
     expect(sql).toContain('member_count');
     // Subquery alias must differ from outer JOIN alias to avoid collision
     expect(sql).toContain('org_memberships om2');
+    expect(sql).toContain('ORDER BY o.created_at DESC');
     expect(params).toEqual(['p1']);
   });
 
