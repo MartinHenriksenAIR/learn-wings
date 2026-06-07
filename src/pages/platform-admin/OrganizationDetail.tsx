@@ -144,6 +144,11 @@ export default function OrganizationDetail() {
       const { organization } = await callApi<{ organization: Organization }>('/api/organizations', { orgId });
       if (organization) setOrg(organization);
     } catch (err) {
+      toast({
+        title: 'Failed to load organization',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
       console.error('OrganizationDetail: failed to load organization', err);
     }
 
