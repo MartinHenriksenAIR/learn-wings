@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrgAdmin } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQueryOne: vi.fn(),
-    mockGetProfile: vi.fn(),
+    mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
-vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
+vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: mockIsOrgAdmin, isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
 
@@ -27,6 +27,7 @@ describe('organization-update', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
+    mockIsOrgAdmin.mockResolvedValue(false);
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -186,5 +187,62 @@ describe('organization-update', () => {
     const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+  });
+
+  // --- Org-admin logo_url parity (RLS 20260128223657) ---
+
+  it('org admin of the target org can update logo_url only', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: 'https://x/logo.png' });
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { logo_url: 'https://x/logo.png' } }), {} as any);
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('UPDATE organizations SET');
+    expect(sql).toContain('logo_url = $1');
+    expect(sql).toContain('WHERE id = $2');
+    expect(params).toEqual(['https://x/logo.png', 'org-1']);
+    expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
+  });
+
+  it('org admin cannot update other fields', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    // isOrgAdmin is NOT called — onlyLogoUrl is false (name is not logo_url), so && short-circuits
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+    expect(mockIsOrgAdmin).not.toHaveBeenCalled();
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('org admin cannot smuggle other fields alongside logo_url', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { logo_url: 'https://x/logo.png', name: 'New Name' } }),
+      {} as any,
+    );
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('non-admin member gets 403 even for logo_url', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(false);
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { logo_url: 'https://x/logo.png' } }), {} as any);
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('org admin can clear the logo (logo_url: null)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: null });
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { logo_url: null } }), {} as any);
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('logo_url = $1');
+    expect(params).toEqual([null, 'org-1']);
   });
 });

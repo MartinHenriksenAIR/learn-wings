@@ -2,7 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { getProfile } from '../shared/profile';
+import { getProfile, isOrgAdmin } from '../shared/profile';
 
 // Mirrors the zod/schema constraints in organization-create — same DB,
 // same validation messages so the page-side error handling is identical.
@@ -64,11 +64,18 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       }
     }
 
-    // Authorization: platform-admin-only.
-    // RLS provenance: supabase/migrations/20260127153401_*.sql lines 269-276 —
-    // "Platform admins can do everything with orgs" was the only UPDATE-capable policy.
+    // Authorization: platform admin → any whitelisted field; org admin of the target
+    // org → logo_url ONLY.
+    // RLS provenance: supabase/migrations/20260127153401_*.sql:269-276 ("Platform admins
+    // can do everything with orgs") + 20260128223657 ("Org admins can update their org
+    // logo", FOR UPDATE is_org_admin(id)). The old policy was row-scoped (technically any
+    // column); we tighten to the migration's stated intent — logo_url only (deliberate).
     if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      const onlyLogoUrl = updateKeys.every((key) => key === 'logo_url');
+      const allowed = onlyLogoUrl && await isOrgAdmin(profile.id, orgId);
+      if (!allowed) {
+        return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      }
     }
 
     // Dynamic UPDATE over the whitelisted keys (pattern: resource-update:104-125).
