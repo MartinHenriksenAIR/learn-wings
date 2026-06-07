@@ -31,3 +31,4 @@ local.settings.json
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+.claude/worktrees/

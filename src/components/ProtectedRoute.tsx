@@ -1,5 +1,6 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { savePostLoginRedirect } from '@/lib/post-login-redirect';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -16,7 +17,8 @@ export function ProtectedRoute({
   learnerOnly = false,
 }: ProtectedRouteProps) {
   const { user, isLoading, isPlatformAdmin, effectiveIsPlatformAdmin, effectiveIsOrgAdmin } = useAuth();
-  
+  const location = useLocation();
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -26,6 +28,9 @@ export function ProtectedRoute({
   }
   
   if (!user) {
+    // Remember where the user was headed so Login can restore it after the
+    // Entra round trip (deep links / Copy link, #16).
+    savePostLoginRedirect(location.pathname + location.search + location.hash);
     return <Navigate to="/login" replace />;
   }
   

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 
 // Mock MSAL before importing the hook
@@ -43,6 +43,7 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 describe('useAuth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     mockUseMsal.mockReturnValue({
       instance: { loginRedirect: mockLoginRedirect, logoutRedirect: mockLogoutRedirect },
       accounts: [],
@@ -93,5 +94,108 @@ describe('useAuth', () => {
     await act(async () => { result.current.signOut(); });
 
     expect(mockLogoutRedirect).toHaveBeenCalledOnce();
+  });
+
+  it('signOut clears the persisted viewMode and any stashed redirect (same-tab next login must start clean)', async () => {
+    sessionStorage.setItem('viewMode', 'learner');
+    sessionStorage.setItem('postLoginRedirect', '/app/community/org/posts/123');
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await act(async () => { result.current.signOut(); });
+
+    expect(sessionStorage.getItem('viewMode')).toBeNull();
+    expect(sessionStorage.getItem('postLoginRedirect')).toBeNull();
+  });
+
+  describe('isLoading covers user-context resolution (#16)', () => {
+    const msalWithAccount = () => {
+      mockUseMsal.mockReturnValue({
+        instance: { loginRedirect: mockLoginRedirect, logoutRedirect: mockLogoutRedirect },
+        accounts: [mockAccount],
+        inProgress: 'none',
+      });
+      mockUseAccount.mockReturnValue(mockAccount);
+    };
+
+    it('stays loading until the user-context fetch resolves, then exposes the profile', async () => {
+      msalWithAccount();
+      let resolveCtx!: (v: unknown) => void;
+      mockCallApi.mockReturnValue(new Promise((r) => { resolveCtx = r; }));
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      // MSAL is idle but the profile fetch is in flight — route guards must NOT
+      // treat this window as "not authorized" (the refresh→dashboard bug).
+      expect(result.current.isLoading).toBe(true);
+
+      await act(async () => {
+        resolveCtx({ profile: { id: 'p-1', is_platform_admin: false }, memberships: [] });
+      });
+
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.profile?.id).toBe('p-1');
+    });
+
+    it('clears loading even when the user-context fetch fails', async () => {
+      msalWithAccount();
+      mockCallApi.mockRejectedValue(new Error('api down'));
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.profile).toBeNull();
+    });
+
+    it('is not loading when signed out (no MSAL account)', () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      expect(result.current.isLoading).toBe(false);
+      expect(mockCallApi).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('viewMode persistence (#16)', () => {
+    beforeEach(() => {
+      mockUseMsal.mockReturnValue({
+        instance: { loginRedirect: mockLoginRedirect, logoutRedirect: mockLogoutRedirect },
+        accounts: [mockAccount],
+        inProgress: 'none',
+      });
+      mockUseAccount.mockReturnValue(mockAccount);
+      // Keep the context fetch pending so no state updates leak past test end.
+      mockCallApi.mockReturnValue(new Promise(() => {}));
+    });
+
+    it('initializes viewMode from sessionStorage so it survives a reload', () => {
+      sessionStorage.setItem('viewMode', 'learner');
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      expect(result.current.viewMode).toBe('learner');
+    });
+
+    it('defaults viewMode to platform_admin when nothing is stored', () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      expect(result.current.viewMode).toBe('platform_admin');
+    });
+
+    it('ignores an invalid stored viewMode value', () => {
+      sessionStorage.setItem('viewMode', 'garbage');
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      expect(result.current.viewMode).toBe('platform_admin');
+    });
+
+    it('persists viewMode changes to sessionStorage', () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      act(() => { result.current.setViewMode('org_admin'); });
+
+      expect(result.current.viewMode).toBe('org_admin');
+      expect(sessionStorage.getItem('viewMode')).toBe('org_admin');
+    });
   });
 });
