@@ -528,3 +528,51 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 **Negative parity:** no Supabase REST calls in any of the org CRUD paths. The `org_memberships` and `get_platform_invitations_safe` calls observed on the detail page are the explicitly-scoped Slice 3b/3c residue (issue #54) — `TODO(slice-3b)` markers in the source.
 
 **Gate 4 status:** ✅ closed. Slice 3a complete. Slice 2's Gate 4 still pending the next trunk deploy.
+
+---
+
+## 2026-06-07 — Slice 3b: Memberships & invitations cutover (issue #10, PR #58, branch martin/10-slice-3b-memberships-invitations)
+
+**Who:** martin & Claude (subagent-driven per-task implementer pipeline; clean `pr-review-toolkit:code-reviewer` pass — zero must-fix/should-fix findings; squash-merged as `38b29c0`).
+
+**8 new endpoints (barrel at 97 post-merge):**
+- `org-membership-create` (POST: orgId, userId, role, status?='active') — lookup-then-authz-then-INSERT; 23505 (UNIQUE org_id,user_id) → 409; 23503 → 404. Platform admin OR `isOrgAdmin`; RLS provenance `supabase/migrations/20260127153401_*.sql:279-285`.
+- `org-membership-update` (POST: id, role?, status?) — load membership → 404 if missing → authz → dynamic SET clause over whitelisted keys → `UPDATE…RETURNING`; same authz model.
+- `org-membership-delete` (POST: id) — load → 404 → authz → `DELETE…RETURNING id` (TOCTOU still earns 404).
+- `invitations` LIST (POST: scope='org'|'platform', orgId?) — raw SQL wrapping the `get_org_invitations_safe` / `get_platform_invitations_safe` RPCs; columns enumerated explicitly, **token/token_hash deliberately omitted** (asserted by test that the SELECT string never matches `\btoken\b`); `WHERE status='pending'` always; `ORDER BY created_at DESC`. Org-admin scope filters to `invited_by_user_id = profile.id` (parity with `supabase/migrations/20260201171353_*.sql`); platform admins see all.
+- `invitation-create` (POST: orgId, email, role, firstName?, lastName?, department?) — RETURNS the full row including `link_id`, eliminating the follow-up `get_invitation_link_id` RPC roundtrip. Email lowercased + trimmed; `invited_by_user_id` set from token (clients never supply it).
+- `invitation-bulk-create` (POST: orgId, invites[1..500]) — sequential per-row try/catch; one bad row does NOT abort the batch (no wrapping transaction); response shape `{ results: [{ email, success, invitation?, error? }] }` preserves input order. Per-row 23505 → "An invitation for this email is already pending" string.
+- `invitation-update` (POST: id, status='expired') — accepts only the cancel transition (other statuses 400). Lookup-then-authz-then-`UPDATE…RETURNING`; same column projection as `invitation-create` (no token/token_hash).
+- `enrollment-create` (POST: orgId, userId, courseId, status?='enrolled') — admin-driven enrollment; **distinct from the learner-side `enroll`** (untouched). Course-published precondition (404 missing, 400 unpublished); `org_course_access.access='enabled'` precondition **only for non-platform-admins** (admin-override convention); 23505 (UNIQUE org_id,user_id,course_id) → 409; 23503 → 404.
+
+**Test count:** `cd functions && npm test` → **1281 passing / 3 skipped** (+125 from this slice). Each endpoint: OPTIONS + 401 unauth + 401 no-profile + key 400s + 403 non-admin + happy platform-admin + happy org-admin + key error codes + 500 generic — averaging 16 cases per file.
+
+**5 frontend files cut over** (+403 / -1160, net –757 lines):
+- **`OrgMembersTab.tsx`** (12 → 3 supabase calls): membership read → `/api/org-memberships`; invitation RPC → `/api/invitations` `{scope:'org'}`; member precheck removed (was buggy — compared `full_name` to email — and replaced by the new endpoint's 23505 path); invitation create+link RPC collapsed into one `/api/invitation-create` call (link_id comes back); cancel → `/api/invitation-update {status:'expired'}`; role change → `/api/org-membership-update`; remove → `/api/org-membership-delete`. The 3 remaining `.from('ai_champions')` calls (read + insert + delete) keep `TODO(slice-3c)` markers — Slice 5 owns the GET (`/community/ai-champions`), Slice 3c owns the writes (`POST/DELETE /api/ai-champions`). `user?.id` → `profile?.id` audit applied on the row-action self-check.
+- **`BulkInviteDialog.tsx`** (3 → 0): per-row INSERT loop + per-row `get_invitation_link_id` RPC collapsed into ONE `/api/invitation-bulk-create` call; iterate `results[]` for success/failure mapping; `link_id` is on each successful row already. `userId` prop kept on the interface (unused; future cleanup; see follow-up below).
+- **`EnrollUserDialog.tsx`** (4 → 0): `org_course_access` + `courses` read collapsed into ONE `/api/org-course-access` call (existing endpoint already does the JOIN); `enrollments` read → `/api/enrollments`; per-course insert → `/api/enrollment-create`. Loading + enrolling flags now cleared in `finally`.
+- **`OrganizationsManager.tsx`** (3 → 0; TODO(slice-3b) markers cleared): the post-create assign-existing-admin path → `/api/org-membership-create`; the post-create invite-new-admin path → `/api/invitation-create` (link_id from the response, no second roundtrip). Removed `invited_by_user_id: user?.id` (server-derived).
+- **`OrganizationDetail.tsx`** (7 → 0; TODO(slice-3b) markers cleared): all 7 calls — membership reads, the platform-invitations RPC, the add/role/disable/reactivate/invite/cancel handlers — migrated. Member list reshape mirrors `OrgMembersTab`. The legacy follow-up `callApi('/api/invitation-link', ...)` in `handleInvite` deleted (link_id arrives with the create response).
+
+**`OrgUsers.tsx` deleted** (-802 lines). Verified unrouted via `grep` across `src/`; the diff vs `OrgMembersTab.tsx` was purely cosmetic (whitespace + `<AppLayout>` wrapping + import order). Dedupe per the spec's "dedupe OrgUsers/OrgMembersTab" item: **dedupe = delete the dupe.**
+
+**Authorization parity:** validate → authz → DB across every endpoint (same property as Slice 3a — no enumeration via 404-vs-403, since non-admins hit 403 before any row probe). Platform admins bypass the inviter-restriction on the LIST and bypass `org_course_access` on enrollment-create, both documented in inline comments.
+
+**Order-by parity break (deliberate):** the members list in OrgMembersTab + OrganizationDetail now orders by `full_name` ASC (server-side, matching the existing `/api/org-memberships` shape) instead of the legacy `created_at DESC`. Same change Slice 3a accepted for organizations LIST sort regression — not a regression here since the server endpoint always ordered this way.
+
+**Partial Profile DTO** returned by `/api/org-memberships`: rows include only `full_name, email, avatar_url, department` (matches the existing endpoint's projection). Code-reviewer grep verified no consumer in the cut-over files reads any of the missing fields (`first_name`, `last_name`, `is_platform_admin`, `preferred_language`). Risk surface is downstream readers that don't yet exist.
+
+**Follow-up issues filed** (six, all hardening — none blocked the merge):
+- **#61** (cosmetic: `SELECT 1 AS exists` in enrollment-create:57-58) — rename `AS exists` → `AS ok` to match the `shared/profile.ts:23` convention.
+- **#62** (EnrollUserDialog: per-row error messages) — `EnrollUserDialog.handleEnroll`'s `catch (_err) { failed++; }` swallows per-row error messages; preserves pre-migration UX but a 403 from the `org_course_access` precondition currently surfaces as the misleading "may already be enrolled". Either surface error messages OR call a future bulk endpoint.
+- **#63** (BulkInviteDialog: drop the dead `userId` prop) — server now derives `invited_by_user_id` from the token; `BulkInviteDialog`'s `userId` prop is unused; clean up the interface + the OrgMembersTab call site.
+- **#64** (Invitation TS type: `token` is required-but-never-returned) — `src/lib/types.ts:49` has `token: string`; the API never exposes it. Tighten to `token?: string` or remove — prevents future regressions where someone reads `invitation.token` expecting a value.
+- **#65** (invitations LIST: test gap for empty-string orgId on `scope='platform'`) — only the `scope='org'` empty-orgId branch is tested.
+- **#66** (org-membership-create + seat-limit) — endpoint trusts client-supplied `status: 'invited'`; backend `INSERT` doesn't enforce `org.seat_limit` (UI-only gate at `OrganizationDetail.tsx:735`). Parity with pre-migration RLS (org admins had full `ALL`).
+
+**Closes #54** (the post-Slice-3a "scope clarification for remaining supabase.* in cut-over files" issue): every `TODO(slice-3b)` marker resolved, `OrganizationsManager` + `OrganizationDetail` are now supabase-free except for the explicit Slice 3c residue tracked in `OrgMembersTab`/`UserProgressDialog` etc.
+
+**Gates** (pre-deploy on the merged trunk SHA `38b29c0`): functions suite **1281 passing / 3 skipped**; root suite **65 passing**; `npx tsc --noEmit -p tsconfig.app.json` exit 0; `npm run build` exit 0. Zero `supabase.(from|rpc|storage|auth)` matches in the 5 cut-over files; only the 3 deliberate `.from('ai_champions')` calls in `OrgMembersTab` remain (Slice 3c).
+
+**Deploy status:** trunk deploy via `gh workflow run main_func-ai-education-migration.yml --ref feature/lovable-migration` (run #27091444197). Gate 4 user-e2e on PR-6 preview pending post-deploy.
+
