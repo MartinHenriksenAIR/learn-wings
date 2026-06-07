@@ -39,6 +39,7 @@ describe('ai-champion-delete', () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
     const res = await handler(baseReq({ orgId: 'org-1', userId: 'p2' }), {} as any);
     expect(res.status).toBe(401);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
   it('returns 401 when profile is not provisioned', async () => {
