@@ -322,6 +322,8 @@ export default function CourseEditor() {
           <Button
             variant="outline"
             onClick={() => {
+              // Deliberately no setLoading(true): fetchStructure is also the post-mutation
+              // refetch, so retry-in-place keeps the two paths consistent (cf. CoursesManager).
               setLoadError(null);
               fetchStructure();
             }}
