@@ -1,0 +1,153 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import React from 'react';
+
+// --- mock react-i18next (no i18n provider needed) ---
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (k: string) => k }),
+}));
+
+// --- mock AppLayout as a simple passthrough ---
+vi.mock('@/components/layout/AppLayout', () => ({
+  AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+// --- mock api-client so no network fires ---
+vi.mock('@/lib/api-client', () => ({
+  callApi: vi.fn(),
+}));
+
+// --- mock sonner toast ---
+vi.mock('@/components/ui/sonner', () => ({
+  toast: vi.fn(),
+}));
+
+// --- useAuth mock factory ---
+const mockUseAuth = vi.fn();
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+// --- usePlatformSettings mock factory ---
+const mockUsePlatformSettings = vi.fn();
+vi.mock('@/hooks/usePlatformSettings', () => ({
+  usePlatformSettings: () => mockUsePlatformSettings(),
+}));
+
+import OrgSettings from './OrgSettings';
+
+const defaultPlatformSettings = {
+  platformFeatures: {
+    certificates_enabled: true,
+    quizzes_enabled: true,
+    analytics_enabled: true,
+    course_reviews_enabled: true,
+    community_enabled: true,
+  },
+  orgFeatures: null,
+  isLoading: false,
+  refetch: vi.fn(),
+};
+
+const baseAuthState = {
+  user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
+  profile: { id: 'p-1', is_platform_admin: false, first_name: 'Test', last_name: 'User' },
+  currentOrg: null,
+  memberships: [],
+  isPlatformAdmin: false,
+  isOrgAdmin: false,
+  isLoading: false,
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  refreshUserContext: vi.fn(),
+  setCurrentOrg: vi.fn(),
+  viewMode: 'learner' as const,
+  setViewMode: vi.fn(),
+  effectiveIsPlatformAdmin: false,
+  effectiveIsOrgAdmin: false,
+};
+
+function renderOrgSettings() {
+  return render(
+    <MemoryRouter>
+      <OrgSettings />
+    </MemoryRouter>
+  );
+}
+
+describe('OrgSettings — three-way loading guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders empty state when profile resolved + no currentOrg + settings not loading', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: null });
+    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
+
+    renderOrgSettings();
+
+    // Empty state text keys must be visible
+    expect(screen.getByText('common.noOrgSelected')).toBeInTheDocument();
+    expect(screen.getByText('orgSettings.noOrgDescription')).toBeInTheDocument();
+
+    // No editable controls
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+
+    // No spinner
+    expect(document.querySelector('.animate-spin')).toBeNull();
+  });
+
+  it('renders spinner when user exists but profile is null (context not yet resolved)', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, profile: null, currentOrg: null });
+    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
+
+    renderOrgSettings();
+
+    // Spinner must be present
+    expect(document.querySelector('.animate-spin')).not.toBeNull();
+
+    // No empty state
+    expect(screen.queryByText('common.noOrgSelected')).toBeNull();
+    expect(screen.queryByText('orgSettings.noOrgDescription')).toBeNull();
+
+    // No form
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('renders spinner when usePlatformSettings().isLoading is true', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState });
+    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: true });
+
+    renderOrgSettings();
+
+    expect(document.querySelector('.animate-spin')).not.toBeNull();
+    expect(screen.queryByText('common.noOrgSelected')).toBeNull();
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
+  });
+
+  it('renders form when currentOrg is set and context is resolved', () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg: { id: 'org-1', name: 'Test Org' },
+    });
+    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
+
+    renderOrgSettings();
+
+    // No spinner
+    expect(document.querySelector('.animate-spin')).toBeNull();
+
+    // No empty state
+    expect(screen.queryByText('common.noOrgSelected')).toBeNull();
+
+    // Five feature switches present
+    const switches = screen.queryAllByRole('switch');
+    expect(switches).toHaveLength(5);
+
+    // Save button present
+    expect(screen.getByRole('button', { name: /Save Organization Settings/i })).toBeInTheDocument();
+  });
+});

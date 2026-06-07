@@ -241,6 +241,9 @@
     "scopeGlobal": "Global",
     "scopeOrganization": "Organization"
   },
+  "orgSettings": {
+    "noOrgDescription": "Select an organization to manage its settings."
+  },
   "certificates": {
     "title": "Certificates",
     "myCertificates": "My Certificates",

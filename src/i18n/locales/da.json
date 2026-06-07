@@ -241,6 +241,9 @@
     "scopeGlobal": "Global",
     "scopeOrganization": "Organisation"
   },
+  "orgSettings": {
+    "noOrgDescription": "Vælg en organisation for at administrere dens indstillinger."
+  },
   "certificates": {
     "title": "Certifikater",
     "myCertificates": "Mine certifikater",
