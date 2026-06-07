@@ -679,3 +679,15 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 ## 2026-06-07 — #16 Gate 4 user-verified + closed
 
 **Who:** emil & Claude. All four Gate-4 steps PASSED on the PR-6 preview (trunk @acaf771): cold Entra login with no /login bounce (regression guard), hard refresh stays on the origin route, copied deep links open their target in a fresh tab, sidebar view mode survives reload. View-mode persistence failed emil's FIRST manual pass but passed on re-test with zero code change in between — attributed to a stale cached bundle from before the preview rebuild (no DevTools storage evidence ended up being needed). Issue #16 CLOSED (manually — `Closes #N` doesn't auto-fire on non-default-branch merges). Frontend-only: no function deploy this slice; production (`main`) untouched until the PR-6 cutover. Work branch `emil/16-deeplink-routing` deleted post-verification.
+
+---
+
+## 2026-06-07 — Admin-settings hardening bundle: #38 #39 #40 (PR #84)
+
+**Who:** emil & Claude (subagent-driven: implementer + spec review + quality review per fix; /code-review high on the full diff).
+
+- **#38** `PlatformCommunityModeration` — queries ALL report scopes (the backend no-filter mode was already platform-admin-only by Slice 5 design; zero backend changes), per-report scope badge (org name via `/api/organizations` lookup with 5 min staleTime, "Global" otherwise), scope-aware view link, de-globalized header copy. 4 tests incl. an exclusive window.open assertion that fails on an inverted scope mapping (mutation-checked).
+- **#39** `OrgSettings` — profile-gated three-way guard (spinner / `EmptyState` "select an organization" / form). Zero editable controls without an org. Review fix: the guard ignores the save-triggered shared-`isLoading` refetch so the form no longer swaps to a full-page spinner mid-save. 5 tests.
+- **#40** `PlatformSettings` — `populated` flag set only after a successful read; the editable form (and all Save/SMTP-test buttons) structurally unreachable otherwise — error `EmptyState` + retry instead; `saveSetting` no-ops as defense-in-depth. The branding/SMTP wipe path is impossible by construction and mutation-pinned (unconditional `setPopulated(true)` fails 2 tests). 5 tests, fixture-only SMTP values.
+
+All new strings i18n en+da. **Frontend-only — no function deploy** (trunk push rebuilds the PR-6 preview). Gates: build exit 0, **79/79 tests**, tsc exit 0, zero `supabase` in touched files. Review trail: 7 finder angles → 31 candidates → 2 fixed in-PR (spinner-swap, staleTime), follow-ups **#86** (comment-report deep link) + **#87** (useOrganizations/org-guard/PageSpinner dedup) filed; 2 deferred findings documented on PR #84 awaiting issues (PostDetail viewer-org feature gate blocks platform-admin view-content; `platform-settings-update` replace semantics need server-side validation); rest refuted/accepted with reasons on the PR.

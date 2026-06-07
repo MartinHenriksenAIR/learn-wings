@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
+import { callApi } from '@/lib/api-client';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
+import type { Organization } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -43,6 +46,7 @@ interface ReportWithDetails extends Omit<CommunityReport, 'reporter'> {
 }
 
 export default function PlatformCommunityModeration() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<ReportStatus>('pending');
@@ -50,12 +54,26 @@ export default function PlatformCommunityModeration() {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
 
-  // Fetch global reports (org_id is null)
+  // Fetch all reports across all scopes (no-filter mode = platform-admin only)
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ['platform-reports', activeTab],
     queryFn: async () => {
-      const data = await fetchReports(undefined, { scope: 'global', status: activeTab });
+      const data = await fetchReports(undefined, { status: activeTab });
       return data as ReportWithDetails[];
+    },
+  });
+
+  // Fetch all organizations for name lookup
+  const { data: orgsMap } = useQuery({
+    queryKey: ['platform-organizations'],
+    staleTime: 5 * 60 * 1000, // org names don't change mid-session; avoid window-focus refetches
+    queryFn: async () => {
+      const res = await callApi<{ organizations: Organization[] }>('/api/organizations', {});
+      const map = new Map<string, string>();
+      for (const org of res.organizations) {
+        map.set(org.id, org.name);
+      }
+      return map;
     },
   });
 
@@ -151,8 +169,25 @@ export default function PlatformCommunityModeration() {
     return type === 'post' ? <FileText className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />;
   };
 
+  const getScopeBadge = (report: ReportWithDetails) => {
+    if (!report.org_id) {
+      return (
+        <Badge variant="outline" className="text-xs">
+          {t('platformModeration.scopeGlobal')}
+        </Badge>
+      );
+    }
+    const orgName = orgsMap?.get(report.org_id) ?? t('platformModeration.scopeOrganization');
+    return (
+      <Badge variant="secondary" className="text-xs">
+        {orgName}
+      </Badge>
+    );
+  };
+
   const openContentInNewTab = (report: ReportWithDetails) => {
-    const path = `/app/community/global/posts/${report.target_id}`;
+    const scope = report.org_id ? 'org' : 'global';
+    const path = `/app/community/${scope}/posts/${report.target_id}`;
     window.open(path, '_blank', 'noopener,noreferrer');
   };
 
@@ -163,10 +198,10 @@ export default function PlatformCommunityModeration() {
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-1">
             <Globe className="h-5 w-5 text-primary" />
-            <h1 className="text-2xl font-bold">Global Community Moderation</h1>
+            <h1 className="text-2xl font-bold">{t('platformModeration.title')}</h1>
           </div>
           <p className="text-muted-foreground">
-            Review reported content in the platform-wide community
+            {t('platformModeration.description')}
           </p>
         </div>
 
@@ -199,7 +234,7 @@ export default function PlatformCommunityModeration() {
               <Flag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">No reports</h3>
               <p className="text-muted-foreground">
-                {activeTab === 'pending' 
+                {activeTab === 'pending'
                   ? 'No pending reports to review.'
                   : `No ${activeTab} reports found.`}
               </p>
@@ -221,6 +256,7 @@ export default function PlatformCommunityModeration() {
                           <Badge variant={report.status === 'pending' ? 'destructive' : 'secondary'}>
                             {report.status}
                           </Badge>
+                          {getScopeBadge(report)}
                         </CardTitle>
                         <CardDescription>
                           Reported by {report.reporter?.full_name || 'Unknown'} • {' '}

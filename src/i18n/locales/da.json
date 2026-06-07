@@ -235,6 +235,20 @@
       "done": "Færdig"
     }
   },
+  "platformModeration": {
+    "title": "Fællesskabsmoderation",
+    "description": "Gennemse rapporteret indhold på tværs af platformen og alle organisationer",
+    "scopeGlobal": "Global",
+    "scopeOrganization": "Organisation"
+  },
+  "orgSettings": {
+    "noOrgDescription": "Vælg en organisation for at administrere dens indstillinger."
+  },
+  "platformSettings": {
+    "loadFailedTitle": "Kunne ikke indlæse platformsindstillingerne.",
+    "loadFailedDescription": "Indstillingerne blev ikke indlæst fra serveren, så redigering er deaktiveret for at undgå at overskrive gemte værdier. Prøv igen.",
+    "retry": "Prøv igen"
+  },
   "certificates": {
     "title": "Certifikater",
     "myCertificates": "Mine certifikater",
