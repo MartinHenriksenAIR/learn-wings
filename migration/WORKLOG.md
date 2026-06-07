@@ -613,3 +613,24 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 ## 2026-06-07 — #14 merged + deployed (PR #59 → trunk @5ff8758)
 
 **Who:** emil & Claude. PR #59 squash-merged (cross-review waived by emil — the xhigh `/code-review` pass on the PR stood in; Martin active on Slice 3b concurrently). Trunk deploy via CI run **27091801153** (build + deploy green). Unauth smoke 4/4 `401 Missing Bearer token` on the regionalized hostname: `azure-view-url` (the fix) plus `org-membership-create`/`invitations`/`enrollment-create` — confirming Slice 3b's batch registered in the same deploy (97 live). Issue #14 closed. Remaining acceptance: authed video-200 on the seeded Welcome Video (PR-6 preview) — rides the next tester-session sweep alongside Slice 3b's Gate 4.
+
+---
+
+## 2026-06-07 — Slice 3c: AI-champions writes + user-progress (issue #11, PR #73)
+
+**Who:** emil & Claude (subagent-driven: implementer → spec-compliance review → code-quality review per task; final integration review over the whole branch).
+
+**Scope shipped:** 3 new endpoints + 2 frontend cutovers — the last two org-admin components off Supabase.
+- **`ai-champion-create`** — POST `{orgId, userId}`; authz platform admin OR org admin (RLS provenance `20260202125422`); **`assigned_by = profile.id` server-derived** — the old client sent `user.id` (Entra OID, wrong UUID space post-migration); resolves the issue #11 `user?.id` audit item. 23505→409, 23503→404.
+- **`ai-champion-delete`** — POST `{orgId, userId}`; same authz; **idempotent 200** even on a zero-row delete (Supabase `.delete().eq()` parity — deliberate divergence from `org-membership-delete`'s lookup-then-404, rationale inline: orgId is client-supplied and scopes the DELETE directly).
+- **`user-progress`** — POST `{orgId, userId}`; platform admin OR org admin ONLY (self-access deliberately omitted — the admin analytics dialog is the only consumer; learner-side reads live in Slice 1 endpoints). Aggregates UserProgressDialog's old 5-query client fan-out into ≤5 constant server queries (old client: 3 + 2 per course) and returns the dialog's exact camelCase shape; quiz keys **omitted (not null)** when absent to preserve the dialog's `!== undefined` badge guard (JSON.stringify drops undefined). RLS-parity visibility filter for non-platform-admins (`is_published` + `org_course_access` enabled — mirrors the old PostgREST null-embed skip); `ORDER BY c.title` is a deliberate determinism tightening. Multi-org-admin caller-org approximation documented in the plan/PR.
+- **`OrgMembersTab.tsx`** — the 3 remaining champion calls → `callApi`; supabase import gone; spinner now cleared in `finally` (review fix — frontend.md stranded-spinner class).
+- **`UserProgressDialog.tsx`** — `fetchUserProgress` collapses to ONE `callApi` call (−151 lines); the four interfaces retained as the API response contract.
+
+**Review trail:** two-stage review per task + final integration review (verdict: ready to merge, zero must-fix). Review fixes landed along the way: 401-body assertion in the delete test, a 13th user-progress test pinning multi-course Map isolation (passed first run), parity comments on the org-wide progress/attempt fetches, cast-safety invariant comment, spinner-finally.
+
+**Follow-up to file:** champion-toggle double-click race in `OrgMembersTab.handleToggleAiChampion` (pre-existing — no in-flight guard; needs an `updatingRole`-style `toggling` state). Surfaced by the Task 4 quality review; not blocking.
+
+**Gates** (work branch pre-merge): functions suite **1316 passed / 3 skipped**; root suite **65 passed**; `npx tsc --noEmit -p tsconfig.app.json` exit 0; both builds exit 0. Grep gates: **zero `supabase` matches across `src/components/org-admin/**`**; zero `*OrgUsers*` page files (deleted in 3b, completes the issue #11 grep gate); `@/integrations/supabase/client` importers down to `OrgAnalytics.tsx` (#72) + the shim itself — Slice 8 decommission surface is now one file.
+
+**Deploy status:** functions changed → needs a trunk deploy after merge (**100 functions** expected live: 97 + 3). Gate 4 (champion badge toggle on the Team tab + member progress dialog in Analytics, PR-6 preview) rides the next tester sweep post-deploy.

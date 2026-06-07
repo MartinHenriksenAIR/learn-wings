@@ -2,6 +2,8 @@
 // The host loads this file (package.json "main": "dist/index.js"); importing
 // each function module executes its app.http(...) registration.
 import './admin-user-actions/index';
+import './ai-champion-create/index';
+import './ai-champion-delete/index';
 import './ai-champions/index';
 import './asset-signed-url/index';
 import './azure-delete-blob/index';
@@ -98,3 +100,4 @@ import './send-invitation-email/index';
 import './test-smtp-connection/index';
 import './unenroll/index';
 import './user-context/index';
+import './user-progress/index';
