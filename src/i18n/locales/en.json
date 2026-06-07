@@ -244,6 +244,11 @@
   "orgSettings": {
     "noOrgDescription": "Select an organization to manage its settings."
   },
+  "platformSettings": {
+    "loadFailedTitle": "Couldn't load platform settings.",
+    "loadFailedDescription": "Settings were not loaded from the server, so editing is disabled to prevent overwriting saved values. Try again.",
+    "retry": "Try again"
+  },
   "certificates": {
     "title": "Certificates",
     "myCertificates": "My Certificates",
