@@ -235,6 +235,12 @@
       "done": "Færdig"
     }
   },
+  "platformModeration": {
+    "title": "Fællesskabsmoderation",
+    "description": "Gennemse rapporteret indhold på tværs af platformen og alle organisationer",
+    "scopeGlobal": "Global",
+    "scopeOrganization": "Organisation"
+  },
   "certificates": {
     "title": "Certifikater",
     "myCertificates": "Mine certifikater",

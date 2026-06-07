@@ -235,6 +235,12 @@
       "done": "Done"
     }
   },
+  "platformModeration": {
+    "title": "Community Moderation",
+    "description": "Review reported content across the platform and all organizations",
+    "scopeGlobal": "Global",
+    "scopeOrganization": "Organization"
+  },
   "certificates": {
     "title": "Certificates",
     "myCertificates": "My Certificates",
