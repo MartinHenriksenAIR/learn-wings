@@ -657,3 +657,9 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 **Gates (branch, pre-merge):** functions **1321 passed / 3 skipped** (+5), root 65, builds + tsc exit 0. Functions changed (`organization-update`) → redeploy follows this merge (run id announced on PR #77; function count stays 100).
 
 **Triage from the sweep (not yet filed):** invite links hardcode `https://ai-uddannelse.dk` (`src/lib/config.ts:4` `PLATFORM_BASE_URL`, Lovable-era) — preview-minted invites can't be accepted on the preview origin; candidate issue.
+
+---
+
+## 2026-06-07 — #72 deployed + verified + closed (trunk @820569d)
+
+**Who:** emil & Claude. PR #77 trunk deploy via CI run **27099804563** (organization-update authz; function count unchanged at 100), unauth smoke 3/3 401. UI spot-check on the rebuilt PR-6 preview PASSED (org filter populated + scoping, logo update 200, zero supabase requests) — #72 closed. Org-admin-ROLE logo upload remains contract-tested only (no org-admin login in the tester session) — noted as residue, not blocking. Work branches `emil/11-slice-3c` and `emil/72-org-analytics-cutover` deleted post-verification.
