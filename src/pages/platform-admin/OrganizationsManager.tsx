@@ -74,6 +74,11 @@ export default function OrganizationsManager() {
       const { organizations } = await callApi<{ organizations: Organization[] }>('/api/organizations', {});
       setOrgs((organizations ?? []).map((o) => ({ ...o, memberCount: o.member_count })));
     } catch (err) {
+      toast({
+        title: 'Failed to load organizations',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
       console.error('OrganizationsManager: failed to load organizations', err);
     } finally {
       setLoading(false);
