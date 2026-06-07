@@ -1,20 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockGenerateSasToken, mockBuildBlobUrl } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
     MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
-    mockGenerateSasToken: vi.fn().mockReturnValue('sp=d&sig=abc'),
-    mockBuildBlobUrl: vi.fn().mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/some-blob?sp=d&sig=abc'),
+    mockDeleteBlob: vi.fn().mockResolvedValue(true),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', () => ({ queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile }));
-vi.mock('../shared/sas', () => ({ generateSasToken: mockGenerateSasToken, buildBlobUrl: mockBuildBlobUrl }));
+vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
 
 process.env.AZURE_STORAGE_ACCOUNT_NAME = 'testaccount';
 process.env.AZURE_STORAGE_ACCOUNT_KEY = Buffer.alloc(32).toString('base64');
@@ -34,10 +33,7 @@ describe('azure-delete-blob', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'admin@test.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
-    mockGenerateSasToken.mockReturnValue('sp=d&sig=abc');
-    mockBuildBlobUrl.mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/some-blob?sp=d&sig=abc');
-    // Mock global fetch for DELETE request
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    mockDeleteBlob.mockResolvedValue(true);
   });
 
   it('returns success when admin deletes existing blob', async () => {
@@ -47,10 +43,12 @@ describe('azure-delete-blob', () => {
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.message).toBe('Blob deleted');
+    expect(mockDeleteBlob).toHaveBeenCalledWith('some-uuid.mp4');
   });
 
-  it('returns 200 when blob not found (404 from storage is acceptable)', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 404 });
+  it('returns 200 when blob not found (404 from storage is acceptable — helper returns true)', async () => {
+    // deleteBlob returns true for 404 (already gone) — caller sees success
+    mockDeleteBlob.mockResolvedValue(true);
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body as string);
@@ -98,8 +96,8 @@ describe('azure-delete-blob', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid token' });
   });
 
-  it('returns 500 when blob delete fails with non-404 status', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 500 });
+  it('returns 500 when blob delete fails (helper returns false)', async () => {
+    mockDeleteBlob.mockResolvedValue(false);
 
     const res = await handler(baseReq as any, {} as any);
 

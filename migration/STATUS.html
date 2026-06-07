@@ -153,16 +153,16 @@
 </section>
 
 <section id="current-state">
-  <h2>Current State <span class="asof">(post-#44 checkpoint — 2026-06-06)</span></h2>
+  <h2>Current State <span class="asof">(post-#35-review-sweep checkpoint — 2026-06-07)</span></h2>
   <dl class="checkpoint">
     <dt>Branch</dt>
     <dd><code>feature/lovable-migration</code> (PR #6 open; preview env is the live test surface). Tip moves after each merge — check <code>git log -1 origin/feature/lovable-migration</code> for the live SHA.</dd>
     <dt>Done</dt>
-    <dd>Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings &amp; profile), Slice 5 (community), Slice 6 (ideas), Slice 7 (resources — 2026-06-06), <strong>#37 OrgSelector → /api/organizations (PR #44, 2026-06-06)</strong> — ALL user-verified on the PR-6 preview except Slice 7's Gate 4 (pending; Gate 2 unauth-401 smoke ok). 71 functions live, suite at 788 tests. Slice 7 follow-up #41 (search-keystroke tags refetch — non-blocking polish).</dd>
+    <dd>Slice 0 (backend stand-up), Slice 0b (schema + seed), Slice 0.5 (shared reads), Slice 1 (learner flow), Slice 4 (settings &amp; profile), Slice 5 (community), Slice 6 (ideas), Slice 7 (resources — 2026-06-06), <strong>#37 OrgSelector → /api/organizations (PR #44, 2026-06-06)</strong>, <strong>Slice 2 (course authoring — 2026-06-06, issue #8, PR #35)</strong> — all user-verified on the PR-6 preview EXCEPT Slice 7's and Slice 2's Gate 4 (pending; Slice 7 Gate-2 unauth-401 smoke ok; Slice 2 deploys with the next trunk deploy). Slice 2: 15 platform-admin-only endpoints incl. the suite's first transactional one (<code>withTransaction</code> in <code>shared/db.ts</code>) + 3 admin pages cut over (resolves <code>CoursesManager</code>'s <code>from('organizations')</code> noted at the post-#44 checkpoint). 86 functions registered (71 live + Slice 2's 15 pending deploy). <strong>2026-06-07: pre-merge review-fix sweep on PR #35</strong> (see WORKLOG) — fixed cross-lesson quiz overwrite, SAS-URL thumbnail persistence (reads now self-heal), cascade-delete blob orphaning, admin load-path hangs; suites now functions 1105 / root 60; follow-ups #46–#49 filed (#47 lands as its own PR right after #35 merges). Slice 7 follow-up #41 (search-keystroke tags refetch — non-blocking polish). Admin-page test debt (Slice 4 settings pages, Slice 5 moderation pages, Slice 6 kanban, Slice 2 authoring pages) clears after profile elevation — see the Post-elevation queue.</dd>
     <dt>Remaining</dt>
-    <dd>Slices 2 (course authoring — incl. <code>CoursesManager</code>'s remaining <code>from('organizations')</code> #8), 3a/3b/3c (org &amp; user admin — incl. <code>OrgAnalytics</code>/<code>OrganizationsManager</code>/<code>OrganizationDetail</code>'s <code>from('organizations')</code> #9), 8 (decommission Supabase) — all on the issue board (#8–#11, #13).</dd>
+    <dd>Slices 3a/3b/3c (org &amp; user admin — incl. <code>OrgAnalytics</code>/<code>OrganizationsManager</code>/<code>OrganizationDetail</code>'s <code>from('organizations')</code> #9), 8 (decommission Supabase) — all on the issue board (#9–#11, #13).</dd>
     <dt>Collaboration</dt>
-    <dd>Two-person system implemented on PR #34 (issue #7): PR-only trunk (guard hook + ruleset), issue-board ledger (#8–#33), <code>pickup</code>/<code>handoff</code>/<code>slice-workflow</code> skills. Pending: Martin's ruleset creation + cross-review of PR #34.</dd>
+    <dd>Two-person system live: PR #34 merged, <code>trunk-pr-only</code> ruleset ACTIVE (verified 2026-06-06), issue-board ledger (#8–#33), <code>pickup</code>/<code>handoff</code>/<code>slice-workflow</code> skills. First parallel exercise 2026-06-06: Slice 7 (martin, PR #36) and Slice 2 (emil, PR #35) ran concurrently — disjoint scopes, hub-file appends (barrel, WORKLOG, STATUS) reconciled by rebasing #35 over the moved trunk.</dd>
   </dl>
 </section>
 
