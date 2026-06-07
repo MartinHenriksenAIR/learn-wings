@@ -127,6 +127,7 @@ export default function PlatformSettings() {
     } finally {
       setLoading(false);
     }
+    // deps deliberately empty: closes only over module constants and stable setters — referencing component state here would create a stale closure
   }, []);
 
   useEffect(() => {

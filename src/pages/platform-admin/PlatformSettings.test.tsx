@@ -172,6 +172,41 @@ describe('PlatformSettings', () => {
   });
 
   // ----------------------------------------------------------------
+  // Failed retry: fetch fails twice → error EmptyState persists, no form, no write
+  // ----------------------------------------------------------------
+  it('failed retry: clicking retry after two failures keeps error EmptyState and gate closed', async () => {
+    // Both the initial call and the retry call reject
+    mockCallApi
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockRejectedValueOnce(new Error('Network error'));
+
+    renderPage();
+
+    // Wait for the error EmptyState after first failure
+    await waitFor(() => {
+      expect(screen.getByText('platformSettings.loadFailedTitle')).toBeInTheDocument();
+    });
+
+    // Click the retry button
+    const retryBtn = screen.getByRole('button', { name: 'platformSettings.retry' });
+    fireEvent.click(retryBtn);
+
+    // After the retry also fails, error EmptyState should still be shown
+    await waitFor(() => {
+      expect(screen.getByText('platformSettings.loadFailedTitle')).toBeInTheDocument();
+    });
+
+    // Gate is still closed — no editable textboxes
+    expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+
+    // The update endpoint was never called
+    const updateCalls = mockCallApi.mock.calls.filter(
+      (args: unknown[]) => args[0] === '/api/platform-settings-update'
+    );
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  // ----------------------------------------------------------------
   // Save guarded: successful load → Save Branding calls the update endpoint
   // ----------------------------------------------------------------
   it('save guarded: after successful load, Save Branding calls platform-settings-update with branding key', async () => {
