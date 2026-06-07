@@ -53,6 +53,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api-client';
 import { Organization, OrgMembership, Profile, OrgRole, Invitation } from '@/lib/types';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
+import { buildPublicUrl } from '@/lib/storage-url';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Building2,
@@ -86,8 +87,8 @@ const inviteSchema = z.object({
 });
 
 const editOrgSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-  slug: z.string().min(1, 'Slug is required').max(50, 'Slug must be less than 50 characters')
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name must be less than 100 characters'),
+  slug: z.string().min(2, 'Slug must be at least 2 characters').max(50, 'Slug must be less than 50 characters')
     .regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens'),
 });
 
@@ -139,14 +140,16 @@ export default function OrganizationDetail() {
     if (!orgId) return;
 
     // Fetch organization
-    const { data: orgData } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('id', orgId)
-      .maybeSingle();
-
-    if (orgData) {
-      setOrg(orgData as Organization);
+    try {
+      const { organization } = await callApi<{ organization: Organization }>('/api/organizations', { orgId });
+      if (organization) setOrg(organization);
+    } catch (err) {
+      toast({
+        title: 'Failed to load organization',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+      console.error('OrganizationDetail: failed to load organization', err);
     }
 
     // Fetch members
@@ -171,15 +174,15 @@ export default function OrganizationDetail() {
     }
 
     // Fetch all users to find ones not in this org
-    const { data: allProfiles } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('full_name');
-
-    if (allProfiles && memberData) {
-      const memberUserIds = new Set(memberData.map((m) => m.user_id));
-      const available = allProfiles.filter((p) => !memberUserIds.has(p.id));
-      setAvailableUsers(available as Profile[]);
+    try {
+      const { profiles: allProfiles } = await callApi<{ profiles: Profile[] }>('/api/profiles', {});
+      if (allProfiles && memberData) {
+        const memberUserIds = new Set(memberData.map((m) => m.user_id));
+        const available = allProfiles.filter((p) => !memberUserIds.has(p.id));
+        setAvailableUsers(available);
+      }
+    } catch (err) {
+      console.error('OrganizationDetail: failed to load profiles', err);
     }
 
     setLoading(false);
@@ -431,56 +434,48 @@ export default function OrganizationDetail() {
     }
 
     setSaving(true);
-
-    const { error } = await supabase
-      .from('organizations')
-      .update({ 
-        name: editName, 
-        slug: editSlug, 
+    try {
+      const updates: Record<string, unknown> = {
+        name: editName,
+        slug: editSlug,
         logo_url: editLogoUrl,
         seat_limit: editSeatLimit ? parseInt(editSeatLimit, 10) : null,
-      })
-      .eq('id', orgId);
-
-    if (error) {
-      toast({
-        title: 'Failed to update organization',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+      };
+      await callApi('/api/organization-update', { orgId, updates });
       toast({
         title: 'Organization updated',
         description: 'The organization details have been saved.',
       });
       setEditOpen(false);
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to update organization',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
   };
 
   const handleDeleteOrg = async () => {
     setDeleting(true);
-
-    const { error } = await supabase
-      .from('organizations')
-      .delete()
-      .eq('id', orgId);
-
-    if (error) {
-      toast({
-        title: 'Failed to delete organization',
-        description: error.message,
-        variant: 'destructive',
-      });
-      setDeleting(false);
-    } else {
+    try {
+      await callApi('/api/organization-delete', { orgId });
       toast({
         title: 'Organization deleted',
         description: 'The organization has been permanently deleted.',
       });
       navigate('/app/admin/organizations');
+    } catch (err) {
+      toast({
+        title: 'Failed to delete organization',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1005,11 +1000,7 @@ export default function OrganizationDetail() {
                 value={editLogoUrl}
                 onChange={(url, storagePath) => {
                   if (url && storagePath) {
-                    // For public bucket, construct the public URL
-                    const { data: { publicUrl } } = supabase.storage
-                      .from('org-logos')
-                      .getPublicUrl(storagePath);
-                    setEditLogoUrl(publicUrl);
+                    setEditLogoUrl(buildPublicUrl(storagePath));
                   } else {
                     setEditLogoUrl(null);
                   }

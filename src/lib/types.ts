@@ -27,6 +27,7 @@ export interface Organization {
   logo_url: string | null;
   seat_limit: number | null;
   created_at: string;
+  member_count?: number;
 }
 
 export interface OrgMembership {

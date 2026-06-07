@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { callApi, callApiRaw } from '@/lib/api-client';
+import { buildPublicUrl } from '@/lib/storage-url';
 import { Organization } from '@/lib/types';
 import { Loader2, Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -191,7 +192,7 @@ export default function OrgAnalytics() {
     setUploading(true);
     try {
       // storagePath is the Azure blob path returned by file-upload component
-      const logoUrl = `${import.meta.env.VITE_STORAGE_BASE_URL ?? ''}/${storagePath}`;
+      const logoUrl = buildPublicUrl(storagePath);
 
       const { error } = await supabase
         .from('organizations')

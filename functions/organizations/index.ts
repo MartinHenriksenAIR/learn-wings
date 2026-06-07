@@ -28,16 +28,27 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 200, { organization }) as HttpResponseInit;
     }
 
-    // List orgs
+    // List orgs — correlated subquery for member_count is cleaner than a LEFT JOIN + GROUP BY
+    // (no need to enumerate every column in GROUP BY, no JOIN-cardinality risk).
+    // ::int cast: COUNT(*) returns BIGINT which the pg driver serializes as a string;
+    // cast keeps callers seeing a number.
     if (profile.is_platform_admin) {
       const organizations = await query(
-        `SELECT id, name, slug, logo_url, seat_limit, created_at FROM organizations ORDER BY name`,
+        `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at,
+          (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count
+         FROM organizations o
+         ORDER BY o.created_at DESC`,
       );
       return corsResponse(origin, 200, { organizations }) as HttpResponseInit;
     }
 
     const organizations = await query(
-      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at FROM organizations o JOIN org_memberships om ON om.org_id = o.id WHERE om.user_id = $1 AND om.status = 'active' ORDER BY o.name`,
+      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at,
+        (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count
+       FROM organizations o
+       JOIN org_memberships om ON om.org_id = o.id
+       WHERE om.user_id = $1 AND om.status = 'active'
+       ORDER BY o.created_at DESC`,
       [profile.id],
     );
     return corsResponse(origin, 200, { organizations }) as HttpResponseInit;

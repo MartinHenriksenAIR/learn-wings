@@ -48,35 +48,65 @@ describe('organizations', () => {
   });
 
   // 3. List all orgs as platform admin
-  it('returns all organizations for platform admin (no JOIN)', async () => {
+  it('returns all organizations for platform admin (no outer JOIN) with member_count', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    mockQuery.mockResolvedValueOnce([{ id: 'org-1' }, { id: 'org-2' }]);
+    mockQuery.mockResolvedValueOnce([
+      { id: 'org-1', member_count: 5 },
+      { id: 'org-2', member_count: 0 },
+    ]);
 
     const res = await handler(baseReq({}), {} as any);
 
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
     expect(body.organizations).toHaveLength(2);
+    expect(body.organizations[0]).toMatchObject({ id: 'org-1', member_count: 5 });
+    expect(body.organizations[1]).toMatchObject({ id: 'org-2', member_count: 0 });
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    // Platform-admin branch has NO outer JOIN to org_memberships — only the inline subquery
     expect(sql).not.toContain('JOIN org_memberships');
+    expect(sql).toContain('member_count');
+    expect(sql).toContain('org_memberships om2');
+    expect(sql).toContain('ORDER BY o.created_at DESC');
     expect(params ?? []).toEqual([]);
   });
 
   // 4. List orgs as regular member
-  it('returns member orgs for non-admin user via JOIN on org_memberships', async () => {
-    mockQuery.mockResolvedValueOnce([{ id: 'org-1' }]);
+  it('returns member orgs for non-admin user via JOIN on org_memberships with member_count', async () => {
+    mockQuery.mockResolvedValueOnce([{ id: 'org-1', member_count: 3 }]);
 
     const res = await handler(baseReq({}), {} as any);
 
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
     expect(body.organizations).toHaveLength(1);
+    expect(body.organizations[0]).toMatchObject({ id: 'org-1', member_count: 3 });
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain('org_memberships');
+    expect(sql).toContain('JOIN org_memberships om');
     expect(sql).toContain("status = 'active'");
+    expect(sql).toContain('member_count');
+    // Subquery alias must differ from outer JOIN alias to avoid collision
+    expect(sql).toContain('org_memberships om2');
+    expect(sql).toContain('ORDER BY o.created_at DESC');
     expect(params).toEqual(['p1']);
+  });
+
+  // 4b. member_count is returned as a number, not a string (documents the ::int cast intent)
+  it('returns member_count as integer, not string', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQuery.mockResolvedValueOnce([{ id: 'org-1', member_count: 3 }]);
+
+    const res = await handler(baseReq({}), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+    expect(body.organizations[0].member_count).toBe(3);
+    expect(typeof body.organizations[0].member_count).toBe('number');
+
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('COUNT(*)::int');
   });
 
   // 5. Single org as active member
