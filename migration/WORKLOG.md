@@ -634,3 +634,9 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 **Gates** (work branch pre-merge): functions suite **1316 passed / 3 skipped**; root suite **65 passed**; `npx tsc --noEmit -p tsconfig.app.json` exit 0; both builds exit 0. Grep gates: **zero `supabase` matches across `src/components/org-admin/**`**; zero `*OrgUsers*` page files (deleted in 3b, completes the issue #11 grep gate); `@/integrations/supabase/client` importers down to `OrgAnalytics.tsx` (#72) + the shim itself — Slice 8 decommission surface is now one file.
 
 **Deploy status:** functions changed → needs a trunk deploy after merge (**100 functions** expected live: 97 + 3). Gate 4 (champion badge toggle on the Team tab + member progress dialog in Analytics, PR-6 preview) rides the next tester sweep post-deploy.
+
+---
+
+## 2026-06-07 — Slice 3c merged + deployed (PR #73 → trunk @63bccec)
+
+**Who:** emil & Claude. PR #73 squash-merged after emil's separate-session multi-angle review (9 finder angles → 11 findings: 5 fixed on the branch pre-merge — deliberate-divergence comment on the user-progress visibility filter, stale-data reset in UserProgressDialog, Promise.all on the three OrgMembersTab fetches, Promise.all on user-progress queries 2–4, blind-delete form in ai-champion-delete; 3 no-change routed to #25/#74/#48; #75 filed for the 5×-duplicated course-visibility predicate; 2 deferred). Trunk deploy via CI run **27097283659** (build + deploy green, no host restart needed). Unauth smoke **4/4 401** on the regionalized hostname: `ai-champion-create`, `ai-champion-delete`, `user-progress` + `organizations` control — **100 functions live**. Issue #11 closed. Branch `emil/11-slice-3c` deliberately KEPT (may be reused for fixes the UI tester sweep finds). Remaining acceptance: Slice 3c Gate 4 (champion badge toggle + member progress dialog, PR-6 preview) — handed to the tester sweep alongside Slice 3b's Gate 4 and the #14 authed video-200 re-check.
