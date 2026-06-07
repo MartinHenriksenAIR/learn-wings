@@ -508,3 +508,23 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 **Process notes:** the per-task two-stage review caught one cosmetic finding (unused `existingOrg` constant in `organization-update/index.test.ts` post-collapse) explicitly flagged non-blocking and left as-is; the final whole-implementation review noted one unused `beforeEach` import in `storage-url.test.ts` at sub-threshold confidence (also left). The `gh issue create` heredoc commands hit a backtick-in-heredoc parse conflict on issue #52's body; resolved by switching that issue (and the two after it) to `--body-file` with the body in a temp file. Spec at `docs/superpowers/specs/2026-06-07-pr-45-fix-pass-design.md`; implementation plan at `docs/superpowers/plans/2026-06-07-pr-45-fix-pass.md` (both tracked in the bookkeeping PR alongside this entry).
 
 **Deploy status:** trunk-deploy from `a017bff` pending; the new `org_memberships_org_id_active_idx` migration applies via the deploy workflow's migration step. Gate 4 user-e2e on the PR-6 preview pending post-deploy.
+
+---
+
+## 2026-06-07 — Slice 3a Gate 4 user-verified (PR-6 preview, post-deploy)
+
+**Who:** martin & Claude (Playwright MCP-driven e2e on `black-forest-0d7f96c03-6.westeurope.7.azurestaticapps.net`, platform-admin profile `martin vladinov`).
+
+**Pre-check (proves the deploy was needed):** `/api/organization-{create,update,delete}` all returned `404` against the live function host before the trunk deploy, then `401` (auth required, route now registered) after. Same probe before merge had shown the FE still POSTing to `https://cairuxpyfshugwjrrqha.supabase.co/rest/v1/organizations` (→ 401) — confirming the preview was on pre-cutover code. Per AGENTS.md "deploys only from fresh trunk after a merge", Gate 4 is a post-merge verification.
+
+**Verified on the preview:**
+
+- LIST renders `member_count` (`Test Org` row shows `3 / 50` from the correlated subquery — no N+1 in the network panel).
+- CREATE happy path: `POST /api/organization-create → 200`, toast "Organization created!", new row "E2E Test Org · e2e-test-org · 0 / 25" appears (member_count = 0 on a fresh org as expected).
+- CREATE duplicate-slug: re-submit with slug `e2e-test-org` → `POST /api/organization-create → 409 Conflict`; inline error "This slug is already taken" appears under the slug field (not toasted); dialog stays open; no stranded spinner (the `setCreating(false)` in `finally` from the original Slice 3a work clears state correctly).
+- UPDATE: edit the new org (name → "E2E Test Org (renamed)", slug → "e2e-test-renamed", seat limit 25 → 100); `POST /api/organization-update → 200`; heading, breadcrumb, `/e2e-test-renamed` subtitle, and `0 / 100` seats card all reflect the new values; toast "Organization updated".
+- DELETE: confirm in alert dialog; `POST /api/organization-delete → 200`; toast "Organization deleted"; redirected to list; deleted row gone, only the pre-existing `Test Org` remains (cascading FKs handled dependents).
+
+**Negative parity:** no Supabase REST calls in any of the org CRUD paths. The `org_memberships` and `get_platform_invitations_safe` calls observed on the detail page are the explicitly-scoped Slice 3b/3c residue (issue #54) — `TODO(slice-3b)` markers in the source.
+
+**Gate 4 status:** ✅ closed. Slice 3a complete. Slice 2's Gate 4 still pending the next trunk deploy.
