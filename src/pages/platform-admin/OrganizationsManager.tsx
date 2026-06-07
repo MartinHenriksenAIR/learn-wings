@@ -33,12 +33,10 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
-import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api-client';
 import { Organization, Profile, OrgRole } from '@/lib/types';
 import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail, UsersRound } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
-import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { buildPublicUrl } from '@/lib/storage-url';
@@ -51,7 +49,6 @@ const orgSchema = z.object({
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [orgs, setOrgs] = useState<(Organization & { memberCount: number })[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,53 +139,45 @@ export default function OrganizationsManager() {
         return;
       }
 
-      // Post-create steps still use supabase directly — memberships/invitations
-      // cutover is Slice 3b (see migration/STATUS.html). Capture each step's
-      // error so a follow-up failure no longer hides behind a green success toast.
+      // Post-create steps capture each step's error so a follow-up failure no
+      // longer hides behind a green success toast.
       let postCreateError: string | null = null;
 
       if (adminTab === 'existing' && selectedUserId) {
-        // TODO(slice-3b): replace with callApi('/api/org-membership-create')
-        const { error } = await supabase.from('org_memberships').insert({
-          org_id: newOrg.id,
-          user_id: selectedUserId,
-          role: 'org_admin' as OrgRole,
-          status: 'active',
-        });
-        if (error) postCreateError = `admin assignment failed: ${error.message}`;
-      } else if (adminTab === 'invite' && inviteEmail.trim()) {
-        // TODO(slice-3b): replace with callApi('/api/invitation-create')
-        const { data: insertedInvitation, error: inviteErr } = await supabase
-          .from('invitations')
-          .insert({
-            org_id: newOrg.id,
-            email: inviteEmail.trim(),
+        try {
+          await callApi('/api/org-membership-create', {
+            orgId: newOrg.id,
+            userId: selectedUserId,
             role: 'org_admin' as OrgRole,
-            invited_by_user_id: user?.id,
-          })
-          .select('id')
-          .single();
+            status: 'active',
+          });
+        } catch (err) {
+          postCreateError = `admin assignment failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        }
+      } else if (adminTab === 'invite' && inviteEmail.trim()) {
+        try {
+          const { invitation } = await callApi<{ invitation: { id: string; link_id: string } }>(
+            '/api/invitation-create',
+            {
+              orgId: newOrg.id,
+              email: inviteEmail.trim(),
+              role: 'org_admin' as OrgRole,
+            },
+          );
 
-        if (inviteErr) {
-          postCreateError = `invitation creation failed: ${inviteErr.message}`;
-        } else if (insertedInvitation?.id) {
-          // TODO(slice-3b): replace with callApi('/api/invitation-link-id')
-          const { data: linkId, error: linkErr } = await supabase
-            .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
-
-          if (linkErr) {
-            postCreateError = `invitation link generation failed: ${linkErr.message}`;
-          } else if (linkId) {
+          if (invitation?.link_id) {
             const emailResult = await sendInvitationEmail({
               email: inviteEmail.trim(),
               orgName: name,
               role: 'org_admin',
-              linkId,
+              linkId: invitation.link_id,
             });
             if (!emailResult.success) {
               postCreateError = `invitation email failed: ${emailResult.error ?? 'unknown'}`;
             }
           }
+        } catch (err) {
+          postCreateError = `invitation creation failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
         }
       }
 

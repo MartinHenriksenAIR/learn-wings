@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 import { Upload, Download, FileSpreadsheet, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
@@ -31,6 +31,9 @@ interface BulkInviteDialogProps {
   onOpenChange: (open: boolean) => void;
   orgId: string;
   orgName: string;
+  // `userId` is no longer used inside this component — the server derives
+  // invited_by_user_id from the auth token. Kept in the interface for backward
+  // compat with OrgMembersTab; can be removed once that call site is cleaned up.
   userId: string;
   onSuccess: () => void;
 }
@@ -174,66 +177,80 @@ export function BulkInviteDialog({
     let failed = 0;
     let emailsSent = 0;
 
-    for (const invite of validInvites) {
-      const { data: insertedInvitation, error } = await supabase
-        .from('invitations')
-        .insert({
-          org_id: orgId,
-          email: invite.email,
-          role: invite.role,
-          invited_by_user_id: userId,
-          first_name: invite.first_name || null,
-          last_name: invite.last_name || null,
-          department: invite.department || null,
-        })
-        .select('id')
-        .single();
+    try {
+      const invites = validInvites.map((p) => ({
+        email: p.email,
+        role: p.role,
+        firstName: p.first_name || undefined,
+        lastName: p.last_name || undefined,
+        department: p.department || undefined,
+      }));
 
-      if (error) {
-        failed++;
-        // Mark as invalid in UI
-        const idx = parsedData.findIndex((p) => p.email === invite.email);
-        if (idx !== -1) {
-          parsedData[idx].valid = false;
-          parsedData[idx].error = error.message.includes('duplicate')
-            ? 'Already invited'
-            : error.message;
-        }
-      } else {
-        success++;
-        
-        // Send invitation email
-        if (insertedInvitation?.id) {
-          const { data: linkId } = await supabase
-            .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
-          
-          if (linkId) {
+      const { results: rowResults } = await callApi<{
+        results: Array<{
+          email: string;
+          success: boolean;
+          invitation?: { id: string; link_id: string };
+          error?: string;
+        }>;
+      }>('/api/invitation-bulk-create', { orgId, invites });
+
+      for (const row of rowResults) {
+        if (row.success) {
+          success++;
+          if (row.invitation?.link_id) {
             const emailResult = await sendInvitationEmail({
-              email: invite.email,
+              email: row.email,
               orgName,
-              role: invite.role,
-              linkId,
+              role: validInvites.find((v) => v.email === row.email)?.role ?? 'learner',
+              linkId: row.invitation.link_id,
             });
             if (emailResult.success) {
               emailsSent++;
             }
           }
+        } else {
+          failed++;
+          const idx = parsedData.findIndex((p) => p.email === row.email);
+          if (idx !== -1) {
+            parsedData[idx].valid = false;
+            parsedData[idx].error =
+              row.error === 'An invitation for this email is already pending'
+                ? 'Already invited'
+                : row.error || 'Unknown error';
+          }
         }
       }
-    }
 
-    setResults({ success, failed });
-    setParsedData([...parsedData]);
-    setProcessing(false);
+      setResults({ success, failed });
+      setParsedData([...parsedData]);
 
-    if (success > 0) {
+      if (success > 0) {
+        toast({
+          title: `${success} invitation${success > 1 ? 's' : ''} created`,
+          description: emailsSent > 0
+            ? `${emailsSent} email${emailsSent > 1 ? 's' : ''} sent.${failed > 0 ? ` ${failed} failed.` : ''}`
+            : failed > 0 ? `${failed} failed. Check the list for details.` : undefined,
+        });
+        onSuccess();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unexpected error';
       toast({
-        title: `${success} invitation${success > 1 ? 's' : ''} created`,
-        description: emailsSent > 0 
-          ? `${emailsSent} email${emailsSent > 1 ? 's' : ''} sent.${failed > 0 ? ` ${failed} failed.` : ''}`
-          : failed > 0 ? `${failed} failed. Check the list for details.` : undefined,
+        title: 'Bulk invite failed',
+        description: message,
+        variant: 'destructive',
       });
-      onSuccess();
+      validInvites.forEach((invite) => {
+        const idx = parsedData.findIndex((p) => p.email === invite.email);
+        if (idx !== -1) {
+          parsedData[idx].valid = false;
+          parsedData[idx].error = 'Bulk insert failed';
+        }
+      });
+      setParsedData([...parsedData]);
+    } finally {
+      setProcessing(false);
     }
   };
 

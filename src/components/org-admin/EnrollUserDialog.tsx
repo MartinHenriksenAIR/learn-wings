@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 import { Loader2, BookOpen, Users, GraduationCap } from 'lucide-react';
 import { Course, OrgMembership, Profile } from '@/lib/types';
@@ -63,45 +63,54 @@ export function EnrollUserDialog({
 
     setLoading(true);
 
-    // Get courses available to this org
-    const { data: accessData } = await supabase
-      .from('org_course_access')
-      .select('course_id')
-      .eq('org_id', orgId)
-      .eq('access', 'enabled');
+    try {
+      // Get courses available to this org (joined with course details server-side)
+      const accessResult = await callApi<{
+        access: Array<{
+          id: string;
+          course_id: string;
+          access: string;
+          course: Course;
+        }>;
+      }>('/api/org-course-access', { orgId });
 
-    if (!accessData || accessData.length === 0) {
+      const availableCourseList = accessResult.access
+        .filter((row) => row.access === 'enabled' && row.course.is_published === true)
+        .map((row) => row.course);
+
+      // Get existing enrollments for selected user
+      const enrollmentResult = await callApi<{
+        enrollments: Array<{
+          id: string;
+          org_id: string;
+          user_id: string;
+          course_id: string;
+          status: string;
+          enrolled_at: string;
+          completed_at: string | null;
+        }>;
+      }>('/api/enrollments', { orgId, userId: selectedUserId });
+
+      const enrolledCourseIds = new Set(
+        enrollmentResult.enrollments.map((e) => e.course_id),
+      );
+
+      const coursesWithStatus: AvailableCourse[] = availableCourseList.map((c) => ({
+        ...c,
+        alreadyEnrolled: enrolledCourseIds.has(c.id),
+      }));
+
+      setCourses(coursesWithStatus);
+    } catch (_err) {
       setCourses([]);
+      toast({
+        title: 'Failed to load courses',
+        description: 'Could not load available courses. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const courseIds = accessData.map((a) => a.course_id);
-
-    // Get course details
-    const { data: courseData } = await supabase
-      .from('courses')
-      .select('*')
-      .in('id', courseIds)
-      .eq('is_published', true)
-      .order('title');
-
-    // Get existing enrollments for selected user
-    const { data: enrollmentData } = await supabase
-      .from('enrollments')
-      .select('course_id')
-      .eq('org_id', orgId)
-      .eq('user_id', selectedUserId);
-
-    const enrolledCourseIds = new Set(enrollmentData?.map((e) => e.course_id) || []);
-
-    const coursesWithStatus: AvailableCourse[] = (courseData || []).map((c) => ({
-      ...c,
-      alreadyEnrolled: enrolledCourseIds.has(c.id),
-    }));
-
-    setCourses(coursesWithStatus);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -134,22 +143,23 @@ export function EnrollUserDialog({
     let success = 0;
     let failed = 0;
 
-    for (const courseId of selectedCourseIds) {
-      const { error } = await supabase.from('enrollments').insert({
-        org_id: orgId,
-        user_id: selectedUserId,
-        course_id: courseId,
-        status: 'enrolled',
-      });
-
-      if (error) {
-        failed++;
-      } else {
-        success++;
+    try {
+      for (const courseId of selectedCourseIds) {
+        try {
+          await callApi('/api/enrollment-create', {
+            orgId,
+            userId: selectedUserId,
+            courseId,
+            status: 'enrolled',
+          });
+          success++;
+        } catch (_err) {
+          failed++;
+        }
       }
+    } finally {
+      setEnrolling(false);
     }
-
-    setEnrolling(false);
 
     if (success > 0) {
       const selectedUser = activeLearners.find((m) => m.user_id === selectedUserId);
