@@ -96,6 +96,18 @@ describe('useAuth', () => {
     expect(mockLogoutRedirect).toHaveBeenCalledOnce();
   });
 
+  it('signOut clears the persisted viewMode and any stashed redirect (same-tab next login must start clean)', async () => {
+    sessionStorage.setItem('viewMode', 'learner');
+    sessionStorage.setItem('postLoginRedirect', '/app/community/org/posts/123');
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await act(async () => { result.current.signOut(); });
+
+    expect(sessionStorage.getItem('viewMode')).toBeNull();
+    expect(sessionStorage.getItem('postLoginRedirect')).toBeNull();
+  });
+
   describe('isLoading covers user-context resolution (#16)', () => {
     const msalWithAccount = () => {
       mockUseMsal.mockReturnValue({

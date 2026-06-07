@@ -3,6 +3,7 @@ import { useMsal, useAccount } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
 import { apiScopes } from '@/lib/msal-config';
 import { callApi } from '@/lib/api-client';
+import { clearPostLoginRedirect } from '@/lib/post-login-redirect';
 import type { Profile, OrgMembership, Organization } from '@/lib/types';
 
 export interface AppUser { id: string; tid: string; email: string; name: string; }
@@ -122,6 +123,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setMemberships([]);
     setCurrentOrg(null);
+    // Per-tab persistence must not leak into the next login on this tab.
+    try {
+      sessionStorage.removeItem(VIEW_MODE_KEY);
+    } catch {
+      // Storage unavailable — nothing persisted to clear.
+    }
+    clearPostLoginRedirect();
     instance.logoutRedirect();
   };
 

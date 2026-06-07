@@ -4,9 +4,11 @@
 // the tab-scoped MSAL cache in msal-config.ts).
 const KEY = 'postLoginRedirect';
 
+// Only in-app absolute paths — never anything that could leave the SPA.
+const isInAppPath = (url: string) => url.startsWith('/') && !url.startsWith('//');
+
 export function savePostLoginRedirect(url: string) {
-  // Only in-app absolute paths — never anything that could leave the SPA.
-  if (!url.startsWith('/') || url.startsWith('//')) return;
+  if (!isInAppPath(url)) return;
   try {
     sessionStorage.setItem(KEY, url);
   } catch {
@@ -18,8 +20,16 @@ export function consumePostLoginRedirect(): string | null {
   try {
     const url = sessionStorage.getItem(KEY);
     if (url) sessionStorage.removeItem(KEY);
-    return url && url.startsWith('/') && !url.startsWith('//') ? url : null;
+    return url && isInAppPath(url) ? url : null;
   } catch {
     return null;
+  }
+}
+
+export function clearPostLoginRedirect() {
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    // Storage unavailable — nothing to clear.
   }
 }
