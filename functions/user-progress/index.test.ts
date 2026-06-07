@@ -93,7 +93,7 @@ describe('user-progress', () => {
   });
 
   it('returns 403 when caller is neither platform admin nor org admin (self-access excluded by design)', async () => {
-    const res = await handler(baseReq({ orgId: 'org-1', userId: 'p1' }), {} as any);
+    const res = await handler(baseReq({ orgId: 'org-1', userId: 'p2' }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
@@ -141,6 +141,50 @@ describe('user-progress', () => {
       { id: 'a1', quizId: 'q1', lessonTitle: 'Quiz Lesson', score: 40, passed: false,
         startedAt: '2026-01-03T00:00:00Z', finishedAt: '2026-01-03T00:10:00Z' },
     ]);
+  });
+
+  it('multi-course: structure, attempts and counts stay isolated per course', async () => {
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    const twoEnrollments = [
+      ...enrollmentRows,
+      { id: 'e2', course_id: 'c2', status: 'completed', enrolled_at: '2026-01-05T00:00:00Z',
+        completed_at: '2026-01-06T00:00:00Z', title: 'Course Two', level: 'advanced' },
+    ];
+    const twoCourseStructure = [
+      ...structureRows,
+      { module_id: 'm3', course_id: 'c2', module_title: 'C2 Module', module_sort_order: 0,
+        lesson_id: 'l3', lesson_title: 'C2 Lesson', lesson_type: 'quiz', lesson_sort_order: 0 },
+    ];
+    const twoCourseQuizzes = [...quizRows, { id: 'q2', lesson_id: 'l3' }];
+    const twoCourseAttempts = [
+      ...attemptRows,
+      { id: 'a3', quiz_id: 'q2', score: 70, passed: true, started_at: '2026-01-05T12:00:00Z', finished_at: '2026-01-05T12:10:00Z' },
+    ];
+    mockQuery
+      .mockResolvedValueOnce(twoEnrollments)
+      .mockResolvedValueOnce(progressRows)
+      .mockResolvedValueOnce(twoCourseAttempts)
+      .mockResolvedValueOnce(twoCourseStructure)
+      .mockResolvedValueOnce(twoCourseQuizzes);
+    const res = await handler(baseReq({ orgId: 'org-1', userId: 'p2' }), {} as any);
+    expect(res.status).toBe(200);
+    const { courses } = JSON.parse(res.body as string);
+    expect(courses).toHaveLength(2);
+    const [c1, c2] = courses;
+    // c1 unchanged by c2's data: same modules, attempts only for q1
+    expect(c1.modules.map((m: { id: string }) => m.id)).toEqual(['m1', 'm2']);
+    expect(c1.quizAttempts.map((a: { id: string }) => a.id)).toEqual(['a2', 'a1']);
+    expect(c1.totalLessons).toBe(2);
+    // c2 gets only its own module, lesson and attempt
+    expect(c2.modules.map((m: { id: string }) => m.id)).toEqual(['m3']);
+    expect(c2.modules[0].lessons[0]).toEqual({
+      id: 'l3', title: 'C2 Lesson', lessonType: 'quiz', sortOrder: 0,
+      status: 'not_started', completedAt: null,
+      quizId: 'q2', latestQuizScore: 70, latestQuizPassed: true,
+    });
+    expect(c2.quizAttempts.map((a: { id: string }) => a.id)).toEqual(['a3']);
+    expect(c2.totalLessons).toBe(1);
+    expect(c2.completedLessons).toBe(0);
   });
 
   it('skips the quizzes query when the structure has no lessons', async () => {

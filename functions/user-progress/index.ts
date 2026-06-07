@@ -74,7 +74,8 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     }
     const courseIds = enrollments.map((e) => e.course_id);
 
-    // 2. The user's lesson progress in this org.
+    // 2. The user's lesson progress in this org. Parity: the old client fetched ALL of the
+    //    user's progress in the org (not just enrolled courses) — filtered during assembly.
     const progressRows = await query<ProgressRow>(
       `SELECT lesson_id, status, completed_at FROM lesson_progress
         WHERE org_id = $1 AND user_id = $2`,
@@ -82,6 +83,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     );
 
     // 3. The user's quiz attempts in this org, latest first (the dialog's ordering).
+    //    Parity: fetches ALL attempts in the org, like the old client — filtered during assembly.
     const attemptRows = await query<AttemptRow>(
       `SELECT id, quiz_id, score, passed, started_at, finished_at
          FROM quiz_attempts WHERE org_id = $1 AND user_id = $2
@@ -130,6 +132,8 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
           const latest = quizId !== undefined
             ? attemptRows.find((a) => a.quiz_id === quizId) // attempts are DESC — first match is latest
             : undefined;
+          // Casts are safe: the LEFT JOIN nulls all lesson columns together, so when
+          // lesson_id is non-null the other lesson fields are non-null too.
           mod.lessons.push({
             id: row.lesson_id,
             title: row.lesson_title as string,
