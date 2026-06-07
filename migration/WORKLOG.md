@@ -576,3 +576,34 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 
 **Deploy status:** trunk deploy via `gh workflow run main_func-ai-education-migration.yml --ref feature/lovable-migration` (run #27091444197). Gate 4 user-e2e on PR-6 preview pending post-deploy.
 
+
+---
+
+## 2026-06-07 — #14: azure-view-url 403 for video blobs (PR #59)
+
+**Who:** emil & Claude.
+
+**Root cause:** `canAccessAsset` in `functions/azure-view-url/index.ts` hand-inlined `public.can_user_access_lms_asset` (the RPC the original Supabase edge function called) but dropped the `l.azure_blob_path = $2` predicate. `CoursePlayer` sends `lesson.azure_blob_path` as `blobPath` for video lessons, and video paths live ONLY in that column (`video_storage_path` is the legacy Supabase column — NULL on the seeded Welcome Video). The EXISTS never matched → 403 for every video; PDFs went through `document_storage_path` (which WAS checked) → 200. Exactly the Playwright-sweep repro in the issue.
+
+**Fix:** one-line — `OR l.azure_blob_path = $2` added to the lessons EXISTS, restoring lesson-branch parity with the canonical RPC (`01-schema.sql`; its thumbnail branch remains unported — consolidation tracked in #60); no loosening beyond the original RLS-derived authz. TDD: new contract test pins all three lesson asset columns in the authz SQL (watched it fail on the missing predicate first).
+
+**Out-of-scope observations (recorded on PR #59, no live bug):** `azure-view-url` also lacks the canonical thumbnail branch (`c.thumbnail_url`) — no caller requests thumbnails there (they use `asset-signed-url`, which has it). Sibling `asset-signed-url` likewise lacks the `azure_blob_path` predicate — no caller sends such values there today. Both folded into follow-up #60 (shared `canAccessLmsAsset` helper, full RPC parity). The xhigh `/code-review` pass on this PR confirmed both as latent-only and routed the rest: thumbnail exact-match 403 consequence → comment on #49, error-classification heuristic (`includes('token')` → 401, JSON-parse → raw 500) → comment on #25, video fixture path-shape nit → comment on #32.
+
+**Gates (re-run after rebase onto post-Slice-3b trunk @212cddc):** functions suite passing (see PR for the count at merge time); `npx tsc --noEmit -p tsconfig.app.json` exit 0; `npm run build` ok. Runtime verification (video 200 + SAS on the PR-6 preview) pending the next trunk deploy — the live function still 403s videos until then.
+
+**Deploy status:** functions changed → needs a trunk deploy after merge.
+
+---
+
+## 2026-06-07 — Slice 2 trunk deploy + combined verification sweep (retroactively logged)
+
+**Who:** emil & Claude (deploy from the main session; sweep in the dedicated Playwright tester session). Logged retroactively later the same day from the PR/issue evidence trail — the sweep session recorded its results on the issues but appended no WORKLOG entry, which let a stale "Slice 2 pending deploy / Gate 4 pending" picture persist into the checkpoint.
+
+**Deploy (08:13–08:16 UTC):** trunk @`2087ce4` (Slice 2's 15 endpoints) via CI run **27087057009** (`gh workflow run main_func-ai-education-migration.yml --ref feature/lovable-migration`), build + deploy green; smoke 15/15 endpoints return 401 `Missing Bearer token` unauthenticated on the regionalized hostname; **86 functions live** at that point (Martin's deploys later the same day — Slice 3a, then Slice 3b's run #27091444197 — brought it to **97**). Announced on PR #35 per convention.
+
+**Combined verification sweep (PR-6 preview, platform admin; results recorded ~09:56 UTC):**
+- **Slice 2 Gate 4 PASSED** (closing comment on #8): manager list (`courses-admin` 200) → create draft course → module + text lesson (persists through leave/reopen) → quiz with options + pass threshold (`quiz-admin-save` 200, reopens intact) → publish + Test Org access grant (`course-access-set` 200) → enrollable in learner view → full cascade cleanup verified. Sub-results: upload chain blocked at the blob PUT by storage CORS (#15 — environment, not Slice 2 code; CORS applied and #15 closed the same day) and no-reorder-control evidence posted to #46. **Slice 2 fully accepted.**
+- **Slice 7 Gate 4 PASSED** (closing comment on #12): resources list via `POST /api/resources` 200 with **zero `*.supabase.co` requests**; create/edit/pin/search/delete all green; ~1.2 requests/keystroke measured (→ #41). **Slice 7 fully accepted.**
+- **#31 post-elevation queue CLOSED:** "re-ran every suite blocked by the org-context bug: ALL PASS" — report dismissal, OrgSettings round-trip, moderation actions, ideas kanban, junk cleanup. Leftover favicon junk noted on #32; standing findings #38–#40 remain open.
+
+**Ledger correction:** the Slice 3a and 3b bookkeeping written concurrently still described Slice 2's Gate 4 as pending ("74 live" / "pending Gate 4"). Checkpoint corrected (our-side facts only) in PR #59; Martin's slice narratives left untouched.
