@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { supabase } from '@/integrations/supabase/client';
 import { callApi, callApiRaw } from '@/lib/api-client';
 import { buildPublicUrl } from '@/lib/storage-url';
 import { Organization } from '@/lib/types';
@@ -68,13 +67,17 @@ export default function OrgAnalytics() {
   useEffect(() => {
     const fetchOrganizations = async () => {
       if (!isGlobalView || !isPlatformAdmin) return;
-      
-      const { data: orgs } = await supabase
-        .from('organizations')
-        .select('*')
-        .order('name');
-      if (orgs) {
-        setOrganizations(orgs as Organization[]);
+
+      try {
+        const { organizations: orgs } = await callApi<{ organizations: Organization[] }>(
+          '/api/organizations',
+          {},
+        );
+        // endpoint returns created_at DESC (accepted 3a parity break); the filter dropdown was name-ordered
+        setOrganizations([...(orgs ?? [])].sort((a, b) => a.name.localeCompare(b.name)));
+      } catch (err) {
+        // parity: the old client ignored fetch errors (filter just shows "All Organizations")
+        console.error('OrgAnalytics: failed to load organizations', err);
       }
     };
     fetchOrganizations();
@@ -194,12 +197,10 @@ export default function OrgAnalytics() {
       // storagePath is the Azure blob path returned by file-upload component
       const logoUrl = buildPublicUrl(storagePath);
 
-      const { error } = await supabase
-        .from('organizations')
-        .update({ logo_url: logoUrl })
-        .eq('id', currentOrg.id);
-
-      if (error) throw error;
+      await callApi('/api/organization-update', {
+        orgId: currentOrg.id,
+        updates: { logo_url: logoUrl },
+      });
 
       toast.success('Logo updated successfully');
       setLogoDialogOpen(false);

@@ -640,3 +640,20 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 ## 2026-06-07 — Slice 3c merged + deployed (PR #73 → trunk @63bccec)
 
 **Who:** emil & Claude. PR #73 squash-merged after emil's separate-session multi-angle review (9 finder angles → 11 findings: 5 fixed on the branch pre-merge — deliberate-divergence comment on the user-progress visibility filter, stale-data reset in UserProgressDialog, Promise.all on the three OrgMembersTab fetches, Promise.all on user-progress queries 2–4, blind-delete form in ai-champion-delete; 3 no-change routed to #25/#74/#48; #75 filed for the 5×-duplicated course-visibility predicate; 2 deferred). Trunk deploy via CI run **27097283659** (build + deploy green, no host restart needed). Unauth smoke **4/4 401** on the regionalized hostname: `ai-champion-create`, `ai-champion-delete`, `user-progress` + `organizations` control — **100 functions live**. Issue #11 closed. Branch `emil/11-slice-3c` deliberately KEPT (may be reused for fixes the UI tester sweep finds). Remaining acceptance: Slice 3c Gate 4 (champion badge toggle + member progress dialog, PR-6 preview) — handed to the tester sweep alongside Slice 3b's Gate 4 and the #14 authed video-200 re-check.
+
+---
+
+## 2026-06-07 — Tester sweep (3c Gate 4 PASS) + #72 OrgAnalytics cutover (PR #77)
+
+**Who:** emil & Claude (sweep in the dedicated Playwright tester session; triage + #77 in the main session).
+
+**Sweep results (PR-6 preview, platform-admin, evidence on the linked threads):**
+- **Slice 3c Gate 4 PASSED 6/6** (PR #73 comment): champion toggle on/off round-trips (`ai-champion-create`/`-delete` 200, body exactly `{orgId, userId}` — no client-side assigned_by), badge persists across reloads; progress dialog renders the full aggregate off exactly ONE `user-progress` 200 (quiz badge only on quiz lessons — the omitted-keys contract held); empty state clean; zero `*.supabase.co` requests. **Slice 3c fully accepted.**
+- **Slice 3b Gate 4 partial** (#10 comment): invitation create/copy/cancel + role change all PASS (invitation EMAIL 500 is #22, expected). Remove-member N/A and enrollment-create blocked by sandbox data (no disposable member; both learners already enrolled in the only org course) — closing residue noted on #10.
+- **#14 re-check CONFIRMED** (#60 comment): `azure-view-url` 200 authed, mp4 206, real playback — the video fix is verified end-to-end; the standing "authed video-200 rides the next sweep" item is RESOLVED.
+
+**#72 (PR #77): OrgAnalytics cutover — the LAST supabase-importing file.** Dropdown → `/api/organizations` (client-side name sort — endpoint stays `created_at DESC` per the accepted 3a decision); logo update → `/api/organization-update`. **Self-review caught a critical authz-parity gap the delegated review missed:** `organization-update` was platform-admin-only with a provenance comment claiming that was the only UPDATE-capable RLS policy — but migration `20260128223657` ("Org admins can update their org logo", FOR UPDATE `is_org_admin(id)`) deliberately enabled org admins, and the logo flow lives on the `requireOrgAdmin` route. Fixed in the same PR: org admin of the target org may update `logo_url` ONLY (old RLS was row-scoped; tightened to the migration's stated intent), +5 contract tests. LESSON (memorialized): per-table RLS provenance = grep ALL migrations, not the base policy block; check route guards; RLS UPDATE denials are silent zero-row updates, not errors. Repo-wide: **zero `@/integrations/supabase/client` importers besides the shim** — Slice 8's frontend surface is now `client.ts` + the npm package.
+
+**Gates (branch, pre-merge):** functions **1321 passed / 3 skipped** (+5), root 65, builds + tsc exit 0. Functions changed (`organization-update`) → redeploy follows this merge (run id announced on PR #77; function count stays 100).
+
+**Triage from the sweep (not yet filed):** invite links hardcode `https://ai-uddannelse.dk` (`src/lib/config.ts:4` `PLATFORM_BASE_URL`, Lovable-era) — preview-minted invites can't be accepted on the preview origin; candidate issue.
