@@ -44,17 +44,20 @@ export function extractLmsAssetPath(value: string | null): string | null {
   try {
     const parsed = new URL(trimmedValue);
     if (/\.blob\.core\.windows\.net$/i.test(parsed.hostname)) {
-      // pathname is "/<container>/<blobPath>" — strip the leading slash and the first segment (container)
-      const pathSegments = parsed.pathname.replace(/^\//, '').split('/');
+      // pathname is "/<container>/<blobPath>" — drop empty segments, then the container,
+      // and keep the rest. filter(Boolean) makes the >= 2 check self-evident
+      // (container + at least one blob segment) and normalizes stray double slashes.
+      const pathSegments = parsed.pathname.split('/').filter(Boolean);
       if (pathSegments.length >= 2) {
-        // Everything after the container segment, decoded
         const blobPath = pathSegments.slice(1).map(decodeURIComponent).join('/');
         return blobPath || null;
       }
       return null;
     }
   } catch {
-    // Malformed URL — fall through to Supabase / null branches below
+    // Malformed URL, or an undecodable percent-encoded blob segment (decodeURIComponent
+    // throws on bad encoding) — fall through to Supabase / null branches below.
+    // Such a stored value won't self-heal, but callers never see a throw.
   }
 
   if (trimmedValue.includes(LMS_ASSETS_SIGN_PREFIX)) {

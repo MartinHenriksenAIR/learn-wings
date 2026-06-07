@@ -49,6 +49,20 @@ describe('extractLmsAssetPath', () => {
     expect(extractLmsAssetPath(url)).toBe('a/b/c/d.mp4');
   });
 
+  it('Azure URL with stray double slashes → empty segments dropped, path normalized', () => {
+    const url =
+      'https://acct.blob.core.windows.net/lms-assets//double//slash.png?sig=X';
+    expect(extractLmsAssetPath(url)).toBe('double/slash.png');
+  });
+
+  it('Azure URL with undecodable percent-encoding → null, never throws', () => {
+    // decodeURIComponent throws "URI malformed" on %E0%A4%A — the catch must contain it
+    const url =
+      'https://acct.blob.core.windows.net/lms-assets/bad%E0%A4%A.png?sig=X';
+    expect(() => extractLmsAssetPath(url)).not.toThrow();
+    expect(extractLmsAssetPath(url)).toBeNull();
+  });
+
   // ── Supabase legacy branches (pinned — must not regress) ─────────────
 
   it('Supabase signed-URL prefix → storage path', () => {
