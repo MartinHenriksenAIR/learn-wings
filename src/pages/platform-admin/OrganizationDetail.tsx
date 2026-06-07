@@ -53,6 +53,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { callApi } from '@/lib/api-client';
 import { Organization, OrgMembership, Profile, OrgRole, Invitation } from '@/lib/types';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
+import { buildPublicUrl } from '@/lib/storage-url';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Building2,
@@ -994,8 +995,7 @@ export default function OrganizationDetail() {
                 value={editLogoUrl}
                 onChange={(url, storagePath) => {
                   if (url && storagePath) {
-                    const publicUrl = `${import.meta.env.VITE_STORAGE_BASE_URL ?? ''}/${storagePath}`;
-                    setEditLogoUrl(publicUrl);
+                    setEditLogoUrl(buildPublicUrl(storagePath));
                   } else {
                     setEditLogoUrl(null);
                   }

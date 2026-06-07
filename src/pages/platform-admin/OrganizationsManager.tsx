@@ -41,6 +41,7 @@ import { toast } from '@/components/ui/sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
+import { buildPublicUrl } from '@/lib/storage-url';
 
 const orgSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -250,8 +251,7 @@ export default function OrganizationsManager() {
                   value={logoUrl}
                   onChange={(url, storagePath) => {
                     if (url && storagePath) {
-                      const publicUrl = `${import.meta.env.VITE_STORAGE_BASE_URL ?? ''}/${storagePath}`;
-                      setLogoUrl(publicUrl);
+                      setLogoUrl(buildPublicUrl(storagePath));
                     } else {
                       setLogoUrl(null);
                     }
