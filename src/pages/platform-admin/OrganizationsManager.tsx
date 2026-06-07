@@ -254,7 +254,7 @@ export default function OrganizationsManager() {
               Create Organization
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create Organization</DialogTitle>
               <DialogDescription>

@@ -723,3 +723,14 @@ All new strings i18n en+da. **Frontend-only — no function deploy** (trunk push
 **State left behind on the preview env:** 5 pending invitations under `gate4-*@example.test` (single + 3 bulk + 1 dup-pending from Finding A, all expire 14/06/2026) plus 1 from the fetch-per-row test (`gate4-perrow-ok-2026-06-07@example.test`). Not cleaning — they're scoped to Test Org, expire in 7 days, and serve as walkthrough audit trail.
 
 **Closes #78.** Slice 3b is now FULLY user-verified end-to-end. The "Admin-page test debt" entry's Slice 3b dialog line in STATUS.html stays open (Vitest debt for OrgMembersTab/dialogs is a separate task from runtime Gate 4).
+
+---
+
+## 2026-06-07 — Two frontend bug fixes bundled: #70 + #89 (PR #92)
+
+**Who:** emil & Claude. Two disjoint-file bug fixes claimed and shipped in one PR (overlap check: `CreateOrgDialog` in `OrganizationsManager.tsx` vs `PostDetail.tsx` — no shared lines, no competing draft PR). Code review skipped by user direction (small, well-scoped); solo self-merge.
+
+- **#70** — Create Organization dialog was clipped at the viewport edge on short (~700px) windows, leaving the Create button unreachable (no inner scroll region). Added `max-h-[85vh] overflow-y-auto` to its `DialogContent` (`OrganizationsManager.tsx:257`) — the repo's established scrollable-dialog idiom, identical to `CourseEditor.tsx`'s sibling `max-w-lg` dialog.
+- **#89** — `PostDetail`'s community gate (`PostDetail.tsx:184`) redirected to `/app/dashboard` on `!features.community_enabled`, where `features` is the VIEWER's effective flags (platform + their own `currentOrg` override, `usePlatformSettings:144-149`), not the reported post's org. A platform admin clicking "View content" from an org-scoped moderation report got bounced when their own org had community disabled (or none selected); backend authz (`community-post:49`) already permitted them. Added `&& !effectiveIsPlatformAdmin` (view-mode-aware: `isPlatformAdmin && viewMode === 'platform_admin'`) — admins are exempt, org admins stay gated by their own org (the correct scope for them). New `PostDetail.test.tsx` covers both branches (admin → post renders; non-admin → redirect). This is the FIRST of PR #84's two deferred review findings to land; the other is **#90** (platform-settings-update server-side validation, still open).
+
+**Frontend-only — no function deploy** (trunk push rebuilds the PR-6 preview). Gates: `npm run build` exit 0, **98/98 tests** (2 new), `tsc --noEmit -p tsconfig.app.json` exit 0, zero `supabase.*` in touched files. Work branch `emil/70-89-org-dialog-scroll-postdetail-gate` deleted post-merge. Issues #70 + #89 closed manually (`Closes #N` doesn't auto-fire on non-default-branch merges).
