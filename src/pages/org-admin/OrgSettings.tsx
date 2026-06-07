@@ -69,8 +69,10 @@ export default function OrgSettings() {
     }
   };
 
-  // Spinner: settings still loading, OR user exists but profile not yet resolved
-  if (isLoading || (user && !profile)) {
+  // Spinner: settings still loading, OR user exists but profile not yet resolved.
+  // `!saving` keeps the form mounted during the post-save refetch (which flips the
+  // shared isLoading) — otherwise every Save flashes a full-page spinner mid-edit.
+  if ((isLoading && !saving) || (user && !profile)) {
     return (
       <AppLayout title="Organization Settings" breadcrumbs={[{ label: 'Organization Settings' }]}>
         <div className="flex h-64 items-center justify-center">

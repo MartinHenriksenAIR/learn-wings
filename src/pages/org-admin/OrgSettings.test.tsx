@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
@@ -36,6 +36,7 @@ vi.mock('@/hooks/usePlatformSettings', () => ({
 }));
 
 import OrgSettings from './OrgSettings';
+import { callApi } from '@/lib/api-client';
 
 const defaultPlatformSettings = {
   platformFeatures: {
@@ -149,5 +150,36 @@ describe('OrgSettings — three-way loading guard', () => {
 
     // Save button present
     expect(screen.getByRole('button', { name: /Save Organization Settings/i })).toBeInTheDocument();
+  });
+
+  it('keeps the form mounted during the post-save refetch (isLoading flips true while saving)', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg: { id: 'org-1', name: 'Test Org' },
+    });
+    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
+
+    // Save call hangs so the component stays in saving=true
+    let resolveSave: (v: unknown) => void = () => {};
+    vi.mocked(callApi).mockReturnValue(new Promise((res) => { resolveSave = res; }));
+
+    const { rerender } = renderOrgSettings();
+    fireEvent.click(screen.getByRole('button', { name: /Save Organization Settings/i }));
+
+    // The save-triggered refetch flips the shared isLoading while the save is still in flight
+    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: true });
+    rerender(
+      <MemoryRouter>
+        <OrgSettings />
+      </MemoryRouter>
+    );
+
+    // Form must stay mounted — no full-page spinner swap mid-save
+    expect(screen.queryAllByRole('switch')).toHaveLength(5);
+    expect(screen.getByRole('button', { name: /Save Organization Settings/i })).toBeInTheDocument();
+
+    await act(async () => {
+      resolveSave({});
+    });
   });
 });

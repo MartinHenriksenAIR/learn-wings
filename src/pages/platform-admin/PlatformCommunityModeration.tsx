@@ -66,6 +66,7 @@ export default function PlatformCommunityModeration() {
   // Fetch all organizations for name lookup
   const { data: orgsMap } = useQuery({
     queryKey: ['platform-organizations'],
+    staleTime: 5 * 60 * 1000, // org names don't change mid-session; avoid window-focus refetches
     queryFn: async () => {
       const res = await callApi<{ organizations: Organization[] }>('/api/organizations', {});
       const map = new Map<string, string>();
