@@ -181,7 +181,11 @@ export default function PostDetail() {
     return () => window.clearTimeout(timer);
   }, [comments]);
 
-  if (!settingsLoading && !features.community_enabled) {
+  // The community gate is keyed on the VIEWER's effective flags (platform + their
+  // currentOrg override), not the reported post's org. Platform admins moderating an
+  // org-scoped report must not be bounced just because their own org has community
+  // disabled (or they have no org selected). Backend authz already permits them.
+  if (!settingsLoading && !features.community_enabled && !effectiveIsPlatformAdmin) {
     return <Navigate to="/app/dashboard" replace />;
   }
 
