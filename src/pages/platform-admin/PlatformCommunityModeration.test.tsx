@@ -139,6 +139,8 @@ describe('PlatformCommunityModeration', () => {
   });
 
   it('view-content button for org report opens /app/community/org/posts/<target_id>', async () => {
+    // Render with only the org-scoped report so no global card is present
+    mockFetchReports.mockResolvedValue([orgReport]);
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     renderPage();
@@ -147,20 +149,11 @@ describe('PlatformCommunityModeration', () => {
       expect(screen.getByText('Offensive content')).toBeInTheDocument();
     });
 
-    // The view-content buttons are Eye icon buttons — find both by querying all Eye buttons
-    // The org report card is the one for 'Offensive content'
-    // We use getAllByRole and check that clicking one opens the org path
-    // Since both reports have Eye (view) buttons, we need to find the one for the org report.
-    // The Eye button in each card's action area opens content in new tab.
-    // There are multiple Eye buttons per card (view + show); find by tooltip text context is tricky.
-    // Instead, find ALL buttons and filter — the "View content" buttons are the first Eye in each card.
-    // Use test via direct window.open spy: click both and check the org-scoped call exists.
-    const viewButtons = screen.getAllByRole('button');
-    // Click each button and check if window.open was called with org path
-    for (const btn of viewButtons) {
-      btn.click();
-    }
+    // Only one report rendered — the first button in the document is the View content button
+    const firstButton = screen.getAllByRole('button')[0];
+    firstButton.click();
 
+    expect(openSpy).toHaveBeenCalledTimes(1);
     expect(openSpy).toHaveBeenCalledWith(
       `/app/community/org/posts/post-org-1`,
       '_blank',
@@ -171,6 +164,8 @@ describe('PlatformCommunityModeration', () => {
   });
 
   it('view-content button for global report opens /app/community/global/posts/<target_id>', async () => {
+    // Render with only the global report so no org card is present
+    mockFetchReports.mockResolvedValue([globalReport]);
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     renderPage();
@@ -179,11 +174,11 @@ describe('PlatformCommunityModeration', () => {
       expect(screen.getByText('Spam content')).toBeInTheDocument();
     });
 
-    const viewButtons = screen.getAllByRole('button');
-    for (const btn of viewButtons) {
-      btn.click();
-    }
+    // Only one report rendered — the first button in the document is the View content button
+    const firstButton = screen.getAllByRole('button')[0];
+    firstButton.click();
 
+    expect(openSpy).toHaveBeenCalledTimes(1);
     expect(openSpy).toHaveBeenCalledWith(
       `/app/community/global/posts/post-global-1`,
       '_blank',

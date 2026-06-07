@@ -169,7 +169,7 @@ export default function PlatformCommunityModeration() {
   };
 
   const getScopeBadge = (report: ReportWithDetails) => {
-    if (report.org_id === null) {
+    if (!report.org_id) {
       return (
         <Badge variant="outline" className="text-xs">
           {t('platformModeration.scopeGlobal')}
