@@ -38,6 +38,25 @@ export function extractLmsAssetPath(value: string | null): string | null {
     return trimmedValue.replace(/^\/+/, '');
   }
 
+  // Azure Blob Storage URL — host must end with exactly .blob.core.windows.net
+  // Format: https://<account>.blob.core.windows.net/<container>/<blobPath>[?<sas>]
+  // We parse with new URL() inside a try/catch so a malformed input can never throw.
+  try {
+    const parsed = new URL(trimmedValue);
+    if (/\.blob\.core\.windows\.net$/i.test(parsed.hostname)) {
+      // pathname is "/<container>/<blobPath>" — strip the leading slash and the first segment (container)
+      const pathSegments = parsed.pathname.replace(/^\//, '').split('/');
+      if (pathSegments.length >= 2) {
+        // Everything after the container segment, decoded
+        const blobPath = pathSegments.slice(1).map(decodeURIComponent).join('/');
+        return blobPath || null;
+      }
+      return null;
+    }
+  } catch {
+    // Malformed URL — fall through to Supabase / null branches below
+  }
+
   if (trimmedValue.includes(LMS_ASSETS_SIGN_PREFIX)) {
     const [urlWithoutQuery] = trimmedValue.split('?');
     const extractedPath = urlWithoutQuery.split(LMS_ASSETS_SIGN_PREFIX)[1];
