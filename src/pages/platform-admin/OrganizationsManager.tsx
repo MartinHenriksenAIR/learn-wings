@@ -70,7 +70,7 @@ export default function OrganizationsManager() {
 
   const fetchOrgs = async () => {
     try {
-      const { organizations } = await callApi<{ organizations: Array<Organization & { member_count: number }> }>('/api/organizations', {});
+      const { organizations } = await callApi<{ organizations: Organization[] }>('/api/organizations', {});
       setOrgs((organizations ?? []).map((o) => ({ ...o, memberCount: o.member_count })));
     } catch (err) {
       console.error('OrganizationsManager: failed to load organizations', err);
