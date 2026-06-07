@@ -73,7 +73,8 @@ export default function CoursesManager() {
   const [updating, setUpdating] = useState<string | null>(null);
 
   const fetchData = async () => {
-    setLoading(true);
+    // No setLoading(true) here: fetchData is also the post-mutation refetch for the
+    // toggle/create/delete handlers, which must not blank the page with the full spinner.
     setLoadError(null);
     try {
       const [adminRes, orgsRes] = await Promise.all([
@@ -294,6 +295,7 @@ export default function CoursesManager() {
             variant="outline"
             onClick={() => {
               setLoadError(null);
+              setLoading(true); // retry is a full reload — show the spinner, not a flash of empty UI
               fetchData();
             }}
           >
