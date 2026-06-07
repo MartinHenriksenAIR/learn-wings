@@ -1,6 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne } from '../shared/db';
+import { query } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
 
@@ -30,8 +30,9 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
     if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
 
-    await queryOne<{ id: string }>(
-      `DELETE FROM ai_champions WHERE user_id = $1 AND org_id = $2 RETURNING id`,
+    // Blind delete — idempotent (Supabase zero-row-delete parity); see idea-vote-remove.
+    await query(
+      `DELETE FROM ai_champions WHERE user_id = $1 AND org_id = $2`,
       [userId, orgId],
     );
 

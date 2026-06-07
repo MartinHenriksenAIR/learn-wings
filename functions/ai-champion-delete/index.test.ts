@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrgAdmin } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsOrgAdmin } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQueryOne: vi.fn(),
+    mockQuery: vi.fn(),
     mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne, withTransaction: vi.fn(), getDb: vi.fn() }));
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: vi.fn(), withTransaction: vi.fn(), getDb: vi.fn() }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: mockIsOrgAdmin, isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -26,7 +26,7 @@ describe('ai-champion-delete', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValue(false);
-    mockQueryOne.mockResolvedValue({ id: 'ac1' });
+    mockQuery.mockResolvedValue([{ id: 'ac1' }]);
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -72,7 +72,7 @@ describe('ai-champion-delete', () => {
     const res = await handler(baseReq({ orgId: 'org-1', userId: 'p2' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('DELETE FROM ai_champions');
     expect(sql).toContain('user_id = $1');
     expect(sql).toContain('org_id = $2');
@@ -81,7 +81,7 @@ describe('ai-champion-delete', () => {
 
   it('is idempotent: returns 200 ok even when no row matched (Supabase zero-row-delete parity)', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
-    mockQueryOne.mockResolvedValueOnce(null);
+    mockQuery.mockResolvedValueOnce([]);
     const res = await handler(baseReq({ orgId: 'org-1', userId: 'p2' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
@@ -96,7 +96,7 @@ describe('ai-champion-delete', () => {
 
   it('returns 500 on db error', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
-    mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
+    mockQuery.mockRejectedValueOnce(new Error('connection refused'));
     const res = await handler(baseReq({ orgId: 'org-1', userId: 'p2' }), {} as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });

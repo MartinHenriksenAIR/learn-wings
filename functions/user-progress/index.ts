@@ -54,8 +54,12 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
 
     // 1. Enrollments + course metadata. Non-platform-admins see only published, org-accessible
-    //    courses (courses SELECT RLS parity — the old PostgREST embed nulled hidden courses and
-    //    the dialog skipped them). ORDER BY c.title is a deliberate tightening (determinism).
+    //    courses (the old PostgREST embed nulled RLS-hidden courses and the dialog skipped them).
+    //    DELIBERATE DIVERGENCE from exact RLS parity: the old courses policy resolved access via
+    //    ALL the caller's orgs (current_org_ids_for_user()); this filter keys on the TARGET org
+    //    only — a multi-org admin viewing org A no longer sees a course visible solely via org B.
+    //    Scoped-to-the-org-being-viewed is the intended semantics (documented in the PR/plan).
+    //    ORDER BY c.title is a deliberate tightening (determinism).
     const visibilityFilter = profile.is_platform_admin
       ? ''
       : `AND c.is_published = TRUE
@@ -74,35 +78,37 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     }
     const courseIds = enrollments.map((e) => e.course_id);
 
-    // 2. The user's lesson progress in this org. Parity: the old client fetched ALL of the
-    //    user's progress in the org (not just enrolled courses) — filtered during assembly.
-    const progressRows = await query<ProgressRow>(
-      `SELECT lesson_id, status, completed_at FROM lesson_progress
-        WHERE org_id = $1 AND user_id = $2`,
-      [orgId, userId],
-    );
-
-    // 3. The user's quiz attempts in this org, latest first (the dialog's ordering).
-    //    Parity: fetches ALL attempts in the org, like the old client — filtered during assembly.
-    const attemptRows = await query<AttemptRow>(
-      `SELECT id, quiz_id, score, passed, started_at, finished_at
-         FROM quiz_attempts WHERE org_id = $1 AND user_id = $2
-        ORDER BY started_at DESC`,
-      [orgId, userId],
-    );
-
-    // 4. Structure for the enrolled courses (modules already filtered transitively by step 1).
-    const structureRows = await query<StructureRow>(
-      `SELECT cm.id AS module_id, cm.course_id, cm.title AS module_title,
-              cm.sort_order AS module_sort_order,
-              l.id AS lesson_id, l.title AS lesson_title, l.lesson_type,
-              l.sort_order AS lesson_sort_order
-         FROM course_modules cm
-         LEFT JOIN lessons l ON l.module_id = cm.id
-        WHERE cm.course_id = ANY($1)
-        ORDER BY cm.course_id, cm.sort_order, l.sort_order`,
-      [courseIds],
-    );
+    // 2–4 are mutually independent — one Promise.all saves two round trips (suite precedent:
+    // org-analytics-data). Query 5 stays conditional on the structure result.
+    const [progressRows, attemptRows, structureRows] = await Promise.all([
+      // 2. The user's lesson progress in this org. Parity: the old client fetched ALL of the
+      //    user's progress in the org (not just enrolled courses) — filtered during assembly.
+      query<ProgressRow>(
+        `SELECT lesson_id, status, completed_at FROM lesson_progress
+          WHERE org_id = $1 AND user_id = $2`,
+        [orgId, userId],
+      ),
+      // 3. The user's quiz attempts in this org, latest first (the dialog's ordering).
+      //    Parity: fetches ALL attempts in the org, like the old client — filtered during assembly.
+      query<AttemptRow>(
+        `SELECT id, quiz_id, score, passed, started_at, finished_at
+           FROM quiz_attempts WHERE org_id = $1 AND user_id = $2
+          ORDER BY started_at DESC`,
+        [orgId, userId],
+      ),
+      // 4. Structure for the enrolled courses (modules already filtered transitively by step 1).
+      query<StructureRow>(
+        `SELECT cm.id AS module_id, cm.course_id, cm.title AS module_title,
+                cm.sort_order AS module_sort_order,
+                l.id AS lesson_id, l.title AS lesson_title, l.lesson_type,
+                l.sort_order AS lesson_sort_order
+           FROM course_modules cm
+           LEFT JOIN lessons l ON l.module_id = cm.id
+          WHERE cm.course_id = ANY($1)
+          ORDER BY cm.course_id, cm.sort_order, l.sort_order`,
+        [courseIds],
+      ),
+    ]);
 
     // 5. Quizzes for those lessons (quizzes.lesson_id is UNIQUE — one quiz per lesson).
     const lessonIds = structureRows
