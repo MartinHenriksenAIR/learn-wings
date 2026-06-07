@@ -16,7 +16,7 @@ async function canAccessAsset(profileId: string, filePath: string): Promise<bool
         JOIN org_memberships om ON om.org_id = oca.org_id
         WHERE c.is_published = TRUE AND oca.access = 'enabled'
           AND om.user_id = $1 AND om.status = 'active'
-          AND (l.video_storage_path = $2 OR l.document_storage_path = $2)
+          AND (l.video_storage_path = $2 OR l.document_storage_path = $2 OR l.azure_blob_path = $2)
       )
     ) AS can_access`,
     [profileId, filePath]

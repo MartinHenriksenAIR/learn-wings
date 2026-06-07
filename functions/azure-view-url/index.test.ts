@@ -72,6 +72,24 @@ describe('azure-view-url', () => {
     expect(accessCall![1]).toEqual(['p1', 'videos/x.mp4']);
   });
 
+  it('access SQL matches all three lesson asset columns (issue #14: video blobs live in azure_blob_path)', async () => {
+    mockQueryOne.mockResolvedValueOnce({ can_access: true });
+
+    await handler(baseReq as any, {} as any);
+
+    // LESSON-BRANCH PARITY PIN vs public.can_user_access_lms_asset (migration/azure/
+    // 01-schema.sql): a video lesson's path is stored in azure_blob_path
+    // (video_storage_path is the legacy Supabase column) — matching only the other
+    // two 403s every video blob. The RPC's thumbnail branch is deliberately not
+    // ported here (no caller sends thumbnails to this endpoint) — see issue #60.
+    const accessCall = mockQueryOne.mock.calls.find(c => (c[0] as string).includes('can_access'));
+    expect(accessCall).toBeDefined();
+    const sql = accessCall![0] as string;
+    expect(sql).toContain('l.video_storage_path = $2');
+    expect(sql).toContain('l.document_storage_path = $2');
+    expect(sql).toContain('l.azure_blob_path = $2');
+  });
+
   it('returns 200 with viewUrl on happy member path (EXISTS true)', async () => {
     mockQueryOne.mockResolvedValueOnce({ can_access: true });
 
