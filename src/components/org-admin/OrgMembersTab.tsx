@@ -99,73 +99,81 @@ export function OrgMembersTab() {
     }
 
     try {
-      try {
-        type MembershipRow = {
-          id: string;
-          org_id: string;
-          user_id: string;
-          role: OrgRole;
-          status: 'active' | 'invited' | 'disabled';
-          created_at: string;
-          full_name: string;
-          email: string;
-          avatar_url: string | null;
-          department: string | null;
-        };
-        const { memberships } = await callApi<{ memberships: MembershipRow[] }>(
-          '/api/org-memberships',
-          { orgId: currentOrg.id },
-        );
-        const reshaped: (OrgMembership & { profile: Profile })[] = memberships.map((row) => ({
-          id: row.id,
-          org_id: row.org_id,
-          user_id: row.user_id,
-          role: row.role,
-          status: row.status,
-          created_at: row.created_at,
-          profile: {
-            id: row.user_id,
-            full_name: row.full_name,
-            first_name: null,
-            last_name: null,
-            department: row.department,
-            is_platform_admin: false,
-            created_at: row.created_at,
-            preferred_language: null,
-          },
-        }));
-        setMembers(reshaped);
-      } catch (err) {
-        toast({
-          title: 'Failed to load members',
-          description: err instanceof Error ? err.message : 'Unexpected error',
-          variant: 'destructive',
-        });
-      }
-
-      try {
-        const { invitations: inviteData } = await callApi<{ invitations: Invitation[] }>(
-          '/api/invitations',
-          { scope: 'org', orgId: currentOrg.id },
-        );
-        setInvitations(inviteData);
-      } catch (err) {
-        toast({
-          title: 'Failed to load invitations',
-          description: err instanceof Error ? err.message : 'Unexpected error',
-          variant: 'destructive',
-        });
-      }
-
-      try {
-        const { champions } = await callApi<{ champions: { user_id: string }[] }>(
-          '/api/ai-champions',
-          { orgId: currentOrg.id },
-        );
-        setAiChampions(new Set(champions.map((c) => c.user_id)));
-      } catch {
-        // parity: the old client ignored champion-fetch errors (badges simply don't render)
-      }
+      // The three fetches are independent and each handles its own errors —
+      // run them concurrently (same pattern as CoursesManager's Promise.all).
+      await Promise.all([
+        (async () => {
+          try {
+            type MembershipRow = {
+              id: string;
+              org_id: string;
+              user_id: string;
+              role: OrgRole;
+              status: 'active' | 'invited' | 'disabled';
+              created_at: string;
+              full_name: string;
+              email: string;
+              avatar_url: string | null;
+              department: string | null;
+            };
+            const { memberships } = await callApi<{ memberships: MembershipRow[] }>(
+              '/api/org-memberships',
+              { orgId: currentOrg.id },
+            );
+            const reshaped: (OrgMembership & { profile: Profile })[] = memberships.map((row) => ({
+              id: row.id,
+              org_id: row.org_id,
+              user_id: row.user_id,
+              role: row.role,
+              status: row.status,
+              created_at: row.created_at,
+              profile: {
+                id: row.user_id,
+                full_name: row.full_name,
+                first_name: null,
+                last_name: null,
+                department: row.department,
+                is_platform_admin: false,
+                created_at: row.created_at,
+                preferred_language: null,
+              },
+            }));
+            setMembers(reshaped);
+          } catch (err) {
+            toast({
+              title: 'Failed to load members',
+              description: err instanceof Error ? err.message : 'Unexpected error',
+              variant: 'destructive',
+            });
+          }
+        })(),
+        (async () => {
+          try {
+            const { invitations: inviteData } = await callApi<{ invitations: Invitation[] }>(
+              '/api/invitations',
+              { scope: 'org', orgId: currentOrg.id },
+            );
+            setInvitations(inviteData);
+          } catch (err) {
+            toast({
+              title: 'Failed to load invitations',
+              description: err instanceof Error ? err.message : 'Unexpected error',
+              variant: 'destructive',
+            });
+          }
+        })(),
+        (async () => {
+          try {
+            const { champions } = await callApi<{ champions: { user_id: string }[] }>(
+              '/api/ai-champions',
+              { orgId: currentOrg.id },
+            );
+            setAiChampions(new Set(champions.map((c) => c.user_id)));
+          } catch {
+            // parity: the old client ignored champion-fetch errors (badges simply don't render)
+          }
+        })(),
+      ]);
     } finally {
       setLoading(false);
     }

@@ -127,6 +127,7 @@ export function UserProgressDialog({
       setCourseProgress(courses);
     } catch (error) {
       console.error('Error fetching user progress:', error); // parity: no toast
+      setCourseProgress([]); // review fix: don't render a previous user's data under this user's name
     }
     setLoading(false);
   };
