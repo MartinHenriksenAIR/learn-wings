@@ -124,8 +124,6 @@ export default function OrganizationsManager() {
         newOrg = result.organization;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create organization';
-        // Exact 409 message from organization-create — substring matching against
-        // 'slug' also catches 400 validation messages like "slug must be a string".
         if (message === 'Slug already in use') {
           setErrors({ slug: 'This slug is already taken' });
         } else {
@@ -138,16 +136,23 @@ export default function OrganizationsManager() {
         return;
       }
 
-      // Assign initial admin if selected
+      // Post-create steps still use supabase directly — memberships/invitations
+      // cutover is Slice 3b (see migration/STATUS.html). Capture each step's
+      // error so a follow-up failure no longer hides behind a green success toast.
+      let postCreateError: string | null = null;
+
       if (adminTab === 'existing' && selectedUserId) {
-        await supabase.from('org_memberships').insert({
+        // TODO(slice-3b): replace with callApi('/api/org-membership-create')
+        const { error } = await supabase.from('org_memberships').insert({
           org_id: newOrg.id,
           user_id: selectedUserId,
           role: 'org_admin' as OrgRole,
           status: 'active',
         });
+        if (error) postCreateError = `admin assignment failed: ${error.message}`;
       } else if (adminTab === 'invite' && inviteEmail.trim()) {
-        const { data: insertedInvitation } = await supabase
+        // TODO(slice-3b): replace with callApi('/api/invitation-create')
+        const { data: insertedInvitation, error: inviteErr } = await supabase
           .from('invitations')
           .insert({
             org_id: newOrg.id,
@@ -158,26 +163,41 @@ export default function OrganizationsManager() {
           .select('id')
           .single();
 
-        // Send invitation email
-        if (insertedInvitation?.id) {
-          const { data: linkId } = await supabase
+        if (inviteErr) {
+          postCreateError = `invitation creation failed: ${inviteErr.message}`;
+        } else if (insertedInvitation?.id) {
+          // TODO(slice-3b): replace with callApi('/api/invitation-link-id')
+          const { data: linkId, error: linkErr } = await supabase
             .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
 
-          if (linkId) {
-            await sendInvitationEmail({
+          if (linkErr) {
+            postCreateError = `invitation link generation failed: ${linkErr.message}`;
+          } else if (linkId) {
+            const emailResult = await sendInvitationEmail({
               email: inviteEmail.trim(),
               orgName: name,
               role: 'org_admin',
               linkId,
             });
+            if (!emailResult.success) {
+              postCreateError = `invitation email failed: ${emailResult.error ?? 'unknown'}`;
+            }
           }
         }
       }
 
-      toast({
-        title: 'Organization created!',
-        description: `${name} is now ready.`,
-      });
+      if (postCreateError) {
+        toast({
+          title: 'Organization created, but follow-up step failed',
+          description: postCreateError,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Organization created!',
+          description: `${name} is now ready.`,
+        });
+      }
       setCreateOpen(false);
       resetForm();
       fetchOrgs();
