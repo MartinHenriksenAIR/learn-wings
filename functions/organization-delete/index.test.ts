@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQuery: vi.fn(), mockQueryOne: vi.fn(),
+    mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
+vi.mock('../shared/db', () => ({ queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -52,7 +52,6 @@ describe('organization-delete', () => {
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
     expect(mockQueryOne).not.toHaveBeenCalled();
-    expect(mockQuery).not.toHaveBeenCalled();
   });
 
   it('returns 400 when orgId is missing', async () => {
@@ -68,21 +67,20 @@ describe('organization-delete', () => {
   });
 
   it('returns 404 when organization not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null);
+    mockQueryOne.mockResolvedValueOnce(null); // DELETE RETURNING null = no row
     const res = await handler(baseReq({ orgId: 'org-x' }), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization not found' });
-    expect(mockQuery).not.toHaveBeenCalled();
   });
 
   it('happy path: platform admin deletes an organization', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' });
-    mockQuery.mockResolvedValueOnce([]);
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // DELETE RETURNING id
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
-    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('DELETE FROM organizations');
+    expect(sql).toContain('RETURNING id');
     expect(params).toEqual(['org-1']);
   });
 

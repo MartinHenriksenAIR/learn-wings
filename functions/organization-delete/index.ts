@@ -1,6 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { query, queryOne } from '../shared/db';
+import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile } from '../shared/profile';
 
@@ -31,16 +31,14 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
     }
 
-    // Existence check — distinguish "not found" from "delete succeeded with 0 rows".
-    const existing = await queryOne<OrgRow>(
-      `SELECT id FROM organizations WHERE id = $1`,
-      [orgId],
-    );
-    if (!existing) return corsResponse(origin, 404, { error: 'Organization not found' }) as HttpResponseInit;
-
+    // DELETE ... RETURNING gives us the not-found signal (null) in one round trip.
     // Cascade deletes (org_memberships, invitations, org_settings, ai_champions,
     // community_*, ideas) handled by ON DELETE CASCADE per migration 20260127153401.
-    await query(`DELETE FROM organizations WHERE id = $1`, [orgId]);
+    const deleted = await queryOne<OrgRow>(
+      `DELETE FROM organizations WHERE id = $1 RETURNING id`,
+      [orgId],
+    );
+    if (!deleted) return corsResponse(origin, 404, { error: 'Organization not found' }) as HttpResponseInit;
 
     return corsResponse(origin, 200, { ok: true }) as HttpResponseInit;
   } catch (err: unknown) {
