@@ -86,11 +86,17 @@ export default function OrganizationsManager() {
   };
 
   const fetchProfiles = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('full_name');
-    if (data) setProfiles(data as Profile[]);
+    try {
+      const { profiles } = await callApi<{ profiles: Profile[] }>('/api/profiles', {});
+      if (profiles) setProfiles(profiles);
+    } catch (err) {
+      toast({
+        title: 'Failed to load users',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+      console.error('OrganizationsManager: failed to load profiles', err);
+    }
   };
 
   useEffect(() => {

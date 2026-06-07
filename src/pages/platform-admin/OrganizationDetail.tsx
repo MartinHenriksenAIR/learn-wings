@@ -174,15 +174,15 @@ export default function OrganizationDetail() {
     }
 
     // Fetch all users to find ones not in this org
-    const { data: allProfiles } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('full_name');
-
-    if (allProfiles && memberData) {
-      const memberUserIds = new Set(memberData.map((m) => m.user_id));
-      const available = allProfiles.filter((p) => !memberUserIds.has(p.id));
-      setAvailableUsers(available as Profile[]);
+    try {
+      const { profiles: allProfiles } = await callApi<{ profiles: Profile[] }>('/api/profiles', {});
+      if (allProfiles && memberData) {
+        const memberUserIds = new Set(memberData.map((m) => m.user_id));
+        const available = allProfiles.filter((p) => !memberUserIds.has(p.id));
+        setAvailableUsers(available);
+      }
+    } catch (err) {
+      console.error('OrganizationDetail: failed to load profiles', err);
     }
 
     setLoading(false);
