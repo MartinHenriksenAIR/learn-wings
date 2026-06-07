@@ -663,3 +663,13 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 ## 2026-06-07 — #72 deployed + verified + closed (trunk @820569d)
 
 **Who:** emil & Claude. PR #77 trunk deploy via CI run **27099804563** (organization-update authz; function count unchanged at 100), unauth smoke 3/3 401. UI spot-check on the rebuilt PR-6 preview PASSED (org filter populated + scoping, logo update 200, zero supabase requests) — #72 closed. Org-admin-ROLE logo upload remains contract-tested only (no org-admin login in the tester session) — noted as residue, not blocking. Work branches `emil/11-slice-3c` and `emil/72-org-analytics-cutover` deleted post-verification.
+
+---
+
+## 2026-06-07 — #16 fixed: refresh/deep-link routing + view-mode persistence (PR #85)
+
+**Who:** emil & Claude (isolated worktree session, run in parallel with the admin-settings session holding the main working tree).
+
+**Root cause (3 cooperating defects, diagnosed before fixing — full writeup on PR #85):** (1) `AuthContext.isLoading` tracked only MSAL `inProgress`, not the `/api/user-context` fetch — on hard refresh, `ProtectedRoute` evaluated `requirePlatformAdmin`/`requireOrgAdmin` against a still-null profile ("not loaded yet" ≡ "not authorized") and bounced every admin route to `/app/dashboard` with `replace`. (2) Deep links died across the login round trip: MSAL cache is sessionStorage (fresh tab = unauthenticated), `ProtectedRoute` redirected to `/login` without saving the location, and `Login` navigated to a fixed role home. (3) `viewMode` was in-memory `useState` — every reload reset it to Platform Admin, which also fed defect 1 via `effectiveIsPlatformAdmin`. Ruled out: static layer (navigationFallback correct) and `main.tsx`'s pre-render `handleRedirectPromise` (load-bearing prior fix 2494c32 — untouched).
+
+**Fix (PR #85, TDD — 6 failing tests watched fail first):** `contextLoading` flag widens `isLoading` until user-context resolves (cleared in `finally`; signed-out users never "loading", so cold login renders immediately); new `src/lib/post-login-redirect.ts` sessionStorage stash written by `ProtectedRoute`, consumed once by `Login` (in-app-path validated); `viewMode` persisted per tab; `signOut` clears both keys. Code review (7 finder angles): 3 findings fixed pre-merge (stale stash/viewMode across sign-out, validation dedup), remainder refuted/dispositioned on the PR. Gates: 82/82 root tests, tsc, build all exit 0. Frontend-only — NO function deploy; the trunk push rebuilds the PR-6 preview. Gate-4 preview script on PR #85 (cold-login regression guard, refresh-stays-put, copy-link in fresh tab, view-mode persistence) — USER verification on the rebuilt preview pending.
