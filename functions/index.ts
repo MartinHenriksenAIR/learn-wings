@@ -100,3 +100,4 @@ import './send-invitation-email/index';
 import './test-smtp-connection/index';
 import './unenroll/index';
 import './user-context/index';
+import './user-progress/index';
