@@ -607,3 +607,9 @@ Single-component frontend cutover: `src/components/OrgSelector.tsx` swapped from
 - **#31 post-elevation queue CLOSED:** "re-ran every suite blocked by the org-context bug: ALL PASS" — report dismissal, OrgSettings round-trip, moderation actions, ideas kanban, junk cleanup. Leftover favicon junk noted on #32; standing findings #38–#40 remain open.
 
 **Ledger correction:** the Slice 3a and 3b bookkeeping written concurrently still described Slice 2's Gate 4 as pending ("74 live" / "pending Gate 4"). Checkpoint corrected (our-side facts only) in PR #59; Martin's slice narratives left untouched.
+
+---
+
+## 2026-06-07 — #14 merged + deployed (PR #59 → trunk @5ff8758)
+
+**Who:** emil & Claude. PR #59 squash-merged (cross-review waived by emil — the xhigh `/code-review` pass on the PR stood in; Martin active on Slice 3b concurrently). Trunk deploy via CI run **27091801153** (build + deploy green). Unauth smoke 4/4 `401 Missing Bearer token` on the regionalized hostname: `azure-view-url` (the fix) plus `org-membership-create`/`invitations`/`enrollment-create` — confirming Slice 3b's batch registered in the same deploy (97 live). Issue #14 closed. Remaining acceptance: authed video-200 on the seeded Welcome Video (PR-6 preview) — rides the next tester-session sweep alongside Slice 3b's Gate 4.
