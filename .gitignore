@@ -32,3 +32,7 @@ local.settings.json
 # Playwright MCP session artifacts
 .playwright-mcp/
 .claude/worktrees/
+
+# Orientation digest — generated on demand by the `orient` skill, never committed.
+# (The durable core docs/orientation/CONTEXT.md IS committed; only the rendered digest is ignored.)
+docs/orientation/digest.html

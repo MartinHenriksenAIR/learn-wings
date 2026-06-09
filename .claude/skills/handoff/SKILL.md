@@ -9,6 +9,7 @@ description: Use at session end on learn-wings — pushes state, updates the iss
 1. Commit (work branches commit freely) and `git push -u origin HEAD`.
 2. Comment on the draft PR: done / in-progress / next steps / any gotchas discovered.
 3. Update the issue if scope changed (especially "Files touched" — the other developer's overlap check depends on it).
+4. **Sync the orientation core:** run `core-sync` (`.claude/skills/orient/core-sync.md`) against `docs/orientation/CONTEXT.md` — auto-fix mechanical drift (closed issues still listed, merged PRs in `current_focus`, new decisions made this session) and PROPOSE any judgment updates (`health`/`current_focus`/`summary`) for confirmation. Then run `orient` once so the next pickup starts current. (Skip only if nothing this session touched project state.)
 
 **When the work is complete (merge ritual):**
 1. Verify locally: `cd functions && npm test` (if functions changed), `npm run build`, `npm test`, `npx tsc --noEmit -p tsconfig.app.json`.

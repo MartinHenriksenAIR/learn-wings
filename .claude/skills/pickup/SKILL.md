@@ -5,9 +5,7 @@ description: Use at session start when beginning work on learn-wings — reads t
 
 # Pickup — start-of-session claiming
 
-1. **Read state:** `migration/STATUS.html` (checkpoint, quirks), then:
-   - `gh issue list --state open` — the backlog
-   - `gh pr list --state open` — draft PRs = active claims (branch names show who/what)
+1. **Get oriented — run the `orient` skill FIRST.** It regenerates `docs/orientation/digest.html` if state moved (else opens the current one) and gives you the plain-English picture: where the project stands, what each open issue means and whether it matters, and who's claimed what. Skim it before choosing work. Under the hood `orient` reads `migration/STATUS.html` (checkpoint, quirks) + `gh issue list --state open` (backlog) + `gh pr list --state open` (draft PRs = active claims; branch names show who/what) — so you do not need to triangulate those by hand.
 2. **Choose an issue** that is unassigned AND has no associated branch/draft PR. Honor `Depends on:` references and the `blocked` label — AND a filled "Blocked by" field in the issue body (form-created issues may lack labels; the body is authoritative).
 3. **Overlap check (MANDATORY):** compare the issue's "Files touched" against every open draft PR's issue — then grade the overlap by KIND:
    - **Disjoint files** → claim freely.
