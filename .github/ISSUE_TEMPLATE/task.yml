@@ -6,6 +6,22 @@ body:
     attributes:
       value: |
         **After creating: apply the matching type label** (`slice`/`bug`/`hardening`/`ci`/`polish`, plus `blocked` if applicable) — the pickup protocol filters on labels. GitHub forms cannot apply a label from a dropdown automatically.
+  - type: textarea
+    id: plain
+    attributes:
+      label: In plain English
+      description: One sentence a non-author (or future-you) understands — what is this? No file paths, no jargon. This is what surfaces in the /orient digest.
+      placeholder: "Any logged-in user can open any course's content, even one their org wasn't granted."
+    validations:
+      required: true
+  - type: textarea
+    id: matters
+    attributes:
+      label: Why it matters / who it affects
+      description: Real-user bug, launch-blocker, security, cleanup, or nicety? Who's affected? Helps prioritise at a glance.
+      placeholder: "Security — cross-org data exposure. Hits every org once real customers are on. Fix before onboarding."
+    validations:
+      required: true
   - type: dropdown
     id: type
     attributes:

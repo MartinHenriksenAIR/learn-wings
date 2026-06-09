@@ -28,7 +28,7 @@ Everything is **org-scoped**: data belongs to an organization, and members see o
 | Email | **Resend** (transactional invitations) |
 | Hosting | Azure **Static Web Apps** (frontend) + Azure Functions (API) |
 
-Architecture decisions are recorded in **[`docs/adr/`](docs/adr/)** (ADR-0001 … ADR-0012) — read them before structural changes.
+Active architecture decisions live in **[`docs/orientation/CONTEXT.md`](docs/orientation/CONTEXT.md)** (the decisions log) — read it before structural changes. The original 12 ADRs in [`docs/adr/`](docs/adr/) are archived history.
 
 ## How it fits together
 
@@ -60,7 +60,8 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | `functions/` | ~100 Azure Functions (one folder each) + `shared/` (auth, db, profile, cors) + `index.ts` barrel |
 | `migration/azure/` | The canonical Postgres schema (`01-schema.sql`), seed data (`02-seed.sql`), and apply guide |
 | `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history), `lovable-supabase-removal/` (planning) |
-| `docs/adr/` | The 12 architecture decision records |
+| `docs/orientation/` | The durable orientation core (`CONTEXT.md`) + the generated `/orient` digest. Active decisions live here. |
+| `docs/adr/` | The 12 original ADRs — **archived** history; superseded by the orientation core's decisions log |
 | `.claude/` | Agent collaboration system — `rules/` (hard-won conventions), `skills/`, `collab.json` |
 | `supabase/` | **Dead** — the original Supabase Deno functions + migrations, kept only as authz-provenance reference. Deleted in the final migration slice (#13). |
 
@@ -133,12 +134,13 @@ The hard-won rules that keep this codebase stable are codified — read them bef
 |-----|------------|
 | [`migration/STATUS.html`](migration/STATUS.html) | **Live ledger** — current checkpoint, operational quirks, pointers. Authoritative. |
 | [`migration/WORKLOG.md`](migration/WORKLOG.md) | Append-only history of every merged change. |
-| [`docs/adr/`](docs/adr/) | The 12 architecture decision records (what is and isn't allowed). |
+| [`docs/orientation/CONTEXT.md`](docs/orientation/CONTEXT.md) | The durable orientation core — current focus, component map, **active decisions log**. Run `/orient` to merge it with live state into a digest. |
+| [`docs/adr/`](docs/adr/) | The 12 original ADRs — archived history (superseded by the core's decisions log). |
 | [`AGENTS.md`](AGENTS.md) | Agent + contributor instructions. |
 | [`migration/azure/README.md`](migration/azure/README.md) | The Supabase→Azure schema port: what was stripped, added, ported, and flagged. |
 | [`AZURE_DEPLOYMENT_GUIDE.md`](AZURE_DEPLOYMENT_GUIDE.md) | Reference Azure deployment guide. |
 
-> Note: a few root-level docs from early 2026 (`QUICK_START.md`, `DEPLOYMENT_SUMMARY.md`) predate the current vertical-slice migration plan and describe a since-abandoned approach. Treat `STATUS.html`, the ADRs, and `migration/azure/README.md` as authoritative.
+> Note: a few root-level docs from early 2026 (`QUICK_START.md`, `DEPLOYMENT_SUMMARY.md`) predate the current vertical-slice migration plan and describe a since-abandoned approach. Treat `STATUS.html`, `docs/orientation/CONTEXT.md`, and `migration/azure/README.md` as authoritative (the ADRs are archived).
 
 ## Collaboration & deployment
 

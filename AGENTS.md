@@ -3,7 +3,7 @@
 Single source of truth for all coding agents. `CLAUDE.md` imports this file — edit HERE, never there.
 
 ## Session start
-1. Read `migration/STATUS.html` — the live ledger (checkpoint, operational quirks, pointers).
+1. Run the `orient` skill (or `pickup`, which runs it first) for the current plain-English picture — where things stand + every open issue decoded. It reads the durable core `docs/orientation/CONTEXT.md`; `migration/STATUS.html` remains the deploy/checkpoint ledger.
 2. Check claims: `gh issue list --state open` (backlog) + `gh pr list --state open` (draft PRs = active claims).
 3. Starting work → invoke the `pickup` skill. Ending a session → `handoff`. Executing a slice → `slice-workflow`.
 
@@ -22,8 +22,13 @@ This is also the right default for tasks that feel small but have multiple steps
 - **Deploys: ONLY from fresh trunk after a merge** — never from work branches (one shared function app/DB/preview). Procedure in `slice-workflow`. Announce on the merged PR.
 - **Bookkeeping:** merged PRs append a dated `migration/WORKLOG.md` entry (append-only) and update `migration/STATUS.html`'s checkpoint.
 
-## ADRs
-`docs/adr/` holds the 12 architecture decision records — they define what is and isn't allowed; read them before structural changes. Plain markdown, edited by hand (the adr-kit tooling was removed 2026-06-06).
+## Orientation layer
+- **Stay oriented with `orient`** (run it anytime; `pickup` runs it at session start). It renders a plain-English digest (`docs/orientation/digest.html`, gitignored) from the durable core (`docs/orientation/CONTEXT.md`) + live issues/PRs — so you never decode the raw issue board by hand.
+- **Human-summary header** on every issue, PR, and slice doc: lead with *In plain English* (one jargon-free sentence) + *Why it matters / who it affects*, ABOVE the technical detail. Templates enforce it (`.github/ISSUE_TEMPLATE/task.yml`, `.github/pull_request_template.md`). The digest lifts these headers — good headers = a sharper digest for free.
+- **`core-sync`:** when your work obviously moves the core (close a tracked issue, make a structural decision, add a subsystem), update `docs/orientation/CONTEXT.md` in the same change. The full reconcile (auto-fix mechanical drift + propose judgment changes) runs at `handoff`; never silently rewrite judgment fields. See `.claude/skills/orient/core-sync.md`.
+
+## Decisions
+Active architecture decisions live in `docs/orientation/CONTEXT.md` (the `decisions` log) — read it before structural changes. The 12 original ADRs in `docs/adr/` are **archived history** (no longer maintained; the adr-kit tooling was removed 2026-06-06); new and amended decisions go in the core, not as new ADR files.
 
 ## Lovable Source Reference
 Lovable workspace **AIR** (`Q7aTXTRh50LxV00N6SRQ`) holds the original project. **Read-only** — no mutating Lovable tools without explicit user instruction.
