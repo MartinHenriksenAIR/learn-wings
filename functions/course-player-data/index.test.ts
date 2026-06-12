@@ -95,6 +95,28 @@ describe('course-player-data', () => {
     expect(accessParams).toEqual(['p1', 'course-uuid']);
   });
 
+  it('returns 403 for a non-admin opening an unpublished course (gate enforces publication)', async () => {
+    // Course row exists (404 check passes) but is_published = false. The access EXISTS check
+    // gates on is_published = TRUE, so it returns false for a non-admin learner.
+    const course = { id: 'course-uuid', title: 'AI Basics', is_published: false };
+    mockQueryOne.mockResolvedValueOnce(course);        // course lookup
+    mockQueryOne.mockResolvedValueOnce({ ok: false }); // access check fails (unpublished)
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Course access denied' });
+    expect(mockQuery).not.toHaveBeenCalled();
+
+    // Pin the security-critical gating predicates BY VALUE. A regression that opens the gate
+    // (drops the publication / enablement / active-membership clause) must fail here rather than
+    // slip past a loose table-name substring check.
+    const [accessSql] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(accessSql).toContain('is_published = TRUE');
+    expect(accessSql).toContain("oca.access = 'enabled'");
+    expect(accessSql).toContain("om.status = 'active'");
+  });
+
   it('skips the access check for platform admins', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 

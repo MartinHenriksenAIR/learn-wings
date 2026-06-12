@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -705,7 +705,10 @@ export default function CoursePlayer() {
           onReviewSubmitted={() => {
             callApi<{ course: Course; modules: any; progressMap: any; review: any } | null>(
               '/api/course-player-data', { courseId: course.id, orgId: currentOrg.id }
-            ).then(data => { if (data?.review) setExistingReview(data.review as any); });
+            )
+              .then(data => { if (data?.review) setExistingReview(data.review as any); })
+              // Endpoint can now 403 (access revoked mid-session) — don't leave the rejection unhandled.
+              .catch(error => { console.error('Error refreshing review:', error); });
           }}
         />
       )}
