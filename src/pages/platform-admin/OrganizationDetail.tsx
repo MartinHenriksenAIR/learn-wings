@@ -73,6 +73,7 @@ import {
 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { z } from 'zod';
+import { orgSchema } from '@/lib/org-validation';
 
 const addUserSchema = z.object({
   userId: z.string().uuid('Please select a user'),
@@ -82,12 +83,6 @@ const addUserSchema = z.object({
 const inviteSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   role: z.enum(['org_admin', 'learner']),
-});
-
-const editOrgSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name must be less than 100 characters'),
-  slug: z.string().min(2, 'Slug must be at least 2 characters').max(50, 'Slug must be less than 50 characters')
-    .regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens'),
 });
 
 export default function OrganizationDetail() {
@@ -440,7 +435,7 @@ export default function OrganizationDetail() {
   };
 
   const handleSaveEdit = async () => {
-    const result = editOrgSchema.safeParse({ name: editName, slug: editSlug });
+    const result = orgSchema.safeParse({ name: editName, slug: editSlug });
     if (!result.success) {
       toast({
         title: 'Invalid input',

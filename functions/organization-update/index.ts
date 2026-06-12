@@ -3,10 +3,8 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
+import { validateOrgName, validateOrgSlug } from '../shared/org-validation';
 
-// Mirrors the zod/schema constraints in organization-create — same DB,
-// same validation messages so the page-side error handling is identical.
-const SLUG_REGEX = /^[a-z0-9-]+$/;
 const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit']);
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
@@ -43,15 +41,14 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     for (const key of updateKeys) {
       const v = updatesObj[key];
       if (key === 'name') {
-        if (typeof v !== 'string' || v.length < 2 || v.length > 100) {
-          return corsResponse(origin, 400, { error: 'name must be a string between 2 and 100 characters' });
+        const nameError = validateOrgName(v);
+        if (nameError) {
+          return corsResponse(origin, 400, { error: nameError });
         }
       } else if (key === 'slug') {
-        if (typeof v !== 'string' || v.length < 2 || v.length > 50) {
-          return corsResponse(origin, 400, { error: 'slug must be a string between 2 and 50 characters' });
-        }
-        if (!SLUG_REGEX.test(v)) {
-          return corsResponse(origin, 400, { error: 'slug must contain only lowercase letters, numbers, and hyphens' });
+        const slugError = validateOrgSlug(v);
+        if (slugError) {
+          return corsResponse(origin, 400, { error: slugError });
         }
       } else if (key === 'logo_url') {
         if (v !== null && typeof v !== 'string') {

@@ -37,15 +37,9 @@ import { callApi, ApiError } from '@/lib/api-client';
 import { Organization, Profile, OrgRole } from '@/lib/types';
 import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail, UsersRound } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
-import { z } from 'zod';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { buildPublicUrl } from '@/lib/storage-url';
-
-const orgSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
-  slug: z.string().min(2, 'Slug must be at least 2 characters').max(50)
-    .regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
-});
+import { orgSchema } from '@/lib/org-validation';
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();

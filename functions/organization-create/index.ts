@@ -3,11 +3,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile } from '../shared/profile';
-
-// Mirrors the zod schema in src/pages/platform-admin/OrganizationsManager.tsx
-// (the form was the only insert site pre-migration). The slug regex matches
-// the DB-level unique constraint's expectation of lowercase URL-safe tokens.
-const SLUG_REGEX = /^[a-z0-9-]+$/;
+import { validateOrgName, validateOrgSlug } from '../shared/org-validation';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
@@ -21,15 +17,15 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const { name, slug, logo_url, seat_limit } = body;
 
     // Validation first (matches resource-create / org-settings-update order),
-    // authz second. Keep messages aligned with the page-side zod errors.
-    if (typeof name !== 'string' || name.length < 2 || name.length > 100) {
-      return corsResponse(origin, 400, { error: 'name must be a string between 2 and 100 characters' });
+    // authz second. Rules live in shared/org-validation (mirrored by the
+    // frontend zod schema in src/lib/org-validation.ts).
+    const nameError = validateOrgName(name);
+    if (nameError) {
+      return corsResponse(origin, 400, { error: nameError });
     }
-    if (typeof slug !== 'string' || slug.length < 2 || slug.length > 50) {
-      return corsResponse(origin, 400, { error: 'slug must be a string between 2 and 50 characters' });
-    }
-    if (!SLUG_REGEX.test(slug)) {
-      return corsResponse(origin, 400, { error: 'slug must contain only lowercase letters, numbers, and hyphens' });
+    const slugError = validateOrgSlug(slug);
+    if (slugError) {
+      return corsResponse(origin, 400, { error: slugError });
     }
     if (logo_url !== undefined && logo_url !== null && typeof logo_url !== 'string') {
       return corsResponse(origin, 400, { error: 'logo_url must be a string or null' });
