@@ -10,11 +10,14 @@ type ToastPayload = {
   variant?: ToastVariant;
 } & ExternalToast;
 
+/** Errors stay visible longer than the 5s default so users can read them. */
+const ERROR_TOAST_DURATION = 8000;
+
 const toast = (message: ReactNode | ToastPayload, options?: ExternalToast) => {
   if (typeof message === "object" && message !== null && ("title" in message || "variant" in message)) {
     const { title, description, variant, ...rest } = message as ToastPayload;
     if (variant === "destructive") {
-      return sonnerToast.error(title ?? description, { description, ...rest });
+      return sonnerToast.error(title ?? description, { duration: ERROR_TOAST_DURATION, description, ...rest });
     }
     if (variant === "success") {
       return sonnerToast.success(title ?? description, { description, ...rest });
@@ -28,7 +31,8 @@ const toast = (message: ReactNode | ToastPayload, options?: ExternalToast) => {
 };
 
 toast.success = sonnerToast.success;
-toast.error = sonnerToast.error;
+toast.error = (message: ReactNode | (() => ReactNode), options?: ExternalToast) =>
+  sonnerToast.error(message, { duration: ERROR_TOAST_DURATION, ...options });
 toast.info = sonnerToast.info;
 toast.warning = sonnerToast.warning;
 toast.loading = sonnerToast.loading;
@@ -43,9 +47,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
-      duration={7000}
+      duration={5000}
+      closeButton
       toastOptions={{
         classNames: {
+          closeButton: "!opacity-100",
           toast:
             "group toast min-w-[22rem] px-5 py-4 text-[15px] group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
           title: "text-[15px] font-semibold leading-5",
