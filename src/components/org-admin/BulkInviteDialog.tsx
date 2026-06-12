@@ -31,10 +31,6 @@ interface BulkInviteDialogProps {
   onOpenChange: (open: boolean) => void;
   orgId: string;
   orgName: string;
-  // `userId` is no longer used inside this component — the server derives
-  // invited_by_user_id from the auth token. Kept in the interface for backward
-  // compat with OrgMembersTab; can be removed once that call site is cleaned up.
-  userId: string;
   onSuccess: () => void;
 }
 
@@ -55,7 +51,6 @@ export function BulkInviteDialog({
   onOpenChange,
   orgId,
   orgName,
-  userId,
   onSuccess,
 }: BulkInviteDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
