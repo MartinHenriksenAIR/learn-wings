@@ -90,7 +90,9 @@ export async function updateIdeaStatus(
   return res.idea;
 }
 
-// Delete idea (draft only)
+// Delete idea — authors may delete their own ideas of ANY status; org admins may
+// delete any idea in their org (RLS provenance: migration 20260202140817 replaced
+// the draft-only policy with author-any-status + org-admin DELETE policies).
 export async function deleteIdea(ideaId: string): Promise<void> {
   await callApi('/api/idea-delete', { ideaId });
 }
