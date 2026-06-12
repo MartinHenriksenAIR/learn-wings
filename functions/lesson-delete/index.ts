@@ -1,21 +1,15 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { getProfile } from '../shared/profile';
+import { requirePlatformAdmin } from '../shared/guards';
 import { deleteBlob } from '../shared/blob';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
-    if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' });
-    }
+    const gate = await requirePlatformAdmin(req, origin);
+    if (!gate.ok) return gate.response;
 
     const body = await req.json() as { lessonId?: unknown };
     const { lessonId } = body;
@@ -44,7 +38,6 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     return corsResponse(origin, 200, { success: true, blobDeleted });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
     return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
