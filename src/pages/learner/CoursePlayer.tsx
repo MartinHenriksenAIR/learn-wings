@@ -64,23 +64,34 @@ export default function CoursePlayer() {
     const fetchData = async () => {
       if (!user || !currentOrg || !courseId) return;
 
-      const data = await callApi<{
-        course: Course;
-        modules: Array<CourseModule & { lessons: Lesson[] }>;
-        progressMap: Record<string, { status: string; completed_at: string }>;
-        review: { id: string; rating: number; comment: string } | null;
-      }>('/api/course-player-data', { courseId, orgId: currentOrg.id });
+      try {
+        const data = await callApi<{
+          course: Course;
+          modules: Array<CourseModule & { lessons: Lesson[] }>;
+          progressMap: Record<string, { status: string; completed_at: string }>;
+          review: { id: string; rating: number; comment: string } | null;
+        }>('/api/course-player-data', { courseId, orgId: currentOrg.id });
 
-      setCourse(data.course);
-      setModules(data.modules as any);
-      setProgress(data.progressMap as any);
-      setExistingReview(data.review as any);
+        setCourse(data.course);
+        setModules(data.modules as any);
+        setProgress(data.progressMap as any);
+        setExistingReview(data.review as any);
 
-      if (data.modules.length > 0 && data.modules[0].lessons.length > 0) {
-        setCurrentLesson(data.modules[0].lessons[0] as Lesson);
+        if (data.modules.length > 0 && data.modules[0].lessons.length > 0) {
+          setCurrentLesson(data.modules[0].lessons[0] as Lesson);
+        }
+      } catch (error) {
+        // 403 (no org access to this course), 404, or a transient failure. Leave course null so
+        // the "not found" empty state renders with a Back button instead of a frozen spinner.
+        console.error('Error loading course:', error);
+        toast({
+          title: 'Unable to open course',
+          description: 'You may not have access to this course, or it is unavailable.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchData();
