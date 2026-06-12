@@ -255,6 +255,14 @@
     "loadFailedDescription": "Noget gik galt under indlæsningen af denne organisation.",
     "tryAgain": "Prøv igen"
   },
+  "enrollDialog": {
+    "partialTitle": "Nogle tilmeldinger mislykkedes",
+    "partialDescription": "{{success}} tilmeldt, {{failed}} mislykkedes.",
+    "failedTitle": "Tilmelding mislykkedes",
+    "failedDescription": "Ingen kurser kunne tilmeldes. Se årsagerne nedenfor.",
+    "failuresTitle": "Mislykkede tilmeldinger",
+    "unknownError": "Ukendt fejl"
+  },
   "platformSettings": {
     "loadFailedTitle": "Kunne ikke indlæse platformsindstillingerne.",
     "loadFailedDescription": "Indstillingerne blev ikke indlæst fra serveren, så redigering er deaktiveret for at undgå at overskrive gemte værdier. Prøv igen.",

@@ -255,6 +255,14 @@
     "loadFailedDescription": "Something went wrong while loading this organization.",
     "tryAgain": "Try again"
   },
+  "enrollDialog": {
+    "partialTitle": "Some enrollments failed",
+    "partialDescription": "{{success}} enrolled, {{failed}} failed.",
+    "failedTitle": "Enrollment failed",
+    "failedDescription": "No courses could be enrolled. See the reasons below.",
+    "failuresTitle": "Failed enrollments",
+    "unknownError": "Unknown error"
+  },
   "platformSettings": {
     "loadFailedTitle": "Couldn't load platform settings.",
     "loadFailedDescription": "Settings were not loaded from the server, so editing is disabled to prevent overwriting saved values. Try again.",
