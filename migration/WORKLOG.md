@@ -790,3 +790,26 @@ All new strings i18n en+da. **Frontend-only — no function deploy** (trunk push
 **Follow-up noted (not filed — auto-mode declined the issue create as out-of-scope):** `CoursePlayer.tsx` has no i18n wiring; every string is hardcoded English (pre-existing, whole-file), and the two new strings inherit that. Recommend a ticket to internationalize the page as a unit rather than special-casing two strings.
 
 **Op-note for next session:** committing from a parallel worktree gets blocked by `guard-trunk.mjs` once the main checkout moves onto the protected trunk (it reads the branch from the session cwd, not `git -C <worktree>`). Fix: use the `EnterWorktree` tool with the worktree path to move the session cwd into the worktree, then commit. Plain `cd` doesn't persist (worktree is outside the allowed working dirs).
+
+---
+
+## 2026-06-12 — Slice 8: Decommission Supabase (#13, PR #98) — the LAST migration slice
+
+**Who:** emil & Claude. Solo self-merge (code review skipped by user direction). Deps #8–#12 all closed. Branched off trunk; rebased onto trunk after #96/#97 landed mid-session — the `CoursePlayer.tsx` overlap flagged on the PR resolved as a clean auto-rebase (#96's `fetchData` try/catch and my two comment rewords occupy different regions; zero conflict).
+
+**Closes #13.** Removes the now-dead Supabase surface — the app no longer depends on it:
+- Deleted orphaned `src/integrations/supabase/{client,types}.ts` — zero importers (the `supabase` client and the `Database` type were self-referential within those two files only).
+- Dropped `@supabase/supabase-js`; regenerated `package-lock.json` (9 packages removed).
+- Stripped `VITE_SUPABASE_URL` / `_PROJECT_ID` / `_PUBLISHABLE_KEY` (+ the anon-key comment) from the SWA build workflow.
+- Removed dead `supabase/functions/` (11 Deno edge functions, all superseded by `functions/`) + `supabase/config.toml`.
+- Reworded residual `supabase` comments/test-strings across 6 `src/` files (`storage.{ts,test.ts}`, `ideas-api.{ts,test.ts}`, `IdeaLibrary.test.tsx`, `CoursePlayer.tsx`) — **behaviour-preserving**. `extractLmsAssetPath` matches legacy `/storage/v1/object/{sign,public}/lms-assets/` URLs by **path prefix, not hostname**, so the code itself carried no "supabase" string — only comments + test-fixture hostnames did. That legacy fallback path is RETAINED.
+
+**Decision — retained `supabase/migrations/`:** removed `functions/` + `config.toml` (dead runtime/CLI config) but KEPT the 43 SQL migrations as historical RLS-provenance (referenced by the `slice-workflow` playbook + the post-cutover authz-consolidation #47/#60/#75). The issue's grep AC is scoped to `src/`, unaffected. Flagged on PR #98 for the reviewer in case they want migrations gone too.
+
+**Gate 3 (acceptance) green, re-verified post-rebase:** `grep -rniE supabase src/` → **0 matches**; `npm run build` exit 0; `npx tsc --noEmit -p tsconfig.app.json` exit 0; `npm test` **103/103** (20 files).
+
+**Frontend/config-only — no function deploy** (no Azure Functions code changed; 100 functions stay live). The trunk push rebuilds the PR-6 preview with the supabase-free bundle.
+
+**Gate 4 (full all-roles e2e regression):** the issue's third AC — user-verified on the rebuilt PR-6 preview, PENDING. This is the LAST slice before PR #6 → main (#69): remaining road-to-merge = the all-roles regression sweep + the at-merge infra flips (#33 + domain/Entra + SWA backend re-link).
+
+**Issue #13 closed manually** (`Closes #N` doesn't auto-fire on non-default-branch merges). Work branch `emil/13-decommission-supabase` deleted post-merge.
