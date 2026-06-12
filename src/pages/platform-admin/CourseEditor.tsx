@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,17 +32,37 @@ import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/typ
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil, Settings } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useToastMutation } from '@/hooks/useToastMutation';
+import { coursesAdminQueryKey } from './CoursesManager';
+
+/** Cache key for one course's full admin structure (course + modules + lessons). */
+const courseStructureQueryKey = (courseId: string) => ['course-structure-admin', courseId] as const;
+
+interface CourseStructureData {
+  course: Course | null;
+  modules: CourseModule[];
+  /** Display URL re-signed from course.thumbnail_url (the DB row carries the raw path). */
+  signedThumbnailUrl: string | null;
+}
+
+interface SaveLessonInput {
+  /** null → create (sort_order is server-owned, issue #46); set → update. */
+  lessonId: string | null;
+  moduleId: string;
+  title: string;
+  lessonType: LessonType;
+  contentText: string | null;
+  durationMinutes: number | null;
+  videoStoragePath: string | null;
+  azureBlobPath: string | null;
+  documentStoragePath: string | null;
+}
 
 export default function CourseEditor() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { features } = usePlatformSettings();
-
-  const [course, setCourse] = useState<Course | null>(null);
-  const [modules, setModules] = useState<CourseModule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   // Course edit state
   const [editTitle, setEditTitle] = useState('');
@@ -53,7 +74,6 @@ export default function CourseEditor() {
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [moduleTitle, setModuleTitle] = useState('');
-  const [savingModule, setSavingModule] = useState(false);
 
   // Lesson dialog state
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
@@ -66,72 +86,87 @@ export default function CourseEditor() {
   const [lessonVideoPath, setLessonVideoPath] = useState<string | null>(null);
   const [lessonAzureBlobPath, setLessonAzureBlobPath] = useState<string | null>(null);
   const [lessonDocPath, setLessonDocPath] = useState<string | null>(null);
-  const [savingLesson, setSavingLesson] = useState(false);
 
   // Delete course state
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   // Quiz editor state
   const [quizEditorOpen, setQuizEditorOpen] = useState(false);
   const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
   const [quizLessonTitle, setQuizLessonTitle] = useState('');
 
-
-  const fetchStructure = async () => {
-    if (!courseId) return;
-    setLoadError(null);
-    try {
+  // Module/lesson mutations patch this cache from their RETURNING'd rows (issue
+  // #48); only the course save path refetches it, because a changed thumbnail
+  // needs re-signing. Patches must keep the `course` object reference intact so
+  // the edit-field seeding effect below doesn't clobber unsaved course edits.
+  const structureQueryKey = courseStructureQueryKey(courseId ?? '');
+  const {
+    data: structureData,
+    isLoading: loading,
+    error: loadError,
+    refetch: refetchStructure,
+  } = useQuery({
+    queryKey: structureQueryKey,
+    enabled: !!courseId,
+    queryFn: async (): Promise<CourseStructureData> => {
       const res = await callApi<{ course: Course | null; modules: CourseModule[] }>(
         '/api/course-structure-admin',
         { courseId },
       );
-      if (res.course) {
-        const refreshedThumbnailUrl = await getSignedLmsAssetUrl(res.course.thumbnail_url);
-        setCourse(res.course);
-        setEditTitle(res.course.title);
-        setEditDescription(res.course.description || '');
-        setEditLevel(res.course.level as CourseLevel);
-        setEditThumbnailUrl(refreshedThumbnailUrl);
-      } else {
-        setCourse(null);
-      }
-      setModules(res.modules);
-    } catch (err) {
-      setLoadError((err as Error).message);
-      toast({ title: 'Failed to load course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+      const signedThumbnailUrl = res.course ? await getSignedLmsAssetUrl(res.course.thumbnail_url) : null;
+      return { course: res.course, modules: res.modules, signedThumbnailUrl };
+    },
+  });
+  const course = structureData?.course ?? null;
+  const modules = structureData?.modules ?? [];
+  const signedThumbnailUrl = structureData?.signedThumbnailUrl ?? null;
 
   useEffect(() => {
-    fetchStructure();
-  }, [courseId]);
-
-  const handleSaveCourse = async () => {
-    if (!courseId || !editTitle.trim()) return;
-    setSaving(true);
-
-    const thumbnailToPersist = extractLmsAssetPath(editThumbnailUrl) ?? editThumbnailUrl;
-
-    try {
-      await callApi<{ course: Course }>('/api/course-update', {
-        courseId,
-        updates: {
-          title: editTitle,
-          description: editDescription,
-          level: editLevel,
-          thumbnailUrl: thumbnailToPersist,
-        },
-      });
-      toast({ title: 'Course saved!' });
-      fetchStructure();
-    } catch (err) {
-      toast({ title: 'Failed to save course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
+    if (loadError) {
+      toast({ title: 'Failed to load course', description: loadError.message, variant: 'destructive' });
     }
+  }, [loadError]);
+
+  // Seed the editable course fields whenever the server row changes (initial
+  // load + post-save refetch). Module/lesson cache patches keep the same
+  // `course` reference, so they do NOT re-seed (and can't clobber) these fields.
+  useEffect(() => {
+    if (course) {
+      setEditTitle(course.title);
+      setEditDescription(course.description || '');
+      setEditLevel(course.level);
+      setEditThumbnailUrl(signedThumbnailUrl);
+    }
+  }, [course, signedThumbnailUrl]);
+
+  const saveCourseMutation = useToastMutation({
+    mutationFn: (updates: { title: string; description: string; level: CourseLevel; thumbnailUrl: string | null }) =>
+      callApi<{ course: Course }>('/api/course-update', { courseId, updates }),
+    errorTitle: 'Failed to save course',
+    onSuccess: () => {
+      toast({ title: 'Course saved!' });
+      // KEEP the refetch here: a changed thumbnail path needs re-signing.
+      queryClient.invalidateQueries({ queryKey: structureQueryKey });
+    },
+  });
+  const saving = saveCourseMutation.isPending;
+
+  const handleSaveCourse = () => {
+    if (!courseId || !editTitle.trim()) return;
+    const thumbnailToPersist = extractLmsAssetPath(editThumbnailUrl) ?? editThumbnailUrl;
+    saveCourseMutation.mutate({
+      title: editTitle,
+      description: editDescription,
+      level: editLevel,
+      thumbnailUrl: thumbnailToPersist,
+    });
+  };
+
+  /** Patch only `modules` in the structure cache, preserving the `course` reference. */
+  const patchModules = (update: (modules: CourseModule[]) => CourseModule[]) => {
+    queryClient.setQueryData<CourseStructureData>(structureQueryKey, (prev) =>
+      prev && { ...prev, modules: update(prev.modules) },
+    );
   };
 
   // Module handlers
@@ -147,47 +182,47 @@ export default function CourseEditor() {
     setModuleDialogOpen(true);
   };
 
-  const handleSaveModule = async () => {
-    if (!courseId || !moduleTitle.trim()) return;
-    setSavingModule(true);
-
-    try {
-      if (editingModule) {
-        await callApi<{ module: CourseModule }>('/api/module-update', {
-          moduleId: editingModule.id,
-          title: moduleTitle,
-        });
-        toast({ title: 'Module updated!' });
-      } else {
-        // sort_order is server-owned (issue #46): module-create appends at MAX+1
-        await callApi<{ module: CourseModule }>('/api/module-create', {
-          courseId,
-          title: moduleTitle,
-        });
-        toast({ title: 'Module created!' });
-      }
+  const saveModuleMutation = useToastMutation({
+    mutationFn: ({ moduleId, title }: { moduleId: string | null; title: string }) =>
+      moduleId
+        ? callApi<{ module: CourseModule }>('/api/module-update', { moduleId, title })
+        : // sort_order is server-owned (issue #46): module-create appends at MAX+1
+          callApi<{ module: CourseModule }>('/api/module-create', { courseId, title }),
+    errorTitle: ({ moduleId }) => (moduleId ? 'Failed to update module' : 'Failed to create module'),
+    onSuccess: ({ module }, { moduleId }) => {
+      toast({ title: moduleId ? 'Module updated!' : 'Module created!' });
       setModuleDialogOpen(false);
-      fetchStructure();
-    } catch (err) {
-      toast({ title: editingModule ? 'Failed to update module' : 'Failed to create module', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setSavingModule(false);
-    }
+      patchModules((mods) =>
+        moduleId
+          // RETURNING'd row is the bare module — keep the lessons we already have.
+          ? mods.map((m) => (m.id === module.id ? { ...m, ...module, lessons: m.lessons } : m))
+          // Server appends at MAX+1, so the end of the list is its sorted position.
+          : [...mods, { ...module, lessons: [] }],
+      );
+    },
+  });
+  const savingModule = saveModuleMutation.isPending;
+
+  const handleSaveModule = () => {
+    if (!courseId || !moduleTitle.trim()) return;
+    saveModuleMutation.mutate({ moduleId: editingModule?.id ?? null, title: moduleTitle });
   };
 
-  const handleDeleteModule = async (modId: string) => {
-    try {
-      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/module-delete', { moduleId: modId });
+  const deleteModuleMutation = useToastMutation({
+    mutationFn: (moduleId: string) =>
+      callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/module-delete', { moduleId }),
+    errorTitle: 'Failed to delete module',
+    onSuccess: (result, moduleId) => {
       if (result.blobsFailed > 0) {
         toast({ title: 'Module deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
       } else {
         toast({ title: 'Module deleted' });
       }
-      fetchStructure();
-    } catch (err) {
-      toast({ title: 'Failed to delete module', description: (err as Error).message, variant: 'destructive' });
-    }
-  };
+      patchModules((mods) => mods.filter((m) => m.id !== moduleId));
+    },
+  });
+
+  const handleDeleteModule = (modId: string) => deleteModuleMutation.mutate(modId);
 
   // Lesson handlers
   const openAddLesson = (moduleId: string) => {
@@ -216,78 +251,91 @@ export default function CourseEditor() {
     setLessonDialogOpen(true);
   };
 
-  const handleSaveLesson = async () => {
-    if (!lessonModuleId || !lessonTitle.trim()) return;
-
-    setSavingLesson(true);
-
-    try {
-      if (editingLesson) {
-        await callApi<{ lesson: Lesson }>('/api/lesson-update', {
-          lessonId: editingLesson.id,
-          moduleId: lessonModuleId,
-          title: lessonTitle,
-          lessonType,
-          contentText: lessonContent || null,
-          durationMinutes: lessonDuration,
-          videoStoragePath: lessonType === 'video' ? lessonVideoPath : null,
-          azureBlobPath: lessonType === 'video' ? lessonAzureBlobPath : null,
-          documentStoragePath: lessonType === 'document' ? lessonDocPath : null,
-        });
-        toast({ title: 'Lesson updated!' });
-      } else {
-        // sort_order is server-owned (issue #46): lesson-create appends at MAX+1
-        await callApi<{ lesson: Lesson }>('/api/lesson-create', {
-          moduleId: lessonModuleId,
-          title: lessonTitle,
-          lessonType,
-          contentText: lessonContent || null,
-          durationMinutes: lessonDuration,
-          videoStoragePath: lessonType === 'video' ? lessonVideoPath : null,
-          azureBlobPath: lessonType === 'video' ? lessonAzureBlobPath : null,
-          documentStoragePath: lessonType === 'document' ? lessonDocPath : null,
-        });
-        toast({ title: 'Lesson created!' });
-      }
+  const saveLessonMutation = useToastMutation({
+    mutationFn: ({ lessonId, ...payload }: SaveLessonInput) =>
+      lessonId
+        ? callApi<{ lesson: Lesson }>('/api/lesson-update', { lessonId, ...payload })
+        : // sort_order is server-owned (issue #46): lesson-create appends at MAX+1
+          callApi<{ lesson: Lesson }>('/api/lesson-create', payload),
+    errorTitle: ({ lessonId }) => (lessonId ? 'Failed to update lesson' : 'Failed to create lesson'),
+    onSuccess: ({ lesson }, { lessonId }) => {
+      toast({ title: lessonId ? 'Lesson updated!' : 'Lesson created!' });
       setLessonDialogOpen(false);
-      fetchStructure();
-    } catch (err) {
-      toast({ title: editingLesson ? 'Failed to update lesson' : 'Failed to create lesson', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setSavingLesson(false);
-    }
+      patchModules((mods) =>
+        mods.map((m) =>
+          m.id !== lesson.module_id
+            ? m
+            : {
+                ...m,
+                lessons: lessonId
+                  ? (m.lessons ?? []).map((l) => (l.id === lesson.id ? lesson : l))
+                  // Server appends at MAX+1, so the end of the list is its sorted position.
+                  : [...(m.lessons ?? []), lesson],
+              },
+        ),
+      );
+    },
+  });
+  const savingLesson = saveLessonMutation.isPending;
+
+  const handleSaveLesson = () => {
+    if (!lessonModuleId || !lessonTitle.trim()) return;
+    saveLessonMutation.mutate({
+      lessonId: editingLesson?.id ?? null,
+      moduleId: lessonModuleId,
+      title: lessonTitle,
+      lessonType,
+      contentText: lessonContent || null,
+      durationMinutes: lessonDuration,
+      videoStoragePath: lessonType === 'video' ? lessonVideoPath : null,
+      azureBlobPath: lessonType === 'video' ? lessonAzureBlobPath : null,
+      documentStoragePath: lessonType === 'document' ? lessonDocPath : null,
+    });
   };
 
-  const handleDeleteLesson = async (lessonId: string) => {
-    try {
-      const result = await callApi<{ success: boolean; blobDeleted: boolean | null }>('/api/lesson-delete', { lessonId });
+  const deleteLessonMutation = useToastMutation({
+    mutationFn: (lessonId: string) =>
+      callApi<{ success: boolean; blobDeleted: boolean | null }>('/api/lesson-delete', { lessonId }),
+    errorTitle: 'Failed to delete lesson',
+    onSuccess: (result, lessonId) => {
       if (result.blobDeleted === false) {
         toast({ title: 'Lesson deleted', description: 'Could not delete the video file from storage.', variant: 'destructive' });
       } else {
         toast({ title: 'Lesson deleted' });
       }
-      fetchStructure();
-    } catch (err) {
-      toast({ title: 'Failed to delete lesson', description: (err as Error).message, variant: 'destructive' });
-    }
-  };
+      patchModules((mods) =>
+        mods.map((m) =>
+          m.lessons?.some((l) => l.id === lessonId)
+            ? { ...m, lessons: m.lessons.filter((l) => l.id !== lessonId) }
+            : m,
+        ),
+      );
+    },
+  });
 
-  const handleDeleteCourse = async () => {
-    if (!courseId) return;
-    setDeleting(true);
-    try {
-      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId });
+  const handleDeleteLesson = (lessonId: string) => deleteLessonMutation.mutate(lessonId);
+
+  const deleteCourseMutation = useToastMutation({
+    mutationFn: () =>
+      callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId }),
+    errorTitle: 'Failed to delete course',
+    onSuccess: (result) => {
       if (result.blobsFailed > 0) {
         toast({ title: 'Course deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
       } else {
         toast({ title: 'Course deleted' });
       }
+      // The cached admin list still holds the deleted course; drop it so the
+      // list page does a fresh load instead of flashing the deleted row.
+      queryClient.removeQueries({ queryKey: coursesAdminQueryKey });
       navigate('/app/admin/courses');
-    } catch (err) {
-      toast({ title: 'Failed to delete course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setDeleting(false);
-    }
+    },
+  });
+  const deleting = deleteCourseMutation.isPending;
+
+  const handleDeleteCourse = () => {
+    if (!courseId) return;
+    deleteCourseMutation.mutate();
   };
 
   const lessonTypeIcon = (type: LessonType) => {
@@ -314,16 +362,10 @@ export default function CourseEditor() {
       <AppLayout title="Course Editor">
         <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
           <p className="text-destructive font-medium">Failed to load course</p>
-          <p className="text-sm text-muted-foreground">{loadError}</p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              // Deliberately no setLoading(true): fetchStructure is also the post-mutation
-              // refetch, so retry-in-place keeps the two paths consistent (cf. CoursesManager).
-              setLoadError(null);
-              fetchStructure();
-            }}
-          >
+          <p className="text-sm text-muted-foreground">{loadError.message}</p>
+          {/* While the retry is in flight with no cached data, isLoading goes
+              true and the spinner branch above takes over. */}
+          <Button variant="outline" onClick={() => refetchStructure()}>
             Retry
           </Button>
         </div>
@@ -662,7 +704,8 @@ export default function CourseEditor() {
         </DialogContent>
       </Dialog>
 
-      {/* Quiz Editor Dialog */}
+      {/* Quiz Editor Dialog — no onQuizSaved refetch: the structure response
+          carries no quiz data, so a quiz save changes nothing on this page. */}
       {quizLessonId && (
         <QuizEditorDialog
           key={quizLessonId}
@@ -670,7 +713,6 @@ export default function CourseEditor() {
           lessonTitle={quizLessonTitle}
           open={quizEditorOpen}
           onOpenChange={setQuizEditorOpen}
-          onQuizSaved={fetchStructure}
         />
       )}
 

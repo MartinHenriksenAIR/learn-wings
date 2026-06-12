@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,20 @@ interface QuizEditorDialogProps {
   onQuizSaved?: () => void;
 }
 
+interface QuizAdminResponse {
+  quiz: { id: string; lesson_id: string; passing_score: number } | null;
+  questions: Array<{
+    id: string;
+    quiz_id: string;
+    question_text: string;
+    sort_order: number;
+    options: Array<{ id: string; question_id: string; option_text: string; is_correct: boolean; sort_order: number }>;
+  }>;
+}
+
+/** Cache key for one lesson's admin quiz (quiz + questions + options). */
+const quizAdminQueryKey = (lessonId: string) => ['quiz-admin', lessonId] as const;
+
 export function QuizEditorDialog({
   lessonId,
   lessonTitle,
@@ -46,65 +61,51 @@ export function QuizEditorDialog({
   onOpenChange,
   onQuizSaved,
 }: QuizEditorDialogProps) {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [quizId, setQuizId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [passingScore, setPassingScore] = useState(70);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
 
-  // Fetch quiz data on open
+  const {
+    data: quizData,
+    isLoading: loading,
+    error: loadError,
+    refetch: refetchQuiz,
+  } = useQuery({
+    queryKey: quizAdminQueryKey(lessonId),
+    enabled: open && !!lessonId,
+    queryFn: () => callApi<QuizAdminResponse>('/api/quiz-admin', { lessonId }),
+  });
+
   useEffect(() => {
-    if (open && lessonId) {
-      fetchQuiz();
-    }
-  }, [open, lessonId]);
-
-  const fetchQuiz = async () => {
-    setLoading(true);
-    setLoadError(null);
-
-    try {
-      const res = await callApi<{
-        quiz: { id: string; lesson_id: string; passing_score: number } | null;
-        questions: Array<{
-          id: string;
-          quiz_id: string;
-          question_text: string;
-          sort_order: number;
-          options: Array<{ id: string; question_id: string; option_text: string; is_correct: boolean; sort_order: number }>;
-        }>;
-      }>('/api/quiz-admin', { lessonId });
-
-      if (res.quiz) {
-        setQuizId(res.quiz.id);
-        setPassingScore(res.quiz.passing_score);
-        setQuestions(
-          res.questions.map((q) => ({
-            id: q.id,
-            question_text: q.question_text,
-            sort_order: q.sort_order,
-            options: q.options.map((o) => ({
-              id: o.id,
-              option_text: o.option_text,
-              is_correct: o.is_correct,
-            })),
-          }))
-        );
-      } else {
-        // No quiz exists yet — reset all fields to defaults
-        setQuizId(null);
-        setPassingScore(70);
-        setQuestions([]);
-      }
-    } catch (error) {
-      console.error('Error fetching quiz:', error);
+    if (loadError) {
+      console.error('Error fetching quiz:', loadError);
       toast.error('Failed to load quiz');
-      setLoadError('Failed to load quiz data. Please retry.');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [loadError]);
+
+  // Seed the editable form from the fetched quiz (or defaults when none exists).
+  useEffect(() => {
+    if (!quizData) return;
+    if (quizData.quiz) {
+      setPassingScore(quizData.quiz.passing_score);
+      setQuestions(
+        quizData.questions.map((q) => ({
+          id: q.id,
+          question_text: q.question_text,
+          sort_order: q.sort_order,
+          options: q.options.map((o) => ({
+            id: o.id,
+            option_text: o.option_text,
+            is_correct: o.is_correct,
+          })),
+        }))
+      );
+    } else {
+      // No quiz exists yet — reset all fields to defaults
+      setPassingScore(70);
+      setQuestions([]);
+    }
+  }, [quizData]);
 
   const addQuestion = () => {
     const newQuestion: QuizQuestion = {
@@ -201,13 +202,11 @@ export function QuizEditorDialog({
     return true;
   };
 
-  const handleSave = async () => {
-    if (!validateQuiz()) return;
-
-    setSaving(true);
-
-    try {
-      const res = await callApi<{ quiz: { id: string; lesson_id: string; passing_score: number } }>(
+  // Plain useMutation (not useToastMutation): this dialog's failure toast is the
+  // bare sonner `toast.error(...)` with no description — preserved as-is.
+  const saveQuizMutation = useMutation({
+    mutationFn: () =>
+      callApi<{ quiz: { id: string; lesson_id: string; passing_score: number } }>(
         '/api/quiz-admin-save',
         {
           lessonId,
@@ -221,18 +220,26 @@ export function QuizEditorDialog({
             })),
           })),
         }
-      );
-
-      setQuizId(res.quiz.id);
+      ),
+    onSuccess: () => {
       toast.success('Quiz saved successfully');
+      // The server regenerates question/option ids on save, so mark the cache
+      // stale instead of patching it with client-side ids. refetchType 'none':
+      // the dialog is closing, the next open refetches.
+      queryClient.invalidateQueries({ queryKey: quizAdminQueryKey(lessonId), refetchType: 'none' });
       onQuizSaved?.();
       onOpenChange(false);
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Error saving quiz:', error);
       toast.error('Failed to save quiz');
-    } finally {
-      setSaving(false);
-    }
+    },
+  });
+  const saving = saveQuizMutation.isPending;
+
+  const handleSave = () => {
+    if (!validateQuiz()) return;
+    saveQuizMutation.mutate();
   };
 
   return (
@@ -254,8 +261,8 @@ export function QuizEditorDialog({
           </div>
         ) : loadError ? (
           <div className="flex h-48 flex-col items-center justify-center gap-4">
-            <p className="text-sm text-destructive">{loadError}</p>
-            <Button variant="outline" onClick={fetchQuiz}>
+            <p className="text-sm text-destructive">Failed to load quiz data. Please retry.</p>
+            <Button variant="outline" onClick={() => refetchQuiz()}>
               Retry
             </Button>
           </div>

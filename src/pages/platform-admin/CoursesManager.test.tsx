@@ -135,3 +135,47 @@ describe('CoursesManager — fetchData error handling', () => {
     expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
   });
 });
+
+describe('CoursesManager — mutations patch the courses cache (#48)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('publish toggle patches the cache from the RETURNING row — no full refetch', async () => {
+    const course = {
+      id: 'c1',
+      title: 'Course One',
+      description: 'A course',
+      level: 'basic',
+      is_published: false,
+      thumbnail_url: null,
+      created_by_user_id: null,
+      created_at: '2024-01-01T00:00:00Z',
+    };
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/courses-admin') return { courses: [course], accessRecords: [] };
+      if (path === '/api/organizations') return { organizations: [] };
+      if (path === '/api/course-update') return { course: { ...course, is_published: true } };
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+
+    const toggle = await screen.findByRole('switch');
+    expect(screen.getByText('Draft')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    // The RETURNING'd row lands in the UI via the cache patch
+    await waitFor(() => expect(screen.getByText('Published')).toBeInTheDocument());
+    expect(mockCallApi).toHaveBeenCalledWith('/api/course-update', {
+      courseId: 'c1',
+      updates: { isPublished: true },
+    });
+
+    // The whole point of #48: a one-row toggle must NOT refire courses-admin
+    // (which would also re-sign every course thumbnail)
+    const coursesAdminCalls = mockCallApi.mock.calls.filter(([path]) => path === '/api/courses-admin');
+    expect(coursesAdminCalls).toHaveLength(1);
+  });
+});

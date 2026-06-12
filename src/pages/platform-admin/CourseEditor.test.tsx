@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // --- mock AppLayout as passthrough ---
@@ -63,12 +64,17 @@ const successResponse = {
 };
 
 function renderPage(courseId = 'course-1') {
+  // Fresh QueryClient per render (retry off) so call-count-based mocks stay
+  // deterministic and no cache leaks between tests.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={[`/app/admin/courses/${courseId}`]}>
-      <Routes>
-        <Route path="/app/admin/courses/:courseId" element={<CourseEditor />} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[`/app/admin/courses/${courseId}`]}>
+        <Routes>
+          <Route path="/app/admin/courses/:courseId" element={<CourseEditor />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -154,5 +160,46 @@ describe('CourseEditor — fetchStructure error handling', () => {
 
     // No error block
     expect(screen.queryByText('Failed to load course')).toBeNull();
+  });
+});
+
+describe('CourseEditor — mutations patch the structure cache (#48)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('module rename patches the cache from the RETURNING row — no structure refetch', async () => {
+    const moduleRow = { id: 'mod-1', course_id: 'course-1', title: 'Old Name', sort_order: 0 };
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/course-structure-admin') {
+        return { ...successResponse, modules: [{ ...moduleRow, lessons: [] }] };
+      }
+      if (path === '/api/module-update') {
+        return { module: { ...moduleRow, title: 'New Name' } };
+      }
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+
+    // Structure loaded — expand the module accordion
+    const trigger = await screen.findByText(/Module 1: Old Name/);
+    fireEvent.click(trigger);
+
+    // Open the edit dialog and rename
+    fireEvent.click(await screen.findByRole('button', { name: /edit module/i }));
+    const titleInput = await screen.findByDisplayValue('Old Name');
+    fireEvent.change(titleInput, { target: { value: 'New Name' } });
+    fireEvent.click(screen.getByRole('button', { name: /^update$/i }));
+
+    // RETURNING'd row lands in the UI via the cache patch
+    await waitFor(() =>
+      expect(screen.getByText(/Module 1: New Name/)).toBeInTheDocument()
+    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Module updated!' }));
+
+    // The whole point of #48: the one-row rename must NOT re-ship the course tree
+    const structureCalls = mockCallApi.mock.calls.filter(([path]) => path === '/api/course-structure-admin');
+    expect(structureCalls).toHaveLength(1);
   });
 });

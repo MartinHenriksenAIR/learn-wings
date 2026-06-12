@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageSpinner } from '@/components/ui/page-spinner';
@@ -34,23 +35,39 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { FileUpload } from '@/components/ui/file-upload';
 import { callApi } from '@/lib/api-client';
 import { useOrganizations } from '@/hooks/useOrganizations';
+import { useToastMutation } from '@/hooks/useToastMutation';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseLevel, OrgCourseAccess } from '@/lib/types';
 import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 
+/** Cache key for the admin course list + access matrix (one query, one ship). */
+export const coursesAdminQueryKey = ['courses-admin'] as const;
+
+interface CoursesAdminData {
+  /** Courses with thumbnail_url already re-signed for display. */
+  courses: Course[];
+  accessRecords: OrgCourseAccess[];
+}
+
+/** RETURNING'd access rows replace any prior row for the same org+course pair. */
+function upsertAccessRecords(existing: OrgCourseAccess[], incoming: OrgCourseAccess[]): OrgCourseAccess[] {
+  const kept = existing.filter(
+    (r) => !incoming.some((n) => n.org_id === r.org_id && n.course_id === r.course_id),
+  );
+  return [...kept, ...incoming];
+}
+
 export default function CoursesManager() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Tab state from URL
   const activeTab = searchParams.get('tab') || 'courses';
 
   // Course list state
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -59,12 +76,10 @@ export default function CoursesManager() {
   const [description, setDescription] = useState('');
   const [level, setLevel] = useState<CourseLevel>('basic');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
 
   // Delete state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   // Course Access state — org list comes from the shared cache (#87)
   const {
@@ -74,39 +89,43 @@ export default function CoursesManager() {
     refetch: refetchOrgs,
   } = useOrganizations();
   const orgs = orgsData ?? [];
-  const [accessRecords, setAccessRecords] = useState<OrgCourseAccess[]>([]);
   const [orgSearchQuery, setOrgSearchQuery] = useState('');
   const [selectedOrg, setSelectedOrg] = useState<string>('all');
   const [orgComboboxOpen, setOrgComboboxOpen] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  const fetchData = async () => {
-    // No setLoading(true) here: fetchData is also the post-mutation refetch for the
-    // toggle/create/delete handlers, which must not blank the page with the full spinner.
-    setLoadError(null);
-    try {
-      const adminRes = await callApi<{ courses: Course[]; accessRecords: OrgCourseAccess[] }>('/api/courses-admin', {});
-
+  // Mutations patch this cache from their RETURNING'd rows (issue #48); only the
+  // course create path refetches it, because new thumbnails need re-signing.
+  // No-blank-page invariant: during a refetch the stale data keeps rendering
+  // (isLoading is true only while there is no data at all).
+  const {
+    data: coursesData,
+    isLoading: coursesLoading,
+    error: coursesError,
+    refetch: refetchCourses,
+  } = useQuery({
+    queryKey: coursesAdminQueryKey,
+    queryFn: async (): Promise<CoursesAdminData> => {
+      const adminRes = await callApi<CoursesAdminData>('/api/courses-admin', {});
       const coursesWithFreshThumbnails = await Promise.all(
         adminRes.courses.map(async (course) => ({
           ...course,
           thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
         })),
       );
-      setCourses(coursesWithFreshThumbnails);
-      setAccessRecords(adminRes.accessRecords);
-    } catch (err) {
-      setLoadError((err as Error).message);
-      toast({ title: 'Failed to load courses', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
+      return { courses: coursesWithFreshThumbnails, accessRecords: adminRes.accessRecords };
+    },
+  });
+  const courses = coursesData?.courses ?? [];
+  const accessRecords = coursesData?.accessRecords ?? [];
+
+  // Load failures (either query) surface through the page's "Failed to load
+  // courses" error block + toast, same as the pre-TanStack version.
+  useEffect(() => {
+    if (coursesError) {
+      toast({ title: 'Failed to load courses', description: coursesError.message, variant: 'destructive' });
     }
-  };
-
-  useEffect(() => { fetchData(); }, []);
-
-  // The org list now loads via the shared query; a failure there still surfaces
-  // through the page's existing "Failed to load courses" error block + toast.
+  }, [coursesError]);
   useEffect(() => {
     if (orgsError) {
       toast({ title: 'Failed to load courses', description: (orgsError as Error).message, variant: 'destructive' });
@@ -118,52 +137,56 @@ export default function CoursesManager() {
   };
 
   // ========== Course CRUD ==========
-  const handleCreate = async () => {
-    if (!title.trim()) return;
-    setCreating(true);
-
-    const thumbnailToPersist = extractLmsAssetPath(thumbnailUrl) ?? thumbnailUrl;
-
-    try {
-      await callApi<{ course: Course }>('/api/course-create', {
-        title,
-        description,
-        level,
-        thumbnailUrl: thumbnailToPersist,
-      });
+  const createCourseMutation = useToastMutation({
+    mutationFn: (input: { title: string; description: string; level: CourseLevel; thumbnailUrl: string | null }) =>
+      callApi<{ course: Course }>('/api/course-create', input),
+    errorTitle: 'Failed to create course',
+    onSuccess: () => {
       toast({ title: 'Course created!' });
       setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic'); setThumbnailUrl(null);
-      fetchData();
-    } catch (err) {
-      toast({ title: 'Failed to create course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setCreating(false);
-    }
+      // KEEP the refetch here: the new course's thumbnail path needs re-signing.
+      queryClient.invalidateQueries({ queryKey: coursesAdminQueryKey });
+    },
+  });
+  const creating = createCourseMutation.isPending;
+
+  const handleCreate = () => {
+    if (!title.trim()) return;
+    const thumbnailToPersist = extractLmsAssetPath(thumbnailUrl) ?? thumbnailUrl;
+    createCourseMutation.mutate({ title, description, level, thumbnailUrl: thumbnailToPersist });
   };
 
-  const togglePublish = async (course: Course) => {
-    try {
-      await callApi<{ course: Course }>('/api/course-update', {
+  const togglePublishMutation = useToastMutation({
+    mutationFn: (course: Course) =>
+      callApi<{ course: Course }>('/api/course-update', {
         courseId: course.id,
         updates: { isPublished: !course.is_published },
-      });
-    } catch (err) {
-      toast({ title: 'Failed to update course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      await fetchData();
-    }
-  };
+      }),
+    errorTitle: 'Failed to update course',
+    onSuccess: ({ course: updated }) => {
+      queryClient.setQueryData<CoursesAdminData>(coursesAdminQueryKey, (prev) =>
+        prev && {
+          ...prev,
+          courses: prev.courses.map((c) =>
+            // Keep the already-signed thumbnail: the RETURNING'd row carries the raw path.
+            c.id === updated.id ? { ...c, ...updated, thumbnail_url: c.thumbnail_url } : c,
+          ),
+        },
+      );
+    },
+  });
+  const togglePublish = (course: Course) => togglePublishMutation.mutate(course);
 
   const openDeleteDialog = (course: Course) => {
     setCourseToDelete(course);
     setDeleteOpen(true);
   };
 
-  const handleDeleteCourse = async () => {
-    if (!courseToDelete) return;
-    setDeleting(true);
-    try {
-      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId: courseToDelete.id });
+  const deleteCourseMutation = useToastMutation({
+    mutationFn: (course: Course) =>
+      callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId: course.id }),
+    errorTitle: 'Failed to delete course',
+    onSuccess: (result, course) => {
       if (result.blobsFailed > 0) {
         toast({ title: 'Course deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
       } else {
@@ -171,12 +194,19 @@ export default function CoursesManager() {
       }
       setDeleteOpen(false);
       setCourseToDelete(null);
-      fetchData();
-    } catch (err) {
-      toast({ title: 'Failed to delete course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setDeleting(false);
-    }
+      queryClient.setQueryData<CoursesAdminData>(coursesAdminQueryKey, (prev) =>
+        prev && {
+          courses: prev.courses.filter((c) => c.id !== course.id),
+          accessRecords: prev.accessRecords.filter((r) => r.course_id !== course.id),
+        },
+      );
+    },
+  });
+  const deleting = deleteCourseMutation.isPending;
+
+  const handleDeleteCourse = () => {
+    if (!courseToDelete) return;
+    deleteCourseMutation.mutate(courseToDelete);
   };
 
   // ========== Course Access ==========
@@ -187,47 +217,46 @@ export default function CoursesManager() {
     return record?.access === 'enabled';
   };
 
-  const toggleAccess = async (orgId: string, courseId: string, currentEnabled: boolean) => {
-    const key = `${orgId}-${courseId}`;
-    setUpdating(key);
-
-    try {
-      await callApi<{ record: OrgCourseAccess }>('/api/course-access-set', {
+  const toggleAccessMutation = useToastMutation({
+    mutationFn: ({ orgId, courseId, currentEnabled }: { orgId: string; courseId: string; currentEnabled: boolean }) =>
+      callApi<{ record: OrgCourseAccess }>('/api/course-access-set', {
         orgId,
         courseId,
         access: currentEnabled ? 'disabled' : 'enabled',
-      });
-    } catch (err) {
-      toast({
-        title: 'Failed to update access',
-        description: (err as Error).message,
-        variant: 'destructive',
-      });
-    } finally {
-      await fetchData();
-      setUpdating(null);
-    }
+      }),
+    errorTitle: 'Failed to update access',
+    onSuccess: ({ record }) => {
+      queryClient.setQueryData<CoursesAdminData>(coursesAdminQueryKey, (prev) =>
+        prev && { ...prev, accessRecords: upsertAccessRecords(prev.accessRecords, [record]) },
+      );
+    },
+    onSettled: () => setUpdating(null),
+  });
+
+  const toggleAccess = (orgId: string, courseId: string, currentEnabled: boolean) => {
+    setUpdating(`${orgId}-${courseId}`);
+    toggleAccessMutation.mutate({ orgId, courseId, currentEnabled });
   };
 
-  const enableAllForOrg = async (orgId: string) => {
-    setUpdating(`all-${orgId}`);
-
-    try {
-      await callApi<{ records: OrgCourseAccess[] }>('/api/course-access-bulk', { orgId });
+  const enableAllMutation = useToastMutation({
+    mutationFn: (orgId: string) =>
+      callApi<{ records: OrgCourseAccess[] }>('/api/course-access-bulk', { orgId }),
+    errorTitle: 'Failed to enable all courses',
+    onSuccess: ({ records }) => {
       toast({
         title: 'Access granted',
         description: 'All published courses are now accessible to this organization.',
       });
-    } catch (err) {
-      toast({
-        title: 'Failed to enable all courses',
-        description: (err as Error).message,
-        variant: 'destructive',
-      });
-    } finally {
-      await fetchData();
-      setUpdating(null);
-    }
+      queryClient.setQueryData<CoursesAdminData>(coursesAdminQueryKey, (prev) =>
+        prev && { ...prev, accessRecords: upsertAccessRecords(prev.accessRecords, records) },
+      );
+    },
+    onSettled: () => setUpdating(null),
+  });
+
+  const enableAllForOrg = (orgId: string) => {
+    setUpdating(`all-${orgId}`);
+    enableAllMutation.mutate(orgId);
   };
 
   // ========== Filtering ==========
@@ -287,9 +316,11 @@ export default function CoursesManager() {
   });
   const publishedCourses = courses.filter((c) => c.is_published);
 
-  const combinedLoadError = loadError ?? (orgsError ? (orgsError as Error).message : null);
+  const combinedLoadError = coursesError?.message ?? (orgsError ? (orgsError as Error).message : null);
 
-  if (loading || orgsLoading) {
+  // isLoading is true only while there is no cached data, so a post-mutation
+  // refetch keeps rendering the stale page instead of blanking to the spinner.
+  if (coursesLoading || orgsLoading) {
     return (
       <AppLayout title="Course Manager">
         <PageSpinner />
@@ -306,9 +337,9 @@ export default function CoursesManager() {
           <Button
             variant="outline"
             onClick={() => {
-              setLoadError(null);
-              setLoading(true); // retry is a full reload — show the spinner, not a flash of empty UI
-              fetchData();
+              // Retry is a full reload — with no data cached, isLoading goes true
+              // during the refetch, so the spinner shows, not a flash of empty UI.
+              refetchCourses();
               if (orgsError) refetchOrgs();
             }}
           >

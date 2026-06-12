@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // --- mock api-client ---
@@ -31,7 +32,14 @@ function getPassingScoreInput() {
 }
 
 function renderDialog(props: Partial<typeof defaultProps> = {}) {
-  return render(<QuizEditorDialog {...defaultProps} {...props} />);
+  // Fresh QueryClient per render (retry off) so the once-mocks stay
+  // deterministic and no quiz cache leaks between renders.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <QuizEditorDialog {...defaultProps} {...props} />
+    </QueryClientProvider>
+  );
 }
 
 describe('QuizEditorDialog — load-error guard', () => {
