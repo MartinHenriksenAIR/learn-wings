@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +36,7 @@ export default function CoursePlayer() {
   const { courseId } = useParams<{ courseId: string }>();
   const { user, currentOrg } = useAuth();
   const { features } = usePlatformSettings();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [course, setCourse] = useState<Course | null>(null);
@@ -214,20 +216,18 @@ export default function CoursePlayer() {
     setAnswers({});
   };
 
-  const handleCompleteLesson = async (isLastLesson = false) => {
+  const handleCompleteLesson = async () => {
     if (!user || !currentOrg || !currentLesson) return;
 
     setCompletingLesson(true);
-
-    // Upsert progress
     try {
-      await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
-    } catch {
-      setCompletingLesson(false);
-      return;
-    }
+      // Upsert progress
+      try {
+        await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
+      } catch {
+        return;
+      }
 
-    {
       const newProgress = {
         ...progress,
         [currentLesson.id]: {
@@ -241,17 +241,31 @@ export default function CoursePlayer() {
       };
       setProgress(newProgress);
 
-      // Check if this completes the course
+      // Check if this completes the course. Count completed lessons of THIS course
+      // only — the progress map from course-player-data spans every course in the
+      // org, so counting all of it misattributed foreign progress to this course (#18).
       const allLessons = modules.flatMap(m => m.lessons);
-      const completedCount = Object.values(newProgress).filter(p => p.status === 'completed').length;
-      const isCourseComplete = completedCount >= allLessons.length;
+      const completedCount = allLessons.filter(l => newProgress[l.id]?.status === 'completed').length;
+      const isCourseComplete = allLessons.length > 0 && completedCount >= allLessons.length;
 
       if (isCourseComplete && !courseJustCompleted) {
+        // Record completion server-side BEFORE celebrating — enrollments.status /
+        // completed_at is what the dashboard count and the course cards read. A
+        // failed or silently no-op'd call here left the course stuck on
+        // "Continue" / "Completed 0" forever with no feedback (#18).
+        try {
+          await callApi('/api/enrollment-complete', { orgId: currentOrg.id, courseId });
+        } catch (error) {
+          console.error('Error recording course completion:', error);
+          toast({
+            title: t('coursePlayer.completionSaveFailed'),
+            description: t('coursePlayer.completionSaveFailedDescription'),
+            variant: 'destructive',
+          });
+          return;
+        }
         setCourseJustCompleted(true);
         setShowCompletionDialog(true);
-        
-        // Update enrollment status to completed
-        await callApi('/api/enrollment-complete', { orgId: currentOrg.id, courseId });
       } else {
         toast({
           title: 'Lesson completed!',
@@ -264,9 +278,9 @@ export default function CoursePlayer() {
           setCurrentLesson(allLessons[currentIndex + 1]);
         }
       }
+    } finally {
+      setCompletingLesson(false);
     }
-
-    setCompletingLesson(false);
   };
 
   const handleSubmitQuiz = async () => {

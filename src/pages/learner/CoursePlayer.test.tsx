@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import React from 'react';
+
+// react-i18next → key-returning t (the player uses t() for the completion-failure toast)
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
+}));
 
 // AppLayout → passthrough (skips breadcrumbs/i18n)
 vi.mock('@/components/layout/AppLayout', () => ({
@@ -21,8 +26,9 @@ vi.mock('@/lib/api-client', () => ({
 }));
 vi.mock('@/lib/storage', () => ({ getSignedAssetUrl: vi.fn() }));
 
-// toast → no-op
-vi.mock('@/components/ui/sonner', () => ({ toast: vi.fn() }));
+// toast → assertable spy
+const mockToast = vi.fn();
+vi.mock('@/components/ui/sonner', () => ({ toast: (...args: unknown[]) => mockToast(...args) }));
 
 // useAuth + usePlatformSettings → factory mocks (names MUST be `mock`-prefixed for hoisting)
 const mockUseAuth = vi.fn();
@@ -153,5 +159,111 @@ describe('CoursePlayer — review entry point', () => {
     fireEvent.click(button);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Rate This Course')).toBeInTheDocument();
+  });
+});
+
+describe('CoursePlayer — completion semantics (#18)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(baseAuth);
+    mockUsePlatformSettings.mockReturnValue({
+      features: {
+        certificates_enabled: false,
+        quizzes_enabled: true,
+        analytics_enabled: true,
+        course_reviews_enabled: false,
+        community_enabled: true,
+      },
+    });
+  });
+
+  // Two-lesson course; progressMap is configurable so tests can inject prior
+  // progress (including rows from OTHER courses — course-player-data returns the
+  // user's progress for the whole org, not just this course).
+  function setupCompletion(opts: {
+    progressMap?: Record<string, { status: string; completed_at: string }>;
+    enrollmentCompleteError?: Error;
+  }) {
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') {
+        return {
+          course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+          modules: makeModules(2),
+          progressMap: opts.progressMap ?? {},
+          review: null,
+        };
+      }
+      if (url === '/api/quiz-by-lesson') return { quiz: null, questions: [] };
+      if (url === '/api/enrollment-complete' && opts.enrollmentCompleteError) {
+        throw opts.enrollmentCompleteError;
+      }
+      return {};
+    });
+  }
+
+  it('does NOT mark the course complete from progress rows that belong to other courses', async () => {
+    // 3 completed lessons from OTHER courses in the org — more rows than this
+    // course's 2 lessons. Completing lesson 1 of 2 must NOT complete the course.
+    setupCompletion({
+      progressMap: makeProgress(['other-1', 'other-2', 'other-3']),
+    });
+    renderPlayer();
+
+    const btn = await screen.findByRole('button', { name: /mark as complete/i });
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/lesson-progress', {
+        orgId: 'org-1', lessonId: 'l-1', status: 'completed',
+      });
+    });
+
+    // No premature completion: no enrollment-complete call, no congratulations dialog
+    expect(mockCallApi).not.toHaveBeenCalledWith('/api/enrollment-complete', expect.anything());
+    expect(screen.queryByText(/congratulations/i)).toBeNull();
+  });
+
+  it('records the enrollment as completed and shows the congratulations dialog on the last lesson', async () => {
+    setupCompletion({ progressMap: makeProgress(['l-1']) });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    // Select the last incomplete lesson and complete it
+    fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /mark as complete/i }));
+
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/enrollment-complete', {
+        orgId: 'org-1', courseId: 'c-1',
+      });
+    });
+    expect(await screen.findByText(/congratulations/i)).toBeInTheDocument();
+  });
+
+  it('surfaces a failed completion call instead of celebrating (no silent "Continue forever")', async () => {
+    setupCompletion({
+      progressMap: makeProgress(['l-1']),
+      enrollmentCompleteError: new Error('boom'),
+    });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /mark as complete/i }));
+
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/enrollment-complete', {
+        orgId: 'org-1', courseId: 'c-1',
+      });
+    });
+
+    // The failure is surfaced and the congratulations dialog is withheld
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'coursePlayer.completionSaveFailed',
+        variant: 'destructive',
+      }));
+    });
+    expect(screen.queryByText(/congratulations/i)).toBeNull();
   });
 });

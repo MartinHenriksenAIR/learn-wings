@@ -197,6 +197,10 @@
     "unenrolledDescription": "You've been unenrolled from \"{{courseTitle}}\". Your progress has been kept.",
     "joinOrgToAccessCourses": "Join an organization to access courses."
   },
+  "coursePlayer": {
+    "completionSaveFailed": "Couldn't record course completion",
+    "completionSaveFailedDescription": "Your lesson progress is saved, but the course completion wasn't recorded. Please try again later."
+  },
   "community": {
     "title": "Community",
     "feed": "Feed",
