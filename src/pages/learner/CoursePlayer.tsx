@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -8,24 +8,28 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
-import { 
-  ChevronRight, 
-  CheckCircle2, 
-  Circle, 
-  Play, 
-  FileText, 
+import {
+  ChevronRight,
+  CheckCircle2,
+  Circle,
+  Play,
+  FileText,
   HelpCircle,
   Loader2,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  Star
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
 import { CourseCompletionDialog } from '@/components/course/CourseCompletionDialog';
 import { CourseReviewDialog } from '@/components/course/CourseReviewDialog';
+
+// Minimum course progress (percent of lessons completed) before the review entry point appears.
+const REVIEW_MIN_PROGRESS = 20;
 
 export default function CoursePlayer() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -64,86 +68,40 @@ export default function CoursePlayer() {
     const fetchData = async () => {
       if (!user || !currentOrg || !courseId) return;
 
-      // Fetch course
-      const { data: courseData } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('id', courseId)
-        .single();
+      try {
+        const data = await callApi<{
+          course: Course;
+          modules: Array<CourseModule & { lessons: Lesson[] }>;
+          progressMap: Record<string, { status: string; completed_at: string }>;
+          review: { id: string; rating: number; comment: string } | null;
+        }>('/api/course-player-data', { courseId, orgId: currentOrg.id });
 
-      if (courseData) {
-        setCourse(courseData as Course);
-      }
+        setCourse(data.course);
+        setModules(data.modules as any);
+        setProgress(data.progressMap as any);
+        setExistingReview(data.review as any);
 
-      // Fetch modules with lessons
-      const { data: modulesData } = await supabase
-        .from('course_modules')
-        .select('*')
-        .eq('course_id', courseId)
-        .order('sort_order');
-
-      if (modulesData) {
-        const modulesWithLessons = await Promise.all(
-          modulesData.map(async (module) => {
-            const { data: lessons } = await supabase
-              .from('lessons')
-              .select('*')
-              .eq('module_id', module.id)
-              .order('sort_order');
-            return { ...module, lessons: lessons || [] };
-          })
-        );
-        setModules(modulesWithLessons as any);
-
-        // Set first lesson as current if none selected
-        if (modulesWithLessons.length > 0 && modulesWithLessons[0].lessons.length > 0) {
-          setCurrentLesson(modulesWithLessons[0].lessons[0] as Lesson);
+        if (data.modules.length > 0 && data.modules[0].lessons.length > 0) {
+          setCurrentLesson(data.modules[0].lessons[0] as Lesson);
         }
-      }
-
-      // Fetch progress
-      const { data: progressData } = await supabase
-        .from('lesson_progress')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('org_id', currentOrg.id);
-
-      if (progressData) {
-        const progressMap: Record<string, LessonProgress> = {};
-        progressData.forEach(p => {
-          progressMap[p.lesson_id] = p as LessonProgress;
+      } catch (error) {
+        // 403 (no org access to this course), 404, or a transient failure. Leave course null so
+        // the "not found" empty state renders with a Back button instead of a frozen spinner.
+        console.error('Error loading course:', error);
+        toast({
+          title: 'Unable to open course',
+          description: 'You may not have access to this course, or it is unavailable.',
+          variant: 'destructive',
         });
-        setProgress(progressMap);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchData();
   }, [user, currentOrg, courseId]);
 
-  // Load existing review
-  useEffect(() => {
-    const loadExistingReview = async () => {
-      if (!user || !currentOrg || !courseId) return;
-
-      const { data } = await supabase
-        .from('course_reviews')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('org_id', currentOrg.id)
-        .eq('course_id', courseId)
-        .maybeSingle();
-
-      if (data) {
-        setExistingReview(data as CourseReview);
-      }
-    };
-
-    loadExistingReview();
-  }, [user, currentOrg, courseId]);
-
-  // Load quiz when lesson changes - uses public view to hide is_correct
+  // Load quiz when lesson changes - single endpoint, no is_correct exposed
   useEffect(() => {
     const loadQuiz = async () => {
       if (!currentLesson || currentLesson.lesson_type !== 'quiz') {
@@ -154,36 +112,27 @@ export default function CoursePlayer() {
         return;
       }
 
-      const { data: quizData } = await supabase
-        .from('quizzes')
-        .select('*')
-        .eq('lesson_id', currentLesson.id)
-        .single();
+      try {
+        const data = await callApi<{
+          quiz: Quiz | null;
+          questions: Array<QuizQuestion & { options: QuizOption[] }>;
+        }>('/api/quiz-by-lesson', { lessonId: currentLesson.id });
 
-      if (quizData) {
-        setQuiz(quizData as Quiz);
-
-        const { data: questionsData } = await supabase
-          .from('quiz_questions')
-          .select('*')
-          .eq('quiz_id', quizData.id)
-          .order('sort_order');
-
-        if (questionsData) {
-          const questionsWithOptions = await Promise.all(
-            questionsData.map(async (q) => {
-              // Use the secure RPC function that checks access and excludes is_correct
-              const { data: options } = await supabase
-                .rpc('get_quiz_options_for_learner', { p_question_id: q.id });
-              // Add is_correct as undefined since we don't have access to it
-              return { 
-                ...q, 
-                options: (options || []).map(o => ({ ...o, is_correct: false })) 
-              };
-            })
-          );
-          setQuestions(questionsWithOptions as any);
+        if (data.quiz) {
+          setQuiz(data.quiz as Quiz);
+          setQuestions(data.questions as any);
+        } else {
+          setQuiz(null);
+          setQuestions([]);
+          setAnswers({});
+          setQuizSubmitted(false);
         }
+      } catch (error) {
+        console.error('Error loading quiz:', error);
+        setQuiz(null);
+        setQuestions([]);
+        setAnswers({});
+        setQuizSubmitted(false);
       }
     };
 
@@ -205,19 +154,18 @@ export default function CoursePlayer() {
       try {
         // Check for Azure blob path first (preferred for videos)
         if (currentLesson.azure_blob_path) {
-          const { data, error } = await supabase.functions.invoke('azure-view-url', {
-            body: { blobPath: currentLesson.azure_blob_path, lessonId: currentLesson.id },
+          const data = await callApi<{ viewUrl: string }>('/api/azure-view-url', {
+            blobPath: currentLesson.azure_blob_path, lessonId: currentLesson.id,
           });
-          
-          if (!error && data?.viewUrl) {
+
+          if (data?.viewUrl) {
             setAzureVideoUrl(data.viewUrl);
           } else {
-            console.error('Error getting Azure view URL:', error);
             setAzureVideoUrl(null);
           }
           setSignedVideoUrl(null);
         } else if (currentLesson.video_storage_path) {
-          // Fallback to Supabase storage for legacy videos
+          // Fallback to legacy storage path for older videos
           const videoUrl = await getSignedAssetUrl(currentLesson.video_storage_path);
           setSignedVideoUrl(videoUrl);
           setAzureVideoUrl(null);
@@ -230,19 +178,18 @@ export default function CoursePlayer() {
         if (currentLesson.document_storage_path) {
           if (currentLesson.document_storage_path.startsWith('documents/')) {
             // Azure-stored document
-            const { data, error } = await supabase.functions.invoke('azure-view-url', {
-              body: { blobPath: currentLesson.document_storage_path, lessonId: currentLesson.id },
+            const data = await callApi<{ viewUrl: string }>('/api/azure-view-url', {
+              blobPath: currentLesson.document_storage_path, lessonId: currentLesson.id,
             });
-            
-            if (!error && data?.viewUrl) {
+
+            if (data?.viewUrl) {
               setAzureDocUrl(data.viewUrl);
             } else {
-              console.error('Error getting Azure document URL:', error);
               setAzureDocUrl(null);
             }
             setSignedDocUrl(null);
           } else {
-            // Legacy Supabase-stored document
+            // Legacy storage-path document
             const docUrl = await getSignedAssetUrl(currentLesson.document_storage_path);
             setSignedDocUrl(docUrl);
             setAzureDocUrl(null);
@@ -273,17 +220,14 @@ export default function CoursePlayer() {
     setCompletingLesson(true);
 
     // Upsert progress
-    const { error } = await supabase.from('lesson_progress').upsert({
-      org_id: currentOrg.id,
-      user_id: user.id,
-      lesson_id: currentLesson.id,
-      status: 'completed',
-      completed_at: new Date().toISOString(),
-    }, {
-      onConflict: 'org_id,user_id,lesson_id',
-    });
+    try {
+      await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
+    } catch {
+      setCompletingLesson(false);
+      return;
+    }
 
-    if (!error) {
+    {
       const newProgress = {
         ...progress,
         [currentLesson.id]: {
@@ -307,10 +251,7 @@ export default function CoursePlayer() {
         setShowCompletionDialog(true);
         
         // Update enrollment status to completed
-        await supabase.from('enrollments').update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        }).eq('user_id', user.id).eq('org_id', currentOrg.id).eq('course_id', courseId);
+        await callApi('/api/enrollment-complete', { orgId: currentOrg.id, courseId });
       } else {
         toast({
           title: 'Lesson completed!',
@@ -331,15 +272,14 @@ export default function CoursePlayer() {
   const handleSubmitQuiz = async () => {
     if (!quiz || !user || !currentOrg) return;
 
-    // Grade quiz server-side using edge function
-    const { data: gradeResult, error: gradeError } = await supabase.functions.invoke('grade-quiz', {
-      body: {
+    // Grade quiz server-side — attempts inserted server-side, never trust client score
+    let gradeResult: { score: number; passed: boolean };
+    try {
+      gradeResult = await callApi<{ score: number; passed: boolean }>('/api/grade-quiz', {
         quiz_id: quiz.id,
         answers,
-      },
-    });
-
-    if (gradeError || !gradeResult) {
+      });
+    } catch {
       toast({
         title: 'Failed to grade quiz',
         description: 'An error occurred while grading your quiz. Please try again.',
@@ -352,16 +292,6 @@ export default function CoursePlayer() {
 
     setQuizScore(score);
     setQuizSubmitted(true);
-
-    // Save attempt
-    await supabase.from('quiz_attempts').insert({
-      org_id: currentOrg.id,
-      user_id: user.id,
-      quiz_id: quiz.id,
-      score,
-      passed,
-      finished_at: new Date().toISOString(),
-    });
 
     if (!passed) {
       toast({
@@ -429,6 +359,17 @@ export default function CoursePlayer() {
                 </div>
                 <Progress value={progressPercent} className="h-2" />
               </div>
+              {features.course_reviews_enabled && progressPercent >= REVIEW_MIN_PROGRESS && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 w-full"
+                  onClick={() => setShowReviewDialog(true)}
+                >
+                  <Star className="mr-2 h-4 w-4" />
+                  {existingReview ? 'Edit your review' : 'Rate this course'}
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[500px] overflow-y-auto">
@@ -771,24 +712,18 @@ export default function CoursePlayer() {
           courseId={course.id}
           courseTitle={course.title}
           orgId={currentOrg.id}
-          userId={user.id}
           existingReview={existingReview ? {
             id: existingReview.id,
             rating: existingReview.rating,
             comment: existingReview.comment,
           } : undefined}
           onReviewSubmitted={() => {
-            // Refresh existing review
-            supabase
-              .from('course_reviews')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('org_id', currentOrg.id)
-              .eq('course_id', course.id)
-              .maybeSingle()
-              .then(({ data }) => {
-                if (data) setExistingReview(data as CourseReview);
-              });
+            callApi<{ course: Course; modules: any; progressMap: any; review: any } | null>(
+              '/api/course-player-data', { courseId: course.id, orgId: currentOrg.id }
+            )
+              .then(data => { if (data?.review) setExistingReview(data.review as any); })
+              // Endpoint can now 403 (access revoked mid-session) — don't leave the rejection unhandled.
+              .catch(error => { console.error('Error refreshing review:', error); });
           }}
         />
       )}

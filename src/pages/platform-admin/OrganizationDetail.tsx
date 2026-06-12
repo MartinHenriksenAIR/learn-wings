@@ -49,10 +49,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { FileUpload } from '@/components/ui/file-upload';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Organization, OrgMembership, Profile, OrgRole, Invitation } from '@/lib/types';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
-import { useAuth } from '@/hooks/useAuth';
+import { buildPublicUrl } from '@/lib/storage-url';
 import {
   Building2,
   Users,
@@ -85,15 +85,14 @@ const inviteSchema = z.object({
 });
 
 const editOrgSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-  slug: z.string().min(1, 'Slug is required').max(50, 'Slug must be less than 50 characters')
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name must be less than 100 characters'),
+  slug: z.string().min(2, 'Slug must be at least 2 characters').max(50, 'Slug must be less than 50 characters')
     .regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens'),
 });
 
 export default function OrganizationDetail() {
   const { orgId } = useParams<{ orgId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   const [org, setOrg] = useState<Organization | null>(null);
   const [members, setMembers] = useState<(OrgMembership & { profile: Profile })[]>([]);
@@ -138,47 +137,92 @@ export default function OrganizationDetail() {
     if (!orgId) return;
 
     // Fetch organization
-    const { data: orgData } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('id', orgId)
-      .maybeSingle();
-
-    if (orgData) {
-      setOrg(orgData as Organization);
+    try {
+      const { organization } = await callApi<{ organization: Organization }>('/api/organizations', { orgId });
+      if (organization) setOrg(organization);
+    } catch (err) {
+      toast({
+        title: 'Failed to load organization',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+      console.error('OrganizationDetail: failed to load organization', err);
     }
 
     // Fetch members
-    const { data: memberData } = await supabase
-      .from('org_memberships')
-      .select('*, profile:profiles(*)')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false });
-
-    if (memberData) {
-      setMembers(memberData as any);
+    type MembershipRow = {
+      id: string;
+      org_id: string;
+      user_id: string;
+      role: OrgRole;
+      status: 'active' | 'invited' | 'disabled';
+      created_at: string;
+      full_name: string;
+      email: string;
+      avatar_url: string | null;
+      department: string | null;
+    };
+    let memberRows: MembershipRow[] = [];
+    try {
+      const { memberships } = await callApi<{ memberships: MembershipRow[] }>(
+        '/api/org-memberships',
+        { orgId },
+      );
+      memberRows = memberships;
+      const reshaped: (OrgMembership & { profile: Profile })[] = memberships.map((row) => ({
+        id: row.id,
+        org_id: row.org_id,
+        user_id: row.user_id,
+        role: row.role,
+        status: row.status,
+        created_at: row.created_at,
+        profile: {
+          id: row.user_id,
+          full_name: row.full_name,
+          first_name: null,
+          last_name: null,
+          department: row.department,
+          is_platform_admin: false,
+          created_at: row.created_at,
+          preferred_language: null,
+        },
+      }));
+      setMembers(reshaped);
+    } catch (err) {
+      toast({
+        title: 'Failed to load members',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+      console.error('OrganizationDetail: failed to load members', err);
     }
 
-    // Fetch pending invitations using secure RPC (excludes sensitive tokens)
-    const { data: inviteData } = await supabase
-      .rpc('get_platform_invitations_safe', { p_org_id: orgId });
-
-    if (inviteData) {
-      // Filter to only pending status (RPC returns all statuses for the org)
-      const pendingInvites = inviteData.filter((inv: any) => inv.status === 'pending');
-      setInvitations(pendingInvites as Invitation[]);
+    // Fetch pending invitations (endpoint already filters to status = 'pending')
+    try {
+      const { invitations } = await callApi<{ invitations: Invitation[] }>(
+        '/api/invitations',
+        { scope: 'platform', orgId },
+      );
+      setInvitations(invitations);
+    } catch (err) {
+      toast({
+        title: 'Failed to load invitations',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+      console.error('OrganizationDetail: failed to load invitations', err);
     }
 
     // Fetch all users to find ones not in this org
-    const { data: allProfiles } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('full_name');
-
-    if (allProfiles && memberData) {
-      const memberUserIds = new Set(memberData.map((m) => m.user_id));
-      const available = allProfiles.filter((p) => !memberUserIds.has(p.id));
-      setAvailableUsers(available as Profile[]);
+    try {
+      const { profiles: allProfiles } = await callApi<{ profiles: Profile[] }>('/api/profiles', {});
+      if (allProfiles) {
+        const memberUserIds = new Set(memberRows.map((m) => m.user_id));
+        const available = allProfiles.filter((p) => !memberUserIds.has(p.id));
+        setAvailableUsers(available);
+      }
+    } catch (err) {
+      console.error('OrganizationDetail: failed to load profiles', err);
     }
 
     setLoading(false);
@@ -200,21 +244,13 @@ export default function OrganizationDetail() {
     }
 
     setAdding(true);
-
-    const { error } = await supabase.from('org_memberships').insert({
-      org_id: orgId,
-      user_id: selectedUserId,
-      role: selectedRole,
-      status: 'active',
-    });
-
-    if (error) {
-      toast({
-        title: 'Failed to add user',
-        description: error.message,
-        variant: 'destructive',
+    try {
+      await callApi('/api/org-membership-create', {
+        orgId,
+        userId: selectedUserId,
+        role: selectedRole,
+        status: 'active',
       });
-    } else {
       toast({
         title: 'User added!',
         description: 'The user has been added to the organization.',
@@ -223,9 +259,15 @@ export default function OrganizationDetail() {
       setSelectedUserId('');
       setSelectedRole('learner');
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to add user',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setAdding(false);
     }
-
-    setAdding(false);
   };
 
   const handleChangeRole = async () => {
@@ -235,67 +277,55 @@ export default function OrganizationDetail() {
     setUpdatingRole(member.id);
     setRoleChangeDialog(null);
 
-    const { error } = await supabase
-      .from('org_memberships')
-      .update({ role: newRole })
-      .eq('id', member.id);
-
-    if (error) {
-      toast({
-        title: 'Failed to change role',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/org-membership-update', { id: member.id, role: newRole });
       toast({
         title: 'Role updated',
         description: `${member.profile?.full_name} is now ${newRole === 'org_admin' ? 'an Admin' : 'a Learner'}.`,
       });
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to change role',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingRole(null);
     }
-
-    setUpdatingRole(null);
   };
 
   const handleDisableMember = async (membershipId: string) => {
-    const { error } = await supabase
-      .from('org_memberships')
-      .update({ status: 'disabled' })
-      .eq('id', membershipId);
-
-    if (error) {
-      toast({
-        title: 'Failed to disable member',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/org-membership-update', { id: membershipId, status: 'disabled' });
       toast({
         title: 'Member disabled',
         description: 'The user can no longer access this organization.',
       });
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to disable member',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleReactivateMember = async (membershipId: string) => {
-    const { error } = await supabase
-      .from('org_memberships')
-      .update({ status: 'active' })
-      .eq('id', membershipId);
-
-    if (error) {
-      toast({
-        title: 'Failed to reactivate member',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/org-membership-update', { id: membershipId, status: 'active' });
       toast({
         title: 'Member reactivated',
         description: 'The user can now access this organization again.',
       });
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to reactivate member',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -312,41 +342,28 @@ export default function OrganizationDetail() {
 
     setInviting(true);
 
-    const { data: invitation, error } = await supabase
-      .from('invitations')
-      .insert({
-        org_id: orgId,
-        email: inviteEmail,
-        role: inviteRole,
-        first_name: inviteFirstName.trim() || null,
-        last_name: inviteLastName.trim() || null,
-        department: inviteDepartment.trim() || null,
-        invited_by_user_id: user?.id,
-      })
-      .select()
-      .single();
+    try {
+      const { invitation } = await callApi<{ invitation: { id: string; link_id: string } }>(
+        '/api/invitation-create',
+        {
+          orgId,
+          email: inviteEmail,
+          role: inviteRole,
+          firstName: inviteFirstName.trim() || undefined,
+          lastName: inviteLastName.trim() || undefined,
+          department: inviteDepartment.trim() || undefined,
+        },
+      );
 
-    if (error) {
-      toast({
-        title: 'Failed to create invitation',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      // Get the link_id from the invitation using the RPC
-      const { data: linkId } = await supabase.rpc('get_invitation_link_id', {
-        invitation_id: invitation.id,
-      });
-      
-      // Send invitation email
-      if (linkId) {
+      // Send invitation email using link_id returned directly by invitation-create
+      if (invitation?.link_id) {
         const emailResult = await sendInvitationEmail({
           email: inviteEmail,
           orgName: org?.name || null,
           role: inviteRole,
-          linkId,
+          linkId: invitation.link_id,
         });
-        
+
         if (emailResult.success) {
           toast({
             title: 'Invitation sent!',
@@ -366,7 +383,7 @@ export default function OrganizationDetail() {
           description: 'Copy the invite link to share with the user.',
         });
       }
-      
+
       setInviteOpen(false);
       setInviteEmail('');
       setInviteFirstName('');
@@ -374,9 +391,15 @@ export default function OrganizationDetail() {
       setInviteDepartment('');
       setInviteRole('learner');
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to create invitation',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setInviting(false);
     }
-
-    setInviting(false);
   };
 
   const handleCopyInviteLink = async (linkId: string) => {
@@ -391,22 +414,18 @@ export default function OrganizationDetail() {
   };
 
   const handleCancelInvitation = async (invitationId: string) => {
-    const { error } = await supabase
-      .from('invitations')
-      .update({ status: 'expired' })
-      .eq('id', invitationId);
-
-    if (error) {
-      toast({
-        title: 'Failed to cancel invitation',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/invitation-update', { id: invitationId, status: 'expired' });
       toast({
         title: 'Invitation cancelled',
       });
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to cancel invitation',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -432,56 +451,48 @@ export default function OrganizationDetail() {
     }
 
     setSaving(true);
-
-    const { error } = await supabase
-      .from('organizations')
-      .update({ 
-        name: editName, 
-        slug: editSlug, 
+    try {
+      const updates: Record<string, unknown> = {
+        name: editName,
+        slug: editSlug,
         logo_url: editLogoUrl,
         seat_limit: editSeatLimit ? parseInt(editSeatLimit, 10) : null,
-      })
-      .eq('id', orgId);
-
-    if (error) {
-      toast({
-        title: 'Failed to update organization',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+      };
+      await callApi('/api/organization-update', { orgId, updates });
       toast({
         title: 'Organization updated',
         description: 'The organization details have been saved.',
       });
       setEditOpen(false);
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to update organization',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
   };
 
   const handleDeleteOrg = async () => {
     setDeleting(true);
-
-    const { error } = await supabase
-      .from('organizations')
-      .delete()
-      .eq('id', orgId);
-
-    if (error) {
-      toast({
-        title: 'Failed to delete organization',
-        description: error.message,
-        variant: 'destructive',
-      });
-      setDeleting(false);
-    } else {
+    try {
+      await callApi('/api/organization-delete', { orgId });
       toast({
         title: 'Organization deleted',
         description: 'The organization has been permanently deleted.',
       });
       navigate('/app/admin/organizations');
+    } catch (err) {
+      toast({
+        title: 'Failed to delete organization',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1006,11 +1017,7 @@ export default function OrganizationDetail() {
                 value={editLogoUrl}
                 onChange={(url, storagePath) => {
                   if (url && storagePath) {
-                    // For public bucket, construct the public URL
-                    const { data: { publicUrl } } = supabase.storage
-                      .from('org-logos')
-                      .getPublicUrl(storagePath);
-                    setEditLogoUrl(publicUrl);
+                    setEditLogoUrl(buildPublicUrl(storagePath));
                   } else {
                     setEditLogoUrl(null);
                   }

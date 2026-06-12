@@ -30,7 +30,8 @@ interface IdeaCardProps {
 }
 
 export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) {
-  const { user, effectiveIsOrgAdmin } = useAuth();
+  // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
+  const { profile, effectiveIsOrgAdmin } = useAuth();
   
   const initials = idea.profile?.full_name
     ?.split(' ')
@@ -43,7 +44,7 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
     ? BUSINESS_AREAS.find((b) => b.value === idea.business_area)?.label 
     : null;
 
-  const canDelete = effectiveIsOrgAdmin || idea.user_id === user?.id;
+  const canDelete = effectiveIsOrgAdmin || idea.user_id === profile?.id;
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();

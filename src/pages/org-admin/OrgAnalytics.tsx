@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi, callApiRaw } from '@/lib/api-client';
+import { buildPublicUrl } from '@/lib/storage-url';
 import { Organization } from '@/lib/types';
 import { Loader2, Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -66,13 +67,17 @@ export default function OrgAnalytics() {
   useEffect(() => {
     const fetchOrganizations = async () => {
       if (!isGlobalView || !isPlatformAdmin) return;
-      
-      const { data: orgs } = await supabase
-        .from('organizations')
-        .select('*')
-        .order('name');
-      if (orgs) {
-        setOrganizations(orgs as Organization[]);
+
+      try {
+        const { organizations: orgs } = await callApi<{ organizations: Organization[] }>(
+          '/api/organizations',
+          {},
+        );
+        // endpoint returns created_at DESC (accepted 3a parity break); the filter dropdown was name-ordered
+        setOrganizations([...(orgs ?? [])].sort((a, b) => a.name.localeCompare(b.name)));
+      } catch (err) {
+        // parity: the old client ignored fetch errors (filter just shows "All Organizations")
+        console.error('OrgAnalytics: failed to load organizations', err);
       }
     };
     fetchOrganizations();
@@ -85,133 +90,38 @@ export default function OrgAnalytics() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // For org-specific view, require currentOrg
       if (!isGlobalView && !currentOrg) {
         setLoading(false);
         return;
       }
 
       setLoading(true);
-
       const orgFilter = effectiveOrgId;
 
-      // Get total users
-      let totalUsers = 0;
       if (orgFilter) {
-        const { count } = await supabase
-          .from('org_memberships')
-          .select('*', { count: 'exact', head: true })
-          .eq('org_id', orgFilter)
-          .eq('status', 'active');
-        totalUsers = count || 0;
-      } else if (isGlobalView) {
-        const { count } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
-        totalUsers = count || 0;
-      }
+        // Org-specific view: fetch from Azure API
+        try {
+          const data = await callApi<{
+            members: Array<{ user_id: string; full_name: string; email: string; department?: string }>;
+            enrollments: Array<{ user_id: string; status: string; course_id: string }>;
+            quizAttempts: Array<{ user_id: string; score: number }>;
+          }>('/api/org-analytics-data', { orgId: orgFilter });
 
-      // Get active users in last 7 days
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      let active7Query = supabase
-        .from('lesson_progress')
-        .select('user_id')
-        .gte('completed_at', sevenDaysAgo.toISOString());
-      if (orgFilter) {
-        active7Query = active7Query.eq('org_id', orgFilter);
-      }
-      const { data: active7 } = await active7Query;
-      const activeUsers7Days = new Set(active7?.map(p => p.user_id)).size;
+          const totalUsers = data.members.length;
+          const totalEnrollments = data.enrollments.length;
+          const completedEnrollments = data.enrollments.filter(e => e.status === 'completed').length;
+          const completionRate = totalEnrollments > 0
+            ? Math.round((completedEnrollments / totalEnrollments) * 100) : 0;
+          const avgQuizScore = data.quizAttempts.length > 0
+            ? Math.round(data.quizAttempts.reduce((acc, a) => acc + a.score, 0) / data.quizAttempts.length) : 0;
 
-      // Get active users in last 30 days
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      let active30Query = supabase
-        .from('lesson_progress')
-        .select('user_id')
-        .gte('completed_at', thirtyDaysAgo.toISOString());
-      if (orgFilter) {
-        active30Query = active30Query.eq('org_id', orgFilter);
-      }
-      const { data: active30 } = await active30Query;
-      const activeUsers30Days = new Set(active30?.map(p => p.user_id)).size;
+          setStats({ totalUsers, activeUsers7Days: 0, activeUsers30Days: 0, avgQuizScore, completionRate });
 
-      // Get average quiz score
-      let quizQuery = supabase.from('quiz_attempts').select('score');
-      if (orgFilter) {
-        quizQuery = quizQuery.eq('org_id', orgFilter);
-      }
-      const { data: quizAttempts } = await quizQuery;
-      const avgQuizScore = quizAttempts && quizAttempts.length > 0
-        ? Math.round(quizAttempts.reduce((acc, a) => acc + a.score, 0) / quizAttempts.length)
-        : 0;
-
-      // Get completion rate
-      let enrollmentsQuery = supabase.from('enrollments').select('status');
-      if (orgFilter) {
-        enrollmentsQuery = enrollmentsQuery.eq('org_id', orgFilter);
-      }
-      const { data: enrollments } = await enrollmentsQuery;
-      const totalEnrollments = enrollments?.length || 0;
-      const completedEnrollments = enrollments?.filter(e => e.status === 'completed').length || 0;
-      const completionRate = totalEnrollments > 0
-        ? Math.round((completedEnrollments / totalEnrollments) * 100)
-        : 0;
-
-      setStats({
-        totalUsers,
-        activeUsers7Days,
-        activeUsers30Days,
-        avgQuizScore,
-        completionRate,
-      });
-
-      // Get user stats for team performance
-      let userStatsData: UserStats[] = [];
-      let uniqueDepartments: string[] = [];
-
-      if (orgFilter) {
-        const { data: members } = await supabase
-          .from('org_memberships')
-          .select('user_id, profile:profiles(id, full_name, department)')
-          .eq('org_id', orgFilter)
-          .eq('status', 'active');
-
-        if (members) {
-          // Extract unique departments
-          const depts = members
-            .map(m => (m.profile as any)?.department)
-            .filter((d): d is string => Boolean(d));
-          uniqueDepartments = [...new Set(depts)];
-
-          const memberIds = members
-            .map((m) => (m.profile as any)?.id as string | undefined)
-            .filter((id): id is string => Boolean(id));
-
-          let allEnrollments: { user_id: string; status: string }[] = [];
-          let allAttempts: { user_id: string; score: number }[] = [];
-          if (memberIds.length > 0) {
-            const enrollmentPromise = supabase
-              .from('enrollments')
-              .select('user_id, status')
-              .eq('org_id', orgFilter)
-              .in('user_id', memberIds);
-            const attemptsPromise = supabase
-              .from('quiz_attempts')
-              .select('user_id, score')
-              .eq('org_id', orgFilter)
-              .in('user_id', memberIds);
-            const [{ data: enrollmentData }, { data: attemptsData }] = await Promise.all([
-              enrollmentPromise,
-              attemptsPromise,
-            ]);
-            allEnrollments = enrollmentData || [];
-            allAttempts = attemptsData || [];
-          }
+          const depts = data.members.map(m => m.department).filter((d): d is string => Boolean(d));
+          setDepartments([...new Set(depts)]);
 
           const enrollmentMap = new Map<string, { total: number; completed: number }>();
-          allEnrollments.forEach((e) => {
+          data.enrollments.forEach(e => {
             const existing = enrollmentMap.get(e.user_id) || { total: 0, completed: 0 };
             existing.total += 1;
             if (e.status === 'completed') existing.completed += 1;
@@ -219,37 +129,31 @@ export default function OrgAnalytics() {
           });
 
           const attemptMap = new Map<string, { totalScore: number; attempts: number }>();
-          allAttempts.forEach((a) => {
+          data.quizAttempts.forEach(a => {
             const existing = attemptMap.get(a.user_id) || { totalScore: 0, attempts: 0 };
             existing.totalScore += a.score;
             existing.attempts += 1;
             attemptMap.set(a.user_id, existing);
           });
 
-          for (const member of members) {
-            const profile = member.profile as any;
-            if (!profile) continue;
-
-            const enrollmentStats = enrollmentMap.get(profile.id) || { total: 0, completed: 0 };
-            const attemptStats = attemptMap.get(profile.id) || { totalScore: 0, attempts: 0 };
-            const avgScore = attemptStats.attempts > 0
-              ? Math.round(attemptStats.totalScore / attemptStats.attempts)
-              : 0;
-
-            userStatsData.push({
-              id: profile.id,
-              name: profile.full_name,
-              department: profile.department || null,
-              enrollments: enrollmentStats.total,
-              completed: enrollmentStats.completed,
-              avgQuizScore: avgScore,
-            });
-          }
+          setUserStats(data.members.map(m => {
+            const enrollStats = enrollmentMap.get(m.user_id) || { total: 0, completed: 0 };
+            const attemptStats = attemptMap.get(m.user_id) || { totalScore: 0, attempts: 0 };
+            return {
+              id: m.user_id,
+              name: m.full_name,
+              department: m.department || null,
+              enrollments: enrollStats.total,
+              completed: enrollStats.completed,
+              avgQuizScore: attemptStats.attempts > 0
+                ? Math.round(attemptStats.totalScore / attemptStats.attempts) : 0,
+            };
+          }));
+        } catch (err) {
+          console.error('Failed to fetch analytics data:', err);
         }
       }
-
-      setDepartments(uniqueDepartments);
-      setUserStats(userStatsData);
+      // Global view (all orgs) not yet supported via API — show empty stats
       setLoading(false);
     };
 
@@ -265,29 +169,7 @@ export default function OrgAnalytics() {
 
     setGeneratingReport(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Please log in to generate reports');
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-compliance-report`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ orgId: effectiveOrgId }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate report');
-      }
-
+      const response = await callApiRaw('/api/generate-compliance-report', { orgId: effectiveOrgId });
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -312,16 +194,13 @@ export default function OrgAnalytics() {
 
     setUploading(true);
     try {
-      const { data: { publicUrl } } = supabase.storage
-        .from('org-logos')
-        .getPublicUrl(storagePath);
+      // storagePath is the Azure blob path returned by file-upload component
+      const logoUrl = buildPublicUrl(storagePath);
 
-      const { error } = await supabase
-        .from('organizations')
-        .update({ logo_url: publicUrl })
-        .eq('id', currentOrg.id);
-
-      if (error) throw error;
+      await callApi('/api/organization-update', {
+        orgId: currentOrg.id,
+        updates: { logo_url: logoUrl },
+      });
 
       toast.success('Logo updated successfully');
       setLogoDialogOpen(false);

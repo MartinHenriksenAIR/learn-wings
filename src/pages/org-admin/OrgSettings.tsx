@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Building2 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 
 type FeatureSettings = {
@@ -27,8 +29,9 @@ const featureLabels: Record<keyof FeatureSettings, string> = {
 };
 
 export default function OrgSettings() {
-  const { currentOrg } = useAuth();
-  const { platformFeatures, orgFeatures, refetch } = usePlatformSettings();
+  const { user, profile, currentOrg } = useAuth();
+  const { platformFeatures, orgFeatures, isLoading, refetch } = usePlatformSettings();
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const [localFeatures, setLocalFeatures] = useState<FeatureSettings>({
     certificates_enabled: true,
@@ -51,19 +54,48 @@ export default function OrgSettings() {
   const handleSave = async () => {
     if (!currentOrg) return;
     setSaving(true);
-    const { error } = await supabase.from('org_settings').upsert({
-      org_id: currentOrg.id,
-      features: localFeatures,
-    });
-
-    if (error) {
-      toast({ title: 'Failed to save settings', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      await callApi('/api/org-settings-update', { orgId: currentOrg.id, features: localFeatures });
       toast({ title: 'Organization settings saved' });
       await refetch();
+    } catch (error) {
+      toast({
+        title: 'Failed to save settings',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
+
+  // Spinner: settings still loading, OR user exists but profile not yet resolved.
+  // `!saving` keeps the form mounted during the post-save refetch (which flips the
+  // shared isLoading) — otherwise every Save flashes a full-page spinner mid-edit.
+  if ((isLoading && !saving) || (user && !profile)) {
+    return (
+      <AppLayout title="Organization Settings" breadcrumbs={[{ label: 'Organization Settings' }]}>
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Empty state: resolved but no org context
+  if (!currentOrg) {
+    return (
+      <AppLayout title="Organization Settings" breadcrumbs={[{ label: 'Organization Settings' }]}>
+        <div className="flex h-64 items-center justify-center">
+          <EmptyState
+            icon={<Building2 className="h-6 w-6" />}
+            title={t('common.noOrgSelected')}
+            description={t('orgSettings.noOrgDescription')}
+          />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title="Organization Settings" breadcrumbs={[{ label: 'Organization Settings' }]}>

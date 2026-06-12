@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -47,7 +47,7 @@ import {
 
 export default function ResourceLibrary() {
   const navigate = useNavigate();
-  const { currentOrg, user, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
@@ -60,22 +60,8 @@ export default function ResourceLibrary() {
 
   const isAdmin = effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
-  // Fetch all resources (for tag extraction)
-  const { data: allResources = [] } = useQuery({
-    queryKey: ['community-resources-all', currentOrg?.id],
-    queryFn: () => fetchResources(currentOrg!.id),
-    enabled: !!currentOrg,
-  });
-
-  // Unique tags from all resources
-  const allTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    allResources.forEach((r) => r.tags?.forEach((t) => tagSet.add(t)));
-    return Array.from(tagSet).sort();
-  }, [allResources]);
-
-  // Fetch filtered resources
-  const { data: resources = [], isLoading } = useQuery({
+  // Single fetch: filtered resources for display + the org's distinct tags for the dropdown.
+  const { data, isLoading } = useQuery({
     queryKey: ['community-resources', currentOrg?.id, searchQuery, selectedType, selectedTag],
     queryFn: () =>
       fetchResources(currentOrg!.id, {
@@ -85,14 +71,15 @@ export default function ResourceLibrary() {
       }),
     enabled: !!currentOrg,
   });
+  const resources = data?.resources ?? [];
+  const allTags = data?.allTags ?? [];
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: Omit<Parameters<typeof createResource>[0], 'org_id' | 'user_id'>) =>
+    mutationFn: (data: Omit<Parameters<typeof createResource>[0], 'org_id'>) =>
       createResource({
         ...data,
         org_id: currentOrg!.id,
-        user_id: user!.id,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['community-resources'] });
@@ -252,7 +239,7 @@ export default function ResourceLibrary() {
               <ResourceCard
                 key={resource.id}
                 resource={resource}
-                isOwner={resource.user_id === user?.id}
+                isOwner={resource.user_id === profile?.id}
                 isAdmin={isAdmin}
                 onEdit={() => {
                   setEditingResource(resource);

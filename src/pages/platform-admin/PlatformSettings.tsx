@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
+import { EmptyState } from '@/components/ui/empty-state';
+import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
-import { Loader2, Palette, Users, Mail, ToggleLeft, Save } from 'lucide-react';
+import { Loader2, Palette, Users, Mail, ToggleLeft, Save, AlertTriangle } from 'lucide-react';
 
 interface BrandingSettings {
   platform_name: string;
@@ -83,7 +85,9 @@ const defaultFeatures: FeatureSettings = {
 };
 
 export default function PlatformSettings() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
+  const [populated, setPopulated] = useState(false);
   const [saving, setSaving] = useState<SettingsKey | null>(null);
   const [testingSmtp, setTestingSmtp] = useState(false);
 
@@ -92,75 +96,78 @@ export default function PlatformSettings() {
   const [email, setEmail] = useState<EmailSettings>(defaultEmail);
   const [features, setFeatures] = useState<FeatureSettings>(defaultFeatures);
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      const { data } = await supabase
-        .from('platform_settings')
-        .select('key, value');
-
-      if (data) {
-        data.forEach((setting) => {
-          const value = (setting.value as Record<string, unknown>) || {};
-          switch (setting.key) {
-            case 'branding':
-              setBranding({ ...defaultBranding, ...(value as Partial<BrandingSettings>) });
-              break;
-            case 'user_access':
-              setUserAccess({ ...defaultUserAccess, ...(value as Partial<UserAccessSettings>) });
-              break;
-            case 'email':
-              setEmail({ ...defaultEmail, ...(value as Partial<EmailSettings>) });
-              break;
-            case 'features':
-              setFeatures({ ...defaultFeatures, ...(value as Partial<FeatureSettings>) });
-              break;
-          }
-        });
-      }
-      setLoading(false);
-    };
-
-    fetchSettings();
-  }, []);
-
-  const saveSetting = async (key: SettingsKey, value: BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings) => {
-    setSaving(key);
-    const { error } = await supabase
-      .from('platform_settings')
-      .update({ value: JSON.parse(JSON.stringify(value)) })
-      .eq('key', key);
-
-    if (error) {
+  const fetchSettings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { settings } = await callApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>('/api/platform-settings', {});
+      settings.forEach((setting) => {
+        const value = (setting.value as Record<string, unknown>) || {};
+        switch (setting.key) {
+          case 'branding':
+            setBranding({ ...defaultBranding, ...(value as Partial<BrandingSettings>) });
+            break;
+          case 'user_access':
+            setUserAccess({ ...defaultUserAccess, ...(value as Partial<UserAccessSettings>) });
+            break;
+          case 'email':
+            setEmail({ ...defaultEmail, ...(value as Partial<EmailSettings>) });
+            break;
+          case 'features':
+            setFeatures({ ...defaultFeatures, ...(value as Partial<FeatureSettings>) });
+            break;
+        }
+      });
+      setPopulated(true);
+    } catch (error) {
       toast({
-        title: 'Failed to save',
-        description: error.message,
+        title: 'Failed to load settings',
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
-    } else {
+    } finally {
+      setLoading(false);
+    }
+    // deps deliberately empty: closes only over module constants and stable setters — referencing component state here would create a stale closure
+  }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const saveSetting = async (key: SettingsKey, value: BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings) => {
+    if (!populated) return;
+    setSaving(key);
+    try {
+      await callApi('/api/platform-settings-update', { key, value });
       toast({
         title: 'Settings saved',
         description: 'Your changes have been applied.',
       });
+    } catch (error) {
+      toast({
+        title: 'Failed to save',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(null);
     }
-    setSaving(null);
   };
 
   const handleTestSmtpConnection = async () => {
     setTestingSmtp(true);
     try {
-      const { data, error } = await supabase.functions.invoke('test-smtp-connection', {
-        body: {
-          host: email.smtp_host,
-          port: email.smtp_port,
-          username: email.smtp_username,
-          password: email.smtp_password,
-          encryption: email.smtp_encryption,
-          fromEmail: email.from_email,
-        },
+      const data = await callApi<{ success: boolean; message?: string; error?: string }>('/api/test-smtp-connection', {
+        host: email.smtp_host,
+        port: email.smtp_port,
+        username: email.smtp_username,
+        password: email.smtp_password,
+        encryption: email.smtp_encryption,
+        fromEmail: email.from_email,
       });
 
-      if (error || !data?.success) {
-        throw new Error(error?.message || data?.error || 'Connection test failed');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Connection test failed');
       }
 
       toast({
@@ -182,7 +189,7 @@ export default function PlatformSettings() {
 
   if (loading) {
     return (
-      <AppLayout title="Platform Settings" breadcrumbs={[{ label: 'Settings' }]}> 
+      <AppLayout title="Platform Settings" breadcrumbs={[{ label: 'Settings' }]}>
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
         </div>
@@ -190,8 +197,27 @@ export default function PlatformSettings() {
     );
   }
 
+  if (!populated) {
+    return (
+      <AppLayout title="Platform Settings" breadcrumbs={[{ label: 'Settings' }]}>
+        <div className="flex h-64 items-center justify-center">
+          <EmptyState
+            icon={<AlertTriangle className="h-6 w-6" />}
+            title={t('platformSettings.loadFailedTitle')}
+            description={t('platformSettings.loadFailedDescription')}
+            action={
+              <Button variant="outline" onClick={fetchSettings}>
+                {t('platformSettings.retry')}
+              </Button>
+            }
+          />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
-    <AppLayout title="Platform Settings" breadcrumbs={[{ label: 'Platform Settings' }]}> 
+    <AppLayout title="Platform Settings" breadcrumbs={[{ label: 'Platform Settings' }]}>
       <Tabs defaultValue="branding" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-none lg:flex">
           <TabsTrigger value="branding" className="gap-2">

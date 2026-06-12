@@ -1,0 +1,19 @@
+# PATCH 05 — Fix Azure Functions CI/CD workflow
+# DRAFT ONLY — DO NOT APPLY without creating the functions/ directory
+
+--- a/.github/workflows/main_func-ai-education-migration.yml
++++ b/.github/workflows/main_func-ai-education-migration.yml
+@@ -8,10 +8,10 @@ on:
+   workflow_dispatch:
+
+ env:
+-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
++  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'functions'
+   NODE_VERSION: '22.x'
+
+ jobs:
+   build:
+-    runs-on: windows-latest
++    runs-on: ubuntu-latest
+     permissions:
+       contents: read

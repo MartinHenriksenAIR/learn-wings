@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { useAuth } from '@/hooks/useAuth';
 
 interface FeatureSettings {
@@ -85,23 +85,33 @@ const PlatformSettingsContext = createContext<PlatformSettingsContextType>({
 });
 
 export function PlatformSettingsProvider({ children }: { children: ReactNode }) {
-  const { currentOrg } = useAuth();
+  const { user, currentOrg } = useAuth();
   const [platformFeatures, setPlatformFeatures] = useState<FeatureSettings>(defaultFeatures);
   const [orgFeatures, setOrgFeatures] = useState<Partial<FeatureSettings> | null>(null);
   const [branding, setBranding] = useState<BrandingSettings>(defaultBranding);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = async () => {
-    setIsLoading(true);
-    const [platformRes, orgRes] = await Promise.all([
-      supabase.from('platform_settings').select('key, value'),
-      currentOrg
-        ? supabase.from('org_settings').select('features').eq('org_id', currentOrg.id).maybeSingle()
-        : Promise.resolve({ data: null, error: null } as any),
-    ]);
+    if (!user) {
+      setPlatformFeatures(defaultFeatures);
+      setBranding(defaultBranding);
+      setOrgFeatures(null);
+      setIsLoading(false);
+      return;
+    }
 
-    const data = platformRes.data;
-    if (data) {
+    setIsLoading(true);
+    try {
+      const [platformResult, orgResult] = await Promise.all([
+        callApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>('/api/platform-settings', {})
+          .catch(() => ({ settings: [] as Array<{ key: string; value: Record<string, unknown> }> })),
+        currentOrg
+          ? callApi<{ settings: { org_id: string; features: Partial<FeatureSettings> } | null }>('/api/org-settings', { orgId: currentOrg.id })
+              .catch(() => ({ settings: null }))
+          : Promise.resolve({ settings: null }),
+      ]);
+
+      const data = platformResult.settings;
       let nextFeatures = defaultFeatures;
       let nextBranding = defaultBranding;
       data.forEach((setting) => {
@@ -114,16 +124,21 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       });
       setPlatformFeatures(nextFeatures);
       setBranding(nextBranding);
-    }
 
-    const nextOrgFeatures = (orgRes?.data?.features as Partial<FeatureSettings> | undefined) || null;
-    setOrgFeatures(nextOrgFeatures);
-    setIsLoading(false);
+      const nextOrgFeatures = (orgResult.settings?.features as Partial<FeatureSettings> | undefined) ?? null;
+      setOrgFeatures(nextOrgFeatures);
+    } catch {
+      setPlatformFeatures(defaultFeatures);
+      setBranding(defaultBranding);
+      setOrgFeatures(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchSettings();
-  }, [currentOrg?.id]);
+  }, [user?.id, currentOrg?.id]);
 
   const features: FeatureSettings = {
     certificates_enabled: platformFeatures.certificates_enabled && (orgFeatures?.certificates_enabled ?? true),

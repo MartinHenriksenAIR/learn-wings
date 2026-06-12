@@ -33,7 +33,9 @@ export default function IdeaLibrary() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { currentOrg, user, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID
+  // and never matches ideas.user_id post-migration.
+  const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
 
   const initialTab = searchParams.get('tab') || 'all';
@@ -61,13 +63,13 @@ export default function IdeaLibrary() {
 
   // Fetch ideas - for drafts tab, filter by current user
   const { data: ideas = [], isLoading } = useQuery({
-    queryKey: ['ideas', currentOrg?.id, safeTab, searchQuery, selectedBusinessArea, selectedTags, user?.id],
+    queryKey: ['ideas', currentOrg?.id, safeTab, searchQuery, selectedBusinessArea, selectedTags, profile?.id],
     queryFn: () => fetchIdeas(currentOrg!.id, {
       status: tabStatusFilters[safeTab].length > 0 ? tabStatusFilters[safeTab] : undefined,
       search: searchQuery || undefined,
       business_area: selectedBusinessArea ? [selectedBusinessArea as BusinessArea] : undefined,
       tags: selectedTags.length > 0 ? selectedTags : undefined,
-      user_id: safeTab === 'drafts' ? user?.id : undefined,
+      user_id: safeTab === 'drafts' ? profile?.id : undefined,
     }),
     enabled: !!currentOrg,
   });
@@ -95,7 +97,7 @@ export default function IdeaLibrary() {
   const filteredIdeas = safeTab === 'all' 
     ? ideas.filter((i) => i.status !== 'draft')
     : safeTab === 'drafts'
-    ? ideas.filter((i) => i.user_id === user?.id) // Extra safety check
+    ? ideas.filter((i) => i.user_id === profile?.id) // Extra safety check
     : ideas;
 
   const hasActiveFilters = Boolean(searchQuery || selectedBusinessArea || selectedTags.length > 0);

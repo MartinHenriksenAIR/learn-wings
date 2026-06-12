@@ -21,7 +21,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import {
   Loader2,
   CheckCircle2,
@@ -119,158 +119,15 @@ export function UserProgressDialog({
   const fetchUserProgress = async () => {
     setLoading(true);
     try {
-      // 1. Get user's enrollments
-      const { data: enrollments } = await supabase
-        .from('enrollments')
-        .select(`
-          id,
-          course_id,
-          status,
-          enrolled_at,
-          completed_at,
-          course:courses(id, title, level)
-        `)
-        .eq('org_id', orgId)
-        .eq('user_id', userId);
-
-      if (!enrollments || enrollments.length === 0) {
-        setCourseProgress([]);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Get all lesson progress for user
-      const { data: lessonProgressData } = await supabase
-        .from('lesson_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('org_id', orgId);
-
-      const progressMap = new Map(
-        lessonProgressData?.map(p => [p.lesson_id, p]) || []
+      // Slice 3c: the old 5-query fan-out is aggregated server-side.
+      const { courses } = await callApi<{ courses: CourseProgress[] }>(
+        '/api/user-progress',
+        { orgId, userId },
       );
-
-      // 3. Get all quiz attempts for user
-      const { data: quizAttempts } = await supabase
-        .from('quiz_attempts')
-        .select(`
-          id,
-          quiz_id,
-          score,
-          passed,
-          started_at,
-          finished_at
-        `)
-        .eq('user_id', userId)
-        .eq('org_id', orgId)
-        .order('started_at', { ascending: false });
-
-      // 4. Build course progress data
-      const courseProgressData: CourseProgress[] = [];
-
-      for (const enrollment of enrollments) {
-        const course = enrollment.course as any;
-        if (!course) continue;
-
-        // Get modules and lessons for this course
-        const { data: modules } = await supabase
-          .from('course_modules')
-          .select(`
-            id,
-            title,
-            sort_order,
-            lessons(id, title, lesson_type, sort_order)
-          `)
-          .eq('course_id', course.id)
-          .order('sort_order');
-
-        // Get quizzes for lessons in this course
-        const lessonIds = modules?.flatMap(m => (m.lessons as any[])?.map(l => l.id) || []) || [];
-        const { data: quizzes } = await supabase
-          .from('quizzes')
-          .select('id, lesson_id')
-          .in('lesson_id', lessonIds.length > 0 ? lessonIds : ['']);
-
-        const quizMap = new Map(quizzes?.map(q => [q.lesson_id, q.id]) || []);
-        const lessonToQuizMap = new Map(quizzes?.map(q => [q.id, q.lesson_id]) || []);
-
-        // Build module progress
-        const moduleProgress: ModuleProgress[] = (modules || []).map(module => {
-          const lessons = (module.lessons as any[]) || [];
-          return {
-            id: module.id,
-            title: module.title,
-            sortOrder: module.sort_order,
-            lessons: lessons
-              .sort((a, b) => a.sort_order - b.sort_order)
-              .map(lesson => {
-                const progress = progressMap.get(lesson.id);
-                const quizId = quizMap.get(lesson.id);
-                const lessonQuizAttempts = quizAttempts?.filter(a => a.quiz_id === quizId) || [];
-                const latestAttempt = lessonQuizAttempts[0];
-
-                return {
-                  id: lesson.id,
-                  title: lesson.title,
-                  lessonType: lesson.lesson_type,
-                  sortOrder: lesson.sort_order,
-                  status: (progress?.status || 'not_started') as 'not_started' | 'in_progress' | 'completed',
-                  completedAt: progress?.completed_at || null,
-                  quizId,
-                  latestQuizScore: latestAttempt?.score,
-                  latestQuizPassed: latestAttempt?.passed,
-                };
-              }),
-          };
-        });
-
-        // Count lessons
-        const totalLessons = moduleProgress.reduce((acc, m) => acc + m.lessons.length, 0);
-        const completedLessons = moduleProgress.reduce(
-          (acc, m) => acc + m.lessons.filter(l => l.status === 'completed').length,
-          0
-        );
-
-        // Get quiz attempts for this course
-        const courseQuizIds = new Set(
-          moduleProgress.flatMap(m => m.lessons.map(l => l.quizId).filter(Boolean))
-        );
-        const courseQuizAttempts: QuizAttemptData[] = (quizAttempts || [])
-          .filter(a => courseQuizIds.has(a.quiz_id))
-          .map(a => {
-            const lessonId = lessonToQuizMap.get(a.quiz_id);
-            const lesson = moduleProgress
-              .flatMap(m => m.lessons)
-              .find(l => l.id === lessonId);
-            return {
-              id: a.id,
-              quizId: a.quiz_id,
-              lessonTitle: lesson?.title || 'Unknown Quiz',
-              score: a.score,
-              passed: a.passed,
-              startedAt: a.started_at,
-              finishedAt: a.finished_at,
-            };
-          });
-
-        courseProgressData.push({
-          enrollmentId: enrollment.id,
-          courseId: course.id,
-          courseTitle: course.title,
-          courseLevel: course.level,
-          enrollmentStatus: enrollment.status,
-          enrolledAt: enrollment.enrolled_at,
-          completedAt: enrollment.completed_at,
-          modules: moduleProgress,
-          totalLessons,
-          completedLessons,
-          quizAttempts: courseQuizAttempts,
-        });
-      }
-
-      setCourseProgress(courseProgressData);
+      setCourseProgress(courses);
     } catch (error) {
-      console.error('Error fetching user progress:', error);
+      console.error('Error fetching user progress:', error); // parity: no toast
+      setCourseProgress([]); // review fix: don't render a previous user's data under this user's name
     }
     setLoading(false);
   };

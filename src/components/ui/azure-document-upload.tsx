@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -62,15 +62,13 @@ export function AzureDocumentUpload({
 
     try {
       // Step 1: Get signed upload URL from edge function
-      const { data: uploadData, error: uploadError } = await supabase.functions.invoke('azure-document-upload-url', {
-        body: { 
-          fileName: file.name,
-          contentType: file.type,
-        },
+      const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>('/api/azure-document-upload-url', {
+        fileName: file.name,
+        contentType: file.type,
       });
 
-      if (uploadError || !uploadData?.uploadUrl) {
-        throw new Error(uploadError?.message || 'Failed to get upload URL');
+      if (!uploadData?.uploadUrl) {
+        throw new Error('Failed to get upload URL');
       }
 
       const { uploadUrl, blobPath, contentType } = uploadData;

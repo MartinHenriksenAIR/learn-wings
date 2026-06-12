@@ -24,7 +24,7 @@ import { AzureVideoUpload } from '@/components/ui/azure-video-upload';
 import { AzureDocumentUpload } from '@/components/ui/azure-document-upload';
 import { QuizEditorDialog } from '@/components/platform-admin/QuizEditorDialog';
 
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil, Settings } from 'lucide-react';
@@ -39,6 +39,7 @@ export default function CourseEditor() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Course edit state
@@ -76,48 +77,35 @@ export default function CourseEditor() {
   const [quizLessonTitle, setQuizLessonTitle] = useState('');
 
 
-  const fetchCourse = async () => {
+  const fetchStructure = async () => {
     if (!courseId) return;
-    const { data } = await supabase.from('courses').select('*').eq('id', courseId).maybeSingle();
-    if (data) {
-      const refreshedThumbnailUrl = await getSignedLmsAssetUrl(data.thumbnail_url);
-
-      setCourse(data as Course);
-      setEditTitle(data.title);
-      setEditDescription(data.description || '');
-      setEditLevel(data.level as CourseLevel);
-      setEditThumbnailUrl(refreshedThumbnailUrl);
-    }
-  };
-
-  const fetchModules = async () => {
-    if (!courseId) return;
-    const { data: modulesData } = await supabase
-      .from('course_modules')
-      .select('*')
-      .eq('course_id', courseId)
-      .order('sort_order');
-
-    if (modulesData) {
-      // Fetch lessons for each module
-      const modulesWithLessons = await Promise.all(
-        modulesData.map(async (mod) => {
-          const { data: lessonsData } = await supabase
-            .from('lessons')
-            .select('*')
-            .eq('module_id', mod.id)
-            .order('sort_order');
-          return { ...mod, lessons: lessonsData || [] } as CourseModule;
-        })
+    setLoadError(null);
+    try {
+      const res = await callApi<{ course: Course | null; modules: CourseModule[] }>(
+        '/api/course-structure-admin',
+        { courseId },
       );
-      setModules(modulesWithLessons);
+      if (res.course) {
+        const refreshedThumbnailUrl = await getSignedLmsAssetUrl(res.course.thumbnail_url);
+        setCourse(res.course);
+        setEditTitle(res.course.title);
+        setEditDescription(res.course.description || '');
+        setEditLevel(res.course.level as CourseLevel);
+        setEditThumbnailUrl(refreshedThumbnailUrl);
+      } else {
+        setCourse(null);
+      }
+      setModules(res.modules);
+    } catch (err) {
+      setLoadError((err as Error).message);
+      toast({ title: 'Failed to load course', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
-    fetchCourse();
-    fetchModules();
+    fetchStructure();
   }, [courseId]);
 
   const handleSaveCourse = async () => {
@@ -126,17 +114,23 @@ export default function CourseEditor() {
 
     const thumbnailToPersist = extractLmsAssetPath(editThumbnailUrl) ?? editThumbnailUrl;
 
-    const { error } = await supabase
-      .from('courses')
-      .update({ title: editTitle, description: editDescription, level: editLevel, thumbnail_url: thumbnailToPersist })
-      .eq('id', courseId);
-    if (error) {
-      toast({ title: 'Failed to save course', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      await callApi<{ course: Course }>('/api/course-update', {
+        courseId,
+        updates: {
+          title: editTitle,
+          description: editDescription,
+          level: editLevel,
+          thumbnailUrl: thumbnailToPersist,
+        },
+      });
       toast({ title: 'Course saved!' });
-      fetchCourse();
+      fetchStructure();
+    } catch (err) {
+      toast({ title: 'Failed to save course', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   // Module handlers
@@ -156,28 +150,42 @@ export default function CourseEditor() {
     if (!courseId || !moduleTitle.trim()) return;
     setSavingModule(true);
 
-    if (editingModule) {
-      const { error } = await supabase.from('course_modules').update({ title: moduleTitle }).eq('id', editingModule.id);
-      if (error) toast({ title: 'Failed to update module', description: error.message, variant: 'destructive' });
-      else toast({ title: 'Module updated!' });
-    } else {
-      const nextOrder = modules.length;
-      const { error } = await supabase.from('course_modules').insert({ course_id: courseId, title: moduleTitle, sort_order: nextOrder });
-      if (error) toast({ title: 'Failed to create module', description: error.message, variant: 'destructive' });
-      else toast({ title: 'Module created!' });
+    try {
+      if (editingModule) {
+        await callApi<{ module: CourseModule }>('/api/module-update', {
+          moduleId: editingModule.id,
+          title: moduleTitle,
+        });
+        toast({ title: 'Module updated!' });
+      } else {
+        const nextOrder = modules.length;
+        await callApi<{ module: CourseModule }>('/api/module-create', {
+          courseId,
+          title: moduleTitle,
+          sortOrder: nextOrder,
+        });
+        toast({ title: 'Module created!' });
+      }
+      setModuleDialogOpen(false);
+      fetchStructure();
+    } catch (err) {
+      toast({ title: editingModule ? 'Failed to update module' : 'Failed to create module', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setSavingModule(false);
     }
-
-    setModuleDialogOpen(false);
-    fetchModules();
-    setSavingModule(false);
   };
 
   const handleDeleteModule = async (modId: string) => {
-    const { error } = await supabase.from('course_modules').delete().eq('id', modId);
-    if (error) toast({ title: 'Failed to delete module', description: error.message, variant: 'destructive' });
-    else {
-      toast({ title: 'Module deleted' });
-      fetchModules();
+    try {
+      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/module-delete', { moduleId: modId });
+      if (result.blobsFailed > 0) {
+        toast({ title: 'Module deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
+      } else {
+        toast({ title: 'Module deleted' });
+      }
+      fetchStructure();
+    } catch (err) {
+      toast({ title: 'Failed to delete module', description: (err as Error).message, variant: 'destructive' });
     }
   };
 
@@ -210,97 +218,78 @@ export default function CourseEditor() {
 
   const handleSaveLesson = async () => {
     if (!lessonModuleId || !lessonTitle.trim()) return;
-    
+
     setSavingLesson(true);
 
-    const lessonData = {
-      module_id: lessonModuleId,
-      title: lessonTitle,
-      lesson_type: lessonType,
-      content_text: lessonContent || null,
-      duration_minutes: lessonDuration,
-      video_storage_path: lessonType === 'video' ? lessonVideoPath : null,
-      video_url: null,
-      azure_blob_path: lessonType === 'video' ? lessonAzureBlobPath : null,
-      document_storage_path: lessonType === 'document' ? lessonDocPath : null,
-    };
-
-    if (editingLesson) {
-      const { error } = await supabase.from('lessons').update(lessonData).eq('id', editingLesson.id);
-      if (error) toast({ title: 'Failed to update lesson', description: error.message, variant: 'destructive' });
-      else toast({ title: 'Lesson updated!' });
-    } else {
-      const mod = modules.find((m) => m.id === lessonModuleId);
-      const nextOrder = mod?.lessons?.length || 0;
-      const { error } = await supabase.from('lessons').insert({ ...lessonData, sort_order: nextOrder });
-      if (error) toast({ title: 'Failed to create lesson', description: error.message, variant: 'destructive' });
-      else toast({ title: 'Lesson created!' });
+    try {
+      if (editingLesson) {
+        await callApi<{ lesson: Lesson }>('/api/lesson-update', {
+          lessonId: editingLesson.id,
+          moduleId: lessonModuleId,
+          title: lessonTitle,
+          lessonType,
+          contentText: lessonContent || null,
+          durationMinutes: lessonDuration,
+          videoStoragePath: lessonType === 'video' ? lessonVideoPath : null,
+          azureBlobPath: lessonType === 'video' ? lessonAzureBlobPath : null,
+          documentStoragePath: lessonType === 'document' ? lessonDocPath : null,
+        });
+        toast({ title: 'Lesson updated!' });
+      } else {
+        const mod = modules.find((m) => m.id === lessonModuleId);
+        const nextOrder = mod?.lessons?.length || 0;
+        await callApi<{ lesson: Lesson }>('/api/lesson-create', {
+          moduleId: lessonModuleId,
+          title: lessonTitle,
+          lessonType,
+          contentText: lessonContent || null,
+          durationMinutes: lessonDuration,
+          videoStoragePath: lessonType === 'video' ? lessonVideoPath : null,
+          azureBlobPath: lessonType === 'video' ? lessonAzureBlobPath : null,
+          documentStoragePath: lessonType === 'document' ? lessonDocPath : null,
+          sortOrder: nextOrder,
+        });
+        toast({ title: 'Lesson created!' });
+      }
+      setLessonDialogOpen(false);
+      fetchStructure();
+    } catch (err) {
+      toast({ title: editingLesson ? 'Failed to update lesson' : 'Failed to create lesson', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setSavingLesson(false);
     }
-
-    setLessonDialogOpen(false);
-    fetchModules();
-    setSavingLesson(false);
   };
 
   const handleDeleteLesson = async (lessonId: string) => {
-    // First, get the lesson to check if it has an Azure blob
-    const { data: lesson, error: fetchError } = await supabase
-      .from('lessons')
-      .select('azure_blob_path')
-      .eq('id', lessonId)
-      .maybeSingle();
-
-    if (fetchError) {
-      toast({ title: 'Failed to fetch lesson', description: fetchError.message, variant: 'destructive' });
-      return;
-    }
-
-    // If lesson has an Azure blob, delete it first
-    if (lesson?.azure_blob_path) {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const response = await supabase.functions.invoke('azure-delete-blob', {
-          body: { blobPath: lesson.azure_blob_path },
-        });
-
-        if (response.error) {
-          console.error('Failed to delete Azure blob:', response.error);
-          // Continue with lesson deletion even if blob deletion fails
-          toast({ 
-            title: 'Warning', 
-            description: 'Could not delete video file from storage, but lesson will be removed.',
-            variant: 'destructive' 
-          });
-        } else {
-          console.log('Azure blob deleted successfully:', lesson.azure_blob_path);
-        }
-      } catch (err) {
-        console.error('Error calling azure-delete-blob:', err);
-        // Continue with lesson deletion
+    try {
+      const result = await callApi<{ success: boolean; blobDeleted: boolean | null }>('/api/lesson-delete', { lessonId });
+      if (result.blobDeleted === false) {
+        toast({ title: 'Lesson deleted', description: 'Could not delete the video file from storage.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Lesson deleted' });
       }
-    }
-
-    // Delete the lesson from the database
-    const { error } = await supabase.from('lessons').delete().eq('id', lessonId);
-    if (error) {
-      toast({ title: 'Failed to delete lesson', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Lesson deleted' });
-      fetchModules();
+      fetchStructure();
+    } catch (err) {
+      toast({ title: 'Failed to delete lesson', description: (err as Error).message, variant: 'destructive' });
     }
   };
 
   const handleDeleteCourse = async () => {
     if (!courseId) return;
     setDeleting(true);
-    const { error } = await supabase.from('courses').delete().eq('id', courseId);
-    if (error) {
-      toast({ title: 'Failed to delete course', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Course deleted' });
+    try {
+      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId });
+      if (result.blobsFailed > 0) {
+        toast({ title: 'Course deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
+      } else {
+        toast({ title: 'Course deleted' });
+      }
       navigate('/app/admin/courses');
+    } catch (err) {
+      toast({ title: 'Failed to delete course', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setDeleting(false);
     }
-    setDeleting(false);
   };
 
   const lessonTypeIcon = (type: LessonType) => {
@@ -319,6 +308,28 @@ export default function CourseEditor() {
       <AppLayout title="Course Editor">
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!loading && loadError) {
+    return (
+      <AppLayout title="Course Editor">
+        <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
+          <p className="text-destructive font-medium">Failed to load course</p>
+          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              // Deliberately no setLoading(true): fetchStructure is also the post-mutation
+              // refetch, so retry-in-place keeps the two paths consistent (cf. CoursesManager).
+              setLoadError(null);
+              fetchStructure();
+            }}
+          >
+            Retry
+          </Button>
         </div>
       </AppLayout>
     );
@@ -482,9 +493,9 @@ export default function CourseEditor() {
                               )}
                             </div>
                             {lesson.lesson_type === 'quiz' && features.quizzes_enabled && (
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 onClick={() => {
                                   setQuizLessonId(lesson.id);
                                   setQuizLessonTitle(lesson.title);
@@ -625,7 +636,7 @@ export default function CourseEditor() {
                 <div className="rounded-lg border border-dashed p-4 text-center">
                   <HelpCircle className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground mb-2">
-                    {editingLesson 
+                    {editingLesson
                       ? 'Save the lesson first, then use "Edit Quiz" to configure questions.'
                       : 'Create the lesson first, then configure the quiz questions.'}
                   </p>
@@ -658,11 +669,12 @@ export default function CourseEditor() {
       {/* Quiz Editor Dialog */}
       {quizLessonId && (
         <QuizEditorDialog
+          key={quizLessonId}
           lessonId={quizLessonId}
           lessonTitle={quizLessonTitle}
           open={quizEditorOpen}
           onOpenChange={setQuizEditorOpen}
-          onQuizSaved={fetchModules}
+          onQuizSaved={fetchStructure}
         />
       )}
 

@@ -12,26 +12,18 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
-import { Loader2, User, Lock, Mail, Calendar, Shield, Building2, Globe } from 'lucide-react';
+import { Loader2, User, Mail, Calendar, Shield, Building2, Globe } from 'lucide-react';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from 'react-i18next';
+import { callApi } from '@/lib/api-client';
 
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required').max(50, 'First name is too long'),
   lastName: z.string().trim().max(50, 'Last name is too long').optional(),
   department: z.string().trim().max(100, 'Department is too long').optional(),
-});
-
-const passwordSchema = z.object({
-  newPassword: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string(),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
 });
 
 export default function Settings() {
@@ -44,15 +36,6 @@ export default function Settings() {
   const [department, setDepartment] = useState('');
   const [saving, setSaving] = useState(false);
   const [profileErrors, setProfileErrors] = useState<{ firstName?: string; lastName?: string; department?: string }>({});
-
-  // Password state
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordSaving, setPasswordSaving] = useState(false);
-  const [passwordErrors, setPasswordErrors] = useState<{ 
-    newPassword?: string; 
-    confirmPassword?: string 
-  }>({});
 
   // Language state
   const [languageSaving, setLanguageSaving] = useState(false);
@@ -80,24 +63,21 @@ export default function Settings() {
     localStorage.setItem('preferred_language', newLanguage);
     
     // Persist to database
-    const { error } = await supabase
-      .from('profiles')
-      .update({ preferred_language: newLanguage })
-      .eq('id', profile.id);
-
-    if (error) {
-      toast({
-        title: t('settings.languageUpdateFailed'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/profile-update', { preferred_language: newLanguage });
       toast({
         title: t('settings.languageUpdated'),
       });
       await refreshUserContext();
+    } catch (error) {
+      toast({
+        title: t('settings.languageUpdateFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setLanguageSaving(false);
     }
-    setLanguageSaving(false);
   };
 
   const handleProfileSave = async () => {
@@ -115,73 +95,25 @@ export default function Settings() {
     }
 
     if (!profile) return;
-    
-    setSaving(true);
-    
-    // Build full_name from first and last name
-    const fullName = lastName ? `${firstName.trim()} ${lastName.trim()}` : firstName.trim();
-    
-    const { error } = await supabase
-      .from('profiles')
-      .update({ 
-        full_name: fullName,
-        first_name: firstName.trim() || null,
-        last_name: lastName.trim() || null,
-        department: department.trim() || null,
-      })
-      .eq('id', profile.id);
 
-    if (error) {
-      toast({
-        title: t('settings.profileUpdateFailed'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    setSaving(true);
+
+    try {
+      await callApi('/api/profile-update', { first_name: firstName.trim(), last_name: lastName.trim(), department: department.trim() });
       toast({
         title: t('settings.profileUpdated'),
         description: t('settings.profileUpdatedDescription'),
       });
       await refreshUserContext();
-    }
-    setSaving(false);
-  };
-
-  const handlePasswordChange = async () => {
-    setPasswordErrors({});
-    
-    const result = passwordSchema.safeParse({ newPassword, confirmPassword });
-    if (!result.success) {
-      const errors: { newPassword?: string; confirmPassword?: string } = {};
-      result.error.errors.forEach((err) => {
-        const field = err.path[0] as 'newPassword' | 'confirmPassword';
-        errors[field] = err.message;
-      });
-      setPasswordErrors(errors);
-      return;
-    }
-
-    setPasswordSaving(true);
-    
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    });
-
-    if (error) {
+    } catch (error) {
       toast({
-        title: t('settings.passwordUpdateFailed'),
-        description: error.message,
+        title: t('settings.profileUpdateFailed'),
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
-    } else {
-      toast({
-        title: t('settings.passwordUpdated'),
-        description: t('settings.passwordUpdatedDescription'),
-      });
-      setNewPassword('');
-      setConfirmPassword('');
+    } finally {
+      setSaving(false);
     }
-    setPasswordSaving(false);
   };
 
   // Determine role display
@@ -295,65 +227,6 @@ export default function Settings() {
             <Button onClick={handleProfileSave} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t('settings.saveChanges')}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Security Section */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-muted-foreground" />
-              <CardTitle>{t('settings.security')}</CardTitle>
-            </div>
-            <CardDescription>{t('settings.changePassword')}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">{t('settings.newPassword')}</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => {
-                  setNewPassword(e.target.value);
-                  if (passwordErrors.newPassword) {
-                    setPasswordErrors((prev) => ({ ...prev, newPassword: undefined }));
-                  }
-                }}
-                placeholder={t('settings.enterNewPassword')}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t('settings.passwordMinLength')}
-              </p>
-              {passwordErrors.newPassword && (
-                <p className="text-sm text-destructive">{passwordErrors.newPassword}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">{t('auth.confirmPassword')}</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => {
-                  setConfirmPassword(e.target.value);
-                  if (passwordErrors.confirmPassword) {
-                    setPasswordErrors((prev) => ({ ...prev, confirmPassword: undefined }));
-                  }
-                }}
-                placeholder={t('settings.confirmNewPassword')}
-              />
-              {passwordErrors.confirmPassword && (
-                <p className="text-sm text-destructive">{passwordErrors.confirmPassword}</p>
-              )}
-            </div>
-            <Button 
-              onClick={handlePasswordChange} 
-              disabled={passwordSaving || !newPassword || !confirmPassword}
-            >
-              {passwordSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {t('settings.updatePassword')}
             </Button>
           </CardContent>
         </Card>

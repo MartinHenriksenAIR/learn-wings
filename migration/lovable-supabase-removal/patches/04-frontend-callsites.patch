@@ -1,0 +1,62 @@
+# PATCH 04 — Frontend call site updates (12 call sites across 7 files)
+# DRAFT ONLY — DO NOT APPLY without implementing Azure Functions and new auth client
+
+# Summary of changes:
+# - Replace all supabase.functions.invoke() calls with callApi() / callApiRaw()
+# - Replace raw fetch(VITE_SUPABASE_URL/functions/v1/...) with callApi() / callApiRaw()
+# - Add VITE_API_BASE_URL env var usage
+# - Remove VITE_SUPABASE_URL usage from component files
+
+# Files affected:
+# 1. src/lib/api-client.ts (NEW FILE)
+# 2. src/lib/sendInvitationEmail.ts (line 24)
+# 3. src/pages/learner/CoursePlayer.tsx (lines 208, 233, 335)
+# 4. src/pages/learner/Dashboard.tsx (line 147)
+# 5. src/components/platform-admin/UserDetailDialog.tsx (line 186)
+# 6. src/pages/org-admin/OrgAnalytics.tsx (line 275)
+# 7. src/components/ui/azure-video-upload.tsx (lines 38, 75)
+# 8. src/pages/platform-admin/CourseEditor.tsx (line 262)
+# 9. src/components/ui/azure-document-upload.tsx (line 65)
+# 10. src/pages/platform-admin/PlatformSettings.tsx (line 151)
+
+# Full diff for each file is in 06-proposed-code-changes.md
+# This patch file is a placeholder — generate actual diffs after implementing Azure Functions
+
+--- NEW: src/lib/api-client.ts ---
+const API_BASE = import.meta.env.VITE_API_BASE_URL as string;
+
+function getAuthToken(): string | null {
+  // Replace with actual token retrieval from new auth provider
+  // e.g., return authStore.getToken();
+  return localStorage.getItem('auth_token');
+}
+
+function getAuthHeader(): Record<string, string> {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export async function callApi<T = unknown>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `API error ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function callApiRaw(path: string, body: unknown): Promise<Response> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}`);
+  }
+  return res;
+}

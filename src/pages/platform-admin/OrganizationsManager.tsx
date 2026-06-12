@@ -33,13 +33,13 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Organization, Profile, OrgRole } from '@/lib/types';
 import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail, UsersRound } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
-import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
+import { buildPublicUrl } from '@/lib/storage-url';
 
 const orgSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -49,7 +49,6 @@ const orgSchema = z.object({
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [orgs, setOrgs] = useState<(Organization & { memberCount: number })[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,33 +67,33 @@ export default function OrganizationsManager() {
   const [inviteEmail, setInviteEmail] = useState('');
 
   const fetchOrgs = async () => {
-    const { data } = await supabase
-      .from('organizations')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (data) {
-      const orgsWithCounts = await Promise.all(
-        data.map(async (org) => {
-          const { count } = await supabase
-            .from('org_memberships')
-            .select('*', { count: 'exact', head: true })
-            .eq('org_id', org.id)
-            .eq('status', 'active');
-          return { ...org, memberCount: count || 0 };
-        })
-      );
-      setOrgs(orgsWithCounts as any);
+    try {
+      const { organizations } = await callApi<{ organizations: Organization[] }>('/api/organizations', {});
+      setOrgs((organizations ?? []).map((o) => ({ ...o, memberCount: o.member_count })));
+    } catch (err) {
+      toast({
+        title: 'Failed to load organizations',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+      console.error('OrganizationsManager: failed to load organizations', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchProfiles = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('full_name');
-    if (data) setProfiles(data as Profile[]);
+    try {
+      const { profiles } = await callApi<{ profiles: Profile[] }>('/api/profiles', {});
+      if (profiles) setProfiles(profiles);
+    } catch (err) {
+      toast({
+        title: 'Failed to load users',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+      console.error('OrganizationsManager: failed to load profiles', err);
+    }
   };
 
   useEffect(() => {
@@ -116,73 +115,90 @@ export default function OrganizationsManager() {
     }
 
     setCreating(true);
-
-    // Create organization
-    const { data: newOrg, error } = await supabase.from('organizations').insert({
-      name,
-      slug,
-      logo_url: logoUrl,
-      seat_limit: seatLimit ? parseInt(seatLimit, 10) : null,
-    }).select().single();
-
-    if (error) {
-      if (error.message.includes('duplicate')) {
-        setErrors({ slug: 'This slug is already taken' });
-      } else {
-        toast({
-          title: 'Failed to create organization',
-          description: error.message,
-          variant: 'destructive',
+    try {
+      let newOrg: Organization;
+      try {
+        const result = await callApi<{ organization: Organization }>('/api/organization-create', {
+          name,
+          slug,
+          logo_url: logoUrl,
+          seat_limit: seatLimit ? parseInt(seatLimit, 10) : null,
         });
-      }
-      setCreating(false);
-      return;
-    }
-
-    // Assign initial admin if selected
-    if (adminTab === 'existing' && selectedUserId) {
-      await supabase.from('org_memberships').insert({
-        org_id: newOrg.id,
-        user_id: selectedUserId,
-        role: 'org_admin' as OrgRole,
-        status: 'active',
-      });
-    } else if (adminTab === 'invite' && inviteEmail.trim()) {
-      const { data: insertedInvitation } = await supabase
-        .from('invitations')
-        .insert({
-          org_id: newOrg.id,
-          email: inviteEmail.trim(),
-          role: 'org_admin' as OrgRole,
-          invited_by_user_id: user?.id,
-        })
-        .select('id')
-        .single();
-
-      // Send invitation email
-      if (insertedInvitation?.id) {
-        const { data: linkId } = await supabase
-          .rpc('get_invitation_link_id', { invitation_id: insertedInvitation.id });
-        
-        if (linkId) {
-          await sendInvitationEmail({
-            email: inviteEmail.trim(),
-            orgName: name,
-            role: 'org_admin',
-            linkId,
+        newOrg = result.organization;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to create organization';
+        if (message === 'Slug already in use') {
+          setErrors({ slug: 'This slug is already taken' });
+        } else {
+          toast({
+            title: 'Failed to create organization',
+            description: message,
+            variant: 'destructive',
           });
         }
+        return;
       }
-    }
 
-    toast({
-      title: 'Organization created!',
-      description: `${name} is now ready.`,
-    });
-    setCreateOpen(false);
-    resetForm();
-    fetchOrgs();
-    setCreating(false);
+      // Post-create steps capture each step's error so a follow-up failure no
+      // longer hides behind a green success toast.
+      let postCreateError: string | null = null;
+
+      if (adminTab === 'existing' && selectedUserId) {
+        try {
+          await callApi('/api/org-membership-create', {
+            orgId: newOrg.id,
+            userId: selectedUserId,
+            role: 'org_admin' as OrgRole,
+            status: 'active',
+          });
+        } catch (err) {
+          postCreateError = `admin assignment failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        }
+      } else if (adminTab === 'invite' && inviteEmail.trim()) {
+        try {
+          const { invitation } = await callApi<{ invitation: { id: string; link_id: string } }>(
+            '/api/invitation-create',
+            {
+              orgId: newOrg.id,
+              email: inviteEmail.trim(),
+              role: 'org_admin' as OrgRole,
+            },
+          );
+
+          if (invitation?.link_id) {
+            const emailResult = await sendInvitationEmail({
+              email: inviteEmail.trim(),
+              orgName: name,
+              role: 'org_admin',
+              linkId: invitation.link_id,
+            });
+            if (!emailResult.success) {
+              postCreateError = `invitation email failed: ${emailResult.error ?? 'unknown'}`;
+            }
+          }
+        } catch (err) {
+          postCreateError = `invitation creation failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        }
+      }
+
+      if (postCreateError) {
+        toast({
+          title: 'Organization created, but follow-up step failed',
+          description: postCreateError,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Organization created!',
+          description: `${name} is now ready.`,
+        });
+      }
+      setCreateOpen(false);
+      resetForm();
+      fetchOrgs();
+    } finally {
+      setCreating(false);
+    }
   };
 
   const resetForm = () => {
@@ -238,7 +254,7 @@ export default function OrganizationsManager() {
               Create Organization
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create Organization</DialogTitle>
               <DialogDescription>
@@ -255,10 +271,7 @@ export default function OrganizationsManager() {
                   value={logoUrl}
                   onChange={(url, storagePath) => {
                     if (url && storagePath) {
-                      const { data: { publicUrl } } = supabase.storage
-                        .from('org-logos')
-                        .getPublicUrl(storagePath);
-                      setLogoUrl(publicUrl);
+                      setLogoUrl(buildPublicUrl(storagePath));
                     } else {
                       setLogoUrl(null);
                     }

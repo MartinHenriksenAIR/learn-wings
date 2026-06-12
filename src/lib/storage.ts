@@ -1,28 +1,27 @@
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 
 const LMS_ASSETS_SIGN_PREFIX = '/storage/v1/object/sign/lms-assets/';
 const LMS_ASSETS_PUBLIC_PREFIX = '/storage/v1/object/public/lms-assets/';
 
 /**
- * Get a signed URL for a storage file that expires after 1 hour.
+ * Get a signed URL for a storage file via the /api/asset-signed-url endpoint.
+ * Expiry is fixed at 120 minutes server-side; the `_bucket` parameter is
+ * retained for call-site source compatibility but is unused server-side
+ * (the server resolves paths against the single Azure container).
  */
 export async function getSignedUrl(
-  bucket: string,
+  _bucket: string,
   path: string,
-  expiresIn: number = 3600,
 ): Promise<string | null> {
   if (!path) return null;
 
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(path, expiresIn);
-
-  if (error) {
-    console.error('Error creating signed URL:', error);
+  try {
+    const { url } = await callApi<{ url: string }>('/api/asset-signed-url', { blobPath: path });
+    return url ?? null;
+  } catch (e) {
+    console.error('Error creating signed URL:', e);
     return null;
   }
-
-  return data?.signedUrl || null;
 }
 
 /**
@@ -37,6 +36,28 @@ export function extractLmsAssetPath(value: string | null): string | null {
   const isHttpUrl = /^https?:\/\//i.test(trimmedValue);
   if (!isHttpUrl) {
     return trimmedValue.replace(/^\/+/, '');
+  }
+
+  // Azure Blob Storage URL — host must end with exactly .blob.core.windows.net
+  // Format: https://<account>.blob.core.windows.net/<container>/<blobPath>[?<sas>]
+  // We parse with new URL() inside a try/catch so a malformed input can never throw.
+  try {
+    const parsed = new URL(trimmedValue);
+    if (/\.blob\.core\.windows\.net$/i.test(parsed.hostname)) {
+      // pathname is "/<container>/<blobPath>" — drop empty segments, then the container,
+      // and keep the rest. filter(Boolean) makes the >= 2 check self-evident
+      // (container + at least one blob segment) and normalizes stray double slashes.
+      const pathSegments = parsed.pathname.split('/').filter(Boolean);
+      if (pathSegments.length >= 2) {
+        const blobPath = pathSegments.slice(1).map(decodeURIComponent).join('/');
+        return blobPath || null;
+      }
+      return null;
+    }
+  } catch {
+    // Malformed URL, or an undecodable percent-encoded blob segment (decodeURIComponent
+    // throws on bad encoding) — fall through to the legacy storage-prefix / null branches below.
+    // Such a stored value won't self-heal, but callers never see a throw.
   }
 
   if (trimmedValue.includes(LMS_ASSETS_SIGN_PREFIX)) {
@@ -59,23 +80,23 @@ export function extractLmsAssetPath(value: string | null): string | null {
  */
 export async function getSignedAssetUrl(storagePath: string | null): Promise<string | null> {
   if (!storagePath) return null;
-  return getSignedUrl('lms-assets', storagePath, 3600);
+  return getSignedUrl('lms-assets', storagePath);
 }
 
 /**
  * Resolve a stable thumbnail value to a fresh signed URL.
  * Handles raw storage paths and expired signed/public URLs.
+ * Expiry is fixed at 120 minutes server-side.
  */
 export async function getSignedLmsAssetUrl(
   storedValue: string | null,
-  expiresIn: number = 60 * 60 * 24 * 7,
 ): Promise<string | null> {
   if (!storedValue) return null;
 
   const storagePath = extractLmsAssetPath(storedValue);
   if (!storagePath) return storedValue;
 
-  const signedUrl = await getSignedUrl('lms-assets', storagePath, expiresIn);
+  const signedUrl = await getSignedUrl('lms-assets', storagePath);
   if (signedUrl) return signedUrl;
 
   return /^https?:\/\//i.test(storedValue) ? storedValue : null;

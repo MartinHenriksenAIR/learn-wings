@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Loader2, Plus, Trash2, GripVertical, CheckCircle2, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -48,6 +48,7 @@ export function QuizEditorDialog({
 }: QuizEditorDialogProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [quizId, setQuizId] = useState<string | null>(null);
   const [passingScore, setPassingScore] = useState(70);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -61,60 +62,48 @@ export function QuizEditorDialog({
 
   const fetchQuiz = async () => {
     setLoading(true);
-    
-    // Check if quiz exists for this lesson
-    const { data: quiz, error: quizError } = await supabase
-      .from('quizzes')
-      .select('id, passing_score')
-      .eq('lesson_id', lessonId)
-      .maybeSingle();
+    setLoadError(null);
 
-    if (quizError) {
-      console.error('Error fetching quiz:', quizError);
+    try {
+      const res = await callApi<{
+        quiz: { id: string; lesson_id: string; passing_score: number } | null;
+        questions: Array<{
+          id: string;
+          quiz_id: string;
+          question_text: string;
+          sort_order: number;
+          options: Array<{ id: string; question_id: string; option_text: string; is_correct: boolean; sort_order: number }>;
+        }>;
+      }>('/api/quiz-admin', { lessonId });
+
+      if (res.quiz) {
+        setQuizId(res.quiz.id);
+        setPassingScore(res.quiz.passing_score);
+        setQuestions(
+          res.questions.map((q) => ({
+            id: q.id,
+            question_text: q.question_text,
+            sort_order: q.sort_order,
+            options: q.options.map((o) => ({
+              id: o.id,
+              option_text: o.option_text,
+              is_correct: o.is_correct,
+            })),
+          }))
+        );
+      } else {
+        // No quiz exists yet — reset all fields to defaults
+        setQuizId(null);
+        setPassingScore(70);
+        setQuestions([]);
+      }
+    } catch (error) {
+      console.error('Error fetching quiz:', error);
       toast.error('Failed to load quiz');
+      setLoadError('Failed to load quiz data. Please retry.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    if (quiz) {
-      setQuizId(quiz.id);
-      setPassingScore(quiz.passing_score);
-      
-      // Fetch questions
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('quiz_questions')
-        .select('id, question_text, sort_order')
-        .eq('quiz_id', quiz.id)
-        .order('sort_order');
-
-      if (questionsError) {
-        console.error('Error fetching questions:', questionsError);
-        toast.error('Failed to load questions');
-        setLoading(false);
-        return;
-      }
-
-      // Fetch options for each question using the RPC that includes is_correct
-      const questionsWithOptions: QuizQuestion[] = [];
-      for (const q of questionsData || []) {
-        const { data: optionsData } = await supabase.rpc('get_quiz_options_with_answers', {
-          p_question_id: q.id,
-        });
-        
-        questionsWithOptions.push({
-          ...q,
-          options: optionsData || [],
-        });
-      }
-
-      setQuestions(questionsWithOptions);
-    } else {
-      // No quiz exists yet
-      setQuizId(null);
-      setQuestions([]);
-    }
-
-    setLoading(false);
   };
 
   const addQuestion = () => {
@@ -218,78 +207,23 @@ export function QuizEditorDialog({
     setSaving(true);
 
     try {
-      let currentQuizId = quizId;
+      const res = await callApi<{ quiz: { id: string; lesson_id: string; passing_score: number } }>(
+        '/api/quiz-admin-save',
+        {
+          lessonId,
+          passingScore,
+          questions: questions.map((q) => ({
+            questionText: q.question_text,
+            sortOrder: q.sort_order,
+            options: q.options.map((o) => ({
+              optionText: o.option_text,
+              isCorrect: o.is_correct,
+            })),
+          })),
+        }
+      );
 
-      // Create or update quiz
-      if (!currentQuizId) {
-        const { data: newQuiz, error: createError } = await supabase
-          .from('quizzes')
-          .insert({ lesson_id: lessonId, passing_score: passingScore })
-          .select()
-          .single();
-
-        if (createError) throw createError;
-        currentQuizId = newQuiz.id;
-        setQuizId(currentQuizId);
-      } else {
-        const { error: updateError } = await supabase
-          .from('quizzes')
-          .update({ passing_score: passingScore })
-          .eq('id', currentQuizId);
-
-        if (updateError) throw updateError;
-      }
-
-      // Delete existing questions and options (cascade will handle options)
-      const { data: existingQuestions } = await supabase
-        .from('quiz_questions')
-        .select('id')
-        .eq('quiz_id', currentQuizId);
-
-      if (existingQuestions && existingQuestions.length > 0) {
-        const existingIds = existingQuestions.map((q) => q.id);
-        
-        // Delete options first
-        await supabase
-          .from('quiz_options')
-          .delete()
-          .in('question_id', existingIds);
-        
-        // Delete questions
-        await supabase
-          .from('quiz_questions')
-          .delete()
-          .eq('quiz_id', currentQuizId);
-      }
-
-      // Insert new questions and options
-      for (const question of questions) {
-        const { data: newQuestion, error: qError } = await supabase
-          .from('quiz_questions')
-          .insert({
-            quiz_id: currentQuizId,
-            question_text: question.question_text,
-            sort_order: question.sort_order,
-          })
-          .select()
-          .single();
-
-        if (qError) throw qError;
-
-        // Insert options
-        const optionsToInsert = question.options.map((opt) => ({
-          question_id: newQuestion.id,
-          option_text: opt.option_text,
-          is_correct: opt.is_correct,
-        }));
-
-        const { error: optError } = await supabase
-          .from('quiz_options')
-          .insert(optionsToInsert);
-
-        if (optError) throw optError;
-      }
-
+      setQuizId(res.quiz.id);
       toast.success('Quiz saved successfully');
       onQuizSaved?.();
       onOpenChange(false);
@@ -318,6 +252,13 @@ export function QuizEditorDialog({
           <div className="flex h-48 items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : loadError ? (
+          <div className="flex h-48 flex-col items-center justify-center gap-4">
+            <p className="text-sm text-destructive">{loadError}</p>
+            <Button variant="outline" onClick={fetchQuiz}>
+              Retry
+            </Button>
+          </div>
         ) : (
           <div className="space-y-6 py-4">
             {/* Passing Score */}
@@ -328,7 +269,7 @@ export function QuizEditorDialog({
                 min={0}
                 max={100}
                 value={passingScore}
-                onChange={(e) => setPassingScore(parseInt(e.target.value) || 0)}
+                onChange={(e) => { const v = parseInt(e.target.value); setPassingScore(Number.isNaN(v) ? 0 : Math.max(0, Math.min(100, v))); }}
                 className="w-24"
               />
               <span className="text-sm text-muted-foreground">
@@ -462,7 +403,7 @@ export function QuizEditorDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || loading}>
+          <Button onClick={handleSave} disabled={saving || loading || !!loadError}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Quiz
           </Button>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -24,14 +24,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { Course, Enrollment, CourseLevel } from '@/lib/types';
 import { getSignedLmsAssetUrl } from '@/lib/storage';
 import { BookOpen, Play, Clock, CheckCircle2, Loader2, MoreVertical, LogOut } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerCourses() {
-  const { user, currentOrg } = useAuth();
+  const { user, currentOrg, profile } = useAuth();
   const { t } = useTranslation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -49,80 +49,60 @@ export default function LearnerCourses() {
 
   const fetchData = async () => {
     if (!user || !currentOrg) {
-      setLoading(false);
+      if (!user) {
+        // No authenticated user — nothing to load
+        setLoading(false);
+      } else if (profile) {
+        // User context resolved (profile non-null) but no org available — done loading
+        setLoading(false);
+      }
+      // else: user exists but profile not yet fetched — keep spinner
       return;
     }
 
-    // Fetch accessible courses for this org
-    const { data: accessData } = await supabase
-      .from('org_course_access')
-      .select('course_id')
-      .eq('org_id', currentOrg.id)
-      .eq('access', 'enabled');
+    try {
+      const data = await callApi<{ courses: Course[]; enrollments: Enrollment[] }>(
+        '/api/learner-courses', { orgId: currentOrg.id }
+      );
 
-    if (accessData && accessData.length > 0) {
-      const courseIds = accessData.map(a => a.course_id);
-      
-      const { data: coursesData } = await supabase
-        .from('courses')
-        .select('*')
-        .in('id', courseIds)
-        .eq('is_published', true);
+      const coursesWithFreshThumbnails = await Promise.all(
+        data.courses.map(async (course) => ({
+          ...course,
+          thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
+        })),
+      );
 
-      if (coursesData) {
-        const coursesWithFreshThumbnails = await Promise.all(
-          (coursesData as Course[]).map(async (course) => ({
-            ...course,
-            thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
-          })),
-        );
-
-        setCourses(coursesWithFreshThumbnails);
-      }
+      setCourses(coursesWithFreshThumbnails);
+      setEnrollments(data.enrollments);
+    } catch (error) {
+      console.error('Error loading courses:', error);
+    } finally {
+      setLoading(false);
     }
-
-    // Fetch user's enrollments
-    const { data: enrollmentData } = await supabase
-      .from('enrollments')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('org_id', currentOrg.id);
-
-    if (enrollmentData) {
-      setEnrollments(enrollmentData as Enrollment[]);
-    }
-
-    setLoading(false);
   };
 
   useEffect(() => {
     fetchData();
-  }, [user, currentOrg]);
+  }, [user, currentOrg, profile]);
 
   const handleEnroll = async (courseId: string) => {
     if (!user || !currentOrg) return;
 
     setEnrolling(courseId);
 
-    const { error } = await supabase.from('enrollments').insert({
-      org_id: currentOrg.id,
-      user_id: user.id,
-      course_id: courseId,
-      status: 'enrolled',
-    });
-
-    if (error) {
-      toast({
-        title: t('courses.enrollmentFailed'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/enroll', { orgId: currentOrg.id, courseId });
       toast({
         title: t('courses.enrolledSuccessfully'),
         description: t('courses.startLearningNow'),
       });
       fetchData();
+    } catch (error) {
+      toast({
+        title: t('courses.enrollmentFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
     }
 
     setEnrolling(null);
@@ -133,23 +113,19 @@ export default function LearnerCourses() {
 
     setUnenrolling(true);
 
-    const { error } = await supabase
-      .from('enrollments')
-      .delete()
-      .eq('id', unenrollDialog.enrollment.id);
-
-    if (error) {
-      toast({
-        title: t('courses.unenrollFailed'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/unenroll', { enrollmentId: unenrollDialog.enrollment.id });
       toast({
         title: t('courses.unenrolledFromCourse'),
         description: t('courses.unenrolledDescription', { courseTitle: unenrollDialog.course?.title }),
       });
       fetchData();
+    } catch (error) {
+      toast({
+        title: t('courses.unenrollFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
     }
 
     setUnenrolling(false);
@@ -375,7 +351,7 @@ export default function LearnerCourses() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t('courses.unenrollConfirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('courses.unenrollConfirmDescription', { courseTitle: unenrollDialog.course?.title })}
+              <Trans i18nKey="courses.unenrollConfirmDescription" values={{ courseTitle: unenrollDialog.course?.title }} />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

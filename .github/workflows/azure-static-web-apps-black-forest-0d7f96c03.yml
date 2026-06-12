@@ -15,13 +15,23 @@ jobs:
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
         with:
           submodules: true
           lfs: false
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
+        env:
+          # Vite inlines VITE_* at build time. None of these are secrets:
+          # the Entra client id is a public client identifier.
+          VITE_ENTRA_CLIENT_ID: 2f2f3964-fa8b-4ecc-97fe-85b969c0855a
+          VITE_ENTRA_SCOPE: api://2f2f3964-fa8b-4ecc-97fe-85b969c0855a/access_as_user
+          # Direct function-app calls (CORS via ALLOWED_ORIGINS) — SWA linked backends don't
+          # support preview environments, so the backend is unlinked during the migration.
+          # At merge time: re-link the SWA backend and set this back to "" (same-origin /api).
+          VITE_API_BASE_URL: https://func-ai-education-migration-c0fgeqdnfvd6h0cf.swedencentral-01.azurewebsites.net
+          VITE_STORAGE_BASE_URL: https://staieducationmigration.blob.core.windows.net
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_BLACK_FOREST_0D7F96C03 }}
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments and preview environments)

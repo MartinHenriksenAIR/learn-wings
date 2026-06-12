@@ -1,0 +1,62 @@
+# PATCH 01 — package.json changes
+# DRAFT ONLY — DO NOT APPLY without completing auth/DB migration
+#
+# Auth decision: multi-tenant Microsoft Entra ID (MSAL.js v3 on frontend,
+# jwks-rsa + jsonwebtoken on backend). NOT custom JWT, NOT Azure AD B2C.
+#
+# Package placement rules:
+#   - @azure/msal-browser, @azure/msal-react → root package.json (browser bundles)
+#   - pg, jwks-rsa, jsonwebtoken → functions/package.json (Node.js only, never browser)
+
+# --- ROOT package.json ---
+# Remove: @supabase/supabase-js, lovable-tagger
+# Add: @azure/msal-browser, @azure/msal-react (SSO frontend)
+--- a/package.json
++++ b/package.json
+@@ -38,7 +38,8 @@
+     "@radix-ui/react-tooltip": "^1.2.7",
+-    "@supabase/supabase-js": "^2.93.1",
++    "@azure/msal-browser": "^3.28.0",
++    "@azure/msal-react": "^2.1.1",
+     "@tanstack/react-query": "^5.83.0",
+     "@types/papaparse": "^5.5.2",
+     "class-variance-authority": "^0.7.1",
+@@ -79,7 +79,6 @@
+     "jsdom": "^20.0.3",
+-    "lovable-tagger": "^1.1.13",
+     "postcss": "^8.5.6",
+     "tailwindcss": "^3.4.17",
+
+# --- NEW FILE: functions/package.json ---
+# Created as part of the functions/ directory (see patches/03-azure-functions-src.patch).
+# pg: Node.js PostgreSQL client
+# jwks-rsa: fetch and cache Microsoft's JWKS public keys for RS256 validation
+# jsonwebtoken: verify RS256 signed Entra ID access tokens
++++ b/functions/package.json
+@@ -0,0 +1,22 @@
++{
++  "name": "func-ai-education-migration",
++  "version": "1.0.0",
++  "description": "Azure Functions backend for learn-wings",
++  "main": "dist/{functionName}/index.js",
++  "scripts": {
++    "build": "tsc",
++    "build:watch": "tsc --watch",
++    "start": "npm run build && func start",
++    "test": "vitest run",
++    "test:watch": "vitest"
++  },
++  "dependencies": {
++    "@azure/functions": "^4.5.0",
++    "jwks-rsa": "^3.1.0",
++    "jsonwebtoken": "^9.0.2",
++    "pg": "^8.11.3"
++  },
++  "devDependencies": {
++    "@types/jsonwebtoken": "^9.0.6",
++    "@types/node": "^22.0.0",
++    "@types/pg": "^8.11.6",
++    "typescript": "^5.4.0",
++    "vitest": "^1.6.0"
++  }
++}

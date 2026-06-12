@@ -152,7 +152,9 @@
     "noCoursesInProgress": "Ingen kurser i gang",
     "startLearning": "Start din læring ved at tilmelde dig et kursus fra kataloget.",
     "browseCourses": "Gennemse kurser",
-    "completedCourses": "Afsluttede kurser"
+    "completedCourses": "Afsluttede kurser",
+    "noMembershipTitle": "Endnu intet organisationsmedlemskab",
+    "noMembershipDescription": "Du er endnu ikke medlem af nogen organisation. Bed din administrator om en invitation for at komme i gang."
   },
   "courses": {
     "title": "Kursuskatalog",
@@ -189,10 +191,10 @@
     "startLearningNow": "Du kan nu starte din læring.",
     "unenrollFromCourse": "Afmeld fra kursus",
     "unenrollConfirmTitle": "Afmeld fra kursus?",
-    "unenrollConfirmDescription": "Er du sikker på, at du vil afmelde fra <strong>\"{{courseTitle}}\"</strong>? Dette vil fjerne al din fremgang, og du skal tilmelde dig igen for at få adgang til kurset.",
+    "unenrollConfirmDescription": "Er du sikker på, at du vil afmelde fra <strong>\"{{courseTitle}}\"</strong>? Din fremgang bevares, og du kan tilmelde dig igen når som helst.",
     "unenrollFailed": "Kunne ikke afmelde",
     "unenrolledFromCourse": "Afmeldt fra kursus",
-    "unenrolledDescription": "Du er blevet afmeldt fra \"{{courseTitle}}\". Din fremgang er blevet fjernet.",
+    "unenrolledDescription": "Du er blevet afmeldt fra \"{{courseTitle}}\". Din fremgang er bevaret.",
     "joinOrgToAccessCourses": "Tilmeld dig en organisation for at få adgang til kurser."
   },
   "community": {
@@ -232,6 +234,20 @@
       "inProgress": "I gang",
       "done": "Færdig"
     }
+  },
+  "platformModeration": {
+    "title": "Fællesskabsmoderation",
+    "description": "Gennemse rapporteret indhold på tværs af platformen og alle organisationer",
+    "scopeGlobal": "Global",
+    "scopeOrganization": "Organisation"
+  },
+  "orgSettings": {
+    "noOrgDescription": "Vælg en organisation for at administrere dens indstillinger."
+  },
+  "platformSettings": {
+    "loadFailedTitle": "Kunne ikke indlæse platformsindstillingerne.",
+    "loadFailedDescription": "Indstillingerne blev ikke indlæst fra serveren, så redigering er deaktiveret for at undgå at overskrive gemte værdier. Prøv igen.",
+    "retry": "Prøv igen"
   },
   "certificates": {
     "title": "Certifikater",

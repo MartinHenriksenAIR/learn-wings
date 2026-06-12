@@ -48,7 +48,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { callApi } from '@/lib/api-client';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
 import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX, ShieldCheck, User, FileSpreadsheet, GraduationCap, Sparkles } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
@@ -64,7 +64,7 @@ const inviteSchema = z.object({
 });
 
 export function OrgMembersTab() {
-  const { user, currentOrg } = useAuth();
+  const { user, profile, currentOrg } = useAuth();
   const [members, setMembers] = useState<(OrgMembership & { profile: Profile })[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [aiChampions, setAiChampions] = useState<Set<string>>(new Set());
@@ -98,33 +98,85 @@ export function OrgMembersTab() {
       return;
     }
 
-    const { data: memberData } = await supabase
-      .from('org_memberships')
-      .select('*, profile:profiles(*)')
-      .eq('org_id', currentOrg.id)
-      .order('created_at', { ascending: false });
-
-    if (memberData) {
-      setMembers(memberData as any);
+    try {
+      // The three fetches are independent and each handles its own errors —
+      // run them concurrently (same pattern as CoursesManager's Promise.all).
+      await Promise.all([
+        (async () => {
+          try {
+            type MembershipRow = {
+              id: string;
+              org_id: string;
+              user_id: string;
+              role: OrgRole;
+              status: 'active' | 'invited' | 'disabled';
+              created_at: string;
+              full_name: string;
+              email: string;
+              avatar_url: string | null;
+              department: string | null;
+            };
+            const { memberships } = await callApi<{ memberships: MembershipRow[] }>(
+              '/api/org-memberships',
+              { orgId: currentOrg.id },
+            );
+            const reshaped: (OrgMembership & { profile: Profile })[] = memberships.map((row) => ({
+              id: row.id,
+              org_id: row.org_id,
+              user_id: row.user_id,
+              role: row.role,
+              status: row.status,
+              created_at: row.created_at,
+              profile: {
+                id: row.user_id,
+                full_name: row.full_name,
+                first_name: null,
+                last_name: null,
+                department: row.department,
+                is_platform_admin: false,
+                created_at: row.created_at,
+                preferred_language: null,
+              },
+            }));
+            setMembers(reshaped);
+          } catch (err) {
+            toast({
+              title: 'Failed to load members',
+              description: err instanceof Error ? err.message : 'Unexpected error',
+              variant: 'destructive',
+            });
+          }
+        })(),
+        (async () => {
+          try {
+            const { invitations: inviteData } = await callApi<{ invitations: Invitation[] }>(
+              '/api/invitations',
+              { scope: 'org', orgId: currentOrg.id },
+            );
+            setInvitations(inviteData);
+          } catch (err) {
+            toast({
+              title: 'Failed to load invitations',
+              description: err instanceof Error ? err.message : 'Unexpected error',
+              variant: 'destructive',
+            });
+          }
+        })(),
+        (async () => {
+          try {
+            const { champions } = await callApi<{ champions: { user_id: string }[] }>(
+              '/api/ai-champions',
+              { orgId: currentOrg.id },
+            );
+            setAiChampions(new Set(champions.map((c) => c.user_id)));
+          } catch {
+            // parity: the old client ignored champion-fetch errors (badges simply don't render)
+          }
+        })(),
+      ]);
+    } finally {
+      setLoading(false);
     }
-
-    const { data: inviteData } = await supabase
-      .rpc('get_org_invitations_safe', { p_org_id: currentOrg.id });
-
-    if (inviteData) {
-      setInvitations(inviteData as Invitation[]);
-    }
-
-    const { data: championsData } = await supabase
-      .from('ai_champions')
-      .select('user_id')
-      .eq('org_id', currentOrg.id);
-
-    if (championsData) {
-      setAiChampions(new Set(championsData.map((c) => c.user_id)));
-    }
-
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -146,64 +198,34 @@ export function OrgMembersTab() {
 
     setInviting(true);
 
-    const { data: existingMember } = await supabase
-      .from('org_memberships')
-      .select('id')
-      .eq('org_id', currentOrg.id)
-      .eq('user_id', (await supabase.from('profiles').select('id').eq('full_name', inviteEmail).maybeSingle()).data?.id || '')
-      .maybeSingle();
+    try {
+      const { invitation } = await callApi<{ invitation: { id: string; link_id: string } }>(
+        '/api/invitation-create',
+        {
+          orgId: currentOrg.id,
+          email: inviteEmail,
+          role: inviteRole,
+          firstName: inviteFirstName || undefined,
+          lastName: inviteLastName || undefined,
+          department: inviteDepartment || undefined,
+        },
+      );
 
-    if (existingMember) {
-      toast({
-        title: 'Already a member',
-        description: 'This user is already a member of your organization.',
-        variant: 'destructive',
-      });
-      setInviting(false);
-      return;
-    }
-
-    const { data: invitation, error } = await supabase
-      .from('invitations')
-      .insert({
-        org_id: currentOrg.id,
-        email: inviteEmail,
-        role: inviteRole,
-        invited_by_user_id: user.id,
-        first_name: inviteFirstName || null,
-        last_name: inviteLastName || null,
-        department: inviteDepartment || null,
-      })
-      .select('id')
-      .single();
-
-    if (error) {
-      toast({
-        title: 'Failed to create invitation',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
       let emailSent = false;
-      if (invitation?.id) {
-        const { data: linkId } = await supabase
-          .rpc('get_invitation_link_id', { invitation_id: invitation.id });
-        
-        if (linkId) {
-          const emailResult = await sendInvitationEmail({
-            email: inviteEmail,
-            orgName: currentOrg.name,
-            role: inviteRole,
-            linkId,
-          });
-          emailSent = emailResult.success;
-        }
+      if (invitation?.link_id) {
+        const emailResult = await sendInvitationEmail({
+          email: inviteEmail,
+          orgName: currentOrg.name,
+          role: inviteRole,
+          linkId: invitation.link_id,
+        });
+        emailSent = emailResult.success;
       }
-      
+
       toast({
         title: 'Invitation created!',
-        description: emailSent 
-          ? 'Invitation email sent successfully.' 
+        description: emailSent
+          ? 'Invitation email sent successfully.'
           : 'Copy the invite link to share with the user.',
       });
       setInviteOpen(false);
@@ -213,9 +235,15 @@ export function OrgMembersTab() {
       setInviteDepartment('');
       setInviteRole('learner');
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to create invitation',
+        description: err instanceof Error ? err.message : 'Unexpected error',
+        variant: 'destructive',
+      });
+    } finally {
+      setInviting(false);
     }
-
-    setInviting(false);
   };
 
   const handleCopyInviteLink = async (linkId: string) => {
@@ -231,103 +259,86 @@ export function OrgMembersTab() {
 
   const handleRemoveMember = async () => {
     if (!removeMemberDialog?.member) return;
-    
-    const { error } = await supabase
-      .from('org_memberships')
-      .delete()
-      .eq('id', removeMemberDialog.member.id);
 
-    if (error) {
-      toast({
-        title: 'Failed to remove member',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    const memberToRemove = removeMemberDialog.member;
+    try {
+      await callApi('/api/org-membership-delete', { id: memberToRemove.id });
       toast({
         title: 'Member removed',
-        description: `${removeMemberDialog.member.profile?.full_name} has been removed from the organization.`,
+        description: `${memberToRemove.profile?.full_name} has been removed from the organization.`,
       });
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to remove member',
+        description: err instanceof Error ? err.message : 'Unexpected error',
+        variant: 'destructive',
+      });
+    } finally {
+      setRemoveMemberDialog(null);
     }
-    setRemoveMemberDialog(null);
   };
 
   const handleCancelInvitation = async (invitationId: string) => {
-    const { error } = await supabase
-      .from('invitations')
-      .update({ status: 'expired' })
-      .eq('id', invitationId);
-
-    if (error) {
-      toast({
-        title: 'Failed to cancel invitation',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/invitation-update', { id: invitationId, status: 'expired' });
       toast({ title: 'Invitation cancelled' });
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to cancel invitation',
+        description: err instanceof Error ? err.message : 'Unexpected error',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleChangeRole = async () => {
     if (!roleChangeDialog?.member) return;
-    
+
     const { member, newRole } = roleChangeDialog;
     setUpdatingRole(member.id);
     setRoleChangeDialog(null);
 
-    const { error } = await supabase
-      .from('org_memberships')
-      .update({ role: newRole })
-      .eq('id', member.id);
-
-    if (error) {
-      toast({
-        title: 'Failed to change role',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
+    try {
+      await callApi('/api/org-membership-update', { id: member.id, role: newRole });
       toast({
         title: 'Role updated',
         description: `${member.profile?.full_name} is now ${newRole === 'org_admin' ? 'an Admin' : 'a Learner'}.`,
       });
       fetchData();
+    } catch (err) {
+      toast({
+        title: 'Failed to change role',
+        description: err instanceof Error ? err.message : 'Unexpected error',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingRole(null);
     }
-
-    setUpdatingRole(null);
   };
 
   const handleToggleAiChampion = async (member: OrgMembership & { profile: Profile }) => {
-    if (!currentOrg || !user) return;
-    
-    const isCurrentlyChampion = aiChampions.has(member.user_id);
-    
-    if (isCurrentlyChampion) {
-      const { error } = await supabase
-        .from('ai_champions')
-        .delete()
-        .eq('user_id', member.user_id)
-        .eq('org_id', currentOrg.id);
+    if (!currentOrg) return;
 
-      if (error) {
-        toast({ title: 'Failed to remove AI Champion status', description: error.message, variant: 'destructive' });
-      } else {
+    const isCurrentlyChampion = aiChampions.has(member.user_id);
+
+    if (isCurrentlyChampion) {
+      try {
+        await callApi('/api/ai-champion-delete', { orgId: currentOrg.id, userId: member.user_id });
         toast({ title: 'AI Champion status removed', description: `${member.profile?.full_name} is no longer an AI Champion.` });
         setAiChampions((prev) => { const next = new Set(prev); next.delete(member.user_id); return next; });
+      } catch (err) {
+        toast({ title: 'Failed to remove AI Champion status', description: err instanceof Error ? err.message : 'Unexpected error', variant: 'destructive' });
       }
     } else {
-      const { error } = await supabase
-        .from('ai_champions')
-        .insert({ user_id: member.user_id, org_id: currentOrg.id, assigned_by: user.id });
-
-      if (error) {
-        toast({ title: 'Failed to assign AI Champion status', description: error.message, variant: 'destructive' });
-      } else {
+      try {
+        // assigned_by is derived server-side from the caller's profile (issue #11 audit item)
+        await callApi('/api/ai-champion-create', { orgId: currentOrg.id, userId: member.user_id });
         toast({ title: 'AI Champion assigned!', description: `${member.profile?.full_name} is now an AI Champion.` });
         setAiChampions((prev) => new Set([...prev, member.user_id]));
+      } catch (err) {
+        toast({ title: 'Failed to assign AI Champion status', description: err instanceof Error ? err.message : 'Unexpected error', variant: 'destructive' });
       }
     }
   };
@@ -628,7 +639,7 @@ export function OrgMembersTab() {
                     {new Date(member.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    {member.user_id !== user?.id && member.status === 'active' && (
+                    {member.user_id !== profile?.id && member.status === 'active' && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" disabled={updatingRole === member.id}>
