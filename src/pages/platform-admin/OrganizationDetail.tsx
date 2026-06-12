@@ -49,7 +49,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { FileUpload } from '@/components/ui/file-upload';
-import { callApi } from '@/lib/api-client';
+import { callApi, ApiError } from '@/lib/api-client';
 import { Organization, OrgMembership, Profile, OrgRole, Invitation } from '@/lib/types';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { buildPublicUrl } from '@/lib/storage-url';
@@ -70,7 +70,9 @@ import {
   Pencil,
   Trash2,
   UsersRound,
+  RefreshCw,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/sonner';
 import { z } from 'zod';
 import { orgSchema } from '@/lib/org-validation';
@@ -88,8 +90,10 @@ const inviteSchema = z.object({
 export default function OrganizationDetail() {
   const { orgId } = useParams<{ orgId: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [org, setOrg] = useState<Organization | null>(null);
+  const [orgError, setOrgError] = useState<'not_found' | 'load_failed' | null>(null);
   const [members, setMembers] = useState<(OrgMembership & { profile: Profile })[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [availableUsers, setAvailableUsers] = useState<Profile[]>([]);
@@ -135,12 +139,18 @@ export default function OrganizationDetail() {
     try {
       const { organization } = await callApi<{ organization: Organization }>('/api/organizations', { orgId });
       if (organization) setOrg(organization);
+      setOrgError(null);
     } catch (err) {
-      toast({
-        title: 'Failed to load organization',
-        description: err instanceof Error ? err.message : 'Unknown error',
-        variant: 'destructive',
-      });
+      if (err instanceof ApiError && err.status === 404) {
+        setOrgError('not_found');
+      } else {
+        setOrgError('load_failed');
+        toast({
+          title: 'Failed to load organization',
+          description: err instanceof Error ? err.message : 'Unknown error',
+          variant: 'destructive',
+        });
+      }
       console.error('OrganizationDetail: failed to load organization', err);
     }
 
@@ -513,15 +523,37 @@ export default function OrganizationDetail() {
   }
 
   if (!org) {
+    const loadFailed = orgError === 'load_failed';
     return (
-      <AppLayout title="Organization Not Found" breadcrumbs={[{ label: 'Organizations', href: '/app/admin/organizations' }, { label: 'Not Found' }]}>
+      <AppLayout
+        title={loadFailed ? t('orgDetail.loadFailedTitle') : 'Organization Not Found'}
+        breadcrumbs={[
+          { label: 'Organizations', href: '/app/admin/organizations' },
+          { label: loadFailed ? t('orgDetail.loadFailedTitle') : 'Not Found' },
+        ]}
+      >
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <Building2 className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">Organization not found.</p>
-          <Button variant="outline" className="mt-4" onClick={() => navigate('/app/admin/organizations')}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Organizations
-          </Button>
+          <p className="text-muted-foreground">
+            {loadFailed ? t('orgDetail.loadFailedDescription') : 'Organization not found.'}
+          </p>
+          <div className="mt-4 flex gap-2">
+            {loadFailed && (
+              <Button
+                onClick={() => {
+                  setLoading(true);
+                  fetchData();
+                }}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {t('orgDetail.tryAgain')}
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => navigate('/app/admin/organizations')}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Organizations
+            </Button>
+          </div>
         </div>
       </AppLayout>
     );

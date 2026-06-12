@@ -250,6 +250,11 @@
   "orgSettings": {
     "noOrgDescription": "Vælg en organisation for at administrere dens indstillinger."
   },
+  "orgDetail": {
+    "loadFailedTitle": "Kunne ikke indlæse organisationen",
+    "loadFailedDescription": "Noget gik galt under indlæsningen af denne organisation.",
+    "tryAgain": "Prøv igen"
+  },
   "platformSettings": {
     "loadFailedTitle": "Kunne ikke indlæse platformsindstillingerne.",
     "loadFailedDescription": "Indstillingerne blev ikke indlæst fra serveren, så redigering er deaktiveret for at undgå at overskrive gemte værdier. Prøv igen.",
