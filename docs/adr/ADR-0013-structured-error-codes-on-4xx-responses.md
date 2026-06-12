@@ -30,6 +30,7 @@ Registered codes:
 | Code | Status | Returned by | Meaning |
 | --- | --- | --- | --- |
 | `DUPLICATE_SLUG` | 409 | `organization-create`, `organization-update` | Organization slug already taken (Postgres unique_violation on the slug UNIQUE constraint) |
+| `SEAT_LIMIT_REACHED` | 409 | `org-membership-create` | Organization has `seat_limit` set and the count of active members is already at or above it |
 
 Relatedly, the hand-rolled Postgres `23505` checks at call sites collapse into `isUniqueViolation(err)` in `functions/shared/db.ts`.
 
