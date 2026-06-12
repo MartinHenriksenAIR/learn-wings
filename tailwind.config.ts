@@ -15,8 +15,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        sans: ['Hanken Grotesk', 'system-ui', 'sans-serif'],
+        display: ['Hanken Grotesk', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -97,6 +97,25 @@ export default {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.7" },
         },
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to: { opacity: "1", transform: "none" },
+        },
+        "pop-in": {
+          "0%": { transform: "scale(0.3)" },
+          "60%": { transform: "scale(1.18)" },
+          "100%": { transform: "scale(1)" },
+        },
+        "heart-pop": {
+          "0%": { transform: "scale(1)" },
+          "40%": { transform: "scale(1.4)" },
+          "100%": { transform: "scale(1)" },
+        },
+        "bulb-wiggle": {
+          "0%, 100%": { transform: "rotate(0) scale(1)" },
+          "30%": { transform: "rotate(-12deg) scale(1.12)" },
+          "65%": { transform: "rotate(9deg) scale(1.06)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -104,6 +123,10 @@ export default {
         "fade-in": "fade-in 0.3s ease-out",
         "slide-in-right": "slide-in-right 0.3s ease-out",
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+        "fade-up": "fade-up 0.35s ease",
+        "pop-in": "pop-in 0.35s ease",
+        "heart-pop": "heart-pop 0.4s ease",
+        "bulb-wiggle": "bulb-wiggle 0.55s ease",
       },
     },
   },
