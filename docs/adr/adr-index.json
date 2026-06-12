@@ -141,7 +141,7 @@
     },
     {
       "id": "ADR-0006",
-      "title": "Azure Functions v4 (Node.js 22) for Backend API",
+      "title": "Azure Functions v4 (Node.js ~20) for Backend API",
       "status": "accepted",
       "date": "2026-05-19",
       "deciders": [
