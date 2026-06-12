@@ -100,7 +100,8 @@
     "invitedToOrgPrefix": "Du er blevet inviteret til at deltage i",
     "invitedToOrgMiddle": "som",
     "teamAdmin": "Teamadministrator",
-    "platformDescription": "Enterprise læringsplatform"
+    "platformDescription": "Enterprise læringsplatform",
+    "accessProvidedByOrg": "Adgang leveres af din organisation"
   },
   "settings": {
     "title": "Indstillinger",

@@ -33,13 +33,11 @@ import {
   BookOpen,
   GraduationCap,
   LayoutDashboard,
-  Users,
   Building2,
   BarChart3,
   Settings as SettingsIcon,
   LogOut,
   ChevronDown,
-  Eye,
   Lightbulb,
   Flag,
   MessageSquare,
@@ -49,16 +47,28 @@ import { getInitials } from '@/lib/utils';
 import logoLightDa from '@/assets/logo-light.png';
 import logoLightEn from '@/assets/logo-light-en.png';
 
+// Pill nav item: navy bg + white text when active, muted slate otherwise
+const NAV_BUTTON_CLASSES =
+  'h-auto gap-[11px] rounded-[11px] px-3 py-2.5 text-[13.5px] font-semibold text-[#4a4f60] ' +
+  'hover:bg-[#f3f4f8] hover:text-foreground active:bg-[#f3f4f8] active:text-foreground ' +
+  'data-[active=true]:bg-primary data-[active=true]:font-semibold data-[active=true]:text-primary-foreground ' +
+  'data-[active=true]:hover:bg-primary data-[active=true]:hover:text-primary-foreground [&>svg]:size-[17px]';
+
+const GROUP_LABEL_CLASSES =
+  'h-auto px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.09em] text-[#9aa0af]';
+
+const MENU_ITEM_CLASSES = 'rounded-[9px] text-[13px] font-medium';
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const { t } = useTranslation();
-  const { 
-    profile, 
-    isPlatformAdmin, 
-    effectiveIsPlatformAdmin, 
-    effectiveIsOrgAdmin, 
-    currentOrg, 
+  const {
+    profile,
+    isPlatformAdmin,
+    effectiveIsPlatformAdmin,
+    effectiveIsOrgAdmin,
+    currentOrg,
     signOut,
     viewMode,
     setViewMode,
@@ -87,7 +97,7 @@ export function AppSidebar() {
 
   // Build org admin items based on feature toggles
   const orgAdminItems = [
-    
+
     ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: '/app/admin/analytics', icon: BarChart3 }] : []),
     ...(features.community_enabled ? [
       { title: t('nav.ideasOverview'), url: '/app/admin/org/ideas', icon: Lightbulb },
@@ -115,16 +125,16 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="border-r-0">
-      <SidebarHeader className="border-b border-sidebar-border p-4">
+    <Sidebar>
+      <SidebarHeader className="px-5 pb-4 pt-[22px]">
         <div className="flex items-center justify-start">
           {collapsed ? (
             <GraduationCap className="h-6 w-6 text-sidebar-primary" />
           ) : (
-            <img 
-              src={i18n.language === 'da' ? logoLightDa : logoLightEn} 
-              alt={i18n.language === 'da' ? 'AI Uddannelse' : 'AI Education'} 
-              className="h-auto w-full max-w-[180px] object-contain"
+            <img
+              src={i18n.language === 'da' ? logoLightDa : logoLightEn}
+              alt={i18n.language === 'da' ? 'AI Uddannelse' : 'AI Education'}
+              className="block h-10 w-auto max-w-full object-contain"
             />
           )}
         </div>
@@ -133,29 +143,30 @@ export function AppSidebar() {
       {/* Org selector for platform admins viewing as learner/org_admin */}
       <OrgSelector />
 
-      <SidebarContent className="px-2">
+      <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2">
         {/* Learner section - hidden when viewing as platform admin */}
         {!effectiveIsPlatformAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider">
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
               {t('nav.learning')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-[3px]">
                 {learnerItems.map((item) => (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild
                       isActive={location.pathname === item.url}
                       tooltip={collapsed ? item.title : undefined}
+                      className={NAV_BUTTON_CLASSES}
                     >
                       <NavLink
                         to={item.url}
                         end
-                        className="flex items-center gap-3"
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                        className="flex items-center"
+                        activeClassName="bg-primary text-primary-foreground"
                       >
-                        <item.icon className="h-4 w-4" />
+                        <item.icon className="h-[17px] w-[17px]" />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
@@ -168,26 +179,27 @@ export function AppSidebar() {
 
         {/* Org Admin section - hidden when viewing as platform admin */}
         {effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider">
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
               {t('nav.organization')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-[3px]">
                 {orgAdminItems.map((item) => (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild
                       isActive={location.pathname === item.url}
                       tooltip={collapsed ? item.title : undefined}
+                      className={NAV_BUTTON_CLASSES}
                     >
                       <NavLink
                         to={item.url}
                         end
-                        className="flex items-center gap-3"
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                        className="flex items-center"
+                        activeClassName="bg-primary text-primary-foreground"
                       >
-                        <item.icon className="h-4 w-4" />
+                        <item.icon className="h-[17px] w-[17px]" />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
@@ -200,26 +212,27 @@ export function AppSidebar() {
 
         {/* Platform Admin section */}
         {effectiveIsPlatformAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider">
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
               {t('nav.platformAdmin')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-[3px]">
                 {platformAdminItems.map((item) => (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild
                       isActive={location.pathname === item.url}
                       tooltip={collapsed ? item.title : undefined}
+                      className={NAV_BUTTON_CLASSES}
                     >
                       <NavLink
                         to={item.url}
                         end
-                        className="flex items-center gap-3"
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                        className="flex items-center"
+                        activeClassName="bg-primary text-primary-foreground"
                       >
-                        <item.icon className="h-4 w-4" />
+                        <item.icon className="h-[17px] w-[17px]" />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
@@ -231,52 +244,66 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-3">
+      <SidebarFooter className="border-t border-[#eceef3] p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-3 px-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              className="h-auto w-full justify-start gap-2.5 rounded-xl p-2 text-sidebar-foreground hover:bg-[#f3f4f8] hover:text-foreground"
             >
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-[hsl(145,63%,42%)] text-white text-xs">
+              <Avatar className="h-9 w-9">
+                <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               {!collapsed && (
                 <>
-                  <div className="flex flex-1 flex-col items-start text-left">
-                    <span className="text-sm font-medium">{profile?.full_name}</span>
-                    <span className="text-xs text-sidebar-foreground/60">
+                  <div className="flex min-w-0 flex-1 flex-col items-start text-left">
+                    <span className="w-full truncate text-[13px] font-bold text-foreground">
+                      {profile?.full_name}
+                    </span>
+                    <span className="w-full truncate text-[11.5px] text-[#9aa0af]">
                       {getCurrentRoleLabel()}
                     </span>
                   </div>
-                  <ChevronDown className="h-4 w-4 opacity-50" />
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#9aa0af]" />
                 </>
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent
+            side="top"
+            align="end"
+            className="w-56 rounded-[14px] border-[#e4e6ee] p-1.5 shadow-[0_16px_40px_rgba(20,24,46,0.14)]"
+          >
             {isPlatformAdmin && (
               <>
-                <DropdownMenuLabel className="flex items-center gap-2">
-                  <Eye className="h-4 w-4" />
+                <DropdownMenuLabel className="px-2.5 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#9aa0af]">
                   {t('nav.switchView')}
                 </DropdownMenuLabel>
                 <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-                  <DropdownMenuRadioItem value="platform_admin">{t('nav.roles.platformAdmin')}</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="org_admin">{t('nav.roles.orgAdmin')}</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="learner">{t('nav.roles.learner')}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem className={MENU_ITEM_CLASSES} value="platform_admin">
+                    {t('nav.roles.platformAdmin')}
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem className={MENU_ITEM_CLASSES} value="org_admin">
+                    {t('nav.roles.orgAdmin')}
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem className={MENU_ITEM_CLASSES} value="learner">
+                    {t('nav.roles.learner')}
+                  </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator />
+                <DropdownMenuSeparator className="bg-[#eceef3]" />
               </>
             )}
-            <DropdownMenuItem onClick={() => navigate('/app/settings')}>
+            <DropdownMenuItem className={MENU_ITEM_CLASSES} onClick={() => navigate('/app/settings')}>
               <SettingsIcon className="mr-2 h-4 w-4" />
               {t('nav.settings')}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+            <DropdownMenuSeparator className="bg-[#eceef3]" />
+            <DropdownMenuItem
+              onClick={handleSignOut}
+              className={`${MENU_ITEM_CLASSES} text-destructive focus:bg-[#fdf1f1] focus:text-destructive`}
+            >
               <LogOut className="mr-2 h-4 w-4" />
               {t('nav.signOut')}
             </DropdownMenuItem>

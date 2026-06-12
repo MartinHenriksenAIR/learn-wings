@@ -100,7 +100,8 @@
     "invitedToOrgPrefix": "You've been invited to join",
     "invitedToOrgMiddle": "as a",
     "teamAdmin": "Team Admin",
-    "platformDescription": "Enterprise Learning Platform"
+    "platformDescription": "Enterprise Learning Platform",
+    "accessProvidedByOrg": "Access is provided by your organization"
   },
   "settings": {
     "title": "Settings",
