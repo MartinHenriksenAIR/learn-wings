@@ -27,6 +27,7 @@ import { ResourceForm } from '@/components/community/ResourceForm';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { toast } from '@/components/ui/sonner';
@@ -60,15 +61,18 @@ export default function ResourceLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
+  // The input binds the raw value (stays responsive); the query key gets the
+  // debounced one, so typing fires ~one request per pause, not per keystroke (#41).
+  const debouncedSearch = useDebouncedValue(searchQuery, 250);
 
   const isAdmin = effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
   // Single fetch: filtered resources for display + the org's distinct tags for the dropdown.
   const { data, isLoading } = useQuery({
-    queryKey: ['community-resources', currentOrg?.id, searchQuery, selectedType, selectedTag],
+    queryKey: ['community-resources', currentOrg?.id, debouncedSearch, selectedType, selectedTag],
     queryFn: () =>
       fetchResources(currentOrg!.id, {
-        search: searchQuery || undefined,
+        search: debouncedSearch || undefined,
         resource_type: selectedType || undefined,
         tags: selectedTag ? [selectedTag] : undefined,
       }),
