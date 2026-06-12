@@ -770,3 +770,23 @@ All new strings i18n en+da. **Frontend-only — no function deploy** (trunk push
 - **Notes left on the PR (not changed):** the gate grants via *any* member org while downstream progress/review use the client `orgId` (user's-own-data only — no cross-tenant leak); the access-check SQL is hand-duplicated across many endpoints (a `hasCourseAccess` helper in `shared/profile.ts` is the deeper fix — `isActiveMember`/`isOrgAdmin` already establish the `SELECT EXISTS(...) AS ok` pattern); pre-existing stranded-spinner when `currentOrg` is null (early return sits outside the try); ungated sibling writes `lesson-progress`/`enrollment-complete` (out of scope — worth a follow-up issue).
 
 **Gates:** `functions` tsc 0 + **1324/1327** (1 new test; `course-player-data` 7/7); frontend tsc 0, build OK, **98/98**. **Function deploy required** (`course-player-data` source changed) — deployed from fresh trunk via CI (`functions-action` ToS-block lifted; `func` CLI still uninstallable). **Gate 4 (authed smoke: 403 non-member / 200 member) is user-verified and PENDING.** Work branch `martin/17-course-player-access-gate`.
+
+---
+
+## 2026-06-12 — #19 course-review entry point in the learner flow (PR #97)
+
+**Who:** martin & Claude, in a parallel git worktree (`../lw-issue-19`) alongside the #17 chat. Solo self-merge after a subagent-driven two-stage review (spec compliance + code quality, both clean — serves as the `/code-review` gate). Disjoint from Emil's open PR #95 (tooling) and from #17 (`functions/course-player-data`).
+
+**Closes #19.** `CourseReviewDialog` was built and rendered in `CoursePlayer.tsx` but reachable ONLY through the transient "Leave a Review" button inside `CourseCompletionDialog`, which appears for the single instant the final lesson completes. Holes: a quiz last-lesson's "Finish Course" button navigates straight to `/app/courses` (no prompt — the 2026-06-06 sweep's symptom); revisiting a completed course had no entry point (so editing a review was impossible despite the dialog's "Update Your Review" mode); `courseJustCompleted` + dialog dismissal gave no second chance.
+
+**Decision — surface, not remove.** The review feature (both dialogs + the gated `/api/course-review` endpoint + edit-existing support) was intentional Slice-1 functionality, so per the issue's accept-or-remove AC we added a reliable entry point rather than deleting the path.
+
+- **Frontend-only** (`src/pages/learner/CoursePlayer.tsx`): a persistent sidebar button under the progress bar, gated `features.course_reviews_enabled && progressPercent >= REVIEW_MIN_PROGRESS` (**20%**), label `existingReview ? 'Edit your review' : 'Rate this course'`, opening the existing dialog via `showReviewDialog`. The 20% threshold (vs complete-only) was the issue owner's call. The completion-dialog path is untouched; `onReviewSubmitted` already refetches so the label flips to "Edit your review" after a first submit.
+- **New `CoursePlayer.test.tsx`** (5 tests): visibility threshold (0% hidden / 20% shown), feature gate (disabled → hidden even at ≥20%), rate-vs-edit label, dialog-opens-on-click (asserts the real portaled `role="dialog"`).
+- **Out of scope (deliberately):** #18 completion semantics / quiz "Finish Course" navigation / `handleCompleteLesson`; #17 `functions/course-player-data` backend.
+
+**Gates:** frontend tsc 0 (`-p tsconfig.app.json`), build OK, **103/103** tests (CoursePlayer 5/5). **No function change → no deploy required**; the trunk push rebuilds the PR-6 preview (frontend). **Gate 4 (authed: open a course → complete ≥20% → "Rate this course" appears → submit a rating → reload → label flips to "Edit your review") PENDING** on the preview. Work branch `martin/19-course-review-entry-point`. Spec + plan under `docs/superpowers/{specs,plans}/2026-06-12-course-review-entry-point*`.
+
+**Follow-up noted (not filed — auto-mode declined the issue create as out-of-scope):** `CoursePlayer.tsx` has no i18n wiring; every string is hardcoded English (pre-existing, whole-file), and the two new strings inherit that. Recommend a ticket to internationalize the page as a unit rather than special-casing two strings.
+
+**Op-note for next session:** committing from a parallel worktree gets blocked by `guard-trunk.mjs` once the main checkout moves onto the protected trunk (it reads the branch from the session cwd, not `git -C <worktree>`). Fix: use the `EnterWorktree` tool with the worktree path to move the session cwd into the worktree, then commit. Plain `cd` doesn't persist (worktree is outside the allowed working dirs).
