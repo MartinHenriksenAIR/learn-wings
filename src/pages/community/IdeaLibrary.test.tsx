@@ -30,7 +30,7 @@ vi.mock('@/lib/ideas-api', () => ({
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 // --- useAuth mock: user.id (Entra OID) is DELIBERATELY different from profile.id
-//     (the DB row UUID) — pre-migration Supabase made them the same value, Entra does not ---
+//     (the DB row UUID) — pre-migration the legacy backend made them the same value, Entra does not ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
