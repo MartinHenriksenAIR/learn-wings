@@ -100,9 +100,13 @@ export default function Settings() {
 
     try {
       await callApi('/api/profile-update', { first_name: firstName.trim(), last_name: lastName.trim(), department: department.trim() });
+      // Explicit success variant — the variant-less default toast gave no clear
+      // save confirmation (#20); language-change feedback set the precedent that
+      // settings changes confirm visibly.
       toast({
         title: t('settings.profileUpdated'),
         description: t('settings.profileUpdatedDescription'),
+        variant: 'success',
       });
       await refreshUserContext();
     } catch (error) {
