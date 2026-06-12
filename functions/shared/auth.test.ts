@@ -11,7 +11,7 @@ vi.mock('jwks-rsa', () => ({
 const VALID_ISSUER = 'https://login.microsoftonline.com/11111111-1111-1111-1111-111111111111/v2.0';
 
 vi.mock('jsonwebtoken', () => ({
-  verify: (_token: string, _getKey: unknown, _opts: unknown, cb: Function) => {
+  verify: (_token: string, _getKey: unknown, _opts: unknown, cb: (err: Error | null, payload?: unknown) => void) => {
     const parts = _token.split('.');
     if (parts.length !== 3) return cb(new Error('invalid token'));
     try {

@@ -407,12 +407,8 @@ describe('quiz-admin-save', () => {
   it('returns 500 with err.message when transaction throws mid-sequence', async () => {
     mockWithTransaction.mockImplementationOnce(async (cb: any) => {
       const client = { query: vi.fn().mockRejectedValueOnce(new Error('FK violation')) };
-      // Simulate what withTransaction does: throw re-propagates after rollback
-      try {
-        return await cb(client);
-      } catch (err) {
-        throw err; // re-throw as real withTransaction does
-      }
+      // Like real withTransaction: the callback's rejection propagates after rollback
+      return await cb(client);
     });
 
     const res = await handler(baseReq(validBody), {} as any);

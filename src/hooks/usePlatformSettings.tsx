@@ -156,7 +156,7 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
     root.style.setProperty('--sidebar-ring', hexToHslValue(branding.sidebar_primary_color, '173 80% 40%'));
     root.style.setProperty('--sidebar-accent', hexToHslValue(branding.sidebar_accent_color, '222 40% 18%'));
 
-    const faviconEl = document.querySelector<HTMLLinkElement>('link[rel=\"icon\"]');
+    const faviconEl = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (faviconEl) {
       const defaultHref = faviconEl.dataset.defaultHref || faviconEl.href;
       faviconEl.dataset.defaultHref = defaultHref;
