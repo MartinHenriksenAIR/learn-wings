@@ -4,6 +4,7 @@ import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 import { getProfile, isActiveMember } from '../shared/profile';
+import { courseVisibilityPredicate } from '../shared/course-visibility';
 
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
@@ -32,8 +33,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       `SELECT EXISTS(
         SELECT 1
           FROM courses c
-          JOIN org_course_access oca ON oca.course_id = c.id AND oca.access = 'enabled'
-         WHERE c.id = $2 AND oca.org_id = $1 AND c.is_published = TRUE
+         WHERE c.id = $2 AND ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}
       ) AS ok`,
       [orgId, courseId],
     );

@@ -4,6 +4,7 @@ import { query } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
+import { courseVisibilityPredicate } from '../shared/course-visibility';
 
 interface EnrollmentRow {
   id: string; course_id: string; status: string; enrolled_at: string; completed_at: string | null;
@@ -63,9 +64,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     //    ORDER BY c.title is a deliberate tightening (determinism).
     const visibilityFilter = profile.is_platform_admin
       ? ''
-      : `AND c.is_published = TRUE
-         AND EXISTS (SELECT 1 FROM org_course_access oca
-                      WHERE oca.course_id = c.id AND oca.org_id = $1 AND oca.access = 'enabled')`;
+      : `AND ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}`;
     const enrollments = await query<EnrollmentRow>(
       `SELECT e.id, e.course_id, e.status, e.enrolled_at, e.completed_at, c.title, c.level
          FROM enrollments e

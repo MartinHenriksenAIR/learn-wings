@@ -4,6 +4,7 @@ import { query } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 import { getProfile, isActiveMember } from '../shared/profile';
+import { courseVisibilityPredicate } from '../shared/course-visibility';
 
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
@@ -23,13 +24,13 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const authorized = profile.is_platform_admin || await isActiveMember(profile.id, orgId);
     if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
-    // Query 1: Available published courses for the org.
-    // No DISTINCT needed — UNIQUE(org_id, course_id) on org_course_access guarantees one access row per course per org.
+    // Query 1: Available published courses for the org (shared visibility predicate;
+    // equivalent to the old JOIN form — UNIQUE(org_id, course_id) on org_course_access
+    // guarantees one access row per course per org).
     const courses = await query(
       `SELECT c.id, c.title, c.description, c.level, c.is_published, c.thumbnail_url, c.created_by_user_id, c.created_at
          FROM courses c
-         JOIN org_course_access oca ON oca.course_id = c.id AND oca.access = 'enabled'
-        WHERE oca.org_id = $1 AND c.is_published = TRUE
+        WHERE ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}
         ORDER BY c.title`,
       [orgId],
     );

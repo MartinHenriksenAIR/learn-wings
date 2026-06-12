@@ -126,7 +126,7 @@ describe('enrollment-create', () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true }) // course lookup
-      .mockResolvedValueOnce(null);                  // org_course_access lookup
+      .mockResolvedValueOnce({ ok: false });         // org_course_access lookup (EXISTS row, false)
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization does not have access to this course' });
@@ -176,7 +176,7 @@ describe('enrollment-create', () => {
     };
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true }) // course lookup
-      .mockResolvedValueOnce({ ok: 1 })              // org_course_access lookup
+      .mockResolvedValueOnce({ ok: true })           // org_course_access lookup
       .mockResolvedValueOnce(inserted);              // INSERT
 
     const res = await handler(baseReq(validBody), {} as any);

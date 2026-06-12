@@ -4,6 +4,7 @@ import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
+import { orgCourseAccessEnabled } from '../shared/course-visibility';
 
 const ALLOWED_STATUSES = new Set(['enrolled', 'completed']);
 
@@ -54,12 +55,14 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     }
 
     // Org-access precondition: only enforced for non-platform admins (platform admins override).
+    // Publish state is checked separately above (distinct 404/400 errors), so this uses the
+    // access-only shared fragment.
     if (!profile.is_platform_admin) {
-      const access = await queryOne<{ ok: number }>(
-        `SELECT 1 AS ok FROM org_course_access WHERE org_id = $1 AND course_id = $2 AND access = 'enabled'`,
+      const access = await queryOne<{ ok: boolean }>(
+        `SELECT ${orgCourseAccessEnabled({ courseRef: '$2', orgParam: 1 })} AS ok`,
         [orgId, courseId],
       );
-      if (!access) {
+      if (!access?.ok) {
         return corsResponse(origin, 403, { error: 'Organization does not have access to this course' });
       }
     }
