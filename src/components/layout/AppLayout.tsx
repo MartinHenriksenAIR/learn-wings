@@ -12,7 +12,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { useAuth, ViewMode } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
+import { useViewModeLabels } from '@/components/layout/view-mode-labels';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -40,11 +41,7 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
   // Platform admins go to Organizations, others go to Dashboard
   const homeHref = effectiveIsPlatformAdmin ? '/app/admin/organizations' : '/app/dashboard';
 
-  const viewModeLabels: Record<ViewMode, string> = {
-    learner: t('nav.roles.learner'),
-    org_admin: t('nav.roles.orgAdmin'),
-    platform_admin: t('nav.roles.platformAdmin'),
-  };
+  const viewModeLabels = useViewModeLabels();
 
   // Surface the existing view-mode state as a header chip when it differs from the real role
   const showViewingAsChip = isPlatformAdmin && viewMode !== 'platform_admin';
@@ -85,7 +82,7 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
             </Breadcrumb>
             <div className="flex-1" />
             {showViewingAsChip && (
-              <span className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-[7px] border border-[#d7ddf4] bg-[#eef1fb] px-[13px] py-1.5 text-xs font-bold text-primary">
+              <span className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-[7px] border border-[#d7ddf4] bg-accent px-[13px] py-1.5 text-xs font-bold text-accent-foreground">
                 <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('nav.viewingAs', { role: viewModeLabels[viewMode] })}
               </span>

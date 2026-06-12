@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/sidebar';
 import { NavLink } from '@/components/NavLink';
 import { useAuth, ViewMode } from '@/hooks/useAuth';
+import { useViewModeLabels } from '@/components/layout/view-mode-labels';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -47,9 +48,11 @@ import { getInitials } from '@/lib/utils';
 import logoLightDa from '@/assets/logo-light.png';
 import logoLightEn from '@/assets/logo-light-en.png';
 
-// Pill nav item: navy bg + white text when active, muted slate otherwise
+// Pill nav item: navy bg + white text when active, muted slate otherwise.
+// data-[active=true]:font-semibold looks redundant next to the base font-semibold, but it is
+// load-bearing: it twMerge-overrides the sidebar cva's data-[active=true]:font-medium.
 const NAV_BUTTON_CLASSES =
-  'h-auto gap-[11px] rounded-[11px] px-3 py-2.5 text-[13.5px] font-semibold text-[#4a4f60] ' +
+  'h-auto gap-[11px] rounded-[11px] px-3 py-2.5 text-[13.5px] font-semibold text-sidebar-foreground ' +
   'hover:bg-[#f3f4f8] hover:text-foreground active:bg-[#f3f4f8] active:text-foreground ' +
   'data-[active=true]:bg-primary data-[active=true]:font-semibold data-[active=true]:text-primary-foreground ' +
   'data-[active=true]:hover:bg-primary data-[active=true]:hover:text-primary-foreground [&>svg]:size-[17px]';
@@ -82,11 +85,7 @@ export function AppSidebar() {
     navigate('/login');
   };
 
-  const viewModeLabels: Record<ViewMode, string> = {
-    learner: t('nav.roles.learner'),
-    org_admin: t('nav.roles.orgAdmin'),
-    platform_admin: t('nav.roles.platformAdmin'),
-  };
+  const viewModeLabels = useViewModeLabels();
 
   // Build learner items based on feature toggles
   const learnerItems = [
@@ -160,13 +159,8 @@ export function AppSidebar() {
                       tooltip={collapsed ? item.title : undefined}
                       className={NAV_BUTTON_CLASSES}
                     >
-                      <NavLink
-                        to={item.url}
-                        end
-                        className="flex items-center"
-                        activeClassName="bg-primary text-primary-foreground"
-                      >
-                        <item.icon className="h-[17px] w-[17px]" />
+                      <NavLink to={item.url} end className="flex items-center">
+                        <item.icon />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
@@ -193,13 +187,8 @@ export function AppSidebar() {
                       tooltip={collapsed ? item.title : undefined}
                       className={NAV_BUTTON_CLASSES}
                     >
-                      <NavLink
-                        to={item.url}
-                        end
-                        className="flex items-center"
-                        activeClassName="bg-primary text-primary-foreground"
-                      >
-                        <item.icon className="h-[17px] w-[17px]" />
+                      <NavLink to={item.url} end className="flex items-center">
+                        <item.icon />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
@@ -226,13 +215,8 @@ export function AppSidebar() {
                       tooltip={collapsed ? item.title : undefined}
                       className={NAV_BUTTON_CLASSES}
                     >
-                      <NavLink
-                        to={item.url}
-                        end
-                        className="flex items-center"
-                        activeClassName="bg-primary text-primary-foreground"
-                      >
-                        <item.icon className="h-[17px] w-[17px]" />
+                      <NavLink to={item.url} end className="flex items-center">
+                        <item.icon />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
@@ -244,7 +228,7 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-[#eceef3] p-3">
+      <SidebarFooter className="border-t border-border p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -274,7 +258,7 @@ export function AppSidebar() {
           <DropdownMenuContent
             side="top"
             align="end"
-            className="w-56 rounded-[14px] border-[#e4e6ee] p-1.5 shadow-[0_16px_40px_rgba(20,24,46,0.14)]"
+            className="w-56 rounded-[14px] border-border p-1.5 shadow-[0_16px_40px_rgba(20,24,46,0.14)]"
           >
             {isPlatformAdmin && (
               <>
@@ -292,14 +276,14 @@ export function AppSidebar() {
                     {t('nav.roles.learner')}
                   </DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator className="bg-[#eceef3]" />
+                <DropdownMenuSeparator className="bg-border" />
               </>
             )}
             <DropdownMenuItem className={MENU_ITEM_CLASSES} onClick={() => navigate('/app/settings')}>
               <SettingsIcon className="mr-2 h-4 w-4" />
               {t('nav.settings')}
             </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-[#eceef3]" />
+            <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuItem
               onClick={handleSignOut}
               className={`${MENU_ITEM_CLASSES} text-destructive focus:bg-[#fdf1f1] focus:text-destructive`}

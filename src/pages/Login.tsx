@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import logoLight from '@/assets/logo-light.png';
 
+// Soft slate gradient behind both the loading spinner and the login card
+const PAGE_GRADIENT_CLASSES = 'bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)]';
+
 export default function Login() {
   const { signIn, user, isPlatformAdmin, isOrgAdmin, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -31,15 +34,15 @@ export default function Login() {
 
   if (isLoading) {
     return (
-      <div className="grid min-h-screen place-items-center bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)]">
+      <div className={`grid min-h-screen place-items-center ${PAGE_GRADIENT_CLASSES}`}>
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)] px-4">
-      <div className="flex w-full max-w-[380px] flex-col items-center gap-5 rounded-[20px] border border-[#e6e8ef] bg-card px-10 py-11 shadow-[0_24px_60px_rgba(16,41,143,0.10)]">
+    <div className={`grid min-h-screen place-items-center ${PAGE_GRADIENT_CLASSES} px-4`}>
+      <div className="flex w-full max-w-[380px] flex-col items-center gap-5 rounded-[20px] border border-border bg-card px-10 py-11 shadow-[0_24px_60px_rgba(16,41,143,0.10)]">
         <img
           src={logoLight}
           alt="AI Uddannelse"
