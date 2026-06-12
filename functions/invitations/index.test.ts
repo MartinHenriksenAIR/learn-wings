@@ -101,6 +101,17 @@ describe('invitations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required for scope=org' });
   });
 
+  // 6d. 400 scope=platform with empty orgId
+  it('returns 400 when scope=platform and orgId is an empty string', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+
+    const res = await handler(baseReq({ scope: 'platform', orgId: '' }), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId must be a string' });
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   // 7. 403 scope=org caller is neither platform admin nor org admin
   it('returns 403 for scope=org when caller is not platform admin and not org admin', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(false);
