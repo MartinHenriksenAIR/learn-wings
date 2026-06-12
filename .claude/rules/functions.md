@@ -3,7 +3,7 @@ paths:
   - "functions/**"
 ---
 
-# Azure Functions conventions (hard-won — see WORKLOG Slice 0)
+# Azure Functions conventions (hard-won)
 
 - **Every new function MUST be imported in the `functions/index.ts` barrel** (`main: dist/index.js`). An unimported function silently never registers.
 - **No module-load-time side effects that can throw** (e.g. `new Resend(env)` at top level) — they crash the worker entry and deregister ALL functions. Initialize lazily inside handlers.
