@@ -59,13 +59,19 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
+    // post_id: for comment targets we join out the comment's parent post so the
+    // moderation UIs can deep-link /posts/<post_id>#comment-<target_id> (#86).
+    // NULL for post targets, and NULL for orphaned comment reports (comment
+    // deleted) — the frontend disables the link in that case.
     const reports = await query(
       `SELECT r.*,
         json_build_object('id', rep.id, 'full_name', rep.full_name) AS reporter,
-        CASE WHEN rev.id IS NULL THEN NULL ELSE json_build_object('id', rev.id, 'full_name', rev.full_name) END AS reviewer
+        CASE WHEN rev.id IS NULL THEN NULL ELSE json_build_object('id', rev.id, 'full_name', rev.full_name) END AS reviewer,
+        CASE WHEN r.target_type = 'comment' THEN tc.post_id ELSE NULL END AS post_id
        FROM community_reports r
        JOIN profiles rep ON rep.id = r.reporter_user_id
        LEFT JOIN profiles rev ON rev.id = r.reviewed_by
+       LEFT JOIN community_comments tc ON r.target_type = 'comment' AND tc.id = r.target_id
        ${whereClause} ORDER BY r.created_at DESC`,
       params,
     );

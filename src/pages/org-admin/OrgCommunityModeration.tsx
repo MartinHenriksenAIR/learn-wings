@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
+import { buildReportContentLink } from '@/lib/community-report-link';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -153,8 +154,13 @@ export default function OrgCommunityModeration() {
     return type === 'post' ? <FileText className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />;
   };
 
+  // null for orphaned comment reports (parent post id missing) — the View
+  // content button is disabled rather than opening a broken link (#86).
+  const getContentLink = (report: ReportWithDetails) => buildReportContentLink(report, 'org');
+
   const openContentInNewTab = (report: ReportWithDetails) => {
-    const path = `/app/community/org/posts/${report.target_id}`;
+    const path = getContentLink(report);
+    if (!path) return;
     window.open(path, '_blank', 'noopener,noreferrer');
   };
 
@@ -246,6 +252,7 @@ export default function OrgCommunityModeration() {
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => openContentInNewTab(report)}
+                            disabled={!getContentLink(report)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>

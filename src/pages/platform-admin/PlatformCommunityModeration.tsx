@@ -21,6 +21,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
+import { buildReportContentLink } from '@/lib/community-report-link';
 import { callApi } from '@/lib/api-client';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
 import type { Organization } from '@/lib/types';
@@ -185,9 +186,14 @@ export default function PlatformCommunityModeration() {
     );
   };
 
+  // null for orphaned comment reports (parent post id missing) — the View
+  // content button is disabled rather than opening a broken link (#86).
+  const getContentLink = (report: ReportWithDetails) =>
+    buildReportContentLink(report, report.org_id ? 'org' : 'global');
+
   const openContentInNewTab = (report: ReportWithDetails) => {
-    const scope = report.org_id ? 'org' : 'global';
-    const path = `/app/community/${scope}/posts/${report.target_id}`;
+    const path = getContentLink(report);
+    if (!path) return;
     window.open(path, '_blank', 'noopener,noreferrer');
   };
 
@@ -272,6 +278,7 @@ export default function PlatformCommunityModeration() {
                             size="icon"
                             className="h-8 w-8"
                             onClick={() => openContentInNewTab(report)}
+                            disabled={!getContentLink(report)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>

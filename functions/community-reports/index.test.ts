@@ -128,6 +128,29 @@ describe('community-reports', () => {
     expect(params).toContain('org-1');
   });
 
+  // #86: comment targets carry the parent post id so moderation UIs can
+  // deep-link /posts/<post_id>#comment-<target_id>.
+  it('projection joins out the parent post id for comment targets', async () => {
+    const commentReport = {
+      ...sampleReport,
+      id: 'r2',
+      target_type: 'comment',
+      target_id: 'c1',
+      post_id: 'post-9',
+    };
+    mockQuery.mockResolvedValueOnce([commentReport]);
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ reports: [commentReport] });
+
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('LEFT JOIN community_comments tc');
+    expect(sql).toContain("r.target_type = 'comment' AND tc.id = r.target_id");
+    expect(sql).toMatch(/CASE WHEN r\.target_type = 'comment' THEN tc\.post_id ELSE NULL END AS post_id/);
+  });
+
   // platform admin with orgId — isOrgAdmin NOT called
   it('platform admin can list reports without calling isOrgAdmin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });

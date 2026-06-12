@@ -88,6 +88,11 @@ export interface CommunityReport {
   reviewed_at: string | null;
   admin_notes: string | null;
   created_at: string;
+  /**
+   * Parent post id, populated by community-reports for comment targets (#86).
+   * NULL for post targets and for orphaned comment reports (comment deleted).
+   */
+  post_id?: string | null;
   // Joined relations
   reporter?: Profile;
   reviewer?: Profile;
