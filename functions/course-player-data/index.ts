@@ -34,10 +34,12 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       if (!access?.ok) return corsResponse(origin, 403, { error: 'Course access denied' });
     }
 
-    const modules = await query('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order', [courseId]);
+    // `, id` tie-breaker (issue #46): legacy rows may carry duplicate sort_order
+    // ranks; the tie-breaker keeps their relative order stable across reads.
+    const modules = await query('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order, id', [courseId]);
     const modulesWithLessons = await Promise.all(
       modules.map(async (m: Record<string, unknown>) => {
-        const lessons = await query('SELECT * FROM lessons WHERE module_id = $1 ORDER BY sort_order', [m.id]);
+        const lessons = await query('SELECT * FROM lessons WHERE module_id = $1 ORDER BY sort_order, id', [m.id]);
         return { ...m, lessons };
       })
     );

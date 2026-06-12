@@ -21,10 +21,9 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       videoStoragePath?: unknown;
       azureBlobPath?: unknown;
       documentStoragePath?: unknown;
-      sortOrder?: unknown;
     };
 
-    const { moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath, sortOrder } = body;
+    const { moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath } = body;
 
     // Shared field validation (moduleId, title, lessonType, and all optional fields)
     const sharedError = validateLessonFields(body);
@@ -32,15 +31,13 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return corsResponse(origin, 400, { error: sharedError });
     }
 
-    // Required: sortOrder must be integer (create-only field)
-    if (!Number.isInteger(sortOrder)) {
-      return corsResponse(origin, 400, { error: 'sortOrder must be an integer' });
-    }
-
-    // Params order: [moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, null (video_url), azureBlobPath, documentStoragePath, sortOrder]
+    // sort_order is server-owned (issue #46): computed as MAX+1 within the module
+    // inside the INSERT. Any client-supplied sortOrder is ignored — array-length
+    // ranks from the client collided after delete-middle-then-add.
+    // Params order: [moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, null (video_url), azureBlobPath, documentStoragePath]
     const lesson = await queryOne(
       `INSERT INTO lessons (module_id, title, lesson_type, content_text, duration_minutes, video_storage_path, video_url, azure_blob_path, document_storage_path, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT COALESCE(MAX(sort_order) + 1, 0) FROM lessons WHERE module_id = $1))
        RETURNING *`,
       [
         moduleId as string,
@@ -52,7 +49,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         null, // video_url — deprecated column, always null (old client parity)
         (azureBlobPath as string | null | undefined) ?? null,
         (documentStoragePath as string | null | undefined) ?? null,
-        sortOrder as number,
       ],
     );
 

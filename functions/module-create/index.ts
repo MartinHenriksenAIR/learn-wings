@@ -11,8 +11,8 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const gate = await requirePlatformAdmin(req, origin);
     if (!gate.ok) return gate.response;
 
-    const body = await req.json() as { courseId?: unknown; title?: unknown; sortOrder?: unknown };
-    const { courseId, title, sortOrder } = body;
+    const body = await req.json() as { courseId?: unknown; title?: unknown };
+    const { courseId, title } = body;
 
     if (!courseId || typeof courseId !== 'string') {
       return corsResponse(origin, 400, { error: 'courseId is required' });
@@ -22,13 +22,14 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return corsResponse(origin, 400, { error: 'title is required' });
     }
 
-    if (!Number.isInteger(sortOrder)) {
-      return corsResponse(origin, 400, { error: 'sortOrder must be an integer' });
-    }
-
+    // sort_order is server-owned (issue #46): computed as MAX+1 within the course
+    // inside the INSERT. Any client-supplied sortOrder is ignored — array-length
+    // ranks from the client collided after delete-middle-then-add.
     const module_ = await queryOne(
-      `INSERT INTO course_modules (course_id, title, sort_order) VALUES ($1, $2, $3) RETURNING *`,
-      [courseId, title, sortOrder], // title stored raw — trim is validation-only (course-create parity)
+      `INSERT INTO course_modules (course_id, title, sort_order)
+       VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order) + 1, 0) FROM course_modules WHERE course_id = $1))
+       RETURNING *`,
+      [courseId, title], // title stored raw — trim is validation-only (course-create parity)
     );
 
     return corsResponse(origin, 200, { module: module_ });

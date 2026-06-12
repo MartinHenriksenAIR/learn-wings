@@ -137,7 +137,8 @@ describe('course-structure-admin', () => {
     expect(modulesCall).toBeDefined();
     const [modulesSql, modulesParams] = modulesCall!;
     expect(modulesSql).toContain('course_modules');
-    expect(modulesSql).toContain('ORDER BY sort_order');
+    // Deterministic ordering (issue #46): id tie-breaker on equal sort_order ranks
+    expect(modulesSql).toContain('ORDER BY sort_order, id');
     expect(modulesParams).toContain('course-1');
 
     // Lessons query — single query for all lessons via JOIN
@@ -146,7 +147,7 @@ describe('course-structure-admin', () => {
     const [lessonsSql, lessonsParams] = lessonsCall!;
     expect(lessonsSql).toContain('lessons');
     expect(lessonsSql).toContain('JOIN course_modules');
-    expect(lessonsSql).toContain('ORDER BY');
+    expect(lessonsSql).toContain('ORDER BY l.sort_order, l.id');
     expect(lessonsParams).toContain('course-1');
   });
 

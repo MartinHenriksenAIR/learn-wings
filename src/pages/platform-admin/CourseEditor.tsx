@@ -158,11 +158,10 @@ export default function CourseEditor() {
         });
         toast({ title: 'Module updated!' });
       } else {
-        const nextOrder = modules.length;
+        // sort_order is server-owned (issue #46): module-create appends at MAX+1
         await callApi<{ module: CourseModule }>('/api/module-create', {
           courseId,
           title: moduleTitle,
-          sortOrder: nextOrder,
         });
         toast({ title: 'Module created!' });
       }
@@ -236,8 +235,7 @@ export default function CourseEditor() {
         });
         toast({ title: 'Lesson updated!' });
       } else {
-        const mod = modules.find((m) => m.id === lessonModuleId);
-        const nextOrder = mod?.lessons?.length || 0;
+        // sort_order is server-owned (issue #46): lesson-create appends at MAX+1
         await callApi<{ lesson: Lesson }>('/api/lesson-create', {
           moduleId: lessonModuleId,
           title: lessonTitle,
@@ -247,7 +245,6 @@ export default function CourseEditor() {
           videoStoragePath: lessonType === 'video' ? lessonVideoPath : null,
           azureBlobPath: lessonType === 'video' ? lessonAzureBlobPath : null,
           documentStoragePath: lessonType === 'document' ? lessonDocPath : null,
-          sortOrder: nextOrder,
         });
         toast({ title: 'Lesson created!' });
       }

@@ -23,10 +23,12 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return corsResponse(origin, 200, { course: null, modules: [] });
     }
 
+    // `, id` tie-breaker (issue #46): legacy rows may carry duplicate sort_order
+    // ranks; the tie-breaker keeps their relative order stable across reads.
     const [modules, lessons] = await Promise.all([
-      query('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order', [courseId]),
+      query('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order, id', [courseId]),
       query(
-        `SELECT l.* FROM lessons l JOIN course_modules m ON m.id = l.module_id WHERE m.course_id = $1 ORDER BY l.sort_order`,
+        `SELECT l.* FROM lessons l JOIN course_modules m ON m.id = l.module_id WHERE m.course_id = $1 ORDER BY l.sort_order, l.id`,
         [courseId],
       ),
     ]);
