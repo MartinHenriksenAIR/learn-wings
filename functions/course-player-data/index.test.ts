@@ -36,11 +36,12 @@ describe('course-player-data', () => {
     const progress = [{ lesson_id: 'lesson-1', status: 'completed', completed_at: '2026-05-01T00:00:00Z' }];
     const review = { id: 'rev-1', rating: 5, comment: 'Great!' };
 
-    mockQueryOne.mockResolvedValueOnce(course);   // course lookup
-    mockQuery.mockResolvedValueOnce(modules);     // course_modules
-    mockQuery.mockResolvedValueOnce(lessons);     // lessons for mod-1
-    mockQuery.mockResolvedValueOnce(progress);    // lesson_progress
-    mockQueryOne.mockResolvedValueOnce(review);   // course_reviews
+    mockQueryOne.mockResolvedValueOnce(course);       // course lookup
+    mockQueryOne.mockResolvedValueOnce({ ok: true }); // access check
+    mockQuery.mockResolvedValueOnce(modules);         // course_modules
+    mockQuery.mockResolvedValueOnce(lessons);         // lessons for mod-1
+    mockQuery.mockResolvedValueOnce(progress);        // lesson_progress
+    mockQueryOne.mockResolvedValueOnce(review);       // course_reviews
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
@@ -59,7 +60,8 @@ describe('course-player-data', () => {
     expect(progressParams).toEqual(['p1', 'org-uuid']);
 
     // SECURITY PIN: course_reviews must use profile.id ('p1'), not raw oid
-    const reviewCall = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    // mockQueryOne call order: 0=course, 1=access check, 2=course_reviews
+    const reviewCall = mockQueryOne.mock.calls[2] as [string, unknown[]];
     expect(reviewCall[0]).toContain('course_reviews');
     expect(reviewCall[1]).toEqual(['p1', 'org-uuid', 'course-uuid']);
   });
@@ -72,12 +74,76 @@ describe('course-player-data', () => {
     expect(res.status).toBe(404);
   });
 
+  it('returns 403 when user lacks org access to the course (parity with quiz-by-lesson)', async () => {
+    const course = { id: 'course-uuid', title: 'AI Basics', is_published: true };
+    mockQueryOne.mockResolvedValueOnce(course);       // course lookup
+    mockQueryOne.mockResolvedValueOnce({ ok: false }); // access check fails
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Course access denied' });
+
+    // No course content (modules/lessons/progress/reviews) should be fetched once access is denied
+    expect(mockQuery).not.toHaveBeenCalled();
+
+    // Access EXISTS check must be keyed on profile.id + courseId and gate on enablement + publication
+    const [accessSql, accessParams] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(accessSql).toContain('org_course_access');
+    expect(accessSql).toContain('org_memberships');
+    expect(accessSql).toContain('is_published');
+    expect(accessParams).toEqual(['p1', 'course-uuid']);
+  });
+
+  it('returns 403 for a non-admin opening an unpublished course (gate enforces publication)', async () => {
+    // Course row exists (404 check passes) but is_published = false. The access EXISTS check
+    // gates on is_published = TRUE, so it returns false for a non-admin learner.
+    const course = { id: 'course-uuid', title: 'AI Basics', is_published: false };
+    mockQueryOne.mockResolvedValueOnce(course);        // course lookup
+    mockQueryOne.mockResolvedValueOnce({ ok: false }); // access check fails (unpublished)
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Course access denied' });
+    expect(mockQuery).not.toHaveBeenCalled();
+
+    // Pin the security-critical gating predicates BY VALUE. A regression that opens the gate
+    // (drops the publication / enablement / active-membership clause) must fail here rather than
+    // slip past a loose table-name substring check.
+    const [accessSql] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(accessSql).toContain('is_published = TRUE');
+    expect(accessSql).toContain("oca.access = 'enabled'");
+    expect(accessSql).toContain("om.status = 'active'");
+  });
+
+  it('skips the access check for platform admins', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+
+    const course = { id: 'course-uuid', title: 'AI Basics', is_published: false };
+    mockQueryOne.mockResolvedValueOnce(course); // course lookup
+    mockQuery.mockResolvedValueOnce([]);        // no modules
+    mockQuery.mockResolvedValueOnce([]);        // no progress
+    mockQueryOne.mockResolvedValueOnce(null);   // no review
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(200);
+
+    // Only course lookup + review queryOne — no access EXISTS check ran
+    expect(mockQueryOne).toHaveBeenCalledTimes(2);
+    for (const [sql] of mockQueryOne.mock.calls as [string][]) {
+      expect(sql).not.toContain('org_course_access');
+    }
+  });
+
   it('returns null review when user has not reviewed the course', async () => {
     const course = { id: 'course-uuid', title: 'AI Basics', is_published: true };
-    mockQueryOne.mockResolvedValueOnce(course);  // course
-    mockQuery.mockResolvedValueOnce([]);         // no modules
-    mockQuery.mockResolvedValueOnce([]);         // no progress
-    mockQueryOne.mockResolvedValueOnce(null);    // no review
+    mockQueryOne.mockResolvedValueOnce(course);       // course
+    mockQueryOne.mockResolvedValueOnce({ ok: true }); // access check
+    mockQuery.mockResolvedValueOnce([]);              // no modules
+    mockQuery.mockResolvedValueOnce([]);              // no progress
+    mockQueryOne.mockResolvedValueOnce(null);         // no review
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
