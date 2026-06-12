@@ -33,6 +33,15 @@ export async function queryOne<T = Record<string, unknown>>(
   return rows[0] ?? null;
 }
 
+/**
+ * True when `err` is a Postgres unique_violation (SQLSTATE 23505) — e.g. an
+ * INSERT/UPDATE hitting a UNIQUE constraint. Use this instead of hand-checking
+ * `(err as { code?: string })?.code === '23505'` at call sites.
+ */
+export function isUniqueViolation(err: unknown): boolean {
+  return (err as { code?: string } | null | undefined)?.code === '23505';
+}
+
 export async function withTransaction<T>(
   callback: (client: PoolClient) => Promise<T>
 ): Promise<T> {

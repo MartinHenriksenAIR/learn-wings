@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
-import { callApi } from '@/lib/api-client';
+import { callApi, ApiError } from '@/lib/api-client';
 import { Organization, Profile, OrgRole } from '@/lib/types';
 import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail, UsersRound } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
@@ -127,7 +127,8 @@ export default function OrganizationsManager() {
         newOrg = result.organization;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create organization';
-        if (message === 'Slug already in use') {
+        // Match the structured code (ADR-0013), not the English error sentence.
+        if (err instanceof ApiError && err.code === 'DUPLICATE_SLUG') {
           setErrors({ slug: 'This slug is already taken' });
         } else {
           toast({

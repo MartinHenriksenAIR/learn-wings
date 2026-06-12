@@ -1,6 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne } from '../shared/db';
+import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
 
@@ -101,8 +101,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return corsResponse(origin, 200, { organization });
     } catch (dbErr: unknown) {
       // Postgres unique_violation on the slug UNIQUE constraint.
-      if ((dbErr as { code?: string })?.code === '23505') {
-        return corsResponse(origin, 409, { error: 'Slug already in use' });
+      // `code` is the structured machine-readable error code (ADR-0013) —
+      // the frontend matches on it instead of the English sentence.
+      if (isUniqueViolation(dbErr)) {
+        return corsResponse(origin, 409, { error: 'Slug already in use', code: 'DUPLICATE_SLUG' });
       }
       throw dbErr;
     }

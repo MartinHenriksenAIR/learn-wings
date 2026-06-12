@@ -1,6 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne } from '../shared/db';
+import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
 
@@ -119,10 +119,9 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         );
         results.push({ email: normalizedEmail, success: true, invitation });
       } catch (dbErr: unknown) {
-        const code = (dbErr as { code?: string })?.code;
-        if (code === '23505') {
+        if (isUniqueViolation(dbErr)) {
           results.push({ email: normalizedEmail, success: false, error: 'An invitation for this email is already pending' });
-        } else if (code === '23503') {
+        } else if ((dbErr as { code?: string })?.code === '23503') {
           results.push({ email: normalizedEmail, success: false, error: 'Organization not found' });
         } else {
           const msg = dbErr instanceof Error ? dbErr.message : 'Unknown error';

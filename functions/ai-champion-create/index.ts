@@ -1,6 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne } from '../shared/db';
+import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
 
@@ -41,11 +41,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       );
       return corsResponse(origin, 200, { champion });
     } catch (dbErr: unknown) {
-      const code = (dbErr as { code?: string })?.code;
-      if (code === '23505') {
+      if (isUniqueViolation(dbErr)) {
         return corsResponse(origin, 409, { error: 'User is already an AI Champion in this organization' });
       }
-      if (code === '23503') {
+      if ((dbErr as { code?: string })?.code === '23503') {
         return corsResponse(origin, 404, { error: 'Organization or user not found' });
       }
       throw dbErr;

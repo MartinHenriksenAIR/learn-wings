@@ -9,7 +9,7 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoi
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
+vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -173,7 +173,7 @@ describe('organization-create', () => {
     mockQueryOne.mockRejectedValueOnce(Object.assign(new Error('duplicate key value'), { code: '23505' }));
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(409);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'Slug already in use' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Slug already in use', code: 'DUPLICATE_SLUG' });
   });
 
   it('returns 500 on generic db error', async () => {

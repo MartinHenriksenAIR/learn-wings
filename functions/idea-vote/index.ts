@@ -1,6 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne } from '../shared/db';
+import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { getProfile, isActiveMember } from '../shared/profile';
 
@@ -51,7 +51,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         [ideaId, idea.org_id, profile.id],
       );
     } catch (insertErr: unknown) {
-      if ((insertErr as { code?: string }).code === '23505') {
+      if (isUniqueViolation(insertErr)) {
         return corsResponse(origin, 409, { error: 'You have already voted for this idea.' });
       }
       throw insertErr;
