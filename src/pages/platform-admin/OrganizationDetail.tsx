@@ -975,8 +975,11 @@ export default function OrganizationDetail() {
       )}
 
       {/* Role Change Confirmation Dialog */}
+      {/* `open` must be a boolean from the first render — `roleChangeDialog?.open` is
+          undefined until the dialog is first used, which flips the AlertDialog from
+          uncontrolled to controlled and triggers a React console warning. */}
       <AlertDialog
-        open={roleChangeDialog?.open}
+        open={!!roleChangeDialog?.open}
         onOpenChange={(open) => !open && setRoleChangeDialog(null)}
       >
         <AlertDialogContent>
