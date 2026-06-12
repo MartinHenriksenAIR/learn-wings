@@ -27,7 +27,7 @@ Positive: Dedicated App Service Plan (S1, `ASP-AIEducation-bfca`) eliminates col
 
 ## Amendment (2026-06-12)
 
-This record originally specified Node.js 22. At deploy time the Node 22 worker crashed the gRPC channel (`14 UNAVAILABLE`) and no functions registered, so the runtime is pinned to Node `~20` via `WEBSITE_NODE_DEFAULT_VERSION` (recorded in `.claude/rules/functions.md` and WORKLOG Slice 0). Do not bump the runtime without re-verifying function registration. Amended per issue #27.
+This record originally specified Node.js 22. At deploy time the Node 22 worker crashed the gRPC channel (`14 UNAVAILABLE`) and no functions registered, so the runtime is pinned to Node `~20` via `WEBSITE_NODE_DEFAULT_VERSION` (recorded in `.claude/rules/functions.md`). Do not bump the runtime without re-verifying function registration. Amended per issue #27.
 
 ## Alternatives
 
