@@ -6,14 +6,14 @@ import { getProfile } from '../shared/profile';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Forbidden' });
     }
 
     const body = await req.json() as {
@@ -25,15 +25,15 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const { orgId, courseId, access } = body;
 
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required' });
     }
 
     if (!courseId || typeof courseId !== 'string') {
-      return corsResponse(origin, 400, { error: 'courseId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'courseId is required' });
     }
 
     if (access !== 'enabled' && access !== 'disabled') {
-      return corsResponse(origin, 400, { error: "access must be 'enabled' or 'disabled'" }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: "access must be 'enabled' or 'disabled'" });
     }
 
     const record = await queryOne(
@@ -44,10 +44,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [orgId, courseId, access],
     );
 
-    return corsResponse(origin, 200, { record }) as HttpResponseInit;
+    return corsResponse(origin, 200, { record });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

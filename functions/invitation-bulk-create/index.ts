@@ -36,30 +36,30 @@ type RowResult = {
  */
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { orgId?: unknown; invites?: unknown };
     const { orgId, invites } = body;
 
     // Request-level validation: shape errors abort the whole request with 400.
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required' });
     }
     if (invites === undefined || invites === null) {
-      return corsResponse(origin, 400, { error: 'invites is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'invites is required' });
     }
     if (!Array.isArray(invites)) {
-      return corsResponse(origin, 400, { error: 'invites must be an array' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'invites must be an array' });
     }
     if (invites.length === 0) {
-      return corsResponse(origin, 400, { error: 'invites must not be empty' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'invites must not be empty' });
     }
     if (invites.length > MAX_INVITES) {
-      return corsResponse(origin, 400, { error: `invites must not exceed ${MAX_INVITES} entries` }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: `invites must not exceed ${MAX_INVITES} entries` });
     }
 
     // Authorization: platform admin OR org admin of the target org.
@@ -67,7 +67,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // "Admins can insert invitations" policy (WITH CHECK is_platform_admin()
     // OR (org_id IS NOT NULL AND is_org_admin(org_id))). Same gate as invitation-create.
     const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // Per-row processing. Each row resolves to a result entry — never throws out
     // of this loop. Sequential by design (see header comment).
@@ -131,10 +131,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       }
     }
 
-    return corsResponse(origin, 200, { results }) as HttpResponseInit;
+    return corsResponse(origin, 200, { results });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

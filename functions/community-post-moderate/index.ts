@@ -11,11 +11,11 @@ interface PostRow {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as {
       postId?: unknown;
@@ -25,16 +25,16 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const { postId, isHidden, isLocked } = body;
 
     if (!postId || typeof postId !== 'string') {
-      return corsResponse(origin, 400, { error: 'postId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'postId is required' });
     }
     if (isHidden === undefined && isLocked === undefined) {
-      return corsResponse(origin, 400, { error: 'Provide isHidden or isLocked to update' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'Provide isHidden or isLocked to update' });
     }
     if (isHidden !== undefined && typeof isHidden !== 'boolean') {
-      return corsResponse(origin, 400, { error: 'isHidden must be a boolean' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'isHidden must be a boolean' });
     }
     if (isLocked !== undefined && typeof isLocked !== 'boolean') {
-      return corsResponse(origin, 400, { error: 'isLocked must be a boolean' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'isLocked must be a boolean' });
     }
 
     // Load post
@@ -42,13 +42,13 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       `SELECT scope, org_id FROM community_posts WHERE id = $1`,
       [postId],
     );
-    if (!post) return corsResponse(origin, 404, { error: 'Post not found' }) as HttpResponseInit;
+    if (!post) return corsResponse(origin, 404, { error: 'Post not found' });
 
     // Authorization: platform admin OR (org post AND org admin)
     // Global posts: platform admin only
     const canAccess = profile.is_platform_admin ||
       (post.scope === 'org' && post.org_id !== null && await isOrgAdmin(profile.id, post.org_id));
-    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // Build dynamic UPDATE
     const params: unknown[] = [];
@@ -71,10 +71,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       params,
     );
 
-    return corsResponse(origin, 200, { post: updatedPost }) as HttpResponseInit;
+    return corsResponse(origin, 200, { post: updatedPost });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

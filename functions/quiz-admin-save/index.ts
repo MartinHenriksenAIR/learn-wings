@@ -18,14 +18,14 @@ interface QuizQuestion {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Forbidden' });
     }
 
     const body = await req.json() as {
@@ -38,17 +38,17 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     // ── Validate lessonId ────────────────────────────────────────────────────
     if (!lessonId || typeof lessonId !== 'string') {
-      return corsResponse(origin, 400, { error: 'lessonId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'lessonId is required' });
     }
 
     // ── Validate passingScore ────────────────────────────────────────────────
     if (!Number.isInteger(passingScore) || (passingScore as number) < 0 || (passingScore as number) > 100) {
-      return corsResponse(origin, 400, { error: 'passingScore must be an integer between 0 and 100' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'passingScore must be an integer between 0 and 100' });
     }
 
     // ── Validate questions array ─────────────────────────────────────────────
     if (!Array.isArray(questions) || questions.length < 1) {
-      return corsResponse(origin, 400, { error: 'At least one question is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'At least one question is required' });
     }
 
     // ── Validate each question and its options ───────────────────────────────
@@ -56,15 +56,15 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       const q = questions[qi] as QuizQuestion;
 
       if (!q.questionText || typeof q.questionText !== 'string' || (q.questionText as string).trim() === '') {
-        return corsResponse(origin, 400, { error: `Question ${qi}: questionText is required` }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: `Question ${qi}: questionText is required` });
       }
 
       if (!Number.isInteger(q.sortOrder)) {
-        return corsResponse(origin, 400, { error: `Question ${qi}: sortOrder must be an integer` }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: `Question ${qi}: sortOrder must be an integer` });
       }
 
       if (!Array.isArray(q.options) || (q.options as QuizOption[]).length < 2) {
-        return corsResponse(origin, 400, { error: 'Each question needs at least 2 options' }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: 'Each question needs at least 2 options' });
       }
 
       const opts = q.options as QuizOption[];
@@ -74,17 +74,17 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         const o = opts[oi];
 
         if (!o.optionText || typeof o.optionText !== 'string' || (o.optionText as string).trim() === '') {
-          return corsResponse(origin, 400, { error: `Question ${qi}, option ${oi}: optionText is required` }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: `Question ${qi}, option ${oi}: optionText is required` });
         }
 
         if (typeof o.isCorrect !== 'boolean') {
-          return corsResponse(origin, 400, { error: `Question ${qi}, option ${oi}: isCorrect must be a boolean` }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: `Question ${qi}, option ${oi}: isCorrect must be a boolean` });
         }
       }
 
       const hasCorrect = opts.some((o) => o.isCorrect === true);
       if (!hasCorrect) {
-        return corsResponse(origin, 400, { error: 'Each question needs a correct answer' }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: 'Each question needs a correct answer' });
       }
     }
 
@@ -139,10 +139,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       return savedQuiz;
     });
 
-    return corsResponse(origin, 200, { quiz }) as HttpResponseInit;
+    return corsResponse(origin, 200, { quiz });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

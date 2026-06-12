@@ -14,20 +14,20 @@ interface PlatformSettingsUpdateBody {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Forbidden' });
     }
 
     const body = await req.json() as PlatformSettingsUpdateBody;
 
     if (typeof body.key !== 'string' || !(ALLOWED_KEYS as readonly string[]).includes(body.key)) {
-      return corsResponse(origin, 400, { error: 'key must be one of: branding, user_access, email, features' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'key must be one of: branding, user_access, email, features' });
     }
     const key = body.key as SettingKey;
 
@@ -36,7 +36,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       typeof body.value !== 'object' ||
       Array.isArray(body.value)
     ) {
-      return corsResponse(origin, 400, { error: 'value must be a plain object' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'value must be a plain object' });
     }
     const value = body.value as Record<string, unknown>;
 
@@ -48,12 +48,12 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [key, JSON.stringify(value), profile.id],
     );
 
-    if (!setting) return corsResponse(origin, 404, { error: 'Setting not found' }) as HttpResponseInit;
+    if (!setting) return corsResponse(origin, 404, { error: 'Setting not found' });
 
-    return corsResponse(origin, 200, { setting }) as HttpResponseInit;
+    return corsResponse(origin, 200, { setting });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

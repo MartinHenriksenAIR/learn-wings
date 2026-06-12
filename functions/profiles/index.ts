@@ -9,11 +9,11 @@ const PROFILE_COLUMNS_PREFIXED = 'p.id, p.full_name, p.first_name, p.last_name, 
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { userIds?: unknown };
     const { userIds } = body;
@@ -21,7 +21,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // Validate userIds if present
     if (userIds !== undefined) {
       if (!Array.isArray(userIds) || !userIds.every((v) => typeof v === 'string')) {
-        return corsResponse(origin, 400, { error: 'userIds must be an array of strings' }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: 'userIds must be an array of strings' });
       }
     }
 
@@ -40,7 +40,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
           `SELECT ${PROFILE_COLUMNS} FROM profiles ORDER BY full_name`,
         );
       }
-      return corsResponse(origin, 200, { profiles: rows }) as HttpResponseInit;
+      return corsResponse(origin, 200, { profiles: rows });
     }
 
     // Tier 2: Org admin of at least one org
@@ -68,7 +68,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
           [profile.id],
         );
       }
-      return corsResponse(origin, 200, { profiles: rows }) as HttpResponseInit;
+      return corsResponse(origin, 200, { profiles: rows });
     }
 
     // Tier 3: Plain learner — own profile only
@@ -76,10 +76,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       `SELECT ${PROFILE_COLUMNS} FROM profiles WHERE id = $1`,
       [profile.id],
     );
-    return corsResponse(origin, 200, { profiles: rows }) as HttpResponseInit;
+    return corsResponse(origin, 200, { profiles: rows });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

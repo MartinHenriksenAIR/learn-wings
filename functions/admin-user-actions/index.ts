@@ -5,7 +5,7 @@ import { corsPreflightResponse, corsResponse } from '../shared/cors';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
   try {
     const user = await authenticate(req);
@@ -16,7 +16,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [user.id]
     );
     if (!requester?.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Platform admin access required' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Platform admin access required' });
     }
 
     const body = await req.json() as {
@@ -59,14 +59,14 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         break;
 
       default:
-        return corsResponse(origin, 400, { error: `Unknown action: ${body.action}` }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: `Unknown action: ${body.action}` });
     }
 
-    return corsResponse(origin, 200, { ok: true }) as HttpResponseInit;
+    return corsResponse(origin, 200, { ok: true });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    return corsResponse(origin, 500, { error: msg }) as HttpResponseInit;
+    return corsResponse(origin, 500, { error: msg });
   }
 }
 

@@ -10,11 +10,11 @@ interface ReportRow {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as {
       reportId?: unknown;
@@ -24,16 +24,16 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const { reportId, status, adminNotes } = body;
 
     if (!reportId || typeof reportId !== 'string') {
-      return corsResponse(origin, 400, { error: 'reportId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'reportId is required' });
     }
     if (status !== undefined && status !== 'reviewed' && status !== 'dismissed') {
-      return corsResponse(origin, 400, { error: "status must be 'reviewed' or 'dismissed'" }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: "status must be 'reviewed' or 'dismissed'" });
     }
     if (adminNotes !== undefined && adminNotes !== null && typeof adminNotes !== 'string') {
-      return corsResponse(origin, 400, { error: 'adminNotes must be a string or null' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'adminNotes must be a string or null' });
     }
     if (status === undefined && adminNotes === undefined) {
-      return corsResponse(origin, 400, { error: 'Provide status or adminNotes to update' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'Provide status or adminNotes to update' });
     }
 
     // Load report
@@ -41,12 +41,12 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       `SELECT org_id FROM community_reports WHERE id = $1`,
       [reportId],
     );
-    if (!report) return corsResponse(origin, 404, { error: 'Report not found' }) as HttpResponseInit;
+    if (!report) return corsResponse(origin, 404, { error: 'Report not found' });
 
     // Authorization: platform admin OR org admin of the report's org (global reports = plat admin only)
     const canAccess = profile.is_platform_admin ||
       (report.org_id !== null && await isOrgAdmin(profile.id, report.org_id));
-    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // Build dynamic UPDATE
     const params: unknown[] = [];
@@ -74,10 +74,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       params,
     );
 
-    return corsResponse(origin, 200, { report: updatedReport }) as HttpResponseInit;
+    return corsResponse(origin, 200, { report: updatedReport });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

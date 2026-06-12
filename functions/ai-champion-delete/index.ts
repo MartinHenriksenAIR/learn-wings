@@ -6,20 +6,20 @@ import { getProfile, isOrgAdmin } from '../shared/profile';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { orgId?: unknown; userId?: unknown };
     const { orgId, userId } = body;
 
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required' });
     }
     if (!userId || typeof userId !== 'string') {
-      return corsResponse(origin, 400, { error: 'userId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'userId is required' });
     }
 
     // Authorization: platform admin OR org admin of the target org.
@@ -28,7 +28,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // No lookup-then-404 (unlike org-membership-delete): orgId is client-supplied and scopes the
     // DELETE directly, and Supabase zero-row deletes reported success — idempotent 200 is parity.
     const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // Blind delete — idempotent (Supabase zero-row-delete parity); see idea-vote-remove.
     await query(
@@ -36,10 +36,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [userId, orgId],
     );
 
-    return corsResponse(origin, 200, { ok: true }) as HttpResponseInit;
+    return corsResponse(origin, 200, { ok: true });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

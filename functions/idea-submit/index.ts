@@ -13,17 +13,17 @@ interface IdeaRow {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { ideaId?: unknown };
     const { ideaId } = body;
 
     if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'ideaId is required' });
     }
 
     // Load idea
@@ -31,16 +31,16 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
       [ideaId],
     );
-    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' }) as HttpResponseInit;
+    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' });
 
     // Author-only: no admin bypass — submitting someone else's idea is meaningless.
     if (idea.user_id !== profile.id) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Forbidden' });
     }
 
     // Draft-only.
     if (idea.status !== 'draft') {
-      return corsResponse(origin, 409, { error: 'Only draft ideas can be submitted' }) as HttpResponseInit;
+      return corsResponse(origin, 409, { error: 'Only draft ideas can be submitted' });
     }
 
     const submitted = await queryOne(
@@ -48,10 +48,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [ideaId],
     );
 
-    return corsResponse(origin, 200, { idea: submitted }) as HttpResponseInit;
+    return corsResponse(origin, 200, { idea: submitted });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

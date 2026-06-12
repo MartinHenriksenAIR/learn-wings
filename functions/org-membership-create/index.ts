@@ -9,27 +9,27 @@ const ALLOWED_STATUSES = new Set(['active', 'invited', 'disabled']);
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { orgId?: unknown; userId?: unknown; role?: unknown; status?: unknown };
     const { orgId, userId, role, status } = body;
 
     // Validation first, authz second, db third (mirrors organization-update).
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required' });
     }
     if (!userId || typeof userId !== 'string') {
-      return corsResponse(origin, 400, { error: 'userId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'userId is required' });
     }
     if (typeof role !== 'string' || !ALLOWED_ROLES.has(role)) {
-      return corsResponse(origin, 400, { error: 'role must be one of: org_admin, learner' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'role must be one of: org_admin, learner' });
     }
     if (status !== undefined && (typeof status !== 'string' || !ALLOWED_STATUSES.has(status))) {
-      return corsResponse(origin, 400, { error: 'status must be one of: active, invited, disabled' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'status must be one of: active, invited, disabled' });
     }
 
     // Authorization: platform admin OR org admin of the target org.
@@ -37,7 +37,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // "Platform admins can do everything with memberships" (is_platform_admin())
     // + "Org admins can manage memberships in their org" (is_org_admin(org_id)).
     const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     const effectiveStatus = status ?? 'active';
 
@@ -48,20 +48,20 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
          RETURNING id, org_id, user_id, role, status, created_at`,
         [orgId, userId, role, effectiveStatus],
       );
-      return corsResponse(origin, 200, { membership }) as HttpResponseInit;
+      return corsResponse(origin, 200, { membership });
     } catch (dbErr: unknown) {
       const code = (dbErr as { code?: string })?.code;
       if (code === '23505') {
-        return corsResponse(origin, 409, { error: 'User is already a member of this organization' }) as HttpResponseInit;
+        return corsResponse(origin, 409, { error: 'User is already a member of this organization' });
       }
       if (code === '23503') {
-        return corsResponse(origin, 404, { error: 'Organization or user not found' }) as HttpResponseInit;
+        return corsResponse(origin, 404, { error: 'Organization or user not found' });
       }
       throw dbErr;
     }
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

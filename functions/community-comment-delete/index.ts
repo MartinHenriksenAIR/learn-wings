@@ -13,17 +13,17 @@ interface CommentWithPost {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { commentId?: unknown };
     const { commentId } = body;
 
     if (!commentId || typeof commentId !== 'string') {
-      return corsResponse(origin, 400, { error: 'commentId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'commentId is required' });
     }
 
     // Load comment + its post (same join as update for consistency)
@@ -34,7 +34,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
        WHERE c.id = $1`,
       [commentId],
     );
-    if (!comment) return corsResponse(origin, 404, { error: 'Comment not found' }) as HttpResponseInit;
+    if (!comment) return corsResponse(origin, 404, { error: 'Comment not found' });
 
     // Authorization (OR of RLS DELETE policies)
     // NOTE: author CAN delete their own comment even when hidden (no is_hidden condition — RLS asymmetry vs UPDATE)
@@ -48,7 +48,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       authorized = true;
     }
 
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // DELETE — child replies cascade via FK
     await queryOne(
@@ -56,10 +56,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [commentId],
     );
 
-    return corsResponse(origin, 200, { ok: true }) as HttpResponseInit;
+    return corsResponse(origin, 200, { ok: true });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

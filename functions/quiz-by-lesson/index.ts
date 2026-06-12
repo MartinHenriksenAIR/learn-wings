@@ -6,17 +6,17 @@ import { getProfile } from '../shared/profile';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const { lessonId } = await req.json() as { lessonId?: unknown };
 
     if (!lessonId || typeof lessonId !== 'string') {
-      return corsResponse(origin, 400, { error: 'lessonId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'lessonId is required' });
     }
 
     // Access check — skip entirely for platform admins
@@ -34,7 +34,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         ) AS ok`,
         [profile.id, lessonId],
       );
-      if (!access?.ok) return corsResponse(origin, 403, { error: 'Quiz access denied' }) as HttpResponseInit;
+      if (!access?.ok) return corsResponse(origin, 403, { error: 'Quiz access denied' });
     }
 
     // Fetch the quiz for this lesson; if none, return early — no further queries
@@ -42,7 +42,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       'SELECT id, lesson_id, passing_score FROM quizzes WHERE lesson_id = $1',
       [lessonId],
     );
-    if (!quiz) return corsResponse(origin, 200, { quiz: null, questions: [] }) as HttpResponseInit;
+    if (!quiz) return corsResponse(origin, 200, { quiz: null, questions: [] });
 
     // Fetch questions ordered by sort_order
     const questions = await query<{ id: string; quiz_id: string; question_text: string; sort_order: number }>(
@@ -52,7 +52,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     // If no questions, skip options query entirely
     if (questions.length === 0) {
-      return corsResponse(origin, 200, { quiz, questions: [] }) as HttpResponseInit;
+      return corsResponse(origin, 200, { quiz, questions: [] });
     }
 
     // Batched options fetch — no N+1; is_correct is intentionally excluded (security: never expose correct answer)
@@ -75,10 +75,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       options: optionsByQuestion.get(q.id) ?? [],
     }));
 
-    return corsResponse(origin, 200, { quiz, questions: questionsWithOptions }) as HttpResponseInit;
+    return corsResponse(origin, 200, { quiz, questions: questionsWithOptions });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

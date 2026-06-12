@@ -10,11 +10,11 @@ interface ReportRow {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as {
       targetType?: unknown;
@@ -25,16 +25,16 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const { targetType, targetId, orgId, reason } = body;
 
     if (targetType !== 'post' && targetType !== 'comment') {
-      return corsResponse(origin, 400, { error: "targetType must be 'post' or 'comment'" }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: "targetType must be 'post' or 'comment'" });
     }
     if (!targetId || typeof targetId !== 'string') {
-      return corsResponse(origin, 400, { error: 'targetId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'targetId is required' });
     }
     if (!reason || typeof reason !== 'string') {
-      return corsResponse(origin, 400, { error: 'reason is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'reason is required' });
     }
     if (orgId !== undefined && orgId !== null && typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId must be a string or null' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId must be a string or null' });
     }
 
     // Dedupe check (RLS parity)
@@ -43,7 +43,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [profile.id, targetId, targetType],
     );
     if (existing) {
-      return corsResponse(origin, 409, { error: 'You have already reported this content.' }) as HttpResponseInit;
+      return corsResponse(origin, 409, { error: 'You have already reported this content.' });
     }
 
     let report: unknown;
@@ -55,15 +55,15 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       );
     } catch (insertErr: unknown) {
       if ((insertErr as { code?: string }).code === '23505') {
-        return corsResponse(origin, 409, { error: 'You have already reported this content.' }) as HttpResponseInit;
+        return corsResponse(origin, 409, { error: 'You have already reported this content.' });
       }
       throw insertErr;
     }
 
-    return corsResponse(origin, 200, { report }) as HttpResponseInit;
+    return corsResponse(origin, 200, { report });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

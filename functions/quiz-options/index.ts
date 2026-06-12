@@ -5,7 +5,7 @@ import { corsPreflightResponse, corsResponse } from '../shared/cors';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     await authenticate(req); // auth required, role not checked — access checked via course-player-data
     const { questionId } = await req.json() as { questionId: string };
@@ -14,10 +14,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       'SELECT id, option_text, sort_order FROM quiz_options WHERE question_id = $1 ORDER BY sort_order',
       [questionId]
     );
-    return corsResponse(origin, 200, options) as HttpResponseInit;
+    return corsResponse(origin, 200, options);
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'error' });
   }
 }
 

@@ -6,16 +6,16 @@ import { getProfile } from '../shared/profile';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
     const { courseId, orgId } = await req.json() as { courseId: string; orgId: string };
 
     const course = await queryOne('SELECT * FROM courses WHERE id = $1', [courseId]);
-    if (!course) return corsResponse(origin, 404, { error: 'Course not found' }) as HttpResponseInit;
+    if (!course) return corsResponse(origin, 404, { error: 'Course not found' });
 
     // Access check — platform admins bypass (suite convention); everyone else needs an active
     // membership in an org that has this course enabled and published (parity with quiz-by-lesson).
@@ -30,7 +30,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         ) AS ok`,
         [profile.id, courseId],
       );
-      if (!access?.ok) return corsResponse(origin, 403, { error: 'Course access denied' }) as HttpResponseInit;
+      if (!access?.ok) return corsResponse(origin, 403, { error: 'Course access denied' });
     }
 
     const modules = await query('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order', [courseId]);
@@ -52,11 +52,11 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [profile.id, orgId, courseId]
     );
 
-    return corsResponse(origin, 200, { course, modules: modulesWithLessons, progressMap, review: review ?? null }) as HttpResponseInit;
+    return corsResponse(origin, 200, { course, modules: modulesWithLessons, progressMap, review: review ?? null });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    return corsResponse(origin, 500, { error: msg }) as HttpResponseInit;
+    return corsResponse(origin, 500, { error: msg });
   }
 }
 

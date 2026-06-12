@@ -6,29 +6,29 @@ import { getProfile } from '../shared/profile';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Forbidden' });
     }
 
     const body = await req.json() as { courseId?: unknown; title?: unknown; sortOrder?: unknown };
     const { courseId, title, sortOrder } = body;
 
     if (!courseId || typeof courseId !== 'string') {
-      return corsResponse(origin, 400, { error: 'courseId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'courseId is required' });
     }
 
     if (!title || typeof title !== 'string' || (title as string).trim() === '') {
-      return corsResponse(origin, 400, { error: 'title is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'title is required' });
     }
 
     if (!Number.isInteger(sortOrder)) {
-      return corsResponse(origin, 400, { error: 'sortOrder must be an integer' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'sortOrder must be an integer' });
     }
 
     const module_ = await queryOne(
@@ -36,10 +36,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [courseId, title, sortOrder], // title stored raw — trim is validation-only (course-create parity)
     );
 
-    return corsResponse(origin, 200, { module: module_ }) as HttpResponseInit;
+    return corsResponse(origin, 200, { module: module_ });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

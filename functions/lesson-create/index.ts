@@ -7,14 +7,14 @@ import { validateLessonFields } from '../shared/validate';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Forbidden' });
     }
 
     const body = await req.json() as {
@@ -34,12 +34,12 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // Shared field validation (moduleId, title, lessonType, and all optional fields)
     const sharedError = validateLessonFields(body);
     if (sharedError) {
-      return corsResponse(origin, 400, { error: sharedError }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: sharedError });
     }
 
     // Required: sortOrder must be integer (create-only field)
     if (!Number.isInteger(sortOrder)) {
-      return corsResponse(origin, 400, { error: 'sortOrder must be an integer' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'sortOrder must be an integer' });
     }
 
     // Params order: [moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, null (video_url), azureBlobPath, documentStoragePath, sortOrder]
@@ -61,10 +61,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       ],
     );
 
-    return corsResponse(origin, 200, { lesson }) as HttpResponseInit;
+    return corsResponse(origin, 200, { lesson });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

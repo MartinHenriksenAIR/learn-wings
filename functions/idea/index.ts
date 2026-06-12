@@ -14,17 +14,17 @@ interface IdeaRow {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { ideaId?: unknown };
     const { ideaId } = body;
 
     if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'ideaId is required' });
     }
 
     const idea = await queryOne<IdeaRow>(`
@@ -41,21 +41,21 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     `, [ideaId, profile.id]);
 
     // Not found → null (parity with Supabase .single() PGRST116)
-    if (!idea) return corsResponse(origin, 200, { idea: null }) as HttpResponseInit;
+    if (!idea) return corsResponse(origin, 200, { idea: null });
 
     // Org access: platform admin OR active member of the idea's org
     const canAccessOrg = profile.is_platform_admin || await isActiveMember(profile.id, idea.org_id);
-    if (!canAccessOrg) return corsResponse(origin, 200, { idea: null }) as HttpResponseInit;
+    if (!canAccessOrg) return corsResponse(origin, 200, { idea: null });
 
     // Draft privacy: drafts are author-private for EVERY role (no admin bypass).
     if (idea.status === 'draft' && idea.user_id !== profile.id) {
-      return corsResponse(origin, 200, { idea: null }) as HttpResponseInit;
+      return corsResponse(origin, 200, { idea: null });
     }
 
-    return corsResponse(origin, 200, { idea }) as HttpResponseInit;
+    return corsResponse(origin, 200, { idea });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

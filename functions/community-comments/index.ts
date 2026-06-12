@@ -11,17 +11,17 @@ interface PostRow {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { postId?: unknown };
     const { postId } = body;
 
     if (!postId || typeof postId !== 'string') {
-      return corsResponse(origin, 400, { error: 'postId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'postId is required' });
     }
 
     // Load the post to check access
@@ -31,13 +31,13 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     );
 
     // Post missing → parity with old client SELECT returning zero rows
-    if (!post) return corsResponse(origin, 200, { comments: [] }) as HttpResponseInit;
+    if (!post) return corsResponse(origin, 200, { comments: [] });
 
     // Scope visibility check (can_access_community_post parity)
     if (post.scope === 'org') {
       const canAccess = profile.is_platform_admin ||
         await isActiveMember(profile.id, post.org_id!);
-      if (!canAccess) return corsResponse(origin, 200, { comments: [] }) as HttpResponseInit;
+      if (!canAccess) return corsResponse(origin, 200, { comments: [] });
     }
 
     // Hidden-comment visibility: platform admin or org admin of the post's org (global posts: only platform admin)
@@ -55,10 +55,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [postId],
     );
 
-    return corsResponse(origin, 200, { comments }) as HttpResponseInit;
+    return corsResponse(origin, 200, { comments });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

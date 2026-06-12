@@ -6,12 +6,12 @@ import { getProfile } from '../shared/profile';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const { quiz_id, answers } = await req.json() as { quiz_id: string; answers: Record<string, string> };
 
@@ -32,13 +32,13 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         ) AS has_access`,
         [profile.id, quiz_id]
       );
-      if (!access?.has_access) return corsResponse(origin, 403, { error: 'Quiz access denied' }) as HttpResponseInit;
+      if (!access?.has_access) return corsResponse(origin, 403, { error: 'Quiz access denied' });
     }
 
     const quiz = await queryOne<{ id: string; passing_score: number }>(
       'SELECT id, passing_score FROM quizzes WHERE id = $1', [quiz_id]
     );
-    if (!quiz) return corsResponse(origin, 404, { error: 'Quiz not found' }) as HttpResponseInit;
+    if (!quiz) return corsResponse(origin, 404, { error: 'Quiz not found' });
 
     const questions = await query<{ id: string }>(
       'SELECT id FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order', [quiz_id]
@@ -66,11 +66,11 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [profile.id, quiz_id, score, passed]
     );
 
-    return corsResponse(origin, 200, { score, passed, passing_score, correct_count, total_questions }) as HttpResponseInit;
+    return corsResponse(origin, 200, { score, passed, passing_score, correct_count, total_questions });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    return corsResponse(origin, 500, { error: msg }) as HttpResponseInit;
+    return corsResponse(origin, 500, { error: msg });
   }
 }
 

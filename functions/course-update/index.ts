@@ -18,14 +18,14 @@ const COLUMN_MAP: Record<string, string> = {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Forbidden' });
     }
 
     const body = await req.json() as {
@@ -37,12 +37,12 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     // Validate courseId
     if (!courseId || typeof courseId !== 'string') {
-      return corsResponse(origin, 400, { error: 'courseId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'courseId is required' });
     }
 
     // Validate updates: must be a non-null object with at least one whitelisted key
     if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-      return corsResponse(origin, 400, { error: 'No valid fields to update' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'No valid fields to update' });
     }
 
     const updatesObj = updates as Record<string, unknown>;
@@ -58,23 +58,23 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
       if (clientKey === 'title') {
         if (!value || typeof value !== 'string' || (value as string).trim() === '') {
-          return corsResponse(origin, 400, { error: 'title must be a non-empty string' }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: 'title must be a non-empty string' });
         }
       } else if (clientKey === 'description') {
         if (value !== null && typeof value !== 'string') {
-          return corsResponse(origin, 400, { error: 'description must be a string or null' }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: 'description must be a string or null' });
         }
       } else if (clientKey === 'level') {
         if (!VALID_LEVELS.includes(value as CourseLevel)) {
-          return corsResponse(origin, 400, { error: 'level must be basic, intermediate, or advanced' }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: 'level must be basic, intermediate, or advanced' });
         }
       } else if (clientKey === 'thumbnailUrl') {
         if (value !== null && typeof value !== 'string') {
-          return corsResponse(origin, 400, { error: 'thumbnailUrl must be a string or null' }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: 'thumbnailUrl must be a string or null' });
         }
       } else if (clientKey === 'isPublished') {
         if (typeof value !== 'boolean') {
-          return corsResponse(origin, 400, { error: 'isPublished must be a boolean' }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: 'isPublished must be a boolean' });
         }
       }
 
@@ -84,19 +84,19 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     // Must have at least one field to update
     if (setClauses.length === 0) {
-      return corsResponse(origin, 400, { error: 'No valid fields to update' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'No valid fields to update' });
     }
 
     params.push(courseId);
     const sql = `UPDATE courses SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`;
 
     const course = await queryOne(sql, params);
-    if (!course) return corsResponse(origin, 404, { error: 'Course not found' }) as HttpResponseInit;
+    if (!course) return corsResponse(origin, 404, { error: 'Course not found' });
 
-    return corsResponse(origin, 200, { course }) as HttpResponseInit;
+    return corsResponse(origin, 200, { course });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

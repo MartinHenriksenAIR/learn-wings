@@ -34,23 +34,23 @@ async function canAccessAsset(profileId: string, blobPath: string): Promise<bool
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { blobPath?: unknown };
     const { blobPath } = body;
     if (!blobPath || typeof blobPath !== 'string') {
-      return corsResponse(origin, 400, { error: 'blobPath is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'blobPath is required' });
     }
 
     // Access check — short-circuit for platform admins; otherwise check org membership + thumbnail access
     if (!profile.is_platform_admin) {
       const hasAccess = await canAccessAsset(profile.id, blobPath);
-      if (!hasAccess) return corsResponse(origin, 403, { error: 'Access denied' }) as HttpResponseInit;
+      if (!hasAccess) return corsResponse(origin, 403, { error: 'Access denied' });
     }
 
     const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME!;
@@ -60,11 +60,11 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const sasToken = generateSasToken(accountName, accountKey, containerName, blobPath, 'r', 120);
     const url = buildBlobUrl(accountName, containerName, blobPath, sasToken);
 
-    return corsResponse(origin, 200, { url }) as HttpResponseInit;
+    return corsResponse(origin, 200, { url });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     const status = msg.includes('token') || msg.includes('Token') ? 401 : 500;
-    return corsResponse(origin, status, { error: msg }) as HttpResponseInit;
+    return corsResponse(origin, status, { error: msg });
   }
 }
 

@@ -6,11 +6,11 @@ import { getProfile, isOrgAdmin } from '../shared/profile';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as {
       orgId?: unknown;
@@ -20,16 +20,16 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const { orgId, scope, status } = body;
 
     if (orgId !== undefined && typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId must be a string' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId must be a string' });
     }
     if (scope !== undefined && scope !== 'global') {
-      return corsResponse(origin, 400, { error: "scope must be 'global'" }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: "scope must be 'global'" });
     }
     if (status !== undefined && status !== 'pending' && status !== 'reviewed' && status !== 'dismissed') {
-      return corsResponse(origin, 400, { error: "status must be 'pending', 'reviewed', or 'dismissed'" }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: "status must be 'pending', 'reviewed', or 'dismissed'" });
     }
     if (orgId !== undefined && scope !== undefined) {
-      return corsResponse(origin, 400, { error: 'Provide orgId or scope, not both' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'Provide orgId or scope, not both' });
     }
 
     // Authorization
@@ -39,16 +39,16 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     if (orgId !== undefined) {
       // orgId mode: platform admin or org admin
       const canAccess = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId as string);
-      if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' });
       params.push(orgId);
       whereClauses.push(`r.org_id = $${params.length}`);
     } else if (scope === 'global') {
       // global scope: platform admin only
-      if (!profile.is_platform_admin) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      if (!profile.is_platform_admin) return corsResponse(origin, 403, { error: 'Forbidden' });
       whereClauses.push('r.org_id IS NULL');
     } else {
       // no filter: platform admin only (documented deviation — tighter than RLS)
-      if (!profile.is_platform_admin) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      if (!profile.is_platform_admin) return corsResponse(origin, 403, { error: 'Forbidden' });
     }
 
     if (status !== undefined) {
@@ -69,10 +69,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       params,
     );
 
-    return corsResponse(origin, 200, { reports }) as HttpResponseInit;
+    return corsResponse(origin, 200, { reports });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

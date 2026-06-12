@@ -18,11 +18,11 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as {
       orgId?: unknown;
@@ -36,13 +36,13 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     // Validation first, authz second, db third (mirrors org-membership-create).
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required' });
     }
     if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email)) {
-      return corsResponse(origin, 400, { error: 'email is required and must be a valid email address' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'email is required and must be a valid email address' });
     }
     if (typeof role !== 'string' || !ALLOWED_ROLES.has(role)) {
-      return corsResponse(origin, 400, { error: 'role must be one of: org_admin, learner' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'role must be one of: org_admin, learner' });
     }
     // firstName/lastName/department: optional. If provided and not null, must be string ≤ 100.
     const validateOptionalText = (val: unknown, field: string): string | null | undefined => {
@@ -54,15 +54,15 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     };
     const fnVal = validateOptionalText(firstName, 'firstName');
     if (fnVal === undefined) {
-      return corsResponse(origin, 400, { error: 'firstName must be a string of 100 characters or fewer' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'firstName must be a string of 100 characters or fewer' });
     }
     const lnVal = validateOptionalText(lastName, 'lastName');
     if (lnVal === undefined) {
-      return corsResponse(origin, 400, { error: 'lastName must be a string of 100 characters or fewer' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'lastName must be a string of 100 characters or fewer' });
     }
     const deptVal = validateOptionalText(department, 'department');
     if (deptVal === undefined) {
-      return corsResponse(origin, 400, { error: 'department must be a string of 100 characters or fewer' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'department must be a string of 100 characters or fewer' });
     }
 
     // Authorization: platform admin OR org admin of the target org.
@@ -70,7 +70,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // "Admins can insert invitations" policy (WITH CHECK is_platform_admin()
     // OR (org_id IS NOT NULL AND is_org_admin(org_id))).
     const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // Normalize email casing (matches BulkInviteDialog row normalization).
     const normalizedEmail = email.toLowerCase().trim();
@@ -85,20 +85,20 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
                    is_platform_admin_invite, invited_by_user_id, first_name, last_name, department`,
         [orgId, normalizedEmail, role, profile.id, fnVal, lnVal, deptVal],
       );
-      return corsResponse(origin, 200, { invitation }) as HttpResponseInit;
+      return corsResponse(origin, 200, { invitation });
     } catch (dbErr: unknown) {
       const code = (dbErr as { code?: string })?.code;
       if (code === '23505') {
-        return corsResponse(origin, 409, { error: 'An invitation for this email is already pending' }) as HttpResponseInit;
+        return corsResponse(origin, 409, { error: 'An invitation for this email is already pending' });
       }
       if (code === '23503') {
-        return corsResponse(origin, 404, { error: 'Organization not found' }) as HttpResponseInit;
+        return corsResponse(origin, 404, { error: 'Organization not found' });
       }
       throw dbErr;
     }
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

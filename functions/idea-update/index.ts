@@ -38,20 +38,20 @@ interface IdeaRow {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { ideaId?: unknown; updates?: unknown };
     const { ideaId, updates } = body;
 
     if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'ideaId is required' });
     }
     if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-      return corsResponse(origin, 400, { error: 'updates must be an object' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'updates must be an object' });
     }
 
     const updatesObj = updates as Record<string, unknown>;
@@ -59,7 +59,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // Filter to recognized whitelisted keys only (unknown keys are silently ignored).
     const updateKeys = Object.keys(updatesObj).filter((k) => ALLOWED_UPDATE_FIELDS.has(k));
     if (updateKeys.length === 0) {
-      return corsResponse(origin, 400, { error: 'No valid update fields provided' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'No valid update fields provided' });
     }
 
     // Per-field validation on present whitelisted keys.
@@ -67,18 +67,18 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       const v = updatesObj[key];
       if (key === 'tags') {
         if (!Array.isArray(v) || !v.every((t) => typeof t === 'string')) {
-          return corsResponse(origin, 400, { error: 'tags must be an array of strings' }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: 'tags must be an array of strings' });
         }
       } else if (key === 'business_area') {
         if (v !== null && !BUSINESS_AREAS.includes(v as string)) {
           return corsResponse(origin, 400, {
             error: `business_area must be one of: ${BUSINESS_AREAS.join(', ')}`,
-          }) as HttpResponseInit;
+          });
         }
       } else {
         // STRING_FIELDS: string or null
         if (v !== null && typeof v !== 'string') {
-          return corsResponse(origin, 400, { error: `${key} must be a string` }) as HttpResponseInit;
+          return corsResponse(origin, 400, { error: `${key} must be a string` });
         }
       }
     }
@@ -88,16 +88,16 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
       [ideaId],
     );
-    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' }) as HttpResponseInit;
+    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' });
 
     // Author-only: no admin bypass (org-admin writes go through idea-status-update).
     if (idea.user_id !== profile.id) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Forbidden' });
     }
 
     // Draft-only.
     if (idea.status !== 'draft') {
-      return corsResponse(origin, 409, { error: 'Only draft ideas can be edited' }) as HttpResponseInit;
+      return corsResponse(origin, 409, { error: 'Only draft ideas can be edited' });
     }
 
     // Build dynamic UPDATE over the provided whitelisted keys only.
@@ -114,10 +114,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       params,
     );
 
-    return corsResponse(origin, 200, { idea: updatedIdea }) as HttpResponseInit;
+    return corsResponse(origin, 200, { idea: updatedIdea });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

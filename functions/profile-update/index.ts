@@ -13,18 +13,18 @@ interface ProfileUpdateBody {
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as ProfileUpdateBody;
 
     // Validate types — all provided values must be strings
     for (const key of ['first_name', 'last_name', 'department', 'preferred_language'] as const) {
       if (body[key] !== undefined && typeof body[key] !== 'string') {
-        return corsResponse(origin, 400, { error: `${key} must be a string` }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: `${key} must be a string` });
       }
     }
 
@@ -36,32 +36,32 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     // last_name without first_name: reject (full_name derivation requires first_name)
     if (lastName !== undefined && firstName === undefined) {
-      return corsResponse(origin, 400, { error: 'first_name is required when last_name is provided' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'first_name is required when last_name is provided' });
     }
 
     // Validate first_name non-empty and max 50 chars
     if (firstName !== undefined) {
       if (firstName.length === 0) {
-        return corsResponse(origin, 400, { error: 'first_name must not be empty' }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: 'first_name must not be empty' });
       }
       if (firstName.length > 50) {
-        return corsResponse(origin, 400, { error: 'first_name must be 50 characters or fewer' }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: 'first_name must be 50 characters or fewer' });
       }
     }
 
     // Validate last_name max 50 chars (empty string is allowed → stored as NULL)
     if (lastName !== undefined && lastName.length > 50) {
-      return corsResponse(origin, 400, { error: 'last_name must be 50 characters or fewer' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'last_name must be 50 characters or fewer' });
     }
 
     // Validate department max 100 chars (empty string is allowed → stored as NULL)
     if (department !== undefined && department.length > 100) {
-      return corsResponse(origin, 400, { error: 'department must be 100 characters or fewer' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'department must be 100 characters or fewer' });
     }
 
     // Validate preferred_language
     if (prefLang !== undefined && prefLang !== 'en' && prefLang !== 'da') {
-      return corsResponse(origin, 400, { error: "preferred_language must be 'en' or 'da'" }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: "preferred_language must be 'en' or 'da'" });
     }
 
     // Build dynamic parameterized SET clause
@@ -94,7 +94,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     }
 
     if (setClauses.length === 0) {
-      return corsResponse(origin, 400, { error: 'No updatable fields provided' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'No updatable fields provided' });
     }
 
     // Caller can ONLY update their own row — id comes from the authenticated profile, never from the body
@@ -105,10 +105,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     const updated = await queryOne(sql, params);
 
-    return corsResponse(origin, 200, { profile: updated }) as HttpResponseInit;
+    return corsResponse(origin, 200, { profile: updated });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
   }
 }
 

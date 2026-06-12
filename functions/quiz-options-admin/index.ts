@@ -5,13 +5,13 @@ import { corsPreflightResponse, corsResponse } from '../shared/cors';
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const isAdmin = await queryOne<{ is_platform_admin: boolean }>(
       'SELECT is_platform_admin FROM profiles WHERE entra_oid = $1', [user.id]
     );
-    if (!isAdmin?.is_platform_admin) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!isAdmin?.is_platform_admin) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     const { quizId } = await req.json() as { quizId: string };
     // is_correct exposed only to platform admin
@@ -22,10 +22,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
        WHERE qq.quiz_id = $1 ORDER BY qq.sort_order, qo.sort_order`,
       [quizId]
     );
-    return corsResponse(origin, 200, options) as HttpResponseInit;
+    return corsResponse(origin, 200, options);
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'error' });
   }
 }
 
