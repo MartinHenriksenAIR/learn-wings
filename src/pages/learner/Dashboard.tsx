@@ -8,17 +8,20 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi, callApiRaw } from '@/lib/api-client';
 import { getSignedLmsAssetUrl } from '@/lib/storage';
 import { Enrollment, Course } from '@/lib/types';
-import { BookOpen, Clock, Award, Play, ArrowRight, Loader2, TrendingUp } from 'lucide-react';
+import { BookOpen, Clock, Award, Play, ArrowRight, TrendingUp } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerDashboard() {
-  const { user, currentOrg, profile, memberships } = useAuth();
+  const { currentOrg, profile, memberships } = useAuth();
+  const orgGuard = useOrgGuard();
   const { features } = usePlatformSettings();
   const { t } = useTranslation();
   const [enrollments, setEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
@@ -29,16 +32,13 @@ export default function LearnerDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user || !currentOrg) {
-        if (!user) {
-          // No authenticated user — nothing to load
-          setLoading(false);
-        } else if (profile) {
-          // User context has resolved (profile is non-null) but no org is available
-          // (e.g. no memberships, or platform admin with none selected) — done loading
+      // Canonical profile-gated guard (useOrgGuard): while the user context is
+      // still resolving keep the spinner; with no org available stop loading;
+      // the redundant !currentOrg check is for TypeScript narrowing only.
+      if (orgGuard !== 'ready' || !currentOrg) {
+        if (orgGuard === 'no-org') {
           setLoading(false);
         }
-        // else: user exists but profile not yet fetched — keep spinner
         return;
       }
 
@@ -70,7 +70,7 @@ export default function LearnerDashboard() {
     };
 
     fetchData();
-  }, [user, currentOrg, profile]);
+  }, [orgGuard, currentOrg]);
 
   const inProgressCourses = enrollments.filter(e => e.status === 'enrolled');
   const completedCourses = enrollments.filter(e => e.status === 'completed');
@@ -112,9 +112,7 @@ export default function LearnerDashboard() {
   if (loading) {
     return (
       <AppLayout title={t('dashboard.title')}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+        <PageSpinner />
       </AppLayout>
     );
   }

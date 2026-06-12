@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 import { Loader2, Palette, Users, Mail, ToggleLeft, Save, AlertTriangle } from 'lucide-react';
@@ -190,9 +191,7 @@ export default function PlatformSettings() {
   if (loading) {
     return (
       <AppLayout title="Platform Settings" breadcrumbs={[{ label: 'Settings' }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+        <PageSpinner />
       </AppLayout>
     );
   }

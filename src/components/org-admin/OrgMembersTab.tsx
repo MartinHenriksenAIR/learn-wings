@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SearchFilter, FilterConfig } from '@/components/ui/search-filter';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import {
   Dialog,
   DialogContent,
@@ -391,11 +392,7 @@ export function OrgMembersTab() {
   });
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   if (!currentOrg) {

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -303,9 +304,7 @@ export default function CourseEditor() {
   if (loading) {
     return (
       <AppLayout title="Course Editor">
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+        <PageSpinner />
       </AppLayout>
     );
   }

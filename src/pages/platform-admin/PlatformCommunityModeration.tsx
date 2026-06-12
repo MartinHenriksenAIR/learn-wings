@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -22,9 +22,8 @@ import {
 } from '@/components/ui/tooltip';
 import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
 import { buildReportContentLink } from '@/lib/community-report-link';
-import { callApi } from '@/lib/api-client';
+import { useOrganizations } from '@/hooks/useOrganizations';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
-import type { Organization } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -64,19 +63,17 @@ export default function PlatformCommunityModeration() {
     },
   });
 
-  // Fetch all organizations for name lookup
-  const { data: orgsMap } = useQuery({
-    queryKey: ['platform-organizations'],
-    staleTime: 5 * 60 * 1000, // org names don't change mid-session; avoid window-focus refetches
-    queryFn: async () => {
-      const res = await callApi<{ organizations: Organization[] }>('/api/organizations', {});
-      const map = new Map<string, string>();
-      for (const org of res.organizations) {
-        map.set(org.id, org.name);
-      }
-      return map;
-    },
-  });
+  // Fetch all organizations for name lookup (shared ['organizations'] cache, #87).
+  // org names don't change mid-session; the longer staleTime avoids window-focus refetches.
+  const { data: orgsData } = useOrganizations({ staleTime: 5 * 60 * 1000 });
+  const orgsMap = useMemo(() => {
+    if (!orgsData) return undefined;
+    const map = new Map<string, string>();
+    for (const org of orgsData) {
+      map.set(org.id, org.name);
+    }
+    return map;
+  }, [orgsData]);
 
   // Update report status
   const updateReportMutation = useMutation({

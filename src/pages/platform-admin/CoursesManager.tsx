@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,8 +33,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { FileUpload } from '@/components/ui/file-upload';
 import { callApi } from '@/lib/api-client';
+import { useOrganizations } from '@/hooks/useOrganizations';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
-import { Course, CourseLevel, Organization, OrgCourseAccess } from '@/lib/types';
+import { Course, CourseLevel, OrgCourseAccess } from '@/lib/types';
 import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
@@ -64,8 +66,14 @@ export default function CoursesManager() {
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Course Access state
-  const [orgs, setOrgs] = useState<Organization[]>([]);
+  // Course Access state — org list comes from the shared cache (#87)
+  const {
+    data: orgsData,
+    isLoading: orgsLoading,
+    error: orgsError,
+    refetch: refetchOrgs,
+  } = useOrganizations();
+  const orgs = orgsData ?? [];
   const [accessRecords, setAccessRecords] = useState<OrgCourseAccess[]>([]);
   const [orgSearchQuery, setOrgSearchQuery] = useState('');
   const [selectedOrg, setSelectedOrg] = useState<string>('all');
@@ -77,10 +85,7 @@ export default function CoursesManager() {
     // toggle/create/delete handlers, which must not blank the page with the full spinner.
     setLoadError(null);
     try {
-      const [adminRes, orgsRes] = await Promise.all([
-        callApi<{ courses: Course[]; accessRecords: OrgCourseAccess[] }>('/api/courses-admin', {}),
-        callApi<{ organizations: Organization[] }>('/api/organizations', {}),
-      ]);
+      const adminRes = await callApi<{ courses: Course[]; accessRecords: OrgCourseAccess[] }>('/api/courses-admin', {});
 
       const coursesWithFreshThumbnails = await Promise.all(
         adminRes.courses.map(async (course) => ({
@@ -90,7 +95,6 @@ export default function CoursesManager() {
       );
       setCourses(coursesWithFreshThumbnails);
       setAccessRecords(adminRes.accessRecords);
-      setOrgs(orgsRes.organizations);
     } catch (err) {
       setLoadError((err as Error).message);
       toast({ title: 'Failed to load courses', description: (err as Error).message, variant: 'destructive' });
@@ -100,6 +104,14 @@ export default function CoursesManager() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // The org list now loads via the shared query; a failure there still surfaces
+  // through the page's existing "Failed to load courses" error block + toast.
+  useEffect(() => {
+    if (orgsError) {
+      toast({ title: 'Failed to load courses', description: (orgsError as Error).message, variant: 'destructive' });
+    }
+  }, [orgsError]);
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
@@ -275,28 +287,29 @@ export default function CoursesManager() {
   });
   const publishedCourses = courses.filter((c) => c.is_published);
 
-  if (loading) {
+  const combinedLoadError = loadError ?? (orgsError ? (orgsError as Error).message : null);
+
+  if (loading || orgsLoading) {
     return (
       <AppLayout title="Course Manager">
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+        <PageSpinner />
       </AppLayout>
     );
   }
 
-  if (!loading && loadError) {
+  if (combinedLoadError) {
     return (
       <AppLayout title="Course Manager">
         <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
           <p className="text-destructive font-medium">Failed to load courses</p>
-          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <p className="text-sm text-muted-foreground">{combinedLoadError}</p>
           <Button
             variant="outline"
             onClick={() => {
               setLoadError(null);
               setLoading(true); // retry is a full reload — show the spinner, not a flash of empty UI
               fetchData();
+              if (orgsError) refetchOrgs();
             }}
           >
             Retry

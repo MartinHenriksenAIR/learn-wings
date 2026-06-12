@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { PdfViewer } from '@/components/learner/PdfViewer';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -333,9 +334,7 @@ export default function CoursePlayer() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+        <PageSpinner />
       </AppLayout>
     );
   }

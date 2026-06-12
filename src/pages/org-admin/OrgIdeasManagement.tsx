@@ -23,7 +23,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { IdeaStatusBadge } from '@/components/community/IdeaStatusBadge';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { fetchIdeas, updateIdeaStatus } from '@/lib/ideas-api';
 import { BUSINESS_AREAS, IDEA_STATUS_OPTIONS } from '@/lib/community-types';
 import type { IdeaStatusExtended, BusinessArea, EnhancedIdea } from '@/lib/community-types';
@@ -63,6 +65,7 @@ const COLUMN_DROP_STATUS: Record<string, IdeaStatusExtended> = {
 export default function OrgIdeasManagement() {
   const navigate = useNavigate();
   const { currentOrg } = useAuth();
+  const orgGuard = useOrgGuard();
   const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,6 +143,16 @@ export default function OrgIdeasManagement() {
       setDraggedIdeaId(null);
     }
   };
+
+  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
+  // while the signed-in user's context is still resolving.
+  if (orgGuard === 'loading') {
+    return (
+      <AppLayout>
+        <PageSpinner />
+      </AppLayout>
+    );
+  }
 
   if (!currentOrg) {
     return (

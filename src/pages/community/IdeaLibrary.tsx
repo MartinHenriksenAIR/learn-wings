@@ -15,7 +15,9 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IdeaCard } from '@/components/community/IdeaCard';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { fetchIdeas, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
@@ -36,6 +38,7 @@ export default function IdeaLibrary() {
   // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID
   // and never matches ideas.user_id post-migration.
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const orgGuard = useOrgGuard();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
 
   const initialTab = searchParams.get('tab') || 'all';
@@ -104,6 +107,16 @@ export default function IdeaLibrary() {
 
   if (!settingsLoading && !features.community_enabled) {
     return <Navigate to="/app/dashboard" replace />;
+  }
+
+  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
+  // while the signed-in user's context is still resolving.
+  if (orgGuard === 'loading') {
+    return (
+      <AppLayout>
+        <PageSpinner />
+      </AppLayout>
+    );
   }
 
   if (!currentOrg) {

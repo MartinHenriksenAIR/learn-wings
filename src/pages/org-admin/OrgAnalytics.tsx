@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,11 +15,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrganizations } from '@/hooks/useOrganizations';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi, callApiRaw } from '@/lib/api-client';
 import { buildPublicUrl } from '@/lib/storage-url';
-import { Organization } from '@/lib/types';
-import { Loader2, Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
+import { Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
 import { TeamPerformanceTab } from '@/components/org-admin/analytics/TeamPerformanceTab';
@@ -41,7 +42,6 @@ export default function OrgAnalytics() {
   const { currentOrg, isPlatformAdmin, refreshUserContext } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [loading, setLoading] = useState(true);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
   const [stats, setStats] = useState({
@@ -63,25 +63,21 @@ export default function OrgAnalytics() {
     setSearchParams({ tab: value });
   };
 
-  // Fetch organizations for global view filter
+  // Fetch organizations for global view filter (shared cache, #87)
+  const { data: orgsData, error: orgsError } = useOrganizations({
+    enabled: isGlobalView && isPlatformAdmin,
+  });
+  // endpoint returns created_at DESC (accepted 3a parity break); the filter dropdown was name-ordered
+  const organizations = useMemo(
+    () => [...(orgsData ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [orgsData]
+  );
   useEffect(() => {
-    const fetchOrganizations = async () => {
-      if (!isGlobalView || !isPlatformAdmin) return;
-
-      try {
-        const { organizations: orgs } = await callApi<{ organizations: Organization[] }>(
-          '/api/organizations',
-          {},
-        );
-        // endpoint returns created_at DESC (accepted 3a parity break); the filter dropdown was name-ordered
-        setOrganizations([...(orgs ?? [])].sort((a, b) => a.name.localeCompare(b.name)));
-      } catch (err) {
-        // parity: the old client ignored fetch errors (filter just shows "All Organizations")
-        console.error('OrgAnalytics: failed to load organizations', err);
-      }
-    };
-    fetchOrganizations();
-  }, [isGlobalView, isPlatformAdmin]);
+    // parity: the old client ignored fetch errors (filter just shows "All Organizations")
+    if (orgsError) {
+      console.error('OrgAnalytics: failed to load organizations', orgsError);
+    }
+  }, [orgsError]);
 
   // Determine which org ID to use for queries
   const effectiveOrgId = isGlobalView 
@@ -221,9 +217,7 @@ export default function OrgAnalytics() {
   if (loading || settingsLoading) {
     return (
       <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+        <PageSpinner />
       </AppLayout>
     );
   }

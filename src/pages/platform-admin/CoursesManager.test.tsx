@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // --- mock AppLayout as passthrough ---
@@ -48,10 +49,15 @@ const successResponse = [
 ];
 
 function renderPage() {
+  // useOrganizations needs a QueryClient; fresh per render (retry off) so the
+  // call-count-based mocks below stay deterministic and no cache leaks between tests.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <CoursesManager />
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <CoursesManager />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -86,9 +92,9 @@ describe('CoursesManager — fetchData error handling', () => {
     let callCount = 0;
     mockCallApi.mockImplementation(async (path: string) => {
       callCount++;
-      // First two calls are the initial load's Promise.all — fail them
+      // First two calls are the initial load (courses-admin + shared organizations query) — fail them
       if (callCount <= 2) throw new Error('Network error');
-      // Subsequent calls are the Retry's Promise.all — succeed them
+      // Subsequent calls are the Retry's refetches — succeed them
       if (path === '/api/courses-admin') return successResponse[0];
       if (path === '/api/organizations') return successResponse[1];
     });

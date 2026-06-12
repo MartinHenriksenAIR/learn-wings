@@ -7,7 +7,9 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Loader2, Building2 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
@@ -29,7 +31,8 @@ const featureLabels: Record<keyof FeatureSettings, string> = {
 };
 
 export default function OrgSettings() {
-  const { user, profile, currentOrg } = useAuth();
+  const { currentOrg } = useAuth();
+  const orgGuard = useOrgGuard();
   const { platformFeatures, orgFeatures, isLoading, refetch } = usePlatformSettings();
   const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
@@ -69,15 +72,13 @@ export default function OrgSettings() {
     }
   };
 
-  // Spinner: settings still loading, OR user exists but profile not yet resolved.
+  // Spinner: settings still loading, OR user context not yet resolved (useOrgGuard).
   // `!saving` keeps the form mounted during the post-save refetch (which flips the
   // shared isLoading) — otherwise every Save flashes a full-page spinner mid-edit.
-  if ((isLoading && !saving) || (user && !profile)) {
+  if ((isLoading && !saving) || orgGuard === 'loading') {
     return (
       <AppLayout title="Organization Settings" breadcrumbs={[{ label: 'Organization Settings' }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+        <PageSpinner />
       </AppLayout>
     );
   }

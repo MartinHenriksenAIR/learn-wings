@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +35,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
 import { callApi, ApiError } from '@/lib/api-client';
+import { useOrganizations } from '@/hooks/useOrganizations';
 import { Organization, Profile, OrgRole } from '@/lib/types';
 import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail, UsersRound } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
@@ -43,9 +45,17 @@ import { orgSchema } from '@/lib/org-validation';
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
-  const [orgs, setOrgs] = useState<(Organization & { memberCount: number })[]>([]);
+  const {
+    data: orgsData,
+    isLoading: loading,
+    error: orgsError,
+    refetch: refetchOrgs,
+  } = useOrganizations();
+  const orgs = useMemo<(Organization & { memberCount: number })[]>(
+    () => (orgsData ?? []).map((o) => ({ ...o, memberCount: o.member_count })),
+    [orgsData]
+  );
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
@@ -60,21 +70,17 @@ export default function OrganizationsManager() {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [inviteEmail, setInviteEmail] = useState('');
 
-  const fetchOrgs = async () => {
-    try {
-      const { organizations } = await callApi<{ organizations: Organization[] }>('/api/organizations', {});
-      setOrgs((organizations ?? []).map((o) => ({ ...o, memberCount: o.member_count })));
-    } catch (err) {
+  // Org list failures surface the same way the old inline fetch did.
+  useEffect(() => {
+    if (orgsError) {
       toast({
         title: 'Failed to load organizations',
-        description: err instanceof Error ? err.message : 'Unknown error',
+        description: orgsError instanceof Error ? orgsError.message : 'Unknown error',
         variant: 'destructive',
       });
-      console.error('OrganizationsManager: failed to load organizations', err);
-    } finally {
-      setLoading(false);
+      console.error('OrganizationsManager: failed to load organizations', orgsError);
     }
-  };
+  }, [orgsError]);
 
   const fetchProfiles = async () => {
     try {
@@ -91,7 +97,6 @@ export default function OrganizationsManager() {
   };
 
   useEffect(() => {
-    fetchOrgs();
     fetchProfiles();
   }, []);
 
@@ -190,7 +195,7 @@ export default function OrganizationsManager() {
       }
       setCreateOpen(false);
       resetForm();
-      fetchOrgs();
+      refetchOrgs();
     } finally {
       setCreating(false);
     }
@@ -219,9 +224,7 @@ export default function OrganizationsManager() {
   if (loading) {
     return (
       <AppLayout title="Organizations" breadcrumbs={[{ label: 'Organizations' }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+        <PageSpinner />
       </AppLayout>
     );
   }

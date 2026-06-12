@@ -37,7 +37,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { createIdea, submitIdea, updateIdea, fetchIdea, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
@@ -76,6 +78,7 @@ export default function IdeaSubmit() {
   const { ideaId } = useParams<{ ideaId?: string }>();
   // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
   const { currentOrg, profile } = useAuth();
+  const orgGuard = useOrgGuard();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
@@ -247,6 +250,16 @@ export default function IdeaSubmit() {
 
   if (!settingsLoading && !features.community_enabled) {
     return <Navigate to="/app/dashboard" replace />;
+  }
+
+  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
+  // while the signed-in user's context is still resolving.
+  if (orgGuard === 'loading') {
+    return (
+      <AppLayout>
+        <PageSpinner />
+      </AppLayout>
+    );
   }
 
   if (!currentOrg) {

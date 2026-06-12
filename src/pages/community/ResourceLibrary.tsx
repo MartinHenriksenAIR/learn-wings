@@ -25,7 +25,9 @@ import {
 import { ResourceCard } from '@/components/community/ResourceCard';
 import { ResourceForm } from '@/components/community/ResourceForm';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { toast } from '@/components/ui/sonner';
 import {
@@ -48,6 +50,7 @@ import {
 export default function ResourceLibrary() {
   const navigate = useNavigate();
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const orgGuard = useOrgGuard();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
@@ -128,6 +131,16 @@ export default function ResourceLibrary() {
 
   if (!settingsLoading && !features.community_enabled) {
     return <Navigate to="/app/dashboard" replace />;
+  }
+
+  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
+  // while the signed-in user's context is still resolving.
+  if (orgGuard === 'loading') {
+    return (
+      <AppLayout>
+        <PageSpinner />
+      </AppLayout>
+    );
   }
 
   if (!currentOrg) {

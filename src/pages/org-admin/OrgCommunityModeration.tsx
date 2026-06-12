@@ -19,7 +19,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
 import { buildReportContentLink } from '@/lib/community-report-link';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
@@ -45,6 +47,7 @@ interface ReportWithDetails extends Omit<CommunityReport, 'reporter'> {
 
 export default function OrgCommunityModeration() {
   const { currentOrg } = useAuth();
+  const orgGuard = useOrgGuard();
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<ReportStatus>('pending');
@@ -163,6 +166,16 @@ export default function OrgCommunityModeration() {
     if (!path) return;
     window.open(path, '_blank', 'noopener,noreferrer');
   };
+
+  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
+  // while the signed-in user's context is still resolving.
+  if (orgGuard === 'loading') {
+    return (
+      <AppLayout>
+        <PageSpinner />
+      </AppLayout>
+    );
+  }
 
   if (!currentOrg) {
     return (

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { callApi } from '@/lib/api-client';
+import { useOrganizations } from '@/hooks/useOrganizations';
 import { Organization } from '@/lib/types';
 import {
   Select,
@@ -13,41 +13,29 @@ import { Building2, Loader2 } from 'lucide-react';
 
 export function OrgSelector() {
   const { currentOrg, setCurrentOrg, isPlatformAdmin, viewMode } = useAuth();
-  const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: orgs = [], isLoading: loading, error } = useOrganizations({
+    enabled: isPlatformAdmin,
+  });
+
+  // Auto-select the first org ONCE per mount when none is currently selected.
+  // Deliberately not re-running on later refetches — a background refetch must
+  // not reset the user's explicit "Platform-wide (no org)" choice.
+  const autoSelected = useRef(false);
+  useEffect(() => {
+    if (autoSelected.current || orgs.length === 0) return;
+    autoSelected.current = true;
+    if (!currentOrg) {
+      setCurrentOrg(orgs[0]);
+    }
+    // Only react to the org list arriving — not currentOrg, to avoid resetting user's choice
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgs]);
 
   useEffect(() => {
-    const fetchOrgs = async () => {
-      if (!isPlatformAdmin) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const { organizations } = await callApi<{ organizations: Organization[] }>(
-          '/api/organizations',
-          {},
-        );
-        if (Array.isArray(organizations)) {
-          setOrgs(organizations);
-          // Only auto-select first org if none is currently selected
-          if (!currentOrg && organizations.length > 0) {
-            setCurrentOrg(organizations[0]);
-          }
-        } else {
-          console.warn('OrgSelector: unexpected response shape from /api/organizations', organizations);
-        }
-      } catch (err) {
-        console.error('OrgSelector: failed to load organizations', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrgs();
-    // Only depend on isPlatformAdmin — not currentOrg, to avoid resetting user's choice
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlatformAdmin]);
+    if (error) {
+      console.error('OrgSelector: failed to load organizations', error);
+    }
+  }, [error]);
 
   // Ensure an org is selected when entering org_admin mode
   useEffect(() => {
