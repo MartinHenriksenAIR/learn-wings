@@ -11,21 +11,25 @@ import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi } from '@/lib/api-client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
-import { 
-  ChevronRight, 
-  CheckCircle2, 
-  Circle, 
-  Play, 
-  FileText, 
+import {
+  ChevronRight,
+  CheckCircle2,
+  Circle,
+  Play,
+  FileText,
   HelpCircle,
   Loader2,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  Star
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
 import { CourseCompletionDialog } from '@/components/course/CourseCompletionDialog';
 import { CourseReviewDialog } from '@/components/course/CourseReviewDialog';
+
+// Minimum course progress (percent of lessons completed) before the review entry point appears.
+const REVIEW_MIN_PROGRESS = 20;
 
 export default function CoursePlayer() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -355,6 +359,17 @@ export default function CoursePlayer() {
                 </div>
                 <Progress value={progressPercent} className="h-2" />
               </div>
+              {features.course_reviews_enabled && progressPercent >= REVIEW_MIN_PROGRESS && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 w-full"
+                  onClick={() => setShowReviewDialog(true)}
+                >
+                  <Star className="mr-2 h-4 w-4" />
+                  {existingReview ? 'Edit your review' : 'Rate this course'}
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[500px] overflow-y-auto">
