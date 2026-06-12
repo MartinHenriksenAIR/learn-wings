@@ -10,7 +10,7 @@ vi.mock('@/lib/api-client', () => ({
 import { createIdea, updateIdea } from './ideas-api';
 import type { BusinessArea } from '@/lib/community-types';
 
-describe('ideas-api payload coercions (old Supabase-lib parity)', () => {
+describe('ideas-api payload coercions (old client-lib parity)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCallApi.mockResolvedValue({ idea: { id: 'idea-1' } });

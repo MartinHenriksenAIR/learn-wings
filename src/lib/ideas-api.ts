@@ -28,7 +28,7 @@ export async function fetchIdea(ideaId: string): Promise<EnhancedIdea | null> {
 // Create idea
 // `|| null` coercions are old-lib parity: IdeaSubmit's form defaults every field
 // to '' (incl. business_area, a PG enum server-side) — '' would 400 the endpoint's
-// enum validation, and the old Supabase lib stored null, not ''.
+// enum validation, and the old client lib stored null, not ''.
 export async function createIdea(input: CreateIdeaInput): Promise<EnhancedIdea> {
   const res = await callApi<{ idea: EnhancedIdea }>('/api/idea-create', {
     orgId: input.org_id,

@@ -39,7 +39,7 @@ describe('extractLmsAssetPath', () => {
     // Host is "evil.blob.core.windows.net.attacker.com" — does NOT end with .blob.core.windows.net
     const url =
       'https://evil.blob.core.windows.net.attacker.com/lms-assets/course-thumbnails/evil.png?sig=x';
-    // Falls through — no Supabase prefix, is an http URL but unrecognised, returns null
+    // Falls through — no legacy storage prefix, is an http URL but unrecognised, returns null
     expect(extractLmsAssetPath(url)).toBeNull();
   });
 
@@ -63,17 +63,19 @@ describe('extractLmsAssetPath', () => {
     expect(extractLmsAssetPath(url)).toBeNull();
   });
 
-  // ── Supabase legacy branches (pinned — must not regress) ─────────────
+  // ── Legacy storage-prefix branches (pinned — must not regress) ───────
+  // Matched by URL path prefix (/storage/v1/object/{sign,public}/lms-assets/),
+  // NOT by hostname — so any host carrying that path hits these branches.
 
-  it('Supabase signed-URL prefix → storage path', () => {
+  it('legacy signed-URL prefix → storage path', () => {
     const url =
-      'https://example.supabase.co/storage/v1/object/sign/lms-assets/course-thumbnails/xyz.png?token=abc';
+      'https://legacy.example.com/storage/v1/object/sign/lms-assets/course-thumbnails/xyz.png?token=abc';
     expect(extractLmsAssetPath(url)).toBe('course-thumbnails/xyz.png');
   });
 
-  it('Supabase public-URL prefix → storage path', () => {
+  it('legacy public-URL prefix → storage path', () => {
     const url =
-      'https://example.supabase.co/storage/v1/object/public/lms-assets/course-thumbnails/xyz.png';
+      'https://legacy.example.com/storage/v1/object/public/lms-assets/course-thumbnails/xyz.png';
     expect(extractLmsAssetPath(url)).toBe('course-thumbnails/xyz.png');
   });
 

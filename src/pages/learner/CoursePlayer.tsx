@@ -165,7 +165,7 @@ export default function CoursePlayer() {
           }
           setSignedVideoUrl(null);
         } else if (currentLesson.video_storage_path) {
-          // Fallback to Supabase storage for legacy videos
+          // Fallback to legacy storage path for older videos
           const videoUrl = await getSignedAssetUrl(currentLesson.video_storage_path);
           setSignedVideoUrl(videoUrl);
           setAzureVideoUrl(null);
@@ -189,7 +189,7 @@ export default function CoursePlayer() {
             }
             setSignedDocUrl(null);
           } else {
-            // Legacy Supabase-stored document
+            // Legacy storage-path document
             const docUrl = await getSignedAssetUrl(currentLesson.document_storage_path);
             setSignedDocUrl(docUrl);
             setAzureDocUrl(null);

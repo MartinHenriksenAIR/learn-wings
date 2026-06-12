@@ -56,7 +56,7 @@ export function extractLmsAssetPath(value: string | null): string | null {
     }
   } catch {
     // Malformed URL, or an undecodable percent-encoded blob segment (decodeURIComponent
-    // throws on bad encoding) — fall through to Supabase / null branches below.
+    // throws on bad encoding) — fall through to the legacy storage-prefix / null branches below.
     // Such a stored value won't self-heal, but callers never see a throw.
   }
 
