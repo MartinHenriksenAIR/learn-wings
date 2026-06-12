@@ -697,8 +697,11 @@ export function OrgMembersTab() {
       )}
 
       {/* Role Change Confirmation Dialog */}
+      {/* `open` must be a boolean from the first render — `roleChangeDialog?.open` is
+          undefined until the dialog is first used, which flips the AlertDialog from
+          uncontrolled to controlled and triggers a React console warning (#81 pattern). */}
       <AlertDialog
-        open={roleChangeDialog?.open}
+        open={!!roleChangeDialog?.open}
         onOpenChange={(open) => !open && setRoleChangeDialog(null)}
       >
         <AlertDialogContent>
@@ -733,7 +736,7 @@ export function OrgMembersTab() {
 
       {/* Remove Member Confirmation Dialog */}
       <AlertDialog
-        open={removeMemberDialog?.open}
+        open={!!removeMemberDialog?.open}
         onOpenChange={(open) => !open && setRemoveMemberDialog(null)}
       >
         <AlertDialogContent>

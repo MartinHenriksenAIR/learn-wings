@@ -106,6 +106,10 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     const updated = await queryOne(sql, params);
 
+    // The row can vanish between getProfile and the UPDATE (account deletion race) —
+    // without this guard the endpoint would answer 200 { profile: null }.
+    if (!updated) return corsResponse(origin, 404, { error: 'Profile not found' });
+
     return corsResponse(origin, 200, { profile: updated });
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });

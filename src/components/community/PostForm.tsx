@@ -142,7 +142,8 @@ export function PostForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{editMode ? 'Edit Post' : 'Create New Post'}</DialogTitle>
         </DialogHeader>

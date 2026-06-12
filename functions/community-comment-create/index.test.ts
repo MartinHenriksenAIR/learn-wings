@@ -4,7 +4,7 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsAct
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQuery: vi.fn(), mockQueryOne: vi.fn(),
+    mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(), mockIsActiveMember: vi.fn(), mockIsOrgAdmin: vi.fn(),
   };
 });

@@ -267,7 +267,8 @@ export default function OrgAnalytics() {
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
+                <DialogContent aria-describedby={undefined}>
                   <DialogHeader>
                     <DialogTitle>Update Organization Logo</DialogTitle>
                   </DialogHeader>

@@ -6,7 +6,7 @@ import { IdeaStatusBadge } from './IdeaStatusBadge';
 import { TagList } from './TagList';
 import { MessageSquare, ThumbsUp, Briefcase, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, getInitials } from '@/lib/utils';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { EnhancedIdea } from '@/lib/community-types';
 import { useAuth } from '@/hooks/useAuth';
@@ -33,12 +33,7 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
   // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
   const { profile, effectiveIsOrgAdmin } = useAuth();
   
-  const initials = idea.profile?.full_name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'U';
+  const initials = getInitials(idea.profile?.full_name);
 
   const businessAreaLabel = idea.business_area 
     ? BUSINESS_AREAS.find((b) => b.value === idea.business_area)?.label 

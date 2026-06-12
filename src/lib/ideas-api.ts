@@ -3,6 +3,7 @@ import type {
   EnhancedIdea,
   CreateIdeaInput,
   UpdateIdeaStatusInput,
+  IdeaComment,
   IdeaFilters,
 } from '@/lib/community-types';
 
@@ -108,10 +109,8 @@ export async function removeVoteFromIdea(ideaId: string): Promise<void> {
 }
 
 // Fetch idea comments
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function fetchIdeaComments(ideaId: string): Promise<any[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const res = await callApi<{ comments: any[] }>('/api/idea-comments', { ideaId });
+export async function fetchIdeaComments(ideaId: string): Promise<IdeaComment[]> {
+  const res = await callApi<{ comments: IdeaComment[] }>('/api/idea-comments', { ideaId });
   return res.comments ?? [];
 }
 
@@ -121,9 +120,8 @@ export async function createIdeaComment(
   orgId: string,
   content: string,
   parentId?: string
-) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const res = await callApi<{ comment: any }>('/api/idea-comment-create', {
+): Promise<IdeaComment> {
+  const res = await callApi<{ comment: IdeaComment }>('/api/idea-comment-create', {
     ideaId,
     content,
     parentCommentId: parentId,

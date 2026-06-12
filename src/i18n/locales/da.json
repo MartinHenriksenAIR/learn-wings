@@ -219,7 +219,9 @@
     "share": "Del",
     "report": "Rapporter",
     "alreadyReported": "Allerede rapporteret",
-    "alreadyReportedDescription": "Du har allerede rapporteret dette indhold. Vores moderatorer vil gennemgå det."
+    "alreadyReportedDescription": "Du har allerede rapporteret dette indhold. Vores moderatorer vil gennemgå det.",
+    "deletePostConfirmTitle": "Slet dette opslag?",
+    "deletePostConfirmDescription": "Denne handling kan ikke fortrydes. Opslaget og dets kommentarer vil blive slettet permanent."
   },
   "ideas": {
     "title": "Idéer",

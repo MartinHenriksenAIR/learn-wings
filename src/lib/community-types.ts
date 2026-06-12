@@ -141,6 +141,18 @@ export interface EnhancedIdea {
   user_has_voted?: boolean;
 }
 
+// Idea comment (idea_comments row + the server's joined profile embed)
+export interface IdeaComment {
+  id: string;
+  idea_id: string;
+  org_id: string;
+  user_id: string;
+  content: string;
+  parent_comment_id: string | null;
+  created_at: string;
+  profile: { id: string; full_name: string | null } | null;
+}
+
 // Business area options for forms
 export const BUSINESS_AREAS: { value: BusinessArea; label: string }[] = [
   { value: 'hr', label: 'HR / People' },

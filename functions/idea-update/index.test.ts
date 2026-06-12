@@ -144,14 +144,14 @@ describe('idea-update', () => {
 
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('UPDATE ideas');
-    expect(sql).toContain('title');
-    expect(sql).toContain('pain_points');
+    // Exact placeholder positions: SET clauses follow the body's key order, id is last
+    expect(sql).toContain('title = $1');
+    expect(sql).toContain('pain_points = $2');
+    expect(sql).toContain('WHERE id = $3');
     // SET clause must NOT contain unrelated whitelisted columns
     expect(sql).not.toContain('description');
     expect(sql).not.toContain('business_area');
-    expect(params).toContain('Updated');
-    expect(params).toContain('slow');
-    expect(params).toContain('idea-1');
+    expect(params).toEqual(['Updated', 'slow', 'idea-1']); // exact placeholder order
   });
 
   it('ignores unknown keys but applies recognized ones', async () => {

@@ -21,6 +21,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { getInitials } from '@/lib/utils';
 import type { CommunityResource } from '@/lib/resources-api';
 
 interface ResourceCardProps {
@@ -50,12 +51,7 @@ export function ResourceCard({
   const TypeIcon = typeIcons[resource.resource_type] || Link;
   const canManage = isOwner || isAdmin;
 
-  const initials = resource.profile?.full_name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'U';
+  const initials = getInitials(resource.profile?.full_name);
 
   return (
     <Card className={`group hover:shadow-md transition-shadow ${resource.is_pinned ? 'border-primary/50 bg-primary/5' : ''}`}>

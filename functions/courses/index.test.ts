@@ -47,19 +47,18 @@ describe('courses', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 when courseIds is not an array of strings
-  it('returns 400 when courseIds is not an array of strings', async () => {
-    const res1 = await handler(baseReq({ courseIds: 'x' }), {} as any);
-    expect(res1.status).toBe(400);
-    expect(JSON.parse(res1.body as string)).toEqual({ error: 'courseIds must be an array of strings' });
+  // 3. 400 when courseIds is not an array
+  it('returns 400 when courseIds is not an array', async () => {
+    const res = await handler(baseReq({ courseIds: 'x' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'courseIds must be an array of strings' });
+  });
 
-    vi.clearAllMocks();
-    mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
-    mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
-
-    const res2 = await handler(baseReq({ courseIds: [1] }), {} as any);
-    expect(res2.status).toBe(400);
-    expect(JSON.parse(res2.body as string)).toEqual({ error: 'courseIds must be an array of strings' });
+  // 3b. 400 when courseIds contains non-string elements
+  it('returns 400 when courseIds contains non-string elements', async () => {
+    const res = await handler(baseReq({ courseIds: [1] }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'courseIds must be an array of strings' });
   });
 
   // 4. Platform admin, no filter — no JOIN, no WHERE, explicit columns, no SELECT *

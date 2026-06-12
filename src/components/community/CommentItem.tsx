@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, getInitials } from '@/lib/utils';
 import type { CommunityComment } from '@/lib/community-types';
 
 interface CommentItemProps {
@@ -44,12 +44,7 @@ export function CommentItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
 
-  const initials = comment.profile?.full_name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'U';
+  const initials = getInitials(comment.profile?.full_name);
 
   const isAuthor = currentUserId === comment.user_id;
   const canEdit = isAuthor && !comment.is_hidden;

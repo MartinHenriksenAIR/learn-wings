@@ -3,6 +3,17 @@ import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -44,6 +55,7 @@ import {
   Pin,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { getInitials } from '@/lib/utils';
 import type { CommunityScope } from '@/lib/community-types';
 
 export default function PostDetail() {
@@ -220,12 +232,7 @@ export default function PostDetail() {
     );
   }
 
-  const initials = post.profile?.full_name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'U';
+  const initials = getInitials(post.profile?.full_name);
 
   const isEvent = post.category?.slug === 'events';
 
@@ -358,19 +365,31 @@ export default function PostDetail() {
                       <Edit2 className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm('Are you sure you want to delete this post?')) {
-                          deletePostMutation.mutate();
-                        }
-                      }}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="text-destructive">
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{t('community.deletePostConfirmTitle')}</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {t('community.deletePostConfirmDescription')}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deletePostMutation.mutate()}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {t('common.delete')}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </>
                 )}
                 {isAdmin && (

@@ -288,7 +288,8 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
 
       {/* Course Detail Dialog */}
       <Dialog open={!!selectedCourse} onOpenChange={(open) => !open && setSelectedCourse(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {selectedCourse?.title}

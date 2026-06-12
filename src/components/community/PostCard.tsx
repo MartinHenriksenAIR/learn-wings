@@ -6,7 +6,7 @@ import { CategoryBadge } from './CategoryBadge';
 import { TagList } from './TagList';
 import { MessageSquare, Pin, Lock, Calendar, MapPin, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, getInitials } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
 interface PostCardProps {
@@ -24,12 +24,7 @@ export function PostCard({
   onToggleHide,
   onToggleLock,
 }: PostCardProps) {
-  const initials = post.profile?.full_name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'U';
+  const initials = getInitials(post.profile?.full_name);
 
   const isEvent = post.category?.slug === 'events';
   const isAnnouncement = post.category?.slug === 'announcements';

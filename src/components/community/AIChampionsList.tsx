@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles } from 'lucide-react';
 import { callApi } from '@/lib/api-client';
+import { getInitials } from '@/lib/utils';
 
 interface ChampionProfile {
   id: string;
@@ -37,15 +38,6 @@ export function AIChampionsList({ orgId }: AIChampionsListProps) {
     return null;
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -65,9 +57,7 @@ export function AIChampionsList({ orgId }: AIChampionsListProps) {
           >
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                {champion.profile?.full_name
-                  ? getInitials(champion.profile.full_name)
-                  : '??'}
+                {getInitials(champion.profile?.full_name, '??')}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">

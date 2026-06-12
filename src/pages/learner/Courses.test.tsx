@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
@@ -35,6 +35,7 @@ vi.mock('@/hooks/useAuth', () => ({
 }));
 
 import LearnerCourses from './Courses';
+import { callApi } from '@/lib/api-client';
 
 const baseAuthState = {
   user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
@@ -94,5 +95,33 @@ describe('LearnerCourses — profile-gated loading guard', () => {
 
     // Profile is null and currentOrg is null — guard must keep spinner
     expect(document.querySelector('.animate-spin')).not.toBeNull();
+    // ...and must NOT fire the org-scoped fetch while the context is unresolved
+    expect(callApi).not.toHaveBeenCalled();
+  });
+
+  it('fetches and resolves the spinner once the profile and org resolve (keep-waiting → ready)', async () => {
+    vi.mocked(callApi).mockResolvedValue({ courses: [], enrollments: [] });
+
+    // Initial render: context unresolved → spinner, no fetch
+    mockUseAuth.mockReturnValue({ ...baseAuthState, user: baseAuthState.user, profile: null, currentOrg: null });
+    const { rerender } = renderCourses();
+    expect(document.querySelector('.animate-spin')).not.toBeNull();
+    expect(callApi).not.toHaveBeenCalled();
+
+    // Context resolves with an org → fetch fires and the spinner clears
+    const currentOrg = { id: 'org-1', name: 'Org One' };
+    mockUseAuth.mockReturnValue({ ...baseAuthState, profile: baseAuthState.profile, currentOrg });
+    rerender(
+      <MemoryRouter>
+        <LearnerCourses />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(callApi).toHaveBeenCalledWith('/api/learner-courses', { orgId: 'org-1' });
+    });
+    await waitFor(() => {
+      expect(document.querySelector('.animate-spin')).toBeNull();
+    });
   });
 });

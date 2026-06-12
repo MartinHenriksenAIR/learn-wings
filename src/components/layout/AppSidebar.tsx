@@ -45,6 +45,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
+import { getInitials } from '@/lib/utils';
 import logoLightDa from '@/assets/logo-light.png';
 import logoLightEn from '@/assets/logo-light-en.png';
 
@@ -104,12 +105,7 @@ export function AppSidebar() {
     { title: t('nav.platformSettings'), url: '/app/admin/platform/settings', icon: SettingsIcon },
   ];
 
-  const initials = profile?.full_name
-    ?.split(' ')
-    .map(n => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || 'U';
+  const initials = getInitials(profile?.full_name);
 
   const getCurrentRoleLabel = () => {
     if (isPlatformAdmin) {

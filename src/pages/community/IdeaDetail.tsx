@@ -37,6 +37,7 @@ import {
 } from '@/lib/ideas-api';
 import { BUSINESS_AREAS, IDEA_STATUS_OPTIONS } from '@/lib/community-types';
 import type { IdeaStatusExtended } from '@/lib/community-types';
+import { getInitials } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -511,7 +512,7 @@ export default function IdeaDetail() {
               <div className="flex gap-3">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="text-xs">
-                    {profile?.full_name?.slice(0, 2).toUpperCase() || 'U'}
+                    {getInitials(profile?.full_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 space-y-2">
@@ -554,7 +555,7 @@ export default function IdeaDetail() {
                     <div className="flex gap-3">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="text-xs">
-                          {comment.profile?.full_name?.slice(0, 2).toUpperCase() || 'U'}
+                          {getInitials(comment.profile?.full_name)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">

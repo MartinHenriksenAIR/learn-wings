@@ -89,7 +89,8 @@ export function ResourceForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
+      <DialogContent className="sm:max-w-[500px]" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{editResource ? 'Edit Resource' : 'Add Resource'}</DialogTitle>
         </DialogHeader>

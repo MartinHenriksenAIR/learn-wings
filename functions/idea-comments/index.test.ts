@@ -131,6 +131,17 @@ describe('idea-comments', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  // Own draft but caller is no longer an active member → empty (membership check
+  // runs after the draft-privacy check and has no author bypass)
+  it('returns 200 empty comments for caller\'s own draft when caller is not an active member', async () => {
+    mockQueryOne.mockResolvedValueOnce(ownDraft);
+    mockIsActiveMember.mockResolvedValueOnce(false);
+    const res = await handler(baseReq({ ideaId: 'idea-3' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ comments: [] });
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   // Own draft → comments returned
   it('returns comments for caller\'s own draft', async () => {
     mockQueryOne.mockResolvedValueOnce(ownDraft);

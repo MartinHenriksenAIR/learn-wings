@@ -219,7 +219,9 @@
     "share": "Share",
     "report": "Report",
     "alreadyReported": "Already reported",
-    "alreadyReportedDescription": "You have already reported this content. Our moderators will review it."
+    "alreadyReportedDescription": "You have already reported this content. Our moderators will review it.",
+    "deletePostConfirmTitle": "Delete this post?",
+    "deletePostConfirmDescription": "This action cannot be undone. The post and its comments will be permanently deleted."
   },
   "ideas": {
     "title": "Ideas",
