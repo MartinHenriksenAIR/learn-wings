@@ -176,7 +176,7 @@ describe('enrollment-create', () => {
     };
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true }) // course lookup
-      .mockResolvedValueOnce({ exists: 1 })          // org_course_access lookup
+      .mockResolvedValueOnce({ ok: 1 })              // org_course_access lookup
       .mockResolvedValueOnce(inserted);              // INSERT
 
     const res = await handler(baseReq(validBody), {} as any);

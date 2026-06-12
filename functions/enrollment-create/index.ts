@@ -55,8 +55,8 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     // Org-access precondition: only enforced for non-platform admins (platform admins override).
     if (!profile.is_platform_admin) {
-      const access = await queryOne<{ exists: number }>(
-        `SELECT 1 AS exists FROM org_course_access WHERE org_id = $1 AND course_id = $2 AND access = 'enabled'`,
+      const access = await queryOne<{ ok: number }>(
+        `SELECT 1 AS ok FROM org_course_access WHERE org_id = $1 AND course_id = $2 AND access = 'enabled'`,
         [orgId, courseId],
       );
       if (!access) {
