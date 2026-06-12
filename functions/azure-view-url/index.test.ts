@@ -80,14 +80,28 @@ describe('azure-view-url', () => {
     // LESSON-BRANCH PARITY PIN vs public.can_user_access_lms_asset (migration/azure/
     // 01-schema.sql): a video lesson's path is stored in azure_blob_path
     // (video_storage_path is the legacy Supabase column) — matching only the other
-    // two 403s every video blob. The RPC's thumbnail branch is deliberately not
-    // ported here (no caller sends thumbnails to this endpoint) — see issue #60.
+    // two 403s every video blob. Full parity now lives in shared/lms-asset (issue #60).
     const accessCall = mockQueryOne.mock.calls.find(c => (c[0] as string).includes('can_access'));
     expect(accessCall).toBeDefined();
     const sql = accessCall![0] as string;
     expect(sql).toContain('l.video_storage_path = $2');
     expect(sql).toContain('l.document_storage_path = $2');
     expect(sql).toContain('l.azure_blob_path = $2');
+  });
+
+  it('access SQL also covers the thumbnail branch (issue #60: shared canAccessLmsAsset restores full RPC parity)', async () => {
+    mockQueryOne.mockResolvedValueOnce({ can_access: true });
+
+    const res = await handler({
+      ...baseReq,
+      json: async () => ({ blobPath: 'thumbnails/course.jpg' }),
+    } as any, {} as any);
+
+    expect(res.status).toBe(200);
+    const accessCall = mockQueryOne.mock.calls.find(c => (c[0] as string).includes('can_access'));
+    expect(accessCall).toBeDefined();
+    expect(accessCall![0] as string).toContain('c.thumbnail_url = $2');
+    expect(accessCall![1]).toEqual(['p1', 'thumbnails/course.jpg']);
   });
 
   it('returns 200 with viewUrl on happy member path (EXISTS true)', async () => {

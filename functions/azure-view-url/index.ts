@@ -2,28 +2,9 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
-import { queryOne } from '../shared/db';
 import { authenticate } from '../shared/auth';
 import { getProfile } from '../shared/profile';
-
-async function canAccessAsset(profileId: string, filePath: string): Promise<boolean> {
-  const result = await queryOne<{ can_access: boolean }>(
-    `SELECT (
-      EXISTS (
-        SELECT 1 FROM lessons l
-        JOIN course_modules cm ON cm.id = l.module_id
-        JOIN courses c ON c.id = cm.course_id
-        JOIN org_course_access oca ON oca.course_id = c.id
-        JOIN org_memberships om ON om.org_id = oca.org_id
-        WHERE c.is_published = TRUE AND oca.access = 'enabled'
-          AND om.user_id = $1 AND om.status = 'active'
-          AND (l.video_storage_path = $2 OR l.document_storage_path = $2 OR l.azure_blob_path = $2)
-      )
-    ) AS can_access`,
-    [profileId, filePath]
-  );
-  return result?.can_access ?? false;
-}
+import { canAccessLmsAsset } from '../shared/lms-asset';
 
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
@@ -37,9 +18,10 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const { blobPath } = await req.json() as { blobPath: string };
     if (!blobPath) return corsResponse(origin, 400, { error: 'blobPath is required' });
 
-    // Access check — short-circuit for platform admins; otherwise check org membership
+    // Access check — short-circuit for platform admins; otherwise the shared
+    // can_user_access_lms_asset parity predicate (lesson asset columns + thumbnail).
     if (!profile.is_platform_admin) {
-      const hasAccess = await canAccessAsset(profile.id, blobPath);
+      const hasAccess = await canAccessLmsAsset(profile.id, blobPath);
       if (!hasAccess) return corsResponse(origin, 403, { error: 'Access denied' });
     }
 
