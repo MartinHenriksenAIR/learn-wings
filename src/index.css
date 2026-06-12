@@ -144,9 +144,11 @@
     @apply font-semibold tracking-tight;
   }
 
-  /* Button micro-interaction: subtle darken on hover, press-down on active */
+  /* Button micro-interaction: subtle darken on hover, press-down on active.
+     Standalone `scale` (not `transform: scale(...)`) so it composes with
+     Tailwind transform utilities like -translate-y-1/2 instead of replacing them. */
   button {
-    transition: filter 0.15s ease, transform 0.15s ease, opacity 0.15s ease, box-shadow 0.2s ease;
+    transition: filter 0.15s ease, scale 0.15s ease, opacity 0.15s ease, box-shadow 0.2s ease;
   }
 
   button:not(:disabled):hover {
@@ -154,7 +156,7 @@
   }
 
   button:not(:disabled):active {
-    transform: scale(0.965);
+    scale: 0.965;
   }
 
   /* Native <select> elements get an inset chevron (Radix Select renders a button - unaffected) */
@@ -234,6 +236,7 @@
 
   button:not(:disabled):active {
     transform: none;
+    scale: none;
   }
 
   .hover-lift:hover {
