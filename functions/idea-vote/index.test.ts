@@ -164,15 +164,15 @@ describe('idea-vote', () => {
     mockIsActiveMember.mockResolvedValueOnce(true); // member
     const dbError = new Error('connection refused');
     mockQueryOne.mockRejectedValueOnce(dbError); // INSERT → non-23505
-    const res = await handler(baseReq({ ideaId: 'idea-1' }), {} as any);
+    const res = await handler(baseReq({ ideaId: 'idea-1' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
   it('returns 500 on idea load error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('db unreachable'));
-    const res = await handler(baseReq({ ideaId: 'idea-1' }), {} as any);
+    const res = await handler(baseReq({ ideaId: 'idea-1' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'db unreachable' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

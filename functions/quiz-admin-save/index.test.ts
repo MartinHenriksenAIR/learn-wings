@@ -411,17 +411,17 @@ describe('quiz-admin-save', () => {
       return await cb(client);
     });
 
-    const res = await handler(baseReq(validBody), {} as any);
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'FK violation' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
   // ── 500 on auth-level DB error ───────────────────────────────────────────────
 
   it('returns 500 on auth-level db error propagating err.message', async () => {
     mockWithTransaction.mockRejectedValueOnce(new Error('connection pool exhausted'));
-    const res = await handler(baseReq(validBody), {} as any);
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection pool exhausted' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

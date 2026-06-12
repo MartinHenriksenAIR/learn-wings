@@ -2,9 +2,10 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile } from '../shared/profile';
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
@@ -55,8 +56,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     return corsResponse(origin, 200, { course, modules: modulesWithLessons, progressMap, review: review ?? null });
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    return corsResponse(origin, 500, { error: msg });
+    return internalError(context, origin, err);
   }
 }
 

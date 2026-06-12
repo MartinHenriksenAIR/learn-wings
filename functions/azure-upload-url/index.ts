@@ -1,6 +1,7 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { requirePlatformAdmin } from '../shared/guards';
 
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -33,8 +34,8 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     return corsResponse(origin, 200, { uploadUrl, blobPath: uniqueName, contentType });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    const status = msg.includes('token') || msg.includes('Token') ? 401 : 500;
-    return corsResponse(origin, status, { error: msg });
+    if (msg.includes('token') || msg.includes('Token')) return corsResponse(origin, 401, { error: msg });
+    return internalError(context, origin, err);
   }
 }
 

@@ -1,9 +1,10 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { deleteBlob } from '../shared/blob';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { requirePlatformAdmin } from '../shared/guards';
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
@@ -22,8 +23,8 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     return corsResponse(origin, 200, { success: true, message: 'Blob deleted' });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    const status = msg.includes('token') || msg.includes('Token') ? 401 : 500;
-    return corsResponse(origin, status, { error: msg });
+    if (msg.includes('token') || msg.includes('Token')) return corsResponse(origin, 401, { error: msg });
+    return internalError(context, origin, err);
   }
 }
 

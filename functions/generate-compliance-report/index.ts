@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
 import { corsPreflightResponse, getCorsHeaders } from '../shared/cors';
+import { internalError } from '../shared/errors';
 
 interface ReportData {
   organizationName: string;
@@ -157,7 +158,7 @@ startxref
   return new TextEncoder().encode(pdfContent);
 }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
@@ -270,7 +271,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     };
   } catch (err: unknown) {
     if (err instanceof AuthError) return { status: 401, headers: getCorsHeaders(origin), body: JSON.stringify({ error: (err as Error).message }) };
-    return { status: 500, headers: getCorsHeaders(origin), body: JSON.stringify({ error: err instanceof Error ? err.message : 'error' }) };
+    return internalError(context, origin, err);
   }
 }
 

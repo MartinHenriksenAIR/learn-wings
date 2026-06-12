@@ -267,8 +267,8 @@ describe('lesson-create', () => {
 
   it('returns 500 on db error propagating err.message', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('FK violation'));
-    const res = await handler(baseReq(validBody), {} as any);
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'FK violation' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

@@ -147,10 +147,10 @@ describe('organizations', () => {
   it('returns 500 on db error', async () => {
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
 
-    const res = await handler(baseReq({}), {} as any);
+    const res = await handler(baseReq({}), { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
   // 9. Platform admin + orgId bypasses membership check

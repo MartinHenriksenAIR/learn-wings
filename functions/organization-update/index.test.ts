@@ -184,9 +184,9 @@ describe('organization-update', () => {
 
   it('returns 500 on generic db error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
-    const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
   // --- Org-admin logo_url parity (RLS 20260128223657) ---

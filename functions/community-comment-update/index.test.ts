@@ -164,8 +164,8 @@ describe('community-comment-update', () => {
 
   it('returns 500 on db error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
-    const res = await handler(baseReq({ commentId: 'c1', content: 'hi' }), {} as any);
+    const res = await handler(baseReq({ commentId: 'c1', content: 'hi' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

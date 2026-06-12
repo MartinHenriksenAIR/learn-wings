@@ -134,9 +134,9 @@ describe('platform-settings-update', () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
 
-    const res = await handler(baseReq({ key: 'email', value: { smtp_host: 'x' } }), {} as any);
+    const res = await handler(baseReq({ key: 'email', value: { smtp_host: 'x' } }), { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

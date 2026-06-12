@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
 
 interface EnrollmentRow {
@@ -27,7 +28,7 @@ interface LessonOut {
 }
 interface ModuleOut { id: string; title: string; sortOrder: number; lessons: LessonOut[] }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
@@ -192,7 +193,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     return corsResponse(origin, 200, { courses });
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
+    return internalError(context, origin, err);
   }
 }
 

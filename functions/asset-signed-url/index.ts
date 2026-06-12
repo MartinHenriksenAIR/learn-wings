@@ -1,6 +1,7 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { queryOne } from '../shared/db';
 import { authenticate } from '../shared/auth';
 import { getProfile } from '../shared/profile';
@@ -32,7 +33,7 @@ async function canAccessAsset(profileId: string, blobPath: string): Promise<bool
   return result?.can_access ?? false;
 }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
@@ -63,8 +64,8 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     return corsResponse(origin, 200, { url });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    const status = msg.includes('token') || msg.includes('Token') ? 401 : 500;
-    return corsResponse(origin, status, { error: msg });
+    if (msg.includes('token') || msg.includes('Token')) return corsResponse(origin, 401, { error: msg });
+    return internalError(context, origin, err);
   }
 }
 

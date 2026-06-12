@@ -55,7 +55,7 @@ describe('lesson-progress', () => {
   it('returns 500 on database error', async () => {
     mockQuery.mockRejectedValueOnce(new Error('db down'));
 
-    const res = await handler(baseReq as any, {} as any);
+    const res = await handler(baseReq as any, { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
   });

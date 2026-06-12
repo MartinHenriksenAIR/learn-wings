@@ -188,8 +188,8 @@ describe('community-report-update', () => {
 
   it('returns 500 on db error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
-    const res = await handler(baseReq({ reportId: 'r1', status: 'reviewed' }), {} as any);
+    const res = await handler(baseReq({ reportId: 'r1', status: 'reviewed' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

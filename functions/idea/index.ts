@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isActiveMember } from '../shared/profile';
 
 interface IdeaRow {
@@ -12,7 +13,7 @@ interface IdeaRow {
   [key: string]: unknown;
 }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
@@ -55,7 +56,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     return corsResponse(origin, 200, { idea });
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
+    return internalError(context, origin, err);
   }
 }
 

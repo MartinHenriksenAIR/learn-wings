@@ -99,7 +99,7 @@ describe('azure-delete-blob', () => {
   it('returns 500 when blob delete fails (helper returns false)', async () => {
     mockDeleteBlob.mockResolvedValue(false);
 
-    const res = await handler(baseReq as any, {} as any);
+    const res = await handler(baseReq as any, { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string).error).toContain('Blob delete failed');

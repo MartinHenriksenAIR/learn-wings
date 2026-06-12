@@ -1,10 +1,11 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { requirePlatformAdmin } from '../shared/guards';
 import { validateLessonFields } from '../shared/validate';
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
@@ -65,7 +66,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     return corsResponse(origin, 200, { lesson });
   } catch (err: unknown) {
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' });
+    return internalError(context, origin, err);
   }
 }
 

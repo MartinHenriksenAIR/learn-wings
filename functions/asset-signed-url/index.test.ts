@@ -121,13 +121,15 @@ describe('asset-signed-url', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  // 8. 500 db error propagates message
-  it('returns 500 when db throws propagating the error message', async () => {
+  // 8. 500 db error: generic body, real message logged server-side (ADR-0014)
+  it('returns 500 when db throws with generic body, real error logged on context', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
+    const ctx = { error: vi.fn() };
 
-    const res = await handler(baseReq({ blobPath: 'videos/lesson.mp4' }) as any, {} as any);
+    const res = await handler(baseReq({ blobPath: 'videos/lesson.mp4' }) as any, ctx as any);
 
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+    expect(ctx.error).toHaveBeenCalledWith(expect.stringContaining('connection refused'));
   });
 });
