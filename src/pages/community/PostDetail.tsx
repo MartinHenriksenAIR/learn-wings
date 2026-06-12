@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import { ReportDialog } from '@/components/community/ReportDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { toast } from '@/components/ui/sonner';
+import { ApiError } from '@/lib/api-client';
 import {
   fetchPost,
   fetchComments,
@@ -50,6 +52,7 @@ export default function PostDetail() {
   const scope = (routeScope || 'org') as CommunityScope;
   const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -151,6 +154,9 @@ export default function PostDetail() {
       setShowReportDialog(false);
     },
     onError: (error: Error) => {
+      // 409 (already reported) is handled at the dialog boundary (#21) — it gets
+      // its own informational toast there, not a misleading failure toast here.
+      if (error instanceof ApiError && error.status === 409) return;
       toast({ title: 'Failed to submit report', description: error.message, variant: 'destructive' });
     },
   });
@@ -431,7 +437,22 @@ export default function PostDetail() {
           open={showReportDialog}
           onOpenChange={setShowReportDialog}
           onSubmit={async (reason) => {
-            await reportMutation.mutateAsync(reason);
+            try {
+              await reportMutation.mutateAsync(reason);
+            } catch (error) {
+              // Duplicate report: the report already exists, so this is terminal —
+              // surface it as information and resolve the dialog (#21).
+              if (error instanceof ApiError && error.status === 409) {
+                toast({
+                  title: t('community.alreadyReported'),
+                  description: t('community.alreadyReportedDescription'),
+                });
+                return;
+              }
+              // Other failures: rethrow so the dialog stays open for a retry
+              // (the mutation's onError already showed a destructive toast).
+              throw error;
+            }
           }}
           targetType={reportTargetType}
         />

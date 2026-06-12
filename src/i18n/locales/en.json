@@ -217,7 +217,9 @@
     "comments": "Comments",
     "likes": "Likes",
     "share": "Share",
-    "report": "Report"
+    "report": "Report",
+    "alreadyReported": "Already reported",
+    "alreadyReportedDescription": "You have already reported this content. Our moderators will review it."
   },
   "ideas": {
     "title": "Ideas",

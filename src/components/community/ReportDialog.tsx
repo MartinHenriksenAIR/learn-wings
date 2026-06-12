@@ -51,6 +51,10 @@ export function ReportDialog({
       onOpenChange(false);
       setSelectedReason('');
       setCustomReason('');
+    } catch {
+      // The caller surfaces feedback for failures (#21). Keep the dialog open so
+      // the user can retry; terminal outcomes (e.g. duplicate report) are the
+      // caller's job to resolve without rethrowing.
     } finally {
       setIsSubmitting(false);
     }

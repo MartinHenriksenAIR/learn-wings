@@ -217,7 +217,9 @@
     "comments": "Kommentarer",
     "likes": "Likes",
     "share": "Del",
-    "report": "Rapporter"
+    "report": "Rapporter",
+    "alreadyReported": "Allerede rapporteret",
+    "alreadyReportedDescription": "Du har allerede rapporteret dette indhold. Vores moderatorer vil gennemgå det."
   },
   "ideas": {
     "title": "Idéer",

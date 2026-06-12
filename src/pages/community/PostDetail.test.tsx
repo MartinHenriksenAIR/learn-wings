@@ -26,6 +26,24 @@ vi.mock('@/components/community/ReportDialog', () => ({
 // --- mock toast (PostDetail imports from '@/components/ui/sonner') ---
 vi.mock('@/components/ui/sonner', () => ({ toast: vi.fn() }));
 
+// --- mock react-i18next (PostDetail uses t() for the duplicate-report toast) ---
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: 'en', changeLanguage: vi.fn() },
+  }),
+}));
+
+// --- mock api-client (PostDetail imports ApiError; avoid loading real msal-config) ---
+vi.mock('@/lib/api-client', () => ({
+  ApiError: class ApiError extends Error {
+    status: number;
+    constructor(message: string, status: number) { super(message); this.status = status; }
+  },
+  callApi: vi.fn(),
+  callApiRaw: vi.fn(),
+}));
+
 // --- mock the community api ---
 const mockFetchPost = vi.fn();
 const mockFetchComments = vi.fn();
