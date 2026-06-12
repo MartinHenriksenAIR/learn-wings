@@ -1,6 +1,7 @@
 {
   "common": {
     "save": "Gem",
+    "saved": "Gemt",
     "cancel": "Annuller",
     "delete": "Slet",
     "edit": "Rediger",

@@ -137,26 +137,26 @@ export default function LearnerDashboard() {
       {/* Stats Grid */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title={t('dashboard.coursesEnrolled')}
+          label={t('dashboard.coursesEnrolled')}
           value={enrollments.length}
           icon={<BookOpen className="h-5 w-5" />}
         />
         <StatCard
-          title={t('dashboard.inProgress')}
+          label={t('dashboard.inProgress')}
           value={inProgressCourses.length}
           icon={<Clock className="h-5 w-5" />}
         />
         <StatCard
-          title={t('dashboard.completed')}
+          label={t('dashboard.completed')}
           value={completedCourses.length}
           icon={<Award className="h-5 w-5" />}
         />
         <StatCard
-          title={t('dashboard.overallProgress')}
+          label={t('dashboard.overallProgress')}
           value={`${Math.round(totalProgress)}%`}
           icon={
             totalProgress > 0
-              ? <ProgressRing progress={totalProgress} size={24} strokeWidth={3} showLabel={false} />
+              ? <ProgressRing pct={totalProgress} size={24} stroke={3} fg="#10298f" bg="#e9eaf0" />
               : <TrendingUp className="h-5 w-5" />
           }
         />
@@ -218,7 +218,7 @@ export default function LearnerDashboard() {
                     </p>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <ProgressRing progress={progressPercent} size={32} strokeWidth={4} />
+                        <ProgressRing pct={progressPercent} size={32} stroke={4} fg="#10298f" bg="#e9eaf0" labelColor="#171a26" />
                         <span className="text-xs text-muted-foreground">
                           {progress?.completed || 0}/{progress?.total || 0} {t('common.lessons')}
                         </span>

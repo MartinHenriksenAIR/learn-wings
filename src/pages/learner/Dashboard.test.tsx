@@ -149,7 +149,7 @@ describe('LearnerDashboard — completion count (#18)', () => {
 
     // Stat card: dashboard.completed must show 1 (counts enrollments.status === 'completed')
     const completedTitle = await screen.findByText('dashboard.completed');
-    const completedCard = completedTitle.closest('.overflow-hidden') as HTMLElement;
+    const completedCard = completedTitle.closest('.rounded-2xl') as HTMLElement;
     expect(completedCard).not.toBeNull();
     expect(within(completedCard).getByText('1')).toBeInTheDocument();
 

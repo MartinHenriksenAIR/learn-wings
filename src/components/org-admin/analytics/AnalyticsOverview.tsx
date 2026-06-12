@@ -31,27 +31,27 @@ export function AnalyticsOverview({
       {/* Summary Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
-          title={isGlobalView && selectedOrgId === 'all' ? 'Total Users' : 'Total Members'}
+          label={isGlobalView && selectedOrgId === 'all' ? 'Total Users' : 'Total Members'}
           value={stats.totalUsers}
           icon={<Users className="h-5 w-5" />}
         />
         <StatCard
-          title="Active (7 days)"
+          label="Active (7 days)"
           value={stats.activeUsers7Days}
           icon={<TrendingUp className="h-5 w-5" />}
         />
         <StatCard
-          title="Active (30 days)"
+          label="Active (30 days)"
           value={stats.activeUsers30Days}
           icon={<TrendingUp className="h-5 w-5" />}
         />
         <StatCard
-          title="Completion Rate"
+          label="Completion Rate"
           value={`${stats.completionRate}%`}
           icon={<Award className="h-5 w-5" />}
         />
         <StatCard
-          title="Avg Quiz Score"
+          label="Avg Quiz Score"
           value={`${stats.avgQuizScore}%`}
           icon={<BookOpen className="h-5 w-5" />}
         />
