@@ -21,6 +21,11 @@ export interface SlidingTabsProps {
  * Controlled: the indicator position derives from the `active` prop; callers
  * own the state (and any URL sync). Port of the design prototype's
  * SlidingTabs, minus the rAF watchdog (a capture-iframe workaround).
+ *
+ * Implements the ARIA tabs keyboard pattern with selection-follows-focus:
+ * roving tabindex (only the active tab is in the tab order), ArrowLeft /
+ * ArrowRight wrap through enabled tabs, Home / End jump to the first / last
+ * enabled tab, and disabled tabs are skipped.
  */
 export function SlidingTabs({ tabs, active, onChange, className }: SlidingTabsProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -52,6 +57,34 @@ export function SlidingTabs({ tabs, active, onChange, className }: SlidingTabsPr
     return () => observer.disconnect();
   }, [measure]);
 
+  // ARIA tabs keyboard pattern (selection follows focus): arrows wrap through
+  // enabled tabs, Home/End jump to the first/last enabled tab.
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const { key } = event;
+    if (key !== "ArrowLeft" && key !== "ArrowRight" && key !== "Home" && key !== "End") return;
+    event.preventDefault();
+
+    const enabledKeys = tabs.filter((tab) => !tab.disabled).map((tab) => tab.key);
+    if (enabledKeys.length === 0) return;
+
+    let nextKey: string;
+    if (key === "Home") {
+      nextKey = enabledKeys[0];
+    } else if (key === "End") {
+      nextKey = enabledKeys[enabledKeys.length - 1];
+    } else {
+      const delta = key === "ArrowRight" ? 1 : -1;
+      const currentIndex = enabledKeys.indexOf(active);
+      nextKey =
+        currentIndex === -1
+          ? enabledKeys[delta === 1 ? 0 : enabledKeys.length - 1]
+          : enabledKeys[(currentIndex + delta + enabledKeys.length) % enabledKeys.length];
+    }
+
+    if (nextKey !== active) onChange(nextKey);
+    btnRefs.current[nextKey]?.focus();
+  };
+
   return (
     <div
       ref={containerRef}
@@ -82,8 +115,10 @@ export function SlidingTabs({ tabs, active, onChange, className }: SlidingTabsPr
           type="button"
           role="tab"
           aria-selected={tab.key === active}
+          tabIndex={tab.key === active ? 0 : -1}
           disabled={tab.disabled}
           onClick={() => onChange(tab.key)}
+          onKeyDown={handleKeyDown}
           className={cn(
             "relative z-[1] inline-flex cursor-pointer items-center gap-[7px] whitespace-nowrap rounded-[8px] border-0 bg-transparent px-4 py-2 text-[13px] font-bold transition-colors duration-[220ms]",
             tab.key === active ? "text-primary" : "text-[#686d7e]",

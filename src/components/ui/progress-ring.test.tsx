@@ -32,4 +32,26 @@ describe('ProgressRing', () => {
 
     expect(container.querySelector('text')).toBeNull();
   });
+
+  it('clamps pct above 100 to a full ring and a 100% label', () => {
+    const { container } = render(
+      <ProgressRing pct={150} size={120} stroke={9} fg="#10298f" bg="#e9eaf0" labelColor="#171a26" />,
+    );
+
+    const progress = container.querySelectorAll('circle')[1];
+    expect(Number(progress.getAttribute('stroke-dashoffset'))).toBeCloseTo(0, 5);
+    expect(screen.getByText('100%')).toBeInTheDocument();
+  });
+
+  it('clamps negative pct to an empty ring and a 0% label', () => {
+    const { container } = render(
+      <ProgressRing pct={-20} size={120} stroke={9} fg="#10298f" bg="#e9eaf0" labelColor="#171a26" />,
+    );
+
+    const radius = (120 - 9) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const progress = container.querySelectorAll('circle')[1];
+    expect(Number(progress.getAttribute('stroke-dashoffset'))).toBeCloseTo(circumference, 5);
+    expect(screen.getByText('0%')).toBeInTheDocument();
+  });
 });

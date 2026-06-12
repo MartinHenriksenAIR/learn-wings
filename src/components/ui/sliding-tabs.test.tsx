@@ -81,4 +81,98 @@ describe('SlidingTabs', () => {
 
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  describe('keyboard navigation (ARIA tabs pattern)', () => {
+    const fourTabs = [
+      { key: 'one', label: 'One' },
+      { key: 'two', label: 'Two' },
+      { key: 'three', label: 'Three', disabled: true },
+      { key: 'four', label: 'Four' },
+    ];
+
+    it('uses a roving tabindex: only the active tab is in the tab order', () => {
+      render(<SlidingTabs tabs={fourTabs} active="two" onChange={() => {}} />);
+
+      expect(screen.getByRole('tab', { name: 'One' })).toHaveAttribute('tabindex', '-1');
+      expect(screen.getByRole('tab', { name: 'Two' })).toHaveAttribute('tabindex', '0');
+      expect(screen.getByRole('tab', { name: 'Three' })).toHaveAttribute('tabindex', '-1');
+      expect(screen.getByRole('tab', { name: 'Four' })).toHaveAttribute('tabindex', '-1');
+    });
+
+    it('ArrowRight moves selection and focus to the next tab, skipping disabled ones', () => {
+      const onChange = vi.fn();
+      render(<SlidingTabs tabs={fourTabs} active="two" onChange={onChange} />);
+
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'Two' }), { key: 'ArrowRight' });
+
+      // 'three' is disabled, so selection jumps straight to 'four'.
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith('four');
+      expect(screen.getByRole('tab', { name: 'Four' })).toHaveFocus();
+    });
+
+    it('ArrowLeft moves selection and focus to the previous tab', () => {
+      const onChange = vi.fn();
+      render(<SlidingTabs tabs={fourTabs} active="two" onChange={onChange} />);
+
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'Two' }), { key: 'ArrowLeft' });
+
+      expect(onChange).toHaveBeenCalledWith('one');
+      expect(screen.getByRole('tab', { name: 'One' })).toHaveFocus();
+    });
+
+    it('wraps at both ends (skipping disabled tabs)', () => {
+      const onChange = vi.fn();
+      const { rerender } = render(<SlidingTabs tabs={fourTabs} active="four" onChange={onChange} />);
+
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'Four' }), { key: 'ArrowRight' });
+      expect(onChange).toHaveBeenLastCalledWith('one');
+
+      rerender(<SlidingTabs tabs={fourTabs} active="one" onChange={onChange} />);
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'One' }), { key: 'ArrowLeft' });
+      // Backwards from the first tab wraps to 'four' ('three' is disabled).
+      expect(onChange).toHaveBeenLastCalledWith('four');
+      expect(screen.getByRole('tab', { name: 'Four' })).toHaveFocus();
+    });
+
+    it('Home and End jump to the first and last enabled tab', () => {
+      const onChange = vi.fn();
+      render(<SlidingTabs tabs={fourTabs} active="two" onChange={onChange} />);
+      const activeTab = screen.getByRole('tab', { name: 'Two' });
+
+      fireEvent.keyDown(activeTab, { key: 'Home' });
+      expect(onChange).toHaveBeenLastCalledWith('one');
+      expect(screen.getByRole('tab', { name: 'One' })).toHaveFocus();
+
+      fireEvent.keyDown(activeTab, { key: 'End' });
+      expect(onChange).toHaveBeenLastCalledWith('four');
+      expect(screen.getByRole('tab', { name: 'Four' })).toHaveFocus();
+    });
+
+    it('ignores unrelated keys', () => {
+      const onChange = vi.fn();
+      render(<SlidingTabs tabs={fourTabs} active="two" onChange={onChange} />);
+
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'Two' }), { key: 'ArrowDown' });
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'Two' }), { key: 'a' });
+
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('selection follows focus when the parent is controlled', () => {
+      function Controlled() {
+        const [active, setActive] = React.useState('one');
+        return <SlidingTabs tabs={fourTabs} active={active} onChange={setActive} />;
+      }
+      render(<Controlled />);
+
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'One' }), { key: 'ArrowRight' });
+
+      const two = screen.getByRole('tab', { name: 'Two' });
+      expect(two).toHaveAttribute('aria-selected', 'true');
+      expect(two).toHaveAttribute('tabindex', '0');
+      expect(two).toHaveFocus();
+      expect(screen.getByRole('tab', { name: 'One' })).toHaveAttribute('tabindex', '-1');
+    });
+  });
 });

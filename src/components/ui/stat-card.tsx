@@ -14,8 +14,9 @@ export interface StatCardProps {
 /**
  * Dashboard stat card: 42px tinted icon chip, big value, small label.
  * When `extra` is given the card lifts on hover and expands a hidden panel
- * with one extra info line. When `onClick` is given the whole card is
- * clickable and keyboard accessible.
+ * with one extra info line; the panel also reveals while focus is inside the
+ * card, so keyboard users can reach it. When `onClick` is given the whole
+ * card is clickable and keyboard accessible.
  */
 export function StatCard({ icon, value, label, extra, onClick, className }: StatCardProps) {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -51,9 +52,13 @@ export function StatCard({ icon, value, label, extra, onClick, className }: Stat
         </span>
       </div>
       {extra != null && (
+        // Revealed on hover AND on focus (group-focus-within covers both the
+        // focused card itself and any focusable content inside it), so
+        // keyboard and touch users can reach the panel too. The 84px
+        // max-height matches the design; content must fit ~2 lines of text.
         <div
           data-testid="stat-card-extra"
-          className="max-h-0 overflow-hidden text-xs leading-normal text-muted-foreground opacity-0 transition-[max-height,opacity,margin-top] duration-[280ms] ease-out group-hover:mt-[11px] group-hover:max-h-[84px] group-hover:opacity-100"
+          className="max-h-0 overflow-hidden text-xs leading-normal text-muted-foreground opacity-0 transition-[max-height,opacity,margin-top] duration-[280ms] ease-out group-hover:mt-[11px] group-hover:max-h-[84px] group-hover:opacity-100 group-focus-within:mt-[11px] group-focus-within:max-h-[84px] group-focus-within:opacity-100"
         >
           {extra}
         </div>
