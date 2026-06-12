@@ -85,6 +85,7 @@ export function OrgMembersTab() {
     newRole: OrgRole;
   } | null>(null);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+  const [togglingChampion, setTogglingChampion] = useState<string | null>(null);
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const [removeMemberDialog, setRemoveMemberDialog] = useState<{
@@ -322,24 +323,31 @@ export function OrgMembersTab() {
     if (!currentOrg) return;
 
     const isCurrentlyChampion = aiChampions.has(member.user_id);
+    // In-flight guard (same pattern as updatingRole): set before the await,
+    // cleared in finally, so a double-click can't fire a second request.
+    setTogglingChampion(member.id);
 
-    if (isCurrentlyChampion) {
-      try {
-        await callApi('/api/ai-champion-delete', { orgId: currentOrg.id, userId: member.user_id });
-        toast({ title: 'AI Champion status removed', description: `${member.profile?.full_name} is no longer an AI Champion.` });
-        setAiChampions((prev) => { const next = new Set(prev); next.delete(member.user_id); return next; });
-      } catch (err) {
-        toast({ title: 'Failed to remove AI Champion status', description: err instanceof Error ? err.message : 'Unexpected error', variant: 'destructive' });
+    try {
+      if (isCurrentlyChampion) {
+        try {
+          await callApi('/api/ai-champion-delete', { orgId: currentOrg.id, userId: member.user_id });
+          toast({ title: 'AI Champion status removed', description: `${member.profile?.full_name} is no longer an AI Champion.` });
+          setAiChampions((prev) => { const next = new Set(prev); next.delete(member.user_id); return next; });
+        } catch (err) {
+          toast({ title: 'Failed to remove AI Champion status', description: err instanceof Error ? err.message : 'Unexpected error', variant: 'destructive' });
+        }
+      } else {
+        try {
+          // assigned_by is derived server-side from the caller's profile (issue #11 audit item)
+          await callApi('/api/ai-champion-create', { orgId: currentOrg.id, userId: member.user_id });
+          toast({ title: 'AI Champion assigned!', description: `${member.profile?.full_name} is now an AI Champion.` });
+          setAiChampions((prev) => new Set([...prev, member.user_id]));
+        } catch (err) {
+          toast({ title: 'Failed to assign AI Champion status', description: err instanceof Error ? err.message : 'Unexpected error', variant: 'destructive' });
+        }
       }
-    } else {
-      try {
-        // assigned_by is derived server-side from the caller's profile (issue #11 audit item)
-        await callApi('/api/ai-champion-create', { orgId: currentOrg.id, userId: member.user_id });
-        toast({ title: 'AI Champion assigned!', description: `${member.profile?.full_name} is now an AI Champion.` });
-        setAiChampions((prev) => new Set([...prev, member.user_id]));
-      } catch (err) {
-        toast({ title: 'Failed to assign AI Champion status', description: err instanceof Error ? err.message : 'Unexpected error', variant: 'destructive' });
-      }
+    } finally {
+      setTogglingChampion(null);
     }
   };
 
@@ -665,7 +673,10 @@ export function OrgMembersTab() {
                               Change to Learner
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem onClick={() => handleToggleAiChampion(member)}>
+                          <DropdownMenuItem
+                            onClick={() => handleToggleAiChampion(member)}
+                            disabled={togglingChampion === member.id}
+                          >
                             <Sparkles className="mr-2 h-4 w-4" />
                             {aiChampions.has(member.user_id) ? 'Remove AI Champion' : 'Make AI Champion'}
                           </DropdownMenuItem>
