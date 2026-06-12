@@ -1,7 +1,62 @@
-import { describe, it, expect, afterAll } from 'vitest';
-import { query, queryOne, getDb, isUniqueViolation } from './db';
+import { describe, it, expect, afterAll, vi, afterEach } from 'vitest';
+import { query, queryOne, getDb, isUniqueViolation, buildSslConfig } from './db';
+import {
+  AZURE_POSTGRES_CA,
+  DIGICERT_GLOBAL_ROOT_G2,
+  DIGICERT_GLOBAL_ROOT_CA,
+  MICROSOFT_RSA_ROOT_CA_2017,
+} from './azure-ca';
 
 const skip = !process.env.DATABASE_URL;
+
+// Pure unit tests — no DATABASE_URL gate.
+describe('buildSslConfig', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('defaults to verify-full: rejectUnauthorized true with the Azure CA bundle', () => {
+    const config = buildSslConfig({});
+    expect(config.rejectUnauthorized).toBe(true);
+    expect(config.ca).toBe(AZURE_POSTGRES_CA);
+  });
+
+  it('the CA bundle contains exactly 3 PEM certificates', () => {
+    const begins = AZURE_POSTGRES_CA.match(/-----BEGIN CERTIFICATE-----/g) ?? [];
+    const ends = AZURE_POSTGRES_CA.match(/-----END CERTIFICATE-----/g) ?? [];
+    expect(begins).toHaveLength(3);
+    expect(ends).toHaveLength(3);
+    expect(AZURE_POSTGRES_CA).toContain(DIGICERT_GLOBAL_ROOT_G2.trim());
+    expect(AZURE_POSTGRES_CA).toContain(DIGICERT_GLOBAL_ROOT_CA.trim());
+    expect(AZURE_POSTGRES_CA).toContain(MICROSOFT_RSA_ROOT_CA_2017.trim());
+  });
+
+  it('each bundled cert parses as a valid X509 certificate', async () => {
+    const { X509Certificate } = await import('node:crypto');
+    const subjects = [DIGICERT_GLOBAL_ROOT_G2, DIGICERT_GLOBAL_ROOT_CA, MICROSOFT_RSA_ROOT_CA_2017].map(
+      (pem) => new X509Certificate(pem).subject
+    );
+    expect(subjects.join('\n')).toContain('DigiCert Global Root G2');
+    expect(subjects.join('\n')).toContain('DigiCert Global Root CA');
+    expect(subjects.join('\n')).toContain('Microsoft RSA Root Certificate Authority 2017');
+  });
+
+  it('DATABASE_SSL_INSECURE=1 falls back to unverified TLS and warns loudly', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const config = buildSslConfig({ DATABASE_SSL_INSECURE: '1' });
+    expect(config).toEqual({ rejectUnauthorized: false });
+    expect(config.ca).toBeUndefined();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('DATABASE_SSL_INSECURE');
+  });
+
+  it('other DATABASE_SSL_INSECURE values do not trigger the escape hatch', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(buildSslConfig({ DATABASE_SSL_INSECURE: '0' }).rejectUnauthorized).toBe(true);
+    expect(buildSslConfig({ DATABASE_SSL_INSECURE: 'true' }).rejectUnauthorized).toBe(true);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
 
 // Pure unit tests — no DATABASE_URL gate.
 describe('isUniqueViolation', () => {
