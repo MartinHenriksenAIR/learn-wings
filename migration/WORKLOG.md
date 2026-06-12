@@ -755,3 +755,18 @@ All new strings i18n en+da. **Frontend-only — no function deploy** (trunk push
 - Node 20 EOL warning surfaces on every `az functionapp config appsettings set` — pinned intentionally (`.claude/rules/functions.md`: Node 22 crashes the worker's gRPC handshake). Ignore until that's re-verified.
 
 **Docs-only PR** (no source files touched — AC was verify-only). Work branch `martin/22-resend-secrets-verify`.
+
+---
+
+## 2026-06-12 — #17 per-course access gate on `course-player-data` (PR #96)
+
+**Who:** martin & Claude. Solo self-merge (`/code-review` run + fixes applied this session; user waived the re-run). Disjoint from Emil's open PR #95 (tooling).
+
+**Closes #17.** `course-player-data` returned the full course payload (modules + lessons + progress + review) to ANY authenticated profile — a learner could load any *published* course, including ones their org was never granted access to. Cross-org read exposure in a multi-tenant product ("fix before go-live").
+
+- **Backend gate** (`functions/course-player-data/index.ts`) — parity with `quiz-by-lesson`, keyed on `courseId`: platform admins bypass (suite convention); everyone else needs an `active` membership in an org that has the course `enabled` AND `is_published = TRUE`, else **403 `Course access denied`**. Runs after the 404 existence check and before any module/lesson content is fetched, so a denied request leaks nothing.
+- **Frontend** (`src/pages/learner/CoursePlayer.tsx`) — the endpoint can now 403; `fetchData` had no try/catch/finally and stranded the spinner on any failure. Wrapped it: clear `loading` in `finally`, toast a friendly message, fall through to the existing "not found" empty state with a Back button. Also covers 404/transient.
+- **Self-review fixes (commit `3f75f0b`):** added `.catch` to the `onReviewSubmitted` re-fetch (a 2nd call site to the same endpoint — the now-possible 403 was an unhandled rejection); added a contract test pinning *non-admin + unpublished → 403* with the gate SQL asserted BY VALUE (`is_published = TRUE`, `oca.access = 'enabled'`, `om.status = 'active'`) so an allow-all regression fails the test instead of slipping past a loose table-name substring check; removed a dead `useCallback` import.
+- **Notes left on the PR (not changed):** the gate grants via *any* member org while downstream progress/review use the client `orgId` (user's-own-data only — no cross-tenant leak); the access-check SQL is hand-duplicated across many endpoints (a `hasCourseAccess` helper in `shared/profile.ts` is the deeper fix — `isActiveMember`/`isOrgAdmin` already establish the `SELECT EXISTS(...) AS ok` pattern); pre-existing stranded-spinner when `currentOrg` is null (early return sits outside the try); ungated sibling writes `lesson-progress`/`enrollment-complete` (out of scope — worth a follow-up issue).
+
+**Gates:** `functions` tsc 0 + **1324/1327** (1 new test; `course-player-data` 7/7); frontend tsc 0, build OK, **98/98**. **Function deploy required** (`course-player-data` source changed) — deployed from fresh trunk via CI (`functions-action` ToS-block lifted; `func` CLI still uninstallable). **Gate 4 (authed smoke: 403 non-member / 200 member) is user-verified and PENDING.** Work branch `martin/17-course-player-access-gate`.
