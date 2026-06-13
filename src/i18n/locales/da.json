@@ -490,8 +490,90 @@
     "scopeGlobal": "Global",
     "scopeOrganization": "Organisation"
   },
+  "ideaManagement": {
+    "title": "Idéoversigt",
+    "subtitle": "Gennemgå og administrer indsendte idéer fra {{orgName}}. Træk et kort mellem kolonner for at ændre status — klik på et kort for at åbne det.",
+    "noOrgDescription": "Vælg en organisation for at administrere idéer.",
+    "allBusinessAreas": "Alle forretningsområder",
+    "searchPlaceholder": "Søg idéer...",
+    "emptyTitle": "Ingen idéer fundet",
+    "emptyDescription": "Ingen indsendte idéer endnu.",
+    "dropHere": "Slip idéer her",
+    "open": "Åbn",
+    "unknownAuthor": "Ukendt",
+    "statusUpdated": "Status opdateret",
+    "statusUpdateFailed": "Kunne ikke opdatere status",
+    "columns": {
+      "inbox": "Indbakke",
+      "backlog": "Backlog",
+      "done": "Færdig",
+      "rejected": "Afvist"
+    },
+    "dialog": {
+      "title": "Opdater idéstatus",
+      "statusLabel": "Status",
+      "rejectionReasonLabel": "Begrundelse for afvisning *",
+      "rejectionReasonPlaceholder": "Forklar, hvorfor denne idé blev afvist...",
+      "adminNotesLabel": "Administratornoter (intern)",
+      "adminNotesPlaceholder": "Noter, der kun er synlige for administratorer..."
+    }
+  },
+  "moderation": {
+    "title": "Moderation",
+    "subtitleOrg": "Rapporteret indhold i {{orgName}}s fællesskab.",
+    "noOrgDescription": "Vælg en organisation.",
+    "emptyTitle": "Intet her",
+    "emptyDescription": "Ingen rapporter med denne status.",
+    "reasonLabel": "Rapporteringsårsag",
+    "adminNotesInline": "Moderatornoter:",
+    "reportedBy": "Rapporteret af {{name}} · {{time}}",
+    "unknownReporter": "Ukendt",
+    "typePost": "Opslag",
+    "typeComment": "Kommentar",
+    "viewContent": "Se indhold",
+    "hidePost": "Skjul opslag",
+    "hideComment": "Skjul kommentar",
+    "showPost": "Vis opslag",
+    "showComment": "Vis kommentar",
+    "lockPost": "Lås kommentarer",
+    "unlockPost": "Lås kommentarer op",
+    "dismiss": "Afvis",
+    "markReviewed": "Markér som gennemgået",
+    "reportUpdated": "Rapport opdateret",
+    "reportUpdateFailed": "Kunne ikke opdatere rapport",
+    "visibilityUpdated": "Indholdets synlighed opdateret",
+    "contentUpdateFailed": "Kunne ikke opdatere indhold",
+    "lockUpdated": "Opslagets låsestatus opdateret",
+    "postUpdateFailed": "Kunne ikke opdatere opslag",
+    "tabs": {
+      "pending": "Afventer",
+      "reviewed": "Gennemgået",
+      "dismissed": "Afvist"
+    },
+    "dialog": {
+      "title": "Gennemgå rapport",
+      "description": "Tilføj noter og markér denne rapport som gennemgået eller afvist.",
+      "adminNotesLabel": "Administratornoter",
+      "adminNotesPlaceholder": "Tilføj noter om, hvordan dette blev håndteret..."
+    }
+  },
   "orgSettings": {
-    "noOrgDescription": "Vælg en organisation for at administrere dens indstillinger."
+    "title": "Organisationsindstillinger",
+    "noOrgDescription": "Vælg en organisation for at administrere dens indstillinger.",
+    "combinedNote": "Funktionsadgang kombineres som: platformflag OG organisationstilsidesættelse.",
+    "featureOverrides": "Funktionstilsidesættelser",
+    "platformDefault": "Platformstandard: {{state}}",
+    "enabled": "Aktiveret",
+    "disabled": "Deaktiveret",
+    "saveButton": "Gem organisationsindstillinger",
+    "saveFailed": "Kunne ikke gemme indstillinger",
+    "features": {
+      "certificates_enabled": "Certifikater",
+      "quizzes_enabled": "Quizzer",
+      "analytics_enabled": "Analyse",
+      "course_reviews_enabled": "Kursusanmeldelser",
+      "community_enabled": "Fællesskab"
+    }
   },
   "orgDetail": {
     "loadFailedTitle": "Kunne ikke indlæse organisationen",

@@ -490,8 +490,90 @@
     "scopeGlobal": "Global",
     "scopeOrganization": "Organization"
   },
+  "ideaManagement": {
+    "title": "Ideas Overview",
+    "subtitle": "Review and manage submitted ideas from {{orgName}}. Drag a card between columns to change its status — click a card to open it.",
+    "noOrgDescription": "Please select an organization to manage ideas.",
+    "allBusinessAreas": "All business areas",
+    "searchPlaceholder": "Search ideas...",
+    "emptyTitle": "No ideas found",
+    "emptyDescription": "No submitted ideas yet.",
+    "dropHere": "Drop ideas here",
+    "open": "Open",
+    "unknownAuthor": "Unknown",
+    "statusUpdated": "Status updated",
+    "statusUpdateFailed": "Failed to update status",
+    "columns": {
+      "inbox": "Inbox",
+      "backlog": "Backlog",
+      "done": "Done",
+      "rejected": "Rejected"
+    },
+    "dialog": {
+      "title": "Update Idea Status",
+      "statusLabel": "Status",
+      "rejectionReasonLabel": "Rejection Reason *",
+      "rejectionReasonPlaceholder": "Explain why this idea was rejected...",
+      "adminNotesLabel": "Admin Notes (internal)",
+      "adminNotesPlaceholder": "Notes visible only to admins..."
+    }
+  },
+  "moderation": {
+    "title": "Moderation",
+    "subtitleOrg": "Reported content in {{orgName}}'s community.",
+    "noOrgDescription": "Please select an organization.",
+    "emptyTitle": "Nothing here",
+    "emptyDescription": "No reports with this status.",
+    "reasonLabel": "Report reason",
+    "adminNotesInline": "Moderator notes:",
+    "reportedBy": "Reported by {{name}} · {{time}}",
+    "unknownReporter": "Unknown",
+    "typePost": "Post",
+    "typeComment": "Comment",
+    "viewContent": "View content",
+    "hidePost": "Hide post",
+    "hideComment": "Hide comment",
+    "showPost": "Show post",
+    "showComment": "Show comment",
+    "lockPost": "Lock comments",
+    "unlockPost": "Unlock comments",
+    "dismiss": "Dismiss",
+    "markReviewed": "Mark reviewed",
+    "reportUpdated": "Report updated",
+    "reportUpdateFailed": "Failed to update report",
+    "visibilityUpdated": "Content visibility updated",
+    "contentUpdateFailed": "Failed to update content",
+    "lockUpdated": "Post lock status updated",
+    "postUpdateFailed": "Failed to update post",
+    "tabs": {
+      "pending": "Pending",
+      "reviewed": "Reviewed",
+      "dismissed": "Dismissed"
+    },
+    "dialog": {
+      "title": "Review Report",
+      "description": "Add notes and mark this report as reviewed or dismissed.",
+      "adminNotesLabel": "Admin Notes",
+      "adminNotesPlaceholder": "Add any notes about how this was handled..."
+    }
+  },
   "orgSettings": {
-    "noOrgDescription": "Select an organization to manage its settings."
+    "title": "Organization Settings",
+    "noOrgDescription": "Select an organization to manage its settings.",
+    "combinedNote": "Feature access is combined as: platform flag AND organization override.",
+    "featureOverrides": "Feature overrides",
+    "platformDefault": "Platform default: {{state}}",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "saveButton": "Save organization settings",
+    "saveFailed": "Failed to save settings",
+    "features": {
+      "certificates_enabled": "Certificates",
+      "quizzes_enabled": "Quizzes",
+      "analytics_enabled": "Analytics",
+      "course_reviews_enabled": "Course Reviews",
+      "community_enabled": "Community"
+    }
   },
   "orgDetail": {
     "loadFailedTitle": "Couldn't load organization",
