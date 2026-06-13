@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -45,6 +46,7 @@ import { createIdea, submitIdea, updateIdea, fetchIdea, deleteIdea, fetchOrgTags
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { BusinessArea } from '@/lib/community-types';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
   Loader2,
@@ -73,9 +75,12 @@ const ideaFormSchema = z.object({
 
 type IdeaFormValues = z.infer<typeof ideaFormSchema>;
 
+const LABEL_CLASSES = 'text-xs font-bold text-[#4a4f60]';
+
 export default function IdeaSubmit() {
   const navigate = useNavigate();
   const { ideaId } = useParams<{ ideaId?: string }>();
+  const { t } = useTranslation();
   // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
   const { currentOrg, profile } = useAuth();
   const orgGuard = useOrgGuard();
@@ -160,7 +165,7 @@ export default function IdeaSubmit() {
     onSuccess: (data) => {
       setDraftId(data.id);
       queryClient.invalidateQueries({ queryKey: ['ideas'] });
-      toast.success('Draft saved! You can find it in the "My Drafts" tab of the Idea Library.');
+      toast.success(t('ideas.draftSaved'));
       navigate('/app/community/org/ideas?tab=drafts');
     },
     onError: () => {
@@ -190,7 +195,7 @@ export default function IdeaSubmit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ideas'] });
-      toast.success('Idea submitted successfully!');
+      toast.success(t('ideas.ideaSubmitted'));
       navigate('/app/community/org/ideas');
     },
     onError: () => {
@@ -242,10 +247,10 @@ export default function IdeaSubmit() {
   };
 
   const steps = [
-    { title: 'Basics', description: 'Title and business area' },
-    { title: 'Current State', description: 'Describe the current process' },
-    { title: 'Proposed Change', description: 'Your improvement idea' },
-    { title: 'Details', description: 'Optional additional context' },
+    { title: t('community.ideaForm.stepBasics') },
+    { title: t('community.ideaForm.stepCurrentState') },
+    { title: t('community.ideaForm.stepProposedChange') },
+    { title: t('community.ideaForm.stepDetails') },
   ];
 
   if (!settingsLoading && !features.community_enabled) {
@@ -265,9 +270,11 @@ export default function IdeaSubmit() {
   if (!currentOrg) {
     return (
       <AppLayout>
-        <div className="container mx-auto py-12 text-center">
-          <h1 className="text-2xl font-bold mb-2">No Organization Selected</h1>
-          <p className="text-muted-foreground">Please select an organization to submit an idea.</p>
+        <div className="py-12 text-center">
+          <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+            {t('community.noOrganizationTitle')}
+          </h1>
+          <p className="text-sm text-muted-foreground">{t('community.noOrgSubmitIdea')}</p>
         </div>
       </AppLayout>
     );
@@ -276,7 +283,7 @@ export default function IdeaSubmit() {
   if (isEditMode && isLoadingIdea) {
     return (
       <AppLayout>
-        <div className="container mx-auto py-12 flex items-center justify-center">
+        <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       </AppLayout>
@@ -284,41 +291,45 @@ export default function IdeaSubmit() {
   }
 
   return (
-    <AppLayout title="Submit Idea" breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: isEditMode ? 'Edit Draft' : 'Submit Idea' }]}>
-      <div className="container max-w-3xl mx-auto py-6 px-4">
+    <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: isEditMode ? 'Edit Draft' : 'Submit Idea' }]}>
+      <div className="max-w-[680px]">
+        {/* Back to idea library */}
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/app/community/org/ideas')}
+          className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
+        >
+          <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
+          {t('community.backToIdeas')}
+        </Button>
+
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/app/community/org/ideas')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Submit an Idea</h1>
-            <p className="text-muted-foreground">
-              Share your AI or process improvement idea with {currentOrg.name}
-            </p>
-          </div>
+        <div className="mb-[22px]">
+          <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+            {isEditMode ? t('community.ideaForm.editHeading') : t('ideas.submitNew')}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {t('community.ideaForm.subtitle', { orgName: currentOrg.name })}
+          </p>
         </div>
 
         {/* Progress steps */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="mb-7 flex items-center justify-between">
           {steps.map((step, index) => (
             <button
               key={step.title}
+              type="button"
               onClick={() => setCurrentStep(index)}
-              className={`flex-1 text-center pb-2 border-b-2 transition-colors ${
+              className={cn(
+                'flex-1 border-b-2 pb-2 text-center transition-colors',
                 index === currentStep
-                  ? 'border-primary text-primary font-medium'
+                  ? 'border-primary font-bold text-primary'
                   : index < currentStep
-                  ? 'border-muted-foreground/50 text-muted-foreground'
-                  : 'border-muted text-muted-foreground/50'
-              }`}
+                  ? 'border-muted-foreground/50 font-semibold text-muted-foreground'
+                  : 'border-muted font-semibold text-muted-foreground/50'
+              )}
             >
-              <span className="text-sm">{step.title}</span>
+              <span className="text-[13px]">{step.title}</span>
             </button>
           ))}
         </div>
@@ -327,14 +338,14 @@ export default function IdeaSubmit() {
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             {/* Step 0: Basics */}
             {currentStep === 0 && (
-              <Card>
+              <Card className="rounded-2xl">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Lightbulb className="h-5 w-5 text-primary" />
-                    What's your idea?
+                  <CardTitle className="flex items-center gap-2 text-[17px] font-bold">
+                    <Lightbulb aria-hidden="true" className="h-5 w-5 text-primary" />
+                    {t('community.ideaForm.whatsYourIdea')}
                   </CardTitle>
-                  <CardDescription>
-                    Start with a clear title and categorize your idea
+                  <CardDescription className="text-[13px]">
+                    {t('community.ideaForm.whatsYourIdeaDescription')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -343,15 +354,15 @@ export default function IdeaSubmit() {
                     name="title"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Idea Title *</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.titleLabel')}</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="e.g., Automate invoice processing with AI"
+                            placeholder={t('community.ideaForm.titlePlaceholder')}
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          A short, descriptive title for your idea
+                          {t('community.ideaForm.titleDescription')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -363,14 +374,14 @@ export default function IdeaSubmit() {
                     name="business_area"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Business Area / Domain</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.businessAreaLabel')}</FormLabel>
                         <Select
                           value={field.value}
                           onValueChange={field.onChange}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a business area" />
+                              <SelectValue placeholder={t('community.ideaForm.businessAreaPlaceholder')} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -382,7 +393,7 @@ export default function IdeaSubmit() {
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          Which part of the business does this idea relate to?
+                          {t('community.ideaForm.businessAreaDescription')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -394,10 +405,10 @@ export default function IdeaSubmit() {
                     name="tags"
                     render={() => (
                       <FormItem>
-                        <FormLabel>Tags</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.tagsLabel')}</FormLabel>
                         <div className="flex gap-2">
                           <Input
-                            placeholder="Add a tag..."
+                            placeholder={t('community.ideaForm.addTagPlaceholder')}
                             value={tagInput}
                             onChange={(e) => setTagInput(e.target.value)}
                             list="org-idea-tags"
@@ -413,14 +424,14 @@ export default function IdeaSubmit() {
                               <option key={tag} value={tag} />
                             ))}
                           </datalist>
-                          <Button type="button" variant="outline" onClick={addTag}>
-                            Add
+                          <Button type="button" variant="outline" onClick={addTag} className="text-[13px] font-bold">
+                            {t('community.postForm.add')}
                           </Button>
                         </div>
                         {(form.watch('tags') || []).length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
+                          <div className="mt-2 flex flex-wrap gap-2">
                             {form.watch('tags')?.map((tag) => (
-                              <Badge key={tag} variant="secondary" className="gap-1">
+                              <Badge key={tag} variant="secondary" className="gap-1 rounded-[7px] bg-accent text-[11.5px] font-semibold text-accent-foreground">
                                 {tag}
                                 <button
                                   type="button"
@@ -434,7 +445,7 @@ export default function IdeaSubmit() {
                           </div>
                         )}
                         <FormDescription>
-                          Add keywords to help others find this idea
+                          {t('community.ideaForm.tagsDescription')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -446,11 +457,11 @@ export default function IdeaSubmit() {
 
             {/* Step 1: Current State */}
             {currentStep === 1 && (
-              <Card>
+              <Card className="rounded-2xl">
                 <CardHeader>
-                  <CardTitle>Current State</CardTitle>
-                  <CardDescription>
-                    Help us understand the current situation and why change is needed
+                  <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.stepCurrentState')}</CardTitle>
+                  <CardDescription className="text-[13px]">
+                    {t('community.ideaForm.currentStateDescription')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -459,16 +470,16 @@ export default function IdeaSubmit() {
                     name="current_process"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Current Process (As-Is)</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.currentProcessLabel')}</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Describe how things work today. What steps are involved? Who does what?"
+                            placeholder={t('community.ideaForm.currentProcessPlaceholder')}
                             className="min-h-[120px]"
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          Walk us through the current workflow or process
+                          {t('community.ideaForm.currentProcessDescription')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -480,37 +491,37 @@ export default function IdeaSubmit() {
                     name="pain_points"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Pain Points / Why It Matters</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.painPointsLabel')}</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="What problems does this cause? Time wasted? Errors? Frustration?"
+                            placeholder={t('community.ideaForm.painPointsPlaceholder')}
                             className="min-h-[120px]"
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          Explain the impact and why this needs to change
+                          {t('community.ideaForm.painPointsDescription')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <FormField
                       control={form.control}
                       name="affected_roles"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Who Is Affected?</FormLabel>
+                          <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.affectedRolesLabel')}</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="e.g., Finance team, all employees"
+                              placeholder={t('community.ideaForm.affectedRolesPlaceholder')}
                               {...field}
                             />
                           </FormControl>
                           <FormDescription>
-                            Roles or teams impacted
+                            {t('community.ideaForm.affectedRolesDescription')}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -522,15 +533,15 @@ export default function IdeaSubmit() {
                       name="frequency_volume"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Frequency / Volume</FormLabel>
+                          <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.frequencyLabel')}</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="e.g., 50 invoices/week, daily task"
+                              placeholder={t('community.ideaForm.frequencyPlaceholder')}
                               {...field}
                             />
                           </FormControl>
                           <FormDescription>
-                            How often does this happen?
+                            {t('community.ideaForm.frequencyDescription')}
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -543,11 +554,11 @@ export default function IdeaSubmit() {
 
             {/* Step 2: Proposed Change */}
             {currentStep === 2 && (
-              <Card>
+              <Card className="rounded-2xl">
                 <CardHeader>
-                  <CardTitle>Proposed Improvement</CardTitle>
-                  <CardDescription>
-                    Describe your idea for how AI or automation could help
+                  <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.proposedTitle')}</CardTitle>
+                  <CardDescription className="text-[13px]">
+                    {t('community.ideaForm.proposedDescription')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -556,16 +567,16 @@ export default function IdeaSubmit() {
                     name="proposed_improvement"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>What Should Be Improved?</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.proposedImprovementLabel')}</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Describe your idea for improvement. How could AI or automation help? What would change?"
+                            placeholder={t('community.ideaForm.proposedImprovementPlaceholder')}
                             className="min-h-[150px]"
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          Explain your proposed solution or improvement
+                          {t('community.ideaForm.proposedImprovementDescription')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -577,16 +588,16 @@ export default function IdeaSubmit() {
                     name="desired_process"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Desired Future State (To-Be)</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.desiredProcessLabel')}</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="How should the process work after the improvement? (Optional)"
+                            placeholder={t('community.ideaForm.desiredProcessPlaceholder')}
                             className="min-h-[120px]"
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          Paint a picture of the improved workflow
+                          {t('community.ideaForm.desiredProcessDescription')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -598,15 +609,15 @@ export default function IdeaSubmit() {
                     name="success_metrics"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Success Metrics</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.successMetricsLabel')}</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="e.g., 50% time reduction, zero errors, faster turnaround"
+                            placeholder={t('community.ideaForm.successMetricsPlaceholder')}
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          How would you measure success?
+                          {t('community.ideaForm.successMetricsDescription')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -618,11 +629,11 @@ export default function IdeaSubmit() {
 
             {/* Step 3: Details */}
             {currentStep === 3 && (
-              <Card>
+              <Card className="rounded-2xl">
                 <CardHeader>
-                  <CardTitle>Additional Details</CardTitle>
-                  <CardDescription>
-                    Optional technical context that might help evaluate this idea
+                  <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.detailsTitle')}</CardTitle>
+                  <CardDescription className="text-[13px]">
+                    {t('community.ideaForm.detailsDescription')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -631,10 +642,10 @@ export default function IdeaSubmit() {
                     name="data_inputs"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Data Inputs</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.dataInputsLabel')}</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="What data is involved? Where does it come from? (e.g., emails, PDFs, Excel files, ERP system)"
+                            placeholder={t('community.ideaForm.dataInputsPlaceholder')}
                             className="min-h-[100px]"
                             {...field}
                           />
@@ -649,15 +660,15 @@ export default function IdeaSubmit() {
                     name="systems_involved"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Systems / Tools Involved</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.systemsLabel')}</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="e.g., SAP, Salesforce, SharePoint, custom apps"
+                            placeholder={t('community.ideaForm.systemsPlaceholder')}
                             {...field}
                           />
                         </FormControl>
                         <FormDescription>
-                          Which software systems are part of this process?
+                          {t('community.ideaForm.systemsDescription')}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -669,10 +680,10 @@ export default function IdeaSubmit() {
                     name="constraints_risks"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Constraints / Risks</FormLabel>
+                        <FormLabel className={LABEL_CLASSES}>{t('community.ideaForm.constraintsLabel')}</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Any concerns, limitations, or risks to consider? (e.g., data privacy, compliance, budget)"
+                            placeholder={t('community.ideaForm.constraintsPlaceholder')}
                             className="min-h-[100px]"
                             {...field}
                           />
@@ -686,15 +697,16 @@ export default function IdeaSubmit() {
             )}
 
             {/* Navigation buttons */}
-            <div className="flex justify-between mt-6">
+            <div className="mt-6 flex justify-between">
               <div className="flex gap-2">
                 {currentStep > 0 && (
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setCurrentStep(currentStep - 1)}
+                    className="rounded-[10px] border-[#dcdee6] text-[13px] font-bold"
                   >
-                    Previous
+                    {t('common.previous')}
                   </Button>
                 )}
                 {isEditMode && draftId && (
@@ -703,31 +715,31 @@ export default function IdeaSubmit() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="text-destructive hover:text-destructive"
+                        className="rounded-[10px] text-[13px] font-bold text-destructive hover:text-destructive"
                         disabled={deleteDraftMutation.isPending}
                       >
                         {deleteDraftMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <Trash2 className="h-4 w-4 mr-2" />
+                          <Trash2 aria-hidden="true" className="h-4 w-4" />
                         )}
-                        Delete Draft
+                        {t('ideas.deleteDraft')}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+                        <AlertDialogTitle>{t('ideas.deleteConfirm')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. The draft will be permanently deleted.
+                          {t('ideas.deleteWarning')}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => deleteDraftMutation.mutate()}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Delete
+                          {t('common.delete')}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -737,16 +749,16 @@ export default function IdeaSubmit() {
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  variant="outline"
                   onClick={handleSaveDraft}
                   disabled={saveDraftMutation.isPending}
+                  className="rounded-[10px] bg-accent text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
                 >
                   {saveDraftMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <Save aria-hidden="true" className="h-4 w-4" />
                   )}
-                  Save Draft
+                  {t('ideas.saveDraft')}
                 </Button>
                 {currentStep < steps.length - 1 ? (
                   <Button
@@ -755,20 +767,22 @@ export default function IdeaSubmit() {
                       e.preventDefault();
                       setCurrentStep(currentStep + 1);
                     }}
+                    className="rounded-[10px] text-[13px] font-bold"
                   >
-                    Next
+                    {t('common.next')}
                   </Button>
                 ) : (
                   <Button
                     type="submit"
                     disabled={submitMutation.isPending}
+                    className="rounded-[10px] text-[13px] font-bold"
                   >
                     {submitMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Send className="h-4 w-4 mr-2" />
+                      <Send aria-hidden="true" className="h-4 w-4" />
                     )}
-                    Submit Idea
+                    {t('ideas.submitIdea')}
                   </Button>
                 )}
               </div>

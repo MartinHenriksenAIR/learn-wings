@@ -1,22 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -25,6 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { IdeaStatusBadge } from '@/components/community/IdeaStatusBadge';
+import { SaveButton } from '@/components/ui/save-button';
+import { useFlash } from '@/hooks/useFlash';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import {
@@ -37,7 +29,7 @@ import {
 } from '@/lib/ideas-api';
 import { BUSINESS_AREAS, IDEA_STATUS_OPTIONS } from '@/lib/community-types';
 import type { IdeaStatusExtended } from '@/lib/community-types';
-import { getInitials } from '@/lib/utils';
+import { cn, getAvatarColor, getInitials } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -45,26 +37,20 @@ import {
   Loader2,
   MessageSquare,
   ThumbsUp,
-  User,
-  Calendar,
-  Briefcase,
-  Tag,
   AlertCircle,
-  CheckCircle,
-  XCircle,
-  Clock,
   Send,
 } from 'lucide-react';
 
 export default function IdeaDetail() {
   const { ideaId } = useParams<{ ideaId: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { profile, currentOrg, effectiveIsOrgAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
+  const { flashed, flash } = useFlash();
 
   const [newComment, setNewComment] = useState('');
-  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<IdeaStatusExtended>('submitted');
   const [adminNotes, setAdminNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
@@ -83,9 +69,20 @@ export default function IdeaDetail() {
     enabled: !!ideaId,
   });
 
+  // Seed the admin status panel once per loaded idea (the panel replaced the
+  // old dialog, which seeded on open). Keyed on the id so background refetches
+  // (e.g. after a comment) don't clobber in-progress admin edits.
+  useEffect(() => {
+    if (!idea) return;
+    setNewStatus(idea.status);
+    setAdminNotes(idea.admin_notes || '');
+    setRejectionReason(idea.rejection_reason || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idea?.id]);
+
   // Comment mutation
   const commentMutation = useMutation({
-    mutationFn: (content: string) => 
+    mutationFn: (content: string) =>
       createIdeaComment(ideaId!, currentOrg!.id, content),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['idea-comments', ideaId] });
@@ -122,9 +119,9 @@ export default function IdeaDetail() {
     },
   });
 
-  // Status update mutation
+  // Status update mutation — routine save: in-button "Saved" morph, no success toast.
   const statusMutation = useMutation({
-    mutationFn: () => 
+    mutationFn: () =>
       updateIdeaStatus(ideaId!, {
         status: newStatus,
         admin_notes: adminNotes || undefined,
@@ -133,8 +130,7 @@ export default function IdeaDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['idea', ideaId] });
       queryClient.invalidateQueries({ queryKey: ['ideas'] });
-      setStatusDialogOpen(false);
-      toast.success('Status updated');
+      flash('ideaStatus');
     },
     onError: () => {
       toast.error('Failed to update status');
@@ -154,15 +150,6 @@ export default function IdeaDetail() {
     commentMutation.mutate(newComment.trim());
   };
 
-  const openStatusDialog = () => {
-    if (idea) {
-      setNewStatus(idea.status);
-      setAdminNotes(idea.admin_notes || '');
-      setRejectionReason(idea.rejection_reason || '');
-    }
-    setStatusDialogOpen(true);
-  };
-
   const getBusinessAreaLabel = (value: string | null) => {
     if (!value) return null;
     return BUSINESS_AREAS.find((a) => a.value === value)?.label || value;
@@ -174,7 +161,7 @@ export default function IdeaDetail() {
 
   if (ideaLoading) {
     return (
-      <AppLayout title="Idea" breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
+      <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -184,244 +171,158 @@ export default function IdeaDetail() {
 
   if (!idea) {
     return (
-      <AppLayout title="Idea Not Found" breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }]}>
-        <div className="container mx-auto py-12 text-center">
-          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Idea Not Found</h1>
-          <p className="text-muted-foreground mb-4">
-            The idea you're looking for doesn't exist or you don't have access.
-          </p>
-          <Button onClick={() => navigate('/app/community/org/ideas')}>
-            Back to Ideas
+      <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }]}>
+        <div className="py-12 text-center">
+          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+            {t('community.ideaNotFound')}
+          </h1>
+          <p className="mb-4 text-sm text-muted-foreground">{t('community.ideaNotFoundDescription')}</p>
+          <Button
+            onClick={() => navigate('/app/community/org/ideas')}
+            className="rounded-[11px] text-[13px] font-bold"
+          >
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+            {t('community.backToIdeas')}
           </Button>
         </div>
       </AppLayout>
     );
   }
 
-  const isAuthor = idea.user_id === profile?.id;
-
   return (
-    <AppLayout title={idea.title} breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
-      <div className="container max-w-4xl mx-auto py-6 px-4">
-        {/* Header */}
-        <div className="flex items-start gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-        </div>
+    <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
+      <div className="max-w-[760px]">
+        {/* Back */}
+        <Button
+          variant="ghost"
+          onClick={() => navigate(-1)}
+          className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
+        >
+          <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
+          {t('common.back')}
+        </Button>
 
         {/* Idea header card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-2">
-                <IdeaStatusBadge status={idea.status} />
-                <CardTitle className="text-2xl">{idea.title}</CardTitle>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <User className="h-4 w-4" />
-                    {idea.profile?.full_name || 'Unknown'}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {formatDistanceToNow(new Date(idea.created_at), { addSuffix: true })}
-                  </span>
-                  {idea.business_area && (
-                    <span className="flex items-center gap-1">
-                      <Briefcase className="h-4 w-4" />
-                      {getBusinessAreaLabel(idea.business_area)}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={idea.user_has_voted ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={handleVote}
-                  disabled={voteMutation.isPending || unvoteMutation.isPending}
-                >
-                  <ThumbsUp className={`h-4 w-4 mr-1 ${idea.user_has_voted ? 'fill-current' : ''}`} />
-                  {idea.vote_count || 0}
-                </Button>
-                <Button variant="outline" size="sm" disabled>
-                  <MessageSquare className="h-4 w-4 mr-1" />
-                  {idea.comment_count || 0}
-                </Button>
-                {effectiveIsOrgAdmin && (
-                  <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" onClick={openStatusDialog}>
-                        Update Status
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Update Idea Status</DialogTitle>
-                        <DialogDescription>
-                          Change the status and add notes for this idea.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Status</label>
-                          <Select
-                            value={newStatus}
-                            onValueChange={(v) => setNewStatus(v as IdeaStatusExtended)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {IDEA_STATUS_OPTIONS.filter(s => s.value !== 'draft').map((s) => (
-                                <SelectItem key={s.value} value={s.value}>
-                                  {s.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {newStatus === 'rejected' && (
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Rejection Reason *</label>
-                            <Textarea
-                              placeholder="Explain why this idea was rejected..."
-                              value={rejectionReason}
-                              onChange={(e) => setRejectionReason(e.target.value)}
-                            />
-                          </div>
-                        )}
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Admin Notes (internal)</label>
-                          <Textarea
-                            placeholder="Notes visible only to admins..."
-                            value={adminNotes}
-                            onChange={(e) => setAdminNotes(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button
-                          variant="outline"
-                          onClick={() => setStatusDialogOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={() => statusMutation.mutate()}
-                          disabled={statusMutation.isPending || (newStatus === 'rejected' && !rejectionReason)}
-                        >
-                          {statusMutation.isPending && (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          )}
-                          Save Changes
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </div>
-            </div>
-            {/* Tags */}
+        <div className="mb-4 rounded-2xl border border-border bg-card px-7 py-[26px]">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <IdeaStatusBadge status={idea.status} />
+            {idea.business_area && (
+              <span className="inline-flex items-center whitespace-nowrap rounded-[7px] bg-[#f3f4f8] px-[11px] py-1 text-[11px] font-bold text-[#686d7e]">
+                {getBusinessAreaLabel(idea.business_area)}
+              </span>
+            )}
+          </div>
+          <h1 className="mb-2 font-display text-[22px] font-extrabold tracking-[-0.01em]">{idea.title}</h1>
+          <p className="mb-4 text-[12.5px] font-semibold text-[#9aa0af]">
+            {t('community.submittedBy', { name: idea.profile?.full_name || t('community.unknownUser') })}
+            {' · '}
+            {formatDistanceToNow(new Date(idea.created_at), { addSuffix: true })}
+          </p>
+          <div className="flex flex-wrap items-center gap-2.5 border-t border-[#eceef3] pt-4">
+            <button
+              type="button"
+              onClick={handleVote}
+              disabled={voteMutation.isPending || unvoteMutation.isPending}
+              className={cn(
+                'inline-flex items-center gap-[7px] rounded-[7px] border px-4 py-2 text-[13px] font-bold disabled:opacity-60',
+                idea.user_has_voted
+                  ? 'border-primary bg-accent text-accent-foreground'
+                  : 'border-[#dcdee6] bg-card text-[#686d7e]'
+              )}
+            >
+              <ThumbsUp
+                aria-hidden="true"
+                className={cn('h-3.5 w-3.5', idea.user_has_voted && 'fill-current')}
+              />
+              {idea.vote_count || 0}
+            </button>
+            <span className="inline-flex items-center gap-[7px] text-[12.5px] font-semibold text-[#9aa0af]">
+              <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
+              {idea.comment_count || 0}
+            </span>
+            <div className="flex-1" />
             {idea.tags && idea.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-2">
+              <div className="flex flex-wrap gap-1.5">
                 {idea.tags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    <Tag className="h-3 w-3 mr-1" />
-                    {tag}
-                  </Badge>
+                  <span
+                    key={tag}
+                    className="rounded-[7px] bg-accent px-[11px] py-1 text-[11.5px] font-semibold text-accent-foreground"
+                  >
+                    #{tag}
+                  </span>
                 ))}
               </div>
             )}
-          </CardHeader>
-        </Card>
+          </div>
+        </div>
 
         {/* Rejection notice */}
         {idea.status === 'rejected' && idea.rejection_reason && (
-          <Card className="mb-6 border-destructive/50 bg-destructive/5">
-            <CardHeader className="py-4">
-              <div className="flex items-start gap-3">
-                <XCircle className="h-5 w-5 text-destructive mt-0.5" />
-                <div>
-                  <CardTitle className="text-base text-destructive">Idea Rejected</CardTitle>
-                  <CardDescription className="text-destructive/80 mt-1">
-                    {idea.rejection_reason}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
+          <div className="mb-4 rounded-[14px] border border-[#f3ccd0] bg-[#fdf1f1] px-5 py-4">
+            <p className="mb-1 text-xs font-extrabold uppercase tracking-[0.05em] text-destructive">
+              {t('community.ideaRejected')}
+            </p>
+            <p className="text-[13px] leading-[1.55] text-[#7a2e2e]">{idea.rejection_reason}</p>
+          </div>
         )}
 
         {/* Admin notes (visible only to admins) */}
         {effectiveIsOrgAdmin && idea.admin_notes && (
-          <Card className="mb-6 border-primary/50 bg-primary/5">
-            <CardHeader className="py-4">
-              <div className="flex items-start gap-3">
-                <Clock className="h-5 w-5 text-primary mt-0.5" />
-                <div>
-                  <CardTitle className="text-base text-primary">Admin Notes (Internal)</CardTitle>
-                  <CardDescription className="text-primary/80 mt-1">
-                    {idea.admin_notes}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
+          <div className="mb-4 rounded-[14px] border border-[#efddb2] bg-[#fbf2dd] px-5 py-4">
+            <p className="mb-1 text-xs font-extrabold uppercase tracking-[0.05em] text-[#8a5e10]">
+              {t('community.adminNotesInternal')}
+            </p>
+            <p className="text-[13px] leading-[1.55] text-[#6e4c0d]">{idea.admin_notes}</p>
+          </div>
         )}
 
         {/* Idea content sections */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Current Process */}
           {idea.current_process && (
-            <Card>
+            <Card className="rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg">Current Process (As-Is)</CardTitle>
+                <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.currentProcessLabel')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground whitespace-pre-wrap">{idea.current_process}</p>
+                <p className="whitespace-pre-wrap text-sm leading-[1.65] text-[#4a4f60]">{idea.current_process}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Pain Points */}
           {idea.pain_points && (
-            <Card>
+            <Card className="rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg">Pain Points / Why It Matters</CardTitle>
+                <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.painPointsLabel')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground whitespace-pre-wrap">{idea.pain_points}</p>
+                <p className="whitespace-pre-wrap text-sm leading-[1.65] text-[#4a4f60]">{idea.pain_points}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Affected Roles & Frequency */}
           {(idea.affected_roles || idea.frequency_volume) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {idea.affected_roles && (
-                <Card>
+                <Card className="rounded-2xl">
                   <CardHeader className="py-4">
-                    <CardTitle className="text-base">Who Is Affected</CardTitle>
+                    <CardTitle className="text-[14.5px] font-bold">{t('community.ideaForm.affectedRolesLabel')}</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <p className="text-muted-foreground">{idea.affected_roles}</p>
+                    <p className="text-sm text-[#4a4f60]">{idea.affected_roles}</p>
                   </CardContent>
                 </Card>
               )}
               {idea.frequency_volume && (
-                <Card>
+                <Card className="rounded-2xl">
                   <CardHeader className="py-4">
-                    <CardTitle className="text-base">Frequency / Volume</CardTitle>
+                    <CardTitle className="text-[14.5px] font-bold">{t('community.ideaForm.frequencyLabel')}</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <p className="text-muted-foreground">{idea.frequency_volume}</p>
+                    <p className="text-sm text-[#4a4f60]">{idea.frequency_volume}</p>
                   </CardContent>
                 </Card>
               )}
@@ -430,66 +331,65 @@ export default function IdeaDetail() {
 
           {/* Proposed Improvement */}
           {idea.proposed_improvement && (
-            <Card>
+            <Card className="rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg">Proposed Improvement</CardTitle>
+                <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.proposedTitle')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground whitespace-pre-wrap">{idea.proposed_improvement}</p>
+                <p className="whitespace-pre-wrap text-sm leading-[1.65] text-[#4a4f60]">{idea.proposed_improvement}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Desired Process */}
           {idea.desired_process && (
-            <Card>
+            <Card className="rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg">Desired Future State (To-Be)</CardTitle>
+                <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.desiredProcessLabel')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground whitespace-pre-wrap">{idea.desired_process}</p>
+                <p className="whitespace-pre-wrap text-sm leading-[1.65] text-[#4a4f60]">{idea.desired_process}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Success Metrics */}
           {idea.success_metrics && (
-            <Card>
+            <Card className="rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  Success Metrics
+                <CardTitle className="text-[17px] font-bold text-success">
+                  {t('community.ideaForm.successMetricsLabel')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">{idea.success_metrics}</p>
+                <p className="text-sm leading-[1.65] text-[#4a4f60]">{idea.success_metrics}</p>
               </CardContent>
             </Card>
           )}
 
           {/* Technical Details */}
           {(idea.data_inputs || idea.systems_involved || idea.constraints_risks) && (
-            <Card>
+            <Card className="rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg">Technical Details</CardTitle>
+                <CardTitle className="text-[17px] font-bold">{t('community.technicalDetails')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {idea.data_inputs && (
                   <div>
-                    <h4 className="font-medium mb-1">Data Inputs</h4>
-                    <p className="text-muted-foreground text-sm whitespace-pre-wrap">{idea.data_inputs}</p>
+                    <h4 className="mb-1 text-[13px] font-bold">{t('community.ideaForm.dataInputsLabel')}</h4>
+                    <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-muted-foreground">{idea.data_inputs}</p>
                   </div>
                 )}
                 {idea.systems_involved && (
                   <div>
-                    <h4 className="font-medium mb-1">Systems / Tools Involved</h4>
-                    <p className="text-muted-foreground text-sm">{idea.systems_involved}</p>
+                    <h4 className="mb-1 text-[13px] font-bold">{t('community.ideaForm.systemsLabel')}</h4>
+                    <p className="text-[13px] leading-[1.6] text-muted-foreground">{idea.systems_involved}</p>
                   </div>
                 )}
                 {idea.constraints_risks && (
                   <div>
-                    <h4 className="font-medium mb-1">Constraints / Risks</h4>
-                    <p className="text-muted-foreground text-sm whitespace-pre-wrap">{idea.constraints_risks}</p>
+                    <h4 className="mb-1 text-[13px] font-bold">{t('community.ideaForm.constraintsLabel')}</h4>
+                    <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-muted-foreground">{idea.constraints_risks}</p>
                   </div>
                 )}
               </CardContent>
@@ -497,83 +397,138 @@ export default function IdeaDetail() {
           )}
         </div>
 
+        {/* Admin status panel (replaces the old dialog; in-button save feedback) */}
+        {effectiveIsOrgAdmin && (
+          <div className="mt-4 rounded-2xl border border-border bg-card px-6 py-5">
+            <h3 className="mb-3 text-sm font-extrabold">{t('community.updateStatus')}</h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[#4a4f60]">{t('community.statusLabel')}</label>
+                <Select
+                  value={newStatus}
+                  onValueChange={(v) => setNewStatus(v as IdeaStatusExtended)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {IDEA_STATUS_OPTIONS.filter(s => s.value !== 'draft').map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {newStatus === 'rejected' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-[#4a4f60]">{t('community.rejectionReason')}</label>
+                  <Textarea
+                    placeholder={t('community.rejectionReasonPlaceholder')}
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                  />
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[#4a4f60]">{t('community.adminNotesInternal')}</label>
+                <Textarea
+                  placeholder={t('community.adminNotesPlaceholder')}
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end">
+                <SaveButton
+                  done={flashed('ideaStatus')}
+                  idleLabel={t('common.save')}
+                  onClick={() => statusMutation.mutate()}
+                  disabled={statusMutation.isPending || (newStatus === 'rejected' && !rejectionReason)}
+                  className="rounded-[10px] text-[13px] font-bold"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Comments section */}
-        <Separator className="my-8" />
-        
-        <div className="space-y-6">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Discussion ({comments.length})
+        <div className="mt-8 space-y-4">
+          <h2 className="flex items-center gap-2 text-[17px] font-bold">
+            <MessageSquare aria-hidden="true" className="h-[18px] w-[18px]" />
+            {t('community.discussion', { count: comments.length })}
           </h2>
 
           {/* Comment input */}
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex gap-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="text-xs">
-                    {getInitials(profile?.full_name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-2">
-                  <Textarea
-                    placeholder="Add a comment..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    className="min-h-[80px]"
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      onClick={handleSubmitComment}
-                      disabled={!newComment.trim() || commentMutation.isPending}
-                    >
-                      {commentMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4 mr-2" />
-                      )}
-                      Comment
-                    </Button>
-                  </div>
+          <div className="rounded-2xl border border-border bg-card px-5 py-4">
+            <div className="flex gap-3">
+              <Avatar className="h-8 w-8 shrink-0">
+                <AvatarFallback
+                  className="text-[11px] font-bold text-white"
+                  style={{ backgroundColor: getAvatarColor(profile?.full_name) }}
+                >
+                  {getInitials(profile?.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 space-y-2">
+                <Textarea
+                  placeholder={t('community.addCommentPlaceholder')}
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  className="min-h-[80px]"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={handleSubmitComment}
+                    disabled={!newComment.trim() || commentMutation.isPending}
+                    className="rounded-[10px] text-[13px] font-bold"
+                  >
+                    {commentMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send aria-hidden="true" className="h-4 w-4" />
+                    )}
+                    {t('community.comment')}
+                  </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Comments list */}
           {comments.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No comments yet. Start the discussion!</p>
+            <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-8 text-center text-muted-foreground">
+              <MessageSquare aria-hidden="true" className="mx-auto mb-2 h-8 w-8 opacity-50" />
+              <p className="text-[13px]">{t('community.noCommentsStartDiscussion')}</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {comments.map((comment) => (
-                <Card key={comment.id}>
-                  <CardContent className="pt-4">
-                    <div className="flex gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs">
-                          {getInitials(comment.profile?.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">
-                            {comment.profile?.full_name || 'Unknown'}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {comment.content}
-                        </p>
+                <div key={comment.id} className="rounded-2xl border border-border bg-card px-5 py-4">
+                  <div className="flex gap-3">
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarFallback
+                        className="text-[11px] font-bold text-white"
+                        style={{ backgroundColor: getAvatarColor(comment.profile?.full_name) }}
+                      >
+                        {getInitials(comment.profile?.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="text-[13px] font-bold">
+                          {comment.profile?.full_name || t('community.unknownUser')}
+                        </span>
+                        <span className="text-[11.5px] text-[#9aa0af]">
+                          {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                        </span>
                       </div>
+                      <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#4a4f60]">
+                        {comment.content}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           )}
