@@ -156,7 +156,10 @@ export function AnalyticsOverview({
             <div className="mb-3 flex min-h-[46px] items-center">{card.visual}</div>
             <span className="block text-[21px] font-extrabold tracking-[-0.02em]">{card.value}</span>
             <span className="mt-px block text-xs font-medium text-muted-foreground">{card.label}</span>
-            <div className="max-h-0 overflow-hidden text-[11.5px] leading-snug text-muted-foreground opacity-0 transition-[max-height,opacity,margin-top] duration-[280ms] ease-out group-hover:mt-[11px] group-hover:max-h-[84px] group-hover:opacity-100">
+            {/* Revealed on hover AND on focus (group-focus-within reaches any
+                focusable child), mirroring the StatCard primitive so keyboard
+                and touch users can reach the panel too. */}
+            <div className="max-h-0 overflow-hidden text-[11.5px] leading-snug text-muted-foreground opacity-0 transition-[max-height,opacity,margin-top] duration-[280ms] ease-out group-hover:mt-[11px] group-hover:max-h-[84px] group-hover:opacity-100 group-focus-within:mt-[11px] group-focus-within:max-h-[84px] group-focus-within:opacity-100">
               {card.extra}
             </div>
           </div>

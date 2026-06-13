@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { IdeaStatusBadge } from '@/components/community/IdeaStatusBadge';
 import { PageSpinner } from '@/components/ui/page-spinner';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { fetchIdeas, updateIdeaStatus } from '@/lib/ideas-api';
@@ -222,13 +223,11 @@ export default function OrgIdeasManagement() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : ideas.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <Lightbulb className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 className="mb-2 text-lg font-medium">{t('ideaManagement.emptyTitle')}</h3>
-            <p className="text-muted-foreground">{t('ideaManagement.emptyDescription')}</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<Lightbulb aria-hidden="true" className="h-6 w-6" />}
+          title={t('ideaManagement.emptyTitle')}
+          description={t('ideaManagement.emptyDescription')}
+        />
       ) : (
         <div className="grid grid-cols-1 items-start gap-3.5 md:grid-cols-2 xl:grid-cols-4">
           {KANBAN_COLUMNS.map((column) => {

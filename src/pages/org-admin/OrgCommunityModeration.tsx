@@ -20,6 +20,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { PageSpinner } from '@/components/ui/page-spinner';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
@@ -219,13 +220,11 @@ export default function OrgCommunityModeration() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : reports.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <Flag className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 className="mb-2 text-lg font-medium">{t('moderation.emptyTitle')}</h3>
-            <p className="text-muted-foreground">{t('moderation.emptyDescription')}</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<Flag aria-hidden="true" className="h-6 w-6" />}
+          title={t('moderation.emptyTitle')}
+          description={t('moderation.emptyDescription')}
+        />
       ) : (
         <div className="flex flex-col gap-3">
           {reports.map((report) => {

@@ -93,7 +93,8 @@ export function CommentItem({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-7 w-7 rounded-lg p-0 text-[#9aa0af]">
-                <MoreHorizontal className="h-4 w-4" />
+                <MoreHorizontal aria-hidden="true" className="h-4 w-4" />
+                <span className="sr-only">{t('common.actions')}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
