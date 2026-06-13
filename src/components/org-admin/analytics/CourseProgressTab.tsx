@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { Search, BookOpen, ChevronRight, Users, Loader2 } from 'lucide-react';
 import { callApi } from '@/lib/api-client';
+import { LevelBadge } from '@/components/ui/level-badge';
 import { CourseLevel } from '@/lib/types';
 
 interface CourseStats {
@@ -148,18 +149,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
     return groups;
   }, [filteredCourses]);
 
-  const levelLabels: Record<string, string> = {
-    basic: 'Basic',
-    intermediate: 'Intermediate',
-    advanced: 'Advanced',
-  };
-
-  const levelColors: Record<string, string> = {
-    basic: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    intermediate: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-    advanced: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  };
-
   const CourseRow = ({ course }: { course: CourseStats }) => (
     <div
       className="flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
@@ -171,9 +160,7 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <h4 className="font-medium truncate">{course.title}</h4>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${levelColors[course.level]}`}>
-            {levelLabels[course.level]}
-          </span>
+          <LevelBadge level={course.level} />
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span>{course.enrolled} enrolled</span>
@@ -261,9 +248,7 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
               <AccordionItem key={level} value={level} className="border rounded-lg px-4">
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${levelColors[level]}`}>
-                      {levelLabels[level]}
-                    </span>
+                    <LevelBadge level={level as CourseLevel} />
                     <span className="text-sm text-muted-foreground">({courses.length} courses)</span>
                   </div>
                 </AccordionTrigger>
@@ -293,11 +278,7 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {selectedCourse?.title}
-              {selectedCourse && (
-                <span className={`text-xs px-2 py-0.5 rounded-full ${levelColors[selectedCourse.level]}`}>
-                  {levelLabels[selectedCourse.level]}
-                </span>
-              )}
+              {selectedCourse && <LevelBadge level={selectedCourse.level} />}
             </DialogTitle>
           </DialogHeader>
 
@@ -342,10 +323,10 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
                       <TableCell className="font-medium">{enrollee.name}</TableCell>
                       <TableCell>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
+                          className={`rounded-[7px] px-2.5 py-1 text-[11px] font-bold ${
                             enrollee.status === 'completed'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                              ? 'bg-success/10 text-success'
+                              : 'bg-accent text-primary'
                           }`}
                         >
                           {enrollee.status === 'completed' ? 'Completed' : 'In Progress'}

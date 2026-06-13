@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageSpinner } from '@/components/ui/page-spinner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -36,6 +37,7 @@ interface UserStats {
 }
 
 export default function OrgAnalytics() {
+  const { t } = useTranslation();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isGlobalView = location.pathname === '/app/admin/analytics/global';
@@ -236,12 +238,52 @@ export default function OrgAnalytics() {
   }
 
   const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization';
-  const breadcrumbs = isGlobalView 
+  const breadcrumbs = isGlobalView
     ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
     : [{ label: 'Organization' }];
 
+  const subtitle = isGlobalView
+    ? selectedOrgId === 'all'
+      ? t('analytics.subtitleGlobalAll')
+      : t('analytics.subtitleGlobalOne')
+    : t('analytics.subtitleOrg', { orgName: currentOrg?.name ?? t('nav.organization') });
+
+  // SlidingTabs definitions — the Members tab is org-only (no all-orgs membership
+  // view yet), matching the previous Tabs render exactly.
+  const tabs = [
+    { key: 'overview', label: t('analytics.tabs.overview'), icon: <BarChart3 className="h-4 w-4" aria-hidden="true" /> },
+    ...(!isGlobalView
+      ? [{ key: 'members', label: t('analytics.tabs.members'), icon: <Users className="h-4 w-4 shrink-0" aria-hidden="true" /> }]
+      : []),
+    { key: 'team', label: t('analytics.tabs.team'), icon: <GraduationCap className="h-4 w-4" aria-hidden="true" /> },
+    { key: 'courses', label: t('analytics.tabs.courses'), icon: <BookOpen className="h-4 w-4" aria-hidden="true" /> },
+  ];
+
   return (
-    <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
+    <AppLayout breadcrumbs={breadcrumbs}>
+      {/* Header: title + subtitle, with the global org filter aligned right */}
+      <div className="mb-5 flex flex-col items-start justify-between gap-4 md:flex-row">
+        <div>
+          <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">{pageTitle}</h1>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
+        </div>
+        {isGlobalView && isPlatformAdmin && (
+          <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+            <SelectTrigger className="w-[220px] shrink-0">
+              <SelectValue placeholder={t('analytics.allOrganizations')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('analytics.allOrganizations')}</SelectItem>
+              {organizations.map((org) => (
+                <SelectItem key={org.id} value={org.id}>
+                  {org.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
       {!isGlobalView && currentOrg && (
         <Card className="mb-6">
           <CardContent className="flex items-center gap-4 p-6">
@@ -305,89 +347,38 @@ export default function OrgAnalytics() {
         </Card>
       )}
 
-      {/* Organization Filter for Global View */}
-      {isGlobalView && isPlatformAdmin && (
-        <div className="mb-6 flex items-center gap-3">
-          <span className="text-sm font-medium text-muted-foreground">Filter by organization:</span>
-          <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="All Organizations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Organizations</SelectItem>
-              {organizations.map((org) => (
-                <SelectItem key={org.id} value={org.id}>
-                  {org.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <SlidingTabs tabs={tabs} active={activeTab} onChange={handleTabChange} className="mb-6" />
+
+      {activeTab === 'overview' && (
+        <AnalyticsOverview
+          stats={stats}
+          isGlobalView={isGlobalView}
+          selectedOrgId={selectedOrgId}
+          showComplianceReport={!isGlobalView && !!currentOrg}
+          generatingReport={generatingReport}
+          onGenerateReport={handleGenerateReport}
+        />
       )}
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className={`inline-flex h-11 w-auto gap-1 ${isGlobalView ? '' : ''}`}>
-          <TabsTrigger value="overview" className="gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          {!isGlobalView && (
-            <TabsTrigger value="members" className="gap-2">
-              <Users className="h-4 w-4 shrink-0" />
-              Organization Members
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="team" className="gap-2">
-            <GraduationCap className="h-4 w-4" />
-            Learning Progress
-          </TabsTrigger>
-          <TabsTrigger value="courses" className="gap-2">
-            <BookOpen className="h-4 w-4" />
-            Courses
-          </TabsTrigger>
-        </TabsList>
+      {!isGlobalView && activeTab === 'members' && <OrgMembersTab />}
 
-        <TabsContent value="overview">
-          <AnalyticsOverview
-            stats={stats}
-            isGlobalView={isGlobalView}
-            selectedOrgId={selectedOrgId}
-            showComplianceReport={!isGlobalView && !!currentOrg}
-            generatingReport={generatingReport}
-            onGenerateReport={handleGenerateReport}
-          />
-        </TabsContent>
+      {activeTab === 'team' &&
+        (effectiveOrgId ? (
+          <TeamPerformanceTab userStats={userStats} departments={departments} orgId={effectiveOrgId} />
+        ) : (
+          <div className="py-12 text-center text-muted-foreground">
+            Select an organization to view team performance.
+          </div>
+        ))}
 
-        {!isGlobalView && (
-          <TabsContent value="members">
-            <OrgMembersTab />
-          </TabsContent>
-        )}
-
-        <TabsContent value="team">
-          {effectiveOrgId ? (
-            <TeamPerformanceTab
-              userStats={userStats}
-              departments={departments}
-              orgId={effectiveOrgId}
-            />
-          ) : (
-            <div className="py-12 text-center text-muted-foreground">
-              Select an organization to view team performance.
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="courses">
-          {effectiveOrgId ? (
-            <CourseProgressTab orgId={effectiveOrgId} />
-          ) : (
-            <div className="py-12 text-center text-muted-foreground">
-              Select an organization to view course progress.
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+      {activeTab === 'courses' &&
+        (effectiveOrgId ? (
+          <CourseProgressTab orgId={effectiveOrgId} />
+        ) : (
+          <div className="py-12 text-center text-muted-foreground">
+            Select an organization to view course progress.
+          </div>
+        ))}
     </AppLayout>
   );
 }
