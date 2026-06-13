@@ -4,9 +4,17 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import React from 'react';
 
 // --- mock react-i18next (no i18n provider needed) ---
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
-}));
+// `t` echoes the key (so assertions pin i18n keys); `Trans` renders its key
+// text — enough for the controlled-dialog test, which never inspects the
+// interpolated member name inside descriptions.
+vi.mock('react-i18next', async () => {
+  const ReactActual = await import('react');
+  return {
+    useTranslation: () => ({ t: (k: string) => k }),
+    Trans: ({ i18nKey }: { i18nKey: string }) =>
+      ReactActual.createElement(ReactActual.Fragment, null, i18nKey),
+  };
+});
 
 // --- mock AppLayout as a simple passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
@@ -129,11 +137,11 @@ describe('OrganizationDetail — AlertDialog controlled from first render (#81)'
     renderPage();
 
     // Page loads with the member row (inline-mocked dropdown renders items directly)
-    const promoteItem = await screen.findByRole('button', { name: /Promote to Admin/i });
+    const promoteItem = await screen.findByRole('button', { name: 'orgDetail.promoteToAdmin' });
     fireEvent.click(promoteItem);
 
-    // The confirm dialog opened
-    expect(await screen.findByText('Promote to Organization Admin?')).toBeInTheDocument();
+    // The confirm dialog opened (titles/labels are i18n keys under the test's `t` echo)
+    expect(await screen.findByText('orgDetail.promoteTitle')).toBeInTheDocument();
 
     // No controlled/uncontrolled warning fired
     const controlledWarnings = [...consoleErrorSpy.mock.calls, ...consoleWarnSpy.mock.calls].filter(
@@ -146,7 +154,66 @@ describe('OrganizationDetail — AlertDialog controlled from first render (#81)'
     expect(controlledWarnings).toEqual([]);
 
     // Dialog still dismisses correctly
-    fireEvent.click(screen.getByRole('button', { name: /^Cancel$/i }));
-    expect(screen.queryByText('Promote to Organization Admin?')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }));
+    expect(screen.queryByText('orgDetail.promoteTitle')).toBeNull();
+  });
+});
+
+describe('OrganizationDetail — load-failure retry (#53)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows a Try again button on load failure and refetches when clicked', async () => {
+    // First load: the organization fetch throws a non-404 (load_failed); the
+    // other fetches resolve empty. The retry must re-run the load.
+    let orgCallCount = 0;
+    const { ApiError } = (await import('@/lib/api-client')) as unknown as {
+      ApiError: new (m: string, s: number, c?: string) => Error;
+    };
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/organizations') {
+        orgCallCount += 1;
+        if (orgCallCount === 1) throw new ApiError('boom', 500);
+        return { organization };
+      }
+      if (path === '/api/org-memberships') return { memberships: [] };
+      if (path === '/api/invitations') return { invitations: [] };
+      if (path === '/api/profiles') return { profiles: [] };
+      throw new Error(`Unexpected callApi path: ${path}`);
+    });
+
+    renderPage();
+
+    // The load-failed state surfaces a retry button (toast policy: load errors keep toast).
+    const retry = await screen.findByRole('button', { name: /orgDetail\.tryAgain/i });
+    expect(retry).toBeInTheDocument();
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'destructive' }),
+    );
+
+    fireEvent.click(retry);
+
+    // After the retry succeeds, the org header renders.
+    expect(await screen.findByRole('heading', { name: 'Acme Corp' })).toBeInTheDocument();
+  });
+
+  it('shows an honest not-found (no retry) on a real 404', async () => {
+    const { ApiError } = (await import('@/lib/api-client')) as unknown as {
+      ApiError: new (m: string, s: number, c?: string) => Error;
+    };
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/organizations') throw new ApiError('missing', 404);
+      if (path === '/api/org-memberships') return { memberships: [] };
+      if (path === '/api/invitations') return { invitations: [] };
+      if (path === '/api/profiles') return { profiles: [] };
+      throw new Error(`Unexpected callApi path: ${path}`);
+    });
+
+    renderPage();
+
+    // Not-found description shows; no Try again button (404 is honest, not retryable).
+    expect(await screen.findByText('orgDetail.notFoundDescription')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /orgDetail\.tryAgain/i })).toBeNull();
   });
 });

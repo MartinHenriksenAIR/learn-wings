@@ -6,8 +6,8 @@ import { PageSpinner } from '@/components/ui/page-spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { StatCard } from '@/components/ui/stat-card';
 import {
   Dialog,
   DialogContent,
@@ -24,14 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,14 +42,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { FileUpload } from '@/components/ui/file-upload';
+import { useFlash } from '@/hooks/useFlash';
 import { callApi, ApiError } from '@/lib/api-client';
+import { cn, getAvatarColor, getInitials } from '@/lib/utils';
 import { Organization, OrgMembership, Profile, OrgRole, Invitation } from '@/lib/types';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { buildPublicUrl } from '@/lib/storage-url';
 import {
   Building2,
   Users,
-  Plus,
   MoreHorizontal,
   Loader2,
   UserX,
@@ -73,7 +66,7 @@ import {
   UsersRound,
   RefreshCw,
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/sonner';
 import { z } from 'zod';
 import { orgSchema } from '@/lib/org-validation';
@@ -112,7 +105,9 @@ export default function OrganizationDetail() {
   const [inviteDepartment, setInviteDepartment] = useState('');
   const [inviteRole, setInviteRole] = useState<OrgRole>('learner');
   const [inviting, setInviting] = useState(false);
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  // In-button "Copied!" morph for the invite link, keyed by link id (toast
+  // policy: copy is routine — no toast).
+  const { flashed: copyFlashed, flash: flashCopy } = useFlash();
 
   const [roleChangeDialog, setRoleChangeDialog] = useState<{
     open: boolean;
@@ -411,12 +406,8 @@ export default function OrganizationDetail() {
   const handleCopyInviteLink = async (linkId: string) => {
     const link = `${window.location.origin}/signup?invite=${linkId}`;
     await navigator.clipboard.writeText(link);
-    setCopiedToken(linkId);
-    toast({
-      title: 'Link copied!',
-      description: 'Share this link with the invited user.',
-    });
-    setTimeout(() => setCopiedToken(null), 2000);
+    // In-button "Copied!" morph instead of a toast (toast policy: copy is routine).
+    flashCopy(linkId);
   };
 
   const handleCancelInvitation = async (invitationId: string) => {
@@ -502,20 +493,15 @@ export default function OrganizationDetail() {
     }
   };
 
-  const roleColors = {
-    org_admin: 'bg-purple-100 text-purple-800',
-    learner: 'bg-blue-100 text-blue-800',
-  };
-
-  const statusColors = {
-    active: 'bg-green-100 text-green-800',
-    invited: 'bg-yellow-100 text-yellow-800',
-    disabled: 'bg-red-100 text-red-800',
-  };
-
   if (loading) {
     return (
-      <AppLayout title="Organization" breadcrumbs={[{ label: 'Organizations', href: '/app/admin/organizations' }, { label: 'Loading...' }]}>
+      <AppLayout
+        title={t('orgDetail.loadingBreadcrumb')}
+        breadcrumbs={[
+          { label: t('organizations.title'), href: '/app/admin/organizations' },
+          { label: t('orgDetail.loadingBreadcrumb') },
+        ]}
+      >
         <PageSpinner />
       </AppLayout>
     );
@@ -525,16 +511,16 @@ export default function OrganizationDetail() {
     const loadFailed = orgError === 'load_failed';
     return (
       <AppLayout
-        title={loadFailed ? t('orgDetail.loadFailedTitle') : 'Organization Not Found'}
+        title={loadFailed ? t('orgDetail.loadFailedTitle') : t('orgDetail.notFoundTitle')}
         breadcrumbs={[
-          { label: 'Organizations', href: '/app/admin/organizations' },
-          { label: loadFailed ? t('orgDetail.loadFailedTitle') : 'Not Found' },
+          { label: t('organizations.title'), href: '/app/admin/organizations' },
+          { label: loadFailed ? t('orgDetail.loadFailedTitle') : t('orgDetail.notFoundBreadcrumb') },
         ]}
       >
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <Building2 className="h-12 w-12 text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground">
-            {loadFailed ? t('orgDetail.loadFailedDescription') : 'Organization not found.'}
+            {loadFailed ? t('orgDetail.loadFailedDescription') : t('orgDetail.notFoundDescription')}
           </p>
           <div className="mt-4 flex gap-2">
             {loadFailed && (
@@ -544,13 +530,13 @@ export default function OrganizationDetail() {
                   fetchData();
                 }}
               >
-                <RefreshCw className="mr-2 h-4 w-4" />
+                <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
                 {t('orgDetail.tryAgain')}
               </Button>
             )}
             <Button variant="outline" onClick={() => navigate('/app/admin/organizations')}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Organizations
+              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t('orgDetail.backToOrganizations')}
             </Button>
           </div>
         </div>
@@ -559,54 +545,137 @@ export default function OrganizationDetail() {
   }
 
   const activeMembers = members.filter((m) => m.status === 'active');
-  const disabledMembers = members.filter((m) => m.status === 'disabled');
+  const seatUsage = org.seat_limit ? activeMembers.length / org.seat_limit : 0;
+  const seatLimitReached = !!org.seat_limit && activeMembers.length >= org.seat_limit;
+  const adminCount = activeMembers.filter((m) => m.role === 'org_admin').length;
+  const learnerCount = activeMembers.filter((m) => m.role === 'learner').length;
 
   return (
     <AppLayout
       title={org.name}
       breadcrumbs={[
-        { label: 'Organizations', href: '/app/admin/organizations' },
+        { label: t('organizations.title'), href: '/app/admin/organizations' },
         { label: org.name },
       ]}
     >
-      {/* Header with org info and actions */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {org.logo_url ? (
-            <img src={org.logo_url} alt={org.name} className="h-14 w-14 rounded-xl object-contain bg-muted" />
-          ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
-              <Building2 className="h-7 w-7 text-primary" />
-            </div>
-          )}
-          <div>
-            <h2 className="text-xl font-semibold">{org.name}</h2>
-            <p className="text-sm text-muted-foreground">/{org.slug}</p>
-          </div>
-          <Button variant="ghost" size="icon" onClick={handleOpenEdit}>
-            <Pencil className="h-4 w-4" />
+      {/* Back link */}
+      <button
+        type="button"
+        onClick={() => navigate('/app/admin/organizations')}
+        className="mb-3.5 inline-flex items-center gap-[7px] rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground transition-colors hover:text-primary"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+        {t('orgDetail.allOrganizations')}
+      </button>
+
+      {/* Header: icon chip + name/slug + actions */}
+      <div className="mb-6 flex flex-wrap items-center gap-4">
+        {org.logo_url ? (
+          <img src={org.logo_url} alt="" className="h-14 w-14 shrink-0 rounded-2xl bg-muted object-contain" />
+        ) : (
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-accent text-primary">
+            <Building2 className="h-[26px] w-[26px]" aria-hidden="true" />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-2xl font-extrabold tracking-[-0.02em]">{org.name}</h1>
+          <p className="truncate font-mono text-[13px] text-muted-foreground">
+            {org.slug} · {new Date(org.created_at).toLocaleDateString()}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" onClick={handleOpenEdit}>
+            <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+            {t('orgDetail.editSeatLimit')}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setDeleteOpen(true)}
+            className="text-destructive hover:bg-destructive/10"
+            aria-label={t('orgDetail.deleteOrganization')}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
+      </div>
 
+      {/* Stats */}
+      <div className="mb-6 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          icon={<UsersRound className="h-[18px] w-[18px]" />}
+          value={
+            <>
+              {activeMembers.length}
+              {org.seat_limit ? (
+                <span className="text-base font-normal text-muted-foreground"> / {org.seat_limit}</span>
+              ) : null}
+            </>
+          }
+          label={org.seat_limit ? t('orgDetail.seatsUsed') : t('orgDetail.activeMembers')}
+        />
+        <StatCard
+          icon={<ShieldCheck className="h-[18px] w-[18px]" />}
+          value={adminCount}
+          label={t('orgDetail.admins')}
+        />
+        <StatCard
+          icon={<User className="h-[18px] w-[18px]" />}
+          value={learnerCount}
+          label={t('orgDetail.learners')}
+        />
+        <StatCard
+          icon={<Mail className="h-[18px] w-[18px]" />}
+          value={invitations.length}
+          label={t('orgDetail.pendingInvites')}
+        />
+      </div>
+
+      {/* Seat-limit usage bar — shown when a limit exists; the SEAT_LIMIT_REACHED
+          warning is preserved. */}
+      {org.seat_limit ? (
+        <div className="mb-6 rounded-2xl border border-border bg-card px-5 py-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[12.5px] font-bold text-[#4a4f60]">{t('orgDetail.seatLimit')}</span>
+            <span className={cn('text-[12.5px] font-bold', seatLimitReached ? 'text-destructive' : 'text-muted-foreground')}>
+              {activeMembers.length}/{org.seat_limit}
+            </span>
+          </div>
+          <span aria-hidden="true" className="mt-2 block h-[6px] w-full overflow-hidden rounded bg-[#eceef3]">
+            <span
+              className="block h-full rounded transition-[width] duration-300"
+              style={{
+                width: `${Math.min(100, Math.max(0, seatUsage * 100))}%`,
+                background: seatLimitReached ? 'hsl(var(--destructive))' : 'hsl(var(--primary))',
+              }}
+            />
+          </span>
+          {seatLimitReached && (
+            <p className="mt-2 text-xs font-medium text-destructive">{t('orgDetail.seatLimitReached')}</p>
+          )}
+        </div>
+      ) : null}
+
+      {/* Members section header + actions */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[17px] font-extrabold">{t('orgDetail.members')}</h2>
         <div className="flex gap-2">
           {/* Invite User Dialog */}
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
-                <Mail className="mr-2 h-4 w-4" />
-                Invite User
+                <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t('orgDetail.inviteUser')}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Invite User to {org.name}</DialogTitle>
-                <DialogDescription>
-                  Send an invitation email to join this organization.
-                </DialogDescription>
+                <DialogTitle>{t('orgDetail.inviteDialogTitle', { org: org.name })}</DialogTitle>
+                <DialogDescription>{t('orgDetail.inviteDialogDescription')}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="invite-email">Email Address</Label>
+                  <Label htmlFor="invite-email">{t('orgDetail.emailAddress')}</Label>
                   <Input
                     id="invite-email"
                     type="email"
@@ -617,7 +686,7 @@ export default function OrganizationDetail() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="invite-first-name">First Name</Label>
+                    <Label htmlFor="invite-first-name">{t('orgDetail.firstName')}</Label>
                     <Input
                       id="invite-first-name"
                       placeholder="John"
@@ -626,7 +695,7 @@ export default function OrganizationDetail() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="invite-last-name">Last Name</Label>
+                    <Label htmlFor="invite-last-name">{t('orgDetail.lastName')}</Label>
                     <Input
                       id="invite-last-name"
                       placeholder="Doe"
@@ -636,7 +705,7 @@ export default function OrganizationDetail() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="invite-department">Department</Label>
+                  <Label htmlFor="invite-department">{t('orgDetail.department')}</Label>
                   <Input
                     id="invite-department"
                     placeholder="Engineering"
@@ -645,29 +714,29 @@ export default function OrganizationDetail() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Role</Label>
+                  <Label>{t('orgDetail.role')}</Label>
                   <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as OrgRole)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="learner">Learner</SelectItem>
-                      <SelectItem value="org_admin">Organization Admin</SelectItem>
+                      <SelectItem value="learner">{t('orgDetail.learner')}</SelectItem>
+                      <SelectItem value="org_admin">{t('orgDetail.organizationAdmin')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setInviteOpen(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handleInvite} disabled={inviting}>
                   {inviting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                   ) : (
-                    <Mail className="mr-2 h-4 w-4" />
+                    <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
                   )}
-                  Create Invitation
+                  {t('orgDetail.createInvitation')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -677,28 +746,26 @@ export default function OrganizationDetail() {
           <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
             <DialogTrigger asChild>
               <Button>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add User
+                <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t('orgDetail.addMember')}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add User to {org.name}</DialogTitle>
-                <DialogDescription>
-                  Select an existing user and assign them a role in this organization.
-                </DialogDescription>
+                <DialogTitle>{t('orgDetail.addDialogTitle', { org: org.name })}</DialogTitle>
+                <DialogDescription>{t('orgDetail.addDialogDescription')}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label>User</Label>
+                  <Label>{t('orgDetail.user')}</Label>
                   <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a user..." />
+                      <SelectValue placeholder={t('orgDetail.selectUser')} />
                     </SelectTrigger>
                     <SelectContent>
                       {availableUsers.length === 0 ? (
                         <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                          All users are already members
+                          {t('orgDetail.allUsersMembers')}
                         </div>
                       ) : (
                         availableUsers.map((user) => (
@@ -711,266 +778,230 @@ export default function OrganizationDetail() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Role</Label>
+                  <Label>{t('orgDetail.role')}</Label>
                   <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as OrgRole)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="learner">Learner</SelectItem>
-                      <SelectItem value="org_admin">Organization Admin</SelectItem>
+                      <SelectItem value="learner">{t('orgDetail.learner')}</SelectItem>
+                      <SelectItem value="org_admin">{t('orgDetail.organizationAdmin')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setAddUserOpen(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handleAddUser} disabled={adding || !selectedUserId}>
-                  {adding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Add User
+                  {adding && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                  {t('orgDetail.addUser')}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
-          {/* Delete Button */}
-          <Button variant="outline" size="icon" onClick={() => setDeleteOpen(true)} className="text-destructive hover:bg-destructive/10">
-            <Trash2 className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <UsersRound className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-2xl font-bold">
-                  {activeMembers.length}
-                  {org.seat_limit ? <span className="text-base font-normal text-muted-foreground"> / {org.seat_limit}</span> : ''}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {org.seat_limit ? 'Seats Used' : 'Active Members'}
-                </p>
-              </div>
-            </div>
-            {org.seat_limit && activeMembers.length >= org.seat_limit && (
-              <p className="mt-2 text-xs text-destructive font-medium">Seat limit reached</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-2xl font-bold">
-                  {activeMembers.filter((m) => m.role === 'org_admin').length}
-                </p>
-                <p className="text-sm text-muted-foreground">Admins</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <User className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-2xl font-bold">
-                  {activeMembers.filter((m) => m.role === 'learner').length}
-                </p>
-                <p className="text-sm text-muted-foreground">Learners</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Mail className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-2xl font-bold">{invitations.length}</p>
-                <p className="text-sm text-muted-foreground">Pending Invites</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Pending Invitations */}
-      {invitations.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">Pending Invitations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {invitations.map((invitation) => (
-                <div
-                  key={invitation.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{invitation.email}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Expires {new Date(invitation.expires_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Badge className={roleColors[invitation.role]}>
-                      {invitation.role === 'org_admin' ? 'Admin' : 'Learner'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopyInviteLink(invitation.link_id)}
-                    >
-                      {copiedToken === invitation.link_id ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCancelInvitation(invitation.id)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Members Table */}
+      {/* Members list */}
       {members.length === 0 ? (
         <EmptyState
           icon={<Users className="h-6 w-6" />}
-          title="No members yet"
-          description="Add users to this organization to get started."
+          title={t('orgDetail.noMembersTitle')}
+          description={t('orgDetail.noMembersDescription')}
           action={
             <Button onClick={() => setAddUserOpen(true)}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Add User
+              <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t('orgDetail.addUser')}
             </Button>
           }
         />
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Members</CardTitle>
-          </CardHeader>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Added</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((member) => (
-                <TableRow key={member.id} className={member.status === 'disabled' ? 'opacity-60' : ''}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-medium">
-                        {member.profile?.full_name?.charAt(0).toUpperCase() || '?'}
-                      </div>
-                      <span className="font-medium">{member.profile?.full_name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={roleColors[member.role]}>
-                      {member.role === 'org_admin' ? 'Admin' : 'Learner'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={statusColors[member.status]}>
-                      {member.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(member.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={updatingRole === member.id}>
-                          {updatingRole === member.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <MoreHorizontal className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-popover">
-                        {member.status === 'active' && (
-                          <>
-                            {member.role === 'learner' ? (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  setRoleChangeDialog({
-                                    open: true,
-                                    member,
-                                    newRole: 'org_admin',
-                                  })
-                                }
-                              >
-                                <ShieldCheck className="mr-2 h-4 w-4" />
-                                Promote to Admin
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  setRoleChangeDialog({
-                                    open: true,
-                                    member,
-                                    newRole: 'learner',
-                                  })
-                                }
-                              >
-                                <User className="mr-2 h-4 w-4" />
-                                Change to Learner
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
+        <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
+          {/* Header row */}
+          <div className="grid grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.5fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
+            <span>{t('orgDetail.colName')}</span>
+            <span>{t('orgDetail.colRole')}</span>
+            <span>{t('orgDetail.colStatus')}</span>
+            <span>{t('orgDetail.colAdded')}</span>
+            <span className="text-right">{t('orgDetail.colActions')}</span>
+          </div>
+          {members.map((member) => {
+            const isAdmin = member.role === 'org_admin';
+            return (
+              <div
+                key={member.id}
+                className={cn(
+                  'grid grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.5fr] items-center gap-3 border-t border-[#f3f4f8] px-5 py-3',
+                  member.status === 'disabled' && 'opacity-60',
+                )}
+              >
+                {/* Name: avatar + name */}
+                <span className="flex min-w-0 items-center gap-[11px]">
+                  <Avatar className="h-8 w-8 shrink-0">
+                    <AvatarFallback
+                      className="text-[11px] font-bold text-white"
+                      style={{ backgroundColor: getAvatarColor(member.profile?.full_name) }}
+                    >
+                      {getInitials(member.profile?.full_name, '??')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate text-[13px] font-bold">{member.profile?.full_name}</span>
+                </span>
+                {/* Role pill */}
+                <span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
+                      isAdmin ? 'bg-accent text-primary' : 'bg-[#f3f4f8] text-[#686d7e]',
+                    )}
+                  >
+                    {isAdmin ? t('orgDetail.admin') : t('orgDetail.learner')}
+                  </span>
+                </span>
+                {/* Status pill */}
+                <span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold capitalize',
+                      member.status === 'active'
+                        ? 'bg-success/10 text-success'
+                        : member.status === 'disabled'
+                          ? 'bg-destructive/10 text-destructive'
+                          : 'bg-warning/10 text-warning',
+                    )}
+                  >
+                    {member.status}
+                  </span>
+                </span>
+                {/* Added */}
+                <span className="text-[12.5px] text-muted-foreground">
+                  {new Date(member.created_at).toLocaleDateString()}
+                </span>
+                {/* Actions */}
+                <span className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" disabled={updatingRole === member.id}>
+                        {updatingRole === member.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-popover">
+                      {member.status === 'active' && (
+                        <>
+                          {member.role === 'learner' ? (
                             <DropdownMenuItem
-                              onClick={() => handleDisableMember(member.id)}
-                              className="text-destructive"
+                              onClick={() =>
+                                setRoleChangeDialog({
+                                  open: true,
+                                  member,
+                                  newRole: 'org_admin',
+                                })
+                              }
                             >
-                              <UserX className="mr-2 h-4 w-4" />
-                              Disable Access
+                              <ShieldCheck className="mr-2 h-4 w-4" aria-hidden="true" />
+                              {t('orgDetail.promoteToAdmin')}
                             </DropdownMenuItem>
-                          </>
-                        )}
-                        {member.status === 'disabled' && (
-                          <DropdownMenuItem onClick={() => handleReactivateMember(member.id)}>
-                            <User className="mr-2 h-4 w-4" />
-                            Reactivate
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setRoleChangeDialog({
+                                  open: true,
+                                  member,
+                                  newRole: 'learner',
+                                })
+                              }
+                            >
+                              <User className="mr-2 h-4 w-4" aria-hidden="true" />
+                              {t('orgDetail.changeToLearner')}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDisableMember(member.id)}
+                            className="text-destructive"
+                          >
+                            <UserX className="mr-2 h-4 w-4" aria-hidden="true" />
+                            {t('orgDetail.disableAccess')}
                           </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+                        </>
+                      )}
+                      {member.status === 'disabled' && (
+                        <DropdownMenuItem onClick={() => handleReactivateMember(member.id)}>
+                          <User className="mr-2 h-4 w-4" aria-hidden="true" />
+                          {t('orgDetail.reactivate')}
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pending Invitations */}
+      {invitations.length > 0 && (
+        <>
+          <h2 className="mb-3 text-[17px] font-extrabold">{t('orgDetail.pendingInvitations')}</h2>
+          <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
+            {invitations.map((invitation) => {
+              const copied = copyFlashed(invitation.link_id);
+              return (
+                <div
+                  key={invitation.id}
+                  className="flex items-center gap-3.5 border-b border-[#f3f4f8] px-5 py-3 last:border-b-0"
+                >
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f3f4f8] text-[#9aa0af]">
+                    <Mail className="h-[15px] w-[15px]" aria-hidden="true" />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[13px] font-bold">{invitation.email}</span>
+                    <span className="text-[11.5px] text-[#9aa0af]">
+                      {t('orgDetail.expiresOn', { date: new Date(invitation.expires_at).toLocaleDateString() })}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
+                      invitation.role === 'org_admin' ? 'bg-accent text-primary' : 'bg-[#f3f4f8] text-[#686d7e]',
+                    )}
+                  >
+                    {invitation.role === 'org_admin' ? t('orgDetail.admin') : t('orgDetail.learner')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyInviteLink(invitation.link_id)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-[9px] border px-3 py-[7px] text-xs font-bold transition-colors',
+                      copied
+                        ? 'border-[#bfe5d3] bg-success/10 text-success'
+                        : 'border-[#dcdee6] bg-card text-[#2a2d3a] hover:border-primary hover:text-primary',
+                    )}
+                  >
+                    <span className={cn('inline-flex', copied && 'animate-pop-in')} aria-hidden="true">
+                      {copied ? <Check className="h-[13px] w-[13px]" /> : <Copy className="h-3 w-3" />}
+                    </span>
+                    {copied ? t('orgDetail.copied') : t('orgDetail.copyLink')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCancelInvitation(invitation.id)}
+                    className="rounded-lg px-2.5 py-[7px] text-xs font-bold text-[#9aa0af] transition-colors hover:text-destructive"
+                  >
+                    {t('orgDetail.cancelInvite')}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Role Change Confirmation Dialog */}
@@ -985,27 +1016,31 @@ export default function OrganizationDetail() {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {roleChangeDialog?.newRole === 'org_admin'
-                ? 'Promote to Organization Admin?'
-                : 'Change to Learner?'}
+                ? t('orgDetail.promoteTitle')
+                : t('orgDetail.changeToLearnerTitle')}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {roleChangeDialog?.newRole === 'org_admin' ? (
-                <>
-                  <strong>{roleChangeDialog?.member?.profile?.full_name}</strong> will be able to
-                  manage team members, view analytics, and control settings for {org.name}.
-                </>
+                <Trans
+                  i18nKey="orgDetail.promoteDescription"
+                  values={{ name: roleChangeDialog?.member?.profile?.full_name, org: org.name }}
+                  components={[<strong key="0" />]}
+                />
               ) : (
-                <>
-                  <strong>{roleChangeDialog?.member?.profile?.full_name}</strong> will lose admin
-                  privileges and only have access as a regular learner.
-                </>
+                <Trans
+                  i18nKey="orgDetail.demoteDescription"
+                  values={{ name: roleChangeDialog?.member?.profile?.full_name }}
+                  components={[<strong key="0" />]}
+                />
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleChangeRole}>
-              {roleChangeDialog?.newRole === 'org_admin' ? 'Promote to Admin' : 'Change to Learner'}
+              {roleChangeDialog?.newRole === 'org_admin'
+                ? t('orgDetail.promoteToAdmin')
+                : t('orgDetail.changeToLearner')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1015,27 +1050,21 @@ export default function OrganizationDetail() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Organization</DialogTitle>
-            <DialogDescription>
-              Update the organization details.
-            </DialogDescription>
+            <DialogTitle>{t('orgDetail.editDialogTitle')}</DialogTitle>
+            <DialogDescription>{t('orgDetail.editDialogDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Logo</Label>
+              <Label>{t('orgDetail.logo')}</Label>
               <div className="border-2 border-dashed rounded-lg p-4 mb-3">
                 <div className="flex flex-col items-center gap-2 text-center">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                    <Building2 className="h-6 w-6 text-muted-foreground" />
+                    <Building2 className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
                   </div>
                   <div className="space-y-0.5">
-                    <p className="text-sm font-medium">Recommended specifications</p>
-                    <p className="text-xs text-muted-foreground">
-                      Square image, 256×256px or larger
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      PNG or JPG format, max 5MB
-                    </p>
+                    <p className="text-sm font-medium">{t('orgDetail.logoRecommended')}</p>
+                    <p className="text-xs text-muted-foreground">{t('orgDetail.logoSize')}</p>
+                    <p className="text-xs text-muted-foreground">{t('orgDetail.logoFormat')}</p>
                   </div>
                 </div>
               </div>
@@ -1055,7 +1084,7 @@ export default function OrganizationDetail() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Organization Name</Label>
+              <Label htmlFor="edit-name">{t('orgDetail.organizationName')}</Label>
               <Input
                 id="edit-name"
                 value={editName}
@@ -1064,19 +1093,18 @@ export default function OrganizationDetail() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-slug">Slug</Label>
+              <Label htmlFor="edit-slug">{t('orgDetail.slug')}</Label>
               <Input
                 id="edit-slug"
                 value={editSlug}
                 onChange={(e) => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                 placeholder="acme-corp"
+                className="font-mono"
               />
-              <p className="text-xs text-muted-foreground">
-                Used in URLs. Only lowercase letters, numbers, and hyphens.
-              </p>
+              <p className="text-xs text-muted-foreground">{t('orgDetail.slugHint')}</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-seat-limit">Seat Limit</Label>
+              <Label htmlFor="edit-seat-limit">{t('orgDetail.seatLimitLabel')}</Label>
               <Input
                 id="edit-seat-limit"
                 type="number"
@@ -1085,18 +1113,16 @@ export default function OrganizationDetail() {
                 value={editSeatLimit}
                 onChange={(e) => setEditSeatLimit(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
-                Maximum number of users allowed. Leave empty for unlimited.
-              </p>
+              <p className="text-xs text-muted-foreground">{t('orgDetail.seatLimitHint')}</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveEdit} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1106,22 +1132,24 @@ export default function OrganizationDetail() {
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Organization?</AlertDialogTitle>
+            <AlertDialogTitle>{t('orgDetail.deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>{org.name}</strong> and all associated data
-              including memberships, invitations, enrollments, and progress records.
-              This action cannot be undone.
+              <Trans
+                i18nKey="orgDetail.deleteDescription"
+                values={{ name: org.name }}
+                components={[<strong key="0" />]}
+              />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteOrg}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete Organization
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {t('orgDetail.deleteOrganization')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
