@@ -88,31 +88,31 @@ export default function IdeaDetail() {
       queryClient.invalidateQueries({ queryKey: ['idea-comments', ideaId] });
       queryClient.invalidateQueries({ queryKey: ['idea', ideaId] });
       setNewComment('');
-      toast.success('Comment added');
+      // Routine: the new comment appearing in the thread is the feedback
+      // (matches PostDetail) — no success toast (toast policy). Errors keep toasts.
     },
     onError: () => {
       toast.error('Failed to add comment');
     },
   });
 
-  // Vote mutation
+  // Vote mutation — routine toggle: the button's pressed state + vote count are
+  // the feedback (toast policy: like/vote toggles get no success toast). Errors keep toasts.
   const voteMutation = useMutation({
     mutationFn: () => voteForIdea(ideaId!, currentOrg!.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['idea', ideaId] });
-      toast.success('Vote recorded');
     },
     onError: () => {
       toast.error('Failed to vote');
     },
   });
 
-  // Unvote mutation
+  // Unvote mutation — routine toggle (see voteMutation): no success toast.
   const unvoteMutation = useMutation({
     mutationFn: () => removeVoteFromIdea(ideaId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['idea', ideaId] });
-      toast.success('Vote removed');
     },
     onError: () => {
       toast.error('Failed to remove vote');

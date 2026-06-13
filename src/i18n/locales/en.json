@@ -102,7 +102,14 @@
     "invitedToOrgMiddle": "as a",
     "teamAdmin": "Team Admin",
     "platformDescription": "Enterprise Learning Platform",
-    "accessProvidedByOrg": "Access is provided by your organization"
+    "accessProvidedByOrg": "Access is provided by your organization",
+    "passwordResetInfo": "Password reset is managed by your organization's IT administrator via Microsoft Entra ID.",
+    "backToSignIn": "Back to sign in"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The page you're looking for doesn't exist or has moved.",
+    "returnHome": "Return to home"
   },
   "settings": {
     "title": "Settings",

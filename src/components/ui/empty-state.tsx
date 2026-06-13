@@ -13,7 +13,7 @@ export function EmptyState({ icon, title, description, action, className }: Empt
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center',
+        'flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center',
         className
       )}
     >
@@ -22,9 +22,9 @@ export function EmptyState({ icon, title, description, action, className }: Empt
           {icon}
         </div>
       )}
-      <h3 className="font-display text-lg font-semibold">{title}</h3>
+      <h3 className="text-[15px] font-bold">{title}</h3>
       {description && (
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>
+        <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">{description}</p>
       )}
       {action && <div className="mt-4">{action}</div>}
     </div>

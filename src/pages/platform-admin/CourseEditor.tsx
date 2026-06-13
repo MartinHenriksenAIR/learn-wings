@@ -786,7 +786,7 @@ export default function CourseEditor() {
             )}
             {lessonType === 'quiz' && (
               <>
-                <div className="rounded-lg border border-dashed p-4 text-center">
+                <div className="rounded-xl border border-dashed border-[#d6d8e0] p-4 text-center">
                   <HelpCircle className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
                   <p className="mb-2 text-sm text-muted-foreground">
                     {editingLesson

@@ -102,7 +102,14 @@
     "invitedToOrgMiddle": "som",
     "teamAdmin": "Teamadministrator",
     "platformDescription": "Enterprise læringsplatform",
-    "accessProvidedByOrg": "Adgang leveres af din organisation"
+    "accessProvidedByOrg": "Adgang leveres af din organisation",
+    "passwordResetInfo": "Nulstilling af adgangskode håndteres af din organisations IT-administrator via Microsoft Entra ID.",
+    "backToSignIn": "Tilbage til login"
+  },
+  "notFound": {
+    "title": "Siden blev ikke fundet",
+    "description": "Den side, du leder efter, findes ikke eller er blevet flyttet.",
+    "returnHome": "Tilbage til forsiden"
   },
   "settings": {
     "title": "Indstillinger",

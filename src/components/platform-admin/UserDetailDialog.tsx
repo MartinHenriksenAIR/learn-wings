@@ -166,7 +166,7 @@ export function UserDetailDialog({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-medium">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground font-bold">
                 {user.full_name.charAt(0).toUpperCase()}
               </div>
               <div>
@@ -186,7 +186,7 @@ export function UserDetailDialog({
 
           <div className="space-y-6 py-4">
             {/* Platform Admin Toggle */}
-            <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="flex items-center justify-between rounded-2xl border border-border p-4">
               <div className="flex items-center gap-3">
                 <Shield className="h-5 w-5 text-primary" />
                 <div>
@@ -224,7 +224,7 @@ export function UserDetailDialog({
               </div>
 
               {memberships.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
+                <p className="rounded-2xl border border-dashed border-[#d6d8e0] py-6 text-center text-sm text-muted-foreground">
                   No organization memberships
                 </p>
               ) : (
@@ -232,7 +232,7 @@ export function UserDetailDialog({
                   {memberships.map((membership) => (
                     <div
                       key={membership.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
+                      className="flex items-center justify-between rounded-xl border border-border p-3"
                     >
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -269,7 +269,7 @@ export function UserDetailDialog({
 
               {/* Add Organization Form */}
               {showAddOrg && (
-                <div className="rounded-lg border p-3 space-y-3 bg-muted/50">
+                <div className="rounded-xl border border-border p-3 space-y-3 bg-muted/50">
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={newOrgId} onValueChange={setNewOrgId}>
                       <SelectTrigger>
