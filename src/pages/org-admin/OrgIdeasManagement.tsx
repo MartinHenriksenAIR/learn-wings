@@ -272,7 +272,6 @@ export default function OrgIdeasManagement() {
                       return (
                         <div
                           key={idea.id}
-                          data-kcard="1"
                           draggable
                           onDragStart={() => setDraggedIdeaId(idea.id)}
                           onDragEnd={() => {
@@ -296,7 +295,6 @@ export default function OrgIdeasManagement() {
                             )}
                             {/* "Open ->" hint surfaces the click-to-open affordance (drag = move). */}
                             <span
-                              data-khint="1"
                               aria-hidden="true"
                               className="ml-auto inline-flex items-center gap-0.5 text-[10.5px] font-extrabold text-primary opacity-0 transition-opacity group-hover:opacity-100"
                             >
