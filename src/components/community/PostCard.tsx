@@ -1,12 +1,12 @@
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { useTranslation } from 'react-i18next';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CategoryBadge } from './CategoryBadge';
 import { TagList } from './TagList';
 import { MessageSquare, Pin, Lock, Calendar, MapPin, ExternalLink, Eye, EyeOff } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { cn, getInitials } from '@/lib/utils';
+import { format, formatDistanceToNow } from 'date-fns';
+import { cn, getAvatarColor, getInitials } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
 interface PostCardProps {
@@ -24,51 +24,38 @@ export function PostCard({
   onToggleHide,
   onToggleLock,
 }: PostCardProps) {
-  const initials = getInitials(post.profile?.full_name);
+  const { t } = useTranslation();
+  const authorName = post.profile?.full_name;
+  const initials = getInitials(authorName);
 
   const isEvent = post.category?.slug === 'events';
-  const isAnnouncement = post.category?.slug === 'announcements';
 
   return (
-    <Card
+    <div
       className={cn(
-        'transition-colors hover:bg-accent/50 cursor-pointer',
-        isAnnouncement && 'border-l-4 border-l-pink-500',
-        post.is_pinned && 'border-l-4 border-l-primary',
-        post.is_hidden && 'opacity-60'
+        'cursor-pointer rounded-2xl border border-border bg-card px-5 py-[18px] transition-shadow hover:shadow-[0_10px_28px_rgba(20,24,46,0.08)]',
+        post.is_hidden && 'opacity-55'
       )}
       onClick={onClick}
     >
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9">
-              <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-              <span className="font-medium text-sm">{post.profile?.full_name || 'Unknown User'}</span>
-              <span className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {post.is_pinned && (
-              <Pin className="h-4 w-4 text-primary" />
-            )}
-            {post.is_locked && (
-              <Lock className="h-4 w-4 text-muted-foreground" />
-            )}
-            {post.is_hidden && (
-              <Badge variant="outline" className="text-xs">Hidden</Badge>
-            )}
-          </div>
+      {/* Author row */}
+      <div className="mb-2.5 flex items-center gap-2.5">
+        <Avatar className="h-[34px] w-[34px] shrink-0">
+          <AvatarFallback
+            className="text-[11.5px] font-bold text-white"
+            style={{ backgroundColor: getAvatarColor(authorName) }}
+          >
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-[13px] font-bold">{authorName || t('community.unknownUser')}</span>
+          <span className="text-[11.5px] text-[#9aa0af]">
+            {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+          </span>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex-1" />
+        <div className="flex shrink-0 items-center gap-2">
           {post.category && (
             <CategoryBadge
               name={post.category.name}
@@ -78,82 +65,97 @@ export function PostCard({
             />
           )}
           {post.scope === 'org' && post.organization && (
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="rounded-[7px] text-[11px] font-bold text-muted-foreground">
               {post.organization.name}
             </Badge>
           )}
-        </div>
-
-        <h3 className="font-semibold text-base line-clamp-2">{post.title}</h3>
-        <p className="text-sm text-muted-foreground line-clamp-2">{post.content}</p>
-
-        {isEvent && post.event_date && (
-          <div className="flex items-center gap-4 text-sm text-muted-foreground bg-muted/50 rounded-md p-2">
-            <div className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              <span>{new Date(post.event_date).toLocaleDateString()}</span>
-            </div>
-            {post.event_location && (
-              <div className="flex items-center gap-1">
-                <MapPin className="h-4 w-4" />
-                <span className="truncate max-w-[150px]">{post.event_location}</span>
-              </div>
-            )}
-            {post.event_registration_url && (
-              <a
-                href={post.event_registration_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-primary hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ExternalLink className="h-3 w-3" />
-                Register
-              </a>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center justify-between pt-2">
-          <TagList tags={post.tags} maxVisible={3} size="sm" />
-          <div className="flex items-center gap-3 text-muted-foreground text-sm">
-            <span className="flex items-center gap-1">
-              <MessageSquare className="h-4 w-4" />
-              {post.comment_count || 0}
+          {post.is_pinned && (
+            <Pin aria-label={t('community.pinned')} className="h-4 w-4 text-primary" />
+          )}
+          {post.is_locked && (
+            <Lock aria-label={t('community.locked')} className="h-4 w-4 text-[#9aa0af]" />
+          )}
+          {post.is_hidden && (
+            <span className="rounded-[7px] bg-[#fbf2dd] px-[11px] py-1 text-[11px] font-bold text-warning">
+              {t('community.hidden')}
             </span>
-          </div>
+          )}
         </div>
+      </div>
 
-        {isAdmin && (onToggleHide || onToggleLock) && (
-          <div
-            className="flex items-center gap-2 pt-2 border-t"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {onToggleHide && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onToggleHide(post.id, !post.is_hidden)}
-              >
-                {post.is_hidden ? (
-                  <><Eye className="h-4 w-4 mr-1" /> Show</>
-                ) : (
-                  <><EyeOff className="h-4 w-4 mr-1" /> Hide</>
-                )}
-              </Button>
-            )}
-            {onToggleLock && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onToggleLock(post.id, !post.is_locked)}
-              >
-                {post.is_locked ? 'Unlock' : 'Lock Comments'}
-              </Button>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      <h3 className="mb-1.5 line-clamp-2 text-[15px] font-bold leading-[1.35]">{post.title}</h3>
+      <p className="mb-3 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">{post.content}</p>
+
+      {/* Event date/time/place chips */}
+      {isEvent && post.event_date && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-[7px] text-xs font-bold text-accent-foreground">
+            <Calendar aria-hidden="true" className="h-[13px] w-[13px]" />
+            {format(new Date(post.event_date), 'MMM d, h:mm a')}
+          </span>
+          {post.event_location && (
+            <span className="inline-flex max-w-[220px] items-center gap-2 rounded-lg bg-accent px-3 py-[7px] text-xs font-bold text-accent-foreground">
+              <MapPin aria-hidden="true" className="h-[13px] w-[13px] shrink-0" />
+              <span className="truncate">{post.event_location}</span>
+            </span>
+          )}
+          {post.event_registration_url && (
+            <a
+              href={post.event_registration_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-[7px] text-xs font-bold text-primary hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink aria-hidden="true" className="h-3 w-3" />
+              {t('community.register')}
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Footer: comment count + tags */}
+      <div className="flex items-center gap-3.5">
+        <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#9aa0af]">
+          <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
+          {post.comment_count || 0}
+        </span>
+        <div className="flex-1" />
+        <TagList tags={post.tags} maxVisible={3} size="sm" />
+      </div>
+
+      {/* Admin controls */}
+      {isAdmin && (onToggleHide || onToggleLock) && (
+        <div
+          className="mt-3 flex items-center gap-2 border-t border-border pt-3"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onToggleHide && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onToggleHide(post.id, !post.is_hidden)}
+              className="h-auto rounded-lg border-input px-3 py-[7px] text-xs font-bold"
+            >
+              {post.is_hidden ? (
+                <><Eye aria-hidden="true" className="mr-1 h-4 w-4" /> {t('community.show')}</>
+              ) : (
+                <><EyeOff aria-hidden="true" className="mr-1 h-4 w-4" /> {t('community.hide')}</>
+              )}
+            </Button>
+          )}
+          {onToggleLock && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onToggleLock(post.id, !post.is_locked)}
+              className="h-auto rounded-lg border-input px-3 py-[7px] text-xs font-bold"
+            >
+              {post.is_locked ? t('community.unlock') : t('community.lockComments')}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

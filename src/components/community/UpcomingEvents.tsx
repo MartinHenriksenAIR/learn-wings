@@ -1,6 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, ExternalLink, ArrowRight } from 'lucide-react';
+import { Calendar, ExternalLink, ArrowRight } from 'lucide-react';
 import { format, isFuture, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
@@ -20,6 +20,8 @@ export function UpcomingEvents({
   maxVisible = 3,
   className,
 }: UpcomingEventsProps) {
+  const { t } = useTranslation();
+
   // Filter and sort upcoming events
   const upcomingEvents = events
     .filter((e) => e.event_date && (isFuture(new Date(e.event_date)) || isToday(new Date(e.event_date))))
@@ -31,22 +33,25 @@ export function UpcomingEvents({
   }
 
   return (
-    <Card className={cn('', className)}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-primary" />
-            Upcoming Events
-          </CardTitle>
-          {onViewAll && events.length > maxVisible && (
-            <Button variant="ghost" size="sm" onClick={onViewAll}>
-              View all
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <div className={cn('rounded-2xl border border-border bg-card px-5 py-[18px]', className)}>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold">
+          <Calendar aria-hidden="true" className="h-[15px] w-[15px] text-primary" />
+          {t('community.upcomingEvents')}
+        </h3>
+        {onViewAll && events.length > maxVisible && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onViewAll}
+            className="h-auto px-2 py-1 text-xs font-bold text-muted-foreground hover:text-primary"
+          >
+            {t('community.viewAll')}
+            <ArrowRight aria-hidden="true" className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+      <div className="flex flex-col gap-3">
         {upcomingEvents.map((event) => {
           const eventDate = new Date(event.event_date!);
           const isEventToday = isToday(eventDate);
@@ -54,52 +59,63 @@ export function UpcomingEvents({
           return (
             <div
               key={event.id}
-              className={cn(
-                'p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer',
-                isEventToday && 'border-primary bg-primary/5'
-              )}
+              className="flex cursor-pointer items-center gap-3"
               onClick={() => onEventClick?.(event)}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="space-y-1 flex-1 min-w-0">
-                  <h4 className="font-medium text-sm line-clamp-1">{event.title}</h4>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className={cn(
-                      'flex items-center gap-1',
-                      isEventToday && 'text-primary font-medium'
-                    )}>
-                      <Calendar className="h-3 w-3" />
-                      {isEventToday ? 'Today' : format(eventDate, 'MMM d')}
-                      {', '}
-                      {format(eventDate, 'h:mm a')}
-                    </span>
-                    {event.event_location && (
-                      <span className="flex items-center gap-1 truncate">
-                        <MapPin className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">{event.event_location}</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {event.event_registration_url && (
-                  <a
-                    href={event.event_registration_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-shrink-0"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Button size="sm" variant="outline" className="h-7 text-xs">
-                      <ExternalLink className="h-3 w-3 mr-1" />
-                      Register
-                    </Button>
-                  </a>
+              <span
+                className={cn(
+                  'flex h-[46px] w-[42px] shrink-0 flex-col items-center justify-center rounded-[11px] bg-accent',
+                  isEventToday && 'bg-primary'
                 )}
-              </div>
+              >
+                <span
+                  className={cn(
+                    'text-[10px] font-extrabold uppercase tracking-[0.05em]',
+                    isEventToday ? 'text-primary-foreground' : 'text-primary'
+                  )}
+                >
+                  {format(eventDate, 'MMM')}
+                </span>
+                <span
+                  className={cn(
+                    'text-base font-extrabold leading-none',
+                    isEventToday ? 'text-primary-foreground' : 'text-primary'
+                  )}
+                >
+                  {format(eventDate, 'd')}
+                </span>
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="line-clamp-1 text-[12.5px] font-bold leading-[1.3]">{event.title}</span>
+                <span className={cn('truncate text-[11.5px]', isEventToday ? 'font-semibold text-primary' : 'text-[#9aa0af]')}>
+                  {isEventToday ? t('community.today') : format(eventDate, 'MMM d')}
+                  {' · '}
+                  {format(eventDate, 'h:mm a')}
+                  {event.event_location && ` · ${event.event_location}`}
+                </span>
+              </span>
+              {event.event_registration_url && (
+                <a
+                  href={event.event_registration_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 rounded-lg border-input px-2.5 text-[11px] font-bold"
+                  >
+                    <ExternalLink aria-hidden="true" className="mr-1 h-3 w-3" />
+                    {t('community.register')}
+                  </Button>
+                </a>
+              )}
             </div>
           );
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

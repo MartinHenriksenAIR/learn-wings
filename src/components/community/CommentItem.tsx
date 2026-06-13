@@ -1,8 +1,8 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, Reply, Edit2, Trash2, Flag, EyeOff, Eye, Link2 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
-import { cn, getInitials } from '@/lib/utils';
+import { cn, getAvatarColor, getInitials } from '@/lib/utils';
 import type { CommunityComment } from '@/lib/community-types';
 
 interface CommentItemProps {
@@ -41,10 +41,12 @@ export function CommentItem({
   highlightedCommentId = null,
   depth = 0,
 }: CommentItemProps) {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
 
-  const initials = getInitials(comment.profile?.full_name);
+  const authorName = comment.profile?.full_name;
+  const initials = getInitials(authorName);
 
   const isAuthor = currentUserId === comment.user_id;
   const canEdit = isAuthor && !comment.is_hidden;
@@ -61,31 +63,36 @@ export function CommentItem({
     <div
       id={`comment-${comment.id}`}
       className={cn(
-        'flex gap-3 rounded-md transition-colors',
+        'flex gap-2.5 rounded-xl transition-colors',
         depth > 0 && 'ml-8 border-l-2 border-muted pl-4',
-        comment.is_hidden && 'opacity-60',
-        highlightedCommentId === comment.id && 'bg-accent/20'
+        comment.is_hidden && 'opacity-55',
+        highlightedCommentId === comment.id && 'bg-accent/60'
       )}
     >
-      <Avatar className="h-8 w-8 flex-shrink-0">
-        <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+      <Avatar className="h-7 w-7 flex-shrink-0">
+        <AvatarFallback
+          className="text-[10px] font-bold text-white"
+          style={{ backgroundColor: getAvatarColor(authorName) }}
+        >
           {initials}
         </AvatarFallback>
       </Avatar>
       <div className="flex-1 space-y-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-sm">{comment.profile?.full_name || 'Unknown User'}</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[12.5px] font-bold">{authorName || t('community.unknownUser')}</span>
+            <span className="text-[11px] text-[#9aa0af]">
               {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
             </span>
             {comment.is_hidden && (
-              <Badge variant="outline" className="text-xs">Hidden</Badge>
+              <span className="rounded-[7px] bg-[#fbf2dd] px-2 py-0.5 text-[10.5px] font-bold text-warning">
+                {t('community.hidden')}
+              </span>
             )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <Button variant="ghost" size="sm" className="h-7 w-7 rounded-lg p-0 text-[#9aa0af]">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -93,33 +100,33 @@ export function CommentItem({
               {onReply && (
                 <DropdownMenuItem onClick={() => onReply(comment.id)}>
                   <Reply className="h-4 w-4 mr-2" />
-                  Reply
+                  {t('community.reply')}
                 </DropdownMenuItem>
               )}
               {canEdit && onEdit && (
                 <DropdownMenuItem onClick={() => setIsEditing(true)}>
                   <Edit2 className="h-4 w-4 mr-2" />
-                  Edit
+                  {t('common.edit')}
                 </DropdownMenuItem>
               )}
               {onReport && !isAuthor && (
                 <DropdownMenuItem onClick={() => onReport(comment.id)}>
                   <Flag className="h-4 w-4 mr-2" />
-                  Report
+                  {t('community.report')}
                 </DropdownMenuItem>
               )}
               {onCopyLink && (
                 <DropdownMenuItem onClick={() => onCopyLink(comment.id)}>
                   <Link2 className="h-4 w-4 mr-2" />
-                  Copy link
+                  {t('community.copyLink')}
                 </DropdownMenuItem>
               )}
               {isAdmin && onToggleHide && (
                 <DropdownMenuItem onClick={() => onToggleHide(comment.id, !comment.is_hidden)}>
                   {comment.is_hidden ? (
-                    <><Eye className="h-4 w-4 mr-2" /> Show</>
+                    <><Eye className="h-4 w-4 mr-2" /> {t('community.show')}</>
                   ) : (
-                    <><EyeOff className="h-4 w-4 mr-2" /> Hide</>
+                    <><EyeOff className="h-4 w-4 mr-2" /> {t('community.hide')}</>
                   )}
                 </DropdownMenuItem>
               )}
@@ -129,7 +136,7 @@ export function CommentItem({
                   className="text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  {t('common.delete')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -141,11 +148,11 @@ export function CommentItem({
             <Textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="min-h-[80px]"
+              className="min-h-[80px] rounded-[11px] text-[13px]"
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleSaveEdit}>
-                Save
+              <Button size="sm" onClick={handleSaveEdit} className="rounded-lg text-xs font-bold">
+                {t('common.save')}
               </Button>
               <Button
                 size="sm"
@@ -154,13 +161,14 @@ export function CommentItem({
                   setIsEditing(false);
                   setEditContent(comment.content);
                 }}
+                className="rounded-lg text-xs font-bold"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-foreground whitespace-pre-wrap">{comment.content}</p>
+          <p className="whitespace-pre-wrap text-[13px] leading-[1.55] text-[#4a4f60]">{comment.content}</p>
         )}
 
         {/* Nested replies */}
