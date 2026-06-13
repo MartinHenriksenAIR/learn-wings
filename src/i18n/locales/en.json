@@ -689,9 +689,71 @@
     "unknownError": "Unknown error"
   },
   "platformSettings": {
+    "title": "Platform Settings",
+    "subtitle": "Branding, access and feature configuration for the whole platform.",
     "loadFailedTitle": "Couldn't load platform settings.",
     "loadFailedDescription": "Settings were not loaded from the server, so editing is disabled to prevent overwriting saved values. Try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "saveFailed": "Failed to save",
+    "tabs": {
+      "branding": "Branding",
+      "userAccess": "User & Access",
+      "email": "Email",
+      "features": "Features"
+    },
+    "branding": {
+      "platformName": "Platform name",
+      "primaryColor": "Primary color",
+      "accentColor": "Accent color",
+      "sidebarPrimaryColor": "Sidebar primary color",
+      "sidebarAccentColor": "Sidebar accent color",
+      "logoUrl": "Logo URL",
+      "faviconUrl": "Favicon URL",
+      "save": "Save branding"
+    },
+    "userAccess": {
+      "defaultRole": "Default role for new users",
+      "defaultRoleNote": "New users are always created as Learner. Elevated access is granted via explicit admin invitation flows.",
+      "requireEmailVerification": "Require email verification",
+      "requireEmailVerificationHint": "Users must verify their email before accessing the platform.",
+      "allowSelfRegistration": "Allow self registration",
+      "allowSelfRegistrationHint": "Allow users to sign up without an invitation.",
+      "save": "Save user settings"
+    },
+    "email": {
+      "notConfiguredWarning": "SMTP is not configured — invitation emails will not be sent.",
+      "fromName": "From name",
+      "fromEmail": "From email",
+      "smtpHost": "SMTP host",
+      "smtpPort": "SMTP port",
+      "smtpUsername": "Username",
+      "smtpPassword": "Password",
+      "encryption": "Encryption",
+      "encryptionStarttls": "STARTTLS",
+      "encryptionSslTls": "SSL/TLS",
+      "encryptionNone": "None",
+      "testConnection": "Test connection",
+      "save": "Save email settings",
+      "testSuccessTitle": "SMTP test successful",
+      "testSuccessDescription": "Connection and authentication succeeded.",
+      "testFailedTitle": "SMTP test failed",
+      "testFailedDescription": "Unable to connect to SMTP server.",
+      "testFailedFallback": "Connection test failed"
+    },
+    "features": {
+      "note": "Disabling a feature here hides it for every organization, regardless of their overrides.",
+      "certificates_enabled": "Certificates",
+      "certificates_enabled_hint": "Allow learners to earn certificates upon course completion.",
+      "quizzes_enabled": "Quizzes",
+      "quizzes_enabled_hint": "Enable quiz lessons in courses.",
+      "analytics_enabled": "Analytics",
+      "analytics_enabled_hint": "Show analytics dashboards to org admins.",
+      "community_enabled": "Community",
+      "community_enabled_hint": "Enable community feed, ideas and moderation features.",
+      "course_reviews_enabled": "Course reviews",
+      "course_reviews_enabled_hint": "Allow learners to leave reviews on courses.",
+      "save": "Save feature settings"
+    }
   },
   "certificates": {
     "title": "Certificates",

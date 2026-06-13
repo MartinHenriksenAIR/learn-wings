@@ -2,11 +2,10 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +23,7 @@ import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togg
 import { buildReportContentLink } from '@/lib/community-report-link';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
+import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -34,11 +34,9 @@ import {
   Unlock,
   CheckCircle,
   XCircle,
-  AlertTriangle,
+  Flag,
   MessageSquare,
   FileText,
-  Flag,
-  Globe,
 } from 'lucide-react';
 
 interface ReportWithDetails extends Omit<CommunityReport, 'reporter'> {
@@ -75,7 +73,7 @@ export default function PlatformCommunityModeration() {
     return map;
   }, [orgsData]);
 
-  // Update report status
+  // Update report status — moderation decisions keep their toasts (toast policy).
   const updateReportMutation = useMutation({
     mutationFn: async ({
       reportId,
@@ -92,14 +90,14 @@ export default function PlatformCommunityModeration() {
       queryClient.invalidateQueries({ queryKey: ['platform-reports'] });
       setReviewDialogOpen(false);
       setSelectedReport(null);
-      toast.success('Report updated');
+      toast.success(t('moderation.reportUpdated'));
     },
     onError: () => {
-      toast.error('Failed to update report');
+      toast.error(t('moderation.reportUpdateFailed'));
     },
   });
 
-  // Hide/show content
+  // Hide/show content — moderation decisions keep their toasts (toast policy).
   const toggleContentVisibility = useMutation({
     mutationFn: async ({
       type,
@@ -118,24 +116,24 @@ export default function PlatformCommunityModeration() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-reports'] });
-      toast.success('Content visibility updated');
+      toast.success(t('moderation.visibilityUpdated'));
     },
     onError: () => {
-      toast.error('Failed to update content');
+      toast.error(t('moderation.contentUpdateFailed'));
     },
   });
 
-  // Lock/unlock post comments
+  // Lock/unlock post comments — moderation decisions keep their toasts (toast policy).
   const togglePostLock = useMutation({
     mutationFn: async ({ postId, lock }: { postId: string; lock: boolean }) => {
       await togglePostLocked(postId, lock);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-reports'] });
-      toast.success('Post lock status updated');
+      toast.success(t('moderation.lockUpdated'));
     },
     onError: () => {
-      toast.error('Failed to update post');
+      toast.error(t('moderation.postUpdateFailed'));
     },
   });
 
@@ -163,24 +161,14 @@ export default function PlatformCommunityModeration() {
     });
   };
 
-  const getTargetTypeIcon = (type: string) => {
-    return type === 'post' ? <FileText className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />;
-  };
-
-  const getScopeBadge = (report: ReportWithDetails) => {
+  // Org-scope badge: platform queue spans every org plus global, so each card
+  // shows where the report came from (Global, or the org name).
+  const getScopeLabel = (report: ReportWithDetails): { label: string; global: boolean } => {
     if (!report.org_id) {
-      return (
-        <Badge variant="outline" className="text-xs">
-          {t('platformModeration.scopeGlobal')}
-        </Badge>
-      );
+      return { label: t('platformModeration.scopeGlobal'), global: true };
     }
     const orgName = orgsMap?.get(report.org_id) ?? t('platformModeration.scopeOrganization');
-    return (
-      <Badge variant="secondary" className="text-xs">
-        {orgName}
-      </Badge>
-    );
+    return { label: orgName, global: false };
   };
 
   // null for orphaned comment reports (parent post id missing) — the View
@@ -194,278 +182,252 @@ export default function PlatformCommunityModeration() {
     window.open(path, '_blank', 'noopener,noreferrer');
   };
 
+  const breadcrumbs = [{ label: t('platformModeration.title') }];
+
+  const tabs: { key: ReportStatus; label: string }[] = [
+    { key: 'pending', label: t('moderation.tabs.pending') },
+    { key: 'reviewed', label: t('moderation.tabs.reviewed') },
+    { key: 'dismissed', label: t('moderation.tabs.dismissed') },
+  ];
+
   return (
-    <AppLayout>
-      <div className="container mx-auto py-6 px-4">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Globe className="h-5 w-5 text-primary" />
-            <h1 className="text-2xl font-bold">{t('platformModeration.title')}</h1>
-          </div>
-          <p className="text-muted-foreground">
-            {t('platformModeration.description')}
-          </p>
+    <AppLayout breadcrumbs={breadcrumbs}>
+      {/* Header */}
+      <div className="mb-5">
+        <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+          {t('platformModeration.title')}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t('platformModeration.description')}</p>
+      </div>
+
+      {/* Tabs */}
+      <SlidingTabs
+        tabs={tabs}
+        active={activeTab}
+        onChange={(k) => setActiveTab(k as ReportStatus)}
+        className="mb-5"
+      />
+
+      {/* Reports list */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ReportStatus)} className="mb-6">
-          <TabsList>
-            <TabsTrigger value="pending" className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Pending
-            </TabsTrigger>
-            <TabsTrigger value="reviewed" className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4" />
-              Reviewed
-            </TabsTrigger>
-            <TabsTrigger value="dismissed" className="flex items-center gap-2">
-              <XCircle className="h-4 w-4" />
-              Dismissed
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {/* Reports list */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : reports.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Flag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No reports</h3>
-              <p className="text-muted-foreground">
-                {activeTab === 'pending'
-                  ? 'No pending reports to review.'
-                  : `No ${activeTab} reports found.`}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {reports.map((report) => (
+      ) : reports.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <Flag className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-medium">{t('moderation.emptyTitle')}</h3>
+            <p className="text-muted-foreground">{t('moderation.emptyDescription')}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {reports.map((report) => {
+            const isPost = report.target_type === 'post';
+            const scope = getScopeLabel(report);
+            return (
               <Card key={report.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-muted rounded-lg">
-                        {getTargetTypeIcon(report.target_type)}
-                      </div>
-                      <div>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          Reported {report.target_type}
-                          <Badge variant={report.status === 'pending' ? 'destructive' : 'secondary'}>
-                            {report.status}
-                          </Badge>
-                          {getScopeBadge(report)}
-                        </CardTitle>
-                        <CardDescription>
-                          Reported by {report.reporter?.full_name || 'Unknown'} • {' '}
-                          {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-end gap-1">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openContentInNewTab(report)}
-                            disabled={!getContentLink(report)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>View content</TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => toggleContentVisibility.mutate({
-                              type: report.target_type,
-                              id: report.target_id,
-                              hide: true,
-                            })}
-                            disabled={toggleContentVisibility.isPending}
-                          >
-                            <EyeOff className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Hide content</TooltipContent>
-                      </Tooltip>
-
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => toggleContentVisibility.mutate({
-                              type: report.target_type,
-                              id: report.target_id,
-                              hide: false,
-                            })}
-                            disabled={toggleContentVisibility.isPending}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Show content</TooltipContent>
-                      </Tooltip>
-
-                      {report.target_type === 'post' && (
-                        <>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => togglePostLock.mutate({
-                                  postId: report.target_id,
-                                  lock: true,
-                                })}
-                                disabled={togglePostLock.isPending}
-                              >
-                                <Lock className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Lock comments</TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => togglePostLock.mutate({
-                                  postId: report.target_id,
-                                  lock: false,
-                                })}
-                                disabled={togglePostLock.isPending}
-                              >
-                                <Unlock className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Unlock comments</TooltipContent>
-                          </Tooltip>
-                        </>
+                <CardContent className="px-[22px] py-[18px]">
+                  {/* Meta row */}
+                  <div className="mb-2.5 flex flex-wrap items-center gap-2">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[#fdecec] text-[#c43d3d]">
+                      {isPost ? <FileText className="h-[15px] w-[15px]" /> : <MessageSquare className="h-[15px] w-[15px]" />}
+                    </span>
+                    <span className="rounded-[7px] bg-[#f3f4f8] px-[11px] py-1 text-[11px] font-bold text-muted-foreground">
+                      {isPost ? t('moderation.typePost') : t('moderation.typeComment')}
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded-[7px] px-[11px] py-1 text-[11px] font-bold capitalize',
+                        report.status === 'pending'
+                          ? 'bg-[#fdecec] text-[#c43d3d]'
+                          : 'bg-[#f3f4f8] text-muted-foreground'
                       )}
-
-                      {report.status === 'pending' && (
-                        <>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openReviewDialog(report)}
-                                disabled={updateReportMutation.isPending}
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Mark reviewed</TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => updateReportMutation.mutate({
-                                  reportId: report.id,
-                                  status: 'dismissed',
-                                })}
-                                disabled={updateReportMutation.isPending}
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Dismiss report</TooltipContent>
-                          </Tooltip>
-                        </>
+                    >
+                      {report.status}
+                    </span>
+                    {/* Org column: platform queue spans orgs + global */}
+                    <span
+                      className={cn(
+                        'rounded-[7px] px-[11px] py-1 text-[11px] font-bold',
+                        scope.global
+                          ? 'bg-[#f3f4f8] text-muted-foreground'
+                          : 'bg-accent text-accent-foreground'
                       )}
-                    </div>
+                    >
+                      {scope.label}
+                    </span>
+                    <div className="flex-1" />
+                    <span className="text-[11.5px] font-semibold text-muted-foreground">
+                      {t('moderation.reportedBy', {
+                        name: report.reporter?.full_name || t('moderation.unknownReporter'),
+                        time: formatDistanceToNow(new Date(report.created_at), { addSuffix: true }),
+                      })}
+                    </span>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="bg-muted/50 rounded-lg p-3">
-                    <p className="text-sm font-medium mb-1">Report Reason:</p>
-                    <p className="text-sm text-muted-foreground">{report.reason}</p>
-                  </div>
+
+                  {/* Reason */}
+                  <p className="mb-1 text-[13.5px] font-bold">{t('moderation.reasonLabel')}</p>
+                  <p className="mb-3.5 text-[13px] italic leading-[1.5] text-muted-foreground">
+                    {report.reason}
+                  </p>
+
                   {report.admin_notes && (
-                    <div className="mt-3 p-3 border rounded-lg">
-                      <p className="text-sm font-medium mb-1">Admin Notes:</p>
-                      <p className="text-sm text-muted-foreground">{report.admin_notes}</p>
-                    </div>
+                    <p className="mb-3.5 rounded-[10px] bg-[#fbf2dd] px-3.5 py-2.5 text-[12.5px] text-[#8a5e10]">
+                      <strong>{t('moderation.adminNotesInline')}</strong> {report.admin_notes}
+                    </p>
                   )}
+
+                  {/* Action controls — kept exactly as today (view/hide/show/lock/unlock/review/dismiss) */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openContentInNewTab(report)}
+                          disabled={!getContentLink(report)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          {t('moderation.viewContent')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('moderation.viewContent')}</TooltipContent>
+                    </Tooltip>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleContentVisibility.mutate({
+                        type: report.target_type,
+                        id: report.target_id,
+                        hide: true,
+                      })}
+                      disabled={toggleContentVisibility.isPending}
+                    >
+                      <EyeOff className="h-3.5 w-3.5" />
+                      {isPost ? t('moderation.hidePost') : t('moderation.hideComment')}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleContentVisibility.mutate({
+                        type: report.target_type,
+                        id: report.target_id,
+                        hide: false,
+                      })}
+                      disabled={toggleContentVisibility.isPending}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      {isPost ? t('moderation.showPost') : t('moderation.showComment')}
+                    </Button>
+
+                    {isPost && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => togglePostLock.mutate({
+                            postId: report.target_id,
+                            lock: true,
+                          })}
+                          disabled={togglePostLock.isPending}
+                        >
+                          <Lock className="h-3.5 w-3.5" />
+                          {t('moderation.lockPost')}
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => togglePostLock.mutate({
+                            postId: report.target_id,
+                            lock: false,
+                          })}
+                          disabled={togglePostLock.isPending}
+                        >
+                          <Unlock className="h-3.5 w-3.5" />
+                          {t('moderation.unlockPost')}
+                        </Button>
+                      </>
+                    )}
+
+                    {report.status === 'pending' && (
+                      <>
+                        <div className="flex-1" />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => updateReportMutation.mutate({
+                            reportId: report.id,
+                            status: 'dismissed',
+                          })}
+                          disabled={updateReportMutation.isPending}
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          {t('moderation.dismiss')}
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          onClick={() => openReviewDialog(report)}
+                          disabled={updateReportMutation.isPending}
+                        >
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          {t('moderation.markReviewed')}
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
+      )}
 
-        {/* Review dialog */}
-        <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Review Report</DialogTitle>
-              <DialogDescription>
-                Add notes and mark this report as reviewed or dismissed.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Admin Notes</label>
-                <Textarea
-                  placeholder="Add any notes about how this was handled..."
-                  value={adminNotes}
-                  onChange={(e) => setAdminNotes(e.target.value)}
-                />
-              </div>
+      {/* Review dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('moderation.dialog.title')}</DialogTitle>
+            <DialogDescription>{t('moderation.dialog.description')}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t('moderation.dialog.adminNotesLabel')}</label>
+              <Textarea
+                placeholder={t('moderation.dialog.adminNotesPlaceholder')}
+                value={adminNotes}
+                onChange={(e) => setAdminNotes(e.target.value)}
+              />
             </div>
-            <DialogFooter className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setReviewDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={handleDismiss}
-                disabled={updateReportMutation.isPending}
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                Dismiss
-              </Button>
-              <Button
-                onClick={handleMarkReviewed}
-                disabled={updateReportMutation.isPending}
-              >
-                {updateReportMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                )}
-                Mark Reviewed
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleDismiss}
+              disabled={updateReportMutation.isPending}
+            >
+              <XCircle className="mr-2 h-4 w-4" />
+              {t('moderation.dismiss')}
+            </Button>
+            <Button onClick={handleMarkReviewed} disabled={updateReportMutation.isPending}>
+              {updateReportMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="mr-2 h-4 w-4" />
+              )}
+              {t('moderation.markReviewed')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

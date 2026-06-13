@@ -689,9 +689,71 @@
     "unknownError": "Ukendt fejl"
   },
   "platformSettings": {
+    "title": "Platformindstillinger",
+    "subtitle": "Branding, adgang og funktionskonfiguration for hele platformen.",
     "loadFailedTitle": "Kunne ikke indlæse platformsindstillingerne.",
     "loadFailedDescription": "Indstillingerne blev ikke indlæst fra serveren, så redigering er deaktiveret for at undgå at overskrive gemte værdier. Prøv igen.",
-    "retry": "Prøv igen"
+    "retry": "Prøv igen",
+    "saveFailed": "Kunne ikke gemme",
+    "tabs": {
+      "branding": "Branding",
+      "userAccess": "Brugere & adgang",
+      "email": "E-mail",
+      "features": "Funktioner"
+    },
+    "branding": {
+      "platformName": "Platformnavn",
+      "primaryColor": "Primær farve",
+      "accentColor": "Accentfarve",
+      "sidebarPrimaryColor": "Sidebjælkens primære farve",
+      "sidebarAccentColor": "Sidebjælkens accentfarve",
+      "logoUrl": "Logo-URL",
+      "faviconUrl": "Favicon-URL",
+      "save": "Gem branding"
+    },
+    "userAccess": {
+      "defaultRole": "Standardrolle for nye brugere",
+      "defaultRoleNote": "Nye brugere oprettes altid som Elev. Udvidet adgang gives via udtrykkelige admin-invitationsforløb.",
+      "requireEmailVerification": "Kræv e-mailbekræftelse",
+      "requireEmailVerificationHint": "Brugere skal bekræfte deres e-mail, før de får adgang til platformen.",
+      "allowSelfRegistration": "Tillad selvregistrering",
+      "allowSelfRegistrationHint": "Tillad brugere at tilmelde sig uden en invitation.",
+      "save": "Gem brugerindstillinger"
+    },
+    "email": {
+      "notConfiguredWarning": "SMTP er ikke konfigureret — invitations-e-mails sendes ikke.",
+      "fromName": "Afsendernavn",
+      "fromEmail": "Afsender-e-mail",
+      "smtpHost": "SMTP-vært",
+      "smtpPort": "SMTP-port",
+      "smtpUsername": "Brugernavn",
+      "smtpPassword": "Adgangskode",
+      "encryption": "Kryptering",
+      "encryptionStarttls": "STARTTLS",
+      "encryptionSslTls": "SSL/TLS",
+      "encryptionNone": "Ingen",
+      "testConnection": "Test forbindelse",
+      "save": "Gem e-mailindstillinger",
+      "testSuccessTitle": "SMTP-test lykkedes",
+      "testSuccessDescription": "Forbindelse og godkendelse lykkedes.",
+      "testFailedTitle": "SMTP-test mislykkedes",
+      "testFailedDescription": "Kunne ikke oprette forbindelse til SMTP-serveren.",
+      "testFailedFallback": "Forbindelsestesten mislykkedes"
+    },
+    "features": {
+      "note": "Hvis du deaktiverer en funktion her, skjules den for alle organisationer, uanset deres tilsidesættelser.",
+      "certificates_enabled": "Certifikater",
+      "certificates_enabled_hint": "Tillad elever at optjene certifikater ved kursusafslutning.",
+      "quizzes_enabled": "Quizzer",
+      "quizzes_enabled_hint": "Aktivér quiz-lektioner i kurser.",
+      "analytics_enabled": "Analyse",
+      "analytics_enabled_hint": "Vis analyse-dashboards til organisationsadministratorer.",
+      "community_enabled": "Fællesskab",
+      "community_enabled_hint": "Aktivér fællesskabsfeed, idéer og moderationsfunktioner.",
+      "course_reviews_enabled": "Kursusanmeldelser",
+      "course_reviews_enabled_hint": "Tillad elever at skrive anmeldelser af kurser.",
+      "save": "Gem funktionsindstillinger"
+    }
   },
   "certificates": {
     "title": "Certifikater",

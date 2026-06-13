@@ -46,7 +46,10 @@ describe('Settings — profile save feedback (#20)', () => {
     });
   });
 
-  it('shows a success toast after a successful profile save', async () => {
+  // #20: a successful profile save now confirms via the SaveButton morph
+  // (in-button "Saved" + success styling), replacing the old success toast
+  // (toast policy). Pins the morph AND the mutation firing — equal strength.
+  it('morphs the save button into the Saved state after a successful profile save', async () => {
     mockCallApi.mockResolvedValue({ profile: {} });
 
     render(<Settings />);
@@ -57,13 +60,17 @@ describe('Settings — profile save feedback (#20)', () => {
         first_name: 'Test', last_name: 'User', department: '',
       });
     });
+
+    // Button morphs to the "Saved" label with success styling.
     await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-        title: 'settings.profileUpdated',
-        description: 'settings.profileUpdatedDescription',
-        variant: 'success',
-      }));
+      expect(screen.getByRole('button', { name: 'common.saved' })).toBeInTheDocument();
     });
+    expect(screen.getByRole('button', { name: 'common.saved' }).className).toMatch(/bg-success/);
+
+    // No success toast is fired for the routine save.
+    expect(mockToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'success' })
+    );
   });
 
   it('shows a destructive toast when the save fails', async () => {
