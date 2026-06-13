@@ -124,21 +124,21 @@ describe('CoursePlayer — review entry point', () => {
     setup({ reviewsEnabled: true, completed: [] }); // 0/5 = 0%
     renderPlayer();
     await screen.findByText('Intro to AI'); // wait for load
-    expect(screen.queryByRole('button', { name: /rate this course/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /edit your review/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /rateThisCourse/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /editYourReview/i })).toBeNull();
   });
 
   it('hides the review button when course reviews are disabled, even at >=20%', async () => {
     setup({ reviewsEnabled: false, completed: ['l-1'] }); // 1/5 = 20%
     renderPlayer();
     await screen.findByText('Intro to AI');
-    expect(screen.queryByRole('button', { name: /rate this course/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /rateThisCourse/i })).toBeNull();
   });
 
   it('shows "Rate this course" at >=20% with reviews enabled and no existing review', async () => {
     setup({ reviewsEnabled: true, completed: ['l-1'], review: null }); // 20%
     renderPlayer();
-    expect(await screen.findByRole('button', { name: /rate this course/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /rateThisCourse/i })).toBeInTheDocument();
   });
 
   it('shows "Edit your review" when an existing review is present', async () => {
@@ -148,17 +148,47 @@ describe('CoursePlayer — review entry point', () => {
       review: { id: 'r-1', rating: 4, comment: 'Nice' },
     });
     renderPlayer();
-    expect(await screen.findByRole('button', { name: /edit your review/i })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /rate this course/i })).toBeNull();
+    expect(await screen.findByRole('button', { name: /editYourReview/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /rateThisCourse/i })).toBeNull();
   });
 
   it('opens CourseReviewDialog when the button is clicked', async () => {
     setup({ reviewsEnabled: true, completed: ['l-1'], review: null });
     renderPlayer();
-    const button = await screen.findByRole('button', { name: /rate this course/i });
+    const button = await screen.findByRole('button', { name: /rateThisCourse/i });
     fireEvent.click(button);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Rate This Course')).toBeInTheDocument();
+  });
+});
+
+describe('CoursePlayer — restyled sidebar and footer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sidebar progress label counts only this course's lessons (n/m · pct%)", async () => {
+    // 1 completed lesson of THIS course + 2 foreign rows — the label must read 1/5 · 20%
+    setup({ reviewsEnabled: false, completed: ['l-1', 'other-1', 'other-2'] });
+    renderPlayer();
+    await screen.findByText('Intro to AI');
+    expect(
+      screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '1/5 · 20%')
+    ).toBeInTheDocument();
+  });
+
+  it('shows the pop-in Completed badge instead of the complete button on a completed lesson', async () => {
+    setup({ reviewsEnabled: false, completed: ['l-1'] }); // initial lesson l-1 is completed
+    renderPlayer();
+    await screen.findByText('Intro to AI');
+
+    const badge = screen.getByText('coursePlayer.completed');
+    expect(badge).toHaveClass('animate-pop-in');
+    expect(screen.queryByRole('button', { name: /markAsComplete/i })).toBeNull();
+
+    // Footer nav: Previous disabled on the first lesson, Next enabled
+    expect(screen.getByRole('button', { name: /common\.previous/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /common\.next/ })).toBeEnabled();
   });
 });
 
@@ -209,7 +239,7 @@ describe('CoursePlayer — completion semantics (#18)', () => {
     });
     renderPlayer();
 
-    const btn = await screen.findByRole('button', { name: /mark as complete/i });
+    const btn = await screen.findByRole('button', { name: /markAsComplete/i });
     fireEvent.click(btn);
 
     await waitFor(() => {
@@ -230,7 +260,7 @@ describe('CoursePlayer — completion semantics (#18)', () => {
     await screen.findByText('Intro to AI');
     // Select the last incomplete lesson and complete it
     fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /mark as complete/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /markAsComplete/i }));
 
     await waitFor(() => {
       expect(mockCallApi).toHaveBeenCalledWith('/api/enrollment-complete', {
@@ -249,7 +279,7 @@ describe('CoursePlayer — completion semantics (#18)', () => {
 
     await screen.findByText('Intro to AI');
     fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /mark as complete/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /markAsComplete/i }));
 
     await waitFor(() => {
       expect(mockCallApi).toHaveBeenCalledWith('/api/enrollment-complete', {

@@ -33,7 +33,8 @@
     "lessons": "lessons",
     "completedOn": "Completed on",
     "noOrgSelected": "No organization selected.",
-    "joinOrgToContinue": "Join an organization to continue."
+    "joinOrgToContinue": "Join an organization to continue.",
+    "clear": "Clear"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -217,11 +218,44 @@
     "unenrollFailed": "Failed to unenroll",
     "unenrolledFromCourse": "Unenrolled from course",
     "unenrolledDescription": "You've been unenrolled from \"{{courseTitle}}\". Your progress has been kept.",
-    "joinOrgToAccessCourses": "Join an organization to access courses."
+    "joinOrgToAccessCourses": "Join an organization to access courses.",
+    "subtitle": "Courses available to {{orgName}}.",
+    "allLevels": "All levels",
+    "anyStatus": "Any status",
+    "reviewCourse": "Review course"
   },
   "coursePlayer": {
     "completionSaveFailed": "Couldn't record course completion",
-    "completionSaveFailedDescription": "Your lesson progress is saved, but the course completion wasn't recorded. Please try again later."
+    "completionSaveFailedDescription": "Your lesson progress is saved, but the course completion wasn't recorded. Please try again later.",
+    "moduleHeader": "Module {{number}}: {{title}}",
+    "durationMinutes": "{{minutes}} min",
+    "lessonTypes": {
+      "video": "Video",
+      "document": "Document",
+      "quiz": "Quiz"
+    },
+    "rateThisCourse": "Rate this course",
+    "editYourReview": "Edit your review",
+    "markAsComplete": "Mark as complete",
+    "completed": "Completed",
+    "lessonComplete": "Lesson complete",
+    "nextLesson": "Next lesson",
+    "nextModule": "Next module",
+    "finishCourse": "Finish course",
+    "submitAnswers": "Submit answers",
+    "tryAgain": "Try again",
+    "quizIntro": "Answer all {{total}} questions. You need {{score}}% to pass.",
+    "quizPassedMessage": "Nice work — you passed!",
+    "quizFailedMessage": "You need {{score}}% to pass. Try again!",
+    "courseNotFound": "Course not found",
+    "backToCourses": "Back to courses",
+    "selectLessonToBegin": "Select a lesson to begin",
+    "loadingVideo": "Loading video...",
+    "videoLoadFailed": "Unable to load video. Please try again.",
+    "noVideo": "No video uploaded",
+    "loadingDocument": "Loading document...",
+    "documentLoadFailed": "Unable to load document. Please try again.",
+    "noDocument": "No document uploaded"
   },
   "community": {
     "title": "Community",

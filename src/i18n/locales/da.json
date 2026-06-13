@@ -33,7 +33,8 @@
     "lessons": "lektioner",
     "completedOn": "Afsluttet den",
     "noOrgSelected": "Ingen organisation valgt.",
-    "joinOrgToContinue": "Tilmeld dig en organisation for at fortsætte."
+    "joinOrgToContinue": "Tilmeld dig en organisation for at fortsætte.",
+    "clear": "Ryd"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -217,11 +218,44 @@
     "unenrollFailed": "Kunne ikke afmelde",
     "unenrolledFromCourse": "Afmeldt fra kursus",
     "unenrolledDescription": "Du er blevet afmeldt fra \"{{courseTitle}}\". Din fremgang er bevaret.",
-    "joinOrgToAccessCourses": "Tilmeld dig en organisation for at få adgang til kurser."
+    "joinOrgToAccessCourses": "Tilmeld dig en organisation for at få adgang til kurser.",
+    "subtitle": "Kurser tilgængelige for {{orgName}}.",
+    "allLevels": "Alle niveauer",
+    "anyStatus": "Enhver status",
+    "reviewCourse": "Gennemse kursus"
   },
   "coursePlayer": {
     "completionSaveFailed": "Kursusgennemførelsen kunne ikke registreres",
-    "completionSaveFailedDescription": "Din lektionsfremgang er gemt, men kursusgennemførelsen blev ikke registreret. Prøv igen senere."
+    "completionSaveFailedDescription": "Din lektionsfremgang er gemt, men kursusgennemførelsen blev ikke registreret. Prøv igen senere.",
+    "moduleHeader": "Modul {{number}}: {{title}}",
+    "durationMinutes": "{{minutes}} min",
+    "lessonTypes": {
+      "video": "Video",
+      "document": "Dokument",
+      "quiz": "Quiz"
+    },
+    "rateThisCourse": "Bedøm dette kursus",
+    "editYourReview": "Rediger din anmeldelse",
+    "markAsComplete": "Markér som gennemført",
+    "completed": "Gennemført",
+    "lessonComplete": "Lektion gennemført",
+    "nextLesson": "Næste lektion",
+    "nextModule": "Næste modul",
+    "finishCourse": "Afslut kursus",
+    "submitAnswers": "Indsend svar",
+    "tryAgain": "Prøv igen",
+    "quizIntro": "Besvar alle {{total}} spørgsmål. Du skal have {{score}}% for at bestå.",
+    "quizPassedMessage": "Flot klaret — du bestod!",
+    "quizFailedMessage": "Du skal have {{score}}% for at bestå. Prøv igen!",
+    "courseNotFound": "Kursus ikke fundet",
+    "backToCourses": "Tilbage til kurser",
+    "selectLessonToBegin": "Vælg en lektion for at begynde",
+    "loadingVideo": "Indlæser video...",
+    "videoLoadFailed": "Videoen kunne ikke indlæses. Prøv igen.",
+    "noVideo": "Ingen video uploadet",
+    "loadingDocument": "Indlæser dokument...",
+    "documentLoadFailed": "Dokumentet kunne ikke indlæses. Prøv igen.",
+    "noDocument": "Intet dokument uploadet"
   },
   "community": {
     "title": "Fællesskab",
