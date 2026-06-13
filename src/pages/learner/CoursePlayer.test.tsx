@@ -177,18 +177,49 @@ describe('CoursePlayer — restyled sidebar and footer', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the pop-in Completed badge instead of the complete button on a completed lesson', async () => {
+  it('shows the Completed badge WITHOUT the pop-in animation on a lesson completed before load', async () => {
     setup({ reviewsEnabled: false, completed: ['l-1'] }); // initial lesson l-1 is completed
     renderPlayer();
     await screen.findByText('Intro to AI');
 
     const badge = screen.getByText('coursePlayer.completed');
-    expect(badge).toHaveClass('animate-pop-in');
+    expect(badge).toBeInTheDocument();
+    // Already-completed-on-load lessons must NOT replay the celebration on mount —
+    // neither the footer badge nor the sidebar status dot.
+    expect(badge).not.toHaveClass('animate-pop-in');
+    expect(document.querySelector('.animate-pop-in')).toBeNull();
     expect(screen.queryByRole('button', { name: /markAsComplete/i })).toBeNull();
 
     // Footer nav: Previous disabled on the first lesson, Next enabled
     expect(screen.getByRole('button', { name: /common\.previous/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /common\.next/ })).toBeEnabled();
+  });
+
+  it('pops in the celebration only for the lesson completed during this session', async () => {
+    setup({ reviewsEnabled: false, completed: ['l-2'] }); // l-2 pre-completed, l-1 not
+    renderPlayer();
+    await screen.findByText('Intro to AI');
+
+    // Complete l-1 in-session (auto-advances to l-2)
+    fireEvent.click(screen.getByRole('button', { name: /markAsComplete/i }));
+
+    // The just-completed l-1 sidebar dot animates...
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /lesson 1/i }).querySelector('.animate-pop-in')
+      ).not.toBeNull();
+    });
+    // ...while the pre-completed l-2 dot still does not
+    expect(
+      screen.getByRole('button', { name: /lesson 2/i }).querySelector('.animate-pop-in')
+    ).toBeNull();
+
+    // Auto-advanced onto pre-completed l-2: its footer badge renders without the animation
+    expect(screen.getByText('coursePlayer.completed')).not.toHaveClass('animate-pop-in');
+
+    // Navigating back to the just-completed lesson shows the animated footer badge
+    fireEvent.click(screen.getByRole('button', { name: /lesson 1/i }));
+    expect(await screen.findByText('coursePlayer.completed')).toHaveClass('animate-pop-in');
   });
 });
 

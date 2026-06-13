@@ -336,7 +336,7 @@ export default function LearnerCourses() {
                         title={t('courses.unenrollFromCourse')}
                         aria-label={t('courses.unenrollFromCourse')}
                         onClick={() => setUnenrollDialog({ open: true, course, enrollment })}
-                        className="h-9 w-9 shrink-0 rounded-[10px] text-[#9aa0af] hover:border-[#f0c7c7] hover:bg-card hover:text-[#d23f3f]"
+                        className="h-9 w-9 shrink-0 rounded-[10px] text-[#9aa0af] hover:border-[#f0c7c7] hover:bg-card hover:text-destructive"
                       >
                         <LogOut aria-hidden="true" className="h-[15px] w-[15px]" />
                       </Button>

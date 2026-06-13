@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
@@ -146,37 +146,46 @@ describe('LearnerCourses — enroll in-button morph (no success toast)', () => {
   });
 
   it('morphs Enroll → "Enrolled" → Continue, with no success toast', async () => {
-    let enrolled = false;
-    vi.mocked(callApi).mockImplementation(async (url: unknown) => {
-      if (url === '/api/learner-courses') {
-        return {
-          courses: [course],
-          enrollments: enrolled
-            ? [{ id: 'e-1', course_id: 'c-1', status: 'enrolled' }]
-            : [],
-        };
-      }
-      if (url === '/api/enroll') {
-        enrolled = true;
+    // Fake timers so the 1.6s flash window is fast-forwarded instead of waited out.
+    // shouldAdvanceTime keeps waitFor/findBy polling alive under vitest fake timers.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let enrolled = false;
+      vi.mocked(callApi).mockImplementation(async (url: unknown) => {
+        if (url === '/api/learner-courses') {
+          return {
+            courses: [course],
+            enrollments: enrolled
+              ? [{ id: 'e-1', course_id: 'c-1', status: 'enrolled' }]
+              : [],
+          };
+        }
+        if (url === '/api/enroll') {
+          enrolled = true;
+          return {};
+        }
         return {};
-      }
-      return {};
-    });
+      });
 
-    renderCourses();
-    fireEvent.click(await screen.findByRole('button', { name: 'common.enroll' }));
+      renderCourses();
+      fireEvent.click(await screen.findByRole('button', { name: 'common.enroll' }));
 
-    // In-button success morph appears...
-    expect(await screen.findByRole('button', { name: /common\.enrolled/ })).toBeInTheDocument();
-    // ...without a success toast
-    expect(toast).not.toHaveBeenCalled();
+      // In-button success morph appears...
+      expect(await screen.findByRole('button', { name: /common\.enrolled/ })).toBeInTheDocument();
+      // ...without a success toast
+      expect(toast).not.toHaveBeenCalled();
 
-    // After the flash expires, the card settles on the normal Continue state
-    await waitFor(
-      () => expect(screen.getByRole('link', { name: /common\.continue/ })).toBeInTheDocument(),
-      { timeout: 3000 },
-    );
-    expect(screen.queryByRole('button', { name: /common\.enrolled/ })).toBeNull();
+      // After the flash expires, the card settles on the normal Continue state
+      act(() => {
+        vi.advanceTimersByTime(1600);
+      });
+      await waitFor(() =>
+        expect(screen.getByRole('link', { name: /common\.continue/ })).toBeInTheDocument()
+      );
+      expect(screen.queryByRole('button', { name: /common\.enrolled/ })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the destructive toast on enroll failure and does not morph', async () => {

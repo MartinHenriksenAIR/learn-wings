@@ -43,6 +43,9 @@ export default function CoursePlayer() {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [completingLesson, setCompletingLesson] = useState(false);
+  // Lessons completed DURING this session — only these get the pop-in celebration.
+  // Lessons already completed on load render the completed state with no animation.
+  const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set());
 
   // Quiz state
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -238,6 +241,7 @@ export default function CoursePlayer() {
         }
       };
       setProgress(newProgress);
+      setJustCompletedIds(prev => new Set(prev).add(currentLesson.id));
 
       // Check if this completes the course. Count completed lessons of THIS course
       // only — the progress map from course-player-data spans every course in the
@@ -410,8 +414,9 @@ export default function CoursePlayer() {
                         className={cn(
                           'grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full',
                           isCompleted
-                            ? 'animate-pop-in bg-success text-success-foreground'
-                            : 'bg-[#eceef3] text-muted-foreground'
+                            ? 'bg-success text-success-foreground'
+                            : 'bg-[#eceef3] text-muted-foreground',
+                          isCompleted && justCompletedIds.has(lesson.id) && 'animate-pop-in'
                         )}
                       >
                         {isCompleted ? (
@@ -567,7 +572,12 @@ export default function CoursePlayer() {
 
                           return (
                             <div className="space-y-3">
-                              <span className="inline-flex animate-pop-in items-center gap-[5px] rounded-[7px] bg-success/15 px-[11px] py-[5px] text-xs font-bold text-success">
+                              <span
+                                className={cn(
+                                  'inline-flex items-center gap-[5px] rounded-[7px] bg-success/15 px-[11px] py-[5px] text-xs font-bold text-success',
+                                  justCompletedIds.has(currentLesson.id) && 'animate-pop-in'
+                                )}
+                              >
                                 <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
                                 {t('coursePlayer.lessonComplete')}
                               </span>
@@ -699,7 +709,12 @@ export default function CoursePlayer() {
                 </Button>
 
                 {progress[currentLesson.id]?.status === 'completed' ? (
-                  <span className="inline-flex animate-pop-in items-center gap-[7px] text-[13.5px] font-bold text-success">
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-[7px] text-[13.5px] font-bold text-success',
+                      justCompletedIds.has(currentLesson.id) && 'animate-pop-in'
+                    )}
+                  >
                     <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
                     {t('coursePlayer.completed')}
                   </span>
