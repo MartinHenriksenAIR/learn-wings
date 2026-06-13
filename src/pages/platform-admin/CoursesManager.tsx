@@ -73,6 +73,9 @@ export default function CoursesManager() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
 
+  // Publish in-flight tracking
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+
   // Course Access state — org list comes from the shared cache (#87)
   const {
     data: orgsData,
@@ -166,8 +169,12 @@ export default function CoursesManager() {
         },
       );
     },
+    onSettled: () => setPublishingId(null),
   });
-  const togglePublish = (course: Course) => togglePublishMutation.mutate(course);
+  const togglePublish = (course: Course) => {
+    setPublishingId(course.id);
+    togglePublishMutation.mutate(course);
+  };
 
   const openDeleteDialog = (course: Course) => {
     setCourseToDelete(course);
@@ -501,6 +508,7 @@ export default function CoursesManager() {
                     <Switch
                       checked={course.is_published}
                       onCheckedChange={() => togglePublish(course)}
+                      disabled={publishingId === course.id}
                       aria-label={course.is_published ? t('courseEditor.unpublishAria') : t('courseEditor.publishAria')}
                     />
                   </span>

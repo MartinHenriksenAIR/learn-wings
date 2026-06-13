@@ -181,4 +181,50 @@ describe('CoursesManager — mutations patch the courses cache (#48)', () => {
     const coursesAdminCalls = mockCallApi.mock.calls.filter(([path]) => path === '/api/courses-admin');
     expect(coursesAdminCalls).toHaveLength(1);
   });
+
+  it('publish switch is disabled while mutation is in flight (prevents double-toggle)', async () => {
+    const course = {
+      id: 'c1',
+      title: 'Course One',
+      description: 'A course',
+      level: 'basic',
+      is_published: false,
+      thumbnail_url: null,
+      created_by_user_id: null,
+      created_at: '2024-01-01T00:00:00Z',
+    };
+    let updateResolve: () => void;
+    const updatePromise = new Promise<void>((resolve) => {
+      updateResolve = resolve;
+    });
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/courses-admin') return { courses: [course], accessRecords: [] };
+      if (path === '/api/organizations') return { organizations: [] };
+      if (path === '/api/course-update') {
+        await updatePromise;
+        return { course: { ...course, is_published: true } };
+      }
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+
+    const toggle = await screen.findByRole('switch') as HTMLInputElement;
+    expect(toggle.disabled).toBe(false);
+
+    fireEvent.click(toggle);
+
+    // While mutation is in flight, switch should be disabled
+    await waitFor(() => {
+      expect(toggle.disabled).toBe(true);
+    });
+
+    // Resolve the mutation
+    updateResolve!();
+
+    // After mutation completes, switch should be re-enabled
+    await waitFor(() => {
+      expect(toggle.disabled).toBe(false);
+    });
+  });
 });
