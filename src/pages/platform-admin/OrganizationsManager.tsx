@@ -33,25 +33,7 @@ import { toast } from '@/components/ui/sonner';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { buildPublicUrl } from '@/lib/storage-url';
 import { orgSchema } from '@/lib/org-validation';
-
-/** Thin seat-usage bar (port of the prototype's `miniBar`): turns danger-red
- * once usage crosses 90% of the seat limit. Hidden from the a11y tree — the
- * "n/m" label beside it carries the meaning. */
-function SeatBar({ members, seats }: { members: number; seats: number }) {
-  const pct = seats > 0 ? Math.min(100, Math.max(0, (members / seats) * 100)) : 0;
-  const full = members / seats > 0.9;
-  return (
-    <span
-      aria-hidden="true"
-      className="mt-1.5 block h-[5px] w-full overflow-hidden rounded bg-[#eceef3]"
-    >
-      <span
-        className="block h-full rounded transition-[width] duration-300"
-        style={{ width: `${pct}%`, background: full ? 'hsl(var(--destructive))' : 'hsl(var(--primary))' }}
-      />
-    </span>
-  );
-}
+import { SeatUsageBar } from '@/components/platform-admin/SeatUsageBar';
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
@@ -455,7 +437,11 @@ export default function OrganizationsManager() {
                       <span className={`text-[13px] font-semibold ${atLimit ? 'text-destructive' : 'text-[#4a4f60]'}`}>
                         {org.memberCount}/{org.seat_limit}
                       </span>
-                      <SeatBar members={org.memberCount} seats={org.seat_limit} />
+                      <SeatUsageBar
+                        used={org.memberCount}
+                        limit={org.seat_limit}
+                        className="mt-1.5 h-[5px]"
+                      />
                     </>
                   ) : (
                     <span className="text-[13px] font-semibold text-muted-foreground">

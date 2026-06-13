@@ -48,6 +48,7 @@ import { cn, getAvatarColor, getInitials } from '@/lib/utils';
 import { Organization, OrgMembership, Profile, OrgRole, Invitation } from '@/lib/types';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { buildPublicUrl } from '@/lib/storage-url';
+import { SeatUsageBar } from '@/components/platform-admin/SeatUsageBar';
 import {
   Building2,
   Users,
@@ -545,7 +546,6 @@ export default function OrganizationDetail() {
   }
 
   const activeMembers = members.filter((m) => m.status === 'active');
-  const seatUsage = org.seat_limit ? activeMembers.length / org.seat_limit : 0;
   const seatLimitReached = !!org.seat_limit && activeMembers.length >= org.seat_limit;
   const adminCount = activeMembers.filter((m) => m.role === 'org_admin').length;
   const learnerCount = activeMembers.filter((m) => m.role === 'learner').length;
@@ -641,15 +641,11 @@ export default function OrganizationDetail() {
               {activeMembers.length}/{org.seat_limit}
             </span>
           </div>
-          <span aria-hidden="true" className="mt-2 block h-[6px] w-full overflow-hidden rounded bg-[#eceef3]">
-            <span
-              className="block h-full rounded transition-[width] duration-300"
-              style={{
-                width: `${Math.min(100, Math.max(0, seatUsage * 100))}%`,
-                background: seatLimitReached ? 'hsl(var(--destructive))' : 'hsl(var(--primary))',
-              }}
-            />
-          </span>
+          <SeatUsageBar
+            used={activeMembers.length}
+            limit={org.seat_limit}
+            className="mt-2 h-[6px]"
+          />
           {seatLimitReached && (
             <p className="mt-2 text-xs font-medium text-destructive">{t('orgDetail.seatLimitReached')}</p>
           )}
