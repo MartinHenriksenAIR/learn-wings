@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
 import { ProgressRing } from '@/components/ui/progress-ring';
+import { LevelBadge } from '@/components/ui/level-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useFlash } from '@/hooks/useFlash';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi, callApiRaw } from '@/lib/api-client';
@@ -24,6 +24,8 @@ export default function LearnerDashboard() {
   const orgGuard = useOrgGuard();
   const { features } = usePlatformSettings();
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { flashed, flash } = useFlash();
   const [enrollments, setEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
   const [progressData, setProgressData] = useState<Record<string, { total: number; completed: number }>>({});
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
@@ -94,10 +96,8 @@ export default function LearnerDashboard() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      toast({
-        title: t('certificates.downloadSuccess'),
-        description: t('certificates.downloadSuccessDescription'),
-      });
+      // Routine confirmation: in-button "Saved" morph on the card, no toast
+      flash(enrollmentId);
     } catch (_err) {
       toast({
         title: t('certificates.downloadFailed'),
@@ -132,46 +132,185 @@ export default function LearnerDashboard() {
     );
   }
 
+  // ----- Stat-card extras (derived from data this page already fetched) -----
+  const enrolledTitles = enrollments
+    .map(e => e.course?.title)
+    .filter(Boolean)
+    .join('  ·  ');
+  const nextUp = inProgressCourses[0];
+  const latestCompleted = completedCourses.reduce<(Enrollment & { course: Course }) | null>(
+    (latest, e) => (!latest || (e.completed_at ?? '') > (latest.completed_at ?? '') ? e : latest),
+    null
+  );
+
+  // ----- Hero variants: in-progress / all caught up / first-time user -----
+  const heroProgress = nextUp ? progressData[nextUp.course_id] : undefined;
+  const heroDone = heroProgress?.completed ?? 0;
+  const heroTotal = heroProgress?.total ?? 0;
+  const hero = nextUp
+    ? {
+        badge: t('dashboard.heroContinueBadge'),
+        title: nextUp.course?.title,
+        description: nextUp.course?.description,
+        cta: t('dashboard.heroResumeCta'),
+        progressLabel: heroTotal > 0 ? t('dashboard.heroLessonsDone', { done: heroDone, total: heroTotal }) : null,
+        pct: heroTotal > 0 ? (heroDone / heroTotal) * 100 : 0,
+        to: `/app/learn/${nextUp.course_id}`,
+      }
+    : completedCourses.length > 0
+      ? {
+          badge: t('dashboard.heroAllCaughtUpBadge'),
+          title: t('dashboard.heroAllDoneTitle'),
+          description: t('dashboard.heroAllDoneDescription'),
+          cta: t('dashboard.heroStartNewCta'),
+          progressLabel: t('dashboard.heroCoursesCompleted', {
+            completed: completedCourses.length,
+            total: enrollments.length,
+          }),
+          pct: 100,
+          to: '/app/courses',
+        }
+      : {
+          badge: t('dashboard.heroFirstTimeBadge'),
+          title: t('dashboard.heroFirstTimeTitle'),
+          description: t('dashboard.heroFirstTimeDescription'),
+          cta: t('dashboard.browseCourses'),
+          progressLabel: t('dashboard.heroPickFirstCourse'),
+          pct: 0,
+          to: '/app/courses',
+        };
+
+  const firstName = profile?.first_name || profile?.full_name;
+
   return (
-    <AppLayout title={t('dashboard.title')}>
+    <AppLayout>
+      {/* Welcome header */}
+      <div className="mb-6">
+        <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+          {firstName ? t('dashboard.welcomeBack', { name: firstName }) : t('dashboard.welcome')}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t('dashboard.pickUpWhereYouLeftOff')}</p>
+      </div>
+
       {/* Stats Grid */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-7 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title={t('dashboard.coursesEnrolled')}
+          label={t('dashboard.coursesEnrolled')}
           value={enrollments.length}
           icon={<BookOpen className="h-5 w-5" />}
+          extra={
+            enrollments.length > 0
+              ? <span className="line-clamp-2">{enrolledTitles}</span>
+              : t('dashboard.extraNoEnrollments')
+          }
+          onClick={() => navigate('/app/courses')}
         />
         <StatCard
-          title={t('dashboard.inProgress')}
+          label={t('dashboard.inProgress')}
           value={inProgressCourses.length}
           icon={<Clock className="h-5 w-5" />}
+          extra={
+            nextUp
+              ? t('dashboard.extraNextUp', { course: nextUp.course?.title })
+              : t('dashboard.extraNothingInProgress')
+          }
+          onClick={() => navigate(nextUp ? `/app/learn/${nextUp.course_id}` : '/app/courses')}
         />
         <StatCard
-          title={t('dashboard.completed')}
+          label={t('dashboard.completed')}
           value={completedCourses.length}
           icon={<Award className="h-5 w-5" />}
+          extra={
+            latestCompleted
+              ? t('dashboard.extraLatestCompleted', {
+                  course: latestCompleted.course?.title,
+                  date: new Date(latestCompleted.completed_at!).toLocaleDateString(),
+                })
+              : t('dashboard.extraNoCompleted')
+          }
+          onClick={() => navigate('/app/courses')}
         />
         <StatCard
-          title={t('dashboard.overallProgress')}
+          label={t('dashboard.overallProgress')}
           value={`${Math.round(totalProgress)}%`}
-          icon={
-            totalProgress > 0
-              ? <ProgressRing progress={totalProgress} size={24} strokeWidth={3} showLabel={false} />
-              : <TrendingUp className="h-5 w-5" />
+          icon={<TrendingUp className="h-5 w-5" />}
+          extra={
+            <span className="flex items-center gap-2">
+              <span className="block h-[5px] flex-1 overflow-hidden rounded bg-[#eceef3]">
+                <span
+                  className="block h-full rounded bg-primary transition-[width] duration-[400ms]"
+                  style={{ width: `${Math.round(totalProgress)}%` }}
+                />
+              </span>
+              <span className="whitespace-nowrap">
+                {t('dashboard.extraCoursesDone', {
+                  completed: completedCourses.length,
+                  total: enrollments.length,
+                })}
+              </span>
+            </span>
           }
+          onClick={() => navigate('/app/courses')}
+        />
+      </div>
+
+      {/* Hero card */}
+      <div
+        data-testid="dashboard-hero"
+        className="gradient-hero relative mb-7 flex items-center gap-7 overflow-hidden rounded-[20px] px-[30px] py-7 text-white"
+      >
+        <div
+          aria-hidden="true"
+          className="absolute -right-[60px] -top-20 h-[280px] w-[280px] rounded-full bg-white/[0.06]"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -bottom-[120px] right-[60px] h-[220px] w-[220px] rounded-full bg-white/5"
+        />
+        <div className="relative min-w-0 flex-1">
+          <span className="mb-3 inline-block rounded-[7px] bg-white/[0.14] px-[11px] py-[5px] text-[11px] font-bold uppercase tracking-[0.08em]">
+            {hero.badge}
+          </span>
+          <h2 className="mb-1.5 font-display text-[22px] font-extrabold tracking-[-0.01em]">{hero.title}</h2>
+          {hero.description && (
+            <p className="mb-[18px] max-w-[480px] text-[13.5px] text-white/75">{hero.description}</p>
+          )}
+          <div className="flex items-center gap-4">
+            <Button
+              asChild
+              className="h-auto rounded-[11px] bg-white px-[18px] py-[11px] text-[13.5px] font-bold text-primary hover:bg-[#e9edfb]"
+            >
+              <Link to={hero.to}>
+                <Play aria-hidden="true" />
+                {hero.cta}
+              </Link>
+            </Button>
+            {hero.progressLabel && (
+              <span className="text-[12.5px] font-semibold text-white/85">{hero.progressLabel}</span>
+            )}
+          </div>
+        </div>
+        <ProgressRing
+          pct={hero.pct}
+          size={120}
+          stroke={9}
+          fg="#ffffff"
+          bg="rgba(255,255,255,0.2)"
+          labelColor="#ffffff"
+          className="relative shrink-0"
         />
       </div>
 
       {/* Continue Learning */}
       <div className="mb-8">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">{t('dashboard.continueLearning')}</h2>
-          <Link to="/app/courses">
-            <Button variant="ghost" size="sm">
+        <div className="mb-3.5 flex items-center justify-between">
+          <h2 className="font-display text-[17px] font-bold">{t('dashboard.continueLearning')}</h2>
+          <Button asChild variant="ghost" size="sm" className="text-[13px] font-bold text-primary hover:text-primary">
+            <Link to="/app/courses">
               {t('dashboard.viewAllCourses')}
-              <ArrowRight className="ml-1 h-4 w-4" />
-            </Button>
-          </Link>
+              <ArrowRight aria-hidden="true" className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
         </div>
 
         {inProgressCourses.length === 0 ? (
@@ -180,13 +319,13 @@ export default function LearnerDashboard() {
             title={t('dashboard.noCoursesInProgress')}
             description={t('dashboard.startLearning')}
             action={
-              <Link to="/app/courses">
-                <Button>{t('dashboard.browseCourses')}</Button>
-              </Link>
+              <Button asChild>
+                <Link to="/app/courses">{t('dashboard.browseCourses')}</Link>
+              </Button>
             }
           />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3.5 md:grid-cols-2 lg:grid-cols-3">
             {inProgressCourses.slice(0, 3).map((enrollment) => {
               const progress = progressData[enrollment.course_id];
               const progressPercent = progress
@@ -194,44 +333,46 @@ export default function LearnerDashboard() {
                 : 0;
 
               return (
-                <Card key={enrollment.id} className="overflow-hidden transition-shadow hover:shadow-card-hover">
-                  <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
+                <div
+                  key={enrollment.id}
+                  className="hover-lift flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+                >
+                  <div className="relative h-[110px] bg-gradient-to-br from-primary/80 to-primary">
                     {thumbnailUrls[enrollment.course_id] && (
                       <img
                         src={thumbnailUrls[enrollment.course_id]}
                         alt={enrollment.course?.title || ''}
-                        className="absolute inset-0 w-full h-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
                     )}
+                    {enrollment.course?.level && (
+                      <LevelBadge level={enrollment.course.level} className="absolute bottom-3 left-3.5" />
+                    )}
                   </div>
-                  <CardContent className="p-4">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <h3 className="font-display font-semibold leading-tight">
-                        {enrollment.course?.title}
-                      </h3>
-                      <Badge variant="secondary" className="shrink-0">
-                        {enrollment.course?.level}
-                      </Badge>
-                    </div>
-                    <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
-                      {enrollment.course?.description}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ProgressRing progress={progressPercent} size={32} strokeWidth={4} />
-                        <span className="text-xs text-muted-foreground">
-                          {progress?.completed || 0}/{progress?.total || 0} {t('common.lessons')}
-                        </span>
+                  <div className="flex flex-1 flex-col gap-2.5 px-[18px] pb-[18px] pt-4">
+                    <h3 className="text-[14.5px] font-bold leading-[1.35]">{enrollment.course?.title}</h3>
+                    <div className="mt-auto flex items-center gap-2.5">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eceef3]">
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{ width: `${progressPercent}%` }}
+                        />
                       </div>
-                      <Link to={`/app/learn/${enrollment.course_id}`}>
-                        <Button size="sm">
-                          <Play className="mr-1 h-3 w-3" />
-                          {t('common.continue')}
-                        </Button>
-                      </Link>
+                      <span className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
+                        {progress?.completed || 0}/{progress?.total || 0}
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
+                    <Button
+                      asChild
+                      className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                    >
+                      <Link to={`/app/learn/${enrollment.course_id}`}>
+                        <Play aria-hidden="true" className="h-3.5 w-3.5" />
+                        {t('common.continue')}
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -241,22 +382,23 @@ export default function LearnerDashboard() {
       {/* Completed Courses */}
       {completedCourses.length > 0 && (
         <div className="mb-8">
-          <h2 className="mb-4 font-display text-lg font-semibold">{t('dashboard.completedCourses')}</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('dashboard.completedCourses')}</h2>
+          <div className="grid gap-3.5 md:grid-cols-2 lg:grid-cols-3">
             {completedCourses.map((enrollment) => (
-              <Card key={enrollment.id}>
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
-                    <Award className="h-6 w-6 text-success" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium">{enrollment.course?.title}</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {t('common.completedOn')} {new Date(enrollment.completed_at!).toLocaleDateString()}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div
+                key={enrollment.id}
+                className="hover-lift flex items-center gap-3.5 rounded-2xl border border-border bg-card px-[18px] py-4"
+              >
+                <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-success/10 text-success">
+                  <Award className="h-5 w-5" />
+                </span>
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[13.5px] font-bold">{enrollment.course?.title}</span>
+                  <span className="text-xs text-[#9aa0af]">
+                    {t('common.completedOn')} {new Date(enrollment.completed_at!).toLocaleDateString()}
+                  </span>
+                </span>
+              </div>
             ))}
           </div>
         </div>
@@ -265,7 +407,7 @@ export default function LearnerDashboard() {
       {/* Certificates */}
       {features.certificates_enabled && (
         <div id="certificates">
-          <h2 className="mb-4 font-display text-lg font-semibold">{t('certificates.title')}</h2>
+          <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('certificates.title')}</h2>
           {completedEnrollments.length === 0 ? (
             <EmptyState
               icon={<Award className="h-6 w-6" />}
@@ -273,13 +415,14 @@ export default function LearnerDashboard() {
               description={t('certificates.noCertificatesDescription')}
             />
           ) : (
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-3.5 md:grid-cols-2">
               {completedEnrollments.map((enrollment) => (
                 <CertificateCard
                   key={enrollment.id}
                   enrollment={enrollment}
                   profile={profile}
                   downloading={downloadingId === enrollment.id}
+                  saved={flashed(enrollment.id)}
                   onDownload={handleDownloadCertificate}
                 />
               ))}

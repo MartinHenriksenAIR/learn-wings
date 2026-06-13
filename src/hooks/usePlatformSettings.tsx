@@ -39,10 +39,10 @@ const defaultFeatures: FeatureSettings = {
 
 const defaultBranding: BrandingSettings = {
   platform_name: 'AIR Academy',
-  primary_color: '#6366f1',
-  accent_color: '#10b981',
-  sidebar_primary_color: '#10b981',
-  sidebar_accent_color: '#1f2937',
+  primary_color: '#10298f',
+  accent_color: '#eef1fb',
+  sidebar_primary_color: '#10298f',
+  sidebar_accent_color: '#eef1fb',
   logo_url: null,
   favicon_url: null,
 };
@@ -153,11 +153,11 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty('--primary', hexToHslValue(branding.primary_color, '222 47% 20%'));
-    root.style.setProperty('--accent', hexToHslValue(branding.accent_color, '173 80% 40%'));
-    root.style.setProperty('--sidebar-primary', hexToHslValue(branding.sidebar_primary_color, '173 80% 40%'));
-    root.style.setProperty('--sidebar-ring', hexToHslValue(branding.sidebar_primary_color, '173 80% 40%'));
-    root.style.setProperty('--sidebar-accent', hexToHslValue(branding.sidebar_accent_color, '222 40% 18%'));
+    root.style.setProperty('--primary', hexToHslValue(branding.primary_color, '228 80% 31%'));
+    root.style.setProperty('--accent', hexToHslValue(branding.accent_color, '226 62% 96%'));
+    root.style.setProperty('--sidebar-primary', hexToHslValue(branding.sidebar_primary_color, '228 80% 31%'));
+    root.style.setProperty('--sidebar-ring', hexToHslValue(branding.sidebar_primary_color, '228 80% 31%'));
+    root.style.setProperty('--sidebar-accent', hexToHslValue(branding.sidebar_accent_color, '226 62% 96%'));
 
     const faviconEl = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (faviconEl) {

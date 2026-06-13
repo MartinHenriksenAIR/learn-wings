@@ -20,3 +20,15 @@ export function getInitials(name?: string | null, fallback = "U"): string {
       .slice(0, 2) || fallback
   );
 }
+
+/**
+ * Deterministic avatar circle color from a display name (port of the design
+ * prototype's `avatar()` hash). Same name always gets the same color, so
+ * avatars stay stable across feed, comments, and widgets.
+ */
+const AVATAR_COLORS = ["#10298f", "#1e9e6a", "#b07514", "#8a4fb8", "#c43d3d", "#0f7e8a"];
+
+export function getAvatarColor(name?: string | null): string {
+  if (!name) return AVATAR_COLORS[0];
+  return AVATAR_COLORS[(name.length * 7 + name.charCodeAt(0)) % AVATAR_COLORS.length];
+}

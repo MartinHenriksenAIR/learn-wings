@@ -1,7 +1,9 @@
-import { StatCard } from '@/components/ui/stat-card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ProgressRing } from '@/components/ui/progress-ring';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, TrendingUp, Award, BookOpen, Loader2, FileText } from 'lucide-react';
+import { Users, TrendingUp, Loader2, FileText } from 'lucide-react';
 
 interface AnalyticsOverviewProps {
   stats: {
@@ -18,6 +20,34 @@ interface AnalyticsOverviewProps {
   onGenerateReport: () => void;
 }
 
+// Tints for the icon chips / mini-bar fills (navy primary + success green for a
+// strong quiz score) — values from the design brief palette.
+const NAVY = '#10298f';
+const SUCCESS = '#1e9e6a';
+const TRACK = '#eceef3';
+
+function MiniBar({ pct }: { pct: number }) {
+  const clamped = Math.min(100, Math.max(0, pct));
+  return (
+    <span
+      aria-hidden="true"
+      className="block h-[5px] flex-1 overflow-hidden rounded"
+      style={{ background: TRACK }}
+    >
+      <span
+        className="block h-full rounded"
+        style={{ width: `${clamped}%`, background: NAVY, transition: 'width .4s ease' }}
+      />
+    </span>
+  );
+}
+
+/**
+ * Visual-first analytics overview: a row of stat cards (icon chips, ProgressRings
+ * for completion / quiz score, mini bars under the engagement metrics) with a
+ * hover-reveal extra info line, plus activity / learning summary cards and the
+ * AI Act compliance report card. Uses only data the page already computes.
+ */
 export function AnalyticsOverview({
   stats,
   isGlobalView,
@@ -26,110 +56,185 @@ export function AnalyticsOverview({
   generatingReport,
   onGenerateReport,
 }: AnalyticsOverviewProps) {
+  const { t } = useTranslation();
+
+  const allOrgsView = isGlobalView && selectedOrgId === 'all';
+  const total = Math.max(1, stats.totalUsers);
+  const active7Pct = Math.round((stats.activeUsers7Days / total) * 100);
+  const active30Pct = Math.round((stats.activeUsers30Days / total) * 100);
+  const quizColor = stats.avgQuizScore >= 80 ? SUCCESS : NAVY;
+
+  const cards: Array<{
+    key: string;
+    visual: ReactNode;
+    value: ReactNode;
+    label: string;
+    extra: string;
+  }> = [
+    {
+      key: 'total',
+      visual: (
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+          <Users className="h-[17px] w-[17px]" aria-hidden="true" />
+        </span>
+      ),
+      value: stats.totalUsers,
+      label: allOrgsView ? t('analytics.totalUsers') : t('analytics.totalMembers'),
+      extra: t('analytics.totalMembersExtra'),
+    },
+    {
+      key: 'active7',
+      visual: (
+        <span className="flex flex-1 items-center gap-2.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+            <TrendingUp className="h-[17px] w-[17px]" aria-hidden="true" />
+          </span>
+          <MiniBar pct={active7Pct} />
+        </span>
+      ),
+      value: stats.activeUsers7Days,
+      label: t('analytics.active7Days'),
+      extra: t('analytics.engagementThisWeek', { pct: active7Pct }),
+    },
+    {
+      key: 'active30',
+      visual: (
+        <span className="flex flex-1 items-center gap-2.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+            <TrendingUp className="h-[17px] w-[17px]" aria-hidden="true" />
+          </span>
+          <MiniBar pct={active30Pct} />
+        </span>
+      ),
+      value: stats.activeUsers30Days,
+      label: t('analytics.active30Days'),
+      extra: t('analytics.engagementThisMonth', { pct: active30Pct }),
+    },
+    {
+      key: 'completion',
+      visual: (
+        <ProgressRing
+          pct={stats.completionRate}
+          size={46}
+          stroke={5}
+          fg={NAVY}
+          bg={TRACK}
+          labelColor="#171a26"
+        />
+      ),
+      value: `${stats.completionRate}%`,
+      label: t('analytics.completionRate'),
+      extra: t('analytics.quizExtra'),
+    },
+    {
+      key: 'quiz',
+      visual: (
+        <ProgressRing
+          pct={stats.avgQuizScore}
+          size={46}
+          stroke={5}
+          fg={quizColor}
+          bg={TRACK}
+          labelColor="#171a26"
+        />
+      ),
+      value: `${stats.avgQuizScore}%`,
+      label: t('analytics.avgQuizScore'),
+      extra: t('analytics.quizExtra'),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Summary Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard
-          title={isGlobalView && selectedOrgId === 'all' ? 'Total Users' : 'Total Members'}
-          value={stats.totalUsers}
-          icon={<Users className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Active (7 days)"
-          value={stats.activeUsers7Days}
-          icon={<TrendingUp className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Active (30 days)"
-          value={stats.activeUsers30Days}
-          icon={<TrendingUp className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Completion Rate"
-          value={`${stats.completionRate}%`}
-          icon={<Award className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Avg Quiz Score"
-          value={`${stats.avgQuizScore}%`}
-          icon={<BookOpen className="h-5 w-5" />}
-        />
+    <div className="space-y-5">
+      {/* Visual-first stat cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {cards.map((card) => (
+          <div
+            key={card.key}
+            className="group rounded-2xl border border-border bg-card px-[18px] py-4 transition-[transform,box-shadow] duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_30px_rgba(20,24,46,0.10)]"
+          >
+            <div className="mb-3 flex min-h-[46px] items-center">{card.visual}</div>
+            <span className="block text-[21px] font-extrabold tracking-[-0.02em]">{card.value}</span>
+            <span className="mt-px block text-xs font-medium text-muted-foreground">{card.label}</span>
+            {/* Revealed on hover AND on focus (group-focus-within reaches any
+                focusable child), mirroring the StatCard primitive so keyboard
+                and touch users can reach the panel too. */}
+            <div className="max-h-0 overflow-hidden text-[11.5px] leading-snug text-muted-foreground opacity-0 transition-[max-height,opacity,margin-top] duration-[280ms] ease-out group-hover:mt-[11px] group-hover:max-h-[84px] group-hover:opacity-100 group-focus-within:mt-[11px] group-focus-within:max-h-[84px] group-focus-within:opacity-100">
+              {card.extra}
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Quick insights */}
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* Summary rows: activity + learning */}
+      <div className="grid gap-3.5 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Activity Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">7-day engagement rate</span>
-                <span className="font-medium">
-                  {stats.totalUsers > 0 
-                    ? `${Math.round((stats.activeUsers7Days / stats.totalUsers) * 100)}%` 
-                    : '0%'}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">30-day engagement rate</span>
-                <span className="font-medium">
-                  {stats.totalUsers > 0 
-                    ? `${Math.round((stats.activeUsers30Days / stats.totalUsers) * 100)}%` 
-                    : '0%'}
-                </span>
-              </div>
-            </div>
+          <CardContent className="px-[22px] py-5">
+            <h3 className="mb-3.5 text-[14px] font-extrabold">{t('analytics.activitySummary')}</h3>
+            <SummaryRow label={t('analytics.engagement7Day')} value={`${active7Pct}%`} pct={active7Pct} />
+            <SummaryRow label={t('analytics.engagement30Day')} value={`${active30Pct}%`} pct={active30Pct} />
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Learning Metrics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Course completion rate</span>
-                <span className="font-medium">{stats.completionRate}%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Average quiz performance</span>
-                <span className="font-medium">{stats.avgQuizScore}%</span>
-              </div>
-            </div>
+          <CardContent className="px-[22px] py-5">
+            <h3 className="mb-3.5 text-[14px] font-extrabold">{t('analytics.learningMetrics')}</h3>
+            <SummaryRow
+              label={t('analytics.courseCompletionRate')}
+              value={`${stats.completionRate}%`}
+              pct={stats.completionRate}
+            />
+            <SummaryRow
+              label={t('analytics.avgQuizPerformance')}
+              value={`${stats.avgQuizScore}%`}
+              pct={stats.avgQuizScore}
+            />
           </CardContent>
         </Card>
       </div>
 
-      {/* Report Generation - Moved to bottom */}
+      {/* AI Act compliance report */}
       {showComplianceReport && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardContent className="flex items-center justify-between gap-4 px-[22px] py-5">
             <div>
-              <CardTitle className="text-base">AI Act Compliance</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Generate a PDF report documenting staff training completion status
-              </p>
+              <h3 className="mb-0.5 text-[14px] font-extrabold">{t('analytics.aiActCompliance')}</h3>
+              <p className="text-[12.5px] text-muted-foreground">{t('analytics.aiActComplianceBlurb')}</p>
             </div>
             <Button
               onClick={onGenerateReport}
               disabled={generatingReport}
               variant="outline"
-              className="gap-2"
+              className="shrink-0 gap-2"
             >
               {generatingReport ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
-                <FileText className="h-4 w-4" />
+                <FileText className="h-4 w-4" aria-hidden="true" />
               )}
-              {generatingReport ? 'Generating...' : 'Download Report'}
+              {generatingReport ? t('analytics.generatingReport') : t('analytics.downloadReport')}
             </Button>
-          </CardHeader>
+          </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function SummaryRow({ label, value, pct }: { label: string; value: string; pct: number }) {
+  const clamped = Math.min(100, Math.max(0, pct));
+  return (
+    <div className="border-b border-[#f3f4f8] py-2.5 last:border-b-0">
+      <div className="mb-[7px] flex items-center justify-between">
+        <span className="text-[13px] text-muted-foreground">{label}</span>
+        <span className="text-[13px] font-bold">{value}</span>
+      </div>
+      <div className="h-[5px] overflow-hidden rounded" style={{ background: TRACK }}>
+        <div
+          className="h-full rounded"
+          style={{ width: `${clamped}%`, background: NAVY, transition: 'width .4s ease' }}
+        />
+      </div>
     </div>
   );
 }

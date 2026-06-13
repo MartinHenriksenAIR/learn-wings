@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,6 +18,7 @@ export function TagList({
   className,
   maxVisible,
 }: TagListProps) {
+  const { t } = useTranslation();
   const visibleTags = maxVisible ? tags.slice(0, maxVisible) : tags;
   const hiddenCount = maxVisible ? Math.max(0, tags.length - maxVisible) : 0;
 
@@ -29,8 +31,8 @@ export function TagList({
           key={tag}
           variant="secondary"
           className={cn(
-            'font-normal',
-            size === 'sm' ? 'text-xs px-1.5 py-0' : 'text-sm px-2 py-0.5',
+            'rounded-[7px] border-transparent bg-accent font-semibold text-accent-foreground',
+            size === 'sm' ? 'px-2.5 py-[3px] text-[11.5px]' : 'px-[11px] py-1 text-xs',
             onRemove && 'pr-1'
           )}
         >
@@ -47,8 +49,8 @@ export function TagList({
         </Badge>
       ))}
       {hiddenCount > 0 && (
-        <Badge variant="outline" className="text-xs px-1.5 py-0 font-normal">
-          +{hiddenCount} more
+        <Badge variant="outline" className="rounded-[7px] px-2 py-[3px] text-[11px] font-semibold text-muted-foreground">
+          {t('community.moreTags', { count: hiddenCount })}
         </Badge>
       )}
     </div>

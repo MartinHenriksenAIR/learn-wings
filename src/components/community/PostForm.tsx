@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -67,6 +68,7 @@ export function PostForm({
   initialData,
   editMode = false,
 }: PostFormProps) {
+  const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagInput, setTagInput] = useState('');
 
@@ -145,7 +147,9 @@ export function PostForm({
       {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{editMode ? 'Edit Post' : 'Create New Post'}</DialogTitle>
+          <DialogTitle className="text-[17px] font-extrabold">
+            {editMode ? t('community.postForm.editPost') : t('community.postForm.createNewPost')}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -155,11 +159,11 @@ export function PostForm({
               name="category_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
+                  <FormLabel>{t('community.postForm.category')}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder={t('community.postForm.selectCategory')} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -172,7 +176,7 @@ export function PostForm({
                               size="sm"
                             />
                             {cat.is_restricted && (
-                              <span className="text-xs text-muted-foreground">(Admin)</span>
+                              <span className="text-xs text-muted-foreground">{t('community.postForm.adminOnly')}</span>
                             )}
                           </div>
                         </SelectItem>
@@ -189,9 +193,9 @@ export function PostForm({
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title</FormLabel>
+                  <FormLabel>{t('community.postForm.title')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter a descriptive title" {...field} />
+                    <Input placeholder={t('community.postForm.titlePlaceholder')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -203,10 +207,10 @@ export function PostForm({
               name="content"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Content</FormLabel>
+                  <FormLabel>{t('community.postForm.content')}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Share your thoughts, questions, or resources..."
+                      placeholder={t('community.postForm.contentPlaceholder')}
                       className="min-h-[150px]"
                       {...field}
                     />
@@ -224,7 +228,7 @@ export function PostForm({
                   name="event_date"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Event Date & Time</FormLabel>
+                      <FormLabel>{t('community.postForm.eventDateTime')}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -245,14 +249,14 @@ export function PostForm({
                   name="event_location"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Location</FormLabel>
+                      <FormLabel>{t('community.postForm.location')}</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="e.g., Zoom, Conference Room A, or full address"
+                          placeholder={t('community.postForm.locationPlaceholder')}
                           {...field}
                         />
                       </FormControl>
-                      <FormDescription>Physical location or virtual meeting platform</FormDescription>
+                      <FormDescription>{t('community.postForm.locationDescription')}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -263,7 +267,7 @@ export function PostForm({
                   name="event_registration_url"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Registration URL (optional)</FormLabel>
+                      <FormLabel>{t('community.postForm.registrationUrl')}</FormLabel>
                       <FormControl>
                         <Input
                           type="url"
@@ -284,10 +288,10 @@ export function PostForm({
               name="tags"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tags (optional)</FormLabel>
+                  <FormLabel>{t('community.postForm.tagsOptional')}</FormLabel>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Add a tag"
+                      placeholder={t('community.postForm.addTagPlaceholder')}
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -298,13 +302,13 @@ export function PostForm({
                       }}
                     />
                     <Button type="button" variant="outline" onClick={addTag}>
-                      Add
+                      {t('community.postForm.add')}
                     </Button>
                   </div>
                   {field.value.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {field.value.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="pr-1">
+                        <Badge key={tag} variant="secondary" className="rounded-[7px] bg-accent pr-1 text-[11.5px] font-semibold text-accent-foreground">
                           #{tag}
                           <button
                             type="button"
@@ -317,7 +321,7 @@ export function PostForm({
                       ))}
                     </div>
                   )}
-                  <FormDescription>Up to 5 tags to help others find your post</FormDescription>
+                  <FormDescription>{t('community.postForm.tagsDescription')}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -329,12 +333,13 @@ export function PostForm({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 disabled={isSubmitting}
+                className="rounded-[10px] text-[13px] font-bold"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="rounded-[10px] text-[13px] font-bold">
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {editMode ? 'Save Changes' : 'Create Post'}
+                {editMode ? t('community.postForm.saveChanges') : t('community.createPost')}
               </Button>
             </div>
           </form>

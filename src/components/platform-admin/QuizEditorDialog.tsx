@@ -341,11 +341,11 @@ export function QuizEditorDialog({
                             onValueChange={(value) => setCorrectOption(qIndex, value)}
                           >
                             {question.options.map((option, oIndex) => (
-                              <div 
-                                key={option.id} 
-                                className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
-                                  option.is_correct 
-                                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' 
+                              <div
+                                key={option.id}
+                                className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                                  option.is_correct
+                                    ? 'border-success bg-success/10'
                                     : 'border-transparent hover:bg-muted/50'
                                 }`}
                                 onClick={() => setCorrectOption(qIndex, option.id)}
@@ -359,7 +359,7 @@ export function QuizEditorDialog({
                                   className="flex-1"
                                 />
                                 {option.is_correct && (
-                                  <Badge variant="outline" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 border-emerald-300">
+                                  <Badge variant="outline" className="rounded-[7px] border-success/30 bg-success/10 text-success">
                                     Correct
                                   </Badge>
                                 )}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -26,12 +27,15 @@ interface ResourceFormProps {
   editResource?: CommunityResource | null;
 }
 
+const LABEL_CLASSES = 'text-xs font-bold text-[#4a4f60]';
+
 export function ResourceForm({
   open,
   onOpenChange,
   onSubmit,
   editResource,
 }: ResourceFormProps) {
+  const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -92,23 +96,25 @@ export function ResourceForm({
       {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
       <DialogContent className="sm:max-w-[500px]" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{editResource ? 'Edit Resource' : 'Add Resource'}</DialogTitle>
+          <DialogTitle className="text-[17px] font-bold">
+            {editResource ? t('community.resourceForm.editResource') : t('community.resourceForm.addResource')}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
+            <Label htmlFor="title" className={LABEL_CLASSES}>{t('community.resourceForm.titleLabel')}</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Resource title"
+              placeholder={t('community.resourceForm.titlePlaceholder')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="resource_type">Type</Label>
+            <Label htmlFor="resource_type" className={LABEL_CLASSES}>{t('community.resourceForm.type')}</Label>
             <Select value={resourceType} onValueChange={setResourceType}>
               <SelectTrigger>
                 <SelectValue />
@@ -124,7 +130,7 @@ export function ResourceForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="url">URL</Label>
+            <Label htmlFor="url" className={LABEL_CLASSES}>{t('community.resourceForm.url')}</Label>
             <Input
               id="url"
               type="url"
@@ -135,23 +141,23 @@ export function ResourceForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description" className={LABEL_CLASSES}>{t('community.resourceForm.description')}</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief description of this resource"
+              placeholder={t('community.resourceForm.descriptionPlaceholder')}
               rows={3}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tags">Tags (comma-separated)</Label>
+            <Label htmlFor="tags" className={LABEL_CLASSES}>{t('community.resourceForm.tagsLabel')}</Label>
             <Input
               id="tags"
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
-              placeholder="e.g. prompts, automation, templates"
+              placeholder={t('community.resourceForm.tagsPlaceholder')}
             />
           </div>
 
@@ -160,12 +166,17 @@ export function ResourceForm({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              className="rounded-[10px] border-[#dcdee6] text-[13px] font-bold"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
-            <Button type="submit" disabled={isSubmitting || !title.trim()}>
-              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {editResource ? 'Update' : 'Add Resource'}
+            <Button
+              type="submit"
+              disabled={isSubmitting || !title.trim()}
+              className="rounded-[10px] text-[13px] font-bold"
+            >
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {editResource ? t('community.resourceForm.update') : t('community.resourceForm.addResource')}
             </Button>
           </div>
         </form>

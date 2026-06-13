@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { LevelBadge } from '@/components/ui/level-badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { callApi } from '@/lib/api-client';
@@ -211,12 +211,6 @@ export function EnrollUserDialog({
   const availableCourses = courses.filter((c) => !c.alreadyEnrolled);
   const enrolledCourses = courses.filter((c) => c.alreadyEnrolled);
 
-  const levelColors = {
-    basic: 'bg-green-100 text-green-800',
-    intermediate: 'bg-yellow-100 text-yellow-800',
-    advanced: 'bg-red-100 text-red-800',
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
@@ -266,7 +260,7 @@ export function EnrollUserDialog({
               <Label>Select Courses</Label>
               {loading ? (
                 <div className="flex items-center justify-center p-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-accent" />
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               ) : courses.length === 0 ? (
                 <div className="p-4 rounded-lg border bg-muted/50 text-center">
@@ -292,9 +286,7 @@ export function EnrollUserDialog({
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{course.title}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className={levelColors[course.level]}>
-                              {course.level}
-                            </Badge>
+                            <LevelBadge level={course.level} />
                           </div>
                         </div>
                       </div>
@@ -311,7 +303,7 @@ export function EnrollUserDialog({
                             key={course.id}
                             className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 opacity-60"
                           >
-                            <GraduationCap className="h-4 w-4 text-accent" />
+                            <GraduationCap className="h-4 w-4 text-primary" />
                             <div className="flex-1 min-w-0">
                               <p className="font-medium truncate">{course.title}</p>
                               <p className="text-xs text-muted-foreground">

@@ -149,13 +149,94 @@ describe('LearnerDashboard — completion count (#18)', () => {
 
     // Stat card: dashboard.completed must show 1 (counts enrollments.status === 'completed')
     const completedTitle = await screen.findByText('dashboard.completed');
-    const completedCard = completedTitle.closest('.overflow-hidden') as HTMLElement;
+    const completedCard = completedTitle.closest('.rounded-2xl') as HTMLElement;
     expect(completedCard).not.toBeNull();
     expect(within(completedCard).getByText('1')).toBeInTheDocument();
 
     // The completed course is listed under Completed Courses, the ongoing one under Continue Learning
     expect(screen.getByText('dashboard.completedCourses')).toBeInTheDocument();
     expect(screen.getByText('Finished Course')).toBeInTheDocument();
-    expect(screen.getByText('Ongoing Course')).toBeInTheDocument();
+    // The ongoing course renders twice: as the hero card title and in the In-progress grid
+    expect(screen.getAllByText('Ongoing Course')).toHaveLength(2);
+  });
+});
+
+describe('LearnerDashboard — hero variants', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
+      currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
+    });
+  });
+
+  const enrolled = {
+    id: 'e-2', org_id: 'org-1', user_id: 'p-1', course_id: 'c-2',
+    status: 'enrolled', enrolled_at: '2026-06-02T00:00:00Z', completed_at: null,
+    course: { id: 'c-2', title: 'Ongoing Course', level: 'basic', description: '' },
+  };
+  const completed = {
+    id: 'e-1', org_id: 'org-1', user_id: 'p-1', course_id: 'c-1',
+    status: 'completed', enrolled_at: '2026-06-01T00:00:00Z',
+    completed_at: '2026-06-10T00:00:00Z',
+    course: { id: 'c-1', title: 'Finished Course', level: 'basic', description: '' },
+  };
+
+  it('shows the continue-learning variant when a course is in progress', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({
+      enrollments: [completed, enrolled],
+      progress: { 'c-1': { total: 4, completed: 4 }, 'c-2': { total: 4, completed: 1 } },
+    });
+
+    renderDashboard();
+
+    const hero = await screen.findByTestId('dashboard-hero');
+    expect(within(hero).getByText('dashboard.heroContinueBadge')).toBeInTheDocument();
+    expect(within(hero).getByText('Ongoing Course')).toBeInTheDocument();
+    expect(within(hero).getByText('dashboard.heroLessonsDone')).toBeInTheDocument();
+    // Ring reflects the in-progress course (1 of 4 lessons = 25%)
+    expect(within(hero).getByText('25%')).toBeInTheDocument();
+    // CTA resumes the in-progress course
+    const cta = within(hero).getByRole('link', { name: /dashboard\.heroResumeCta/ });
+    expect(cta).toHaveAttribute('href', '/app/learn/c-2');
+  });
+
+  it('shows the all-caught-up variant with a 100% ring when everything is completed', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({
+      enrollments: [completed],
+      progress: { 'c-1': { total: 4, completed: 4 } },
+    });
+
+    renderDashboard();
+
+    const hero = await screen.findByTestId('dashboard-hero');
+    expect(within(hero).getByText('dashboard.heroAllCaughtUpBadge')).toBeInTheDocument();
+    expect(within(hero).getByText('dashboard.heroAllDoneTitle')).toBeInTheDocument();
+    expect(within(hero).getByText('100%')).toBeInTheDocument();
+    // CTA suggests starting a new course, pointing at the catalog
+    const cta = within(hero).getByRole('link', { name: /dashboard\.heroStartNewCta/ });
+    expect(cta).toHaveAttribute('href', '/app/courses');
+  });
+
+  it('shows the first-time variant with a 0% ring when there are no enrollments', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
+
+    renderDashboard();
+
+    const hero = await screen.findByTestId('dashboard-hero');
+    expect(within(hero).getByText('dashboard.heroFirstTimeBadge')).toBeInTheDocument();
+    expect(within(hero).getByText('dashboard.heroFirstTimeTitle')).toBeInTheDocument();
+    expect(within(hero).getByText('0%')).toBeInTheDocument();
+    const cta = within(hero).getByRole('link', { name: /dashboard\.browseCourses/ });
+    expect(cta).toHaveAttribute('href', '/app/courses');
+
+    // Empty-data stat extras fall back to inviting copy derived from available data
+    expect(screen.getByText('dashboard.extraNoEnrollments')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.extraNothingInProgress')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.extraNoCompleted')).toBeInTheDocument();
   });
 });

@@ -82,13 +82,14 @@ describe('PlatformSettings', () => {
     // First mount
     const { unmount } = renderPage();
 
-    // Wait for the form to appear (branding tab is default)
+    // Wait for the form to appear (branding tab is default). Labels are i18n
+    // keys here (the mocked t returns the key).
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /Platform Name/i })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toBeInTheDocument();
     });
 
     // Local edit
-    const input = screen.getByRole('textbox', { name: /Platform Name/i });
+    const input = screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' });
     fireEvent.change(input, { target: { value: 'Edited Name' } });
     expect(input).toHaveValue('Edited Name');
 
@@ -99,10 +100,10 @@ describe('PlatformSettings', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /Platform Name/i })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toBeInTheDocument();
     });
 
-    const freshInput = screen.getByRole('textbox', { name: /Platform Name/i });
+    const freshInput = screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' });
     // Must show server value, not 'Edited Name' and not blank
     expect(freshInput).toHaveValue('Server Name');
     expect(freshInput).not.toHaveValue('Edited Name');
@@ -129,10 +130,11 @@ describe('PlatformSettings', () => {
     // No editable textboxes
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);
 
-    // No save buttons (only the retry button should exist)
+    // No save buttons (only the retry button should exist). Save labels are
+    // i18n keys (platformSettings.*.save); the retry button is the only one.
     const buttons = screen.getAllByRole('button');
     for (const btn of buttons) {
-      expect(btn).not.toHaveAccessibleName(/save/i);
+      expect(btn).not.toHaveAccessibleName(/\.save$/i);
     }
 
     // callApi was never called with the update endpoint
@@ -164,11 +166,11 @@ describe('PlatformSettings', () => {
 
     // Wait for form to appear
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /Platform Name/i })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toBeInTheDocument();
     });
 
     // Form shows the server value
-    expect(screen.getByRole('textbox', { name: /Platform Name/i })).toHaveValue('Server Name');
+    expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toHaveValue('Server Name');
   });
 
   // ----------------------------------------------------------------
@@ -215,7 +217,7 @@ describe('PlatformSettings', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Save Branding/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'platformSettings.branding.save' })).toBeInTheDocument();
     });
 
     // Clear previous calls (the initial fetch)
@@ -223,13 +225,43 @@ describe('PlatformSettings', () => {
     // Re-set so the save call resolves
     mockCallApi.mockResolvedValue({});
 
-    fireEvent.click(screen.getByRole('button', { name: /Save Branding/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'platformSettings.branding.save' }));
 
+    // Sends only the branding panel's fields under `value` (#90 merge: the
+    // server never receives other keys, so it can't clobber them).
     await waitFor(() => {
       expect(mockCallApi).toHaveBeenCalledWith(
         '/api/platform-settings-update',
         expect.objectContaining({ key: 'branding' })
       );
     });
+  });
+
+  // ----------------------------------------------------------------
+  // Per-panel SaveButton morph: a successful save flashes the button into
+  // its "Saved" done state (green), replacing the old success toast.
+  // ----------------------------------------------------------------
+  it('per-panel morph: successful branding save morphs the button into the Saved state', async () => {
+    mockCallApi.mockResolvedValue(successResponse);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'platformSettings.branding.save' })).toBeInTheDocument();
+    });
+
+    mockCallApi.mockClear();
+    mockCallApi.mockResolvedValue({});
+
+    fireEvent.click(screen.getByRole('button', { name: 'platformSettings.branding.save' }));
+
+    // After the save resolves the button shows the morphed "Saved" label.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'common.saved' })).toBeInTheDocument();
+    });
+    // The morphed button carries the success styling.
+    expect(screen.getByRole('button', { name: 'common.saved' }).className).toMatch(/bg-success/);
+    // The idle "Save Branding" label is gone while morphed.
+    expect(screen.queryByRole('button', { name: 'platformSettings.branding.save' })).not.toBeInTheDocument();
   });
 });

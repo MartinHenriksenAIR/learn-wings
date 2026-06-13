@@ -102,7 +102,9 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
 
     render(<OrgMembersTab />);
 
-    const item = await screen.findByRole('button', { name: /Make AI Champion/i });
+    // The mocked t() returns the i18n key verbatim, so the action labels are the
+    // keys themselves (analytics.members.makeAiChampion / removeAiChampion).
+    const item = await screen.findByRole('button', { name: 'analytics.members.makeAiChampion' });
 
     fireEvent.click(item);
     expect(createCalls).toBe(1);
@@ -117,8 +119,87 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
       resolveCreate?.({});
     });
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Remove AI Champion/i })).not.toBeDisabled()
+      expect(
+        screen.getByRole('button', { name: 'analytics.members.removeAiChampion' }),
+      ).not.toBeDisabled()
     );
     expect(createCalls).toBe(1);
+  });
+});
+
+const invitationRow = {
+  id: 'inv-1',
+  org_id: 'org-1',
+  email: 'pending@example.com',
+  role: 'learner',
+  link_id: 'link-abc',
+  status: 'pending',
+  invited_by_user_id: 'admin-1',
+  created_at: '2026-02-01T00:00:00Z',
+  expires_at: '2026-03-01T00:00:00Z',
+  is_platform_admin_invite: false,
+};
+
+describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)', () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      user: { id: 'oid-1' },
+      profile: { id: 'admin-1', full_name: 'Org Admin', is_platform_admin: false },
+      currentOrg: { id: 'org-1', name: 'Acme' },
+    });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/org-memberships') return { memberships: [] };
+      if (path === '/api/invitations') return { invitations: [invitationRow] };
+      if (path === '/api/ai-champions') return { champions: [] };
+      if (path === '/api/invitation-update') return {};
+      throw new Error(`Unexpected callApi path: ${path}`);
+    });
+  });
+
+  it('copy link writes to clipboard and morphs to "Copied!" with no toast', async () => {
+    render(<OrgMembersTab />);
+
+    const copyBtn = await screen.findByRole('button', { name: 'analytics.members.copyLink' });
+    fireEvent.click(copyBtn);
+
+    // Clipboard received the invite link (built from the link_id)
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toContain('link-abc');
+
+    // The button morphs to the "Copied!" label — no success toast
+    await screen.findByRole('button', { name: 'analytics.members.copied' });
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('revoke shows inline "Revoked" feedback, removes the row, and fires no success toast', async () => {
+    render(<OrgMembersTab />);
+
+    const revokeBtn = await screen.findByRole('button', { name: 'analytics.members.revoke' });
+    fireEvent.click(revokeBtn);
+
+    // The update mutation fired with the expired status
+    await waitFor(() =>
+      expect(
+        mockCallApi.mock.calls.some(
+          ([p, body]) =>
+            p === '/api/invitation-update' &&
+            (body as { id: string; status: string }).id === 'inv-1' &&
+            (body as { id: string; status: string }).status === 'expired',
+        ),
+      ).toBe(true),
+    );
+
+    // The invitation row is removed (heading + row gone) and no success toast fired
+    await waitFor(() =>
+      expect(screen.queryByText('pending@example.com')).toBeNull(),
+    );
+    expect(mockToast).not.toHaveBeenCalled();
   });
 });

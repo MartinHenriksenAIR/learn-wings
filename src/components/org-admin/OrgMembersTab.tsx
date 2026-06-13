@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { SearchFilter, FilterConfig } from '@/components/ui/search-filter';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import {
@@ -24,14 +23,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -49,9 +40,26 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
+import { useFlash } from '@/hooks/useFlash';
 import { callApi } from '@/lib/api-client';
+import { cn, getAvatarColor, getInitials } from '@/lib/utils';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
-import { Users, Plus, MoreHorizontal, Mail, Copy, Check, Loader2, UserX, ShieldCheck, User, FileSpreadsheet, GraduationCap, Sparkles } from 'lucide-react';
+import {
+  Users,
+  Plus,
+  MoreHorizontal,
+  Mail,
+  Copy,
+  Check,
+  Loader2,
+  UserX,
+  ShieldCheck,
+  User,
+  FileSpreadsheet,
+  GraduationCap,
+  Sparkles,
+  Search,
+} from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { z } from 'zod';
 import { getInviteLink } from '@/lib/config';
@@ -65,6 +73,7 @@ const inviteSchema = z.object({
 });
 
 export function OrgMembersTab() {
+  const { t } = useTranslation();
   const { user, profile, currentOrg } = useAuth();
   const [members, setMembers] = useState<(OrgMembership & { profile: Profile })[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -79,7 +88,10 @@ export function OrgMembersTab() {
   const [inviteDepartment, setInviteDepartment] = useState('');
   const [inviteRole, setInviteRole] = useState<OrgRole>('learner');
   const [inviting, setInviting] = useState(false);
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  // In-button morph feedback for copy-link ("Copied!") and revoke ("Revoked"),
+  // keyed by invitation link/id — replaces the routine success toasts.
+  const { flashed: copyFlashed, flash: flashCopy } = useFlash();
+  const { flashed: revokeFlashed, flash: flashRevoke } = useFlash();
   const [roleChangeDialog, setRoleChangeDialog] = useState<{
     open: boolean;
     member: (OrgMembership & { profile: Profile }) | null;
@@ -224,6 +236,7 @@ export function OrgMembersTab() {
         emailSent = emailResult.success;
       }
 
+      // Invitation creation is a submission — keep the success toast (toast policy).
       toast({
         title: 'Invitation created!',
         description: emailSent
@@ -251,12 +264,8 @@ export function OrgMembersTab() {
   const handleCopyInviteLink = async (linkId: string) => {
     const link = getInviteLink(linkId);
     await navigator.clipboard.writeText(link);
-    setCopiedToken(linkId);
-    toast({
-      title: 'Link copied!',
-      description: 'Share this link with the invited user.',
-    });
-    setTimeout(() => setCopiedToken(null), 2000);
+    // In-button "Copied!" morph instead of a toast (toast policy: copy is routine).
+    flashCopy(linkId);
   };
 
   const handleRemoveMember = async () => {
@@ -281,11 +290,13 @@ export function OrgMembersTab() {
     }
   };
 
-  const handleCancelInvitation = async (invitationId: string) => {
+  const handleCancelInvitation = async (invitation: Invitation) => {
+    // Optimistic inline feedback ("Revoked"), then drop the row once the request
+    // succeeds — no success toast (toast policy: revoke is routine). Errors keep toasts.
+    flashRevoke(invitation.id);
     try {
-      await callApi('/api/invitation-update', { id: invitationId, status: 'expired' });
-      toast({ title: 'Invitation cancelled' });
-      fetchData();
+      await callApi('/api/invitation-update', { id: invitation.id, status: 'expired' });
+      setInvitations((prev) => prev.filter((inv) => inv.id !== invitation.id));
     } catch (err) {
       toast({
         title: 'Failed to cancel invitation',
@@ -352,44 +363,15 @@ export function OrgMembersTab() {
     }
   };
 
-  const roleColors = {
-    org_admin: 'bg-purple-100 text-purple-800',
-    learner: 'bg-blue-100 text-blue-800',
-  };
-
-  const statusColors = {
-    active: 'bg-green-100 text-green-800',
-    invited: 'bg-yellow-100 text-yellow-800',
-  };
-
-  const memberFilters: FilterConfig[] = [
-    {
-      key: 'role',
-      label: 'Role',
-      options: [
-        { value: 'org_admin', label: 'Admin' },
-        { value: 'learner', label: 'Learner' },
-      ],
-    },
-  ];
-
-  const filterValues = { role: roleFilter };
-
-  const handleFilterChange = (key: string, value: string) => {
-    if (key === 'role') setRoleFilter(value);
-  };
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setRoleFilter('all');
-  };
-
-  const filteredMembers = members.filter(member => {
-    const matchesSearch = searchQuery === '' ||
+  const filteredMembers = members.filter((member) => {
+    const matchesSearch =
+      searchQuery === '' ||
       member.profile?.full_name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = roleFilter === 'all' || member.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+
+  const hasFilters = searchQuery !== '' || roleFilter !== 'all';
 
   if (loading) {
     return <PageSpinner />;
@@ -398,118 +380,123 @@ export function OrgMembersTab() {
   if (!currentOrg) {
     return (
       <div className="flex h-64 flex-col items-center justify-center text-center">
-        <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-        <p className="text-muted-foreground">No organization selected.</p>
+        <Users className="mb-4 h-12 w-12 text-muted-foreground/50" />
+        <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
       </div>
     );
   }
 
   return (
     <div>
-      {/* Search and Actions */}
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <SearchFilter
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder="Search members..."
-          filters={memberFilters}
-          filterValues={filterValues}
-          onFilterChange={handleFilterChange}
-          onClearFilters={clearFilters}
-          className="flex-1"
-        />
-        <div className="flex gap-2 shrink-0">
-          <Button variant="outline" onClick={() => setEnrollDialogOpen(true)}>
-            <GraduationCap className="mr-2 h-4 w-4" />
-            Enroll User
-          </Button>
-          <Button variant="outline" onClick={() => setBulkInviteOpen(true)}>
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Bulk Invite
-          </Button>
-          <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Invite Member
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Invite Team Member</DialogTitle>
-                <DialogDescription>
-                  Send an invitation to join {currentOrg?.name}.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
+      {/* Search and actions toolbar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2.5">
+        <div className="relative min-w-[200px] flex-1">
+          <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('analytics.members.searchPlaceholder')}
+            className="pl-10"
+          />
+        </div>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('analytics.members.allRoles')}</SelectItem>
+            <SelectItem value="org_admin">{t('analytics.members.admins')}</SelectItem>
+            <SelectItem value="learner">{t('analytics.members.learners')}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" onClick={() => setEnrollDialogOpen(true)} className="shrink-0">
+          <GraduationCap className="mr-2 h-4 w-4" aria-hidden="true" />
+          {t('analytics.members.enrollInCourse')}
+        </Button>
+        <Button variant="outline" onClick={() => setBulkInviteOpen(true)} className="shrink-0">
+          <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
+          {t('analytics.members.bulkInvite')}
+        </Button>
+        <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+          <DialogTrigger asChild>
+            <Button className="shrink-0">
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t('analytics.members.inviteMember')}
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Invite Team Member</DialogTitle>
+              <DialogDescription>Send an invitation to join {currentOrg?.name}.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="colleague@company.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="first-name">First Name</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="colleague@company.com"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="first-name">First Name</Label>
-                    <Input
-                      id="first-name"
-                      placeholder="John"
-                      value={inviteFirstName}
-                      onChange={(e) => setInviteFirstName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="last-name">Last Name</Label>
-                    <Input
-                      id="last-name"
-                      placeholder="Doe"
-                      value={inviteLastName}
-                      onChange={(e) => setInviteLastName(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
-                  <Input
-                    id="department"
-                    placeholder="Engineering"
-                    value={inviteDepartment}
-                    onChange={(e) => setInviteDepartment(e.target.value)}
+                    id="first-name"
+                    placeholder="John"
+                    value={inviteFirstName}
+                    onChange={(e) => setInviteFirstName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as OrgRole)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="learner">Learner</SelectItem>
-                      <SelectItem value="org_admin">Organization Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="last-name">Last Name</Label>
+                  <Input
+                    id="last-name"
+                    placeholder="Doe"
+                    value={inviteLastName}
+                    onChange={(e) => setInviteLastName(e.target.value)}
+                  />
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setInviteOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleInvite} disabled={inviting}>
-                  {inviting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Mail className="mr-2 h-4 w-4" />
-                  )}
-                  Create Invitation
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="department">Department</Label>
+                <Input
+                  id="department"
+                  placeholder="Engineering"
+                  value={inviteDepartment}
+                  onChange={(e) => setInviteDepartment(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as OrgRole)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="learner">Learner</SelectItem>
+                    <SelectItem value="org_admin">Organization Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setInviteOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleInvite} disabled={inviting}>
+                {inviting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
+                )}
+                Create Invitation
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Bulk Invite Dialog */}
@@ -531,169 +518,211 @@ export function OrgMembersTab() {
         onSuccess={fetchData}
       />
 
-      {/* Pending Invitations */}
-      {invitations.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">Pending Invitations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {invitations.map((invitation) => (
-                <div
-                  key={invitation.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{invitation.email}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Expires {new Date(invitation.expires_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Badge className={roleColors[invitation.role]}>
-                      {invitation.role === 'org_admin' ? 'Admin' : 'Learner'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleCopyInviteLink(invitation.link_id || '')}
-                    >
-                      {copiedToken === invitation.link_id ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCancelInvitation(invitation.id)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Members table */}
       {filteredMembers.length === 0 ? (
         <EmptyState
           icon={<Users className="h-6 w-6" />}
-          title={searchQuery || roleFilter !== 'all' ? "No matching members" : "No team members yet"}
-          description={searchQuery || roleFilter !== 'all'
-            ? "Try adjusting your filters." 
-            : "Invite colleagues to join your organization."}
+          title={hasFilters ? t('analytics.members.noMatchingTitle') : t('analytics.members.noMembersTitle')}
+          description={
+            hasFilters
+              ? t('analytics.members.noMatchingDescription')
+              : t('analytics.members.noMembersDescription')
+          }
           action={
-            !searchQuery && roleFilter === 'all' ? (
+            !hasFilters ? (
               <Button onClick={() => setInviteOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Invite Member
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t('analytics.members.inviteMember')}
               </Button>
             ) : undefined
           }
         />
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMembers.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{member.profile?.full_name}</p>
-                      {aiChampions.has(member.user_id) && (
-                        <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
-                          <Sparkles className="h-3 w-3 mr-1" />
-                          AI Champion
-                        </Badge>
+        <div className="mb-[18px] overflow-hidden rounded-2xl border border-border bg-card">
+          {/* Header row */}
+          <div className="grid grid-cols-[2.2fr_1.2fr_0.9fr_0.9fr_0.9fr_0.6fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
+            <span>{t('analytics.members.colMember')}</span>
+            <span>{t('analytics.members.colDepartment')}</span>
+            <span>{t('analytics.members.colRole')}</span>
+            <span>{t('analytics.members.colStatus')}</span>
+            <span>{t('analytics.members.colJoined')}</span>
+            <span className="text-right">{t('analytics.members.colActions')}</span>
+          </div>
+          {filteredMembers.map((member) => {
+            const isChampion = aiChampions.has(member.user_id);
+            const isAdmin = member.role === 'org_admin';
+            return (
+              <div
+                key={member.id}
+                className="grid grid-cols-[2.2fr_1.2fr_0.9fr_0.9fr_0.9fr_0.6fr] items-center gap-3 border-t border-[#f3f4f8] px-5 py-3"
+              >
+                {/* Member: avatar + name/email */}
+                <span className="flex min-w-0 items-center gap-[11px]">
+                  <Avatar className="h-8 w-8 shrink-0">
+                    <AvatarFallback
+                      className="text-[11px] font-bold text-white"
+                      style={{ backgroundColor: getAvatarColor(member.profile?.full_name) }}
+                    >
+                      {getInitials(member.profile?.full_name, '??')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="flex items-center gap-1.5 text-[13px] font-bold">
+                      {member.profile?.full_name}
+                      {isChampion && (
+                        <Sparkles
+                          aria-label={t('analytics.members.aiChampion')}
+                          className="h-[13px] w-[13px] text-warning"
+                        />
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {member.profile?.department || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={roleColors[member.role]}>
-                      {member.role === 'org_admin' ? 'Admin' : 'Learner'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={statusColors[member.status]}>
-                      {member.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(member.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    {member.user_id !== profile?.id && member.status === 'active' && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" disabled={updatingRole === member.id}>
-                            {updatingRole === member.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <MoreHorizontal className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {member.role === 'learner' ? (
-                            <DropdownMenuItem
-                              onClick={() => setRoleChangeDialog({ open: true, member, newRole: 'org_admin' })}
-                            >
-                              <ShieldCheck className="mr-2 h-4 w-4" />
-                              Promote to Admin
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              onClick={() => setRoleChangeDialog({ open: true, member, newRole: 'learner' })}
-                            >
-                              <User className="mr-2 h-4 w-4" />
-                              Change to Learner
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => handleToggleAiChampion(member)}
-                            disabled={togglingChampion === member.id}
-                          >
-                            <Sparkles className="mr-2 h-4 w-4" />
-                            {aiChampions.has(member.user_id) ? 'Remove AI Champion' : 'Make AI Champion'}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => setRemoveMemberDialog({ open: true, member })}
-                            className="text-destructive"
-                          >
-                            <UserX className="mr-2 h-4 w-4" />
-                            Remove from Team
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    </span>
+                  </span>
+                </span>
+                {/* Department */}
+                <span className="truncate text-[12.5px] text-[#4a4f60]">
+                  {member.profile?.department || '-'}
+                </span>
+                {/* Role pill */}
+                <span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
+                      isAdmin ? 'bg-accent text-primary' : 'bg-[#f3f4f8] text-[#686d7e]',
                     )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+                  >
+                    {isAdmin ? t('analytics.members.admin') : t('analytics.members.learner')}
+                  </span>
+                </span>
+                {/* Status pill */}
+                <span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold capitalize',
+                      member.status === 'active'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-warning/10 text-warning',
+                    )}
+                  >
+                    {member.status}
+                  </span>
+                </span>
+                {/* Joined */}
+                <span className="text-[12.5px] text-muted-foreground">
+                  {new Date(member.created_at).toLocaleDateString()}
+                </span>
+                {/* Actions */}
+                <span className="text-right">
+                  {member.user_id !== profile?.id && member.status === 'active' && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={updatingRole === member.id}>
+                          {updatingRole === member.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {member.role === 'learner' ? (
+                          <DropdownMenuItem
+                            onClick={() => setRoleChangeDialog({ open: true, member, newRole: 'org_admin' })}
+                          >
+                            <ShieldCheck className="mr-2 h-4 w-4" aria-hidden="true" />
+                            {t('analytics.members.promoteToAdmin')}
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            onClick={() => setRoleChangeDialog({ open: true, member, newRole: 'learner' })}
+                          >
+                            <User className="mr-2 h-4 w-4" aria-hidden="true" />
+                            {t('analytics.members.changeToLearner')}
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => handleToggleAiChampion(member)}
+                          disabled={togglingChampion === member.id}
+                        >
+                          <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
+                          {isChampion
+                            ? t('analytics.members.removeAiChampion')
+                            : t('analytics.members.makeAiChampion')}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setRemoveMemberDialog({ open: true, member })}
+                          className="text-destructive"
+                        >
+                          <UserX className="mr-2 h-4 w-4" aria-hidden="true" />
+                          {t('analytics.members.removeFromTeam')}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pending invitations */}
+      {invitations.length > 0 && (
+        <>
+          <h3 className="mb-3 text-[15px] font-extrabold">{t('analytics.members.pendingInvitations')}</h3>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            {invitations.map((invitation) => {
+              const linkId = invitation.link_id || '';
+              const copied = copyFlashed(linkId);
+              const revoked = revokeFlashed(invitation.id);
+              return (
+                <div
+                  key={invitation.id}
+                  className="flex items-center gap-3.5 border-b border-[#f3f4f8] px-5 py-3 last:border-b-0"
+                >
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f3f4f8] text-[#9aa0af]">
+                    <Mail className="h-[15px] w-[15px]" aria-hidden="true" />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[13px] font-bold">{invitation.email}</span>
+                    <span className="text-[11.5px] text-[#9aa0af]">
+                      {t('analytics.members.invitedOn', {
+                        date: new Date(invitation.created_at).toLocaleDateString(),
+                        role:
+                          invitation.role === 'org_admin'
+                            ? t('analytics.members.admin')
+                            : t('analytics.members.learner'),
+                      })}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyInviteLink(linkId)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-[9px] border px-3 py-[7px] text-xs font-bold transition-colors',
+                      copied
+                        ? 'border-[#bfe5d3] bg-success/10 text-success'
+                        : 'border-[#dcdee6] bg-card text-[#2a2d3a] hover:border-primary hover:text-primary',
+                    )}
+                  >
+                    <span className={cn('inline-flex', copied && 'animate-pop-in')} aria-hidden="true">
+                      {copied ? <Check className="h-[13px] w-[13px]" /> : <Copy className="h-3 w-3" />}
+                    </span>
+                    {copied ? t('analytics.members.copied') : t('analytics.members.copyLink')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCancelInvitation(invitation)}
+                    disabled={revoked}
+                    className="rounded-lg px-2.5 py-[7px] text-xs font-bold text-[#9aa0af] transition-colors hover:text-destructive disabled:text-success disabled:hover:text-success"
+                  >
+                    {revoked ? t('analytics.members.revoked') : t('analytics.members.revoke')}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Role Change Confirmation Dialog */}
@@ -714,12 +743,12 @@ export function OrgMembersTab() {
             <AlertDialogDescription>
               {roleChangeDialog?.newRole === 'org_admin' ? (
                 <>
-                  <strong>{roleChangeDialog?.member?.profile?.full_name}</strong> will be able to 
+                  <strong>{roleChangeDialog?.member?.profile?.full_name}</strong> will be able to
                   manage team members, view analytics, and control course access for this organization.
                 </>
               ) : (
                 <>
-                  <strong>{roleChangeDialog?.member?.profile?.full_name}</strong> will lose admin 
+                  <strong>{roleChangeDialog?.member?.profile?.full_name}</strong> will lose admin
                   privileges and only have access as a regular learner.
                 </>
               )}
@@ -743,14 +772,14 @@ export function OrgMembersTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove team member?</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{removeMemberDialog?.member?.profile?.full_name}</strong> will be removed from 
-              this organization. They will lose access to all courses and their progress data will 
+              <strong>{removeMemberDialog?.member?.profile?.full_name}</strong> will be removed from
+              this organization. They will lose access to all courses and their progress data will
               be retained but they won't be able to continue learning until re-invited.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleRemoveMember}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

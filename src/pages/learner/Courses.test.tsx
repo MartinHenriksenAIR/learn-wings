@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
@@ -36,6 +36,7 @@ vi.mock('@/hooks/useAuth', () => ({
 
 import LearnerCourses from './Courses';
 import { callApi } from '@/lib/api-client';
+import { toast } from '@/components/ui/sonner';
 
 const baseAuthState = {
   user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
@@ -123,5 +124,87 @@ describe('LearnerCourses — profile-gated loading guard', () => {
     await waitFor(() => {
       expect(document.querySelector('.animate-spin')).toBeNull();
     });
+  });
+});
+
+describe('LearnerCourses — enroll in-button morph (no success toast)', () => {
+  const currentOrg = { id: 'org-1', name: 'Org One' };
+  const course = {
+    id: 'c-1',
+    title: 'Intro to AI',
+    description: 'Learn the basics',
+    level: 'basic',
+    is_published: true,
+    thumbnail_url: null,
+    created_by_user_id: null,
+    created_at: '2026-01-01T00:00:00Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg });
+  });
+
+  it('morphs Enroll → "Enrolled" → Continue, with no success toast', async () => {
+    // Fake timers so the 1.6s flash window is fast-forwarded instead of waited out.
+    // shouldAdvanceTime keeps waitFor/findBy polling alive under vitest fake timers.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let enrolled = false;
+      vi.mocked(callApi).mockImplementation(async (url: unknown) => {
+        if (url === '/api/learner-courses') {
+          return {
+            courses: [course],
+            enrollments: enrolled
+              ? [{ id: 'e-1', course_id: 'c-1', status: 'enrolled' }]
+              : [],
+          };
+        }
+        if (url === '/api/enroll') {
+          enrolled = true;
+          return {};
+        }
+        return {};
+      });
+
+      renderCourses();
+      fireEvent.click(await screen.findByRole('button', { name: 'common.enroll' }));
+
+      // In-button success morph appears...
+      expect(await screen.findByRole('button', { name: /common\.enrolled/ })).toBeInTheDocument();
+      // ...without a success toast
+      expect(toast).not.toHaveBeenCalled();
+
+      // After the flash expires, the card settles on the normal Continue state
+      act(() => {
+        vi.advanceTimersByTime(1600);
+      });
+      await waitFor(() =>
+        expect(screen.getByRole('link', { name: /common\.continue/ })).toBeInTheDocument()
+      );
+      expect(screen.queryByRole('button', { name: /common\.enrolled/ })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the destructive toast on enroll failure and does not morph', async () => {
+    vi.mocked(callApi).mockImplementation(async (url: unknown) => {
+      if (url === '/api/learner-courses') return { courses: [course], enrollments: [] };
+      if (url === '/api/enroll') throw new Error('boom');
+      return {};
+    });
+
+    renderCourses();
+    fireEvent.click(await screen.findByRole('button', { name: 'common.enroll' }));
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'courses.enrollmentFailed',
+        variant: 'destructive',
+      }));
+    });
+    expect(screen.queryByRole('button', { name: /common\.enrolled/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'common.enroll' })).toBeInTheDocument();
   });
 });

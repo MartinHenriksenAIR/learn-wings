@@ -29,6 +29,14 @@ vi.mock('@/lib/ideas-api', () => ({
 // --- mock sonner toast ---
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
+// --- mock react-i18next (t returns the key) ---
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: 'en', changeLanguage: vi.fn() },
+  }),
+}));
+
 // --- useAuth mock: user.id (Entra OID) is DELIBERATELY different from profile.id
 //     (the DB row UUID) — pre-migration the legacy backend made them the same value, Entra does not ---
 const mockUseAuth = vi.fn();
