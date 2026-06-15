@@ -7,9 +7,16 @@ import React from 'react';
 // Initialize i18n so t() resolves real (English) strings, matching production.
 import '@/i18n';
 
-// --- mock AppLayout as passthrough ---
+// --- mock AppLayout faithfully: the real one renders its `title` prop as an <h1>
+// (see AppLayout.tsx). Modeling that here is what lets the #101 regression test below
+// observe a duplicate heading if a page ever passes `title` AND renders its own <h1>. ---
 vi.mock('@/components/layout/AppLayout', () => ({
-  AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppLayout: ({ title, children }: { title?: string; children: React.ReactNode }) => (
+    <div>
+      {title ? <h1>{title}</h1> : null}
+      {children}
+    </div>
+  ),
 }));
 
 // --- mock api-client ---
@@ -136,6 +143,24 @@ describe('CoursesManager — fetchData error handling', () => {
 
     expect(screen.queryByText('Failed to load courses')).toBeNull();
     expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
+  });
+
+  it('(#101) renders the "Course Manager" heading exactly once on the success path', async () => {
+    // Regression guard for #101: the success-path <AppLayout> must NOT also pass `title`,
+    // or the (faithfully-mocked) layout title + the in-page <h1> stack into two identical
+    // headings. The fix relies on the in-page header alone here.
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/courses-admin') return successResponse[0];
+      if (path === '/api/organizations') return successResponse[1];
+    });
+
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /courses/i })).toBeInTheDocument()
+    );
+
+    expect(screen.getAllByRole('heading', { name: 'Course Manager' })).toHaveLength(1);
   });
 });
 
