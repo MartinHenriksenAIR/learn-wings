@@ -383,11 +383,12 @@ export default function CoursesManager() {
   );
 
   return (
-    <AppLayout title={t('coursesManager.title')} breadcrumbs={[{ label: t('coursesManager.tabCourses') }]}>
-      {/* Header */}
+    <AppLayout breadcrumbs={[{ label: t('coursesManager.tabCourses') }]}>
+      {/* Header — the page owns its heading; AppLayout `title` is omitted here to avoid a
+          duplicate <h1> (the loading/error branches keep `title` since they have no in-page header). */}
       <div className="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
-          <h1 className="text-[26px] font-extrabold tracking-[-0.02em]">{t('coursesManager.title')}</h1>
+          <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('coursesManager.title')}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t('coursesManager.subtitle')}</p>
         </div>
         {createDialog}
