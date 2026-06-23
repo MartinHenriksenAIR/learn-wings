@@ -14,6 +14,7 @@ export const ORG_SLUG_REGEX = /^[a-z0-9-]+$/;
 
 export const orgNameSchema = z
   .string()
+  .trim()
   .min(ORG_NAME_MIN_LENGTH, `Name must be at least ${ORG_NAME_MIN_LENGTH} characters`)
   .max(ORG_NAME_MAX_LENGTH, `Name must be less than ${ORG_NAME_MAX_LENGTH} characters`);
 

@@ -125,8 +125,15 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         } else if ((dbErr as { code?: string })?.code === '23503') {
           results.push({ email: normalizedEmail, success: false, error: 'Organization not found' });
         } else {
-          const msg = dbErr instanceof Error ? dbErr.message : 'Unknown error';
-          results.push({ email: normalizedEmail, success: false, error: msg });
+          // Unexpected DB error for this row. The request-level internalError never
+          // sees it (the loop intentionally swallows per-row failures), so log it
+          // here for App Insights, and return a CONSTANT message — never the raw
+          // driver text (CWE-209, ADR-0014, #25 — the leak was still open inside
+          // this loop).
+          const message = dbErr instanceof Error ? dbErr.message : String(dbErr);
+          const stack = dbErr instanceof Error && dbErr.stack ? `\n${dbErr.stack}` : '';
+          context.error(`invitation-bulk-create row failed: ${message}${stack}`);
+          results.push({ email: normalizedEmail, success: false, error: 'Could not create invitation' });
         }
       }
     }

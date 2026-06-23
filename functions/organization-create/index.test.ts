@@ -83,6 +83,20 @@ describe('organization-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'name must be a string between 2 and 100 characters' });
   });
 
+  it('returns 400 when name is whitespace only (trimmed length is 0) — I-1', async () => {
+    const res = await handler(baseReq({ name: '   ', slug: 'acme-corp' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'name must be a string between 2 and 100 characters' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('persists the name trimmed of surrounding whitespace — I-1', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' });
+    await handler(baseReq({ name: '  Acme Corp  ', slug: 'acme-corp' }), {} as any);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params[0]).toBe('Acme Corp');
+  });
+
   it('returns 400 when slug is missing', async () => {
     const res = await handler(baseReq({ name: 'Acme Corp' }), {} as any);
     expect(res.status).toBe(400);

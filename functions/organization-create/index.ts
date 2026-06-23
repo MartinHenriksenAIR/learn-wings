@@ -4,7 +4,7 @@ import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 import { getProfile } from '../shared/profile';
-import { validateOrgName, validateOrgSlug } from '../shared/org-validation';
+import { validateOrgName, validateOrgSlug, normalizeOrgName } from '../shared/org-validation';
 
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
@@ -52,7 +52,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
          VALUES ($1, $2, $3, $4)
          RETURNING id, name, slug, logo_url, seat_limit, created_at`,
         [
-          name,
+          normalizeOrgName(name as string),
           slug,
           (logo_url as string | null | undefined) ?? null,
           (seat_limit as number | null | undefined) ?? null,

@@ -21,6 +21,10 @@ const nameFixtures: Array<{ label: string; value: string; valid: boolean }> = [
   { label: 'typical name', value: 'Acme Corporation A/S', valid: true },
   { label: '100 chars (max boundary)', value: 'a'.repeat(100), valid: true },
   { label: '101 chars (above max)', value: 'a'.repeat(101), valid: false },
+  // Whitespace handling (review finding I-1): length is judged on the trimmed value.
+  { label: 'whitespace only', value: '   ', valid: false },
+  { label: 'padded but valid (trims to "ab")', value: '  ab  ', valid: true },
+  { label: 'padded down to 1 char (trims to "a")', value: '  a  ', valid: false },
 ];
 
 const slugFixtures: Array<{ label: string; value: string; valid: boolean }> = [

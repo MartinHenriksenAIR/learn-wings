@@ -210,14 +210,20 @@ describe('invitation-bulk-create', () => {
     ]);
   });
 
-  it('per-row generic db error surfaces the error message', async () => {
+  it('per-row generic db error logs server-side and returns a constant message (no CWE-209 leak)', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
-    const res = await handler(baseReq({ orgId: 'org-1', invites: [makeInvite('a@b.com')] }), {} as any);
+    const ctx = { error: vi.fn() } as any;
+    const res = await handler(baseReq({ orgId: 'org-1', invites: [makeInvite('a@b.com')] }), ctx);
     expect(res.status).toBe(200);
     const parsed = JSON.parse(res.body as string);
     expect(parsed.results).toEqual([
-      { email: 'a@b.com', success: false, error: 'connection refused' },
+      { email: 'a@b.com', success: false, error: 'Could not create invitation' },
     ]);
+    // The raw driver message must not leak to the client...
+    expect(res.body as string).not.toContain('connection refused');
+    // ...but it must be logged server-side for App Insights / incident response.
+    expect(ctx.error).toHaveBeenCalledOnce();
+    expect(String(ctx.error.mock.calls[0][0])).toContain('connection refused');
   });
 
   it('happy path (org admin): authorizes via isOrgAdmin', async () => {

@@ -4,7 +4,7 @@ import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
-import { validateOrgName, validateOrgSlug } from '../shared/org-validation';
+import { validateOrgName, validateOrgSlug, normalizeOrgName } from '../shared/org-validation';
 
 const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit']);
 
@@ -81,7 +81,9 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     // the 404 distinction without a separate existence SELECT.
     const params: unknown[] = [];
     const setClauses = updateKeys.map((key) => {
-      params.push(updatesObj[key]);
+      // Persist the trimmed name (parity with organization-create); other fields
+      // pass through as validated.
+      params.push(key === 'name' ? normalizeOrgName(updatesObj[key] as string) : updatesObj[key]);
       return `${key} = $${params.length}`;
     });
     params.push(orgId);

@@ -1,6 +1,6 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne, isUniqueViolation } from '../shared/db';
+import { isUniqueViolation, withTransaction } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
@@ -47,29 +47,44 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     // Seat-limit enforcement (issue #66): the UI disables the add button at the limit,
     // but the backend must hold the line for any caller. Counts ACTIVE members only —
     // parity with OrganizationDetail's activeMembers semantics.
-    const org = await queryOne<{ seat_limit: number | null; active_count: number }>(
-      `SELECT o.seat_limit,
-              (SELECT COUNT(*)::int FROM org_memberships m
-                WHERE m.org_id = o.id AND m.status = 'active') AS active_count
-         FROM organizations o
-        WHERE o.id = $1`,
-      [orgId],
-    );
-    if (!org) {
-      return corsResponse(origin, 404, { error: 'Organization or user not found' });
-    }
-    if (org.seat_limit !== null && Number(org.active_count) >= org.seat_limit) {
-      return corsResponse(origin, 409, { error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' });
-    }
-
+    //
+    // The seat count and the INSERT run in ONE transaction with `FOR UPDATE` on the
+    // organization row (review finding C-2). Without the lock, two concurrent adds at
+    // (limit - 1) both read an under-limit count and both insert, overshooting the cap.
+    // FOR UPDATE serializes them: the second add blocks until the first commits, then
+    // re-counts with that insert already visible and is correctly rejected.
     try {
-      const membership = await queryOne(
-        `INSERT INTO org_memberships (org_id, user_id, role, status)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, org_id, user_id, role, status, created_at`,
-        [orgId, userId, role, effectiveStatus],
-      );
-      return corsResponse(origin, 200, { membership });
+      const result = await withTransaction(async (client) => {
+        const orgRes = await client.query<{ seat_limit: number | null; active_count: number }>(
+          `SELECT o.seat_limit,
+                  (SELECT COUNT(*)::int FROM org_memberships m
+                    WHERE m.org_id = o.id AND m.status = 'active') AS active_count
+             FROM organizations o
+            WHERE o.id = $1
+            FOR UPDATE OF o`,
+          [orgId],
+        );
+        const org = orgRes.rows[0];
+        if (!org) return { kind: 'not_found' as const };
+        if (org.seat_limit !== null && Number(org.active_count) >= Number(org.seat_limit)) {
+          return { kind: 'seat_limit' as const };
+        }
+        const insertRes = await client.query(
+          `INSERT INTO org_memberships (org_id, user_id, role, status)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id, org_id, user_id, role, status, created_at`,
+          [orgId, userId, role, effectiveStatus],
+        );
+        return { kind: 'created' as const, membership: insertRes.rows[0] };
+      });
+
+      if (result.kind === 'not_found') {
+        return corsResponse(origin, 404, { error: 'Organization or user not found' });
+      }
+      if (result.kind === 'seat_limit') {
+        return corsResponse(origin, 409, { error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' });
+      }
+      return corsResponse(origin, 200, { membership: result.membership });
     } catch (dbErr: unknown) {
       if (isUniqueViolation(dbErr)) {
         return corsResponse(origin, 409, { error: 'User is already a member of this organization' });
