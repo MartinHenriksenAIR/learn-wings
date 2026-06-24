@@ -50,8 +50,8 @@ describe('courseVisibilityPredicate', () => {
 // against an inline comment, so a change to the canonical visibility rule in
 // migration/azure/01-schema.sql would NOT be caught. These read the schema and
 // fail if a column the predicate depends on is renamed/retyped, or if the
-// canonical rule (embedded in can_user_access_lms_asset) stops matching what
-// courseVisibilityPredicate emits.
+// canonical rule (embedded in can_user_access_lms_asset) drops or renames one
+// of the published/org-enabled conjuncts courseVisibilityPredicate emits.
 describe('schema-drift parity guard', () => {
   const schema = readFileSync(resolve(__dirname, '../../migration/azure/01-schema.sql'), 'utf8');
 
@@ -65,14 +65,22 @@ describe('schema-drift parity guard', () => {
     expect(tableBody('courses')).toMatch(/^\s*is_published\s+boolean/m);
   });
 
-  it('org_course_access still declares the org_id, course_id and access columns the EXISTS clause uses', () => {
+  it('org_course_access still declares the uuid org_id/course_id and access_type access columns the EXISTS clause joins on', () => {
     const body = tableBody('org_course_access');
-    for (const col of ['org_id', 'course_id', 'access']) {
-      expect(body, `org_course_access.${col} missing`).toMatch(new RegExp(`^\\s*${col}\\s`, 'm'));
+    // Pin name AND type (mirroring the courses `is_published boolean` check) so a
+    // retype — e.g. access enum → text, org_id uuid → bigint — also trips the guard.
+    const columns = { org_id: 'uuid', course_id: 'uuid', access: 'public\\.access_type' };
+    for (const [col, type] of Object.entries(columns)) {
+      expect(body, `org_course_access.${col} missing or retyped`).toMatch(
+        new RegExp(`^\\s*${col}\\s+${type}\\b`, 'm'),
+      );
     }
   });
 
-  it('the canonical rule and courseVisibilityPredicate share the same published + org-enabled conjuncts', () => {
+  it('canonical rule and courseVisibilityPredicate both contain the three published + org-enabled conjuncts', () => {
+    // Substring pin, not a structural diff: catches a conjunct being dropped or
+    // renamed on either side, but NOT one being widened while the literal
+    // survives (e.g. access = 'enabled' → access IN ('enabled', 'trial')).
     const fnMatch = schema.match(
       /FUNCTION public\.can_user_access_lms_asset[\s\S]*?AS \$\$([\s\S]*?)\$\$;/,
     );
