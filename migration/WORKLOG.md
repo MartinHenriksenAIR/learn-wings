@@ -834,3 +834,19 @@ All new strings i18n en+da. **Frontend-only — no function deploy** (trunk push
 **Remaining (all human-gated):** Azure prod cutover flips (SWA backend re-link + `VITE_API_BASE_URL=""`, prod Entra redirect URIs, custom domain + `VITE_PLATFORM_BASE_URL`); the open backlog #103/#104/#105/#28/#49/#71/#91/#29; a full all-roles e2e regression sweep on the deployed app.
 
 **Op-notes for next session:** (1) the `main` ruleset needs **1 approval from a non-author** with **no bypass actors** — neither self-approve nor `gh pr merge --admin` works; a second account/dev must approve, or temporarily add a bypass actor. (2) Removing `Closes #X` from a PR **body** is not enough — **commit-message** keywords on the branch also auto-close on merge to the default branch (that's how #26 closed). (3) Deploy smoke: several "read" endpoints (e.g. `organizations`, `platform-settings`) are **POST-only** — an unauth GET returns a misleading 404; smoke with POST and expect 401. Work branch `martin/mvp-merge-bookkeeping` for this ledger update.
+
+---
+
+## 2026-06-24 — #105 course-visibility schema-drift guard merged (PR #108)
+
+**Who:** martin & Claude. Branch `martin/105-course-visibility-drift-test`; reviewed via `/code-review` (xhigh), merged by martin after the `main` ruleset was relaxed for this merge.
+
+**What.** Added a `describe('schema-drift parity guard')` block to `functions/shared/course-visibility.test.ts`, mirroring `lms-asset.test.ts`: it `readFileSync`s `migration/azure/01-schema.sql` and fails if (a) `courses.is_published boolean` or the `org_course_access` `org_id`/`course_id`/`access` columns are renamed/retyped, or (b) the canonical rule embedded in `can_user_access_lms_asset` and `courseVisibilityPredicate` stop sharing the published + org-enabled conjuncts (`c.is_published = TRUE`, `oca.course_id = c.id`, `oca.access = 'enabled'`). Closes the defense-in-depth gap #105 flagged — the predicate was previously pinned by hand against an inline comment only. **Test-only — no runtime code, no `dist/` change.**
+
+**Review (this session, `/code-review` xhigh).** No correctness bugs (each regex traced to its schema source; suite green). Three low-severity cleanup findings, two applied on-branch (commit `dd424c2`): **#3** — `org_course_access` columns now pin TYPE not just name (`uuid` / `public.access_type`), so a retype also trips the guard; **#2** — parity test/comment reworded to be honest it is a substring pin (catches a dropped/renamed conjunct, not one widened while the literal survives). The third — DRY the duplicated `01-schema.sql` extraction regex shared with `lms-asset.test.ts` — was deliberately deferred (it would pull `lms-asset.test.ts` into a PR scoped to one test file) and filed as **#109**.
+
+**Verify.** functions `npm run build` (tsc) exit 0; `npm test` **1386 pass / 3 skip** (112 files — unchanged from baseline). Type-pin proven to bite (an `access → text` retype fails the new assertion).
+
+**Merge + deploy.** Merged as `8ca97ed` (merge commit). **#105 closed manually** (no closing keyword in the PR title/commits, so no auto-close); remote branch deleted. Auto-deploy green: CI + SWA + functions all ✅. **No runtime smoke** — test-only, functions runtime byte-identical (no `dist/` change).
+
+**Op-note for next session.** `gh pr merge <n>` fails with `could not determine current branch: not on any branch` when the local checkout is on a **detached HEAD** (here: mid-#104 work). The server-side merge still completes — only the post-merge local `--delete-branch` step aborts. Delete the remote branch out-of-band: `gh api -X DELETE repos/MartinHenriksenAIR/learn-wings/git/refs/heads/<branch>`. Work branch `martin/108-bookkeeping` for this ledger update.
