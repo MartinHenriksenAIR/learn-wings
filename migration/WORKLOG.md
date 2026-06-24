@@ -813,3 +813,24 @@ All new strings i18n en+da. **Frontend-only — no function deploy** (trunk push
 **Gate 4 (full all-roles e2e regression):** the issue's third AC — user-verified on the rebuilt PR-6 preview, PENDING. This is the LAST slice before PR #6 → main (#69): remaining road-to-merge = the all-roles regression sweep + the at-merge infra flips (#33 + domain/Entra + SWA backend re-link).
 
 **Issue #13 closed manually** (`Closes #N` doesn't auto-fire on non-default-branch merges). Work branch `emil/13-decommission-supabase` deleted post-merge.
+
+---
+
+## 2026-06-24 — MVP shipped: PR #99 (`mvp` → `main`) merged + deployed
+
+**Who:** martin & Claude. Pre-merge review by Claude (multi-agent), fixes by Claude on the `mvp` branch; **merged by martin** (the `main` ruleset requires 1 approval from a non-author and has no admin bypass, so neither the author nor an `--admin` override could self-merge — see op-note).
+
+**The umbrella merge.** PR #99 brought the whole MVP to trunk in one merge commit (`fd66153`): the full backlog sweep (35 issues auto-closed), CI test gates (`.github/workflows/ci.yml`), the navy UI re-skin, backend hardening, and the collaboration system **re-pointed at `main`** (#33). `main` had not moved since PR #6; `mvp` was 64 commits ahead, 0 behind. Frontend tests 103→**231**, functions 1324→**1383** (3 `DATABASE_URL`-gated skips).
+
+**Pre-merge review (this session).** Three specialized agents over the backend hardening + auth/access surface. Verified **clean**: `requirePlatformAdmin` sweep (#47, faithful 1:1 across 19 endpoints), access predicates (#60/#75), the `internalError` CWE-209 sweep (#25 — a net security improvement over `main`, which leaked `err.message`), settings merge (#90), enrollment completion (#18). **Three findings fixed on-branch** (commit `cdbc9d5`), each test-pinned:
+- **C-2** — `org-membership-create` seat limit was a check-then-insert race (two concurrent adds at limit−1 both passed). Now one `withTransaction` + `SELECT … FOR UPDATE OF o`, serializing concurrent adds.
+- **Silent-failure** — `invitation-bulk-create` swallowed unexpected per-row DB errors (no `context.error`) and leaked the raw driver message into the per-row result. Now logged server-side + constant `"Could not create invitation"` (the #25 leak was still open inside the batch loop).
+- **I-1** — org name now validated on its **trimmed** length (whitespace-only rejected) and persisted trimmed (`normalizeOrgName`); frontend zod mirrors with `.trim()`; parity test gains whitespace fixtures.
+
+**Deploy.** Auto-deploy green on merge — functions (run `28097464299`) + SWA (`28097464267`) + CI (`28097464257`). **Smoke OK** on the regionalized host (`func-ai-education-migration-…swedencentral-01`): unauth **6/6 → 401** + OPTIONS preflight 204 (incl. all three changed endpoints). Host healthy, no restart needed.
+
+**Issue hygiene.** #33 (re-point collab) auto-closed correctly. **#26 was wrongly auto-closed** by commit `4a4db7a`'s close-keyword despite a scrubbed PR body — the TLS change shipped **inert** (see below). Briefly reopened to flag the premature close, then **closed again as `not planned`, superseded by #103** (the canonical tracker for the real fix + staging validation). Follow-ups filed: **#103** (DB TLS `verify-full` is inert — the `pg` Pool lets `?sslmode=require` overwrite the explicit `ssl` object, so the embedded CA bundle / `verify-full` / `DATABASE_SSL_INSECURE` hatch are all dead code; connections still succeed via Node's default store = no behavior change, no outage; needs the URL-merge fix **plus staging cert validation** before any flip), **#104** (substring auth detection in 5 blob handlers), **#105** (course-visibility schema-drift test).
+
+**Remaining (all human-gated):** Azure prod cutover flips (SWA backend re-link + `VITE_API_BASE_URL=""`, prod Entra redirect URIs, custom domain + `VITE_PLATFORM_BASE_URL`); the open backlog #103/#104/#105/#28/#49/#71/#91/#29; a full all-roles e2e regression sweep on the deployed app.
+
+**Op-notes for next session:** (1) the `main` ruleset needs **1 approval from a non-author** with **no bypass actors** — neither self-approve nor `gh pr merge --admin` works; a second account/dev must approve, or temporarily add a bypass actor. (2) Removing `Closes #X` from a PR **body** is not enough — **commit-message** keywords on the branch also auto-close on merge to the default branch (that's how #26 closed). (3) Deploy smoke: several "read" endpoints (e.g. `organizations`, `platform-settings`) are **POST-only** — an unauth GET returns a misleading 404; smoke with POST and expect 401. Work branch `martin/mvp-merge-bookkeeping` for this ledger update.
