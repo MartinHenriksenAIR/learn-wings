@@ -50,6 +50,30 @@ describe('asset-signed-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
+  // 1b. issue #104: an AuthError whose message lacks the literal "token" must
+  // still map to 401 — the old substring check collapsed it to a generic 500.
+  it('returns 401 when authenticate throws an AuthError with a token-less message', async () => {
+    mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing oid or tid claims'));
+
+    const res = await handler(baseReq() as any, {} as any);
+
+    expect(res.status).toBe(401);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing oid or tid claims' });
+  });
+
+  // 1c. issue #104: a non-auth error whose message merely contains "token" must
+  // NOT be mistaken for a 401 and must not leak its message — generic 500.
+  it('returns a generic 500 (no leak) when a non-auth error mentions "token"', async () => {
+    mockQueryOne.mockRejectedValueOnce(new Error('db connection token expired'));
+    const ctx = { error: vi.fn() };
+
+    const res = await handler(baseReq() as any, ctx as any);
+
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+    expect(ctx.error).toHaveBeenCalledWith(expect.stringContaining('db connection token expired'));
+  });
+
   // 2. 401 no profile
   it('returns 401 when profile is not found', async () => {
     mockGetProfile.mockResolvedValueOnce(null);

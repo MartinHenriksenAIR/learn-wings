@@ -33,8 +33,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     return corsResponse(origin, 200, { uploadUrl, blobPath: uniqueName, contentType });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    if (msg.includes('token') || msg.includes('Token')) return corsResponse(origin, 401, { error: msg });
     return internalError(context, origin, err);
   }
 }

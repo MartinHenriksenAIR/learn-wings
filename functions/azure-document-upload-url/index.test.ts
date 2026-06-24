@@ -91,13 +91,28 @@ describe('azure-document-upload-url', () => {
     expect(body.contentType).toBe('application/pdf');
   });
 
-  it('returns 401 on auth token error', async () => {
-    mockAuthenticate.mockRejectedValueOnce(new Error('Invalid token'));
+  // issue #104: an AuthError (even one whose message lacks "token") maps to 401
+  // through the platform-admin gate — not the old catch-block substring check.
+  it('returns 401 when authenticate throws an AuthError with a token-less message', async () => {
+    mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing oid or tid claims'));
 
     const res = await handler(baseReq as any, {} as any);
 
     expect(res.status).toBe(401);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid token' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing oid or tid claims' });
+  });
+
+  // issue #104: a non-auth error whose message merely contains "token" must NOT
+  // be mistaken for a 401 — it routes to a generic, logged 500 (no leak).
+  it('returns a generic 500 (no leak) when a non-auth error mentions "token"', async () => {
+    mockGetProfile.mockRejectedValueOnce(new Error('profile token lookup failed'));
+    const ctx = { error: vi.fn() };
+
+    const res = await handler(baseReq as any, ctx as any);
+
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+    expect(ctx.error).toHaveBeenCalledWith(expect.stringContaining('profile token lookup failed'));
   });
 
   it('regression: no db query contains FROM profiles WHERE id =', async () => {

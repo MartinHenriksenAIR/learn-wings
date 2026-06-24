@@ -2,7 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
-import { authenticate } from '../shared/auth';
+import { authenticate, AuthError } from '../shared/auth';
 import { getProfile } from '../shared/profile';
 import { canAccessLmsAsset } from '../shared/lms-asset';
 
@@ -37,8 +37,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     return corsResponse(origin, 200, { url });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    if (msg.includes('token') || msg.includes('Token')) return corsResponse(origin, 401, { error: msg });
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
     return internalError(context, origin, err);
   }
 }
