@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { courseVisibilityPredicate, orgCourseAccessEnabled } from './course-visibility';
 
@@ -41,5 +43,54 @@ describe('courseVisibilityPredicate', () => {
 
   it('hard-codes no ordinal: $1 appears only when asked for', () => {
     expect(courseVisibilityPredicate({ courseAlias: 'c', orgParam: 7 })).not.toContain('$1');
+  });
+});
+
+// Drift guard mirroring lms-asset.test.ts: the predicate above is pinned by hand
+// against an inline comment, so a change to the canonical visibility rule in
+// migration/azure/01-schema.sql would NOT be caught. These read the schema and
+// fail if a column the predicate depends on is renamed/retyped, or if the
+// canonical rule (embedded in can_user_access_lms_asset) drops or renames one
+// of the published/org-enabled conjuncts courseVisibilityPredicate emits.
+describe('schema-drift parity guard', () => {
+  const schema = readFileSync(resolve(__dirname, '../../migration/azure/01-schema.sql'), 'utf8');
+
+  const tableBody = (table: string) => {
+    const m = schema.match(new RegExp(`CREATE TABLE public\\.${table} \\(([\\s\\S]*?)\\n\\);`));
+    expect(m, `${table} table not found in schema`).not.toBeNull();
+    return m![1];
+  };
+
+  it('courses still declares the is_published boolean the predicate gates on', () => {
+    expect(tableBody('courses')).toMatch(/^\s*is_published\s+boolean/m);
+  });
+
+  it('org_course_access still declares the uuid org_id/course_id and access_type access columns the EXISTS clause joins on', () => {
+    const body = tableBody('org_course_access');
+    // Pin name AND type (mirroring the courses `is_published boolean` check) so a
+    // retype — e.g. access enum → text, org_id uuid → bigint — also trips the guard.
+    const columns = { org_id: 'uuid', course_id: 'uuid', access: 'public\\.access_type' };
+    for (const [col, type] of Object.entries(columns)) {
+      expect(body, `org_course_access.${col} missing or retyped`).toMatch(
+        new RegExp(`^\\s*${col}\\s+${type}\\b`, 'm'),
+      );
+    }
+  });
+
+  it('canonical rule and courseVisibilityPredicate both contain the three published + org-enabled conjuncts', () => {
+    // Substring pin, not a structural diff: catches a conjunct being dropped or
+    // renamed on either side, but NOT one being widened while the literal
+    // survives (e.g. access = 'enabled' → access IN ('enabled', 'trial')).
+    const fnMatch = schema.match(
+      /FUNCTION public\.can_user_access_lms_asset[\s\S]*?AS \$\$([\s\S]*?)\$\$;/,
+    );
+    expect(fnMatch).not.toBeNull();
+    const canonical = flat(fnMatch![1]);
+    const predicate = flat(courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 }));
+
+    for (const conjunct of ['c.is_published = TRUE', 'oca.course_id = c.id', "oca.access = 'enabled'"]) {
+      expect(canonical, `canonical rule no longer contains: ${conjunct}`).toContain(conjunct);
+      expect(predicate, `predicate no longer emits: ${conjunct}`).toContain(conjunct);
+    }
   });
 });
