@@ -2,7 +2,6 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { deleteBlob } from '../shared/blob';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
-import { AuthError } from '../shared/auth';
 import { requirePlatformAdmin } from '../shared/guards';
 
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -23,7 +22,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     return corsResponse(origin, 200, { success: true, message: 'Blob deleted' });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
     return internalError(context, origin, err);
   }
 }
