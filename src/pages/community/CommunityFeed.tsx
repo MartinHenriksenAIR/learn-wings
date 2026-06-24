@@ -1,21 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import { PostCard } from '@/components/community/PostCard';
 import { PostForm } from '@/components/community/PostForm';
 import { UpcomingEvents } from '@/components/community/UpcomingEvents';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
-import { CategoryBadge } from '@/components/community/CategoryBadge';
 import { AIChampionsList } from '@/components/community/AIChampionsList';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { toast } from '@/components/ui/sonner';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import {
   fetchCategories,
   fetchPosts,
@@ -30,21 +29,24 @@ import {
   Globe,
   Building2,
   Loader2,
+  Lock,
   X,
   FolderOpen,
+  ChevronRight,
 } from 'lucide-react';
-import type { CommunityScope, CommunityCategory, CommunityPost } from '@/lib/community-types';
+import type { CommunityScope, CommunityPost } from '@/lib/community-types';
 
 export default function CommunityFeed() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const scopeParam = searchParams.get('scope') as CommunityScope | null;
   const scope: CommunityScope = scopeParam === 'global' ? 'global' : 'org';
-  
+
   const [showPostForm, setShowPostForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -105,12 +107,12 @@ export default function CommunityFeed() {
     },
   });
 
-  const canPostRestricted = scope === 'global' 
-    ? effectiveIsPlatformAdmin 
+  const canPostRestricted = scope === 'global'
+    ? effectiveIsPlatformAdmin
     : effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
-  const isAdmin = scope === 'global' 
-    ? effectiveIsPlatformAdmin 
+  const isAdmin = scope === 'global'
+    ? effectiveIsPlatformAdmin
     : effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
   // Filter event posts for the widget
@@ -124,283 +126,255 @@ export default function CommunityFeed() {
     return <Navigate to="/app/dashboard" replace />;
   }
 
+  const scopeTabs = [
+    ...(currentOrg
+      ? [{ key: 'org', label: currentOrg.name, icon: <Building2 aria-hidden="true" className="h-3.5 w-3.5" /> }]
+      : []),
+    { key: 'global', label: t('community.globalCommunity'), icon: <Globe aria-hidden="true" className="h-3.5 w-3.5" /> },
+    {
+      key: 'events_coming_soon',
+      label: <span title={t('community.comingSoon')}>{t('community.eventsOfficeHours')}</span>,
+      disabled: true,
+    },
+  ];
+
   return (
-    <AppLayout title="Community" breadcrumbs={[{ label: 'Community' }]}>
-      <div className="container mx-auto py-6 px-4">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Community</h1>
-            <p className="text-muted-foreground">
-              {scope === 'org' 
-                ? `Connect with your ${currentOrg?.name || 'organization'} team`
-                : 'Connect with the entire platform community'
-              }
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {scope === 'org' && (
-              <Button
-                variant="outline"
-                onClick={() => navigate('/app/community/org/ideas/new')}
-              >
-                <Lightbulb className="h-4 w-4 mr-2" />
-                Submit Idea
-              </Button>
-            )}
-            <Button onClick={() => setShowPostForm(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Post
+    <AppLayout breadcrumbs={[{ label: 'Community' }]}>
+      {/* Header */}
+      <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
+        <div>
+          <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+            {t('community.title')}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {scope === 'org'
+              ? t('community.subtitleOrg', { orgName: currentOrg?.name || t('nav.organization') })
+              : t('community.subtitleGlobal')}
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          {scope === 'org' && (
+            <Button
+              variant="outline"
+              onClick={() => navigate('/app/community/org/ideas/new')}
+              className="group h-auto whitespace-nowrap rounded-[11px] border-[#dcdee6] bg-card px-4 py-2.5 text-[13px] font-bold text-[#2a2d3a] hover:border-primary hover:bg-card hover:text-primary"
+            >
+              <Lightbulb aria-hidden="true" className="h-[15px] w-[15px] group-hover:animate-bulb-wiggle" />
+              {t('community.submitIdea')}
             </Button>
+          )}
+          <Button
+            onClick={() => setShowPostForm(true)}
+            className="h-auto whitespace-nowrap rounded-[11px] px-4 py-2.5 text-[13px] font-bold"
+          >
+            <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
+            {t('community.newPost')}
+          </Button>
+        </div>
+      </div>
+
+      {/* Scope tabs */}
+      <SlidingTabs
+        tabs={scopeTabs}
+        active={scope}
+        onChange={(key) => setSearchParams({ scope: key as CommunityScope })}
+        className="mb-5"
+      />
+
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_300px]">
+        {/* Main content */}
+        <div className="flex flex-col gap-3.5">
+          {/* Search and category chips */}
+          <div className="flex flex-col gap-[13px] rounded-2xl border border-border bg-card px-[18px] py-4">
+            {/* Search bar */}
+            <div className="relative">
+              <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
+              <Input
+                placeholder={t('community.searchPosts')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-auto rounded-[11px] py-2.5 pl-10 pr-3.5 text-[13.5px] md:text-[13.5px]"
+              />
+            </div>
+
+            {/* Category chips */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-[7px] border px-3.5 py-[7px] text-[12.5px] font-bold',
+                  !selectedCategory
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-input bg-card text-[#4a4f60] hover:opacity-85'
+                )}
+              >
+                {t('common.all')}
+              </button>
+              {categories.filter((cat) => cat.slug !== 'events').map((cat) => {
+                const active = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.id === selectedCategory ? '' : cat.id)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-[7px] border px-3.5 py-[7px] text-[12.5px] font-bold',
+                      active
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input bg-card text-[#4a4f60] hover:opacity-85'
+                    )}
+                  >
+                    {cat.name}
+                    {cat.is_restricted && <Lock aria-label={t('community.locked')} className="h-[11px] w-[11px]" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active tag filters */}
+            {selectedTags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[12.5px] font-semibold text-muted-foreground">{t('community.tagsLabel')}</span>
+                {selectedTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSelectedTags((t) => t.filter((x) => x !== tag))}
+                    className="inline-flex items-center gap-1 rounded-[7px] bg-accent px-2.5 py-[3px] text-[11.5px] font-semibold text-accent-foreground hover:opacity-85"
+                  >
+                    #{tag}
+                    <X aria-hidden="true" className="h-3 w-3" />
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setSelectedTags([])}
+                  className="rounded-lg px-1.5 py-[3px] text-[11.5px] font-semibold text-muted-foreground hover:text-primary"
+                >
+                  {t('community.clearTags')}
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* Posts list */}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : posts.length === 0 ? (
+            <CommunityEmptyState
+              variant="posts"
+              scope={scope}
+              onAction={() => setShowPostForm(true)}
+              actionLabel={t('community.createFirstPost')}
+              hasActiveFilters={hasActiveFilters}
+              filterDescription={t('community.noPostsMatchFilters')}
+              onClearFilters={() => {
+                setSearchQuery('');
+                setSelectedCategory('');
+                setSelectedTags([]);
+              }}
+            />
+          ) : (
+            <div className="flex flex-col gap-3.5">
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  onClick={() => navigate(`/app/community/${scope}/posts/${post.id}`)}
+                  isAdmin={isAdmin}
+                  onToggleHide={isAdmin ? (id, hidden) => toggleHideMutation.mutate({ postId: id, hidden }) : undefined}
+                  onToggleLock={isAdmin ? (id, locked) => toggleLockMutation.mutate({ postId: id, locked }) : undefined}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Scope tabs */}
-        <Tabs
-          value={scope}
-          onValueChange={(v) => setSearchParams({ scope: v as CommunityScope })}
-          className="mb-6"
-        >
-          <TabsList>
-            {currentOrg && (
-              <TabsTrigger value="org" className="gap-2">
-                <Building2 className="h-4 w-4" />
-                {currentOrg.name}
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="global" className="gap-2">
-              <Globe className="h-4 w-4" />
-              Global Community
-            </TabsTrigger>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <TabsTrigger value="events_coming_soon" disabled className="gap-2">
-                    Events & Office Hours
-                  </TabsTrigger>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Coming soon</TooltipContent>
-            </Tooltip>
-          </TabsList>
-        </Tabs>
+        {/* Sidebar */}
+        <div className="flex flex-col gap-3.5">
+          {/* Upcoming Events */}
+          {eventPosts.length > 0 && (
+            <UpcomingEvents
+              events={eventPosts}
+              onEventClick={(event: CommunityPost) => navigate(`/app/community/${scope}/posts/${event.id}`)}
+            />
+          )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main content */}
-          <div className="lg:col-span-3 space-y-4">
-            {/* Search and Category Tabs */}
-            <Card>
-              <CardContent className="pt-4 space-y-4">
-                {/* Search bar */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search posts..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+          {/* Libraries (org only) */}
+          {scope === 'org' && currentOrg && (
+            <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card px-5 py-[18px]">
+              <h3 className="mb-2 text-[13.5px] font-extrabold">{t('community.libraries')}</h3>
+              <button
+                type="button"
+                onClick={() => navigate('/app/community/org/ideas')}
+                className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-left text-[13px] font-bold text-[#2a2d3a] hover:bg-muted/60"
+              >
+                <Lightbulb aria-hidden="true" className="h-[15px] w-[15px] text-warning" />
+                {t('community.ideaLibrary')}
+                <ChevronRight aria-hidden="true" className="ml-auto h-[13px] w-[13px] text-[#c3c7d3]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/app/community/org/resources')}
+                className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-left text-[13px] font-bold text-[#2a2d3a] hover:bg-muted/60"
+              >
+                <FolderOpen aria-hidden="true" className="h-[15px] w-[15px] text-primary" />
+                {t('community.resourceLibrary')}
+                <ChevronRight aria-hidden="true" className="ml-auto h-[13px] w-[13px] text-[#c3c7d3]" />
+              </button>
+            </div>
+          )}
 
-                {/* Category tabs */}
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={!selectedCategory ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedCategory('')}
-                    className="h-8"
+          {/* AI Champions (org only) */}
+          {scope === 'org' && currentOrg && (
+            <AIChampionsList orgId={currentOrg.id} />
+          )}
+
+          {/* Popular tags */}
+          {allTags.length > 0 && (
+            <div className="rounded-2xl border border-border bg-card px-5 py-[18px]">
+              <h3 className="mb-3 text-[13.5px] font-extrabold">{t('community.popularTags')}</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {allTags.slice(0, 10).map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() =>
+                      setSelectedTags((t) =>
+                        t.includes(tag) ? t.filter((x) => x !== tag) : [...t, tag]
+                      )
+                    }
+                    className={cn(
+                      'rounded-[7px] px-2.5 py-[3px] text-[11.5px] font-semibold',
+                      selectedTags.includes(tag)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-accent text-accent-foreground hover:opacity-85'
+                    )}
                   >
-                    All
-                  </Button>
-                  {categories.filter((cat) => cat.slug !== 'events').map((cat) => (
-                    <Button
-                      key={cat.id}
-                      variant={selectedCategory === cat.id ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setSelectedCategory(cat.id === selectedCategory ? '' : cat.id)}
-                      className="h-8"
-                    >
-                      <CategoryBadge
-                        name={cat.name}
-                        icon={cat.icon}
-                        isRestricted={cat.is_restricted}
-                        size="sm"
-                      />
-                    </Button>
-                  ))}
-                </div>
-
-                {/* Active tag filters */}
-                {selectedTags.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm text-muted-foreground">Tags:</span>
-                    {selectedTags.map((tag) => (
-                      <Button
-                        key={tag}
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setSelectedTags((t) => t.filter((x) => x !== tag))}
-                        className="h-6 text-xs"
-                      >
-                        #{tag}
-                        <X className="h-3 w-3 ml-1" />
-                      </Button>
-                    ))}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedTags([])}
-                      className="h-6 text-xs"
-                    >
-                      Clear tags
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Posts list */}
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : posts.length === 0 ? (
-              <CommunityEmptyState
-                variant="posts"
-                scope={scope}
-                onAction={() => setShowPostForm(true)}
-                actionLabel="Create First Post"
-                hasActiveFilters={hasActiveFilters}
-                filterDescription="No posts match your current search/category/tag filters."
-                onClearFilters={() => {
-                  setSearchQuery('');
-                  setSelectedCategory('');
-                  setSelectedTags([]);
-                }}
-              />
-            ) : (
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    onClick={() => navigate(`/app/community/${scope}/posts/${post.id}`)}
-                    isAdmin={isAdmin}
-                    onToggleHide={isAdmin ? (id, hidden) => toggleHideMutation.mutate({ postId: id, hidden }) : undefined}
-                    onToggleLock={isAdmin ? (id, locked) => toggleLockMutation.mutate({ postId: id, locked }) : undefined}
-                  />
+                    #{tag}
+                  </button>
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-4">
-            {/* Upcoming Events */}
-            {eventPosts.length > 0 && (
-              <UpcomingEvents
-                events={eventPosts}
-                onEventClick={(event) => navigate(`/app/community/${scope}/posts/${event.id}`)}
-              />
-            )}
-
-            {/* Idea Library link (org only) */}
-            {scope === 'org' && currentOrg && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-warning" />
-                    Idea Library
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Browse AI and process improvement ideas submitted by your team.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => navigate('/app/community/org/ideas')}
-                  >
-                    View Ideas
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Resource Library link (org only) */}
-            {scope === 'org' && currentOrg && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <FolderOpen className="h-4 w-4 text-primary" />
-                    Resources
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Helpful templates, guides, and links shared by your team.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => navigate('/app/community/org/resources')}
-                  >
-                    View Resources
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* AI Champions (org only) */}
-            {scope === 'org' && currentOrg && (
-              <AIChampionsList orgId={currentOrg.id} />
-            )}
-
-
-            {/* Popular tags */}
-            {allTags.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold">Popular Tags</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-1">
-                    {allTags.slice(0, 10).map((tag) => (
-                      <Button
-                        key={tag}
-                        variant={selectedTags.includes(tag) ? 'secondary' : 'outline'}
-                        size="sm"
-                        className="h-6 text-xs"
-                        onClick={() =>
-                          setSelectedTags((t) =>
-                            t.includes(tag) ? t.filter((x) => x !== tag) : [...t, tag]
-                          )
-                        }
-                      >
-                        #{tag}
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-
-        {/* Post form dialog */}
-        <PostForm
-          open={showPostForm}
-          onOpenChange={setShowPostForm}
-          onSubmit={async (data) => {
-            await createPostMutation.mutateAsync(data);
-          }}
-          categories={categories}
-          scope={scope}
-          orgId={currentOrg?.id}
-          canPostRestricted={canPostRestricted}
-        />
       </div>
+
+      {/* Post form dialog */}
+      <PostForm
+        open={showPostForm}
+        onOpenChange={setShowPostForm}
+        onSubmit={async (data) => {
+          await createPostMutation.mutateAsync(data);
+        }}
+        categories={categories}
+        scope={scope}
+        orgId={currentOrg?.id}
+        canPostRestricted={canPostRestricted}
+      />
     </AppLayout>
   );
 }

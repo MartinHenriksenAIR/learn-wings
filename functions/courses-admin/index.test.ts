@@ -90,8 +90,8 @@ describe('courses-admin', () => {
 
   it('returns 500 on db error propagating err.message', async () => {
     mockQuery.mockRejectedValueOnce(new Error('db connection failed'));
-    const res = await handler(baseReq(), {} as any);
+    const res = await handler(baseReq(), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'db connection failed' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

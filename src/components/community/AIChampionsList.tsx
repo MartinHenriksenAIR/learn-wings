@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTranslation } from 'react-i18next';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Sparkles } from 'lucide-react';
 import { callApi } from '@/lib/api-client';
+import { getAvatarColor, getInitials } from '@/lib/utils';
 
 interface ChampionProfile {
   id: string;
@@ -24,6 +24,7 @@ interface AIChampionsListProps {
 }
 
 export function AIChampionsList({ orgId }: AIChampionsListProps) {
+  const { t } = useTranslation();
   const { data: champions = [], isLoading } = useQuery({
     queryKey: ['ai-champions', orgId],
     queryFn: async () => {
@@ -37,56 +38,37 @@ export function AIChampionsList({ orgId }: AIChampionsListProps) {
     return null;
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-warning" />
-          AI Champions
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground mb-3">
-          Reach out to these team members for AI guidance and support.
-        </p>
+    <div className="rounded-2xl border border-border bg-card px-5 py-[18px]">
+      <h3 className="mb-2 flex items-center gap-2 text-[13.5px] font-extrabold">
+        <Sparkles aria-hidden="true" className="h-[15px] w-[15px] text-warning" />
+        {t('community.aiChampions')}
+      </h3>
+      <p className="mb-3 text-xs text-muted-foreground">{t('community.aiChampionsBlurb')}</p>
+      <div className="flex flex-col gap-[11px]">
         {champions.map((champion) => (
-          <div
-            key={champion.id}
-            className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-          >
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                {champion.profile?.full_name
-                  ? getInitials(champion.profile.full_name)
-                  : '??'}
+          <div key={champion.id} className="flex items-center gap-2.5">
+            <Avatar className="h-[30px] w-[30px] shrink-0">
+              <AvatarFallback
+                className="text-[10.5px] font-bold text-white"
+                style={{ backgroundColor: getAvatarColor(champion.profile?.full_name) }}
+              >
+                {getInitials(champion.profile?.full_name, '??')}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {champion.profile?.full_name || 'Unknown User'}
+            <div className="flex min-w-0 flex-col">
+              <p className="truncate text-[12.5px] font-bold">
+                {champion.profile?.full_name || t('community.unknownUser')}
               </p>
               {champion.profile?.department && (
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="truncate text-[11px] text-[#9aa0af]">
                   {champion.profile.department}
                 </p>
               )}
             </div>
-            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 shrink-0">
-              <Sparkles className="h-3 w-3 mr-1" />
-              Champion
-            </Badge>
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

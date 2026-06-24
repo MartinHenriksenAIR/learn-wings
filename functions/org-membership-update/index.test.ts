@@ -180,8 +180,8 @@ describe('org-membership-update', () => {
   it('returns 500 on generic db error during UPDATE', async () => {
     mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused')); // UPDATE
-    const res = await handler(baseReq({ id: 'm1', role: 'learner' }), {} as any);
+    const res = await handler(baseReq({ id: 'm1', role: 'learner' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

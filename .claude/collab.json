@@ -1,4 +1,4 @@
 {
-  "trunk": "feature/lovable-migration",
-  "protectedBranches": ["feature/lovable-migration", "main"]
+  "trunk": "main",
+  "protectedBranches": ["main"]
 }

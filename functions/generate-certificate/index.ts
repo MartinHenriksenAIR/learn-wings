@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, getCorsHeaders } from '../shared/cors';
+import { internalError } from '../shared/errors';
 
 // Pure TypeScript PDF generation — no Deno APIs, works unchanged in Node.js
 function pdfString(str: string): string {
@@ -96,9 +97,9 @@ function generateCertificatePDF(
   return new TextEncoder().encode(pdf);
 }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const { enrollmentId } = await req.json() as { enrollmentId: string };
@@ -154,7 +155,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     };
   } catch (err: unknown) {
     if (err instanceof AuthError) return { status: 401, headers: getCorsHeaders(origin), body: JSON.stringify({ error: (err as Error).message }) };
-    return { status: 500, headers: getCorsHeaders(origin), body: JSON.stringify({ error: err instanceof Error ? err.message : 'error' }) };
+    return internalError(context, origin, err);
   }
 }
 

@@ -1,34 +1,36 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne } from '../shared/db';
+import { queryOne, isUniqueViolation } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
+import { orgCourseAccessEnabled } from '../shared/course-visibility';
 
 const ALLOWED_STATUSES = new Set(['enrolled', 'completed']);
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { orgId?: unknown; userId?: unknown; courseId?: unknown; status?: unknown };
     const { orgId, userId, courseId, status } = body;
 
     // Validation first, authz second, db third (mirrors org-membership-create).
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required' });
     }
     if (!userId || typeof userId !== 'string') {
-      return corsResponse(origin, 400, { error: 'userId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'userId is required' });
     }
     if (!courseId || typeof courseId !== 'string') {
-      return corsResponse(origin, 400, { error: 'courseId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'courseId is required' });
     }
     if (status !== undefined && (typeof status !== 'string' || !ALLOWED_STATUSES.has(status))) {
-      return corsResponse(origin, 400, { error: 'status must be one of: enrolled, completed' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'status must be one of: enrolled, completed' });
     }
 
     // Authorization: platform admin OR org admin of the target org.
@@ -38,7 +40,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // the admin-driven INSERT write path (used by EnrollUserDialog), authorized server-side
     // via isOrgAdmin to match the suite's admin-create convention.
     const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // Course-precondition: course must exist and be published.
     const course = await queryOne<{ is_published: boolean }>(
@@ -46,20 +48,22 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [courseId],
     );
     if (!course) {
-      return corsResponse(origin, 404, { error: 'Course not found' }) as HttpResponseInit;
+      return corsResponse(origin, 404, { error: 'Course not found' });
     }
     if (!course.is_published) {
-      return corsResponse(origin, 400, { error: 'Course is not published' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'Course is not published' });
     }
 
     // Org-access precondition: only enforced for non-platform admins (platform admins override).
+    // Publish state is checked separately above (distinct 404/400 errors), so this uses the
+    // access-only shared fragment.
     if (!profile.is_platform_admin) {
-      const access = await queryOne<{ exists: number }>(
-        `SELECT 1 AS exists FROM org_course_access WHERE org_id = $1 AND course_id = $2 AND access = 'enabled'`,
+      const access = await queryOne<{ ok: boolean }>(
+        `SELECT ${orgCourseAccessEnabled({ courseRef: '$2', orgParam: 1 })} AS ok`,
         [orgId, courseId],
       );
-      if (!access) {
-        return corsResponse(origin, 403, { error: 'Organization does not have access to this course' }) as HttpResponseInit;
+      if (!access?.ok) {
+        return corsResponse(origin, 403, { error: 'Organization does not have access to this course' });
       }
     }
 
@@ -72,20 +76,19 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
          RETURNING id, org_id, user_id, course_id, status, enrolled_at, completed_at`,
         [orgId, userId, courseId, effectiveStatus],
       );
-      return corsResponse(origin, 200, { enrollment }) as HttpResponseInit;
+      return corsResponse(origin, 200, { enrollment });
     } catch (dbErr: unknown) {
-      const code = (dbErr as { code?: string })?.code;
-      if (code === '23505') {
-        return corsResponse(origin, 409, { error: 'User is already enrolled in this course' }) as HttpResponseInit;
+      if (isUniqueViolation(dbErr)) {
+        return corsResponse(origin, 409, { error: 'User is already enrolled in this course' });
       }
-      if (code === '23503') {
-        return corsResponse(origin, 404, { error: 'User or course not found' }) as HttpResponseInit;
+      if ((dbErr as { code?: string })?.code === '23503') {
+        return corsResponse(origin, 404, { error: 'User or course not found' });
       }
       throw dbErr;
     }
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

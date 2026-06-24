@@ -95,6 +95,22 @@ describe('asset-signed-url', () => {
     expect(params).toEqual(['p1', 'thumbnails/course.jpg']);
   });
 
+  // 5b. issue #60: shared canAccessLmsAsset restores azure_blob_path to the lesson branch
+  // (the exact bug class issue #14 fixed in azure-view-url — video blobs live in azure_blob_path)
+  it('access SQL covers all three lesson asset columns including azure_blob_path', async () => {
+    mockQueryOne.mockResolvedValueOnce({ can_access: true });
+
+    const res = await handler(baseReq({ blobPath: 'videos/lesson.mp4' }) as any, {} as any);
+
+    expect(res.status).toBe(200);
+    const accessCall = mockQueryOne.mock.calls.find(c => (c[0] as string).includes('can_access'));
+    expect(accessCall).toBeDefined();
+    const sql = accessCall![0] as string;
+    expect(sql).toContain('l.video_storage_path = $2');
+    expect(sql).toContain('l.document_storage_path = $2');
+    expect(sql).toContain('l.azure_blob_path = $2');
+  });
+
   // 6. Happy non-admin path → 200 with { url }
   it('returns 200 with url on happy member path', async () => {
     mockQueryOne.mockResolvedValueOnce({ can_access: true });
@@ -121,13 +137,15 @@ describe('asset-signed-url', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  // 8. 500 db error propagates message
-  it('returns 500 when db throws propagating the error message', async () => {
+  // 8. 500 db error: generic body, real message logged server-side (ADR-0014)
+  it('returns 500 when db throws with generic body, real error logged on context', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
+    const ctx = { error: vi.fn() };
 
-    const res = await handler(baseReq({ blobPath: 'videos/lesson.mp4' }) as any, {} as any);
+    const res = await handler(baseReq({ blobPath: 'videos/lesson.mp4' }) as any, ctx as any);
 
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+    expect(ctx.error).toHaveBeenCalledWith(expect.stringContaining('connection refused'));
   });
 });

@@ -88,6 +88,11 @@ export interface CommunityReport {
   reviewed_at: string | null;
   admin_notes: string | null;
   created_at: string;
+  /**
+   * Parent post id, populated by community-reports for comment targets (#86).
+   * NULL for post targets and for orphaned comment reports (comment deleted).
+   */
+  post_id?: string | null;
   // Joined relations
   reporter?: Profile;
   reviewer?: Profile;
@@ -134,6 +139,18 @@ export interface EnhancedIdea {
   comment_count?: number;
   vote_count?: number;
   user_has_voted?: boolean;
+}
+
+// Idea comment (idea_comments row + the server's joined profile embed)
+export interface IdeaComment {
+  id: string;
+  idea_id: string;
+  org_id: string;
+  user_id: string;
+  content: string;
+  parent_comment_id: string | null;
+  created_at: string;
+  profile: { id: string; full_name: string | null } | null;
 }
 
 // Business area options for forms

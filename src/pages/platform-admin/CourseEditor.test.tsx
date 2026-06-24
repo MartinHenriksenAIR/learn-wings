@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
+
+// Initialize i18n so t() resolves real (English) strings, matching production.
+import '@/i18n';
 
 // --- mock AppLayout as passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
@@ -63,12 +67,17 @@ const successResponse = {
 };
 
 function renderPage(courseId = 'course-1') {
+  // Fresh QueryClient per render (retry off) so call-count-based mocks stay
+  // deterministic and no cache leaks between tests.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={[`/app/admin/courses/${courseId}`]}>
-      <Routes>
-        <Route path="/app/admin/courses/:courseId" element={<CourseEditor />} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[`/app/admin/courses/${courseId}`]}>
+        <Routes>
+          <Route path="/app/admin/courses/:courseId" element={<CourseEditor />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -154,5 +163,89 @@ describe('CourseEditor — fetchStructure error handling', () => {
 
     // No error block
     expect(screen.queryByText('Failed to load course')).toBeNull();
+  });
+});
+
+describe('CourseEditor — mutations patch the structure cache (#48)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('module rename patches the cache from the RETURNING row — no structure refetch', async () => {
+    const moduleRow = { id: 'mod-1', course_id: 'course-1', title: 'Old Name', sort_order: 0 };
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/course-structure-admin') {
+        return { ...successResponse, modules: [{ ...moduleRow, lessons: [] }] };
+      }
+      if (path === '/api/module-update') {
+        return { module: { ...moduleRow, title: 'New Name' } };
+      }
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+
+    // Structure loaded — module rows are always expanded (no accordion).
+    await screen.findByText(/Module 1: Old Name/);
+
+    // Open the rename dialog and rename
+    fireEvent.click(await screen.findByRole('button', { name: /rename module/i }));
+    const titleInput = await screen.findByDisplayValue('Old Name');
+    fireEvent.change(titleInput, { target: { value: 'New Name' } });
+    fireEvent.click(screen.getByRole('button', { name: /^update$/i }));
+
+    // RETURNING'd row lands in the UI via the cache patch
+    await waitFor(() =>
+      expect(screen.getByText(/Module 1: New Name/)).toBeInTheDocument()
+    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Module updated!' }));
+
+    // The whole point of #48: the one-row rename must NOT re-ship the course tree
+    const structureCalls = mockCallApi.mock.calls.filter(([path]) => path === '/api/course-structure-admin');
+    expect(structureCalls).toHaveLength(1);
+  });
+});
+
+describe('CourseEditor — publish toggle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('flipping the publish switch calls the publish mutation and reflects the new state', async () => {
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/course-structure-admin') return successResponse; // is_published: false
+      if (path === '/api/course-update') {
+        return { course: { ...successResponse.course, is_published: true } };
+      }
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+
+    // Course loaded; the publish switch reflects the draft state.
+    const toggle = await screen.findByRole('switch');
+    expect(toggle).not.toBeChecked();
+
+    fireEvent.click(toggle);
+
+    // Same mutation/payload the manager's publish switch uses.
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith('/api/course-update', {
+        courseId: 'course-1',
+        updates: { isPublished: true },
+      })
+    );
+
+    // The RETURNING'd row lands via the cache patch — the switch flips on.
+    await waitFor(() => expect(screen.getByRole('switch')).toBeChecked());
+
+    // Publish toggle is routine: the switch state IS the feedback, no toast.
+    expect(mockToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: expect.stringMatching(/publish/i) })
+    );
+
+    // #48: the one-row publish toggle must NOT re-ship the course tree.
+    const structureCalls = mockCallApi.mock.calls.filter(([path]) => path === '/api/course-structure-admin');
+    expect(structureCalls).toHaveLength(1);
   });
 });

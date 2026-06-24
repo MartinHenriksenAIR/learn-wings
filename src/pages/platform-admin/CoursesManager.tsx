@@ -1,24 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { SearchFilter, FilterConfig } from '@/components/ui/search-filter';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { LevelBadge } from '@/components/ui/level-badge';
+import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -32,23 +25,41 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { FileUpload } from '@/components/ui/file-upload';
 import { callApi } from '@/lib/api-client';
+import { useOrganizations } from '@/hooks/useOrganizations';
+import { useToastMutation } from '@/hooks/useToastMutation';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
-import { Course, CourseLevel, Organization, OrgCourseAccess } from '@/lib/types';
-import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check, ChevronsUpDown } from 'lucide-react';
+import { Course, CourseLevel, OrgCourseAccess } from '@/lib/types';
+import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check, ChevronsUpDown, Pencil } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 
+/** Cache key for the admin course list + access matrix (one query, one ship). */
+export const coursesAdminQueryKey = ['courses-admin'] as const;
+
+interface CoursesAdminData {
+  /** Courses with thumbnail_url already re-signed for display. */
+  courses: Course[];
+  accessRecords: OrgCourseAccess[];
+}
+
+/** RETURNING'd access rows replace any prior row for the same org+course pair. */
+function upsertAccessRecords(existing: OrgCourseAccess[], incoming: OrgCourseAccess[]): OrgCourseAccess[] {
+  const kept = existing.filter(
+    (r) => !incoming.some((n) => n.org_id === r.org_id && n.course_id === r.course_id),
+  );
+  return [...kept, ...incoming];
+}
+
 export default function CoursesManager() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Tab state from URL
   const activeTab = searchParams.get('tab') || 'courses';
 
   // Course list state
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -57,89 +68,112 @@ export default function CoursesManager() {
   const [description, setDescription] = useState('');
   const [level, setLevel] = useState<CourseLevel>('basic');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
 
   // Delete state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  // Course Access state
-  const [orgs, setOrgs] = useState<Organization[]>([]);
-  const [accessRecords, setAccessRecords] = useState<OrgCourseAccess[]>([]);
+  // Publish in-flight tracking
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+
+  // Course Access state — org list comes from the shared cache (#87)
+  const {
+    data: orgsData,
+    isLoading: orgsLoading,
+    error: orgsError,
+    refetch: refetchOrgs,
+  } = useOrganizations();
+  const orgs = orgsData ?? [];
   const [orgSearchQuery, setOrgSearchQuery] = useState('');
   const [selectedOrg, setSelectedOrg] = useState<string>('all');
   const [orgComboboxOpen, setOrgComboboxOpen] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  const fetchData = async () => {
-    // No setLoading(true) here: fetchData is also the post-mutation refetch for the
-    // toggle/create/delete handlers, which must not blank the page with the full spinner.
-    setLoadError(null);
-    try {
-      const [adminRes, orgsRes] = await Promise.all([
-        callApi<{ courses: Course[]; accessRecords: OrgCourseAccess[] }>('/api/courses-admin', {}),
-        callApi<{ organizations: Organization[] }>('/api/organizations', {}),
-      ]);
-
+  // Mutations patch this cache from their RETURNING'd rows (issue #48); only the
+  // course create path refetches it, because new thumbnails need re-signing.
+  // No-blank-page invariant: during a refetch the stale data keeps rendering
+  // (isLoading is true only while there is no data at all).
+  const {
+    data: coursesData,
+    isLoading: coursesLoading,
+    error: coursesError,
+    refetch: refetchCourses,
+  } = useQuery({
+    queryKey: coursesAdminQueryKey,
+    queryFn: async (): Promise<CoursesAdminData> => {
+      const adminRes = await callApi<CoursesAdminData>('/api/courses-admin', {});
       const coursesWithFreshThumbnails = await Promise.all(
         adminRes.courses.map(async (course) => ({
           ...course,
           thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
         })),
       );
-      setCourses(coursesWithFreshThumbnails);
-      setAccessRecords(adminRes.accessRecords);
-      setOrgs(orgsRes.organizations);
-    } catch (err) {
-      setLoadError((err as Error).message);
-      toast({ title: 'Failed to load courses', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+      return { courses: coursesWithFreshThumbnails, accessRecords: adminRes.accessRecords };
+    },
+  });
+  const courses = coursesData?.courses ?? [];
+  const accessRecords = coursesData?.accessRecords ?? [];
 
-  useEffect(() => { fetchData(); }, []);
+  // Load failures (either query) surface through the page's "Failed to load
+  // courses" error block + toast, same as the pre-TanStack version.
+  useEffect(() => {
+    if (coursesError) {
+      toast({ title: 'Failed to load courses', description: coursesError.message, variant: 'destructive' });
+    }
+  }, [coursesError]);
+  useEffect(() => {
+    if (orgsError) {
+      toast({ title: 'Failed to load courses', description: (orgsError as Error).message, variant: 'destructive' });
+    }
+  }, [orgsError]);
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value });
   };
 
   // ========== Course CRUD ==========
-  const handleCreate = async () => {
-    if (!title.trim()) return;
-    setCreating(true);
-
-    const thumbnailToPersist = extractLmsAssetPath(thumbnailUrl) ?? thumbnailUrl;
-
-    try {
-      await callApi<{ course: Course }>('/api/course-create', {
-        title,
-        description,
-        level,
-        thumbnailUrl: thumbnailToPersist,
-      });
-      toast({ title: 'Course created!' });
+  const createCourseMutation = useToastMutation({
+    mutationFn: (input: { title: string; description: string; level: CourseLevel; thumbnailUrl: string | null }) =>
+      callApi<{ course: Course }>('/api/course-create', input),
+    errorTitle: 'Failed to create course',
+    onSuccess: () => {
+      toast({ title: t('coursesManager.courseCreated') });
       setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic'); setThumbnailUrl(null);
-      fetchData();
-    } catch (err) {
-      toast({ title: 'Failed to create course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setCreating(false);
-    }
+      // KEEP the refetch here: the new course's thumbnail path needs re-signing.
+      queryClient.invalidateQueries({ queryKey: coursesAdminQueryKey });
+    },
+  });
+  const creating = createCourseMutation.isPending;
+
+  const handleCreate = () => {
+    if (!title.trim()) return;
+    const thumbnailToPersist = extractLmsAssetPath(thumbnailUrl) ?? thumbnailUrl;
+    createCourseMutation.mutate({ title, description, level, thumbnailUrl: thumbnailToPersist });
   };
 
-  const togglePublish = async (course: Course) => {
-    try {
-      await callApi<{ course: Course }>('/api/course-update', {
+  const togglePublishMutation = useToastMutation({
+    mutationFn: (course: Course) =>
+      callApi<{ course: Course }>('/api/course-update', {
         courseId: course.id,
         updates: { isPublished: !course.is_published },
-      });
-    } catch (err) {
-      toast({ title: 'Failed to update course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      await fetchData();
-    }
+      }),
+    errorTitle: 'Failed to update course',
+    onSuccess: ({ course: updated }) => {
+      queryClient.setQueryData<CoursesAdminData>(coursesAdminQueryKey, (prev) =>
+        prev && {
+          ...prev,
+          courses: prev.courses.map((c) =>
+            // Keep the already-signed thumbnail: the RETURNING'd row carries the raw path.
+            c.id === updated.id ? { ...c, ...updated, thumbnail_url: c.thumbnail_url } : c,
+          ),
+        },
+      );
+    },
+    onSettled: () => setPublishingId(null),
+  });
+  const togglePublish = (course: Course) => {
+    setPublishingId(course.id);
+    togglePublishMutation.mutate(course);
   };
 
   const openDeleteDialog = (course: Course) => {
@@ -147,24 +181,31 @@ export default function CoursesManager() {
     setDeleteOpen(true);
   };
 
-  const handleDeleteCourse = async () => {
-    if (!courseToDelete) return;
-    setDeleting(true);
-    try {
-      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId: courseToDelete.id });
+  const deleteCourseMutation = useToastMutation({
+    mutationFn: (course: Course) =>
+      callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId: course.id }),
+    errorTitle: 'Failed to delete course',
+    onSuccess: (result, course) => {
       if (result.blobsFailed > 0) {
-        toast({ title: 'Course deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
+        toast({ title: t('coursesManager.courseDeleted'), description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
       } else {
-        toast({ title: 'Course deleted' });
+        toast({ title: t('coursesManager.courseDeleted') });
       }
       setDeleteOpen(false);
       setCourseToDelete(null);
-      fetchData();
-    } catch (err) {
-      toast({ title: 'Failed to delete course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setDeleting(false);
-    }
+      queryClient.setQueryData<CoursesAdminData>(coursesAdminQueryKey, (prev) =>
+        prev && {
+          courses: prev.courses.filter((c) => c.id !== course.id),
+          accessRecords: prev.accessRecords.filter((r) => r.course_id !== course.id),
+        },
+      );
+    },
+  });
+  const deleting = deleteCourseMutation.isPending;
+
+  const handleDeleteCourse = () => {
+    if (!courseToDelete) return;
+    deleteCourseMutation.mutate(courseToDelete);
   };
 
   // ========== Course Access ==========
@@ -175,84 +216,60 @@ export default function CoursesManager() {
     return record?.access === 'enabled';
   };
 
-  const toggleAccess = async (orgId: string, courseId: string, currentEnabled: boolean) => {
-    const key = `${orgId}-${courseId}`;
-    setUpdating(key);
+  /** How many orgs currently have this course enabled (derived from the cache). */
+  const orgAccessCount = (courseId: string): number =>
+    accessRecords.filter((r) => r.course_id === courseId && r.access === 'enabled').length;
 
-    try {
-      await callApi<{ record: OrgCourseAccess }>('/api/course-access-set', {
+  const toggleAccessMutation = useToastMutation({
+    mutationFn: ({ orgId, courseId, currentEnabled }: { orgId: string; courseId: string; currentEnabled: boolean }) =>
+      callApi<{ record: OrgCourseAccess }>('/api/course-access-set', {
         orgId,
         courseId,
         access: currentEnabled ? 'disabled' : 'enabled',
-      });
-    } catch (err) {
-      toast({
-        title: 'Failed to update access',
-        description: (err as Error).message,
-        variant: 'destructive',
-      });
-    } finally {
-      await fetchData();
-      setUpdating(null);
-    }
+      }),
+    errorTitle: 'Failed to update access',
+    onSuccess: ({ record }) => {
+      queryClient.setQueryData<CoursesAdminData>(coursesAdminQueryKey, (prev) =>
+        prev && { ...prev, accessRecords: upsertAccessRecords(prev.accessRecords, [record]) },
+      );
+    },
+    onSettled: () => setUpdating(null),
+  });
+
+  const toggleAccess = (orgId: string, courseId: string, currentEnabled: boolean) => {
+    setUpdating(`${orgId}-${courseId}`);
+    toggleAccessMutation.mutate({ orgId, courseId, currentEnabled });
   };
 
-  const enableAllForOrg = async (orgId: string) => {
-    setUpdating(`all-${orgId}`);
+  const enableAllMutation = useToastMutation({
+    mutationFn: (orgId: string) =>
+      callApi<{ records: OrgCourseAccess[] }>('/api/course-access-bulk', { orgId }),
+    errorTitle: 'Failed to enable all courses',
+    onSuccess: ({ records }) => {
+      toast({
+        title: t('coursesManager.accessGranted'),
+        description: t('coursesManager.accessGrantedDescription'),
+      });
+      queryClient.setQueryData<CoursesAdminData>(coursesAdminQueryKey, (prev) =>
+        prev && { ...prev, accessRecords: upsertAccessRecords(prev.accessRecords, records) },
+      );
+    },
+    onSettled: () => setUpdating(null),
+  });
 
-    try {
-      await callApi<{ records: OrgCourseAccess[] }>('/api/course-access-bulk', { orgId });
-      toast({
-        title: 'Access granted',
-        description: 'All published courses are now accessible to this organization.',
-      });
-    } catch (err) {
-      toast({
-        title: 'Failed to enable all courses',
-        description: (err as Error).message,
-        variant: 'destructive',
-      });
-    } finally {
-      await fetchData();
-      setUpdating(null);
-    }
+  const enableAllForOrg = (orgId: string) => {
+    setUpdating(`all-${orgId}`);
+    enableAllMutation.mutate(orgId);
   };
 
   // ========== Filtering ==========
-  const levelColors = { basic: 'bg-green-100 text-green-800', intermediate: 'bg-yellow-100 text-yellow-800', advanced: 'bg-red-100 text-red-800' };
-
-  const courseFilters: FilterConfig[] = [
-    {
-      key: 'level',
-      label: 'Level',
-      options: [
-        { value: 'basic', label: 'Basic' },
-        { value: 'intermediate', label: 'Intermediate' },
-        { value: 'advanced', label: 'Advanced' },
-      ],
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      options: [
-        { value: 'published', label: 'Published' },
-        { value: 'draft', label: 'Draft' },
-      ],
-    },
-  ];
-
-  const filterValues = { level: levelFilter, status: statusFilter };
-
-  const handleFilterChange = (key: string, value: string) => {
-    if (key === 'level') setLevelFilter(value);
-    if (key === 'status') setStatusFilter(value);
-  };
-
   const clearFilters = () => {
     setSearchQuery('');
     setLevelFilter('all');
     setStatusFilter('all');
   };
+
+  const hasFilters = searchQuery !== '' || levelFilter !== 'all' || statusFilter !== 'all';
 
   const filteredCourses = courses.filter(course => {
     const matchesSearch = searchQuery === '' ||
@@ -275,201 +292,296 @@ export default function CoursesManager() {
   });
   const publishedCourses = courses.filter((c) => c.is_published);
 
-  if (loading) {
+  const combinedLoadError = coursesError?.message ?? (orgsError ? (orgsError as Error).message : null);
+
+  // isLoading is true only while there is no cached data, so a post-mutation
+  // refetch keeps rendering the stale page instead of blanking to the spinner.
+  if (coursesLoading || orgsLoading) {
     return (
-      <AppLayout title="Course Manager">
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+      <AppLayout title={t('coursesManager.title')}>
+        <PageSpinner />
       </AppLayout>
     );
   }
 
-  if (!loading && loadError) {
+  if (combinedLoadError) {
     return (
-      <AppLayout title="Course Manager">
+      <AppLayout title={t('coursesManager.title')}>
         <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
-          <p className="text-destructive font-medium">Failed to load courses</p>
-          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <p className="text-destructive font-medium">{t('coursesManager.failedToLoad')}</p>
+          <p className="text-sm text-muted-foreground">{combinedLoadError}</p>
           <Button
             variant="outline"
             onClick={() => {
-              setLoadError(null);
-              setLoading(true); // retry is a full reload — show the spinner, not a flash of empty UI
-              fetchData();
+              // Retry is a full reload — with no data cached, isLoading goes true
+              // during the refetch, so the spinner shows, not a flash of empty UI.
+              refetchCourses();
+              if (orgsError) refetchOrgs();
             }}
           >
-            Retry
+            {t('coursesManager.retry')}
           </Button>
         </div>
       </AppLayout>
     );
   }
 
-  return (
-    <AppLayout title="Course Manager" breadcrumbs={[{ label: 'Courses' }]}>
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="courses">Courses</TabsTrigger>
-          <TabsTrigger value="access">Organization Access</TabsTrigger>
-        </TabsList>
-
-        {/* ========== Courses Tab ========== */}
-        <TabsContent value="courses" className="space-y-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <SearchFilter
-              searchValue={searchQuery}
-              onSearchChange={setSearchQuery}
-              searchPlaceholder="Search courses..."
-              filters={courseFilters}
-              filterValues={filterValues}
-              onFilterChange={handleFilterChange}
-              onClearFilters={clearFilters}
-              className="flex-1"
+  const createDialog = (
+    <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+          {t('coursesManager.newCourse')}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('coursesManager.createTitle')}</DialogTitle>
+          <DialogDescription>{t('coursesManager.createDescription')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>{t('coursesManager.thumbnail')}</Label>
+            <FileUpload
+              bucket="lms-assets"
+              folder="thumbnails"
+              accept="image"
+              value={thumbnailUrl}
+              onChange={(url) => setThumbnailUrl(url)}
+              maxSizeMB={10}
             />
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger asChild>
-                <Button><Plus className="mr-2 h-4 w-4" />Create Course</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create Course</DialogTitle>
-                  <DialogDescription>Add a new course to the platform.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Thumbnail</Label>
-                    <FileUpload
-                      bucket="lms-assets"
-                      folder="thumbnails"
-                      accept="image"
-                      value={thumbnailUrl}
-                      onChange={(url) => setThumbnailUrl(url)}
-                      maxSizeMB={10}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Title</Label>
-                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Course title" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Course description" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Level</Label>
-                    <Select value={level} onValueChange={(v) => setLevel(v as CourseLevel)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="basic">Basic</SelectItem>
-                        <SelectItem value="intermediate">Intermediate</SelectItem>
-                        <SelectItem value="advanced">Advanced</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-                  <Button onClick={handleCreate} disabled={creating}>
-                    {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Create
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+          </div>
+          <div className="space-y-2">
+            <Label>{t('coursesManager.titleLabel')}</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('coursesManager.titlePlaceholder')} />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('coursesManager.descriptionLabel')}</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('coursesManager.descriptionPlaceholder')} />
+          </div>
+          <div className="space-y-2">
+            <Label>{t('coursesManager.levelLabel')}</Label>
+            <Select value={level} onValueChange={(v) => setLevel(v as CourseLevel)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="basic">{t('courses.levels.basic')}</SelectItem>
+                <SelectItem value="intermediate">{t('courses.levels.intermediate')}</SelectItem>
+                <SelectItem value="advanced">{t('courses.levels.advanced')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCreateOpen(false)}>{t('common.cancel')}</Button>
+          <Button onClick={handleCreate} disabled={creating}>
+            {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+            {t('coursesManager.create')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  return (
+    <AppLayout breadcrumbs={[{ label: t('coursesManager.tabCourses') }]}>
+      {/* Header — the page owns its heading; AppLayout `title` is omitted here to avoid a
+          duplicate <h1> (the loading/error branches keep `title` since they have no in-page header). */}
+      <div className="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
+        <div>
+          <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('coursesManager.title')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t('coursesManager.subtitle')}</p>
+        </div>
+        {createDialog}
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-5">
+        <SlidingTabs
+          tabs={[
+            { key: 'courses', label: t('coursesManager.tabCourses') },
+            { key: 'access', label: t('coursesManager.tabAccess') },
+          ]}
+          active={activeTab}
+          onChange={handleTabChange}
+        />
+      </div>
+
+      {/* ========== Courses Tab ========== */}
+      {activeTab === 'courses' && (
+        <div className="space-y-[18px]">
+          {/* Search + filters */}
+          <div className="flex flex-col gap-[10px] sm:flex-row">
+            <div className="relative flex-1">
+              <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('coursesManager.searchPlaceholder')}
+                className="pl-10"
+              />
+            </div>
+            <Select value={levelFilter} onValueChange={setLevelFilter}>
+              <SelectTrigger className="w-full sm:w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('courses.allLevels')}</SelectItem>
+                <SelectItem value="basic">{t('courses.levels.basic')}</SelectItem>
+                <SelectItem value="intermediate">{t('courses.levels.intermediate')}</SelectItem>
+                <SelectItem value="advanced">{t('courses.levels.advanced')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('courses.anyStatus')}</SelectItem>
+                <SelectItem value="published">{t('coursesManager.published')}</SelectItem>
+                <SelectItem value="draft">{t('coursesManager.draft')}</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasFilters && (
+              <Button variant="ghost" onClick={clearFilters} className="sm:self-stretch">
+                {t('common.clear')}
+              </Button>
+            )}
           </div>
 
           {filteredCourses.length === 0 ? (
-            <EmptyState 
-              icon={<BookOpen className="h-6 w-6" />} 
-              title={searchQuery || levelFilter !== 'all' || statusFilter !== 'all' ? "No matching courses" : "No courses yet"} 
-              description={searchQuery || levelFilter !== 'all' || statusFilter !== 'all' ? "Try adjusting your filters." : "Create your first course."} 
-              action={!searchQuery && levelFilter === 'all' && statusFilter === 'all' ? <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />Create Course</Button> : undefined} 
+            <EmptyState
+              icon={<BookOpen className="h-6 w-6" />}
+              title={hasFilters ? t('coursesManager.noMatchingTitle') : t('coursesManager.noCoursesTitle')}
+              description={hasFilters ? t('coursesManager.noMatchingDescription') : t('coursesManager.noCoursesDescription')}
+              action={!hasFilters ? (
+                <Button onClick={() => setCreateOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t('coursesManager.newCourse')}
+                </Button>
+              ) : undefined}
             />
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+              {/* Header row */}
+              <div className="grid grid-cols-[2.4fr_0.9fr_1fr_0.9fr_0.8fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
+                <span>{t('coursesManager.colCourse')}</span>
+                <span>{t('coursesManager.colLevel')}</span>
+                <span>{t('coursesManager.colStatus')}</span>
+                <span>{t('coursesManager.tabAccess')}</span>
+                <span className="text-right">{t('coursesManager.colActions')}</span>
+              </div>
               {filteredCourses.map((course) => (
-                <Card
+                <div
                   key={course.id}
-                  className="cursor-pointer transition-shadow hover:shadow-md"
-                  onClick={() => navigate(`/app/admin/courses/${course.id}`)}
+                  className="grid grid-cols-[2.4fr_0.9fr_1fr_0.9fr_0.8fr] items-center gap-3 border-t border-[#f3f4f8] px-5 py-3.5"
                 >
-                  {course.thumbnail_url ? (
-                    <img src={course.thumbnail_url} alt={course.title} className="aspect-video object-cover" />
-                  ) : (
-                    <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary" />
-                  )}
-                  <CardContent className="p-4">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <h3 className="font-display font-semibold">{course.title}</h3>
-                      <Badge className={levelColors[course.level]}>{course.level}</Badge>
-                    </div>
-                    <p className="mb-4 text-sm text-muted-foreground line-clamp-2">{course.description}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Switch checked={course.is_published} onCheckedChange={() => togglePublish(course)} />
-                        <span className="text-sm">{course.is_published ? 'Published' : 'Draft'}</span>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); openDeleteDialog(course); }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  {/* Course: thumb chip + title */}
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/app/admin/courses/${course.id}`)}
+                    className="flex min-w-0 items-center gap-3 text-left"
+                  >
+                    {course.thumbnail_url ? (
+                      <img
+                        src={course.thumbnail_url}
+                        alt=""
+                        className="h-[30px] w-[42px] shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <span className="h-[30px] w-[42px] shrink-0 rounded-lg bg-gradient-to-br from-primary/80 to-primary" />
+                    )}
+                    <span className="truncate text-[13px] font-bold">{course.title}</span>
+                  </button>
+                  {/* Level */}
+                  <span>
+                    <LevelBadge level={course.level} />
+                  </span>
+                  {/* Status pill + publish switch */}
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
+                        course.is_published ? 'bg-success/10 text-success' : 'bg-[#f3f4f8] text-[#686d7e]',
+                      )}
+                    >
+                      {course.is_published ? t('coursesManager.published') : t('coursesManager.draft')}
+                    </span>
+                    <Switch
+                      checked={course.is_published}
+                      onCheckedChange={() => togglePublish(course)}
+                      disabled={publishingId === course.id}
+                      aria-label={course.is_published ? t('courseEditor.unpublishAria') : t('courseEditor.publishAria')}
+                    />
+                  </span>
+                  {/* Org-access count */}
+                  <span className="text-[13px] font-semibold text-[#4a4f60]">{orgAccessCount(course.id)}</span>
+                  {/* Actions */}
+                  <span className="flex justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/app/admin/courses/${course.id}`)}
+                      title={t('coursesManager.editCourse')}
+                      aria-label={t('coursesManager.editCourse')}
+                      className="grid h-[30px] w-[30px] place-items-center rounded-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-primary"
+                    >
+                      <Pencil className="h-[14px] w-[14px]" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openDeleteDialog(course)}
+                      title={t('coursesManager.deleteCourse')}
+                      aria-label={t('coursesManager.deleteCourse')}
+                      className="grid h-[30px] w-[30px] place-items-center rounded-lg text-[#9aa0af] transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-[14px] w-[14px]" aria-hidden="true" />
+                    </button>
+                  </span>
+                </div>
               ))}
             </div>
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        {/* ========== Organization Access Tab ========== */}
-        <TabsContent value="access" className="space-y-6">
+      {/* ========== Organization Access Tab ========== */}
+      {activeTab === 'access' && (
+        <div className="space-y-6">
           {/* Info Banner */}
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="flex items-start gap-3 py-4">
-              <ShieldCheck className="h-5 w-5 text-primary mt-0.5" />
-              <div>
-                <p className="font-medium text-primary">Course Visibility Control</p>
-                <p className="text-sm text-muted-foreground">
-                  Only published courses can be made accessible. Toggle the switch to enable or disable 
-                  access for each organization. Learners will only see courses that are both published 
-                  AND enabled for their organization.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex items-start gap-3 rounded-2xl border border-[#d7ddf4] bg-[#eef1fb] px-5 py-4">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <div>
+              <p className="font-bold text-primary">{t('coursesManager.accessInfoTitle')}</p>
+              <p className="text-sm text-muted-foreground">{t('coursesManager.accessInfoBody')}</p>
+            </div>
+          </div>
 
           {/* Filters */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <div className="relative max-w-sm flex-1">
+              <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
               <Input
-                placeholder="Search organizations..."
+                placeholder={t('coursesManager.searchOrganizations')}
                 value={orgSearchQuery}
                 onChange={(e) => setOrgSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-10"
               />
             </div>
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Popover open={orgComboboxOpen} onOpenChange={setOrgComboboxOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" aria-expanded={orgComboboxOpen} className="w-[240px] justify-between">
                     {selectedOrg === 'all'
-                      ? 'All Organizations'
-                      : orgs.find((org) => org.id === selectedOrg)?.name || 'Select organization'}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      ? t('coursesManager.allOrganizations')
+                      : orgs.find((org) => org.id === selectedOrg)?.name || t('coursesManager.selectOrganization')}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden="true" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[240px] p-0">
                   <Command>
-                    <CommandInput placeholder="Search organization..." />
+                    <CommandInput placeholder={t('coursesManager.searchOrganizationPrompt')} />
                     <CommandList>
-                      <CommandEmpty>No organization found.</CommandEmpty>
+                      <CommandEmpty>{t('coursesManager.noOrganizationFound')}</CommandEmpty>
                       <CommandGroup>
                         <CommandItem
                           value="All Organizations"
@@ -479,7 +591,7 @@ export default function CoursesManager() {
                           }}
                         >
                           <Check className={cn('mr-2 h-4 w-4', selectedOrg === 'all' ? 'opacity-100' : 'opacity-0')} />
-                          All Organizations
+                          {t('coursesManager.allOrganizations')}
                         </CommandItem>
                         {orgs.map((org) => (
                           <CommandItem
@@ -504,26 +616,27 @@ export default function CoursesManager() {
 
           {/* Access Matrix */}
           {publishedCourses.length === 0 ? (
-            <Card className="p-8 text-center">
-              <BookOpen className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-              <p className="text-muted-foreground">No published courses available.</p>
-              <p className="text-sm text-muted-foreground">Publish a course first to manage access.</p>
-            </Card>
+            <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center">
+              <BookOpen className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+              <p className="text-muted-foreground">{t('coursesManager.noPublishedCoursesTitle')}</p>
+              <p className="text-sm text-muted-foreground">{t('coursesManager.noPublishedCoursesDescription')}</p>
+            </div>
           ) : filteredOrgs.length === 0 ? (
-            <Card className="p-8 text-center">
-              <Building2 className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-              <p className="text-muted-foreground">No organizations found.</p>
-            </Card>
+            <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center">
+              <Building2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+              <p className="text-muted-foreground">{t('coursesManager.noOrganizationsFound')}</p>
+            </div>
           ) : (
             <div className="space-y-6">
               {filteredOrgs.map((org) => (
-                <Card key={org.id}>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div key={org.id} className="overflow-hidden rounded-2xl border border-border bg-card">
+                  {/* Org header */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Building2 className="h-5 w-5 text-primary" />
-                      </div>
-                      <CardTitle className="text-lg">{org.name}</CardTitle>
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+                        <Building2 className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <span className="text-[15px] font-extrabold">{org.name}</span>
                     </div>
                     <Button
                       variant="outline"
@@ -532,99 +645,86 @@ export default function CoursesManager() {
                       disabled={updating === `all-${org.id}`}
                     >
                       {updating === `all-${org.id}` ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                       ) : null}
-                      Enable All Courses
+                      {t('coursesManager.enableAllCourses')}
                     </Button>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Course</TableHead>
-                          <TableHead>Level</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Access</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {publishedCourses.map((course) => {
-                          const isEnabled = getAccessStatus(org.id, course.id);
-                          const key = `${org.id}-${course.id}`;
-                          return (
-                            <TableRow key={course.id}>
-                              <TableCell>
-                                <div className="flex items-center gap-3">
-                                  <div className="flex h-8 w-8 items-center justify-center rounded bg-accent/10">
-                                    <BookOpen className="h-4 w-4 text-accent" />
-                                  </div>
-                                  <span className="font-medium">{course.title}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="capitalize">
-                                  {course.level}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={isEnabled ? 'default' : 'secondary'}
-                                  className={isEnabled ? 'bg-green-100 text-green-800' : ''}
-                                >
-                                  {isEnabled ? 'Enabled' : 'Disabled'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  {updating === key && (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  )}
-                                  <Switch
-                                    checked={isEnabled}
-                                    onCheckedChange={() => toggleAccess(org.id, course.id, isEnabled)}
-                                    disabled={updating === key}
-                                  />
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
+                  </div>
+                  {/* Access rows */}
+                  <div className="border-t border-[#f3f4f8]">
+                    {publishedCourses.map((course) => {
+                      const isEnabled = getAccessStatus(org.id, course.id);
+                      const key = `${org.id}-${course.id}`;
+                      return (
+                        <div
+                          key={course.id}
+                          className="flex items-center gap-3 border-b border-[#f3f4f8] px-5 py-3 last:border-b-0"
+                        >
+                          {course.thumbnail_url ? (
+                            <img
+                              src={course.thumbnail_url}
+                              alt=""
+                              className="h-[34px] w-[34px] shrink-0 rounded-[10px] object-cover"
+                            />
+                          ) : (
+                            <span className="h-[34px] w-[34px] shrink-0 rounded-[10px] bg-gradient-to-br from-primary/80 to-primary" />
+                          )}
+                          <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{course.title}</span>
+                          <LevelBadge level={course.level} />
+                          <span
+                            className={cn(
+                              'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
+                              isEnabled ? 'bg-success/10 text-success' : 'bg-[#f3f4f8] text-[#686d7e]',
+                            )}
+                          >
+                            {isEnabled ? t('coursesManager.enabled') : t('coursesManager.disabled')}
+                          </span>
+                          <span className="flex items-center gap-2">
+                            {updating === key && (
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            )}
+                            <Switch
+                              checked={isEnabled}
+                              onCheckedChange={() => toggleAccess(org.id, course.id, isEnabled)}
+                              disabled={updating === key}
+                              aria-label={course.title}
+                            />
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Course?</AlertDialogTitle>
+            <AlertDialogTitle>{t('coursesManager.deleteCourseTitle')}</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>
-                This will permanently delete <strong>"{courseToDelete?.title}"</strong> and all associated data including:
-              </p>
-              <ul className="list-disc list-inside text-sm">
-                <li>All modules and lessons</li>
-                <li>All learner enrollments and progress</li>
-                <li>All quiz attempts and reviews</li>
+              <span className="block">{t('coursesManager.deleteIntro', { title: courseToDelete?.title })}</span>
+              <ul className="list-inside list-disc text-sm">
+                <li>{t('coursesManager.deleteItemModules')}</li>
+                <li>{t('coursesManager.deleteItemEnrollments')}</li>
+                <li>{t('coursesManager.deleteItemQuizzes')}</li>
               </ul>
-              <p className="font-medium">This action cannot be undone.</p>
+              <span className="block font-medium">{t('coursesManager.deleteIrreversible')}</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteCourse}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete Course
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {t('coursesManager.deleteCourse')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

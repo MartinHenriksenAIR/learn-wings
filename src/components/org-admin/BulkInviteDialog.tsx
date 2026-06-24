@@ -31,10 +31,6 @@ interface BulkInviteDialogProps {
   onOpenChange: (open: boolean) => void;
   orgId: string;
   orgName: string;
-  // `userId` is no longer used inside this component — the server derives
-  // invited_by_user_id from the auth token. Kept in the interface for backward
-  // compat with OrgMembersTab; can be removed once that call site is cleaned up.
-  userId: string;
   onSuccess: () => void;
 }
 
@@ -55,7 +51,6 @@ export function BulkInviteDialog({
   onOpenChange,
   orgId,
   orgName,
-  userId,
   onSuccess,
 }: BulkInviteDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -277,7 +272,7 @@ export function BulkInviteDialog({
           {/* Download Template */}
           <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
             <div className="flex items-center gap-3">
-              <FileSpreadsheet className="h-8 w-8 text-accent" />
+              <FileSpreadsheet className="h-8 w-8 text-primary" />
               <div>
                 <p className="font-medium">Download Template</p>
                 <p className="text-sm text-muted-foreground">
@@ -307,7 +302,7 @@ export function BulkInviteDialog({
             >
               {uploading ? (
                 <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">Parsing file...</p>
                 </div>
               ) : (
@@ -325,12 +320,12 @@ export function BulkInviteDialog({
           {parsedData.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-4">
-                <Badge variant="outline" className="bg-green-100 text-green-800">
+                <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
                   <CheckCircle2 className="mr-1 h-3 w-3" />
                   {validCount} valid
                 </Badge>
                 {invalidCount > 0 && (
-                  <Badge variant="outline" className="bg-red-100 text-red-800">
+                  <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">
                     <XCircle className="mr-1 h-3 w-3" />
                     {invalidCount} invalid
                   </Badge>
@@ -355,9 +350,9 @@ export function BulkInviteDialog({
                       <TableRow key={idx}>
                         <TableCell>
                           {row.valid ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <CheckCircle2 className="h-4 w-4 text-success" />
                           ) : (
-                            <XCircle className="h-4 w-4 text-red-600" />
+                            <XCircle className="h-4 w-4 text-destructive" />
                           )}
                         </TableCell>
                         <TableCell className="font-medium">{row.email}</TableCell>

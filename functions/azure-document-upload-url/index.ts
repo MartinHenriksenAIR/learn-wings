@@ -1,21 +1,19 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { authenticate } from '../shared/auth';
-import { getProfile } from '../shared/profile';
+import { internalError } from '../shared/errors';
+import { requirePlatformAdmin } from '../shared/guards';
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
   try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
-    if (!profile.is_platform_admin) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    const gate = await requirePlatformAdmin(req, origin);
+    if (!gate.ok) return gate.response;
 
     const { fileName, contentType: reqContentType } = await req.json() as { fileName: string; contentType?: string };
-    if (!fileName) return corsResponse(origin, 400, { error: 'fileName is required' }) as HttpResponseInit;
+    if (!fileName) return corsResponse(origin, 400, { error: 'fileName is required' });
 
     const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME!;
     const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY!;
@@ -28,11 +26,11 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const sasToken = generateSasToken(accountName, accountKey, containerName, uniqueName, 'cw', 30);
     const uploadUrl = buildBlobUrl(accountName, containerName, uniqueName, sasToken);
 
-    return corsResponse(origin, 200, { uploadUrl, blobPath: uniqueName, contentType }) as HttpResponseInit;
+    return corsResponse(origin, 200, { uploadUrl, blobPath: uniqueName, contentType });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    const status = msg.includes('token') || msg.includes('Token') ? 401 : 500;
-    return corsResponse(origin, status, { error: msg }) as HttpResponseInit;
+    if (msg.includes('token') || msg.includes('Token')) return corsResponse(origin, 401, { error: msg });
+    return internalError(context, origin, err);
   }
 }
 

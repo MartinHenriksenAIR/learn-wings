@@ -28,19 +28,35 @@ describe('enrollment-complete', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
   });
 
-  it('marks enrollment as completed and returns success', async () => {
-    mockQuery.mockResolvedValueOnce([]);
+  it('marks enrollment as completed and returns the updated enrollment', async () => {
+    const row = {
+      id: 'e-1', org_id: 'org-1', user_id: 'p1', course_id: 'c-1',
+      status: 'completed', enrolled_at: '2026-06-01T00:00:00Z', completed_at: '2026-06-12T00:00:00Z',
+    };
+    mockQuery.mockResolvedValueOnce([row]);
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body as string);
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
+    // The dashboard counts enrollments.status === 'completed' — pin that this
+    // endpoint actually sets and returns it (#18).
+    expect(body.enrollment).toEqual(row);
 
     // SECURITY PIN: enrollments must use profile.id ('p1'), not raw oid
     const updateCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('enrollments'));
     expect(updateCall).toBeDefined();
     expect(updateCall![1]).toEqual(['p1', 'org-1', 'c-1']);
+  });
+
+  it('returns 404 when no enrollment row matches (no silent no-op) (#18)', async () => {
+    mockQuery.mockResolvedValueOnce([]);
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Enrollment not found' });
   });
 
   it('returns 401 when getProfile returns null', async () => {
@@ -55,7 +71,7 @@ describe('enrollment-complete', () => {
   it('returns 500 on database error', async () => {
     mockQuery.mockRejectedValueOnce(new Error('db down'));
 
-    const res = await handler(baseReq as any, {} as any);
+    const res = await handler(baseReq as any, { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
   });

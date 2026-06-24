@@ -1,3 +1,5 @@
+import type { HttpResponseInit } from '@azure/functions';
+
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? 'https://ai-uddannelse.dk').split(',').filter(Boolean);
 
 export function getCorsHeaders(origin: string | null): Record<string, string> {
@@ -10,7 +12,7 @@ export function getCorsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-export function corsResponse(origin: string | null, status: number, body: unknown): object {
+export function corsResponse(origin: string | null, status: number, body: unknown): HttpResponseInit {
   return {
     status,
     headers: getCorsHeaders(origin),
@@ -18,7 +20,7 @@ export function corsResponse(origin: string | null, status: number, body: unknow
   };
 }
 
-export function corsPreflightResponse(origin: string | null): object {
+export function corsPreflightResponse(origin: string | null): HttpResponseInit {
   // 204 must NOT carry a body — the worker's undici Response constructor throws
   // "Invalid response status code 204" if one is present (even an empty string),
   // turning every browser CORS preflight into a 500.

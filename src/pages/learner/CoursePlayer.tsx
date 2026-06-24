@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { PdfViewer } from '@/components/learner/PdfViewer';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi } from '@/lib/api-client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
 import {
-  ChevronRight,
+  Check,
   CheckCircle2,
   Circle,
   Play,
@@ -35,6 +34,7 @@ export default function CoursePlayer() {
   const { courseId } = useParams<{ courseId: string }>();
   const { user, currentOrg } = useAuth();
   const { features } = usePlatformSettings();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [course, setCourse] = useState<Course | null>(null);
@@ -43,6 +43,9 @@ export default function CoursePlayer() {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [completingLesson, setCompletingLesson] = useState(false);
+  // Lessons completed DURING this session — only these get the pop-in celebration.
+  // Lessons already completed on load render the completed state with no animation.
+  const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set());
 
   // Quiz state
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -173,7 +176,7 @@ export default function CoursePlayer() {
           setSignedVideoUrl(null);
           setAzureVideoUrl(null);
         }
-        
+
         // Load document URL - check if it's an Azure path (starts with 'documents/')
         if (currentLesson.document_storage_path) {
           if (currentLesson.document_storage_path.startsWith('documents/')) {
@@ -214,20 +217,18 @@ export default function CoursePlayer() {
     setAnswers({});
   };
 
-  const handleCompleteLesson = async (isLastLesson = false) => {
+  const handleCompleteLesson = async () => {
     if (!user || !currentOrg || !currentLesson) return;
 
     setCompletingLesson(true);
-
-    // Upsert progress
     try {
-      await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
-    } catch {
-      setCompletingLesson(false);
-      return;
-    }
+      // Upsert progress
+      try {
+        await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
+      } catch {
+        return;
+      }
 
-    {
       const newProgress = {
         ...progress,
         [currentLesson.id]: {
@@ -240,23 +241,36 @@ export default function CoursePlayer() {
         }
       };
       setProgress(newProgress);
+      setJustCompletedIds(prev => new Set(prev).add(currentLesson.id));
 
-      // Check if this completes the course
+      // Check if this completes the course. Count completed lessons of THIS course
+      // only — the progress map from course-player-data spans every course in the
+      // org, so counting all of it misattributed foreign progress to this course (#18).
       const allLessons = modules.flatMap(m => m.lessons);
-      const completedCount = Object.values(newProgress).filter(p => p.status === 'completed').length;
-      const isCourseComplete = completedCount >= allLessons.length;
+      const completedCount = allLessons.filter(l => newProgress[l.id]?.status === 'completed').length;
+      const isCourseComplete = allLessons.length > 0 && completedCount >= allLessons.length;
 
       if (isCourseComplete && !courseJustCompleted) {
+        // Record completion server-side BEFORE celebrating — enrollments.status /
+        // completed_at is what the dashboard count and the course cards read. A
+        // failed or silently no-op'd call here left the course stuck on
+        // "Continue" / "Completed 0" forever with no feedback (#18).
+        try {
+          await callApi('/api/enrollment-complete', { orgId: currentOrg.id, courseId });
+        } catch (error) {
+          console.error('Error recording course completion:', error);
+          toast({
+            title: t('coursePlayer.completionSaveFailed'),
+            description: t('coursePlayer.completionSaveFailedDescription'),
+            variant: 'destructive',
+          });
+          return;
+        }
         setCourseJustCompleted(true);
         setShowCompletionDialog(true);
-        
-        // Update enrollment status to completed
-        await callApi('/api/enrollment-complete', { orgId: currentOrg.id, courseId });
       } else {
-        toast({
-          title: 'Lesson completed!',
-          description: 'Great job! Keep up the momentum.',
-        });
+        // Routine confirmation: the sidebar status dot pops in green (and the
+        // footer shows the Completed badge) — no success toast.
 
         // Auto-advance to next lesson if not last
         const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
@@ -264,9 +278,9 @@ export default function CoursePlayer() {
           setCurrentLesson(allLessons[currentIndex + 1]);
         }
       }
+    } finally {
+      setCompletingLesson(false);
     }
-
-    setCompletingLesson(false);
   };
 
   const handleSubmitQuiz = async () => {
@@ -303,25 +317,27 @@ export default function CoursePlayer() {
     // If passed, user will see success UI and can click "Mark as Complete" manually
   };
 
-  const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
-  const completedLessons = Object.values(progress).filter(p => p.status === 'completed').length;
+  // Per-course progress: only lessons of THIS course count — the progress map
+  // from course-player-data spans every course in the org (#18).
+  const allLessons = modules.flatMap(m => m.lessons);
+  const totalLessons = allLessons.length;
+  const completedLessons = allLessons.filter(l => progress[l.id]?.status === 'completed').length;
   const progressPercent = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+  const currentIndex = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1;
 
   const lessonIcon = (type: string) => {
     switch (type) {
-      case 'video': return <Play className="h-4 w-4" />;
-      case 'document': return <FileText className="h-4 w-4" />;
-      case 'quiz': return <HelpCircle className="h-4 w-4" />;
-      default: return <Circle className="h-4 w-4" />;
+      case 'video': return <Play className="h-3.5 w-3.5" />;
+      case 'document': return <FileText className="h-3.5 w-3.5" />;
+      case 'quiz': return <HelpCircle className="h-3.5 w-3.5" />;
+      default: return <Circle className="h-3.5 w-3.5" />;
     }
   };
 
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+        <PageSpinner />
       </AppLayout>
     );
   }
@@ -329,10 +345,10 @@ export default function CoursePlayer() {
   if (!course) {
     return (
       <AppLayout>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Course not found</p>
+        <div className="py-12 text-center">
+          <p className="text-muted-foreground">{t('coursePlayer.courseNotFound')}</p>
           <Button className="mt-4" onClick={() => navigate('/app/courses')}>
-            Back to Courses
+            {t('coursePlayer.backToCourses')}
           </Button>
         </div>
       </AppLayout>
@@ -342,356 +358,402 @@ export default function CoursePlayer() {
   return (
     <AppLayout
       breadcrumbs={[
-        { label: 'Courses', href: '/app/courses' },
+        { label: t('nav.courses'), href: '/app/courses' },
         { label: course.title },
       ]}
     >
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid items-start gap-5 lg:grid-cols-[320px,1fr]">
         {/* Sidebar - Module List */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{course.title}</CardTitle>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Progress</span>
-                  <span className="font-medium">{completedLessons}/{totalLessons}</span>
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="border-b border-[#eceef3] px-[18px] pb-3.5 pt-[18px]">
+            <h2 className="mb-3 font-display text-[15px] font-extrabold leading-[1.3]">{course.title}</h2>
+            <div className="mb-[7px] flex justify-between text-xs font-semibold text-muted-foreground">
+              <span>{t('courses.progress')}</span>
+              <span className="text-foreground">
+                {completedLessons}/{totalLessons} · {Math.round(progressPercent)}%
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#eceef3]">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            {features.course_reviews_enabled && progressPercent >= REVIEW_MIN_PROGRESS && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3.5 w-full rounded-[10px] text-[12.5px] font-bold"
+                onClick={() => setShowReviewDialog(true)}
+              >
+                <Star aria-hidden="true" className="mr-2 h-4 w-4" />
+                {existingReview ? t('coursePlayer.editYourReview') : t('coursePlayer.rateThisCourse')}
+              </Button>
+            )}
+          </div>
+          <div className="max-h-[520px] overflow-y-auto">
+            {modules.map((module, moduleIndex) => (
+              <div key={module.id}>
+                <div className="bg-[#f7f8fa] px-[18px] py-[9px] text-[11.5px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+                  {t('coursePlayer.moduleHeader', { number: moduleIndex + 1, title: module.title })}
                 </div>
-                <Progress value={progressPercent} className="h-2" />
-              </div>
-              {features.course_reviews_enabled && progressPercent >= REVIEW_MIN_PROGRESS && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 w-full"
-                  onClick={() => setShowReviewDialog(true)}
-                >
-                  <Star className="mr-2 h-4 w-4" />
-                  {existingReview ? 'Edit your review' : 'Rate this course'}
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="max-h-[500px] overflow-y-auto">
-                {modules.map((module, moduleIndex) => (
-                  <div key={module.id}>
-                    <div className="bg-muted/50 px-4 py-2 text-sm font-medium">
-                      Module {moduleIndex + 1}: {module.title}
-                    </div>
-                    {module.lessons.map((lesson) => {
-                      const isCompleted = progress[lesson.id]?.status === 'completed';
-                      const isCurrent = currentLesson?.id === lesson.id;
+                {module.lessons.map((lesson) => {
+                  const isCompleted = progress[lesson.id]?.status === 'completed';
+                  const isCurrent = currentLesson?.id === lesson.id;
 
-                      return (
-                        <button
-                          key={lesson.id}
-                          onClick={() => handleSelectLesson(lesson)}
-                          className={cn(
-                            'flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/50',
-                            isCurrent && 'bg-accent/10 border-l-2 border-accent',
-                          )}
-                        >
-                          <div className={cn(
-                            'flex h-6 w-6 items-center justify-center rounded-full',
-                            isCompleted ? 'bg-success text-success-foreground' : 'bg-muted'
-                          )}>
-                            {isCompleted ? (
-                              <CheckCircle2 className="h-4 w-4" />
-                            ) : (
-                              lessonIcon(lesson.lesson_type)
-                            )}
-                          </div>
-                          <span className={cn(isCompleted && 'text-muted-foreground')}>
-                            {lesson.title}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
+                  return (
+                    <button
+                      key={lesson.id}
+                      onClick={() => handleSelectLesson(lesson)}
+                      className={cn(
+                        'flex w-full items-center gap-[11px] border-l-[3px] px-[18px] py-[11px] text-left transition-colors',
+                        isCurrent ? 'border-l-primary bg-accent' : 'border-l-transparent hover:bg-[#f3f4f8]',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full',
+                          isCompleted
+                            ? 'bg-success text-success-foreground'
+                            : 'bg-[#eceef3] text-muted-foreground',
+                          isCompleted && justCompletedIds.has(lesson.id) && 'animate-pop-in'
+                        )}
+                      >
+                        {isCompleted ? (
+                          <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                        ) : (
+                          lessonIcon(lesson.lesson_type)
+                        )}
+                      </span>
+                      <span
+                        className={cn(
+                          'flex-1 text-[13px] font-semibold',
+                          isCompleted && !isCurrent ? 'text-[#9aa0af]' : 'text-foreground'
+                        )}
+                      >
+                        {lesson.title}
+                      </span>
+                      {lesson.duration_minutes != null && (
+                        <span className="text-[11px] text-[#9aa0af]">
+                          {t('coursePlayer.durationMinutes', { minutes: lesson.duration_minutes })}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
         </div>
 
         {/* Main Content */}
-        <div className="lg:col-span-2">
-          {currentLesson ? (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">
-                    {currentLesson.lesson_type}
-                  </Badge>
-                  <CardTitle>{currentLesson.title}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {/* Lesson content based on type */}
-                {currentLesson.lesson_type === 'video' && (
-                  <div className="space-y-4">
-                    <div className="aspect-video rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                      {loadingAssets ? (
-                        <div className="text-center text-muted-foreground">
-                          <Loader2 className="mx-auto h-12 w-12 mb-2 animate-spin" />
-                          <p>Loading video...</p>
-                        </div>
-                      ) : azureVideoUrl ? (
-                        <video
-                          key={azureVideoUrl}
-                          controls
-                          className="w-full h-full rounded-lg"
-                          src={azureVideoUrl}
-                        />
-                      ) : signedVideoUrl ? (
-                        <video
-                          key={signedVideoUrl}
-                          controls
-                          className="w-full h-full rounded-lg"
-                          src={signedVideoUrl}
-                        />
-                      ) : currentLesson.azure_blob_path || currentLesson.video_storage_path ? (
-                        <div className="text-center text-muted-foreground">
-                          <Play className="mx-auto h-12 w-12 mb-2" />
-                          <p>Unable to load video. Please try again.</p>
-                        </div>
-                      ) : (
-                        <div className="text-center text-muted-foreground">
-                          <Play className="mx-auto h-12 w-12 mb-2" />
-                          <p>No video uploaded</p>
-                        </div>
-                      )}
+        {currentLesson ? (
+          <div className="rounded-2xl border border-border bg-card px-[26px] py-6">
+            <div className="mb-[18px] flex items-center gap-2.5">
+              <span className="rounded-[7px] bg-accent px-[11px] py-[5px] text-[11px] font-bold uppercase tracking-[0.06em] text-accent-foreground">
+                {t(`coursePlayer.lessonTypes.${currentLesson.lesson_type}`)}
+              </span>
+              <h2 className="font-display text-lg font-extrabold">{currentLesson.title}</h2>
+            </div>
+
+            {/* Lesson content based on type */}
+            {currentLesson.lesson_type === 'video' && (
+              <div className="space-y-4">
+                <div className="flex aspect-video items-center justify-center overflow-hidden rounded-[14px] bg-muted">
+                  {loadingAssets ? (
+                    <div className="text-center text-muted-foreground">
+                      <Loader2 className="mx-auto mb-2 h-12 w-12 animate-spin" />
+                      <p>{t('coursePlayer.loadingVideo')}</p>
                     </div>
-                    {currentLesson.content_text && (
-                      <p className="text-muted-foreground">{currentLesson.content_text}</p>
-                    )}
+                  ) : azureVideoUrl ? (
+                    <video
+                      key={azureVideoUrl}
+                      controls
+                      className="h-full w-full"
+                      src={azureVideoUrl}
+                    />
+                  ) : signedVideoUrl ? (
+                    <video
+                      key={signedVideoUrl}
+                      controls
+                      className="h-full w-full"
+                      src={signedVideoUrl}
+                    />
+                  ) : currentLesson.azure_blob_path || currentLesson.video_storage_path ? (
+                    <div className="text-center text-muted-foreground">
+                      <Play className="mx-auto mb-2 h-12 w-12" />
+                      <p>{t('coursePlayer.videoLoadFailed')}</p>
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground">
+                      <Play className="mx-auto mb-2 h-12 w-12" />
+                      <p>{t('coursePlayer.noVideo')}</p>
+                    </div>
+                  )}
+                </div>
+                {currentLesson.content_text && (
+                  <p className="text-[13.5px] leading-relaxed text-muted-foreground">{currentLesson.content_text}</p>
+                )}
+              </div>
+            )}
+
+            {currentLesson.lesson_type === 'document' && (
+              <div className="space-y-4">
+                {currentLesson.content_text && (
+                  <div className="prose prose-sm max-w-none">
+                    <p>{currentLesson.content_text}</p>
                   </div>
                 )}
-
-                {currentLesson.lesson_type === 'document' && (
-                  <div className="space-y-4">
-                    {currentLesson.content_text && (
-                      <div className="prose prose-sm max-w-none">
-                        <p>{currentLesson.content_text}</p>
-                      </div>
-                    )}
-                    {loadingAssets ? (
-                      <div className="flex items-center justify-center py-12 border rounded-lg bg-muted/50">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        <span className="ml-3 text-muted-foreground">Loading document...</span>
-                      </div>
-                    ) : (signedDocUrl || azureDocUrl) ? (
-                      <div className="rounded-lg border overflow-hidden">
-                        <PdfViewer url={azureDocUrl || signedDocUrl || ''} />
-                      </div>
-                    ) : currentLesson.document_storage_path ? (
-                      <div className="flex items-center justify-center py-12 border rounded-lg bg-muted/50">
-                        <FileText className="h-8 w-8 text-muted-foreground" />
-                        <span className="ml-3 text-muted-foreground">Unable to load document. Please try again.</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center py-12 border rounded-lg bg-muted/50">
-                        <FileText className="h-8 w-8 text-muted-foreground" />
-                        <span className="ml-3 text-muted-foreground">No document uploaded</span>
-                      </div>
-                    )}
+                {loadingAssets ? (
+                  <div className="flex items-center justify-center rounded-[14px] border bg-muted/50 py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <span className="ml-3 text-muted-foreground">{t('coursePlayer.loadingDocument')}</span>
+                  </div>
+                ) : (signedDocUrl || azureDocUrl) ? (
+                  <div className="overflow-hidden rounded-[14px] border">
+                    <PdfViewer url={azureDocUrl || signedDocUrl || ''} />
+                  </div>
+                ) : currentLesson.document_storage_path ? (
+                  <div className="flex items-center justify-center rounded-[14px] border bg-muted/50 py-12">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                    <span className="ml-3 text-muted-foreground">{t('coursePlayer.documentLoadFailed')}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center rounded-[14px] border bg-muted/50 py-12">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                    <span className="ml-3 text-muted-foreground">{t('coursePlayer.noDocument')}</span>
                   </div>
                 )}
+              </div>
+            )}
 
-                {currentLesson.lesson_type === 'quiz' && quiz && (
-                  <div className="space-y-6">
-                    {quizSubmitted ? (
-                      <div className={cn(
-                        'rounded-lg p-6 text-center',
-                        quizScore >= quiz.passing_score ? 'bg-success/10' : 'bg-destructive/10'
-                      )}>
-                        {quizScore >= quiz.passing_score ? (
-                          <CheckCircle2 className="mx-auto h-12 w-12 text-success mb-3" />
-                        ) : null}
-                        <div className={cn(
-                          'text-4xl font-bold mb-2',
-                          quizScore >= quiz.passing_score ? 'text-success' : 'text-destructive'
-                        )}>
-                          {quizScore}%
-                        </div>
-                        <p className={cn(
-                          'mb-4',
-                          quizScore >= quiz.passing_score ? 'text-success' : 'text-muted-foreground'
-                        )}>
-                          {quizScore >= quiz.passing_score
-                            ? '🎉 Congratulations! You passed the quiz!'
-                            : `You need ${quiz.passing_score}% to pass. Try again!`}
-                        </p>
-                        {quizScore >= quiz.passing_score ? (
-                          progress[currentLesson.id]?.status === 'completed' ? (
-                            (() => {
-                              const allLessons = modules.flatMap(m => m.lessons);
-                              const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
-                              const isLastLesson = currentIndex >= allLessons.length - 1;
-                              
-                              // Find current module and check if this is the last lesson in the module
-                              const currentModule = modules.find(m => m.lessons.some(l => l.id === currentLesson.id));
-                              const isLastInModule = currentModule && 
-                                currentModule.lessons[currentModule.lessons.length - 1]?.id === currentLesson.id;
-                              
-                              const buttonText = isLastLesson 
-                                ? 'Finish Course' 
-                                : isLastInModule 
-                                  ? 'Next Module' 
-                                  : 'Next Lesson';
-
-                              return (
-                                <div className="space-y-3">
-                                  <Badge variant="secondary" className="bg-success/20 text-success">
-                                    <CheckCircle2 className="mr-1 h-3 w-3" />
-                                    Lesson Complete
-                                  </Badge>
-                                  <div>
-                                    <Button
-                                      onClick={() => {
-                                        if (isLastLesson) {
-                                          navigate('/app/courses');
-                                        } else {
-                                          setCurrentLesson(allLessons[currentIndex + 1]);
-                                          setQuizSubmitted(false);
-                                          setAnswers({});
-                                        }
-                                      }}
-                                    >
-                                      {buttonText}
-                                      <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              );
-                            })()
-                          ) : (
-                            <Button onClick={() => handleCompleteLesson()} disabled={completingLesson}>
-                              {completingLesson ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <CheckCircle2 className="mr-2 h-4 w-4" />
-                              )}
-                              Mark as Complete
-                            </Button>
-                          )
-                        ) : (
-                          <Button
-                            onClick={() => {
-                              setQuizSubmitted(false);
-                              setAnswers({});
-                            }}
-                          >
-                            Retry Quiz
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        {questions.map((question, qIndex) => (
-                          <div key={question.id} className="space-y-3">
-                            <p className="font-medium">
-                              {qIndex + 1}. {question.question_text}
-                            </p>
-                            <div className="space-y-2">
-                              {question.options.map((option) => (
-                                <label
-                                  key={option.id}
-                                  className={cn(
-                                    'flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors',
-                                    answers[question.id] === option.id
-                                      ? 'border-accent bg-accent/10'
-                                      : 'hover:bg-muted/50'
-                                  )}
-                                >
-                                  <input
-                                    type="radio"
-                                    name={question.id}
-                                    value={option.id}
-                                    checked={answers[question.id] === option.id}
-                                    onChange={() => setAnswers(prev => ({
-                                      ...prev,
-                                      [question.id]: option.id
-                                    }))}
-                                    className="sr-only"
-                                  />
-                                  <div className={cn(
-                                    'h-4 w-4 rounded-full border-2',
-                                    answers[question.id] === option.id
-                                      ? 'border-accent bg-accent'
-                                      : 'border-muted-foreground'
-                                  )} />
-                                  <span>{option.option_text}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                        <Button
-                          onClick={handleSubmitQuiz}
-                          disabled={Object.keys(answers).length !== questions.length}
-                          className="w-full"
-                        >
-                          Submit Quiz
-                        </Button>
-                      </>
+            {currentLesson.lesson_type === 'quiz' && quiz && (
+              <div className="space-y-6">
+                {quizSubmitted ? (
+                  <div
+                    className={cn(
+                      'rounded-[14px] p-7 text-center',
+                      quizScore >= quiz.passing_score ? 'bg-[#e7f6ef]' : 'bg-[#fdecec]'
                     )}
-                  </div>
-                )}
-
-                {/* Complete button for non-quiz lessons */}
-                {currentLesson.lesson_type !== 'quiz' && (
-                  <div className="mt-6 flex items-center justify-between border-t pt-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const allLessons = modules.flatMap(m => m.lessons);
-                        const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
-                        if (currentIndex > 0) {
-                          setCurrentLesson(allLessons[currentIndex - 1]);
-                        }
-                      }}
-                      disabled={modules.flatMap(m => m.lessons).findIndex(l => l.id === currentLesson.id) === 0}
+                  >
+                    <span
+                      className={cn(
+                        'block text-[38px] font-extrabold',
+                        quizScore >= quiz.passing_score ? 'text-success' : 'text-[#c43d3d]'
+                      )}
                     >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Previous
-                    </Button>
+                      {quizScore}%
+                    </span>
+                    <p
+                      className={cn(
+                        'mb-3.5 mt-1.5 text-[13.5px] font-semibold',
+                        quizScore >= quiz.passing_score ? 'text-success' : 'text-[#c43d3d]'
+                      )}
+                    >
+                      {quizScore >= quiz.passing_score
+                        ? t('coursePlayer.quizPassedMessage')
+                        : t('coursePlayer.quizFailedMessage', { score: quiz.passing_score })}
+                    </p>
+                    {quizScore >= quiz.passing_score ? (
+                      progress[currentLesson.id]?.status === 'completed' ? (
+                        (() => {
+                          const isLastLesson = currentIndex >= allLessons.length - 1;
 
-                    {progress[currentLesson.id]?.status === 'completed' ? (
+                          // Find current module and check if this is the last lesson in the module
+                          const currentModule = modules.find(m => m.lessons.some(l => l.id === currentLesson.id));
+                          const isLastInModule = currentModule &&
+                            currentModule.lessons[currentModule.lessons.length - 1]?.id === currentLesson.id;
+
+                          const buttonText = isLastLesson
+                            ? t('coursePlayer.finishCourse')
+                            : isLastInModule
+                              ? t('coursePlayer.nextModule')
+                              : t('coursePlayer.nextLesson');
+
+                          return (
+                            <div className="space-y-3">
+                              <span
+                                className={cn(
+                                  'inline-flex items-center gap-[5px] rounded-[7px] bg-success/15 px-[11px] py-[5px] text-xs font-bold text-success',
+                                  justCompletedIds.has(currentLesson.id) && 'animate-pop-in'
+                                )}
+                              >
+                                <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
+                                {t('coursePlayer.lessonComplete')}
+                              </span>
+                              <div>
+                                <Button
+                                  className="h-auto rounded-[10px] px-[18px] py-2.5 text-[13.5px] font-bold"
+                                  onClick={() => {
+                                    if (isLastLesson) {
+                                      navigate('/app/courses');
+                                    } else {
+                                      setCurrentLesson(allLessons[currentIndex + 1]);
+                                      setQuizSubmitted(false);
+                                      setAnswers({});
+                                    }
+                                  }}
+                                >
+                                  {buttonText}
+                                  <ArrowRight aria-hidden="true" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <Button
+                          onClick={() => handleCompleteLesson()}
+                          disabled={completingLesson}
+                          className="h-auto rounded-[10px] px-[18px] py-2.5 text-[13.5px] font-bold"
+                        >
+                          {completingLesson ? (
+                            <Loader2 className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 aria-hidden="true" />
+                          )}
+                          {t('coursePlayer.markAsComplete')}
+                        </Button>
+                      )
+                    ) : (
                       <Button
+                        variant="outline"
+                        className="h-auto rounded-[10px] border-[#dcdee6] bg-card px-4 py-[9px] text-[13px] font-bold"
                         onClick={() => {
-                          const allLessons = modules.flatMap(m => m.lessons);
-                          const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
-                          if (currentIndex < allLessons.length - 1) {
-                            setCurrentLesson(allLessons[currentIndex + 1]);
-                          }
+                          setQuizSubmitted(false);
+                          setAnswers({});
                         }}
                       >
-                        Next Lesson
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button onClick={() => handleCompleteLesson()} disabled={completingLesson}>
-                        {completingLesson ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                        )}
-                        Mark as Complete
+                        {t('coursePlayer.tryAgain')}
                       </Button>
                     )}
                   </div>
+                ) : (
+                  <>
+                    {questions.length > 0 && (
+                      <p className="text-[13px] text-muted-foreground">
+                        {t('coursePlayer.quizIntro', { total: questions.length, score: quiz.passing_score })}
+                      </p>
+                    )}
+                    <div className="flex flex-col gap-4">
+                      {questions.map((question, qIndex) => (
+                        <div key={question.id} className="rounded-[14px] border border-border px-5 py-[18px]">
+                          <p className="mb-3 text-sm font-bold">
+                            {qIndex + 1}. {question.question_text}
+                          </p>
+                          <div className="flex flex-col gap-[7px]">
+                            {question.options.map((option) => (
+                              <label
+                                key={option.id}
+                                className={cn(
+                                  'flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-[13px] py-2.5 text-[13px] font-medium transition-colors',
+                                  answers[question.id] === option.id
+                                    ? 'border-primary bg-accent'
+                                    : 'border-border bg-card hover:bg-muted/50'
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name={question.id}
+                                  value={option.id}
+                                  checked={answers[question.id] === option.id}
+                                  onChange={() => setAnswers(prev => ({
+                                    ...prev,
+                                    [question.id]: option.id
+                                  }))}
+                                  className="sr-only"
+                                />
+                                <span
+                                  aria-hidden="true"
+                                  className={cn(
+                                    'h-[15px] w-[15px] shrink-0 rounded-full border-2',
+                                    answers[question.id] === option.id
+                                      ? 'border-primary bg-primary shadow-[inset_0_0_0_2.5px_#fff]'
+                                      : 'border-[#c9cdd9] bg-card'
+                                  )}
+                                />
+                                <span>{option.option_text}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      onClick={handleSubmitQuiz}
+                      disabled={Object.keys(answers).length !== questions.length}
+                      className="h-auto rounded-[11px] px-5 py-[11px] text-[13.5px] font-bold"
+                    >
+                      {t('coursePlayer.submitAnswers')}
+                    </Button>
+                  </>
                 )}
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">Select a lesson to begin</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              </div>
+            )}
+
+            {/* Footer: Previous / Mark as complete · Completed badge / Next (non-quiz lessons) */}
+            {currentLesson.lesson_type !== 'quiz' && (
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#eceef3] pt-[18px]">
+                <Button
+                  variant="outline"
+                  className="rounded-[10px] border-[#dcdee6] text-[13px] font-bold"
+                  onClick={() => {
+                    if (currentIndex > 0) {
+                      setCurrentLesson(allLessons[currentIndex - 1]);
+                    }
+                  }}
+                  disabled={currentIndex === 0}
+                >
+                  <ArrowLeft aria-hidden="true" />
+                  {t('common.previous')}
+                </Button>
+
+                {progress[currentLesson.id]?.status === 'completed' ? (
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-[7px] text-[13.5px] font-bold text-success',
+                      justCompletedIds.has(currentLesson.id) && 'animate-pop-in'
+                    )}
+                  >
+                    <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+                    {t('coursePlayer.completed')}
+                  </span>
+                ) : (
+                  <Button
+                    onClick={() => handleCompleteLesson()}
+                    disabled={completingLesson}
+                    className="h-auto rounded-[10px] px-[18px] py-2.5 text-[13.5px] font-bold"
+                  >
+                    {completingLesson ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 aria-hidden="true" />
+                    )}
+                    {t('coursePlayer.markAsComplete')}
+                  </Button>
+                )}
+
+                <Button
+                  variant="outline"
+                  className="rounded-[10px] border-[#dcdee6] text-[13px] font-bold"
+                  onClick={() => {
+                    if (currentIndex < allLessons.length - 1) {
+                      setCurrentLesson(allLessons[currentIndex + 1]);
+                    }
+                  }}
+                  disabled={currentIndex >= allLessons.length - 1}
+                >
+                  {t('common.next')}
+                  <ArrowRight aria-hidden="true" />
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border bg-card py-12 text-center">
+            <p className="text-muted-foreground">{t('coursePlayer.selectLessonToBegin')}</p>
+          </div>
+        )}
       </div>
 
       {/* Course Completion Dialog */}

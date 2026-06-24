@@ -1,30 +1,24 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { getProfile } from '../shared/profile';
+import { internalError } from '../shared/errors';
+import { requirePlatformAdmin } from '../shared/guards';
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
-
-    if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
-    }
+    const gate = await requirePlatformAdmin(req, origin);
+    if (!gate.ok) return gate.response;
 
     const [courses, accessRecords] = await Promise.all([
       query(`SELECT * FROM courses ORDER BY created_at DESC`),
       query(`SELECT * FROM org_course_access`),
     ]);
 
-    return corsResponse(origin, 200, { courses, accessRecords }) as HttpResponseInit;
+    return corsResponse(origin, 200, { courses, accessRecords });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    return internalError(context, origin, err);
   }
 }
 

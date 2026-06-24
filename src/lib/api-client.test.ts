@@ -15,7 +15,7 @@ vi.mock('./msal-config', () => ({
   apiScopes: ['api://test-client-id/access_as_user'],
 }));
 
-import { callApi, callApiRaw } from './api-client';
+import { callApi, callApiRaw, ApiError } from './api-client';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -50,6 +50,34 @@ describe('api-client', () => {
     });
 
     await expect(callApi('/api/grade-quiz', {})).rejects.toThrow('Quiz access denied');
+  });
+
+  it('callApi throws ApiError exposing the structured code and status (ADR-0013)', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: 'Slug already in use', code: 'DUPLICATE_SLUG' }),
+    });
+
+    const err = await callApi('/api/organization-create', {}).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).message).toBe('Slug already in use');
+    expect((err as ApiError).code).toBe('DUPLICATE_SLUG');
+    expect((err as ApiError).status).toBe(409);
+  });
+
+  it('callApi throws ApiError with undefined code when the body has none', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: async () => ({ error: 'Forbidden' }),
+    });
+
+    const err = await callApi('/api/organization-create', {}).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).code).toBeUndefined();
   });
 
   it('callApi throws when no account is available', async () => {

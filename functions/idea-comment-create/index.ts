@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isActiveMember } from '../shared/profile';
 
 interface IdeaRow {
@@ -11,25 +12,25 @@ interface IdeaRow {
   status: string;
 }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { ideaId?: unknown; content?: unknown; parentCommentId?: unknown };
     const { ideaId, content, parentCommentId } = body;
 
     if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'ideaId is required' });
     }
     if (!content || typeof content !== 'string') {
-      return corsResponse(origin, 400, { error: 'content is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'content is required' });
     }
     if (parentCommentId !== undefined && typeof parentCommentId !== 'string') {
-      return corsResponse(origin, 400, { error: 'parentCommentId must be a string' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'parentCommentId must be a string' });
     }
 
     // Load idea
@@ -38,16 +39,16 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [ideaId],
     );
 
-    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' }) as HttpResponseInit;
+    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' });
 
     // Draft privacy: other-author's draft is invisible (no admin bypass)
     if (idea.status === 'draft' && idea.user_id !== profile.id) {
-      return corsResponse(origin, 404, { error: 'Idea not found' }) as HttpResponseInit;
+      return corsResponse(origin, 404, { error: 'Idea not found' });
     }
 
     // Authz: platform admin OR active member of idea's org
     const canAccess = profile.is_platform_admin || await isActiveMember(profile.id, idea.org_id);
-    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // Validate parentCommentId if provided
     if (parentCommentId !== undefined) {
@@ -56,7 +57,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         [parentCommentId],
       );
       if (!parentComment || parentComment.idea_id !== ideaId) {
-        return corsResponse(origin, 400, { error: 'parentCommentId must reference a comment on this idea' }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: 'parentCommentId must reference a comment on this idea' });
       }
     }
 
@@ -71,10 +72,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [ideaId, idea.org_id, profile.id, content, (parentCommentId as string | undefined) ?? null],
     );
 
-    return corsResponse(origin, 200, { comment }) as HttpResponseInit;
+    return corsResponse(origin, 200, { comment });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

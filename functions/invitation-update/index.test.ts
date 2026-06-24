@@ -194,8 +194,8 @@ describe('invitation-update', () => {
   it('returns 500 on generic db error during UPDATE', async () => {
     mockQueryOne.mockResolvedValueOnce(existingInvitation); // SELECT
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused')); // UPDATE
-    const res = await handler(baseReq({ id: 'inv-1', status: 'expired' }), {} as any);
+    const res = await handler(baseReq({ id: 'inv-1', status: 'expired' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

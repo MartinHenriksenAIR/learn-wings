@@ -23,8 +23,35 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Search, ArrowUp, ArrowDown, ChevronRight, Download, Users } from 'lucide-react';
 import { UserProgressDialog } from '@/components/org-admin/UserProgressDialog';
+import { getAvatarColor, getInitials } from '@/lib/utils';
+
+// Avg-quiz-score color thresholds (port of the prototype: green ≥80, amber ≥50,
+// red >0, muted for ungraded).
+function scoreClass(score: number): string {
+  if (score >= 80) return 'text-success';
+  if (score >= 50) return 'text-warning';
+  if (score > 0) return 'text-destructive';
+  return 'text-muted-foreground';
+}
+
+function NameCell({ name }: { name: string }) {
+  return (
+    <span className="flex items-center gap-2.5">
+      <Avatar className="h-[30px] w-[30px] shrink-0">
+        <AvatarFallback
+          className="text-[10.5px] font-bold text-white"
+          style={{ backgroundColor: getAvatarColor(name) }}
+        >
+          {getInitials(name, '??')}
+        </AvatarFallback>
+      </Avatar>
+      <span className="font-medium">{name}</span>
+    </span>
+  );
+}
 
 interface UserStats {
   id: string;
@@ -131,13 +158,17 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
         setProgressDialogOpen(true);
       }}
     >
-      <TableCell className="font-medium">{user.name}</TableCell>
+      <TableCell>
+        <NameCell name={user.name} />
+      </TableCell>
       <TableCell className="text-muted-foreground text-sm">
         {user.department || <span className="italic">Unassigned</span>}
       </TableCell>
       <TableCell className="text-right">{user.enrollments}</TableCell>
       <TableCell className="text-right">{user.completed}</TableCell>
-      <TableCell className="text-right">{user.avgQuizScore}%</TableCell>
+      <TableCell className={`text-right font-bold ${scoreClass(user.avgQuizScore)}`}>
+        {user.avgQuizScore}%
+      </TableCell>
       <TableCell>
         <ChevronRight className="h-4 w-4 text-muted-foreground" />
       </TableCell>
@@ -271,10 +302,14 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
                           setProgressDialogOpen(true);
                         }}
                       >
-                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>
+                          <NameCell name={user.name} />
+                        </TableCell>
                         <TableCell className="text-right">{user.enrollments}</TableCell>
                         <TableCell className="text-right">{user.completed}</TableCell>
-                        <TableCell className="text-right">{user.avgQuizScore}%</TableCell>
+                        <TableCell className={`text-right font-bold ${scoreClass(user.avgQuizScore)}`}>
+                          {user.avgQuizScore}%
+                        </TableCell>
                         <TableCell>
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </TableCell>

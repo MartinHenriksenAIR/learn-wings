@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Lightbulb, Users, Calendar, FileEdit, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,41 +16,41 @@ interface CommunityEmptyStateProps {
   className?: string;
 }
 
-const variants: Record<EmptyStateVariant, { icon: typeof MessageSquare; title: string; description: string }> = {
+const variants: Record<EmptyStateVariant, { icon: typeof MessageSquare; titleKey: string; descriptionKey: string }> = {
   posts: {
     icon: MessageSquare,
-    title: 'No posts yet',
-    description: 'Be the first to start a discussion! Share ideas, ask questions, or post resources.',
+    titleKey: 'community.emptyState.postsTitle',
+    descriptionKey: 'community.emptyState.postsDescription',
   },
   ideas: {
     icon: Lightbulb,
-    title: 'No ideas submitted',
-    description: 'Submit your first AI or process optimization idea to help improve workflows.',
+    titleKey: 'community.emptyState.ideasTitle',
+    descriptionKey: 'community.emptyState.ideasDescription',
   },
   drafts: {
     icon: FileEdit,
-    title: 'No drafts',
-    description: 'You don\'t have any draft ideas. Start a new idea and save it as a draft to continue later.',
+    titleKey: 'community.emptyState.draftsTitle',
+    descriptionKey: 'community.emptyState.draftsDescription',
   },
   comments: {
     icon: MessageSquare,
-    title: 'No comments yet',
-    description: 'Be the first to share your thoughts on this post.',
+    titleKey: 'community.emptyState.commentsTitle',
+    descriptionKey: 'community.emptyState.commentsDescription',
   },
   events: {
     icon: Calendar,
-    title: 'No upcoming events',
-    description: 'Check back soon for upcoming events, webinars, and office hours.',
+    titleKey: 'community.emptyState.eventsTitle',
+    descriptionKey: 'community.emptyState.eventsDescription',
   },
   reports: {
     icon: Users,
-    title: 'No reports to review',
-    description: 'All clear! There are no pending content reports at this time.',
+    titleKey: 'community.emptyState.reportsTitle',
+    descriptionKey: 'community.emptyState.reportsDescription',
   },
   resources: {
     icon: FolderOpen,
-    title: 'No resources yet',
-    description: 'Share helpful links, templates, and guides with your team.',
+    titleKey: 'community.emptyState.resourcesTitle',
+    descriptionKey: 'community.emptyState.resourcesDescription',
   },
 };
 
@@ -63,27 +64,33 @@ export function CommunityEmptyState({
   onClearFilters,
   className,
 }: CommunityEmptyStateProps) {
+  const { t } = useTranslation();
   const config = variants[variant];
   const Icon = config.icon;
 
   return (
-    <div className={cn('flex flex-col items-center justify-center py-12 px-4 text-center', className)}>
-      <div className="rounded-full bg-muted p-4 mb-4">
-        <Icon className="h-8 w-8 text-muted-foreground" />
+    <div
+      className={cn(
+        'flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center',
+        className
+      )}
+    >
+      <div className="mb-4 rounded-full bg-muted p-4">
+        <Icon aria-hidden="true" className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h3 className="text-lg font-semibold mb-2">{config.title}</h3>
-      <p className="text-muted-foreground max-w-sm mb-4">
+      <h3 className="mb-1 text-[15px] font-bold">{t(config.titleKey)}</h3>
+      <p className="mb-4 max-w-sm text-[13px] text-[#9aa0af]">
         {hasActiveFilters
-          ? filterDescription || 'No items match your current filters.'
-          : config.description}
+          ? filterDescription || t('community.emptyState.noMatches')
+          : t(config.descriptionKey)}
       </p>
       {hasActiveFilters && onClearFilters && (
-        <Button variant="outline" onClick={onClearFilters} className="mb-3">
-          Clear filters
+        <Button variant="outline" onClick={onClearFilters} className="mb-3 rounded-[10px] text-[13px] font-bold">
+          {t('community.emptyState.clearFilters')}
         </Button>
       )}
       {onAction && actionLabel && (
-        <Button onClick={onAction}>
+        <Button onClick={onAction} className="rounded-[10px] text-[13px] font-bold">
           {actionLabel}
         </Button>
       )}

@@ -19,23 +19,23 @@ async function testConnection(host: string, port: number, useTls: boolean): Prom
 
 async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     // Auth gate — the Supabase function had NONE; this is the security fix
     const user = await authenticate(req);
     const isAdmin = await queryOne<{ is_platform_admin: boolean }>(
       'SELECT is_platform_admin FROM profiles WHERE entra_oid = $1', [user.id]
     );
-    if (!isAdmin?.is_platform_admin) return corsResponse(origin, 403, { error: 'Platform admin required' }) as HttpResponseInit;
+    if (!isAdmin?.is_platform_admin) return corsResponse(origin, 403, { error: 'Platform admin required' });
 
     const { host, port, encryption } = await req.json() as { host: string; port: number; encryption: 'none' | 'ssl_tls' | 'starttls' };
     const useTls = encryption === 'ssl_tls';
     const message = await testConnection(host, port, useTls);
-    return corsResponse(origin, 200, { success: true, message }) as HttpResponseInit;
+    return corsResponse(origin, 200, { success: true, message });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
     const msg = err instanceof Error ? err.message : 'Connection failed';
-    return corsResponse(origin, 200, { success: false, error: msg }) as HttpResponseInit;
+    return corsResponse(origin, 200, { success: false, error: msg });
   }
 }
 

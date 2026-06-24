@@ -53,6 +53,12 @@ describe('course-player-data', () => {
     expect(body.progressMap['lesson-1'].status).toBe('completed');
     expect(body.review.rating).toBe(5);
 
+    // Deterministic ordering (issue #46): id tie-breaker on equal sort_order ranks
+    const [modulesSql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(modulesSql).toContain('ORDER BY sort_order, id');
+    const [lessonsSql] = mockQuery.mock.calls[1] as [string, unknown[]];
+    expect(lessonsSql).toContain('ORDER BY sort_order, id');
+
     // SECURITY PIN: lesson_progress must use profile.id ('p1'), not raw oid
     // mockQuery call order: 0=modules, 1=lessons for mod-1, 2=lesson_progress
     const [progressSql, progressParams] = mockQuery.mock.calls[2] as [string, unknown[]];

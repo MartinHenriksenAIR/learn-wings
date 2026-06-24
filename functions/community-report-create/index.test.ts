@@ -9,7 +9,7 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoi
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
+vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -156,8 +156,8 @@ describe('community-report-create', () => {
 
   it('returns 500 on db error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
-    const res = await handler(baseReq({ targetType: 'post', targetId: 't1', reason: 'spam' }), {} as any);
+    const res = await handler(baseReq({ targetType: 'post', targetId: 't1', reason: 'spam' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

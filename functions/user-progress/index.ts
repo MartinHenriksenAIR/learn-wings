@@ -2,7 +2,9 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
+import { courseVisibilityPredicate } from '../shared/course-visibility';
 
 interface EnrollmentRow {
   id: string; course_id: string; status: string; enrolled_at: string; completed_at: string | null;
@@ -27,22 +29,22 @@ interface LessonOut {
 }
 interface ModuleOut { id: string; title: string; sortOrder: number; lessons: LessonOut[] }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { orgId?: unknown; userId?: unknown };
     const { orgId, userId } = body;
 
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required' });
     }
     if (!userId || typeof userId !== 'string') {
-      return corsResponse(origin, 400, { error: 'userId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'userId is required' });
     }
 
     // Authorization: platform admin OR org admin of the target org.
@@ -51,7 +53,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // + platform-admin-ALL policies. Self-access deliberately omitted (admin dialog only;
     // learner-side reads live in Slice 1 endpoints).
     const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // 1. Enrollments + course metadata. Non-platform-admins see only published, org-accessible
     //    courses (the old PostgREST embed nulled RLS-hidden courses and the dialog skipped them).
@@ -62,9 +64,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     //    ORDER BY c.title is a deliberate tightening (determinism).
     const visibilityFilter = profile.is_platform_admin
       ? ''
-      : `AND c.is_published = TRUE
-         AND EXISTS (SELECT 1 FROM org_course_access oca
-                      WHERE oca.course_id = c.id AND oca.org_id = $1 AND oca.access = 'enabled')`;
+      : `AND ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}`;
     const enrollments = await query<EnrollmentRow>(
       `SELECT e.id, e.course_id, e.status, e.enrolled_at, e.completed_at, c.title, c.level
          FROM enrollments e
@@ -74,7 +74,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [orgId, userId],
     );
     if (enrollments.length === 0) {
-      return corsResponse(origin, 200, { courses: [] }) as HttpResponseInit;
+      return corsResponse(origin, 200, { courses: [] });
     }
     const courseIds = enrollments.map((e) => e.course_id);
 
@@ -189,10 +189,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       };
     });
 
-    return corsResponse(origin, 200, { courses }) as HttpResponseInit;
+    return corsResponse(origin, 200, { courses });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

@@ -58,11 +58,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // True while the initial /api/user-context fetch for a cached account is
-  // unresolved. Without this, a hard refresh has a window where `user` exists
-  // but `profile` is null, and role guards read "not loaded yet" as "not
-  // authorized" — bouncing every deep route to the dashboard (#16).
-  const [contextLoading, setContextLoading] = useState(() => accounts.length > 0);
+  // Which account's /api/user-context fetch has settled (resolved OR failed).
+  // `contextLoading` is DERIVED from it on every render: an account whose
+  // context hasn't settled yet means "still loading". Without this, there is
+  // a window where `user` exists but `profile` is null, and role guards read
+  // "not loaded yet" as "not authorized" — bouncing every deep route to the
+  // dashboard (#16). A mount-time snapshot (`accounts.length > 0`) is NOT
+  // enough: the MSAL account can materialize only after the first render
+  // (cold-login redirect return), reopening that window for admin deep links
+  // (#79). Deliberately NOT tied to MSAL's `inProgress` (invariant from #16).
+  const [contextSettledFor, setContextSettledFor] = useState<string | null>(null);
+  const contextLoading = account !== null && contextSettledFor !== account.localAccountId;
 
   // isLoading is true while MSAL is processing a redirect or popup interaction,
   // OR while the user context (profile/memberships) is still resolving.
@@ -97,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       setMemberships([]);
     } finally {
-      setContextLoading(false);
+      setContextSettledFor(account.localAccountId);
     }
   };
 
@@ -110,7 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       setMemberships([]);
       setCurrentOrg(null);
-      setContextLoading(false);
+      // Signed out: forget the settled marker so a future sign-in of the same
+      // account starts in the loading state again.
+      setContextSettledFor(null);
     }
   }, [account?.localAccountId, inProgress]);
 

@@ -4,9 +4,8 @@ import { Trans, useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { SearchFilter, FilterConfig } from '@/components/ui/search-filter';
+import { Input } from '@/components/ui/input';
+import { LevelBadge } from '@/components/ui/level-badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,22 +16,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useFlash } from '@/hooks/useFlash';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { callApi } from '@/lib/api-client';
-import { Course, Enrollment, CourseLevel } from '@/lib/types';
+import { Course, Enrollment } from '@/lib/types';
 import { getSignedLmsAssetUrl } from '@/lib/storage';
-import { BookOpen, Play, Clock, CheckCircle2, Loader2, MoreVertical, LogOut } from 'lucide-react';
+import { BookOpen, Check, CheckCircle2, Loader2, LogOut, Play, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerCourses() {
-  const { user, currentOrg, profile } = useAuth();
+  const { user, currentOrg } = useAuth();
+  const orgGuard = useOrgGuard();
   const { t } = useTranslation();
+  const { flashed, flash } = useFlash();
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [search, setSearch] = useState('');
@@ -48,15 +47,13 @@ export default function LearnerCourses() {
   const [unenrolling, setUnenrolling] = useState(false);
 
   const fetchData = async () => {
-    if (!user || !currentOrg) {
-      if (!user) {
-        // No authenticated user — nothing to load
-        setLoading(false);
-      } else if (profile) {
-        // User context resolved (profile non-null) but no org available — done loading
+    // Canonical profile-gated guard (useOrgGuard): while the user context is
+    // still resolving keep the spinner; with no org available stop loading;
+    // the redundant !currentOrg check is for TypeScript narrowing only.
+    if (orgGuard !== 'ready' || !currentOrg) {
+      if (orgGuard === 'no-org') {
         setLoading(false);
       }
-      // else: user exists but profile not yet fetched — keep spinner
       return;
     }
 
@@ -83,7 +80,8 @@ export default function LearnerCourses() {
 
   useEffect(() => {
     fetchData();
-  }, [user, currentOrg, profile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgGuard, currentOrg]);
 
   const handleEnroll = async (courseId: string) => {
     if (!user || !currentOrg) return;
@@ -92,10 +90,8 @@ export default function LearnerCourses() {
 
     try {
       await callApi('/api/enroll', { orgId: currentOrg.id, courseId });
-      toast({
-        title: t('courses.enrolledSuccessfully'),
-        description: t('courses.startLearningNow'),
-      });
+      // Routine confirmation: in-button "Enrolled" morph, no success toast.
+      flash(`enr-${courseId}`);
       fetchData();
     } catch (error) {
       toast({
@@ -136,39 +132,13 @@ export default function LearnerCourses() {
     return enrollments.find(e => e.course_id === courseId);
   };
 
-  const courseFilters: FilterConfig[] = [
-    {
-      key: 'level',
-      label: t('courses.level'),
-      options: [
-        { value: 'basic', label: t('courses.levels.basic') },
-        { value: 'intermediate', label: t('courses.levels.intermediate') },
-        { value: 'advanced', label: t('courses.levels.advanced') },
-      ],
-    },
-    {
-      key: 'status',
-      label: t('courses.status'),
-      options: [
-        { value: 'enrolled', label: t('courses.statusOptions.enrolled') },
-        { value: 'completed', label: t('courses.statusOptions.completed') },
-        { value: 'not_enrolled', label: t('courses.statusOptions.notEnrolled') },
-      ],
-    },
-  ];
-
-  const filterValues = { level: levelFilter, status: statusFilter };
-
-  const handleFilterChange = (key: string, value: string) => {
-    if (key === 'level') setLevelFilter(value);
-    if (key === 'status') setStatusFilter(value);
-  };
-
   const clearFilters = () => {
     setSearch('');
     setLevelFilter('all');
     setStatusFilter('all');
   };
+
+  const hasActiveFilters = search.trim() !== '' || levelFilter !== 'all' || statusFilter !== 'all';
 
   const filteredCourses = courses.filter(course => {
     // Search filter
@@ -193,27 +163,19 @@ export default function LearnerCourses() {
     return matchesSearch && matchesLevel && matchesStatus;
   });
 
-  const levelColors = {
-    basic: 'bg-green-100 text-green-800',
-    intermediate: 'bg-yellow-100 text-yellow-800',
-    advanced: 'bg-red-100 text-red-800',
-  };
-
   if (loading) {
     return (
-      <AppLayout title={t('courses.title')} breadcrumbs={[{ label: t('nav.courses') }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+      <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
+        <PageSpinner />
       </AppLayout>
     );
   }
 
   if (!currentOrg) {
     return (
-      <AppLayout title={t('courses.title')} breadcrumbs={[{ label: t('nav.courses') }]}>
+      <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
-          <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/50" />
           <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
           <p className="text-sm text-muted-foreground">{t('courses.joinOrgToAccessCourses')}</p>
         </div>
@@ -221,19 +183,59 @@ export default function LearnerCourses() {
     );
   }
 
+  const selectClasses =
+    'cursor-pointer rounded-xl border border-input bg-card py-[11px] pl-[13px] text-[13px] font-semibold text-[#2a2d3a] outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(16,41,143,0.10)]';
+
   return (
-    <AppLayout title={t('courses.title')} breadcrumbs={[{ label: t('nav.courses') }]}>
-      {/* Search and Filters */}
-      <div className="mb-6">
-        <SearchFilter
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder={t('courses.searchPlaceholder')}
-          filters={courseFilters}
-          filterValues={filterValues}
-          onFilterChange={handleFilterChange}
-          onClearFilters={clearFilters}
-        />
+    <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
+      {/* Page header */}
+      <div className="mb-[22px]">
+        <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('courses.title')}</h1>
+        <p className="text-sm text-muted-foreground">{t('courses.subtitle', { orgName: currentOrg.name })}</p>
+      </div>
+
+      {/* Search and filters */}
+      <div className="mb-[22px] flex flex-wrap items-center gap-2.5">
+        <div className="relative min-w-[200px] flex-1">
+          <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('courses.searchPlaceholder')}
+            className="h-auto rounded-xl bg-card py-[11px] pl-10 pr-3.5 text-[13.5px] md:text-[13.5px]"
+          />
+        </div>
+        <select
+          value={levelFilter}
+          onChange={(e) => setLevelFilter(e.target.value)}
+          aria-label={t('courses.level')}
+          className={selectClasses}
+        >
+          <option value="all">{t('courses.allLevels')}</option>
+          <option value="basic">{t('courses.levels.basic')}</option>
+          <option value="intermediate">{t('courses.levels.intermediate')}</option>
+          <option value="advanced">{t('courses.levels.advanced')}</option>
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label={t('courses.status')}
+          className={selectClasses}
+        >
+          <option value="all">{t('courses.anyStatus')}</option>
+          <option value="enrolled">{t('courses.statusOptions.enrolled')}</option>
+          <option value="completed">{t('courses.statusOptions.completed')}</option>
+          <option value="not_enrolled">{t('courses.statusOptions.notEnrolled')}</option>
+        </select>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold text-muted-foreground hover:text-primary"
+          >
+            {t('common.clear')}
+          </button>
+        )}
       </div>
 
       {filteredCourses.length === 0 ? (
@@ -245,88 +247,81 @@ export default function LearnerCourses() {
               ? t('courses.noCoursesMatch')
               : t('courses.noCoursesForOrg')
           }
+          className="rounded-2xl border-[#d6d8e0] bg-card"
         />
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredCourses.map((course) => {
             const enrollment = getEnrollmentStatus(course.id);
+            const isCompleted = enrollment?.status === 'completed';
+            const justEnrolled = flashed(`enr-${course.id}`);
 
             return (
-              <Card key={course.id} className="overflow-hidden transition-shadow hover:shadow-card-hover">
-                <div className="aspect-video bg-gradient-to-br from-primary/80 to-primary relative overflow-hidden">
+              <div
+                key={course.id}
+                className="hover-lift flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+              >
+                {/* Thumbnail with status badge */}
+                <div className="relative h-[118px] bg-gradient-to-br from-primary/80 to-primary">
                   {course.thumbnail_url && (
                     <img
                       src={course.thumbnail_url}
                       alt={course.title}
-                      className="absolute inset-0 w-full h-full object-cover"
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                   )}
-                  {enrollment?.status === 'completed' && (
-                    <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-success px-2 py-1 text-xs font-medium text-success-foreground">
-                      <CheckCircle2 className="h-3 w-3" />
+                  {isCompleted ? (
+                    <span className="absolute right-3 top-3 inline-flex items-center gap-[5px] rounded-[7px] bg-success px-[11px] py-[5px] text-[11px] font-bold text-success-foreground">
+                      <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
                       {t('dashboard.completed')}
-                    </div>
-                  )}
-                  {enrollment && enrollment.status !== 'completed' && (
-                    <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs font-medium text-accent-foreground">
+                    </span>
+                  ) : enrollment ? (
+                    <span className="absolute right-3 top-3 inline-flex items-center rounded-[7px] bg-[rgba(13,21,60,0.45)] px-[11px] py-[5px] text-[11px] font-bold text-white">
                       {t('common.enrolled')}
-                    </div>
-                  )}
+                    </span>
+                  ) : null}
                 </div>
-                <CardContent className="p-4">
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <h3 className="font-display font-semibold leading-tight">
-                      {course.title}
-                    </h3>
-                    <div className="flex items-center gap-1">
-                      <Badge className={levelColors[course.level]}>
-                        {course.level}
-                      </Badge>
-                      {enrollment && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => setUnenrollDialog({ open: true, course, enrollment })}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <LogOut className="mr-2 h-4 w-4" />
-                              {t('courses.unenrollFromCourse')}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
+
+                <div className="flex flex-1 flex-col gap-[9px] px-[18px] pb-[18px] pt-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-[14.5px] font-bold leading-[1.35]">{course.title}</h3>
+                    <LevelBadge level={course.level} className="shrink-0" />
                   </div>
-                  <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
+                  <p className="line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
                     {course.description}
                   </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>{t('common.selfPaced')}</span>
-                    </div>
-                    
-                    {enrollment ? (
-                      <Link to={`/app/learn/${course.id}`}>
-                        <Button size="sm">
-                          <Play className="mr-1 h-3 w-3" />
-                          {enrollment.status === 'completed' ? t('common.review') : t('common.continue')}
-                        </Button>
-                      </Link>
+
+                  <div className="mt-auto flex items-center gap-2">
+                    {justEnrolled ? (
+                      // Transient post-enroll morph; reverts to Continue when the flash expires
+                      <Button className="h-auto flex-1 rounded-[10px] border border-success bg-success px-3 py-[9px] text-[13px] font-bold text-success-foreground hover:bg-success">
+                        <Check aria-hidden="true" />
+                        {t('common.enrolled')}
+                      </Button>
+                    ) : enrollment ? (
+                      <Button
+                        asChild
+                        className={cn(
+                          'h-auto flex-1 rounded-[10px] px-3 py-[9px] text-[13px] font-bold',
+                          isCompleted
+                            ? 'border border-[#cfd6ef] bg-card text-primary hover:bg-accent'
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        )}
+                      >
+                        <Link to={`/app/learn/${course.id}`}>
+                          <Play aria-hidden="true" />
+                          {isCompleted ? t('courses.reviewCourse') : t('common.continue')}
+                        </Link>
+                      </Button>
                     ) : (
                       <Button
-                        size="sm"
                         onClick={() => handleEnroll(course.id)}
                         disabled={enrolling === course.id}
+                        className="h-auto flex-1 rounded-[10px] border border-[#cfd6ef] bg-card px-3 py-[9px] text-[13px] font-bold text-primary hover:bg-accent"
                       >
                         {enrolling === course.id ? (
                           <>
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                            <Loader2 className="animate-spin" />
                             {t('common.enrolling')}
                           </>
                         ) : (
@@ -334,9 +329,21 @@ export default function LearnerCourses() {
                         )}
                       </Button>
                     )}
+                    {enrollment && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        title={t('courses.unenrollFromCourse')}
+                        aria-label={t('courses.unenrollFromCourse')}
+                        onClick={() => setUnenrollDialog({ open: true, course, enrollment })}
+                        className="h-9 w-9 shrink-0 rounded-[10px] text-[#9aa0af] hover:border-[#f0c7c7] hover:bg-card hover:text-destructive"
+                      >
+                        <LogOut aria-hidden="true" className="h-[15px] w-[15px]" />
+                      </Button>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             );
           })}
         </div>

@@ -158,12 +158,14 @@ describe('grade-quiz', () => {
     expect(JSON.stringify(body)).not.toContain('is_correct');
   });
 
-  it('returns 500 on database error', async () => {
+  it('returns 500 on database error with generic body, real error logged on context', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('DB connection failed'));
+    const ctx = { error: vi.fn() };
 
-    const res = await handler(baseReq as any, {} as any);
+    const res = await handler(baseReq as any, ctx as any);
 
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string).error).toBe('DB connection failed');
+    expect(JSON.parse(res.body as string).error).toBe('Internal server error');
+    expect(ctx.error).toHaveBeenCalledWith(expect.stringContaining('DB connection failed'));
   });
 });

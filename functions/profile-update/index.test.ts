@@ -152,13 +152,23 @@ describe('profile-update', () => {
     expect(nullCount).toBeGreaterThanOrEqual(2);
   });
 
-  // 10. 500 on db error propagates message
+  // 10. 404 when the profile row vanishes between getProfile and the UPDATE
+  it('returns 404 when the UPDATE matches no row (profile deleted mid-request)', async () => {
+    mockQueryOne.mockResolvedValueOnce(null); // UPDATE ... RETURNING → no row
+
+    const res = await handler(baseReq({ preferred_language: 'da' }), {} as any);
+
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
+  });
+
+  // 11. 500 on db error propagates message
   it('returns 500 when the database throws', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
 
-    const res = await handler(baseReq({ preferred_language: 'en' }), {} as any);
+    const res = await handler(baseReq({ preferred_language: 'en' }), { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

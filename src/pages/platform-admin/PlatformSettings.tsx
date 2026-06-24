@@ -1,16 +1,26 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { SlidingTabs } from '@/components/ui/sliding-tabs';
+import { SaveButton } from '@/components/ui/save-button';
+import { useFlash } from '@/hooks/useFlash';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
-import { Loader2, Palette, Users, Mail, ToggleLeft, Save, AlertTriangle } from 'lucide-react';
+import { Loader2, Palette, Users, Mail, ToggleLeft, AlertTriangle } from 'lucide-react';
 
 interface BrandingSettings {
   platform_name: string;
@@ -84,12 +94,22 @@ const defaultFeatures: FeatureSettings = {
   course_reviews_enabled: false,
 };
 
+const featureKeys: (keyof FeatureSettings)[] = [
+  'certificates_enabled',
+  'quizzes_enabled',
+  'analytics_enabled',
+  'community_enabled',
+  'course_reviews_enabled',
+];
+
 export default function PlatformSettings() {
   const { t } = useTranslation();
+  const { flashed, flash } = useFlash();
   const [loading, setLoading] = useState(true);
   const [populated, setPopulated] = useState(false);
   const [saving, setSaving] = useState<SettingsKey | null>(null);
   const [testingSmtp, setTestingSmtp] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsKey>('branding');
 
   const [branding, setBranding] = useState<BrandingSettings>(defaultBranding);
   const [userAccess, setUserAccess] = useState<UserAccessSettings>(defaultUserAccess);
@@ -120,7 +140,7 @@ export default function PlatformSettings() {
       setPopulated(true);
     } catch (error) {
       toast({
-        title: 'Failed to load settings',
+        title: t('platformSettings.loadFailedTitle'),
         description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
@@ -128,24 +148,27 @@ export default function PlatformSettings() {
       setLoading(false);
     }
     // deps deliberately empty: closes only over module constants and stable setters — referencing component state here would create a stale closure
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
+  // Per-panel save. Sends ONLY the panel's fields under `value`; the server
+  // merges with the stored config (`value || $2::jsonb`), so partial/malformed
+  // writes never clobber other keys (#90). Routine saves morph the button
+  // ("Saved" / green) instead of firing a success toast (toast policy); errors
+  // keep their toast.
   const saveSetting = async (key: SettingsKey, value: BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings) => {
     if (!populated) return;
     setSaving(key);
     try {
       await callApi('/api/platform-settings-update', { key, value });
-      toast({
-        title: 'Settings saved',
-        description: 'Your changes have been applied.',
-      });
+      flash(key);
     } catch (error) {
       toast({
-        title: 'Failed to save',
+        title: t('platformSettings.saveFailed'),
         description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
@@ -167,18 +190,18 @@ export default function PlatformSettings() {
       });
 
       if (!data?.success) {
-        throw new Error(data?.error || 'Connection test failed');
+        throw new Error(data?.error || t('platformSettings.email.testFailedFallback'));
       }
 
       toast({
-        title: 'SMTP test successful',
-        description: data.message || 'Connection and authentication succeeded.',
+        title: t('platformSettings.email.testSuccessTitle'),
+        description: data.message || t('platformSettings.email.testSuccessDescription'),
       });
       setEmail((prev) => ({ ...prev, smtp_configured: true }));
     } catch (error: any) {
       toast({
-        title: 'SMTP test failed',
-        description: error?.message || 'Unable to connect to SMTP server.',
+        title: t('platformSettings.email.testFailedTitle'),
+        description: error?.message || t('platformSettings.email.testFailedDescription'),
         variant: 'destructive',
       });
       setEmail((prev) => ({ ...prev, smtp_configured: false }));
@@ -189,17 +212,15 @@ export default function PlatformSettings() {
 
   if (loading) {
     return (
-      <AppLayout title="Platform Settings" breadcrumbs={[{ label: 'Settings' }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+      <AppLayout breadcrumbs={[{ label: t('platformSettings.title') }]}>
+        <PageSpinner />
       </AppLayout>
     );
   }
 
   if (!populated) {
     return (
-      <AppLayout title="Platform Settings" breadcrumbs={[{ label: 'Settings' }]}>
+      <AppLayout breadcrumbs={[{ label: t('platformSettings.title') }]}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<AlertTriangle className="h-6 w-6" />}
@@ -216,37 +237,42 @@ export default function PlatformSettings() {
     );
   }
 
-  return (
-    <AppLayout title="Platform Settings" breadcrumbs={[{ label: 'Platform Settings' }]}>
-      <Tabs defaultValue="branding" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-none lg:flex">
-          <TabsTrigger value="branding" className="gap-2">
-            <Palette className="h-4 w-4" />
-            <span className="hidden sm:inline">Branding</span>
-          </TabsTrigger>
-          <TabsTrigger value="user_access" className="gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">User & Access</span>
-          </TabsTrigger>
-          <TabsTrigger value="email" className="gap-2">
-            <Mail className="h-4 w-4" />
-            <span className="hidden sm:inline">Email</span>
-          </TabsTrigger>
-          <TabsTrigger value="features" className="gap-2">
-            <ToggleLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Features</span>
-          </TabsTrigger>
-        </TabsList>
+  const tabs = [
+    { key: 'branding', label: t('platformSettings.tabs.branding'), icon: <Palette className="h-4 w-4" /> },
+    { key: 'user_access', label: t('platformSettings.tabs.userAccess'), icon: <Users className="h-4 w-4" /> },
+    { key: 'email', label: t('platformSettings.tabs.email'), icon: <Mail className="h-4 w-4" /> },
+    { key: 'features', label: t('platformSettings.tabs.features'), icon: <ToggleLeft className="h-4 w-4" /> },
+  ];
 
-        <TabsContent value="branding">
+  const brandingColors: { key: keyof BrandingSettings; label: string; placeholder: string }[] = [
+    { key: 'primary_color', label: t('platformSettings.branding.primaryColor'), placeholder: '#6366f1' },
+    { key: 'accent_color', label: t('platformSettings.branding.accentColor'), placeholder: '#10b981' },
+    { key: 'sidebar_primary_color', label: t('platformSettings.branding.sidebarPrimaryColor'), placeholder: '#10b981' },
+    { key: 'sidebar_accent_color', label: t('platformSettings.branding.sidebarAccentColor'), placeholder: '#1f2937' },
+  ];
+
+  return (
+    <AppLayout breadcrumbs={[{ label: t('platformSettings.title') }]}>
+      <div className="max-w-[760px]">
+        <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+          {t('platformSettings.title')}
+        </h1>
+        <p className="mb-5 text-sm text-muted-foreground">{t('platformSettings.subtitle')}</p>
+
+        <SlidingTabs
+          tabs={tabs}
+          active={activeTab}
+          onChange={(k) => setActiveTab(k as SettingsKey)}
+          className="mb-5"
+        />
+
+        {activeTab === 'branding' && (
           <Card>
-            <CardHeader>
-              <CardTitle>Branding</CardTitle>
-              <CardDescription>Customize the look and feel of your platform.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="platform_name">Platform Name</Label>
+            <CardContent className="space-y-[18px] px-[26px] py-6">
+              <div className="space-y-1.5">
+                <Label htmlFor="platform_name" className="text-xs font-bold text-[#4a4f60]">
+                  {t('platformSettings.branding.platformName')}
+                </Label>
                 <Input
                   id="platform_name"
                   value={branding.platform_name}
@@ -255,188 +281,154 @@ export default function PlatformSettings() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="primary_color">Primary Color</Label>
-                <div className="flex gap-3">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                {brandingColors.map((c) => (
+                  <div key={c.key} className="space-y-1.5">
+                    <Label htmlFor={c.key} className="text-xs font-bold text-[#4a4f60]">
+                      {c.label}
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-[38px] w-[38px] shrink-0 rounded-[10px] border border-input"
+                        style={{ background: (branding[c.key] as string) || '#ffffff' }}
+                      />
+                      <Input
+                        id={c.key}
+                        value={(branding[c.key] as string) || ''}
+                        onChange={(e) => setBranding({ ...branding, [c.key]: e.target.value })}
+                        placeholder={c.placeholder}
+                        className="flex-1 font-mono text-[13px]"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="logo_url" className="text-xs font-bold text-[#4a4f60]">
+                    {t('platformSettings.branding.logoUrl')}
+                  </Label>
                   <Input
-                    id="primary_color"
-                    type="color"
-                    value={branding.primary_color}
-                    onChange={(e) => setBranding({ ...branding, primary_color: e.target.value })}
-                    className="h-10 w-16 p-1"
+                    id="logo_url"
+                    value={branding.logo_url || ''}
+                    onChange={(e) => setBranding({ ...branding, logo_url: e.target.value || null })}
+                    placeholder="https://example.com/logo.png"
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="favicon_url" className="text-xs font-bold text-[#4a4f60]">
+                    {t('platformSettings.branding.faviconUrl')}
+                  </Label>
                   <Input
-                    value={branding.primary_color}
-                    onChange={(e) => setBranding({ ...branding, primary_color: e.target.value })}
-                    placeholder="#6366f1"
-                    className="flex-1"
+                    id="favicon_url"
+                    value={branding.favicon_url || ''}
+                    onChange={(e) => setBranding({ ...branding, favicon_url: e.target.value || null })}
+                    placeholder="https://example.com/favicon.png"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="accent_color">Accent Color</Label>
-                <div className="flex gap-3">
-                  <Input
-                    id="accent_color"
-                    type="color"
-                    value={branding.accent_color}
-                    onChange={(e) => setBranding({ ...branding, accent_color: e.target.value })}
-                    className="h-10 w-16 p-1"
-                  />
-                  <Input
-                    value={branding.accent_color}
-                    onChange={(e) => setBranding({ ...branding, accent_color: e.target.value })}
-                    placeholder="#10b981"
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sidebar_primary_color">Sidebar Primary Color</Label>
-                <div className="flex gap-3">
-                  <Input
-                    id="sidebar_primary_color"
-                    type="color"
-                    value={branding.sidebar_primary_color}
-                    onChange={(e) => setBranding({ ...branding, sidebar_primary_color: e.target.value })}
-                    className="h-10 w-16 p-1"
-                  />
-                  <Input
-                    value={branding.sidebar_primary_color}
-                    onChange={(e) => setBranding({ ...branding, sidebar_primary_color: e.target.value })}
-                    placeholder="#10b981"
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sidebar_accent_color">Sidebar Accent Color</Label>
-                <div className="flex gap-3">
-                  <Input
-                    id="sidebar_accent_color"
-                    type="color"
-                    value={branding.sidebar_accent_color}
-                    onChange={(e) => setBranding({ ...branding, sidebar_accent_color: e.target.value })}
-                    className="h-10 w-16 p-1"
-                  />
-                  <Input
-                    value={branding.sidebar_accent_color}
-                    onChange={(e) => setBranding({ ...branding, sidebar_accent_color: e.target.value })}
-                    placeholder="#1f2937"
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="logo_url">Logo URL</Label>
-                <Input
-                  id="logo_url"
-                  value={branding.logo_url || ''}
-                  onChange={(e) => setBranding({ ...branding, logo_url: e.target.value || null })}
-                  placeholder="https://example.com/logo.png"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="favicon_url">Favicon URL</Label>
-                <Input
-                  id="favicon_url"
-                  value={branding.favicon_url || ''}
-                  onChange={(e) => setBranding({ ...branding, favicon_url: e.target.value || null })}
-                  placeholder="https://example.com/favicon.png"
-                />
-              </div>
-
-              <Button onClick={() => saveSetting('branding', branding)} disabled={saving === 'branding'}>
-                {saving === 'branding' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Branding
-              </Button>
+              <SaveButton
+                done={flashed('branding')}
+                idleLabel={t('platformSettings.branding.save')}
+                onClick={() => saveSetting('branding', branding)}
+                disabled={saving === 'branding'}
+              />
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
-        <TabsContent value="user_access">
+        {activeTab === 'user_access' && (
           <Card>
-            <CardHeader>
-              <CardTitle>User & Access</CardTitle>
-              <CardDescription>Configure user registration and access policies.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="rounded-lg border p-4 bg-muted/50">
-                <Label>Default Role for New Users</Label>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  New users are always created as <strong>Learner</strong>. Elevated access is granted via explicit admin invitation flows.
+            <CardContent className="space-y-[18px] px-[26px] py-6">
+              <div className="rounded-xl border border-[#eceef3] bg-muted/50 p-4">
+                <Label className="text-[13.5px] font-bold">{t('platformSettings.userAccess.defaultRole')}</Label>
+                <p className="mt-1 text-[11.5px] text-muted-foreground">
+                  {t('platformSettings.userAccess.defaultRoleNote')}
                 </p>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label>Require Email Verification</Label>
-                  <p className="text-sm text-muted-foreground">Users must verify their email before accessing the platform.</p>
+              <div className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]">
+                <div className="flex flex-col gap-px">
+                  <Label htmlFor="require_email_verification" className="text-[13.5px] font-bold">
+                    {t('platformSettings.userAccess.requireEmailVerification')}
+                  </Label>
+                  <p className="text-[11.5px] text-muted-foreground">
+                    {t('platformSettings.userAccess.requireEmailVerificationHint')}
+                  </p>
                 </div>
                 <Switch
+                  id="require_email_verification"
                   checked={userAccess.require_email_verification}
                   onCheckedChange={(checked) => setUserAccess({ ...userAccess, require_email_verification: checked })}
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label>Allow Self Registration</Label>
-                  <p className="text-sm text-muted-foreground">Allow users to sign up without an invitation.</p>
+              <div className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]">
+                <div className="flex flex-col gap-px">
+                  <Label htmlFor="allow_self_registration" className="text-[13.5px] font-bold">
+                    {t('platformSettings.userAccess.allowSelfRegistration')}
+                  </Label>
+                  <p className="text-[11.5px] text-muted-foreground">
+                    {t('platformSettings.userAccess.allowSelfRegistrationHint')}
+                  </p>
                 </div>
                 <Switch
+                  id="allow_self_registration"
                   checked={userAccess.allow_self_registration}
                   onCheckedChange={(checked) => setUserAccess({ ...userAccess, allow_self_registration: checked })}
                 />
               </div>
 
-              <Button
+              <SaveButton
+                done={flashed('user_access')}
+                idleLabel={t('platformSettings.userAccess.save')}
                 onClick={() => saveSetting('user_access', { ...userAccess, default_role: 'learner' })}
                 disabled={saving === 'user_access'}
-              >
-                {saving === 'user_access' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save User Settings
-              </Button>
+              />
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
-        <TabsContent value="email">
+        {activeTab === 'email' && (
           <Card>
-            <CardHeader>
-              <CardTitle>Email & Notifications</CardTitle>
-              <CardDescription>Configure email sender settings and SMTP delivery.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="from_name">Sender Name</Label>
-                <Input
-                  id="from_name"
-                  value={email.from_name}
-                  onChange={(e) => setEmail({ ...email, from_name: e.target.value })}
-                  placeholder="AIR Academy"
-                />
-              </div>
+            <CardContent className="space-y-3.5 px-[26px] py-6">
+              {!email.smtp_configured && (
+                <div className="flex items-center gap-2.5 rounded-xl border border-[#efddb2] bg-[#fbf2dd] px-4 py-3 text-[12.5px] font-semibold text-[#8a5e10]">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  {t('platformSettings.email.notConfiguredWarning')}
+                </div>
+              )}
 
-              <div className="space-y-2">
-                <Label htmlFor="from_email">Sender Email</Label>
-                <Input
-                  id="from_email"
-                  type="email"
-                  value={email.from_email || ''}
-                  onChange={(e) => setEmail({ ...email, from_email: e.target.value || null })}
-                  placeholder="noreply@example.com"
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp_host">SMTP Host</Label>
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="from_name" className="text-xs font-bold text-[#4a4f60]">
+                    {t('platformSettings.email.fromName')}
+                  </Label>
+                  <Input
+                    id="from_name"
+                    value={email.from_name}
+                    onChange={(e) => setEmail({ ...email, from_name: e.target.value })}
+                    placeholder="AIR Academy"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="from_email" className="text-xs font-bold text-[#4a4f60]">
+                    {t('platformSettings.email.fromEmail')}
+                  </Label>
+                  <Input
+                    id="from_email"
+                    type="email"
+                    value={email.from_email || ''}
+                    onChange={(e) => setEmail({ ...email, from_email: e.target.value || null })}
+                    placeholder="noreply@example.com"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="smtp_host" className="text-xs font-bold text-[#4a4f60]">
+                    {t('platformSettings.email.smtpHost')}
+                  </Label>
                   <Input
                     id="smtp_host"
                     value={email.smtp_host}
@@ -444,8 +436,10 @@ export default function PlatformSettings() {
                     placeholder="smtp.example.com"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="smtp_port">SMTP Port</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="smtp_port" className="text-xs font-bold text-[#4a4f60]">
+                    {t('platformSettings.email.smtpPort')}
+                  </Label>
                   <Input
                     id="smtp_port"
                     type="number"
@@ -455,11 +449,10 @@ export default function PlatformSettings() {
                     placeholder="587"
                   />
                 </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp_username">SMTP Username</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="smtp_username" className="text-xs font-bold text-[#4a4f60]">
+                    {t('platformSettings.email.smtpUsername')}
+                  </Label>
                   <Input
                     id="smtp_username"
                     value={email.smtp_username}
@@ -467,8 +460,10 @@ export default function PlatformSettings() {
                     placeholder="smtp-user"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="smtp_password">SMTP Password</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="smtp_password" className="text-xs font-bold text-[#4a4f60]">
+                    {t('platformSettings.email.smtpPassword')}
+                  </Label>
                   <Input
                     id="smtp_password"
                     type="password"
@@ -479,119 +474,79 @@ export default function PlatformSettings() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="smtp_encryption">Encryption</Label>
-                <div className="flex gap-2">
-                  {(['none', 'starttls', 'ssl_tls'] as const).map((mode) => (
-                    <Button
-                      key={mode}
-                      type="button"
-                      variant={email.smtp_encryption === mode ? 'default' : 'outline'}
-                      onClick={() => setEmail({ ...email, smtp_encryption: mode })}
-                    >
-                      {mode === 'none' ? 'None' : mode === 'starttls' ? 'STARTTLS' : 'SSL/TLS'}
-                    </Button>
-                  ))}
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="smtp_encryption" className="text-xs font-bold text-[#4a4f60]">
+                  {t('platformSettings.email.encryption')}
+                </Label>
+                <Select
+                  value={email.smtp_encryption}
+                  onValueChange={(value) => setEmail({ ...email, smtp_encryption: value as EmailSettings['smtp_encryption'] })}
+                >
+                  <SelectTrigger id="smtp_encryption" className="w-[200px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="starttls">{t('platformSettings.email.encryptionStarttls')}</SelectItem>
+                    <SelectItem value="ssl_tls">{t('platformSettings.email.encryptionSslTls')}</SelectItem>
+                    <SelectItem value="none">{t('platformSettings.email.encryptionNone')}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/50">
-                <div className="space-y-0.5">
-                  <Label>SMTP Configuration</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {email.smtp_configured ? 'SMTP connection is configured and verified.' : 'SMTP settings not yet verified.'}
-                  </p>
-                </div>
-                <span className={`text-sm font-medium ${email.smtp_configured ? 'text-green-600' : 'text-muted-foreground'}`}>
-                  {email.smtp_configured ? 'Configured' : 'Not Configured'}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap items-center gap-3 pt-1">
                 <Button type="button" variant="outline" onClick={handleTestSmtpConnection} disabled={testingSmtp}>
                   {testingSmtp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Test Connection
+                  {t('platformSettings.email.testConnection')}
                 </Button>
 
-                <Button onClick={() => saveSetting('email', email)} disabled={saving === 'email'}>
-                  {saving === 'email' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Save Email Settings
-                </Button>
+                <SaveButton
+                  done={flashed('email')}
+                  idleLabel={t('platformSettings.email.save')}
+                  onClick={() => saveSetting('email', email)}
+                  disabled={saving === 'email'}
+                />
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
-        <TabsContent value="features">
+        {activeTab === 'features' && (
           <Card>
-            <CardHeader>
-              <CardTitle>Feature Toggles</CardTitle>
-              <CardDescription>Enable or disable platform features.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label>Certificates</Label>
-                  <p className="text-sm text-muted-foreground">Allow learners to earn certificates upon course completion.</p>
-                </div>
-                <Switch
-                  checked={features.certificates_enabled}
-                  onCheckedChange={(checked) => setFeatures({ ...features, certificates_enabled: checked })}
-                />
+            <CardContent className="space-y-2.5 px-[26px] py-6">
+              <p className="mb-4 text-[13px] text-muted-foreground">{t('platformSettings.features.note')}</p>
+              <div className="mb-[22px] flex flex-col gap-2.5">
+                {featureKeys.map((key) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]"
+                  >
+                    <div className="flex flex-col gap-px">
+                      <Label htmlFor={`feature-${key}`} className="text-[13.5px] font-bold">
+                        {t(`platformSettings.features.${key}`)}
+                      </Label>
+                      <p className="text-[11.5px] text-muted-foreground">
+                        {t(`platformSettings.features.${key}_hint`)}
+                      </p>
+                    </div>
+                    <Switch
+                      id={`feature-${key}`}
+                      checked={features[key]}
+                      onCheckedChange={(checked) => setFeatures({ ...features, [key]: checked })}
+                    />
+                  </div>
+                ))}
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label>Quizzes</Label>
-                  <p className="text-sm text-muted-foreground">Enable quiz lessons in courses.</p>
-                </div>
-                <Switch
-                  checked={features.quizzes_enabled}
-                  onCheckedChange={(checked) => setFeatures({ ...features, quizzes_enabled: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label>Analytics</Label>
-                  <p className="text-sm text-muted-foreground">Show analytics dashboards to org admins.</p>
-                </div>
-                <Switch
-                  checked={features.analytics_enabled}
-                  onCheckedChange={(checked) => setFeatures({ ...features, analytics_enabled: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label>Community</Label>
-                  <p className="text-sm text-muted-foreground">Enable community feed, ideas and moderation features.</p>
-                </div>
-                <Switch
-                  checked={features.community_enabled}
-                  onCheckedChange={(checked) => setFeatures({ ...features, community_enabled: checked })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label>Course Reviews</Label>
-                  <p className="text-sm text-muted-foreground">Allow learners to leave reviews on courses.</p>
-                </div>
-                <Switch
-                  checked={features.course_reviews_enabled}
-                  onCheckedChange={(checked) => setFeatures({ ...features, course_reviews_enabled: checked })}
-                />
-              </div>
-
-              <Button onClick={() => saveSetting('features', features)} disabled={saving === 'features'}>
-                {saving === 'features' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Feature Settings
-              </Button>
+              <SaveButton
+                done={flashed('features')}
+                idleLabel={t('platformSettings.features.save')}
+                onClick={() => saveSetting('features', features)}
+                disabled={saving === 'features'}
+              />
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
     </AppLayout>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
@@ -37,6 +37,7 @@ vi.mock('@/hooks/usePlatformSettings', () => ({
 
 import OrgSettings from './OrgSettings';
 import { callApi } from '@/lib/api-client';
+import { toast } from '@/components/ui/sonner';
 
 const defaultPlatformSettings = {
   platformFeatures: {
@@ -148,8 +149,10 @@ describe('OrgSettings — three-way loading guard', () => {
     const switches = screen.queryAllByRole('switch');
     expect(switches).toHaveLength(5);
 
-    // Save button present
-    expect(screen.getByRole('button', { name: /Save Organization Settings/i })).toBeInTheDocument();
+    // Save button present (idle label key under the i18n passthrough mock)
+    expect(
+      screen.getByRole('button', { name: /orgSettings\.saveButton/i })
+    ).toBeInTheDocument();
   });
 
   it('keeps the form mounted during the post-save refetch (isLoading flips true while saving)', async () => {
@@ -164,7 +167,7 @@ describe('OrgSettings — three-way loading guard', () => {
     vi.mocked(callApi).mockReturnValue(new Promise((res) => { resolveSave = res; }));
 
     const { rerender } = renderOrgSettings();
-    fireEvent.click(screen.getByRole('button', { name: /Save Organization Settings/i }));
+    fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
 
     // The save-triggered refetch flips the shared isLoading while the save is still in flight
     mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: true });
@@ -176,10 +179,43 @@ describe('OrgSettings — three-way loading guard', () => {
 
     // Form must stay mounted — no full-page spinner swap mid-save
     expect(screen.queryAllByRole('switch')).toHaveLength(5);
-    expect(screen.getByRole('button', { name: /Save Organization Settings/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /orgSettings\.saveButton/i })).toBeInTheDocument();
 
     await act(async () => {
       resolveSave({});
     });
+  });
+
+  it('morphs the save button to the "Saved" state on a successful save (no success toast)', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg: { id: 'org-1', name: 'Test Org' },
+    });
+    const refetch = vi.fn().mockResolvedValue(undefined);
+    mockUsePlatformSettings.mockReturnValue({
+      ...defaultPlatformSettings,
+      isLoading: false,
+      refetch,
+    });
+    vi.mocked(callApi).mockResolvedValue({} as never);
+
+    renderOrgSettings();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
+    });
+
+    // Save persisted via the existing endpoint and refetched
+    expect(callApi).toHaveBeenCalledWith('/api/org-settings-update', {
+      orgId: 'org-1',
+      features: expect.any(Object),
+    });
+    expect(refetch).toHaveBeenCalled();
+
+    // In-button morph: the button now shows the "Saved" done label (no success toast)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /common\.saved/i })).toBeInTheDocument();
+    });
+    expect(toast).not.toHaveBeenCalled();
   });
 });

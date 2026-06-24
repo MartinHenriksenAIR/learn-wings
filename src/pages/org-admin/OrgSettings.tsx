@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Loader2, Building2 } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSpinner } from '@/components/ui/page-spinner';
+import { SaveButton } from '@/components/ui/save-button';
+import { useFlash } from '@/hooks/useFlash';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
@@ -20,18 +23,20 @@ type FeatureSettings = {
   community_enabled: boolean;
 };
 
-const featureLabels: Record<keyof FeatureSettings, string> = {
-  certificates_enabled: 'Certificates',
-  quizzes_enabled: 'Quizzes',
-  analytics_enabled: 'Analytics',
-  course_reviews_enabled: 'Course Reviews',
-  community_enabled: 'Community',
-};
+const featureKeys: (keyof FeatureSettings)[] = [
+  'certificates_enabled',
+  'quizzes_enabled',
+  'analytics_enabled',
+  'course_reviews_enabled',
+  'community_enabled',
+];
 
 export default function OrgSettings() {
-  const { user, profile, currentOrg } = useAuth();
+  const { currentOrg } = useAuth();
+  const orgGuard = useOrgGuard();
   const { platformFeatures, orgFeatures, isLoading, refetch } = usePlatformSettings();
   const { t } = useTranslation();
+  const { flashed, flash } = useFlash();
   const [saving, setSaving] = useState(false);
   const [localFeatures, setLocalFeatures] = useState<FeatureSettings>({
     certificates_enabled: true,
@@ -56,11 +61,12 @@ export default function OrgSettings() {
     setSaving(true);
     try {
       await callApi('/api/org-settings-update', { orgId: currentOrg.id, features: localFeatures });
-      toast({ title: 'Organization settings saved' });
+      // Routine save: in-button "Saved" morph, no success toast (toast policy).
+      flash('orgSettings');
       await refetch();
     } catch (error) {
       toast({
-        title: 'Failed to save settings',
+        title: t('orgSettings.saveFailed'),
         description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
@@ -69,15 +75,13 @@ export default function OrgSettings() {
     }
   };
 
-  // Spinner: settings still loading, OR user exists but profile not yet resolved.
+  // Spinner: settings still loading, OR user context not yet resolved (useOrgGuard).
   // `!saving` keeps the form mounted during the post-save refetch (which flips the
   // shared isLoading) — otherwise every Save flashes a full-page spinner mid-edit.
-  if ((isLoading && !saving) || (user && !profile)) {
+  if ((isLoading && !saving) || orgGuard === 'loading') {
     return (
-      <AppLayout title="Organization Settings" breadcrumbs={[{ label: 'Organization Settings' }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+      <AppLayout breadcrumbs={[{ label: t('orgSettings.title') }]}>
+        <PageSpinner />
       </AppLayout>
     );
   }
@@ -85,7 +89,7 @@ export default function OrgSettings() {
   // Empty state: resolved but no org context
   if (!currentOrg) {
     return (
-      <AppLayout title="Organization Settings" breadcrumbs={[{ label: 'Organization Settings' }]}>
+      <AppLayout breadcrumbs={[{ label: t('orgSettings.title') }]}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<Building2 className="h-6 w-6" />}
@@ -98,37 +102,57 @@ export default function OrgSettings() {
   }
 
   return (
-    <AppLayout title="Organization Settings" breadcrumbs={[{ label: 'Organization Settings' }]}>
-      <Card className="max-w-3xl">
-        <CardHeader>
-          <CardTitle>Feature Overrides</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Organization feature access is combined as: platform flag AND organization override.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {(Object.keys(featureLabels) as Array<keyof FeatureSettings>).map((key) => (
-            <div key={key} className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <Label className="text-sm font-medium">{featureLabels[key]}</Label>
-                <p className="text-xs text-muted-foreground">
-                  Platform default: {platformFeatures[key] ? 'Enabled' : 'Disabled'}
-                </p>
-              </div>
-              <Switch
-                checked={localFeatures[key]}
-                onCheckedChange={(checked) => setLocalFeatures((prev) => ({ ...prev, [key]: checked }))}
-                disabled={!platformFeatures[key]}
-              />
-            </div>
-          ))}
+    <AppLayout breadcrumbs={[{ label: t('orgSettings.title') }]}>
+      <div className="max-w-[680px]">
+        <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+          {t('orgSettings.title')}
+        </h1>
+        <p className="mb-[22px] text-sm text-muted-foreground">{t('orgSettings.combinedNote')}</p>
 
-          <Button onClick={handleSave} disabled={saving || !currentOrg}>
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save Organization Settings
-          </Button>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('orgSettings.featureOverrides')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5">
+            <div className="mb-[22px] flex flex-col gap-2.5">
+              {featureKeys.map((key) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]"
+                >
+                  <div className="flex flex-col gap-px">
+                    <Label htmlFor={`feature-${key}`} className="text-[13.5px] font-bold">
+                      {t(`orgSettings.features.${key}`)}
+                    </Label>
+                    <p className="text-[11.5px] text-muted-foreground">
+                      {t('orgSettings.platformDefault', {
+                        state: platformFeatures[key]
+                          ? t('orgSettings.enabled')
+                          : t('orgSettings.disabled'),
+                      })}
+                    </p>
+                  </div>
+                  <Switch
+                    id={`feature-${key}`}
+                    checked={localFeatures[key]}
+                    onCheckedChange={(checked) =>
+                      setLocalFeatures((prev) => ({ ...prev, [key]: checked }))
+                    }
+                    disabled={!platformFeatures[key]}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <SaveButton
+              done={flashed('orgSettings')}
+              idleLabel={t('orgSettings.saveButton')}
+              onClick={handleSave}
+              disabled={saving || !currentOrg}
+            />
+          </CardContent>
+        </Card>
+      </div>
     </AppLayout>
   );
 }

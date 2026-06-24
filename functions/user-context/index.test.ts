@@ -60,10 +60,10 @@ describe('user-context', () => {
   it('returns 500 on unexpected database error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
 
-    const res = await handler(baseReq as any, {} as any);
+    const res = await handler(baseReq as any, { error: vi.fn() } as any);
     const body = JSON.parse(res.body);
 
     expect(res.status).toBe(500);
-    expect(body.error).toBe('connection refused');
+    expect(body.error).toBe('Internal server error');
   });
 });

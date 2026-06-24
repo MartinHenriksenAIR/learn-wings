@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -25,7 +25,10 @@ import {
 import { ResourceCard } from '@/components/community/ResourceCard';
 import { ResourceForm } from '@/components/community/ResourceForm';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { toast } from '@/components/ui/sonner';
 import {
@@ -42,12 +45,13 @@ import {
   Search,
   Plus,
   Loader2,
-  FolderOpen,
 } from 'lucide-react';
 
 export default function ResourceLibrary() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
+  const orgGuard = useOrgGuard();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
 
@@ -57,15 +61,18 @@ export default function ResourceLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
+  // The input binds the raw value (stays responsive); the query key gets the
+  // debounced one, so typing fires ~one request per pause, not per keystroke (#41).
+  const debouncedSearch = useDebouncedValue(searchQuery, 250);
 
   const isAdmin = effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
   // Single fetch: filtered resources for display + the org's distinct tags for the dropdown.
   const { data, isLoading } = useQuery({
-    queryKey: ['community-resources', currentOrg?.id, searchQuery, selectedType, selectedTag],
+    queryKey: ['community-resources', currentOrg?.id, debouncedSearch, selectedType, selectedTag],
     queryFn: () =>
       fetchResources(currentOrg!.id, {
-        search: searchQuery || undefined,
+        search: debouncedSearch || undefined,
         resource_type: selectedType || undefined,
         tags: selectedTag ? [selectedTag] : undefined,
       }),
@@ -130,166 +137,174 @@ export default function ResourceLibrary() {
     return <Navigate to="/app/dashboard" replace />;
   }
 
+  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
+  // while the signed-in user's context is still resolving.
+  if (orgGuard === 'loading') {
+    return (
+      <AppLayout>
+        <PageSpinner />
+      </AppLayout>
+    );
+  }
+
   if (!currentOrg) {
     return (
       <AppLayout>
-        <div className="container mx-auto py-12 text-center">
-          <h1 className="text-2xl font-bold mb-2">No Organization Selected</h1>
-          <p className="text-muted-foreground">Please select an organization to view resources.</p>
+        <div className="py-12 text-center">
+          <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+            {t('community.noOrganizationTitle')}
+          </h1>
+          <p className="text-sm text-muted-foreground">{t('community.noOrgResources')}</p>
         </div>
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout title="Resource Library" breadcrumbs={[{ label: 'Community' }, { label: 'Resources' }]}>
-      <div className="container mx-auto py-6 px-4">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/app/community?scope=org')}
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <FolderOpen className="h-6 w-6" />
-                Resource Library
-              </h1>
-              <p className="text-muted-foreground">
-                Helpful resources, templates, and guides from {currentOrg.name}
-              </p>
-            </div>
-          </div>
-          <Button onClick={() => setShowForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Resource
-          </Button>
+    <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Resources' }]}>
+      {/* Back to community */}
+      <Button
+        variant="ghost"
+        onClick={() => navigate('/app/community?scope=org')}
+        className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
+      >
+        <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
+        {t('community.backToCommunity')}
+      </Button>
+
+      {/* Header */}
+      <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
+        <div>
+          <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+            {t('community.resourceLibrary')}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {t('community.resourceLibrarySubtitle', { orgName: currentOrg.name })}
+          </p>
         </div>
-
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="pt-4">
-            <div className="flex flex-col md:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search resources..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select
-                value={selectedType || 'all'}
-                onValueChange={(v) => setSelectedType(v === 'all' ? '' : v)}
-              >
-                <SelectTrigger className="w-full md:w-[180px]">
-                  <SelectValue placeholder="All types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All types</SelectItem>
-                  {RESOURCE_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {allTags.length > 0 && (
-                <Select
-                  value={selectedTag || 'all'}
-                  onValueChange={(v) => setSelectedTag(v === 'all' ? '' : v)}
-                >
-                  <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="All tags" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All tags</SelectItem>
-                    {allTags.map((tag) => (
-                      <SelectItem key={tag} value={tag}>
-                        #{tag}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Resources grid */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : resources.length === 0 ? (
-          <CommunityEmptyState
-            variant="resources"
-            onAction={() => setShowForm(true)}
-            actionLabel="Add First Resource"
-          />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {resources.map((resource) => (
-              <ResourceCard
-                key={resource.id}
-                resource={resource}
-                isOwner={resource.user_id === profile?.id}
-                isAdmin={isAdmin}
-                onEdit={() => {
-                  setEditingResource(resource);
-                  setShowForm(true);
-                }}
-                onDelete={() => setDeleteConfirm(resource)}
-                onTogglePin={(pinned) => pinMutation.mutate({ id: resource.id, pinned })}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Add/Edit form */}
-        <ResourceForm
-          open={showForm}
-          onOpenChange={(open) => {
-            setShowForm(open);
-            if (!open) setEditingResource(null);
-          }}
-          editResource={editingResource}
-          onSubmit={async (data) => {
-            if (editingResource) {
-              await updateMutation.mutateAsync({ id: editingResource.id, data });
-            } else {
-              await createMutation.mutateAsync(data);
-            }
-          }}
-        />
-
-        {/* Delete confirmation */}
-        <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Resource?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete "{deleteConfirm?.title}"? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <Button
+          onClick={() => setShowForm(true)}
+          className="h-auto whitespace-nowrap rounded-[11px] px-4 py-2.5 text-[13px] font-bold"
+        >
+          <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
+          {t('community.addResource')}
+        </Button>
       </div>
+
+      {/* Filters */}
+      <div className="mb-5 flex flex-col gap-2.5 md:flex-row">
+        <div className="relative flex-1">
+          <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
+          <Input
+            placeholder={t('community.searchResources')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-auto rounded-xl py-[11px] pl-10 pr-3.5 text-[13.5px] md:text-[13.5px]"
+          />
+        </div>
+        <Select
+          value={selectedType || 'all'}
+          onValueChange={(v) => setSelectedType(v === 'all' ? '' : v)}
+        >
+          <SelectTrigger className="h-auto w-full rounded-xl py-[11px] text-[13px] font-semibold md:w-[160px]">
+            <SelectValue placeholder={t('community.allTypes')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('community.allTypes')}</SelectItem>
+            {RESOURCE_TYPES.map((type) => (
+              <SelectItem key={type.value} value={type.value}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {allTags.length > 0 && (
+          <Select
+            value={selectedTag || 'all'}
+            onValueChange={(v) => setSelectedTag(v === 'all' ? '' : v)}
+          >
+            <SelectTrigger className="h-auto w-full rounded-xl py-[11px] text-[13px] font-semibold md:w-[160px]">
+              <SelectValue placeholder={t('community.allTagsFilter')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('community.allTagsFilter')}</SelectItem>
+              {allTags.map((tag) => (
+                <SelectItem key={tag} value={tag}>
+                  #{tag}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      {/* Resources grid */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : resources.length === 0 ? (
+        <CommunityEmptyState
+          variant="resources"
+          onAction={() => setShowForm(true)}
+          actionLabel={t('community.addFirstResource')}
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+          {resources.map((resource) => (
+            <ResourceCard
+              key={resource.id}
+              resource={resource}
+              isOwner={resource.user_id === profile?.id}
+              isAdmin={isAdmin}
+              onEdit={() => {
+                setEditingResource(resource);
+                setShowForm(true);
+              }}
+              onDelete={() => setDeleteConfirm(resource)}
+              onTogglePin={(pinned) => pinMutation.mutate({ id: resource.id, pinned })}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Add/Edit form */}
+      <ResourceForm
+        open={showForm}
+        onOpenChange={(open) => {
+          setShowForm(open);
+          if (!open) setEditingResource(null);
+        }}
+        editResource={editingResource}
+        onSubmit={async (data) => {
+          if (editingResource) {
+            await updateMutation.mutateAsync({ id: editingResource.id, data });
+          } else {
+            await createMutation.mutateAsync(data);
+          }
+        }}
+      />
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('community.deleteResourceTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('community.deleteResourceDescription', { title: deleteConfirm?.title })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t('common.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

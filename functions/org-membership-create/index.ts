@@ -1,35 +1,38 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { queryOne } from '../shared/db';
+import { isUniqueViolation, withTransaction } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
 
 const ALLOWED_ROLES = new Set(['org_admin', 'learner']);
-const ALLOWED_STATUSES = new Set(['active', 'invited', 'disabled']);
+// 'invited' is deliberately NOT accepted here — the invitation flow (invitation-create /
+// invitation-accept) is the only entry point to that state (issue #66).
+const ALLOWED_STATUSES = new Set(['active', 'disabled']);
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { orgId?: unknown; userId?: unknown; role?: unknown; status?: unknown };
     const { orgId, userId, role, status } = body;
 
     // Validation first, authz second, db third (mirrors organization-update).
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required' });
     }
     if (!userId || typeof userId !== 'string') {
-      return corsResponse(origin, 400, { error: 'userId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'userId is required' });
     }
     if (typeof role !== 'string' || !ALLOWED_ROLES.has(role)) {
-      return corsResponse(origin, 400, { error: 'role must be one of: org_admin, learner' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'role must be one of: org_admin, learner' });
     }
     if (status !== undefined && (typeof status !== 'string' || !ALLOWED_STATUSES.has(status))) {
-      return corsResponse(origin, 400, { error: 'status must be one of: active, invited, disabled' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'status must be one of: active, disabled' });
     }
 
     // Authorization: platform admin OR org admin of the target org.
@@ -37,31 +40,63 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     // "Platform admins can do everything with memberships" (is_platform_admin())
     // + "Org admins can manage memberships in their org" (is_org_admin(org_id)).
     const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     const effectiveStatus = status ?? 'active';
 
+    // Seat-limit enforcement (issue #66): the UI disables the add button at the limit,
+    // but the backend must hold the line for any caller. Counts ACTIVE members only —
+    // parity with OrganizationDetail's activeMembers semantics.
+    //
+    // The seat count and the INSERT run in ONE transaction with `FOR UPDATE` on the
+    // organization row (review finding C-2). Without the lock, two concurrent adds at
+    // (limit - 1) both read an under-limit count and both insert, overshooting the cap.
+    // FOR UPDATE serializes them: the second add blocks until the first commits, then
+    // re-counts with that insert already visible and is correctly rejected.
     try {
-      const membership = await queryOne(
-        `INSERT INTO org_memberships (org_id, user_id, role, status)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, org_id, user_id, role, status, created_at`,
-        [orgId, userId, role, effectiveStatus],
-      );
-      return corsResponse(origin, 200, { membership }) as HttpResponseInit;
-    } catch (dbErr: unknown) {
-      const code = (dbErr as { code?: string })?.code;
-      if (code === '23505') {
-        return corsResponse(origin, 409, { error: 'User is already a member of this organization' }) as HttpResponseInit;
+      const result = await withTransaction(async (client) => {
+        const orgRes = await client.query<{ seat_limit: number | null; active_count: number }>(
+          `SELECT o.seat_limit,
+                  (SELECT COUNT(*)::int FROM org_memberships m
+                    WHERE m.org_id = o.id AND m.status = 'active') AS active_count
+             FROM organizations o
+            WHERE o.id = $1
+            FOR UPDATE OF o`,
+          [orgId],
+        );
+        const org = orgRes.rows[0];
+        if (!org) return { kind: 'not_found' as const };
+        if (org.seat_limit !== null && Number(org.active_count) >= Number(org.seat_limit)) {
+          return { kind: 'seat_limit' as const };
+        }
+        const insertRes = await client.query(
+          `INSERT INTO org_memberships (org_id, user_id, role, status)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id, org_id, user_id, role, status, created_at`,
+          [orgId, userId, role, effectiveStatus],
+        );
+        return { kind: 'created' as const, membership: insertRes.rows[0] };
+      });
+
+      if (result.kind === 'not_found') {
+        return corsResponse(origin, 404, { error: 'Organization or user not found' });
       }
-      if (code === '23503') {
-        return corsResponse(origin, 404, { error: 'Organization or user not found' }) as HttpResponseInit;
+      if (result.kind === 'seat_limit') {
+        return corsResponse(origin, 409, { error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' });
+      }
+      return corsResponse(origin, 200, { membership: result.membership });
+    } catch (dbErr: unknown) {
+      if (isUniqueViolation(dbErr)) {
+        return corsResponse(origin, 409, { error: 'User is already a member of this organization' });
+      }
+      if ((dbErr as { code?: string })?.code === '23503') {
+        return corsResponse(origin, 404, { error: 'Organization or user not found' });
       }
       throw dbErr;
     }
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

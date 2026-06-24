@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { PageSpinner } from '@/components/ui/page-spinner';
+import { Switch } from '@/components/ui/switch';
+import { SaveButton } from '@/components/ui/save-button';
+import { useFlash } from '@/hooks/useFlash';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -16,9 +20,6 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import {
-  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
-} from '@/components/ui/accordion';
 import { FileUpload } from '@/components/ui/file-upload';
 import { AzureVideoUpload } from '@/components/ui/azure-video-upload';
 import { AzureDocumentUpload } from '@/components/ui/azure-document-upload';
@@ -27,20 +28,45 @@ import { QuizEditorDialog } from '@/components/platform-admin/QuizEditorDialog';
 import { callApi } from '@/lib/api-client';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
-import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Save, Pencil, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Pencil } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useToastMutation } from '@/hooks/useToastMutation';
+import { cn } from '@/lib/utils';
+import { coursesAdminQueryKey } from './CoursesManager';
+
+/** Cache key for one course's full admin structure (course + modules + lessons). */
+const courseStructureQueryKey = (courseId: string) => ['course-structure-admin', courseId] as const;
+
+interface CourseStructureData {
+  course: Course | null;
+  modules: CourseModule[];
+  /** Display URL re-signed from course.thumbnail_url (the DB row carries the raw path). */
+  signedThumbnailUrl: string | null;
+}
+
+interface SaveLessonInput {
+  /** null → create (sort_order is server-owned, issue #46); set → update. */
+  lessonId: string | null;
+  moduleId: string;
+  title: string;
+  lessonType: LessonType;
+  contentText: string | null;
+  durationMinutes: number | null;
+  videoStoragePath: string | null;
+  azureBlobPath: string | null;
+  documentStoragePath: string | null;
+}
 
 export default function CourseEditor() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { features } = usePlatformSettings();
 
-  const [course, setCourse] = useState<Course | null>(null);
-  const [modules, setModules] = useState<CourseModule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  // In-button "Save changes" success morph (toast policy: course save is routine).
+  const { flashed, flash } = useFlash();
 
   // Course edit state
   const [editTitle, setEditTitle] = useState('');
@@ -52,7 +78,6 @@ export default function CourseEditor() {
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [moduleTitle, setModuleTitle] = useState('');
-  const [savingModule, setSavingModule] = useState(false);
 
   // Lesson dialog state
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
@@ -65,72 +90,124 @@ export default function CourseEditor() {
   const [lessonVideoPath, setLessonVideoPath] = useState<string | null>(null);
   const [lessonAzureBlobPath, setLessonAzureBlobPath] = useState<string | null>(null);
   const [lessonDocPath, setLessonDocPath] = useState<string | null>(null);
-  const [savingLesson, setSavingLesson] = useState(false);
 
   // Delete course state
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   // Quiz editor state
   const [quizEditorOpen, setQuizEditorOpen] = useState(false);
   const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
   const [quizLessonTitle, setQuizLessonTitle] = useState('');
 
-
-  const fetchStructure = async () => {
-    if (!courseId) return;
-    setLoadError(null);
-    try {
+  // Module/lesson mutations patch this cache from their RETURNING'd rows (issue
+  // #48); only the course save path refetches it, because a changed thumbnail
+  // needs re-signing. Patches must keep the `course` object reference intact so
+  // the edit-field seeding effect below doesn't clobber unsaved course edits.
+  const structureQueryKey = courseStructureQueryKey(courseId ?? '');
+  const {
+    data: structureData,
+    isLoading: loading,
+    error: loadError,
+    refetch: refetchStructure,
+  } = useQuery({
+    queryKey: structureQueryKey,
+    enabled: !!courseId,
+    queryFn: async (): Promise<CourseStructureData> => {
       const res = await callApi<{ course: Course | null; modules: CourseModule[] }>(
         '/api/course-structure-admin',
         { courseId },
       );
-      if (res.course) {
-        const refreshedThumbnailUrl = await getSignedLmsAssetUrl(res.course.thumbnail_url);
-        setCourse(res.course);
-        setEditTitle(res.course.title);
-        setEditDescription(res.course.description || '');
-        setEditLevel(res.course.level as CourseLevel);
-        setEditThumbnailUrl(refreshedThumbnailUrl);
-      } else {
-        setCourse(null);
-      }
-      setModules(res.modules);
-    } catch (err) {
-      setLoadError((err as Error).message);
-      toast({ title: 'Failed to load course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+      const signedThumbnailUrl = res.course ? await getSignedLmsAssetUrl(res.course.thumbnail_url) : null;
+      return { course: res.course, modules: res.modules, signedThumbnailUrl };
+    },
+  });
+  const course = structureData?.course ?? null;
+  const modules = structureData?.modules ?? [];
+  const signedThumbnailUrl = structureData?.signedThumbnailUrl ?? null;
 
   useEffect(() => {
-    fetchStructure();
-  }, [courseId]);
-
-  const handleSaveCourse = async () => {
-    if (!courseId || !editTitle.trim()) return;
-    setSaving(true);
-
-    const thumbnailToPersist = extractLmsAssetPath(editThumbnailUrl) ?? editThumbnailUrl;
-
-    try {
-      await callApi<{ course: Course }>('/api/course-update', {
-        courseId,
-        updates: {
-          title: editTitle,
-          description: editDescription,
-          level: editLevel,
-          thumbnailUrl: thumbnailToPersist,
-        },
-      });
-      toast({ title: 'Course saved!' });
-      fetchStructure();
-    } catch (err) {
-      toast({ title: 'Failed to save course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
+    if (loadError) {
+      toast({ title: t('courseEditor.failedToLoad'), description: loadError.message, variant: 'destructive' });
     }
+  }, [loadError, t]);
+
+  // Seed the editable text fields when the course identity changes (initial load
+  // / switching courses). Keyed on the id, not the object, so a publish-toggle
+  // cache patch (new `course` object, same id) can flip is_published WITHOUT
+  // clobbering unsaved title/description edits.
+  useEffect(() => {
+    if (course) {
+      setEditTitle(course.title);
+      setEditDescription(course.description || '');
+      setEditLevel(course.level);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [course?.id]);
+
+  // Re-seed the thumbnail whenever the re-signed URL changes (initial load +
+  // post-save refetch where the path is re-signed).
+  useEffect(() => {
+    if (course) setEditThumbnailUrl(signedThumbnailUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedThumbnailUrl]);
+
+  const saveCourseMutation = useToastMutation({
+    mutationFn: (updates: { title: string; description: string; level: CourseLevel; thumbnailUrl: string | null }) =>
+      callApi<{ course: Course }>('/api/course-update', { courseId, updates }),
+    errorTitle: 'Failed to save course',
+    onSuccess: () => {
+      // Toast policy: routine save → in-button morph, not a toast.
+      flash('course');
+      // KEEP the refetch here: a changed thumbnail path needs re-signing.
+      queryClient.invalidateQueries({ queryKey: structureQueryKey });
+    },
+  });
+  const saving = saveCourseMutation.isPending;
+
+  const handleSaveCourse = () => {
+    if (!courseId || !editTitle.trim()) return;
+    const thumbnailToPersist = extractLmsAssetPath(editThumbnailUrl) ?? editThumbnailUrl;
+    saveCourseMutation.mutate({
+      title: editTitle,
+      description: editDescription,
+      level: editLevel,
+      thumbnailUrl: thumbnailToPersist,
+    });
+  };
+
+  // Publish toggle — same mutation/payload as the manager's publish switch
+  // (#48: patch the cache from the RETURNING'd row, no full refetch). The patch
+  // keeps the same course id so the seeding effects above don't re-seed; it also
+  // preserves the already-signed thumbnail (the RETURNING'd row carries the raw
+  // path). Toast policy: publish toggle is routine — the switch state IS the
+  // feedback, no toast.
+  const togglePublishMutation = useToastMutation({
+    mutationFn: (isPublished: boolean) =>
+      callApi<{ course: Course }>('/api/course-update', {
+        courseId,
+        updates: { isPublished },
+      }),
+    errorTitle: 'Failed to update course',
+    onSuccess: ({ course: updated }) => {
+      queryClient.setQueryData<CourseStructureData>(structureQueryKey, (prev) =>
+        prev && prev.course
+          ? { ...prev, course: { ...prev.course, is_published: updated.is_published } }
+          : prev,
+      );
+    },
+  });
+  const togglingPublish = togglePublishMutation.isPending;
+
+  const handleTogglePublish = () => {
+    if (!course) return;
+    togglePublishMutation.mutate(!course.is_published);
+  };
+
+  /** Patch only `modules` in the structure cache, preserving the `course` reference. */
+  const patchModules = (update: (modules: CourseModule[]) => CourseModule[]) => {
+    queryClient.setQueryData<CourseStructureData>(structureQueryKey, (prev) =>
+      prev && { ...prev, modules: update(prev.modules) },
+    );
   };
 
   // Module handlers
@@ -146,48 +223,47 @@ export default function CourseEditor() {
     setModuleDialogOpen(true);
   };
 
-  const handleSaveModule = async () => {
-    if (!courseId || !moduleTitle.trim()) return;
-    setSavingModule(true);
-
-    try {
-      if (editingModule) {
-        await callApi<{ module: CourseModule }>('/api/module-update', {
-          moduleId: editingModule.id,
-          title: moduleTitle,
-        });
-        toast({ title: 'Module updated!' });
-      } else {
-        const nextOrder = modules.length;
-        await callApi<{ module: CourseModule }>('/api/module-create', {
-          courseId,
-          title: moduleTitle,
-          sortOrder: nextOrder,
-        });
-        toast({ title: 'Module created!' });
-      }
+  const saveModuleMutation = useToastMutation({
+    mutationFn: ({ moduleId, title }: { moduleId: string | null; title: string }) =>
+      moduleId
+        ? callApi<{ module: CourseModule }>('/api/module-update', { moduleId, title })
+        : // sort_order is server-owned (issue #46): module-create appends at MAX+1
+          callApi<{ module: CourseModule }>('/api/module-create', { courseId, title }),
+    errorTitle: ({ moduleId }) => (moduleId ? 'Failed to update module' : 'Failed to create module'),
+    onSuccess: ({ module }, { moduleId }) => {
+      toast({ title: moduleId ? t('courseEditor.moduleUpdated') : t('courseEditor.moduleCreated') });
       setModuleDialogOpen(false);
-      fetchStructure();
-    } catch (err) {
-      toast({ title: editingModule ? 'Failed to update module' : 'Failed to create module', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setSavingModule(false);
-    }
+      patchModules((mods) =>
+        moduleId
+          // RETURNING'd row is the bare module — keep the lessons we already have.
+          ? mods.map((m) => (m.id === module.id ? { ...m, ...module, lessons: m.lessons } : m))
+          // Server appends at MAX+1, so the end of the list is its sorted position.
+          : [...mods, { ...module, lessons: [] }],
+      );
+    },
+  });
+  const savingModule = saveModuleMutation.isPending;
+
+  const handleSaveModule = () => {
+    if (!courseId || !moduleTitle.trim()) return;
+    saveModuleMutation.mutate({ moduleId: editingModule?.id ?? null, title: moduleTitle });
   };
 
-  const handleDeleteModule = async (modId: string) => {
-    try {
-      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/module-delete', { moduleId: modId });
+  const deleteModuleMutation = useToastMutation({
+    mutationFn: (moduleId: string) =>
+      callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/module-delete', { moduleId }),
+    errorTitle: 'Failed to delete module',
+    onSuccess: (result, moduleId) => {
       if (result.blobsFailed > 0) {
-        toast({ title: 'Module deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
+        toast({ title: t('courseEditor.moduleDeleted'), description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
       } else {
-        toast({ title: 'Module deleted' });
+        toast({ title: t('courseEditor.moduleDeleted') });
       }
-      fetchStructure();
-    } catch (err) {
-      toast({ title: 'Failed to delete module', description: (err as Error).message, variant: 'destructive' });
-    }
-  };
+      patchModules((mods) => mods.filter((m) => m.id !== moduleId));
+    },
+  });
+
+  const handleDeleteModule = (modId: string) => deleteModuleMutation.mutate(modId);
 
   // Lesson handlers
   const openAddLesson = (moduleId: string) => {
@@ -216,119 +292,127 @@ export default function CourseEditor() {
     setLessonDialogOpen(true);
   };
 
-  const handleSaveLesson = async () => {
-    if (!lessonModuleId || !lessonTitle.trim()) return;
-
-    setSavingLesson(true);
-
-    try {
-      if (editingLesson) {
-        await callApi<{ lesson: Lesson }>('/api/lesson-update', {
-          lessonId: editingLesson.id,
-          moduleId: lessonModuleId,
-          title: lessonTitle,
-          lessonType,
-          contentText: lessonContent || null,
-          durationMinutes: lessonDuration,
-          videoStoragePath: lessonType === 'video' ? lessonVideoPath : null,
-          azureBlobPath: lessonType === 'video' ? lessonAzureBlobPath : null,
-          documentStoragePath: lessonType === 'document' ? lessonDocPath : null,
-        });
-        toast({ title: 'Lesson updated!' });
-      } else {
-        const mod = modules.find((m) => m.id === lessonModuleId);
-        const nextOrder = mod?.lessons?.length || 0;
-        await callApi<{ lesson: Lesson }>('/api/lesson-create', {
-          moduleId: lessonModuleId,
-          title: lessonTitle,
-          lessonType,
-          contentText: lessonContent || null,
-          durationMinutes: lessonDuration,
-          videoStoragePath: lessonType === 'video' ? lessonVideoPath : null,
-          azureBlobPath: lessonType === 'video' ? lessonAzureBlobPath : null,
-          documentStoragePath: lessonType === 'document' ? lessonDocPath : null,
-          sortOrder: nextOrder,
-        });
-        toast({ title: 'Lesson created!' });
-      }
+  const saveLessonMutation = useToastMutation({
+    mutationFn: ({ lessonId, ...payload }: SaveLessonInput) =>
+      lessonId
+        ? callApi<{ lesson: Lesson }>('/api/lesson-update', { lessonId, ...payload })
+        : // sort_order is server-owned (issue #46): lesson-create appends at MAX+1
+          callApi<{ lesson: Lesson }>('/api/lesson-create', payload),
+    errorTitle: ({ lessonId }) => (lessonId ? 'Failed to update lesson' : 'Failed to create lesson'),
+    onSuccess: ({ lesson }, { lessonId }) => {
+      toast({ title: lessonId ? t('courseEditor.lessonUpdated') : t('courseEditor.lessonCreated') });
       setLessonDialogOpen(false);
-      fetchStructure();
-    } catch (err) {
-      toast({ title: editingLesson ? 'Failed to update lesson' : 'Failed to create lesson', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setSavingLesson(false);
-    }
+      patchModules((mods) =>
+        mods.map((m) =>
+          m.id !== lesson.module_id
+            ? m
+            : {
+                ...m,
+                lessons: lessonId
+                  ? (m.lessons ?? []).map((l) => (l.id === lesson.id ? lesson : l))
+                  // Server appends at MAX+1, so the end of the list is its sorted position.
+                  : [...(m.lessons ?? []), lesson],
+              },
+        ),
+      );
+    },
+  });
+  const savingLesson = saveLessonMutation.isPending;
+
+  const handleSaveLesson = () => {
+    if (!lessonModuleId || !lessonTitle.trim()) return;
+    saveLessonMutation.mutate({
+      lessonId: editingLesson?.id ?? null,
+      moduleId: lessonModuleId,
+      title: lessonTitle,
+      lessonType,
+      contentText: lessonContent || null,
+      durationMinutes: lessonDuration,
+      videoStoragePath: lessonType === 'video' ? lessonVideoPath : null,
+      azureBlobPath: lessonType === 'video' ? lessonAzureBlobPath : null,
+      documentStoragePath: lessonType === 'document' ? lessonDocPath : null,
+    });
   };
 
-  const handleDeleteLesson = async (lessonId: string) => {
-    try {
-      const result = await callApi<{ success: boolean; blobDeleted: boolean | null }>('/api/lesson-delete', { lessonId });
+  const deleteLessonMutation = useToastMutation({
+    mutationFn: (lessonId: string) =>
+      callApi<{ success: boolean; blobDeleted: boolean | null }>('/api/lesson-delete', { lessonId }),
+    errorTitle: 'Failed to delete lesson',
+    onSuccess: (result, lessonId) => {
       if (result.blobDeleted === false) {
-        toast({ title: 'Lesson deleted', description: 'Could not delete the video file from storage.', variant: 'destructive' });
+        toast({ title: t('courseEditor.lessonDeleted'), description: 'Could not delete the video file from storage.', variant: 'destructive' });
       } else {
-        toast({ title: 'Lesson deleted' });
+        toast({ title: t('courseEditor.lessonDeleted') });
       }
-      fetchStructure();
-    } catch (err) {
-      toast({ title: 'Failed to delete lesson', description: (err as Error).message, variant: 'destructive' });
-    }
-  };
+      patchModules((mods) =>
+        mods.map((m) =>
+          m.lessons?.some((l) => l.id === lessonId)
+            ? { ...m, lessons: m.lessons.filter((l) => l.id !== lessonId) }
+            : m,
+        ),
+      );
+    },
+  });
 
-  const handleDeleteCourse = async () => {
-    if (!courseId) return;
-    setDeleting(true);
-    try {
-      const result = await callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId });
+  const handleDeleteLesson = (lessonId: string) => deleteLessonMutation.mutate(lessonId);
+
+  const deleteCourseMutation = useToastMutation({
+    mutationFn: () =>
+      callApi<{ success: boolean; blobsDeleted: number; blobsFailed: number }>('/api/course-delete', { courseId }),
+    errorTitle: 'Failed to delete course',
+    onSuccess: (result) => {
       if (result.blobsFailed > 0) {
-        toast({ title: 'Course deleted', description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
+        toast({ title: t('courseEditor.courseDeleted'), description: `Could not delete ${result.blobsFailed} video file(s) from storage.`, variant: 'destructive' });
       } else {
-        toast({ title: 'Course deleted' });
+        toast({ title: t('courseEditor.courseDeleted') });
       }
+      // The cached admin list still holds the deleted course; drop it so the
+      // list page does a fresh load instead of flashing the deleted row.
+      queryClient.removeQueries({ queryKey: coursesAdminQueryKey });
       navigate('/app/admin/courses');
-    } catch (err) {
-      toast({ title: 'Failed to delete course', description: (err as Error).message, variant: 'destructive' });
-    } finally {
-      setDeleting(false);
-    }
+    },
+  });
+  const deleting = deleteCourseMutation.isPending;
+
+  const handleDeleteCourse = () => {
+    if (!courseId) return;
+    deleteCourseMutation.mutate();
   };
 
   const lessonTypeIcon = (type: LessonType) => {
     switch (type) {
-      case 'video': return <Video className="h-4 w-4" />;
-      case 'document': return <FileText className="h-4 w-4" />;
-      case 'quiz': return <HelpCircle className="h-4 w-4" />;
+      case 'video': return <Video className="h-[13px] w-[13px]" aria-hidden="true" />;
+      case 'document': return <FileText className="h-[13px] w-[13px]" aria-hidden="true" />;
+      case 'quiz': return <HelpCircle className="h-[13px] w-[13px]" aria-hidden="true" />;
     }
   };
 
-  const levelColors = { basic: 'bg-green-100 text-green-800', intermediate: 'bg-yellow-100 text-yellow-800', advanced: 'bg-red-100 text-red-800' };
-
+  const lessonTypeLabel = (type: LessonType) => {
+    switch (type) {
+      case 'video': return t('courseEditor.lessonTypeVideo');
+      case 'document': return t('courseEditor.lessonTypeDocument');
+      case 'quiz': return t('courseEditor.lessonTypeQuiz');
+    }
+  };
 
   if (loading) {
     return (
-      <AppLayout title="Course Editor">
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+      <AppLayout title={t('courseEditor.title')}>
+        <PageSpinner />
       </AppLayout>
     );
   }
 
   if (!loading && loadError) {
     return (
-      <AppLayout title="Course Editor">
+      <AppLayout title={t('courseEditor.title')}>
         <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
-          <p className="text-destructive font-medium">Failed to load course</p>
-          <p className="text-sm text-muted-foreground">{loadError}</p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              // Deliberately no setLoading(true): fetchStructure is also the post-mutation
-              // refetch, so retry-in-place keeps the two paths consistent (cf. CoursesManager).
-              setLoadError(null);
-              fetchStructure();
-            }}
-          >
-            Retry
+          <p className="text-destructive font-medium">{t('courseEditor.failedToLoad')}</p>
+          <p className="text-sm text-muted-foreground">{loadError.message}</p>
+          {/* While the retry is in flight with no cached data, isLoading goes
+              true and the spinner branch above takes over. */}
+          <Button variant="outline" onClick={() => refetchStructure()}>
+            {t('courseEditor.retry')}
           </Button>
         </div>
       </AppLayout>
@@ -337,11 +421,11 @@ export default function CourseEditor() {
 
   if (!course) {
     return (
-      <AppLayout title="Course Editor">
+      <AppLayout title={t('courseEditor.title')}>
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Course not found</p>
+          <p className="text-muted-foreground">{t('courseEditor.courseNotFound')}</p>
           <Button variant="outline" onClick={() => navigate('/app/admin/courses')} className="mt-4">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Courses
+            <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> {t('courseEditor.backToCourses')}
           </Button>
         </div>
       </AppLayout>
@@ -350,202 +434,271 @@ export default function CourseEditor() {
 
   return (
     <AppLayout
-      title="Course Editor"
-      breadcrumbs={[{ label: 'Courses', href: '/app/admin/courses' }, { label: course.title }]}
+      title={t('courseEditor.title')}
+      breadcrumbs={[{ label: t('coursesManager.tabCourses'), href: '/app/admin/courses' }, { label: course.title }]}
     >
-      <div className="mb-4">
-        <Button variant="ghost" onClick={() => navigate('/app/admin/courses')}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Courses
-        </Button>
-      </div>
+      <div className="mx-auto max-w-[860px]">
+        {/* Back link */}
+        <button
+          type="button"
+          onClick={() => navigate('/app/admin/courses')}
+          className="mb-3.5 inline-flex items-center gap-[7px] rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground transition-colors hover:text-primary"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          {t('courseEditor.backToCourses')}
+        </button>
 
-      {/* Course Details Card */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Course Details</span>
-            <Badge className={levelColors[course.level]}>{course.level}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Thumbnail</Label>
-            <FileUpload
-              bucket="lms-assets"
-              folder="thumbnails"
-              accept="image"
-              value={editThumbnailUrl}
-              onChange={(url) => setEditThumbnailUrl(url)}
-              maxSizeMB={10}
+        {/* Course Details Card */}
+        <div className="mb-[18px] rounded-2xl border border-border bg-card p-6">
+          <div className="mb-[18px] flex items-center justify-between gap-3">
+            <h2 className="text-base font-extrabold">{t('courseEditor.courseDetails')}</h2>
+            <span
+              className={cn(
+                'inline-flex items-center rounded-[7px] px-3 py-[5px] text-[11px] font-bold',
+                course.is_published ? 'bg-success/10 text-success' : 'bg-[#f3f4f8] text-[#686d7e]',
+              )}
+            >
+              {course.is_published ? t('courseEditor.published') : t('courseEditor.draft')}
+            </span>
+          </div>
+
+          <div className="mb-4 flex flex-col gap-5 md:flex-row">
+            <div className="flex-1 space-y-3.5">
+              <div className="space-y-1.5">
+                <Label>{t('courseEditor.titleLabel')}</Label>
+                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('courseEditor.descriptionLabel')}</Label>
+                <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
+              </div>
+            </div>
+            <div className="w-full shrink-0 space-y-3.5 md:w-[220px]">
+              <div className="space-y-1.5">
+                <Label>{t('courseEditor.thumbnail')}</Label>
+                <FileUpload
+                  bucket="lms-assets"
+                  folder="thumbnails"
+                  accept="image"
+                  value={editThumbnailUrl}
+                  onChange={(url) => setEditThumbnailUrl(url)}
+                  maxSizeMB={10}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('courseEditor.levelLabel')}</Label>
+                <Select value={editLevel} onValueChange={(v) => setEditLevel(v as CourseLevel)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">{t('courses.levels.basic')}</SelectItem>
+                    <SelectItem value="intermediate">{t('courses.levels.intermediate')}</SelectItem>
+                    <SelectItem value="advanced">{t('courses.levels.advanced')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <SaveButton
+              done={flashed('course')}
+              idleLabel={t('courseEditor.saveChanges')}
+              doneLabel={t('courseEditor.saved')}
+              onClick={handleSaveCourse}
+              disabled={saving}
             />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Title</Label>
-              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Level</Label>
-              <Select value={editLevel} onValueChange={(v) => setEditLevel(v as CourseLevel)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="basic">Basic</SelectItem>
-                  <SelectItem value="intermediate">Intermediate</SelectItem>
-                  <SelectItem value="advanced">Advanced</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
-              <Trash2 className="mr-2 h-4 w-4" /> Delete Course
-            </Button>
-            <Button onClick={handleSaveCourse} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <Save className="mr-2 h-4 w-4" /> Save Course
+            {/* Publish toggle (switch, not button) — wired to the publish mutation. */}
+            <span className="inline-flex items-center gap-2.5 rounded-[10px] border border-[#eceef3] px-3.5 py-2">
+              <span className="text-[13px] font-bold text-[#4a4f60]">{t('courseEditor.publishToggleLabel')}</span>
+              <Switch
+                checked={course.is_published}
+                onCheckedChange={handleTogglePublish}
+                disabled={togglingPublish}
+                aria-label={course.is_published ? t('courseEditor.unpublishAria') : t('courseEditor.publishAria')}
+              />
+            </span>
+            <div className="flex-1" />
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(true)}
+              className="border-[#f0c7c7] text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" /> {t('courseEditor.deleteCourse')}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Modules & Lessons */}
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-extrabold">{t('courseEditor.modulesAndLessons')}</h2>
+          <Button
+            onClick={openAddModule}
+            className="bg-accent text-primary hover:bg-[#dfe5f8]"
+          >
+            <Plus className="mr-2 h-4 w-4" aria-hidden="true" /> {t('courseEditor.addModule')}
+          </Button>
+        </div>
+
+        {modules.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center text-sm text-muted-foreground">
+            {t('courseEditor.noModules')}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {modules.map((mod, modIndex) => (
+              <div key={mod.id} className="overflow-hidden rounded-2xl border border-border bg-card">
+                {/* Module header */}
+                <div className="flex items-center gap-2.5 bg-[#f7f8fa] px-[18px] py-3">
+                  <span className="flex text-[#c3c7d3]" aria-hidden="true">
+                    <GripVertical className="h-[15px] w-[15px]" />
+                  </span>
+                  <span className="flex-1 text-[13.5px] font-extrabold">
+                    {t('courseEditor.moduleLabel', { n: modIndex + 1, title: mod.title })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openAddLesson(mod.id)}
+                    className="rounded-[7px] px-2.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-accent"
+                  >
+                    + {t('courseEditor.lessonShort')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openEditModule(mod)}
+                    title={t('courseEditor.renameModule')}
+                    aria-label={t('courseEditor.renameModule')}
+                    className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-[#eceef3] hover:text-primary"
+                  >
+                    <Pencil className="h-[13px] w-[13px]" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteModule(mod.id)}
+                    title={t('courseEditor.deleteModule')}
+                    aria-label={t('courseEditor.deleteModule')}
+                    className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-[13px] w-[13px]" aria-hidden="true" />
+                  </button>
+                </div>
+
+                {/* Lessons */}
+                {mod.lessons && mod.lessons.length > 0 ? (
+                  mod.lessons.map((lesson) => (
+                    <div
+                      key={lesson.id}
+                      className="flex items-center gap-[11px] border-t border-[#f3f4f8] px-[18px] py-[11px]"
+                    >
+                      <span className="flex text-[#d6d8e0]" aria-hidden="true">
+                        <GripVertical className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent text-primary">
+                        {lessonTypeIcon(lesson.lesson_type)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{lesson.title}</span>
+                      <span className="rounded-[7px] bg-[#f3f4f8] px-2.5 py-[3px] text-[11px] font-bold capitalize text-[#686d7e]">
+                        {lessonTypeLabel(lesson.lesson_type)}
+                      </span>
+                      {lesson.duration_minutes ? (
+                        <span className="min-w-[44px] text-[11.5px] text-[#9aa0af]">
+                          {t('courseEditor.minutesShort', { count: lesson.duration_minutes })}
+                        </span>
+                      ) : (
+                        <span className="min-w-[44px]" aria-hidden="true" />
+                      )}
+                      {lesson.lesson_type === 'quiz' && features.quizzes_enabled && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuizLessonId(lesson.id);
+                            setQuizLessonTitle(lesson.title);
+                            setQuizEditorOpen(true);
+                          }}
+                          className="rounded-[7px] px-2 py-[5px] text-xs font-bold text-primary transition-colors hover:bg-accent"
+                        >
+                          {t('courseEditor.editQuiz')}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => openEditLesson(lesson)}
+                        title={t('courseEditor.editLesson')}
+                        aria-label={t('courseEditor.editLesson')}
+                        className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-primary"
+                      >
+                        <Pencil className="h-[13px] w-[13px]" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteLesson(lesson.id)}
+                        title={t('courseEditor.deleteLesson')}
+                        aria-label={t('courseEditor.deleteLesson')}
+                        className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-[13px] w-[13px]" aria-hidden="true" />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="border-t border-[#f3f4f8] px-[18px] py-[11px] text-sm text-muted-foreground">
+                    {t('courseEditor.noLessons')}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Delete Course Confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Course?</AlertDialogTitle>
+            <AlertDialogTitle>{t('courseEditor.deleteCourseTitle')}</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>
-                This will permanently delete <strong>"{course.title}"</strong> and all associated data including:
-              </p>
-              <ul className="list-disc list-inside text-sm">
-                <li>All modules and lessons</li>
-                <li>All learner enrollments and progress</li>
-                <li>All quiz attempts and reviews</li>
+              <span className="block">{t('courseEditor.deleteIntro', { title: course.title })}</span>
+              <ul className="list-inside list-disc text-sm">
+                <li>{t('courseEditor.deleteItemModules')}</li>
+                <li>{t('courseEditor.deleteItemEnrollments')}</li>
+                <li>{t('courseEditor.deleteItemQuizzes')}</li>
               </ul>
-              <p className="font-medium">This action cannot be undone.</p>
+              <span className="block font-medium">{t('courseEditor.deleteIrreversible')}</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteCourse}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete Course
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {t('courseEditor.deleteCourse')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Modules & Lessons */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Modules & Lessons</span>
-            <Button size="sm" onClick={openAddModule}>
-              <Plus className="mr-2 h-4 w-4" /> Add Module
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {modules.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No modules yet. Add your first module to get started.</p>
-          ) : (
-            <Accordion type="multiple" className="w-full">
-              {modules.map((mod, modIndex) => (
-                <AccordionItem key={mod.id} value={mod.id}>
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3 flex-1">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Module {modIndex + 1}: {mod.title}</span>
-                      <Badge variant="outline" className="ml-2">{mod.lessons?.length || 0} lessons</Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pl-8">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Button size="sm" variant="outline" onClick={() => openEditModule(mod)}>
-                        <Pencil className="mr-1 h-3 w-3" /> Edit Module
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => openAddLesson(mod.id)}>
-                        <Plus className="mr-1 h-3 w-3" /> Add Lesson
-                      </Button>
-                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteModule(mod.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {mod.lessons && mod.lessons.length > 0 ? (
-                      <div className="space-y-2">
-                        {mod.lessons.map((lesson, lessonIndex) => (
-                          <div key={lesson.id} className="flex items-center gap-3 p-3 border rounded-md bg-muted/30">
-                            <GripVertical className="h-4 w-4 text-muted-foreground" />
-                            <div className="flex items-center gap-2 flex-1">
-                              {lessonTypeIcon(lesson.lesson_type)}
-                              <span className="text-sm">{lessonIndex + 1}. {lesson.title}</span>
-                              <Badge variant="secondary" className="text-xs">{lesson.lesson_type}</Badge>
-                              {lesson.duration_minutes && (
-                                <span className="text-xs text-muted-foreground">{lesson.duration_minutes} min</span>
-                              )}
-                            </div>
-                            {lesson.lesson_type === 'quiz' && features.quizzes_enabled && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setQuizLessonId(lesson.id);
-                                  setQuizLessonTitle(lesson.title);
-                                  setQuizEditorOpen(true);
-                                }}
-                              >
-                                <Settings className="mr-1 h-3 w-3" />
-                                Edit Quiz
-                              </Button>
-                            )}
-                            <Button size="icon" variant="ghost" onClick={() => openEditLesson(lesson)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteLesson(lesson.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No lessons in this module.</p>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Module Dialog */}
       <Dialog open={moduleDialogOpen} onOpenChange={setModuleDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingModule ? 'Edit Module' : 'Add Module'}</DialogTitle>
+            <DialogTitle>{editingModule ? t('courseEditor.moduleDialogEditTitle') : t('courseEditor.moduleDialogAddTitle')}</DialogTitle>
             <DialogDescription>
-              {editingModule ? 'Update the module title.' : 'Create a new module for this course.'}
+              {editingModule ? t('courseEditor.moduleDialogEditDescription') : t('courseEditor.moduleDialogAddDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Module Title</Label>
-              <Input value={moduleTitle} onChange={(e) => setModuleTitle(e.target.value)} placeholder="e.g., Introduction" />
+              <Label>{t('courseEditor.moduleTitleLabel')}</Label>
+              <Input value={moduleTitle} onChange={(e) => setModuleTitle(e.target.value)} placeholder={t('courseEditor.moduleTitlePlaceholder')} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModuleDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setModuleDialogOpen(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleSaveModule} disabled={savingModule}>
-              {savingModule && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingModule ? 'Update' : 'Create'}
+              {savingModule && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {editingModule ? t('courseEditor.update') : t('courseEditor.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -555,42 +708,42 @@ export default function CourseEditor() {
       <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingLesson ? 'Edit Lesson' : 'Add Lesson'}</DialogTitle>
+            <DialogTitle>{editingLesson ? t('courseEditor.lessonDialogEditTitle') : t('courseEditor.lessonDialogAddTitle')}</DialogTitle>
             <DialogDescription>
-              {editingLesson ? 'Update the lesson details.' : 'Add a new lesson to this module.'}
+              {editingLesson ? t('courseEditor.lessonDialogEditDescription') : t('courseEditor.lessonDialogAddDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Lesson Title</Label>
-              <Input value={lessonTitle} onChange={(e) => setLessonTitle(e.target.value)} placeholder="e.g., Getting Started" />
+              <Label>{t('courseEditor.lessonTitleLabel')}</Label>
+              <Input value={lessonTitle} onChange={(e) => setLessonTitle(e.target.value)} placeholder={t('courseEditor.lessonTitlePlaceholder')} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Type</Label>
+                <Label>{t('courseEditor.lessonTypeLabel')}</Label>
                 <Select value={lessonType} onValueChange={(v) => setLessonType(v as LessonType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="video">Video</SelectItem>
-                    <SelectItem value="document">Document</SelectItem>
-                    {features.quizzes_enabled && <SelectItem value="quiz">Quiz</SelectItem>}
+                    <SelectItem value="video">{t('courseEditor.lessonTypeVideo')}</SelectItem>
+                    <SelectItem value="document">{t('courseEditor.lessonTypeDocument')}</SelectItem>
+                    {features.quizzes_enabled && <SelectItem value="quiz">{t('courseEditor.lessonTypeQuiz')}</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Duration (minutes)</Label>
+                <Label>{t('courseEditor.lessonDurationLabel')}</Label>
                 <Input
                   type="number"
                   value={lessonDuration ?? ''}
                   onChange={(e) => setLessonDuration(e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="e.g., 15"
+                  placeholder={t('courseEditor.lessonDurationPlaceholder')}
                 />
               </div>
             </div>
             {lessonType === 'document' && (
               <>
                 <div className="space-y-2">
-                  <Label>Document File (optional)</Label>
+                  <Label>{t('courseEditor.documentFileLabel')}</Label>
                   <AzureDocumentUpload
                     value={lessonDocPath}
                     onChange={setLessonDocPath}
@@ -598,12 +751,12 @@ export default function CourseEditor() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Content Text (optional)</Label>
+                  <Label>{t('courseEditor.contentTextLabel')}</Label>
                   <Textarea
                     value={lessonContent}
                     onChange={(e) => setLessonContent(e.target.value)}
                     rows={5}
-                    placeholder="Additional lesson content or description..."
+                    placeholder={t('courseEditor.contentTextPlaceholder')}
                   />
                 </div>
               </>
@@ -611,62 +764,63 @@ export default function CourseEditor() {
             {lessonType === 'video' && (
               <>
                 <div className="space-y-2">
-                  <Label>Video File (Azure Cloud)</Label>
+                  <Label>{t('courseEditor.videoFileLabel')}</Label>
                   <AzureVideoUpload
                     value={lessonAzureBlobPath}
                     onChange={setLessonAzureBlobPath}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Ingen filstørrelses-begrænsning. Videoer uploades direkte til Azure Cloud Storage.
+                    {t('courseEditor.videoFileHint')}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Content Text (optional)</Label>
+                  <Label>{t('courseEditor.contentTextLabel')}</Label>
                   <Textarea
                     value={lessonContent}
                     onChange={(e) => setLessonContent(e.target.value)}
                     rows={5}
-                    placeholder="Additional lesson content or description..."
+                    placeholder={t('courseEditor.contentTextPlaceholder')}
                   />
                 </div>
               </>
             )}
             {lessonType === 'quiz' && (
               <>
-                <div className="rounded-lg border border-dashed p-4 text-center">
-                  <HelpCircle className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground mb-2">
+                <div className="rounded-xl border border-dashed border-[#d6d8e0] p-4 text-center">
+                  <HelpCircle className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
+                  <p className="mb-2 text-sm text-muted-foreground">
                     {editingLesson
-                      ? 'Save the lesson first, then use "Edit Quiz" to configure questions.'
-                      : 'Create the lesson first, then configure the quiz questions.'}
+                      ? t('courseEditor.quizSetupHintEdit')
+                      : t('courseEditor.quizSetupHintCreate')}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Learners will need to pass the quiz to complete this lesson.
+                    {t('courseEditor.quizSetupSubhint')}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Content Text (optional)</Label>
+                  <Label>{t('courseEditor.contentTextLabel')}</Label>
                   <Textarea
                     value={lessonContent}
                     onChange={(e) => setLessonContent(e.target.value)}
                     rows={5}
-                    placeholder="Quiz instructions or additional context..."
+                    placeholder={t('courseEditor.quizContentPlaceholder')}
                   />
                 </div>
               </>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLessonDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setLessonDialogOpen(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleSaveLesson} disabled={savingLesson}>
-              {savingLesson && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingLesson ? 'Update' : 'Create'}
+              {savingLesson && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+              {editingLesson ? t('courseEditor.update') : t('courseEditor.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Quiz Editor Dialog */}
+      {/* Quiz Editor Dialog — no onQuizSaved refetch: the structure response
+          carries no quiz data, so a quiz save changes nothing on this page. */}
       {quizLessonId && (
         <QuizEditorDialog
           key={quizLessonId}
@@ -674,7 +828,6 @@ export default function CourseEditor() {
           lessonTitle={quizLessonTitle}
           open={quizEditorOpen}
           onOpenChange={setQuizEditorOpen}
-          onQuizSaved={fetchStructure}
         />
       )}
 

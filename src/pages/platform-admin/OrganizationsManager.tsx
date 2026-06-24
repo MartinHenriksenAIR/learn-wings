@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSpinner } from '@/components/ui/page-spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
-import { SearchFilter } from '@/components/ui/search-filter';
 import {
   Dialog,
   DialogContent,
@@ -23,35 +23,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
-import { callApi } from '@/lib/api-client';
+import { callApi, ApiError } from '@/lib/api-client';
+import { useOrganizations } from '@/hooks/useOrganizations';
 import { Organization, Profile, OrgRole } from '@/lib/types';
-import { Building2, Plus, Users, Loader2, ChevronRight, UserPlus, Mail, UsersRound } from 'lucide-react';
+import { Building2, Plus, Loader2, ChevronRight, UserPlus, Mail, Search } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
-import { z } from 'zod';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { buildPublicUrl } from '@/lib/storage-url';
-
-const orgSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
-  slug: z.string().min(2, 'Slug must be at least 2 characters').max(50)
-    .regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
-});
+import { orgSchema } from '@/lib/org-validation';
+import { SeatUsageBar } from '@/components/platform-admin/SeatUsageBar';
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
-  const [orgs, setOrgs] = useState<(Organization & { memberCount: number })[]>([]);
+  const { t } = useTranslation();
+  const {
+    data: orgsData,
+    isLoading: loading,
+    error: orgsError,
+    refetch: refetchOrgs,
+  } = useOrganizations();
+  const orgs = useMemo<(Organization & { memberCount: number })[]>(
+    () => (orgsData ?? []).map((o) => ({ ...o, memberCount: o.member_count })),
+    [orgsData]
+  );
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
@@ -66,21 +63,17 @@ export default function OrganizationsManager() {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [inviteEmail, setInviteEmail] = useState('');
 
-  const fetchOrgs = async () => {
-    try {
-      const { organizations } = await callApi<{ organizations: Organization[] }>('/api/organizations', {});
-      setOrgs((organizations ?? []).map((o) => ({ ...o, memberCount: o.member_count })));
-    } catch (err) {
+  // Org list failures surface the same way the old inline fetch did.
+  useEffect(() => {
+    if (orgsError) {
       toast({
         title: 'Failed to load organizations',
-        description: err instanceof Error ? err.message : 'Unknown error',
+        description: orgsError instanceof Error ? orgsError.message : 'Unknown error',
         variant: 'destructive',
       });
-      console.error('OrganizationsManager: failed to load organizations', err);
-    } finally {
-      setLoading(false);
+      console.error('OrganizationsManager: failed to load organizations', orgsError);
     }
-  };
+  }, [orgsError]);
 
   const fetchProfiles = async () => {
     try {
@@ -97,7 +90,6 @@ export default function OrganizationsManager() {
   };
 
   useEffect(() => {
-    fetchOrgs();
     fetchProfiles();
   }, []);
 
@@ -127,8 +119,9 @@ export default function OrganizationsManager() {
         newOrg = result.organization;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create organization';
-        if (message === 'Slug already in use') {
-          setErrors({ slug: 'This slug is already taken' });
+        // Match the structured code (ADR-0013), not the English error sentence.
+        if (err instanceof ApiError && err.code === 'DUPLICATE_SLUG') {
+          setErrors({ slug: t('organizations.slugTaken') });
         } else {
           toast({
             title: 'Failed to create organization',
@@ -195,7 +188,7 @@ export default function OrganizationsManager() {
       }
       setCreateOpen(false);
       resetForm();
-      fetchOrgs();
+      refetchOrgs();
     } finally {
       setCreating(false);
     }
@@ -223,10 +216,8 @@ export default function OrganizationsManager() {
 
   if (loading) {
     return (
-      <AppLayout title="Organizations" breadcrumbs={[{ label: 'Organizations' }]}>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-        </div>
+      <AppLayout title={t('organizations.title')} breadcrumbs={[{ label: t('organizations.title') }]}>
+        <PageSpinner />
       </AppLayout>
     );
   }
@@ -237,221 +228,240 @@ export default function OrganizationsManager() {
     org.slug.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  return (
-    <AppLayout title="Organizations" breadcrumbs={[{ label: 'Organizations' }]}>
-      {/* Search and Actions */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <SearchFilter
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder="Search organizations..."
-          onClearFilters={() => setSearchQuery('')}
-        />
-        <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Organization
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create Organization</DialogTitle>
-              <DialogDescription>
-                Add a new company to the platform.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              {/* Logo Upload */}
-              <div className="space-y-2">
-                <Label>Logo (optional)</Label>
-                <FileUpload
-                  bucket="org-logos"
-                  accept="image"
-                  value={logoUrl}
-                  onChange={(url, storagePath) => {
-                    if (url && storagePath) {
-                      setLogoUrl(buildPublicUrl(storagePath));
-                    } else {
-                      setLogoUrl(null);
-                    }
-                  }}
-                  maxSizeMB={5}
-                />
-              </div>
+  const createDialog = (
+    <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm(); }}>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+          {t('organizations.newOrganization')}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t('organizations.createOrganization')}</DialogTitle>
+          <DialogDescription>{t('organizations.createDialogDescription')}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          {/* Logo Upload */}
+          <div className="space-y-2">
+            <Label>{t('organizations.logoOptional')}</Label>
+            <FileUpload
+              bucket="org-logos"
+              accept="image"
+              value={logoUrl}
+              onChange={(url, storagePath) => {
+                if (url && storagePath) {
+                  setLogoUrl(buildPublicUrl(storagePath));
+                } else {
+                  setLogoUrl(null);
+                }
+              }}
+              maxSizeMB={5}
+            />
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="name">Organization Name</Label>
+          <div className="space-y-2">
+            <Label htmlFor="name">{t('organizations.organizationName')}</Label>
+            <Input
+              id="name"
+              placeholder="Acme Corporation"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={errors.name ? 'border-destructive' : ''}
+            />
+            {errors.name && (
+              <p className="text-xs text-destructive">{errors.name}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="slug">{t('organizations.slug')}</Label>
+            <Input
+              id="slug"
+              placeholder="acme-corp"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              className={`font-mono ${errors.slug ? 'border-destructive' : ''}`}
+            />
+            {errors.slug && (
+              <p className="text-xs text-destructive">{errors.slug}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="seatLimit">{t('organizations.seatLimitOptional')}</Label>
+            <Input
+              id="seatLimit"
+              type="number"
+              min="1"
+              placeholder={t('organizations.seatLimitPlaceholder')}
+              value={seatLimit}
+              onChange={(e) => setSeatLimit(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t('organizations.seatLimitHint')}
+            </p>
+          </div>
+
+          {/* Initial Admin Assignment */}
+          <div className="space-y-2">
+            <Label>{t('organizations.initialAdminOptional')}</Label>
+            <Tabs value={adminTab} onValueChange={(v) => setAdminTab(v as 'existing' | 'invite')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="existing" className="flex items-center gap-1">
+                  <UserPlus className="h-3 w-3" aria-hidden="true" />
+                  {t('organizations.existingUser')}
+                </TabsTrigger>
+                <TabsTrigger value="invite" className="flex items-center gap-1">
+                  <Mail className="h-3 w-3" aria-hidden="true" />
+                  {t('organizations.sendInvite')}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="existing" className="mt-2">
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('organizations.selectUser')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TabsContent>
+              <TabsContent value="invite" className="mt-2">
                 <Input
-                  id="name"
-                  placeholder="Acme Corporation"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={errors.name ? 'border-destructive' : ''}
+                  type="email"
+                  placeholder="admin@company.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
                 />
-                {errors.name && (
-                  <p className="text-xs text-destructive">{errors.name}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="slug">Slug (URL identifier)</Label>
-                <Input
-                  id="slug"
-                  placeholder="acme-corp"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  className={errors.slug ? 'border-destructive' : ''}
-                />
-                {errors.slug && (
-                  <p className="text-xs text-destructive">{errors.slug}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="seatLimit">Seat Limit (optional)</Label>
-                <Input
-                  id="seatLimit"
-                  type="number"
-                  min="1"
-                  placeholder="Unlimited"
-                  value={seatLimit}
-                  onChange={(e) => setSeatLimit(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Maximum number of users allowed. Leave empty for unlimited.
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('organizations.inviteEmailHint')}
                 </p>
-              </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCreateOpen(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={handleCreate} disabled={creating}>
+            {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+            {t('organizations.createOrganization')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
-              {/* Initial Admin Assignment */}
-              <div className="space-y-2">
-                <Label>Initial Admin (optional)</Label>
-                <Tabs value={adminTab} onValueChange={(v) => setAdminTab(v as 'existing' | 'invite')}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="existing" className="flex items-center gap-1">
-                      <UserPlus className="h-3 w-3" />
-                      Existing User
-                    </TabsTrigger>
-                    <TabsTrigger value="invite" className="flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
-                      Send Invite
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="existing" className="mt-2">
-                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a user..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {profiles.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.full_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TabsContent>
-                  <TabsContent value="invite" className="mt-2">
-                    <Input
-                      type="email"
-                      placeholder="admin@company.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      An invite link will be created for this email.
-                    </p>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreate} disabled={creating}>
-                {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Organization
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+  return (
+    <AppLayout breadcrumbs={[{ label: t('organizations.title') }]}>
+      {/* Header — the page owns its heading; AppLayout `title` is omitted here to avoid a
+          duplicate <h1> (the loading/error branches keep `title` since they have no in-page header). */}
+      <div className="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
+        <div>
+          <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('organizations.title')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t('organizations.subtitle')}</p>
+        </div>
+        {createDialog}
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-[18px] max-w-[420px]">
+        <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
+        <Input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t('organizations.searchPlaceholder')}
+          className="pl-10"
+        />
       </div>
 
       {/* Organizations List */}
       {filteredOrgs.length === 0 ? (
         <EmptyState
           icon={<Building2 className="h-6 w-6" />}
-          title={searchQuery ? "No matching organizations" : "No organizations yet"}
-          description={searchQuery ? "Try a different search term." : "Create your first organization to get started."}
+          title={searchQuery ? t('organizations.noMatchingTitle') : t('organizations.noOrganizationsTitle')}
+          description={searchQuery ? t('organizations.noMatchingDescription') : t('organizations.noOrganizationsDescription')}
           action={
             !searchQuery ? (
               <Button onClick={() => setCreateOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Organization
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t('organizations.createOrganization')}
               </Button>
             ) : undefined
           }
         />
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Organization</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead>Seats</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrgs.map((org) => (
-                <TableRow 
-                  key={org.id} 
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/app/admin/organizations/${org.id}`)}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      {org.logo_url ? (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted overflow-hidden">
-                          <img
-                            src={org.logo_url}
-                            alt={org.name}
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                          <Building2 className="h-5 w-5 text-primary" />
-                        </div>
-                      )}
-                      <span className="font-medium">{org.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{org.slug}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <UsersRound className="h-4 w-4 text-muted-foreground" />
-                      <span>
-                        {org.memberCount}
-                        {org.seat_limit ? ` / ${org.seat_limit}` : ''}
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          {/* Header row */}
+          <div className="grid grid-cols-[2.2fr_1.2fr_0.9fr_1fr_1fr_0.4fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
+            <span>{t('organizations.colOrganization')}</span>
+            <span>{t('organizations.colSlug')}</span>
+            <span>{t('organizations.colMembers')}</span>
+            <span>{t('organizations.colSeats')}</span>
+            <span>{t('organizations.colCreated')}</span>
+            <span aria-hidden="true" />
+          </div>
+          {filteredOrgs.map((org) => {
+            const atLimit = !!org.seat_limit && org.memberCount >= org.seat_limit;
+            return (
+              <button
+                key={org.id}
+                type="button"
+                onClick={() => navigate(`/app/admin/organizations/${org.id}`)}
+                className="grid w-full grid-cols-[2.2fr_1.2fr_0.9fr_1fr_1fr_0.4fr] items-center gap-3 border-t border-[#f3f4f8] px-5 py-3.5 text-left transition-colors hover:bg-[#f7f8fa]"
+              >
+                {/* Organization: icon chip + name */}
+                <span className="flex min-w-0 items-center gap-3">
+                  {org.logo_url ? (
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted">
+                      <img src={org.logo_url} alt="" className="max-h-full max-w-full object-contain" />
+                    </span>
+                  ) : (
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+                      <Building2 className="h-[17px] w-[17px]" aria-hidden="true" />
+                    </span>
+                  )}
+                  <span className="truncate text-[13.5px] font-bold">{org.name}</span>
+                </span>
+                {/* Slug (mono) */}
+                <span className="truncate font-mono text-[12.5px] text-muted-foreground">{org.slug}</span>
+                {/* Members */}
+                <span className="text-[13px] font-semibold text-[#4a4f60]">{org.memberCount}</span>
+                {/* Seats: label + usage bar */}
+                <span className="min-w-0">
+                  {org.seat_limit ? (
+                    <>
+                      <span className={`text-[13px] font-semibold ${atLimit ? 'text-destructive' : 'text-[#4a4f60]'}`}>
+                        {org.memberCount}/{org.seat_limit}
                       </span>
-                      {org.seat_limit && org.memberCount >= org.seat_limit && (
-                        <span className="ml-1 text-xs text-destructive font-medium">Full</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(org.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+                      <SeatUsageBar
+                        used={org.memberCount}
+                        limit={org.seat_limit}
+                        className="mt-1.5 h-[5px]"
+                      />
+                    </>
+                  ) : (
+                    <span className="text-[13px] font-semibold text-muted-foreground">
+                      {t('organizations.seatsUnlimited')}
+                    </span>
+                  )}
+                </span>
+                {/* Created */}
+                <span className="text-[12.5px] text-muted-foreground">
+                  {new Date(org.created_at).toLocaleDateString()}
+                </span>
+                {/* Chevron */}
+                <span className="flex justify-end text-[#c3c7d3]">
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
     </AppLayout>
   );

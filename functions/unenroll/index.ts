@@ -2,21 +2,22 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile } from '../shared/profile';
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const { enrollmentId } = await req.json() as { enrollmentId?: unknown };
 
     if (!enrollmentId || typeof enrollmentId !== 'string') {
-      return corsResponse(origin, 400, { error: 'enrollmentId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'enrollmentId is required' });
     }
 
     // NOTE: Platform admins get NO special path here — unenroll is strictly self-service.
@@ -37,13 +38,13 @@ RETURNING id`,
     if (!deleted) {
       // 404 covers both nonexistent ids and other users' enrollments —
       // deliberately indistinguishable to prevent enrollment-id probing.
-      return corsResponse(origin, 404, { error: 'Enrollment not found' }) as HttpResponseInit;
+      return corsResponse(origin, 404, { error: 'Enrollment not found' });
     }
 
-    return corsResponse(origin, 200, { success: true }) as HttpResponseInit;
+    return corsResponse(origin, 200, { success: true });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

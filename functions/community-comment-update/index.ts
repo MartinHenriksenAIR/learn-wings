@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
 
 interface CommentWithPost {
@@ -11,22 +12,22 @@ interface CommentWithPost {
   org_id: string | null;
 }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { commentId?: unknown; content?: unknown };
     const { commentId, content } = body;
 
     if (!commentId || typeof commentId !== 'string') {
-      return corsResponse(origin, 400, { error: 'commentId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'commentId is required' });
     }
     if (!content || typeof content !== 'string') {
-      return corsResponse(origin, 400, { error: 'content is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'content is required' });
     }
 
     // Load comment + its post
@@ -37,7 +38,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
        WHERE c.id = $1`,
       [commentId],
     );
-    if (!comment) return corsResponse(origin, 404, { error: 'Comment not found' }) as HttpResponseInit;
+    if (!comment) return corsResponse(origin, 404, { error: 'Comment not found' });
 
     // Authorization (OR of RLS UPDATE policies)
     let authorized = false;
@@ -51,17 +52,17 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       authorized = true;
     }
 
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     const updated = await queryOne(
       `UPDATE community_comments SET content = $1 WHERE id = $2 RETURNING *`,
       [content, commentId],
     );
 
-    return corsResponse(origin, 200, { comment: updated }) as HttpResponseInit;
+    return corsResponse(origin, 200, { comment: updated });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

@@ -2,7 +2,7 @@
 
 A multi-tenant **B2B learning-management platform** for AI education and EU AI-Act compliance training. Organizations enroll their staff in courses (lessons, quizzes, certificates), generate compliance reports, and collaborate through a community feed, an ideas board, and a shared resource library. Production domain: **ai-uddannelse.dk** ("AI Uddannelse" — _AI Education_).
 
-> **Status — actively migrating, not yet in production.** The app was originally built in [Lovable](https://lovable.dev) on Supabase and is ~95% through a rip-and-replace migration onto a fully owned Azure stack. All current work lives on the **`feature/lovable-migration`** branch behind draft **PR #6**; `main` is the (still-untouched) production target. The single source of truth for current state is **[`migration/STATUS.html`](migration/STATUS.html)** — _not_ this README. The path to the production cutover is tracked in issue **#69 ("Road to merge")**.
+> **Status — MVP on `main`.** The app was originally built in [Lovable](https://lovable.dev) on Supabase and has completed a rip-and-replace migration onto a fully owned Azure stack (June 2026). `main` is the production branch: it takes changes only via pull requests, and every merge deploys both the frontend and the backend. The backlog lives in GitHub issues.
 
 ---
 
@@ -28,7 +28,7 @@ Everything is **org-scoped**: data belongs to an organization, and members see o
 | Email | **Resend** (transactional invitations) |
 | Hosting | Azure **Static Web Apps** (frontend) + Azure Functions (API) |
 
-Architecture decisions are recorded in **[`docs/adr/`](docs/adr/)** (ADR-0001 … ADR-0012) — read them before structural changes.
+Architecture decisions are recorded in **[`docs/adr/`](docs/adr/)** (ADR-0001 … ADR-0014) — read them before structural changes.
 
 ## How it fits together
 
@@ -59,9 +59,9 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | `src/` | Frontend SPA — `pages/` (by role), `components/`, `hooks/useAuth.tsx`, `lib/` (api-client, types, msal-config) |
 | `functions/` | ~100 Azure Functions (one folder each) + `shared/` (auth, db, profile, cors) + `index.ts` barrel |
 | `migration/azure/` | The canonical Postgres schema (`01-schema.sql`), seed data (`02-seed.sql`), and apply guide |
-| `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history), `lovable-supabase-removal/` (planning) |
-| `docs/adr/` | The 12 architecture decision records |
-| `.claude/` | Agent collaboration system — `rules/` (hard-won conventions), `skills/`, `collab.json` |
+| `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history), `lovable-supabase-removal/` (historical planning) |
+| `docs/adr/` | The 14 architecture decision records |
+| `.claude/` | Agent collaboration system — `rules/` (hard-won conventions), `skills/` (`pickup`/`handoff`/`slice-workflow`), `collab.json` (branch topology), and the `guard-trunk` hook |
 | `supabase/` | **Dead** — the original Supabase Deno functions + migrations, kept only as authz-provenance reference. Deleted in the final migration slice (#13). |
 
 ## Local development
@@ -133,13 +133,13 @@ The hard-won rules that keep this codebase stable are codified — read them bef
 |-----|------------|
 | [`migration/STATUS.html`](migration/STATUS.html) | **Live ledger** — current checkpoint, operational quirks, pointers. Authoritative. |
 | [`migration/WORKLOG.md`](migration/WORKLOG.md) | Append-only history of every merged change. |
-| [`docs/adr/`](docs/adr/) | The 12 architecture decision records (what is and isn't allowed). |
+| [`docs/adr/`](docs/adr/) | The 14 architecture decision records (what is and isn't allowed). |
 | [`AGENTS.md`](AGENTS.md) | Agent + contributor instructions. |
 | [`migration/azure/README.md`](migration/azure/README.md) | The Supabase→Azure schema port: what was stripped, added, ported, and flagged. |
 | [`AZURE_DEPLOYMENT_GUIDE.md`](AZURE_DEPLOYMENT_GUIDE.md) | Reference Azure deployment guide. |
 
-> Note: a few root-level docs from early 2026 (`QUICK_START.md`, `DEPLOYMENT_SUMMARY.md`) predate the current vertical-slice migration plan and describe a since-abandoned approach. Treat `STATUS.html`, the ADRs, and `migration/azure/README.md` as authoritative.
+> Note: a few root-level docs from early 2026 (`QUICK_START.md`, `DEPLOYMENT_SUMMARY.md`) predate the migration-era approach that actually shipped. Treat `migration/STATUS.html`, the ADRs, and `migration/azure/README.md` as authoritative.
 
 ## Collaboration & deployment
 
-This is a two-developer repo with a strict workflow: **the trunk takes changes only via pull requests**, work happens on short-lived `<firstname>/<issue#>-<slug>` branches, and a draft PR is the claim on an issue. **Deploys go only from fresh trunk after a merge**, never from work branches (shared function app / DB / preview). The full playbook — including the 5-gate Definition of Done for migration slices — is in [`AGENTS.md`](AGENTS.md) and the `.claude/skills/` (`pickup`, `handoff`, `slice-workflow`).
+This is a two-developer repo with a strict workflow: **`main` takes changes only via pull requests** (enforced by a server-side ruleset), work happens on short-lived `<firstname>/<issue#>-<slug>` branches, and a draft PR is the claim on an issue. CI ([`ci.yml`](.github/workflows/ci.yml)) must be green before merge: frontend lint + typecheck + tests + build, and functions build + tests. **Deploys go only from `main` after a merge** — every merge deploys automatically (the Static Web Apps workflow ships the frontend and builds a preview environment per PR; the functions workflow ships the backend), never from work branches. The full playbook is in [`AGENTS.md`](AGENTS.md) and the `.claude/skills/` (`pickup`, `handoff`, `slice-workflow`).

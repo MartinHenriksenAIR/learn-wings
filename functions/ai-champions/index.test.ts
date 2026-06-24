@@ -107,11 +107,13 @@ describe('ai-champions', () => {
     expect(JSON.parse(res.body as string)).toEqual({ champions: [] });
   });
 
-  it('returns 500 on db error', async () => {
+  it('returns 500 on db error with generic body, real error logged on context', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
-    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    const ctx = { error: vi.fn() };
+    const res = await handler(baseReq({ orgId: 'org-1' }), ctx as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+    expect(ctx.error).toHaveBeenCalledWith(expect.stringContaining('connection refused'));
   });
 });

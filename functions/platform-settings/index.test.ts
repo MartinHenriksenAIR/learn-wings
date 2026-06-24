@@ -80,9 +80,9 @@ describe('platform-settings', () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
 
-    const res = await handler(baseReq({}), {} as any);
+    const res = await handler(baseReq({}), { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

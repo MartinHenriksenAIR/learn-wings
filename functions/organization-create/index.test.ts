@@ -9,7 +9,7 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoi
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
+vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -81,6 +81,20 @@ describe('organization-create', () => {
     const res = await handler(baseReq({ name: 'a'.repeat(101), slug: 'acme-corp' }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'name must be a string between 2 and 100 characters' });
+  });
+
+  it('returns 400 when name is whitespace only (trimmed length is 0) — I-1', async () => {
+    const res = await handler(baseReq({ name: '   ', slug: 'acme-corp' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'name must be a string between 2 and 100 characters' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('persists the name trimmed of surrounding whitespace — I-1', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' });
+    await handler(baseReq({ name: '  Acme Corp  ', slug: 'acme-corp' }), {} as any);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params[0]).toBe('Acme Corp');
   });
 
   it('returns 400 when slug is missing', async () => {
@@ -173,13 +187,13 @@ describe('organization-create', () => {
     mockQueryOne.mockRejectedValueOnce(Object.assign(new Error('duplicate key value'), { code: '23505' }));
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(409);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'Slug already in use' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Slug already in use', code: 'DUPLICATE_SLUG' });
   });
 
   it('returns 500 on generic db error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
-    const res = await handler(baseReq(validBody), {} as any);
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

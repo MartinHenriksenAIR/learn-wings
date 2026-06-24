@@ -1,27 +1,22 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { getProfile } from '../shared/profile';
+import { internalError } from '../shared/errors';
+import { requirePlatformAdmin } from '../shared/guards';
 import { deleteBlob } from '../shared/blob';
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
-
-    if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
-    }
+    const gate = await requirePlatformAdmin(req, origin);
+    if (!gate.ok) return gate.response;
 
     const body = await req.json() as { moduleId?: unknown };
     const { moduleId } = body;
 
     if (!moduleId || typeof moduleId !== 'string') {
-      return corsResponse(origin, 400, { error: 'moduleId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'moduleId is required' });
     }
 
     // Collect descendant blob paths before deletion.
@@ -42,7 +37,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     );
 
     if (!deleted) {
-      return corsResponse(origin, 404, { error: 'Module not found' }) as HttpResponseInit;
+      return corsResponse(origin, 404, { error: 'Module not found' });
     }
 
     // Best-effort blob cleanup — deleteBlob never throws; it warns server-side per failed path,
@@ -55,10 +50,9 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       console.warn(`[module-delete] ${blobsFailed} blob(s) failed to delete for module`, moduleId);
     }
 
-    return corsResponse(origin, 200, { success: true, blobsDeleted, blobsFailed }) as HttpResponseInit;
+    return corsResponse(origin, 200, { success: true, blobsDeleted, blobsFailed });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    return internalError(context, origin, err);
   }
 }
 

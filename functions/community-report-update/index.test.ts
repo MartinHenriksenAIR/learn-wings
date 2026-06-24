@@ -119,12 +119,11 @@ describe('community-report-update', () => {
     const updateCall = mockQueryOne.mock.calls[1] as [string, unknown[]];
     const [sql, params] = updateCall;
     expect(sql).toContain('UPDATE community_reports');
-    expect(sql).toContain('status =');
-    expect(sql).toContain('reviewed_by =');
+    expect(sql).toContain('status = $1');
+    expect(sql).toContain('reviewed_by = $2'); // server-set from profile
     expect(sql).toContain('reviewed_at = now()');
-    expect(params).toContain('reviewed');
-    expect(params).toContain('p1'); // server-set from profile
-    expect(params).toContain('r1');
+    expect(sql).toContain('WHERE id = $3');
+    expect(params).toEqual(['reviewed', 'p1', 'r1']); // exact placeholder order
   });
 
   // Happy path: update adminNotes only
@@ -138,12 +137,12 @@ describe('community-report-update', () => {
 
     const updateCall = mockQueryOne.mock.calls[1] as [string, unknown[]];
     const [sql, params] = updateCall;
-    expect(sql).toContain('admin_notes =');
+    expect(sql).toContain('admin_notes = $1');
     expect(sql).not.toContain('status =');
-    expect(sql).toContain('reviewed_by =');
+    expect(sql).toContain('reviewed_by = $2');
     expect(sql).toContain('reviewed_at = now()');
-    expect(params).toContain('Checked');
-    expect(params).toContain('p1');
+    expect(sql).toContain('WHERE id = $3');
+    expect(params).toEqual(['Checked', 'p1', 'r1']); // exact placeholder order
   });
 
   // Happy path: update both status and adminNotes
@@ -157,10 +156,11 @@ describe('community-report-update', () => {
 
     const updateCall = mockQueryOne.mock.calls[1] as [string, unknown[]];
     const [sql, params] = updateCall;
-    expect(sql).toContain('status =');
-    expect(sql).toContain('admin_notes =');
-    expect(params).toContain('dismissed');
-    expect(params).toContain('Not valid');
+    expect(sql).toContain('status = $1');
+    expect(sql).toContain('admin_notes = $2');
+    expect(sql).toContain('reviewed_by = $3');
+    expect(sql).toContain('WHERE id = $4');
+    expect(params).toEqual(['dismissed', 'Not valid', 'p1', 'r1']); // exact placeholder order
   });
 
   // adminNotes can be null (set to null explicitly)
@@ -172,7 +172,7 @@ describe('community-report-update', () => {
     const res = await handler(baseReq({ reportId: 'r1', adminNotes: null }), {} as any);
     expect(res.status).toBe(200);
     const updateCall = mockQueryOne.mock.calls[1] as [string, unknown[]];
-    expect(updateCall[1]).toContain(null);
+    expect(updateCall[1]).toEqual([null, 'p1', 'r1']); // exact placeholder order
   });
 
   // Platform admin bypasses isOrgAdmin
@@ -188,8 +188,8 @@ describe('community-report-update', () => {
 
   it('returns 500 on db error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
-    const res = await handler(baseReq({ reportId: 'r1', status: 'reviewed' }), {} as any);
+    const res = await handler(baseReq({ reportId: 'r1', status: 'reviewed' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

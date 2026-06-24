@@ -32,7 +32,6 @@ const validBody = {
   moduleId: 'mod-1',
   title: 'Lesson One',
   lessonType: 'video',
-  sortOrder: 0,
 };
 
 const fakeLesson = {
@@ -129,25 +128,6 @@ describe('lesson-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: "lessonType must be 'video', 'document', or 'quiz'" });
   });
 
-  it('returns 400 when sortOrder is missing', async () => {
-    const { sortOrder: _s, ...body } = validBody;
-    const res = await handler(baseReq(body), {} as any);
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'sortOrder must be an integer' });
-  });
-
-  it('returns 400 when sortOrder is a float', async () => {
-    const res = await handler(baseReq({ ...validBody, sortOrder: 1.5 }), {} as any);
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'sortOrder must be an integer' });
-  });
-
-  it('returns 400 when sortOrder is a string', async () => {
-    const res = await handler(baseReq({ ...validBody, sortOrder: '0' }), {} as any);
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'sortOrder must be an integer' });
-  });
-
   it('returns 400 when contentText is not a string (type violation)', async () => {
     const res = await handler(baseReq({ ...validBody, contentText: 42 }), {} as any);
     expect(res.status).toBe(400);
@@ -202,7 +182,7 @@ describe('lesson-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'documentStoragePath must be a non-empty string or null' });
   });
 
-  it('happy path: inserts lesson and returns it', async () => {
+  it('happy path: inserts lesson with server-computed sort_order and returns it', async () => {
     mockQueryOne.mockResolvedValueOnce(fakeLesson);
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
@@ -211,7 +191,11 @@ describe('lesson-create', () => {
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO lessons');
     expect(sql).toContain('RETURNING *');
-    // Params order: [moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, null (video_url), azureBlobPath, documentStoragePath, sortOrder]
+    // sort_order is server-owned: MAX+1 within the module, computed in the INSERT
+    expect(sql).toContain('COALESCE(MAX(sort_order) + 1, 0)');
+    expect(sql).toContain('WHERE module_id = $1');
+    // Params order: [moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, null (video_url), azureBlobPath, documentStoragePath]
+    expect(params).toHaveLength(9); // no client sort_order param
     expect(params[0]).toBe('mod-1');    // module_id
     expect(params[1]).toBe('Lesson One'); // title (raw)
     expect(params[2]).toBe('video');     // lesson_type
@@ -221,7 +205,6 @@ describe('lesson-create', () => {
     expect(params[6]).toBeNull();        // video_url — always null
     expect(params[7]).toBeNull();        // azure_blob_path
     expect(params[8]).toBeNull();        // document_storage_path
-    expect(params[9]).toBe(0);           // sort_order
   });
 
   it('happy path: optional fields passed through, video_url always null', async () => {
@@ -233,7 +216,6 @@ describe('lesson-create', () => {
       videoStoragePath: 'path/to/video',
       azureBlobPath: 'blob/path',
       documentStoragePath: 'doc/path',
-      sortOrder: 5,
     };
     mockQueryOne.mockResolvedValueOnce({ ...fakeLesson, ...body });
     const res = await handler(baseReq(body), {} as any);
@@ -246,7 +228,31 @@ describe('lesson-create', () => {
     expect(params[6]).toBeNull();             // video_url always null
     expect(params[7]).toBe('blob/path');      // azure_blob_path
     expect(params[8]).toBe('doc/path');       // document_storage_path
-    expect(params[9]).toBe(5);               // sort_order
+  });
+
+  it('ignores client-supplied sortOrder entirely', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeLesson);
+    const res = await handler(baseReq({ ...validBody, sortOrder: 999 }), {} as any);
+    expect(res.status).toBe(200);
+
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params).toHaveLength(9);
+    expect(params).not.toContain(999);
+    expect(sql).toContain('COALESCE(MAX(sort_order) + 1, 0)');
+  });
+
+  it('no longer rejects a non-integer sortOrder — the field is ignored, not validated', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeLesson);
+    const res = await handler(baseReq({ ...validBody, sortOrder: 'not-a-number' }), {} as any);
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params).not.toContain('not-a-number');
+  });
+
+  it('no longer requires sortOrder in the body', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeLesson);
+    const res = await handler(baseReq({ moduleId: 'mod-1', title: 'Lesson One', lessonType: 'video' }), {} as any);
+    expect(res.status).toBe(200);
   });
 
   it('accepts durationMinutes: null', async () => {
@@ -267,8 +273,8 @@ describe('lesson-create', () => {
 
   it('returns 500 on db error propagating err.message', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('FK violation'));
-    const res = await handler(baseReq(validBody), {} as any);
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'FK violation' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

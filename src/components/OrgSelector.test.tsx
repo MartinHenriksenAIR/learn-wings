@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 const { mockCallApi } = vi.hoisted(() => ({ mockCallApi: vi.fn() }));
 vi.mock('@/lib/api-client', () => ({ callApi: mockCallApi }));
@@ -40,6 +42,16 @@ const baseAuth = {
   effectiveIsOrgAdmin: true,
 };
 
+// useOrganizations needs a QueryClient; fresh per render so no cache leaks between tests.
+function renderSelector() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <OrgSelector />
+    </QueryClientProvider>
+  );
+}
+
 describe('OrgSelector', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,7 +61,7 @@ describe('OrgSelector', () => {
     mockCallApi.mockResolvedValue({ organizations: [orgA, orgB] });
     mockUseAuth.mockReturnValue(baseAuth);
 
-    render(<OrgSelector />);
+    renderSelector();
 
     await waitFor(() => {
       expect(mockCallApi).toHaveBeenCalledWith('/api/organizations', {});
@@ -60,7 +72,7 @@ describe('OrgSelector', () => {
     mockCallApi.mockResolvedValue({ organizations: [orgA, orgB] });
     mockUseAuth.mockReturnValue(baseAuth);
 
-    render(<OrgSelector />);
+    renderSelector();
 
     await waitFor(() => {
       expect(mockSetCurrentOrg).toHaveBeenCalledWith(orgA);
@@ -71,7 +83,7 @@ describe('OrgSelector', () => {
     mockCallApi.mockResolvedValue({ organizations: [orgA, orgB] });
     mockUseAuth.mockReturnValue({ ...baseAuth, currentOrg: orgB });
 
-    render(<OrgSelector />);
+    renderSelector();
 
     await waitFor(() => {
       expect(mockCallApi).toHaveBeenCalled();
@@ -87,7 +99,7 @@ describe('OrgSelector', () => {
       viewMode: 'learner' as const,
     });
 
-    render(<OrgSelector />);
+    renderSelector();
 
     // Let any pending microtasks settle, then assert no fetch + no spinner.
     await Promise.resolve();
@@ -99,7 +111,7 @@ describe('OrgSelector', () => {
     mockCallApi.mockResolvedValue({ organizations: [orgA] });
     mockUseAuth.mockReturnValue(baseAuth);
 
-    render(<OrgSelector />);
+    renderSelector();
 
     expect(document.querySelector('.animate-spin')).not.toBeNull();
     await waitFor(() => {

@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
 
 // idea_status enum values (provenance: supabase enum idea_status).
@@ -26,13 +27,13 @@ interface IdeaRow {
   status: string;
 }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as {
       ideaId?: unknown;
@@ -43,18 +44,18 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     const { ideaId, status, adminNotes, rejectionReason } = body;
 
     if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'ideaId is required' });
     }
     if (typeof status !== 'string' || !VALID_STATUSES.includes(status)) {
       return corsResponse(origin, 400, {
         error: `status must be one of: ${VALID_STATUSES.join(', ')}`,
-      }) as HttpResponseInit;
+      });
     }
     if (adminNotes !== undefined && adminNotes !== null && typeof adminNotes !== 'string') {
-      return corsResponse(origin, 400, { error: 'adminNotes must be a string or null' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'adminNotes must be a string or null' });
     }
     if (rejectionReason !== undefined && rejectionReason !== null && typeof rejectionReason !== 'string') {
-      return corsResponse(origin, 400, { error: 'rejectionReason must be a string or null' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'rejectionReason must be a string or null' });
     }
 
     // Load idea
@@ -62,12 +63,12 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
       [ideaId],
     );
-    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' }) as HttpResponseInit;
+    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' });
 
     // Authorization: platform admin OR org admin of the IDEA's org (never client-supplied).
     // Authorship grants nothing here; status writes are admin-only.
     const canAccess = profile.is_platform_admin || await isOrgAdmin(profile.id, idea.org_id);
-    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' });
 
     // Build whitelist-only dynamic UPDATE (supabase-js parity):
     //   status              — always set
@@ -96,10 +97,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       params,
     );
 
-    return corsResponse(origin, 200, { idea: updatedIdea }) as HttpResponseInit;
+    return corsResponse(origin, 200, { idea: updatedIdea });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

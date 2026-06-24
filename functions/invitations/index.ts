@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isOrgAdmin } from '../shared/profile';
 
 /**
@@ -18,27 +19,27 @@ import { getProfile, isOrgAdmin } from '../shared/profile';
  *     20260201171353_*.sql and the safe RPC).
  *   - scope='platform': platform-admin-only; orgId optional narrows the result.
  */
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { scope?: unknown; orgId?: unknown };
     const { scope, orgId } = body;
 
     if (scope !== 'org' && scope !== 'platform') {
-      return corsResponse(origin, 400, { error: 'scope must be "org" or "platform"' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'scope must be "org" or "platform"' });
     }
 
     if (scope === 'org' && (typeof orgId !== 'string' || orgId === '')) {
-      return corsResponse(origin, 400, { error: 'orgId is required for scope=org' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required for scope=org' });
     }
     // For scope='platform', orgId is optional; if present it must be a non-empty string.
     if (scope === 'platform' && orgId !== undefined && (typeof orgId !== 'string' || orgId === '')) {
-      return corsResponse(origin, 400, { error: 'orgId must be a string' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId must be a string' });
     }
 
     const vOrgId = typeof orgId === 'string' && orgId !== '' ? orgId : undefined;
@@ -61,12 +62,12 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
         add('org_id', orgIdStr);
         add('invited_by_user_id', profile.id);
       } else {
-        return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+        return corsResponse(origin, 403, { error: 'Forbidden' });
       }
     } else {
       // scope === 'platform' — platform-admin-only
       if (!profile.is_platform_admin) {
-        return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+        return corsResponse(origin, 403, { error: 'Forbidden' });
       }
       if (vOrgId) add('org_id', vOrgId);
     }
@@ -81,10 +82,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       params,
     );
 
-    return corsResponse(origin, 200, { invitations }) as HttpResponseInit;
+    return corsResponse(origin, 200, { invitations });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

@@ -149,8 +149,8 @@ describe('module-delete', () => {
 
   it('returns 500 on db error propagating err.message', async () => {
     mockQuery.mockRejectedValueOnce(new Error('db connection failed'));
-    const res = await handler(baseReq(validBody), {} as any);
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'db connection failed' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

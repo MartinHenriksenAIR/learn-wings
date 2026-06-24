@@ -160,9 +160,9 @@ describe('learner-dashboard', () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
 
-    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    const res = await handler(baseReq({ orgId: 'org-1' }), { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection refused' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

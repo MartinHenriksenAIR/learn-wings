@@ -17,11 +17,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { LevelBadge } from '@/components/ui/level-badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
-import { Loader2, BookOpen, Users, GraduationCap } from 'lucide-react';
+import { Loader2, BookOpen, Users, GraduationCap, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Course, OrgMembership, Profile } from '@/lib/types';
 
 interface EnrollUserDialogProps {
@@ -37,6 +39,12 @@ interface AvailableCourse extends Course {
   alreadyEnrolled?: boolean;
 }
 
+interface EnrollFailure {
+  courseId: string;
+  courseTitle: string;
+  reason: string;
+}
+
 export function EnrollUserDialog({
   open,
   onOpenChange,
@@ -45,11 +53,13 @@ export function EnrollUserDialog({
   members,
   onSuccess,
 }: EnrollUserDialogProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [courses, setCourses] = useState<AvailableCourse[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+  const [failures, setFailures] = useState<EnrollFailure[]>([]);
 
   const activeLearners = members.filter(
     (m) => m.status === 'active' && m.role === 'learner'
@@ -124,6 +134,7 @@ export function EnrollUserDialog({
       setSelectedUserId('');
       setSelectedCourseIds([]);
       setCourses([]);
+      setFailures([]);
     }
   }, [open]);
 
@@ -139,9 +150,10 @@ export function EnrollUserDialog({
     if (!selectedUserId || selectedCourseIds.length === 0) return;
 
     setEnrolling(true);
+    setFailures([]);
 
     let success = 0;
-    let failed = 0;
+    const rowFailures: EnrollFailure[] = [];
 
     try {
       for (const courseId of selectedCourseIds) {
@@ -153,15 +165,23 @@ export function EnrollUserDialog({
             status: 'enrolled',
           });
           success++;
-        } catch (_err) {
-          failed++;
+        } catch (err) {
+          const course = courses.find((c) => c.id === courseId);
+          rowFailures.push({
+            courseId,
+            courseTitle: course?.title ?? courseId,
+            reason: err instanceof Error ? err.message : t('enrollDialog.unknownError'),
+          });
         }
       }
     } finally {
       setEnrolling(false);
     }
 
-    if (success > 0) {
+    setFailures(rowFailures);
+    const failed = rowFailures.length;
+
+    if (failed === 0) {
       const selectedUser = activeLearners.find((m) => m.user_id === selectedUserId);
       toast({
         title: 'Enrollment successful',
@@ -169,10 +189,20 @@ export function EnrollUserDialog({
       });
       onSuccess();
       onOpenChange(false);
+    } else if (success > 0) {
+      // Mixed outcome: keep the dialog open so the per-row failure reasons stay visible.
+      toast({
+        title: t('enrollDialog.partialTitle'),
+        description: t('enrollDialog.partialDescription', { success, failed }),
+        variant: 'destructive',
+      });
+      onSuccess();
+      setSelectedCourseIds(rowFailures.map((f) => f.courseId));
+      fetchCourses();
     } else {
       toast({
-        title: 'Enrollment failed',
-        description: 'Failed to enroll user in courses. They may already be enrolled.',
+        title: t('enrollDialog.failedTitle'),
+        description: t('enrollDialog.failedDescription'),
         variant: 'destructive',
       });
     }
@@ -180,12 +210,6 @@ export function EnrollUserDialog({
 
   const availableCourses = courses.filter((c) => !c.alreadyEnrolled);
   const enrolledCourses = courses.filter((c) => c.alreadyEnrolled);
-
-  const levelColors = {
-    basic: 'bg-green-100 text-green-800',
-    intermediate: 'bg-yellow-100 text-yellow-800',
-    advanced: 'bg-red-100 text-red-800',
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -209,7 +233,13 @@ export function EnrollUserDialog({
                 </p>
               </div>
             ) : (
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <Select
+                value={selectedUserId}
+                onValueChange={(v) => {
+                  setSelectedUserId(v);
+                  setFailures([]);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a team member..." />
                 </SelectTrigger>
@@ -230,7 +260,7 @@ export function EnrollUserDialog({
               <Label>Select Courses</Label>
               {loading ? (
                 <div className="flex items-center justify-center p-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-accent" />
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               ) : courses.length === 0 ? (
                 <div className="p-4 rounded-lg border bg-muted/50 text-center">
@@ -256,9 +286,7 @@ export function EnrollUserDialog({
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{course.title}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className={levelColors[course.level]}>
-                              {course.level}
-                            </Badge>
+                            <LevelBadge level={course.level} />
                           </div>
                         </div>
                       </div>
@@ -275,7 +303,7 @@ export function EnrollUserDialog({
                             key={course.id}
                             className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 opacity-60"
                           >
-                            <GraduationCap className="h-4 w-4 text-accent" />
+                            <GraduationCap className="h-4 w-4 text-primary" />
                             <div className="flex-1 min-w-0">
                               <p className="font-medium truncate">{course.title}</p>
                               <p className="text-xs text-muted-foreground">
@@ -290,6 +318,23 @@ export function EnrollUserDialog({
                 </ScrollArea>
               )}
             </div>
+          )}
+
+          {/* Per-row failure reasons (pattern follows BulkInviteDialog results) */}
+          {failures.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <p className="font-medium">{t('enrollDialog.failuresTitle')}</p>
+                <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                  {failures.map((failure) => (
+                    <li key={failure.courseId}>
+                      <span className="font-medium">{failure.courseTitle}</span>: {failure.reason}
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
           )}
         </div>
 

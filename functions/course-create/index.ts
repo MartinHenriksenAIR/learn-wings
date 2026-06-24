@@ -1,23 +1,19 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { getProfile } from '../shared/profile';
+import { internalError } from '../shared/errors';
+import { requirePlatformAdmin } from '../shared/guards';
 
 const VALID_LEVELS = ['basic', 'intermediate', 'advanced'] as const;
 type CourseLevel = typeof VALID_LEVELS[number];
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
-
-    if (!profile.is_platform_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
-    }
+    const gate = await requirePlatformAdmin(req, origin);
+    if (!gate.ok) return gate.response;
+    const { profile } = gate;
 
     const body = await req.json() as {
       title?: unknown;
@@ -30,23 +26,23 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     // Validate title: required, non-empty string
     if (!title || typeof title !== 'string' || title.trim() === '') {
-      return corsResponse(origin, 400, { error: 'title is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'title is required' });
     }
 
     // Validate level: required, must be one of the enum values
     if (!level || !VALID_LEVELS.includes(level as CourseLevel)) {
-      return corsResponse(origin, 400, { error: 'level must be basic, intermediate, or advanced' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'level must be basic, intermediate, or advanced' });
     }
 
     // Validate description: if present, must be string or null (empty string allowed;
     // null accepted for consistency with course-update — the column is nullable)
     if (description !== undefined && description !== null && typeof description !== 'string') {
-      return corsResponse(origin, 400, { error: 'description must be a string or null' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'description must be a string or null' });
     }
 
     // Validate thumbnailUrl: if present, must be string or null
     if (thumbnailUrl !== undefined && thumbnailUrl !== null && typeof thumbnailUrl !== 'string') {
-      return corsResponse(origin, 400, { error: 'thumbnailUrl must be a string or null' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'thumbnailUrl must be a string or null' });
     }
 
     const course = await queryOne(
@@ -62,10 +58,9 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       ],
     );
 
-    return corsResponse(origin, 200, { course }) as HttpResponseInit;
+    return corsResponse(origin, 200, { course });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    return internalError(context, origin, err);
   }
 }
 

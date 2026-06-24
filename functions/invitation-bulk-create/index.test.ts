@@ -9,7 +9,7 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrg
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
+vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: mockIsOrgAdmin, isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -190,6 +190,16 @@ describe('invitation-bulk-create', () => {
     expect(mockQueryOne).toHaveBeenCalledTimes(2);
   });
 
+  it('per-row unique violation (23505) surfaces as success:false "already pending" — backed by the invitations_pending_unique_per_org partial index (#91)', async () => {
+    mockQueryOne.mockRejectedValueOnce(Object.assign(new Error('duplicate key value violates unique constraint "invitations_pending_unique_per_org"'), { code: '23505' }));
+    const res = await handler(baseReq({ orgId: 'org-1', invites: [makeInvite('Dup@Example.com')] }), {} as any);
+    expect(res.status).toBe(200);
+    const parsed = JSON.parse(res.body as string);
+    expect(parsed.results).toEqual([
+      { email: 'dup@example.com', success: false, error: 'An invitation for this email is already pending' },
+    ]);
+  });
+
   it('per-row foreign-key violation (23503) surfaces as Organization not found', async () => {
     mockQueryOne.mockRejectedValueOnce(Object.assign(new Error('insert violates fk'), { code: '23503' }));
     const res = await handler(baseReq({ orgId: 'org-1', invites: [makeInvite('a@b.com')] }), {} as any);
@@ -200,14 +210,20 @@ describe('invitation-bulk-create', () => {
     ]);
   });
 
-  it('per-row generic db error surfaces the error message', async () => {
+  it('per-row generic db error logs server-side and returns a constant message (no CWE-209 leak)', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
-    const res = await handler(baseReq({ orgId: 'org-1', invites: [makeInvite('a@b.com')] }), {} as any);
+    const ctx = { error: vi.fn() } as any;
+    const res = await handler(baseReq({ orgId: 'org-1', invites: [makeInvite('a@b.com')] }), ctx);
     expect(res.status).toBe(200);
     const parsed = JSON.parse(res.body as string);
     expect(parsed.results).toEqual([
-      { email: 'a@b.com', success: false, error: 'connection refused' },
+      { email: 'a@b.com', success: false, error: 'Could not create invitation' },
     ]);
+    // The raw driver message must not leak to the client...
+    expect(res.body as string).not.toContain('connection refused');
+    // ...but it must be logged server-side for App Insights / incident response.
+    expect(ctx.error).toHaveBeenCalledOnce();
+    expect(String(ctx.error.mock.calls[0][0])).toContain('connection refused');
   });
 
   it('happy path (org admin): authorizes via isOrgAdmin', async () => {

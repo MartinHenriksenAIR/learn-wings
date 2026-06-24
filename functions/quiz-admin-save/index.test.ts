@@ -407,25 +407,21 @@ describe('quiz-admin-save', () => {
   it('returns 500 with err.message when transaction throws mid-sequence', async () => {
     mockWithTransaction.mockImplementationOnce(async (cb: any) => {
       const client = { query: vi.fn().mockRejectedValueOnce(new Error('FK violation')) };
-      // Simulate what withTransaction does: throw re-propagates after rollback
-      try {
-        return await cb(client);
-      } catch (err) {
-        throw err; // re-throw as real withTransaction does
-      }
+      // Like real withTransaction: the callback's rejection propagates after rollback
+      return await cb(client);
     });
 
-    const res = await handler(baseReq(validBody), {} as any);
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'FK violation' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
   // ── 500 on auth-level DB error ───────────────────────────────────────────────
 
   it('returns 500 on auth-level db error propagating err.message', async () => {
     mockWithTransaction.mockRejectedValueOnce(new Error('connection pool exhausted'));
-    const res = await handler(baseReq(validBody), {} as any);
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'connection pool exhausted' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });

@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isActiveMember } from '../shared/profile';
 
 interface IdeaRow {
@@ -11,19 +12,19 @@ interface IdeaRow {
   status: string;
 }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as { ideaId?: unknown };
     const { ideaId } = body;
 
     if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'ideaId is required' });
     }
 
     // Load idea
@@ -33,16 +34,16 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     );
 
     // Missing idea → RLS parity: return empty (not 404)
-    if (!idea) return corsResponse(origin, 200, { comments: [] }) as HttpResponseInit;
+    if (!idea) return corsResponse(origin, 200, { comments: [] });
 
     // Draft privacy: other-author's draft is invisible (no admin bypass)
     if (idea.status === 'draft' && idea.user_id !== profile.id) {
-      return corsResponse(origin, 200, { comments: [] }) as HttpResponseInit;
+      return corsResponse(origin, 200, { comments: [] });
     }
 
     // Access: platform admin OR active member of idea's org
     const canAccess = profile.is_platform_admin || await isActiveMember(profile.id, idea.org_id);
-    if (!canAccess) return corsResponse(origin, 200, { comments: [] }) as HttpResponseInit;
+    if (!canAccess) return corsResponse(origin, 200, { comments: [] });
 
     const comments = await query(
       `SELECT c.*, json_build_object('id', pr.id, 'full_name', pr.full_name) AS profile
@@ -53,10 +54,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [ideaId],
     );
 
-    return corsResponse(origin, 200, { comments }) as HttpResponseInit;
+    return corsResponse(origin, 200, { comments });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

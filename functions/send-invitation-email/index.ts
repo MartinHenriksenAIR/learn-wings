@@ -2,6 +2,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { Resend } from 'resend';
 
 // Lazy init — constructing Resend without an API key throws, which would
@@ -103,9 +104,9 @@ function generateEmailHtml({
 </html>`.trim();
 }
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
 
@@ -119,23 +120,23 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       [user.id]
     );
     if (!profile?.is_platform_admin && !profile?.is_org_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden: Only admins can send invitations' }) as HttpResponseInit;
+      return corsResponse(origin, 403, { error: 'Forbidden: Only admins can send invitations' });
     }
 
     const { email, orgName, role, inviteLink } = await req.json() as InvitationEmailRequest;
 
     if (!email || !inviteLink) {
-      return corsResponse(origin, 400, { error: 'Missing required fields: email and inviteLink' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'Missing required fields: email and inviteLink' });
     }
 
     // Validate invite link domain — only production domain allowed
     try {
       const linkUrl = new URL(inviteLink);
       if (!ALLOWED_LINK_DOMAINS.includes(linkUrl.hostname)) {
-        return corsResponse(origin, 400, { error: 'Invalid invite link domain' }) as HttpResponseInit;
+        return corsResponse(origin, 400, { error: 'Invalid invite link domain' });
       }
     } catch {
-      return corsResponse(origin, 400, { error: 'Invalid invite link format' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'Invalid invite link format' });
     }
 
     const isPlatformAdminInvite = role === 'platform_admin';
@@ -153,10 +154,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       html,
     });
 
-    return corsResponse(origin, 200, { success: true, data: emailResponse }) as HttpResponseInit;
+    return corsResponse(origin, 200, { success: true, data: emailResponse });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

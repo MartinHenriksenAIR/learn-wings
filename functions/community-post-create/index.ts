@@ -2,15 +2,16 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isActiveMember, isOrgAdmin } from '../shared/profile';
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const body = await req.json() as {
       scope?: unknown;
@@ -28,33 +29,33 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
 
     // Validate scope
     if (!scope || (scope !== 'org' && scope !== 'global')) {
-      return corsResponse(origin, 400, { error: 'scope must be "org" or "global"' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'scope must be "org" or "global"' });
     }
 
     // scope='org' requires orgId
     if (scope === 'org' && (!orgId || typeof orgId !== 'string')) {
-      return corsResponse(origin, 400, { error: 'orgId is required for org scope' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId is required for org scope' });
     }
 
     // scope='global' must NOT have orgId (fail-fast before DB CHECK violation)
     if (scope === 'global' && orgId !== undefined && orgId !== null) {
-      return corsResponse(origin, 400, { error: 'orgId must not be provided for global scope' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'orgId must not be provided for global scope' });
     }
 
     // Validate required fields
     if (!categoryId || typeof categoryId !== 'string') {
-      return corsResponse(origin, 400, { error: 'categoryId is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'categoryId is required' });
     }
     if (!title || typeof title !== 'string') {
-      return corsResponse(origin, 400, { error: 'title is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'title is required' });
     }
     if (!content || typeof content !== 'string') {
-      return corsResponse(origin, 400, { error: 'content is required' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'content is required' });
     }
 
     // Validate optional fields
     if (tags !== undefined && (!Array.isArray(tags) || !tags.every((t) => typeof t === 'string'))) {
-      return corsResponse(origin, 400, { error: 'tags must be an array of strings' }) as HttpResponseInit;
+      return corsResponse(origin, 400, { error: 'tags must be an array of strings' });
     }
 
     const vScope = scope as 'org' | 'global';
@@ -71,7 +72,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     if (!profile.is_platform_admin) {
       if (vScope === 'org') {
         const isMember = await isActiveMember(profile.id, vOrgId!);
-        if (!isMember) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+        if (!isMember) return corsResponse(origin, 403, { error: 'Forbidden' });
       }
       // global scope is open to all profiles (no extra check needed beyond having a profile)
     }
@@ -81,18 +82,18 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
       `SELECT is_restricted FROM community_categories WHERE id = $1`,
       [vCategoryId],
     );
-    if (!categoryRow) return corsResponse(origin, 400, { error: 'Category not found' }) as HttpResponseInit;
+    if (!categoryRow) return corsResponse(origin, 400, { error: 'Category not found' });
 
     if (categoryRow.is_restricted) {
       if (vScope === 'global') {
         // Only platform admins can post in restricted categories globally
         if (!profile.is_platform_admin) {
-          return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+          return corsResponse(origin, 403, { error: 'Forbidden' });
         }
       } else {
         // scope='org': platform admin OR org admin
         const canPost = profile.is_platform_admin || await isOrgAdmin(profile.id, vOrgId!);
-        if (!canPost) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+        if (!canPost) return corsResponse(origin, 403, { error: 'Forbidden' });
       }
     }
 
@@ -107,10 +108,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
        vEventDate, vEventLocation, vEventRegistrationUrl],
     );
 
-    return corsResponse(origin, 200, { post }) as HttpResponseInit;
+    return corsResponse(origin, 200, { post });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

@@ -2,30 +2,31 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { internalError } from '../shared/errors';
 import { getProfile, isActiveMember } from '../shared/profile';
 
-async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
+async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin) as HttpResponseInit;
+  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
   try {
     const user = await authenticate(req);
     const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' }) as HttpResponseInit;
+    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
 
     const { orgId } = await req.json() as { orgId?: string };
 
     if (orgId) {
       // Single org lookup
       const authorized = profile.is_platform_admin || await isActiveMember(profile.id, orgId);
-      if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' }) as HttpResponseInit;
+      if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
 
       const organization = await queryOne(
         `SELECT id, name, slug, logo_url, seat_limit, created_at FROM organizations WHERE id = $1`,
         [orgId],
       );
-      if (!organization) return corsResponse(origin, 404, { error: 'Organization not found' }) as HttpResponseInit;
+      if (!organization) return corsResponse(origin, 404, { error: 'Organization not found' });
 
-      return corsResponse(origin, 200, { organization }) as HttpResponseInit;
+      return corsResponse(origin, 200, { organization });
     }
 
     // List orgs — correlated subquery for member_count is cleaner than a LEFT JOIN + GROUP BY
@@ -39,7 +40,7 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
          FROM organizations o
          ORDER BY o.created_at DESC`,
       );
-      return corsResponse(origin, 200, { organizations }) as HttpResponseInit;
+      return corsResponse(origin, 200, { organizations });
     }
 
     const organizations = await query(
@@ -51,10 +52,10 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
        ORDER BY o.created_at DESC`,
       [profile.id],
     );
-    return corsResponse(origin, 200, { organizations }) as HttpResponseInit;
+    return corsResponse(origin, 200, { organizations });
   } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message }) as HttpResponseInit;
-    return corsResponse(origin, 500, { error: err instanceof Error ? err.message : 'Unknown error' }) as HttpResponseInit;
+    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
+    return internalError(context, origin, err);
   }
 }
 

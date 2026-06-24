@@ -28,7 +28,7 @@ const baseReq = (body: unknown) => ({
 const adminProfile = { id: 'admin-1', is_platform_admin: true };
 const nonAdminProfile = { id: 'user-1', is_platform_admin: false };
 
-const validBody = { courseId: 'course-1', title: 'Module 1', sortOrder: 0 };
+const validBody = { courseId: 'course-1', title: 'Module 1' };
 const fakeModule = { id: 'mod-1', course_id: 'course-1', title: 'Module 1', sort_order: 0 };
 
 describe('module-create', () => {
@@ -66,7 +66,7 @@ describe('module-create', () => {
   });
 
   it('returns 400 when courseId is missing', async () => {
-    const res = await handler(baseReq({ title: 'M', sortOrder: 0 }), {} as any);
+    const res = await handler(baseReq({ title: 'M' }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'courseId is required' });
   });
@@ -84,7 +84,7 @@ describe('module-create', () => {
   });
 
   it('returns 400 when title is missing', async () => {
-    const res = await handler(baseReq({ courseId: 'course-1', sortOrder: 0 }), {} as any);
+    const res = await handler(baseReq({ courseId: 'course-1' }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'title is required' });
   });
@@ -101,25 +101,7 @@ describe('module-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'title is required' });
   });
 
-  it('returns 400 when sortOrder is missing', async () => {
-    const res = await handler(baseReq({ courseId: 'course-1', title: 'M' }), {} as any);
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'sortOrder must be an integer' });
-  });
-
-  it('returns 400 when sortOrder is a float', async () => {
-    const res = await handler(baseReq({ ...validBody, sortOrder: 1.5 }), {} as any);
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'sortOrder must be an integer' });
-  });
-
-  it('returns 400 when sortOrder is a string', async () => {
-    const res = await handler(baseReq({ ...validBody, sortOrder: '0' }), {} as any);
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'sortOrder must be an integer' });
-  });
-
-  it('happy path: inserts module and returns it', async () => {
+  it('happy path: inserts module with server-computed sort_order and returns it', async () => {
     mockQueryOne.mockResolvedValueOnce(fakeModule);
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
@@ -128,15 +110,41 @@ describe('module-create', () => {
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO course_modules');
     expect(sql).toContain('RETURNING *');
-    expect(params[0]).toBe('course-1'); // course_id
-    expect(params[1]).toBe('Module 1'); // title (stored raw)
-    expect(params[2]).toBe(0);           // sort_order
+    // sort_order is server-owned: MAX+1 within the course, computed in the INSERT
+    expect(sql).toContain('COALESCE(MAX(sort_order) + 1, 0)');
+    expect(sql).toContain('WHERE course_id = $1');
+    expect(params).toEqual(['course-1', 'Module 1']); // no client sort_order param
+  });
+
+  it('ignores client-supplied sortOrder entirely', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeModule);
+    const res = await handler(baseReq({ ...validBody, sortOrder: 999 }), {} as any);
+    expect(res.status).toBe(200);
+
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params).toEqual(['course-1', 'Module 1']);
+    expect(params).not.toContain(999);
+    expect(sql).toContain('COALESCE(MAX(sort_order) + 1, 0)');
+  });
+
+  it('no longer rejects a non-integer sortOrder — the field is ignored, not validated', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeModule);
+    const res = await handler(baseReq({ ...validBody, sortOrder: 'not-a-number' }), {} as any);
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params).toEqual(['course-1', 'Module 1']);
+  });
+
+  it('no longer requires sortOrder in the body', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeModule);
+    const res = await handler(baseReq({ courseId: 'course-1', title: 'Module 1' }), {} as any);
+    expect(res.status).toBe(200);
   });
 
   it('returns 500 on db error propagating err.message', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('FK violation'));
-    const res = await handler(baseReq(validBody), {} as any);
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'FK violation' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 });
