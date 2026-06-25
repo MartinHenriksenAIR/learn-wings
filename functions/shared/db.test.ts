@@ -1,11 +1,36 @@
-import { describe, it, expect, afterAll, vi, afterEach } from 'vitest';
-import { query, queryOne, getDb, isUniqueViolation, buildSslConfig } from './db';
+import { describe, it, expect, afterAll, beforeEach, vi, afterEach } from 'vitest';
+import { Client, PoolConfig } from 'pg';
+import { query, queryOne, getDb, isUniqueViolation, buildSslConfig, buildPoolConfig } from './db';
 import {
   AZURE_POSTGRES_CA,
   DIGICERT_GLOBAL_ROOT_G2,
   DIGICERT_GLOBAL_ROOT_CA,
   MICROSOFT_RSA_ROOT_CA_2017,
 } from './azure-ca';
+
+/**
+ * The ssl pg would ACTUALLY use for a given Pool/Client config — the value a
+ * real connection is configured with, after pg's own resolution. pg computes it
+ * in ConnectionParameters at Client construction (no socket opens until
+ * .connect()); crucially, if the config still carries a `connectionString`, pg
+ * re-derives ssl from it and overlays the explicit `ssl` option — which is the
+ * exact clobber issue #103 fixes. Asserting on this resolved value (rather than
+ * the raw config object) is what catches that regression; a bare buildSslConfig()
+ * unit test cannot.
+ *
+ * Read `connectionParameters.ssl`, not the public `client.ssl`: the latter is
+ * `connectionParameters.ssl || {}`, which silently turns a resolved `false`
+ * (sslmode=disable) into `{}` and would hide that case. @types/pg doesn't expose
+ * `.connectionParameters`, so reach it through a narrow local shape.
+ */
+function effectiveSsl(config: PoolConfig): false | { ca?: string; rejectUnauthorized?: boolean } {
+  const client = new Client(config);
+  return (
+    client as unknown as {
+      connectionParameters: { ssl: false | { ca?: string; rejectUnauthorized?: boolean } };
+    }
+  ).connectionParameters.ssl;
+}
 
 const skip = !process.env.DATABASE_URL;
 
@@ -55,6 +80,82 @@ describe('buildSslConfig', () => {
     expect(buildSslConfig({ DATABASE_SSL_INSECURE: '0' }).rejectUnauthorized).toBe(true);
     expect(buildSslConfig({ DATABASE_SSL_INSECURE: 'true' }).rejectUnauthorized).toBe(true);
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+// Pure unit tests — no DATABASE_URL gate. Asserts the URL's sslmode can't
+// clobber our pinned-CA ssl, exercised through pg's real config resolution.
+describe('buildPoolConfig', () => {
+  const PROD_SHAPED_URL =
+    'postgres://app:secret@db.example.postgres.database.azure.com:5432/learnwings?sslmode=require';
+
+  beforeEach(() => {
+    // pg-connection-string emits a process warning when it sees sslmode=require
+    // (a v3 deprecation notice, irrelevant here — our explicit ssl object governs
+    // verification, not sslmode). Silence it to keep test output pristine.
+    vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('keeps the pinned Azure CA when DATABASE_URL has ?sslmode=require (verify-full not clobbered)', () => {
+    const ssl = effectiveSsl(buildPoolConfig(PROD_SHAPED_URL));
+    expect(ssl).not.toBe(false);
+    expect((ssl as { ca?: string }).ca).toBe(AZURE_POSTGRES_CA);
+    expect((ssl as { rejectUnauthorized?: boolean }).rejectUnauthorized).toBe(true);
+  });
+
+  it('does not carry a connectionString key (the clobber vector)', () => {
+    expect('connectionString' in buildPoolConfig(PROD_SHAPED_URL)).toBe(false);
+  });
+
+  it('parses host, database, user and port from the URL', () => {
+    const config = buildPoolConfig(PROD_SHAPED_URL);
+    expect(config.host).toBe('db.example.postgres.database.azure.com');
+    expect(config.database).toBe('learnwings');
+    expect(config.user).toBe('app');
+    expect(config.port).toBe(5432);
+  });
+
+  it('keeps the DATABASE_SSL_INSECURE rollback hatch functional through the URL path', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ssl = effectiveSsl(buildPoolConfig(PROD_SHAPED_URL, { DATABASE_SSL_INSECURE: '1' }));
+    expect(ssl).toEqual({ rejectUnauthorized: false });
+  });
+
+  it('keeps the pinned Azure CA when DATABASE_URL has no sslmode', () => {
+    const noSslmodeUrl = 'postgres://app:secret@db.example.postgres.database.azure.com:5432/learnwings';
+    const ssl = effectiveSsl(buildPoolConfig(noSslmodeUrl));
+    expect((ssl as { ca?: string }).ca).toBe(AZURE_POSTGRES_CA);
+    expect((ssl as { rejectUnauthorized?: boolean }).rejectUnauthorized).toBe(true);
+  });
+});
+
+// getDb() is the only production caller of buildPoolConfig; pin the wiring so a
+// revert to `new Pool({ connectionString, ssl })` (the original #103 bug) fails
+// here instead of slipping past the buildPoolConfig-only tests above.
+describe('getDb wiring', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.DATABASE_URL;
+    vi.resetModules();
+  });
+
+  it('builds its Pool through buildPoolConfig so the pinned CA reaches the live pool', async () => {
+    vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
+    vi.resetModules(); // fresh module → fresh pool singleton, isolated from other tests
+    process.env.DATABASE_URL =
+      'postgres://app:secret@db.example.postgres.database.azure.com:5432/learnwings?sslmode=require';
+    const fresh = await import('./db');
+    const pool = fresh.getDb();
+    try {
+      const options = (pool as unknown as { options: PoolConfig }).options;
+      expect('connectionString' in options).toBe(false);
+      expect((effectiveSsl(options) as { ca?: string }).ca).toBe(AZURE_POSTGRES_CA);
+    } finally {
+      await pool.end(); // pool never connected; end() resolves immediately
+    }
   });
 });
 

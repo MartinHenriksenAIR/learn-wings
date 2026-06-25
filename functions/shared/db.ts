@@ -1,4 +1,5 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, PoolConfig } from 'pg';
+import { parseIntoClientConfig } from 'pg-connection-string';
 import { AZURE_POSTGRES_CA } from './azure-ca';
 
 let pool: Pool | null = null;
@@ -26,16 +27,34 @@ export function buildSslConfig(env: NodeJS.ProcessEnv = process.env): {
   return { ca: AZURE_POSTGRES_CA, rejectUnauthorized: true };
 }
 
+/**
+ * Build the pg Pool config from a connection string, parsing the URL into
+ * discrete fields and merging our SSL config LAST so it stays authoritative.
+ *
+ * Why not `{ connectionString, ssl }`: pg's ConnectionParameters does
+ * `Object.assign({}, config, parse(connectionString))`, so a `?sslmode=require`
+ * URL (the documented prod DATABASE_URL) re-derives `ssl` → `{}` and overwrites
+ * our explicit `ssl` — silently discarding the pinned-CA verify-full setup AND
+ * the DATABASE_SSL_INSECURE rollback hatch (issue #103). Passing the
+ * already-parsed fields (no `connectionString` key) removes that clobber vector.
+ */
+export function buildPoolConfig(
+  connectionString: string,
+  env: NodeJS.ProcessEnv = process.env
+): PoolConfig {
+  return {
+    ...parseIntoClientConfig(connectionString),
+    ssl: buildSslConfig(env), // Azure PostgreSQL Flexible Server requires SSL
+    max: 5,
+    idleTimeoutMillis: 30000,
+  };
+}
+
 export function getDb(): Pool {
   if (!pool) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) throw new Error('DATABASE_URL not set');
-    pool = new Pool({
-      connectionString,
-      ssl: buildSslConfig(), // Azure PostgreSQL Flexible Server requires SSL
-      max: 5,
-      idleTimeoutMillis: 30000,
-    });
+    pool = new Pool(buildPoolConfig(connectionString));
   }
   return pool;
 }
