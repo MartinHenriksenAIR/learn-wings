@@ -23,14 +23,19 @@ export function readSchema(): string {
 }
 
 /**
- * Body of a `CREATE FUNCTION public.<name>(...) ... AS $$ <body> $$;` block.
- * Throws if the function — or its `$$` dollar-quoting — is not found, so a
- * stale name or changed quote trips the calling guard loudly instead of
- * silently matching nothing.
+ * Body of a `CREATE [OR REPLACE] FUNCTION public.<name>(...) ... AS $$ <body> $$;`
+ * block. Anchors on the `CREATE … FUNCTION public.<name>(` definition so it
+ * matches neither a prefix-named sibling (`<name>_v2`) nor an `EXECUTE FUNCTION
+ * public.<name>()` trigger reference. Throws if the function — or its `$$`
+ * dollar-quoting — is not found, so a stale name or changed quote trips the
+ * calling guard loudly instead of silently matching nothing.
+ *
+ * `schema` is injectable for unit-testing the matcher; it defaults to the
+ * canonical schema text.
  */
-export function functionBody(name: string): string {
-  const m = readSchema().match(
-    new RegExp(`FUNCTION public\\.${name}[\\s\\S]*?AS \\$\\$([\\s\\S]*?)\\$\\$;`),
+export function functionBody(name: string, schema: string = readSchema()): string {
+  const m = schema.match(
+    new RegExp(`CREATE (?:OR REPLACE )?FUNCTION public\\.${name}\\([\\s\\S]*?AS \\$\\$([\\s\\S]*?)\\$\\$;`),
   );
   if (!m) {
     throw new Error(
@@ -41,11 +46,15 @@ export function functionBody(name: string): string {
 }
 
 /**
- * Column body of a `CREATE TABLE public.<name> ( <body>\n);` block.
- * Throws if the table is not found.
+ * Column body of a `CREATE TABLE public.<name> ( <body>\n);` block. The ` (`
+ * after the name anchors the match to the exact table, not a prefix-named
+ * sibling. Throws if the table is not found.
+ *
+ * `schema` is injectable for unit-testing the matcher; it defaults to the
+ * canonical schema text.
  */
-export function tableBody(name: string): string {
-  const m = readSchema().match(
+export function tableBody(name: string, schema: string = readSchema()): string {
+  const m = schema.match(
     new RegExp(`CREATE TABLE public\\.${name} \\(([\\s\\S]*?)\\n\\);`),
   );
   if (!m) {
