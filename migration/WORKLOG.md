@@ -850,3 +850,31 @@ All new strings i18n en+da. **Frontend-only — no function deploy** (trunk push
 **Merge + deploy.** Merged as `8ca97ed` (merge commit). **#105 closed manually** (no closing keyword in the PR title/commits, so no auto-close); remote branch deleted. Auto-deploy green: CI + SWA + functions all ✅. **No runtime smoke** — test-only, functions runtime byte-identical (no `dist/` change).
 
 **Op-note for next session.** `gh pr merge <n>` fails with `could not determine current branch: not on any branch` when the local checkout is on a **detached HEAD** (here: mid-#104 work). The server-side merge still completes — only the post-merge local `--delete-branch` step aborts. Delete the remote branch out-of-band: `gh api -X DELETE repos/MartinHenriksenAIR/learn-wings/git/refs/heads/<branch>`. Work branch `martin/108-bookkeeping` for this ledger update.
+
+---
+
+## 2026-06-25 — #49 thumbnail SAS data audit — verified clean, no rows to normalize
+
+**Who:** martin (ran the SQL) & Claude (drove). Branch `martin/49-thumbnail-sas-audit`. Data-only audit — no source change, 0 rows mutated.
+
+**Context.** #49 was the *data half* of PR #35's finding 2: before `src/lib/storage.ts` learned to parse Azure blob URLs, saving any field of a course persisted the full signed **SAS URL** into `courses.thumbnail_url` instead of the stable blob path (`extractLmsAssetPath(x) ?? x` fell through to the signed URL). The code half landed in #35 (reads self-heal → next save normalizes); this issue was the one-time DB sweep so nothing depends on the parser fallback.
+
+**Method.** Read-only SQL against the live Azure PG 15 via `psql` in Azure Cloud Shell. A temporary single-IP firewall rule (`tmp-issue49-audit`) was added for the operator's address and **removed immediately after** — no other Azure mutation, no secrets printed (the connection string was read from the function app setting inside Cloud Shell and never surfaced). The audit predicate mirrors `extractLmsAssetPath()`'s Azure branch exactly — host end-anchored to `*.blob.core.windows.net`, query stripped, container segment dropped:
+`WHERE thumbnail_url ~* '^https?://[^/]+\.blob\.core\.windows\.net/'`.
+
+**Result — clean (0 hits).**
+- Faithful audit query → **(0 rows)**.
+- Broader confirmation (the issue's own `LIKE '%blob.core.windows.net%'` + `'%sig=%'` criteria, plus sanity counts): `total_courses=1, with_thumbnail=1, http_url_thumbs=0, blob_host_anywhere=0, sas_token_anywhere=0`. The single course's thumbnail is already a stable relative path (not a URL at all).
+
+**Conclusion.** No `courses.thumbnail_url` row holds an Azure host or SAS token; **no normalization write was needed** — the #35 parser fix + self-healing reads already kept the data clean. **Caveat:** the sandbox DB currently holds one course, so this is conclusive for *current* data only. If production rows carrying legacy SAS URLs are migrated in later, re-run the same audit; if it returns hits, apply the verified normalize statement below.
+
+**Verified normalize SQL (unused now — recorded for any future hit):**
+```sql
+UPDATE courses
+SET thumbnail_url = regexp_replace(split_part(thumbnail_url, '?', 1), '^https?://[^/]+/[^/]+/', '')
+WHERE thumbnail_url ~* '^https?://[^/]+\.blob\.core\.windows\.net/[^/?]+/[^/?]+'
+  AND regexp_replace(split_part(thumbnail_url, '?', 1), '^https?://[^/]+/[^/]+/', '') <> thumbnail_url;
+```
+Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSegments.slice(1).join('/')`. If a matched row ever contains `%`-encoding, decode per segment to match `decodeURIComponent` — none present today.
+
+**Closes #49.** No deploy (data/docs only). Work branch `martin/49-thumbnail-sas-audit` for this ledger update.
