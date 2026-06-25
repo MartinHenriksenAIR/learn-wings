@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { courseVisibilityPredicate, orgCourseAccessEnabled } from './course-visibility';
+import { functionBody, tableBody } from './__fixtures__/schema';
 
 // Collapse whitespace so the pins assert SQL shape, not formatting.
 const flat = (sql: string) => sql.replace(/\s+/g, ' ').trim();
@@ -53,14 +52,6 @@ describe('courseVisibilityPredicate', () => {
 // canonical rule (embedded in can_user_access_lms_asset) drops or renames one
 // of the published/org-enabled conjuncts courseVisibilityPredicate emits.
 describe('schema-drift parity guard', () => {
-  const schema = readFileSync(resolve(__dirname, '../../migration/azure/01-schema.sql'), 'utf8');
-
-  const tableBody = (table: string) => {
-    const m = schema.match(new RegExp(`CREATE TABLE public\\.${table} \\(([\\s\\S]*?)\\n\\);`));
-    expect(m, `${table} table not found in schema`).not.toBeNull();
-    return m![1];
-  };
-
   it('courses still declares the is_published boolean the predicate gates on', () => {
     expect(tableBody('courses')).toMatch(/^\s*is_published\s+boolean/m);
   });
@@ -81,11 +72,7 @@ describe('schema-drift parity guard', () => {
     // Substring pin, not a structural diff: catches a conjunct being dropped or
     // renamed on either side, but NOT one being widened while the literal
     // survives (e.g. access = 'enabled' → access IN ('enabled', 'trial')).
-    const fnMatch = schema.match(
-      /FUNCTION public\.can_user_access_lms_asset[\s\S]*?AS \$\$([\s\S]*?)\$\$;/,
-    );
-    expect(fnMatch).not.toBeNull();
-    const canonical = flat(fnMatch![1]);
+    const canonical = flat(functionBody('can_user_access_lms_asset'));
     const predicate = flat(courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 }));
 
     for (const conjunct of ['c.is_published = TRUE', 'oca.course_id = c.id', "oca.access = 'enabled'"]) {

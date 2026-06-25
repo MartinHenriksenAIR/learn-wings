@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 const { mockQueryOne } = vi.hoisted(() => ({ mockQueryOne: vi.fn() }));
 vi.mock('./db', () => ({ queryOne: mockQueryOne }));
 
 import { canAccessLmsAsset, CAN_ACCESS_LMS_ASSET_SQL } from './lms-asset';
+import { functionBody } from './__fixtures__/schema';
 
 describe('canAccessLmsAsset', () => {
   beforeEach(() => {
@@ -56,12 +55,8 @@ describe('canAccessLmsAsset', () => {
   // file_path must be covered by the helper SQL. If the schema function gains a
   // column, this fails until the helper is updated.
   it('parity pin: covers every `<alias>.<col> = file_path` comparison in public.can_user_access_lms_asset', () => {
-    const schema = readFileSync(resolve(__dirname, '../../migration/azure/01-schema.sql'), 'utf8');
-    const fnMatch = schema.match(
-      /FUNCTION public\.can_user_access_lms_asset[\s\S]*?AS \$\$([\s\S]*?)\$\$;/,
-    );
-    expect(fnMatch).not.toBeNull();
-    const comparisons = [...fnMatch![1].matchAll(/(\w+\.\w+) = file_path/g)].map((m) => m[1]);
+    const body = functionBody('can_user_access_lms_asset');
+    const comparisons = [...body.matchAll(/(\w+\.\w+) = file_path/g)].map((m) => m[1]);
     expect(comparisons.sort()).toEqual(
       ['c.thumbnail_url', 'l.azure_blob_path', 'l.document_storage_path', 'l.video_storage_path'].sort(),
     );
