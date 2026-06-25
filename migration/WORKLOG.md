@@ -853,6 +853,34 @@ All new strings i18n en+da. **Frontend-only — no function deploy** (trunk push
 
 ---
 
+## 2026-06-25 — #49 thumbnail SAS data audit — verified clean, no rows to normalize
+
+**Who:** martin (ran the SQL) & Claude (drove). Branch `martin/49-thumbnail-sas-audit`. Data-only audit — no source change, 0 rows mutated.
+
+**Context.** #49 was the *data half* of PR #35's finding 2: before `src/lib/storage.ts` learned to parse Azure blob URLs, saving any field of a course persisted the full signed **SAS URL** into `courses.thumbnail_url` instead of the stable blob path (`extractLmsAssetPath(x) ?? x` fell through to the signed URL). The code half landed in #35 (reads self-heal → next save normalizes); this issue was the one-time DB sweep so nothing depends on the parser fallback.
+
+**Method.** Read-only SQL against the live Azure PG 15 via `psql` in Azure Cloud Shell. A temporary single-IP firewall rule (`tmp-issue49-audit`) was added for the operator's address and **removed immediately after** — no other Azure mutation, no secrets printed (the connection string was read from the function app setting inside Cloud Shell and never surfaced). The audit predicate mirrors `extractLmsAssetPath()`'s Azure branch exactly — host end-anchored to `*.blob.core.windows.net`, query stripped, container segment dropped:
+`WHERE thumbnail_url ~* '^https?://[^/]+\.blob\.core\.windows\.net/'`.
+
+**Result — clean (0 hits).**
+- Faithful audit query → **(0 rows)**.
+- Broader confirmation (the issue's own `LIKE '%blob.core.windows.net%'` + `'%sig=%'` criteria, plus sanity counts): `total_courses=1, with_thumbnail=1, http_url_thumbs=0, blob_host_anywhere=0, sas_token_anywhere=0`. The single course's thumbnail is already a stable relative path (not a URL at all).
+
+**Conclusion.** No `courses.thumbnail_url` row holds an Azure host or SAS token; **no normalization write was needed** — the #35 parser fix + self-healing reads already kept the data clean. **Caveat:** the sandbox DB currently holds one course, so this is conclusive for *current* data only. If production rows carrying legacy SAS URLs are migrated in later, re-run the same audit; if it returns hits, apply the verified normalize statement below.
+
+**Verified normalize SQL (unused now — recorded for any future hit):**
+```sql
+UPDATE courses
+SET thumbnail_url = regexp_replace(split_part(thumbnail_url, '?', 1), '^https?://[^/]+/[^/]+/', '')
+WHERE thumbnail_url ~* '^https?://[^/]+\.blob\.core\.windows\.net/[^/?]+/[^/?]+'
+  AND regexp_replace(split_part(thumbnail_url, '?', 1), '^https?://[^/]+/[^/]+/', '') <> thumbnail_url;
+```
+Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSegments.slice(1).join('/')`. If a matched row ever contains `%`-encoding, decode per segment to match `decodeURIComponent` — none present today.
+
+**Closes #49.** No deploy (data/docs only). Work branch `martin/49-thumbnail-sas-audit` for this ledger update.
+
+---
+
 ## 2026-06-25 — #103 DB TLS verify-full made effective (PR #112, merged @651c16b, deployed + smoke ok)
 
 **Who:** martin & Claude. Branch `martin/103-db-tls-verify-full`; reviewed via `/code-review` (xhigh), self-merged solo after a clean pass + a **live-cert deploy-gate validation** (the `main` ruleset allowed the merge — `mergeStateStatus: CLEAN`).
