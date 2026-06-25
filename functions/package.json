@@ -15,6 +15,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.1.0",
     "pg": "^8.11.3",
+    "pg-connection-string": "^2.13.0",
     "resend": "^6.12.3"
   },
   "devDependencies": {
