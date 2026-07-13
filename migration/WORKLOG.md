@@ -894,3 +894,21 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Merge + deploy.** Merged as `651c16b` (merge commit), work branch deleted local + remote (remote via `gh api -X DELETE …/refs/heads/<branch>` — the guard-trunk hook blocks push-from-main). Auto-deploy green: functions run `28158057811` ✅ + SWA + CI all triggered on `651c16b`. **Smoke OK** on `func-ai-education-migration-c0fgeqdnfvd6h0cf.swedencentral-01.azurewebsites.net`: unauth POST 5/5 → **401** (`user-context`/`organizations`/`courses`/`platform-settings`/`enrollments` — worker up, all functions registered after deploy, authz before DB) + OPTIONS preflight **204**. #103 auto-closed by the commit keyword.
 
 **Op-note for next session.** Unauth 401 smoke **cannot** confirm DB connectivity — it stops at JWT validation before any query, so a broken DB connection would still smoke green. For a TLS/connection change like #103 the authoritative pre-merge check is the live-cert verify-full simulation (above), not the post-deploy 401 smoke. `DATABASE_SSL_INSECURE=1` is the rollback hatch and is **functional again** as of this PR. Local `az ... -o json`/`--query <object>` is currently broken on this box (xmltodict/pyexpat dylib mismatch under azure-cli 2.86 / Python 3.13) — use `-o tsv` with scalar queries, or `az functionapp list --query "[?name=='…']"`. Work branch `martin/112-bookkeeping` for this ledger update.
+
+---
+
+## 2026-07-13 — Prod DB credential drift fixed + #28 closed (ops fix; no PR-shipped code)
+
+**Who:** martin & Claude. No application code changed — an Azure-config fix run by the owner in a private terminal (agents don't touch/print secrets). This branch carries the ledger/bookkeeping only.
+
+**Symptom.** A real login to the deployed app (`https://black-forest-0d7f96c03.7.azurestaticapps.net`) presented as a data-less learner. But the DB showed the user's profile (`Martinh@ai-raadgivning.dk`) already had `is_platform_admin=true` and the seed data was present — so neither the requested "make me platform admin" nor "seed mock data" actually needed a write.
+
+**Root cause.** The `AIUadmin` password on `psql-ai-education-migration` and the `DATABASE_URL` app setting on `func-ai-education-migration` had **drifted out of sync**. Every authenticated DB call failed `28P01 password authentication failed`; `user-context` (runs on login) 500'd, so the frontend never learned the caller was a platform admin. Exactly as the #103 op-note warned: unauth 401 smoke cannot catch this (the 401 auth check precedes the DB), and App Insights had **zero telemetry** in 90d (no login ever completed) — the app process was up (unauth probes → 401) yet functionally dead for any DB-touching request.
+
+**Diagnosis (read-only).** Connected from this box via the app's exact path (`functions/shared/db.ts` → `buildPoolConfig` → CA-pinned verify-full). Reached the server (firewall NOT blocking — public access + IP allowed) but got `28P01`, proving a credential mismatch, not TLS/network. Server check: `passwordAuth: Enabled` (not Entra-only), admin `AIUadmin`, db `AI_Education`.
+
+**Fix (owner-run; no secrets surfaced).** Reset the server admin password (`az postgres flexible-server update --admin-password`) to a fresh URL-safe (base64url) value → set the matching `DATABASE_URL` on the function app (`az functionapp config appsettings set … --output none`) → `az functionapp restart`. Post-fix re-verify via the same app path: authenticates cleanly; counts `orgs=2 / courses=1 / community_posts=2 / profiles=3`; platform-admin profile intact. Martin confirmed a real login now lands in the platform-admin view.
+
+**Closes #28** — satisfies its acceptance criteria ("Password rotated + DATABASE_URL app setting updated before prod cutover") and doubles as the pre-cutover rotation gate; a matching comment is on the issue. **Filed #115** in the same session (bind `www.ai-uddannelse.dk`, Option B — www canonical + apex forward).
+
+**Op-note.** DB credential drift is invisible to the unauth smoke; confirming the deployed app's DB path actually works needs an authenticated request or a direct connection via the app's own config. Work branch `martin/status-bookkeeping` for this ledger update.
