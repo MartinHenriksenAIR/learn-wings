@@ -1,13 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Lightbulb, Users, Calendar, FileEdit, FolderOpen } from 'lucide-react';
+import { MessageSquare, Lightbulb, FileEdit, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type EmptyStateVariant = 'posts' | 'ideas' | 'comments' | 'events' | 'reports' | 'drafts' | 'resources';
+type EmptyStateVariant = 'posts' | 'ideas' | 'comments' | 'drafts' | 'resources';
 
 interface CommunityEmptyStateProps {
   variant: EmptyStateVariant;
-  scope?: 'org' | 'global';
   onAction?: () => void;
   actionLabel?: string;
   hasActiveFilters?: boolean;
@@ -37,16 +36,6 @@ const variants: Record<EmptyStateVariant, { icon: typeof MessageSquare; titleKey
     titleKey: 'community.emptyState.commentsTitle',
     descriptionKey: 'community.emptyState.commentsDescription',
   },
-  events: {
-    icon: Calendar,
-    titleKey: 'community.emptyState.eventsTitle',
-    descriptionKey: 'community.emptyState.eventsDescription',
-  },
-  reports: {
-    icon: Users,
-    titleKey: 'community.emptyState.reportsTitle',
-    descriptionKey: 'community.emptyState.reportsDescription',
-  },
   resources: {
     icon: FolderOpen,
     titleKey: 'community.emptyState.resourcesTitle',
@@ -56,7 +45,6 @@ const variants: Record<EmptyStateVariant, { icon: typeof MessageSquare; titleKey
 
 export function CommunityEmptyState({
   variant,
-  scope,
   onAction,
   actionLabel,
   hasActiveFilters = false,

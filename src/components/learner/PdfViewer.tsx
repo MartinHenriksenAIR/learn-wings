@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -124,9 +124,6 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
     }
   };
 
-  // Memoize the file prop to prevent unnecessary reloads
-  const fileSource = useMemo(() => pdfUrl, [pdfUrl]);
-
   return (
     <div className={cn('flex flex-col', className)}>
       {/* Toolbar */}
@@ -195,10 +192,10 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : fileSource ? (
+        ) : pdfUrl ? (
           <div className="flex justify-center p-4">
             <Document
-              file={fileSource}
+              file={pdfUrl}
               onLoadSuccess={onDocumentLoadSuccess}
               onLoadError={onDocumentLoadError}
               loading={

@@ -131,7 +131,7 @@ export function ResourceCard({
         </p>
       )}
 
-      <TagList tags={resource.tags || []} maxVisible={3} size="sm" className="mb-3" />
+      <TagList tags={resource.tags || []} maxVisible={3} className="mb-3" />
 
       {/* Footer: open link + author · time */}
       <div className="flex items-center gap-2">

@@ -1,20 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TagListProps {
   tags: string[];
-  onRemove?: (tag: string) => void;
-  size?: 'sm' | 'md';
   className?: string;
   maxVisible?: number;
 }
 
 export function TagList({
   tags,
-  onRemove,
-  size = 'sm',
   className,
   maxVisible,
 }: TagListProps) {
@@ -30,22 +25,9 @@ export function TagList({
         <Badge
           key={tag}
           variant="secondary"
-          className={cn(
-            'rounded-[7px] border-transparent bg-accent font-semibold text-accent-foreground',
-            size === 'sm' ? 'px-2.5 py-[3px] text-[11.5px]' : 'px-[11px] py-1 text-xs',
-            onRemove && 'pr-1'
-          )}
+          className="rounded-[7px] border-transparent bg-accent px-2.5 py-[3px] text-[11.5px] font-semibold text-accent-foreground"
         >
           #{tag}
-          {onRemove && (
-            <button
-              type="button"
-              onClick={() => onRemove(tag)}
-              className="ml-1 hover:text-destructive focus:outline-none"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
         </Badge>
       ))}
       {hiddenCount > 0 && (

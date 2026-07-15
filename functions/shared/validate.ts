@@ -1,11 +1,6 @@
 /**
  * Shared field validators for Azure Functions endpoint validation.
  *
- * Predicates:
- *   isStringOrNull        — accepts string or null; rejects undefined, numbers, etc.
- *   isNonEmptyStringOrNull — accepts non-empty string or null; rejects '', undefined, etc.
- *   isIntOrNull           — accepts integer or null; rejects floats, strings, etc.
- *
  * validateLessonFields(body) — validates the fields shared by lesson-create AND lesson-update:
  *   Required: moduleId, title (non-empty trim), lessonType ∈ ('video','document','quiz')
  *   Optional: contentText (string|null), durationMinutes (int|null),
@@ -17,16 +12,16 @@
  * NOT included: sortOrder (create-only), lessonId (update-only).
  */
 
-export function isStringOrNull(v: unknown): boolean {
+function isStringOrNull(v: unknown): boolean {
   return v === null || typeof v === 'string';
 }
 
-export function isNonEmptyStringOrNull(v: unknown): boolean {
+function isNonEmptyStringOrNull(v: unknown): boolean {
   if (v === null) return true;
   return typeof v === 'string' && v.length > 0;
 }
 
-export function isIntOrNull(v: unknown): boolean {
+function isIntOrNull(v: unknown): boolean {
   return v === null || Number.isInteger(v);
 }
 

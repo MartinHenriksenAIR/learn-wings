@@ -104,7 +104,7 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
         </p>
       )}
 
-      <TagList tags={idea.tags || []} maxVisible={2} size="sm" className="mb-3" />
+      <TagList tags={idea.tags || []} maxVisible={2} className="mb-3" />
 
       {/* Footer: votes, comments, author · time */}
       <div className="flex items-center gap-3 text-xs text-[#9aa0af]">

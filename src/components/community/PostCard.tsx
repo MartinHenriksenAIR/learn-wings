@@ -121,7 +121,7 @@ export function PostCard({
           {post.comment_count || 0}
         </span>
         <div className="flex-1" />
-        <TagList tags={post.tags} maxVisible={3} size="sm" />
+        <TagList tags={post.tags} maxVisible={3} />
       </div>
 
       {/* Admin controls */}
