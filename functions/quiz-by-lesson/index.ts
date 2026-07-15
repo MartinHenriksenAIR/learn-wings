@@ -1,23 +1,11 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('quiz-by-lesson', async ({ req, profile, reply }) => {
     const { lessonId } = await req.json() as { lessonId?: unknown };
 
     if (!lessonId || typeof lessonId !== 'string') {
-      return corsResponse(origin, 400, { error: 'lessonId is required' });
+      return reply(400, { error: 'lessonId is required' });
     }
 
     // Access check — skip entirely for platform admins
@@ -35,7 +23,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         ) AS ok`,
         [profile.id, lessonId],
       );
-      if (!access?.ok) return corsResponse(origin, 403, { error: 'Quiz access denied' });
+      if (!access?.ok) return reply(403, { error: 'Quiz access denied' });
     }
 
     // Fetch the quiz for this lesson; if none, return early — no further queries
@@ -43,7 +31,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       'SELECT id, lesson_id, passing_score FROM quizzes WHERE lesson_id = $1',
       [lessonId],
     );
-    if (!quiz) return corsResponse(origin, 200, { quiz: null, questions: [] });
+    if (!quiz) return reply(200, { quiz: null, questions: [] });
 
     // Fetch questions ordered by sort_order
     const questions = await query<{ id: string; quiz_id: string; question_text: string; sort_order: number }>(
@@ -53,7 +41,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     // If no questions, skip options query entirely
     if (questions.length === 0) {
-      return corsResponse(origin, 200, { quiz, questions: [] });
+      return reply(200, { quiz, questions: [] });
     }
 
     // Batched options fetch — no N+1; is_correct is intentionally excluded (security: never expose correct answer)
@@ -76,12 +64,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       options: optionsByQuestion.get(q.id) ?? [],
     }));
 
-    return corsResponse(origin, 200, { quiz, questions: questionsWithOptions });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('quiz-by-lesson', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { quiz, questions: questionsWithOptions });
+});

@@ -1,9 +1,5 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isOrgAdmin } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 import { courseVisibilityPredicate } from '../shared/course-visibility';
 
 interface EnrollmentRow {
@@ -29,22 +25,15 @@ interface LessonOut {
 }
 interface ModuleOut { id: string; title: string; sortOrder: number; lessons: LessonOut[] }
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('user-progress', async ({ req, profile, reply, requireOrgAdmin }) => {
     const body = await req.json() as { orgId?: unknown; userId?: unknown };
     const { orgId, userId } = body;
 
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' });
+      return reply(400, { error: 'orgId is required' });
     }
     if (!userId || typeof userId !== 'string') {
-      return corsResponse(origin, 400, { error: 'userId is required' });
+      return reply(400, { error: 'userId is required' });
     }
 
     // Authorization: platform admin OR org admin of the target org.
@@ -52,8 +41,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     // "Org admins can view enrollments/progress/attempts in their org" (is_org_admin(org_id))
     // + platform-admin-ALL policies. Self-access deliberately omitted (admin dialog only;
     // learner-side reads live in Slice 1 endpoints).
-    const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
+    await requireOrgAdmin(orgId);
 
     // 1. Enrollments + course metadata. Non-platform-admins see only published, org-accessible
     //    courses (the old PostgREST embed nulled RLS-hidden courses and the dialog skipped them).
@@ -74,7 +62,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [orgId, userId],
     );
     if (enrollments.length === 0) {
-      return corsResponse(origin, 200, { courses: [] });
+      return reply(200, { courses: [] });
     }
     const courseIds = enrollments.map((e) => e.course_id);
 
@@ -189,12 +177,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       };
     });
 
-    return corsResponse(origin, 200, { courses });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('user-progress', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { courses });
+});

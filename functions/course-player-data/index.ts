@@ -1,22 +1,11 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
+export default endpoint('course-player-data', async ({ req, profile, reply }) => {
     const { courseId, orgId } = await req.json() as { courseId: string; orgId: string };
 
     const course = await queryOne('SELECT * FROM courses WHERE id = $1', [courseId]);
-    if (!course) return corsResponse(origin, 404, { error: 'Course not found' });
+    if (!course) return reply(404, { error: 'Course not found' });
 
     // Access check — platform admins bypass (suite convention); everyone else needs an active
     // membership in an org that has this course enabled and published (parity with quiz-by-lesson).
@@ -31,7 +20,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         ) AS ok`,
         [profile.id, courseId],
       );
-      if (!access?.ok) return corsResponse(origin, 403, { error: 'Course access denied' });
+      if (!access?.ok) return reply(403, { error: 'Course access denied' });
     }
 
     // `, id` tie-breaker (issue #46): legacy rows may carry duplicate sort_order
@@ -55,12 +44,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [profile.id, orgId, courseId]
     );
 
-    return corsResponse(origin, 200, { course, modules: modulesWithLessons, progressMap, review: review ?? null });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('course-player-data', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { course, modules: modulesWithLessons, progressMap, review: review ?? null });
+});

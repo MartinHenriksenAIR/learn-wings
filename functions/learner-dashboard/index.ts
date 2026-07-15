@@ -1,27 +1,14 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isActiveMember } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('learner-dashboard', async ({ req, profile, reply, requireActiveMember }) => {
     const { orgId } = await req.json() as { orgId?: unknown };
 
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' });
+      return reply(400, { error: 'orgId is required' });
     }
 
-    const authorized = profile.is_platform_admin || await isActiveMember(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
+    await requireActiveMember(orgId);
 
     // Step 1: Own enrollments with embedded course
     const enrollments = await query(
@@ -40,7 +27,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     // Step 2: Early exit if no enrollments
     if (enrollments.length === 0) {
-      return corsResponse(origin, 200, { enrollments: [], progress: {} });
+      return reply(200, { enrollments: [], progress: {} });
     }
 
     // Step 3: Batched count queries — no N+1
@@ -86,12 +73,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     }
 
     // Step 5: Respond
-    return corsResponse(origin, 200, { enrollments, progress });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('learner-dashboard', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { enrollments, progress });
+});
