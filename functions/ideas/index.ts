@@ -1,22 +1,11 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isActiveMember } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('ideas', async ({ req, profile, reply, requireActiveMember }) => {
     const body = await req.json() as {
       orgId?: unknown;
       status?: unknown;
@@ -29,22 +18,22 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const { orgId, status, businessArea, tags, search, userId } = body;
 
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' });
+      return reply(400, { error: 'orgId is required' });
     }
     if (status !== undefined && !isStringArray(status)) {
-      return corsResponse(origin, 400, { error: 'status must be an array of strings' });
+      return reply(400, { error: 'status must be an array of strings' });
     }
     if (businessArea !== undefined && !isStringArray(businessArea)) {
-      return corsResponse(origin, 400, { error: 'businessArea must be an array of strings' });
+      return reply(400, { error: 'businessArea must be an array of strings' });
     }
     if (tags !== undefined && !isStringArray(tags)) {
-      return corsResponse(origin, 400, { error: 'tags must be an array of strings' });
+      return reply(400, { error: 'tags must be an array of strings' });
     }
     if (search !== undefined && typeof search !== 'string') {
-      return corsResponse(origin, 400, { error: 'search must be a string' });
+      return reply(400, { error: 'search must be a string' });
     }
     if (userId !== undefined && typeof userId !== 'string') {
-      return corsResponse(origin, 400, { error: 'userId must be a string' });
+      return reply(400, { error: 'userId must be a string' });
     }
 
     const vStatus = status as string[] | undefined;
@@ -54,8 +43,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const vUserId = userId as string | undefined;
 
     // Authorization: platform admin OR active member of the org
-    const authorized = profile.is_platform_admin || await isActiveMember(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
+    await requireActiveMember(orgId);
 
     // Build dynamic WHERE + params
     const conditions: string[] = [];
@@ -113,12 +101,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       ORDER BY i.created_at DESC
     `, params);
 
-    return corsResponse(origin, 200, { ideas });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('ideas', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { ideas });
+});

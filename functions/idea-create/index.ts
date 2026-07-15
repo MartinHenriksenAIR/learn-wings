@@ -1,9 +1,5 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isActiveMember } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
 // Author-writable fields. Everything else (org_id, status, user_id, submitted_at,
 // admin_notes, rejection_reason, category_id, course/lesson context) is NOT settable
@@ -28,48 +24,40 @@ const STRING_FIELDS = [
 
 const BUSINESS_AREAS = ['hr', 'finance', 'sales', 'support', 'ops', 'it', 'legal', 'other'] as const;
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('idea-create', async ({ req, profile, reply, requireActiveMember }) => {
     const body = await req.json() as Record<string, unknown>;
     const { orgId } = body;
 
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' });
+      return reply(400, { error: 'orgId is required' });
     }
     if (!body.title || typeof body.title !== 'string') {
-      return corsResponse(origin, 400, { error: 'title is required' });
+      return reply(400, { error: 'title is required' });
     }
 
     // Validate string fields (string or null if present)
     for (const field of STRING_FIELDS) {
       const v = body[field];
       if (v !== undefined && v !== null && typeof v !== 'string') {
-        return corsResponse(origin, 400, { error: `${field} must be a string` });
+        return reply(400, { error: `${field} must be a string` });
       }
     }
 
     // Validate tags (array of strings if present)
     if (body.tags !== undefined && (!Array.isArray(body.tags) || !body.tags.every((t) => typeof t === 'string'))) {
-      return corsResponse(origin, 400, { error: 'tags must be an array of strings' });
+      return reply(400, { error: 'tags must be an array of strings' });
     }
 
     // Validate business_area (one of the 8 enum values or null) — fail fast before PG enum cast 500.
     if (body.business_area !== undefined && body.business_area !== null
       && !(BUSINESS_AREAS as readonly string[]).includes(body.business_area as string)) {
-      return corsResponse(origin, 400, {
+      return reply(400, {
         error: `business_area must be one of: ${BUSINESS_AREAS.join(', ')}`,
       });
     }
 
     // Authorization: platform admin OR active member of the org
-    const authorized = profile.is_platform_admin || await isActiveMember(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
+    await requireActiveMember(orgId);
 
     // Insert. user_id is ALWAYS profile.id (never client-supplied); status is ALWAYS 'draft'.
     const idea = await queryOne(
@@ -104,12 +92,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       ],
     );
 
-    return corsResponse(origin, 200, { idea });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('idea-create', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { idea });
+});

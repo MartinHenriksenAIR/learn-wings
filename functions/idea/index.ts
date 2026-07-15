@@ -1,9 +1,6 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isActiveMember } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
+import { isActiveMember } from '../shared/profile';
 
 interface IdeaRow {
   id: string;
@@ -13,19 +10,12 @@ interface IdeaRow {
   [key: string]: unknown;
 }
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('idea', async ({ req, profile, reply }) => {
     const body = await req.json() as { ideaId?: unknown };
     const { ideaId } = body;
 
     if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' });
+      return reply(400, { error: 'ideaId is required' });
     }
 
     const idea = await queryOne<IdeaRow>(`
@@ -42,23 +32,16 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     `, [ideaId, profile.id]);
 
     // Not found → null (parity with Supabase .single() PGRST116)
-    if (!idea) return corsResponse(origin, 200, { idea: null });
+    if (!idea) return reply(200, { idea: null });
 
     // Org access: platform admin OR active member of the idea's org
     const canAccessOrg = profile.is_platform_admin || await isActiveMember(profile.id, idea.org_id);
-    if (!canAccessOrg) return corsResponse(origin, 200, { idea: null });
+    if (!canAccessOrg) return reply(200, { idea: null });
 
     // Draft privacy: drafts are author-private for EVERY role (no admin bypass).
     if (idea.status === 'draft' && idea.user_id !== profile.id) {
-      return corsResponse(origin, 200, { idea: null });
+      return reply(200, { idea: null });
     }
 
-    return corsResponse(origin, 200, { idea });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('idea', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { idea });
+});

@@ -1,9 +1,5 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isActiveMember } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
 interface IdeaRow {
   id: string;
@@ -12,25 +8,18 @@ interface IdeaRow {
   status: string;
 }
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('idea-comment-create', async ({ req, profile, reply, requireActiveMember }) => {
     const body = await req.json() as { ideaId?: unknown; content?: unknown; parentCommentId?: unknown };
     const { ideaId, content, parentCommentId } = body;
 
     if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' });
+      return reply(400, { error: 'ideaId is required' });
     }
     if (!content || typeof content !== 'string') {
-      return corsResponse(origin, 400, { error: 'content is required' });
+      return reply(400, { error: 'content is required' });
     }
     if (parentCommentId !== undefined && typeof parentCommentId !== 'string') {
-      return corsResponse(origin, 400, { error: 'parentCommentId must be a string' });
+      return reply(400, { error: 'parentCommentId must be a string' });
     }
 
     // Load idea
@@ -39,16 +28,15 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [ideaId],
     );
 
-    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' });
+    if (!idea) return reply(404, { error: 'Idea not found' });
 
     // Draft privacy: other-author's draft is invisible (no admin bypass)
     if (idea.status === 'draft' && idea.user_id !== profile.id) {
-      return corsResponse(origin, 404, { error: 'Idea not found' });
+      return reply(404, { error: 'Idea not found' });
     }
 
     // Authz: platform admin OR active member of idea's org
-    const canAccess = profile.is_platform_admin || await isActiveMember(profile.id, idea.org_id);
-    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' });
+    await requireActiveMember(idea.org_id);
 
     // Validate parentCommentId if provided
     if (parentCommentId !== undefined) {
@@ -57,7 +45,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         [parentCommentId],
       );
       if (!parentComment || parentComment.idea_id !== ideaId) {
-        return corsResponse(origin, 400, { error: 'parentCommentId must reference a comment on this idea' });
+        return reply(400, { error: 'parentCommentId must reference a comment on this idea' });
       }
     }
 
@@ -72,12 +60,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [ideaId, idea.org_id, profile.id, content, (parentCommentId as string | undefined) ?? null],
     );
 
-    return corsResponse(origin, 200, { comment });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('idea-comment-create', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { comment });
+});
