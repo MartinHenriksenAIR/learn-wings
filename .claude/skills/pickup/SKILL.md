@@ -21,4 +21,3 @@ description: Use at session start when beginning work on learn-wings — reads t
      `gh pr create --draft --base <trunk> --title "<type>: <slug> (#<n>)" --body "Claims #<n>. Files: <scope from issue>."`
 5. **Stale claims:** an assigned issue with no branch push for 7 days is fair game after a ping to the other developer.
 6. **Multiple claims per person are fine** — one branch + draft PR each, worked in separate git worktrees (`git worktree add ../lw-issue-<n> <branch>` or `claude --worktree`; each needs its own `npm install` + `.env` copy). The overlap check applies between YOUR OWN claims too. Practical ceiling: 2–3 active claims per person — review bandwidth is the bottleneck.
-7. For slice work, now invoke the `slice-workflow` skill.

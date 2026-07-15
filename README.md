@@ -62,7 +62,7 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | `migration/azure/` | The canonical Postgres schema (`01-schema.sql`), seed data (`02-seed.sql`), and apply guide |
 | `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history) |
 | `docs/adr/` | The 15 architecture decision records |
-| `.claude/` | Agent collaboration system — `rules/` (hard-won conventions), `skills/` (`pickup`/`handoff`/`slice-workflow`), `collab.json` (branch topology), and the `guard-trunk` hook |
+| `.claude/` | Agent collaboration system — `rules/` (hard-won conventions), `skills/` (`pickup`/`handoff`), `collab.json` (branch topology), and the `guard-trunk` hook |
 | `supabase/` | **Dead** — the original Supabase Deno functions + migrations, kept only as authz-provenance reference. Deleted in the final migration slice (#13). |
 
 ## Local development
@@ -141,4 +141,4 @@ The hard-won rules that keep this codebase stable are codified — read them bef
 
 ## Collaboration & deployment
 
-This is a two-developer repo with a strict workflow: **`main` takes changes only via pull requests** (enforced by a server-side ruleset), work happens on short-lived `<firstname>/<issue#>-<slug>` branches, and a draft PR is the claim on an issue. CI ([`ci.yml`](.github/workflows/ci.yml)) must be green before merge: frontend lint + typecheck + tests + build, and functions build + tests. **Deploys go only from `main` after a merge** — every merge deploys automatically (the Static Web Apps workflow ships the frontend and builds a preview environment per PR; the functions workflow ships the backend), never from work branches. The full playbook is in [`AGENTS.md`](AGENTS.md) and the `.claude/skills/` (`pickup`, `handoff`, `slice-workflow`).
+This is a two-developer repo with a strict workflow: **`main` takes changes only via pull requests** (enforced by a server-side ruleset), work happens on short-lived `<firstname>/<issue#>-<slug>` branches, and a draft PR is the claim on an issue. CI ([`ci.yml`](.github/workflows/ci.yml)) must be green before merge: frontend lint + typecheck + tests + build, and functions build + tests. **Deploys go only from `main` after a merge** — every merge deploys automatically (the Static Web Apps workflow ships the frontend and builds a preview environment per PR; the functions workflow ships the backend), never from work branches. The full playbook is in [`AGENTS.md`](AGENTS.md) and the `.claude/skills/` (`pickup`, `handoff`).

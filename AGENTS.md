@@ -11,7 +11,7 @@ Single source of truth for all coding agents. `CLAUDE.md` imports this file — 
 ## Session start
 1. Read `migration/STATUS.html` — the live ledger (checkpoint, operational quirks, pointers).
 2. Check claims: `gh issue list --state open` (backlog) + `gh pr list --state open` (draft PRs = active claims).
-3. Starting work → invoke the `pickup` skill. Ending a session → `handoff`. Executing a slice → `slice-workflow`.
+3. Starting work → invoke the `pickup` skill. Ending a session → `handoff`.
 
 ## Collaboration rules (two developers + their agents)
 - **Trunk = the `trunk` branch named in `.claude/collab.json`** (currently `main`) — the single source of truth for branch topology; the guard hook and the pickup/handoff skills read it, so re-pointing the trunk edits that one file. The trunk receives changes ONLY via pull requests, enforced by the server-side ruleset on `main`; the local `guard-trunk` hook is best-effort fast feedback on top (its known gaps are documented in the hook header and all land on the server-side wall).
