@@ -29,7 +29,7 @@ function getKey(header: any, callback: (err: Error | null, key?: string) => void
 // Multi-tenant: issuer varies per tenant — validate pattern, not fixed value
 const ISSUER_RE = /^https:\/\/login\.microsoftonline\.com\/[0-9a-f-]{36}\/v2\.0$/;
 
-export function verifyToken(token: string): Promise<AuthUser> {
+function verifyToken(token: string): Promise<AuthUser> {
   return new Promise((resolve, reject) => {
     verify(
       token,

@@ -72,5 +72,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
 export default handler;
 // Route must not start with 'admin' — a reserved route prefix in Azure Functions
-// (admin/runtime/host). Suffix style matches quiz-options-admin.
+// (admin/runtime/host). Suffix style matches courses-admin.
 app.http('user-actions-admin', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
