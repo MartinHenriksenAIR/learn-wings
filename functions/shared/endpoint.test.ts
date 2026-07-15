@@ -307,6 +307,37 @@ describe('adminEndpoint', () => {
     expect(json).not.toHaveBeenCalled();
   });
 
+  it('returns 401 (not 403) when authenticate rejects with AuthError — auth precedes the admin gate', async () => {
+    mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
+    const handler = adminEndpoint('t-admin-auth-401', ok);
+    const res = await handler(baseReq({}), {} as any);
+    expect(res.status).toBe(401);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
+    expect(ok).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 Profile not found (not 403) when the profile is not provisioned; denial carries CORS headers', async () => {
+    mockGetProfile.mockResolvedValueOnce(null);
+    const handler = adminEndpoint('t-admin-profile-401', ok);
+    const res = await handler(baseReq({}), {} as any);
+    expect(res.status).toBe(401);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
+    expect((res.headers as Record<string, string>)['Access-Control-Allow-Origin']).toBe(ORIGIN);
+    expect(ok).not.toHaveBeenCalled();
+  });
+
+  it('non-AuthError from getProfile → constant 500 (the admin gate does not swallow infrastructure failures)', async () => {
+    mockGetProfile.mockRejectedValueOnce(new Error('db connection failed'));
+    const handler = adminEndpoint('t-admin-profile-500', ok);
+    const ctxError = vi.fn();
+    const res = await handler(baseReq({}), { error: ctxError } as any);
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+    expect(ctxError).toHaveBeenCalledTimes(1);
+    expect(String(ctxError.mock.calls[0][0])).toContain('db connection failed');
+    expect(ok).not.toHaveBeenCalled();
+  });
+
   it('OPTIONS preflight wins over the admin gate (204, no auth calls)', async () => {
     const handler = adminEndpoint('t-admin-options', ok);
     const req = { method: 'OPTIONS', headers: { get: () => ORIGIN } } as any;

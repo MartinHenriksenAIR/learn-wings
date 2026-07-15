@@ -59,6 +59,16 @@ describe('organization-create', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
+  it('returns 400 (not 403) for invalid body when caller is not platform admin', async () => {
+    // Pins the deliberate validation-before-authz ordering (why this endpoint
+    // uses endpoint() + an inline admin check instead of adminEndpoint).
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const res = await handler(baseReq({ slug: 'acme-corp' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'name must be a string between 2 and 100 characters' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when name is missing', async () => {
     const res = await handler(baseReq({ slug: 'acme-corp' }), {} as any);
     expect(res.status).toBe(400);

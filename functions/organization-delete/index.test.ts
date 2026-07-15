@@ -54,6 +54,16 @@ describe('organization-delete', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
+  it('returns 400 (not 403) for invalid body when caller is not platform admin', async () => {
+    // Pins the deliberate validation-before-authz ordering (why this endpoint
+    // uses endpoint() + an inline admin check instead of adminEndpoint).
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const res = await handler(baseReq({}), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when orgId is missing', async () => {
     const res = await handler(baseReq({}), {} as any);
     expect(res.status).toBe(400);

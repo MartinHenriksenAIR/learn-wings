@@ -20,7 +20,8 @@ import { internalError } from './errors';
  *   3. authenticate(req)
  *   4. getProfile(user) → null → 401 { error: 'Profile not found' }
  *   5. adminEndpoint only: !is_platform_admin → 403 (BEFORE run, so before any
- *      body parsing — matches the legacy requirePlatformAdmin placement)
+ *      body parsing — adminEndpoint subsumed the legacy shared platform-admin
+ *      guard; its gate contract is now pinned here and in this module's tests)
  *   6. run(ctx)
  *   7. catch: Reply → rendered as-is · AuthError → 401 { error: err.message }
  *      · anything else → internalError(context, origin, err)
@@ -28,7 +29,7 @@ import { internalError } from './errors';
  * DEPENDENCY FREEZE — this module may only ever call authenticate/AuthError
  * (./auth), getProfile/isOrgAdmin/isActiveMember (./profile), and the cors and
  * errors helpers. Endpoint tests mock exactly those module names; any new call
- * (in particular anything from ./db or ./guards) is a breaking change to every
+ * (in particular anything from ./db) is a breaking change to every
  * migrated endpoint's tests. Body parsing stays the endpoint's job — the
  * module never touches the request body.
  *
