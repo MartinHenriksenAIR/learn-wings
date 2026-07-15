@@ -1,28 +1,18 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isOrgAdminOfAny } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
+import { isOrgAdminOfAny } from '../shared/profile';
 
 const PROFILE_COLUMNS = 'id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, created_at';
 const PROFILE_COLUMNS_PREFIXED = 'p.id, p.full_name, p.first_name, p.last_name, p.department, p.email, p.avatar_url, p.is_platform_admin, p.created_at';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('profiles', async ({ req, profile, reply }) => {
     const body = await req.json() as { userIds?: unknown };
     const { userIds } = body;
 
     // Validate userIds if present
     if (userIds !== undefined) {
       if (!Array.isArray(userIds) || !userIds.every((v) => typeof v === 'string')) {
-        return corsResponse(origin, 400, { error: 'userIds must be an array of strings' });
+        return reply(400, { error: 'userIds must be an array of strings' });
       }
     }
 
@@ -41,7 +31,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
           `SELECT ${PROFILE_COLUMNS} FROM profiles ORDER BY full_name`,
         );
       }
-      return corsResponse(origin, 200, { profiles: rows });
+      return reply(200, { profiles: rows });
     }
 
     // Tier 2: Org admin of at least one org
@@ -69,7 +59,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
           [profile.id],
         );
       }
-      return corsResponse(origin, 200, { profiles: rows });
+      return reply(200, { profiles: rows });
     }
 
     // Tier 3: Plain learner — own profile only
@@ -77,12 +67,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       `SELECT ${PROFILE_COLUMNS} FROM profiles WHERE id = $1`,
       [profile.id],
     );
-    return corsResponse(origin, 200, { profiles: rows });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('profiles', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { profiles: rows });
+});

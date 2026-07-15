@@ -1,8 +1,5 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 
 const ALLOWED_KEYS = ['branding', 'user_access', 'email', 'features'] as const;
 type SettingKey = typeof ALLOWED_KEYS[number];
@@ -56,18 +53,11 @@ interface PlatformSettingsUpdateBody {
   value?: unknown;
 }
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
-    const { profile } = gate;
-
+export default adminEndpoint('platform-settings-update', async ({ req, profile, reply }) => {
     const body = await req.json() as PlatformSettingsUpdateBody;
 
     if (typeof body.key !== 'string' || !(ALLOWED_KEYS as readonly string[]).includes(body.key)) {
-      return corsResponse(origin, 400, { error: 'key must be one of: branding, user_access, email, features' });
+      return reply(400, { error: 'key must be one of: branding, user_access, email, features' });
     }
     const key = body.key as SettingKey;
 
@@ -76,7 +66,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       typeof body.value !== 'object' ||
       Array.isArray(body.value)
     ) {
-      return corsResponse(origin, 400, { error: 'value must be a plain object' });
+      return reply(400, { error: 'value must be a plain object' });
     }
     const value = body.value as Record<string, unknown>;
 
@@ -88,10 +78,10 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     for (const [field, fieldValue] of Object.entries(value)) {
       const check = shape[field];
       if (!check) {
-        return corsResponse(origin, 400, { error: `unknown field "${field}" for setting "${key}"` });
+        return reply(400, { error: `unknown field "${field}" for setting "${key}"` });
       }
       if (!check(fieldValue)) {
-        return corsResponse(origin, 400, { error: `invalid value for field "${field}" of setting "${key}"` });
+        return reply(400, { error: `invalid value for field "${field}" of setting "${key}"` });
       }
     }
 
@@ -105,13 +95,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [key, JSON.stringify(value), profile.id],
     );
 
-    if (!setting) return corsResponse(origin, 404, { error: 'Setting not found' });
+    if (!setting) return reply(404, { error: 'Setting not found' });
 
-    return corsResponse(origin, 200, { setting });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('platform-settings-update', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { setting });
+});

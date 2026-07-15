@@ -1,29 +1,17 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isOrgAdmin } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('org-course-enrollees', async ({ req, reply, requireOrgAdmin }) => {
     const { orgId, courseId } = await req.json() as { orgId?: string; courseId?: string };
 
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' });
+      return reply(400, { error: 'orgId is required' });
     }
     if (!courseId || typeof courseId !== 'string') {
-      return corsResponse(origin, 400, { error: 'courseId is required' });
+      return reply(400, { error: 'courseId is required' });
     }
 
-    const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
+    await requireOrgAdmin(orgId);
 
     const enrollees = await query(
       `SELECT e.user_id, p.full_name, e.status, e.enrolled_at, e.completed_at
@@ -33,12 +21,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         ORDER BY p.full_name`,
       [orgId, courseId],
     );
-    return corsResponse(origin, 200, { enrollees });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('org-course-enrollees', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { enrollees });
+});
