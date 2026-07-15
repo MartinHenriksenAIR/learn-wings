@@ -32,99 +32,99 @@ type RowResult = {
  * invitation-create).
  */
 export default endpoint('invitation-bulk-create', async ({ req, context, profile, reply, requireOrgAdmin }) => {
-    const body = await req.json() as { orgId?: unknown; invites?: unknown };
-    const { orgId, invites } = body;
+  const body = await req.json() as { orgId?: unknown; invites?: unknown };
+  const { orgId, invites } = body;
 
-    // Request-level validation: shape errors abort the whole request with 400.
-    if (!orgId || typeof orgId !== 'string') {
-      return reply(400, { error: 'orgId is required' });
+  // Request-level validation: shape errors abort the whole request with 400.
+  if (!orgId || typeof orgId !== 'string') {
+    return reply(400, { error: 'orgId is required' });
+  }
+  if (invites === undefined || invites === null) {
+    return reply(400, { error: 'invites is required' });
+  }
+  if (!Array.isArray(invites)) {
+    return reply(400, { error: 'invites must be an array' });
+  }
+  if (invites.length === 0) {
+    return reply(400, { error: 'invites must not be empty' });
+  }
+  if (invites.length > MAX_INVITES) {
+    return reply(400, { error: `invites must not exceed ${MAX_INVITES} entries` });
+  }
+
+  // Authorization: platform admin OR org admin of the target org.
+  // RLS provenance: supabase/migrations/20260130144031_*.sql —
+  // "Admins can insert invitations" policy (WITH CHECK is_platform_admin()
+  // OR (org_id IS NOT NULL AND is_org_admin(org_id))). Same gate as invitation-create.
+  await requireOrgAdmin(orgId);
+
+  // Per-row processing. Each row resolves to a result entry — never throws out
+  // of this loop. Sequential by design (see header comment).
+  const results: RowResult[] = [];
+  for (const raw of invites as RawInvite[]) {
+    const rawEmail = typeof raw?.email === 'string' ? raw.email : '';
+    const normalizedEmail = rawEmail.toLowerCase().trim();
+
+    // Per-row validation — non-fatal. Failed rows surface as success: false.
+    if (!rawEmail || typeof raw.email !== 'string' || !EMAIL_REGEX.test(rawEmail)) {
+      results.push({ email: normalizedEmail, success: false, error: 'email is required and must be a valid email address' });
+      continue;
     }
-    if (invites === undefined || invites === null) {
-      return reply(400, { error: 'invites is required' });
-    }
-    if (!Array.isArray(invites)) {
-      return reply(400, { error: 'invites must be an array' });
-    }
-    if (invites.length === 0) {
-      return reply(400, { error: 'invites must not be empty' });
-    }
-    if (invites.length > MAX_INVITES) {
-      return reply(400, { error: `invites must not exceed ${MAX_INVITES} entries` });
-    }
-
-    // Authorization: platform admin OR org admin of the target org.
-    // RLS provenance: supabase/migrations/20260130144031_*.sql —
-    // "Admins can insert invitations" policy (WITH CHECK is_platform_admin()
-    // OR (org_id IS NOT NULL AND is_org_admin(org_id))). Same gate as invitation-create.
-    await requireOrgAdmin(orgId);
-
-    // Per-row processing. Each row resolves to a result entry — never throws out
-    // of this loop. Sequential by design (see header comment).
-    const results: RowResult[] = [];
-    for (const raw of invites as RawInvite[]) {
-      const rawEmail = typeof raw?.email === 'string' ? raw.email : '';
-      const normalizedEmail = rawEmail.toLowerCase().trim();
-
-      // Per-row validation — non-fatal. Failed rows surface as success: false.
-      if (!rawEmail || typeof raw.email !== 'string' || !EMAIL_REGEX.test(rawEmail)) {
-        results.push({ email: normalizedEmail, success: false, error: 'email is required and must be a valid email address' });
-        continue;
-      }
-      if (typeof raw.role !== 'string' || !ALLOWED_ROLES.has(raw.role)) {
-        results.push({ email: normalizedEmail, success: false, error: 'role must be one of: org_admin, learner' });
-        continue;
-      }
-
-      const validateOptionalText = (val: unknown): { ok: true; value: string | null } | { ok: false } => {
-        if (val === undefined || val === null) return { ok: true, value: null };
-        if (typeof val !== 'string') return { ok: false };
-        if (val.length > 100) return { ok: false };
-        return { ok: true, value: val === '' ? null : val };
-      };
-
-      const fnRes = validateOptionalText(raw.firstName);
-      if (!fnRes.ok) {
-        results.push({ email: normalizedEmail, success: false, error: 'firstName must be a string of 100 characters or fewer' });
-        continue;
-      }
-      const lnRes = validateOptionalText(raw.lastName);
-      if (!lnRes.ok) {
-        results.push({ email: normalizedEmail, success: false, error: 'lastName must be a string of 100 characters or fewer' });
-        continue;
-      }
-      const deptRes = validateOptionalText(raw.department);
-      if (!deptRes.ok) {
-        results.push({ email: normalizedEmail, success: false, error: 'department must be a string of 100 characters or fewer' });
-        continue;
-      }
-
-      try {
-        const invitation = await queryOne(
-          `INSERT INTO invitations (org_id, email, role, invited_by_user_id, first_name, last_name, department)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
-           RETURNING id, org_id, email, role, status, expires_at, created_at, link_id,
-                     is_platform_admin_invite, invited_by_user_id, first_name, last_name, department`,
-          [orgId, normalizedEmail, raw.role, profile.id, fnRes.value, lnRes.value, deptRes.value],
-        );
-        results.push({ email: normalizedEmail, success: true, invitation });
-      } catch (dbErr: unknown) {
-        if (isUniqueViolation(dbErr)) {
-          results.push({ email: normalizedEmail, success: false, error: 'An invitation for this email is already pending' });
-        } else if ((dbErr as { code?: string })?.code === '23503') {
-          results.push({ email: normalizedEmail, success: false, error: 'Organization not found' });
-        } else {
-          // Unexpected DB error for this row. The request-level internalError never
-          // sees it (the loop intentionally swallows per-row failures), so log it
-          // here for App Insights, and return a CONSTANT message — never the raw
-          // driver text (CWE-209, ADR-0014, #25 — the leak was still open inside
-          // this loop).
-          const message = dbErr instanceof Error ? dbErr.message : String(dbErr);
-          const stack = dbErr instanceof Error && dbErr.stack ? `\n${dbErr.stack}` : '';
-          context.error(`invitation-bulk-create row failed: ${message}${stack}`);
-          results.push({ email: normalizedEmail, success: false, error: 'Could not create invitation' });
-        }
-      }
+    if (typeof raw.role !== 'string' || !ALLOWED_ROLES.has(raw.role)) {
+      results.push({ email: normalizedEmail, success: false, error: 'role must be one of: org_admin, learner' });
+      continue;
     }
 
-    return reply(200, { results });
+    const validateOptionalText = (val: unknown): { ok: true; value: string | null } | { ok: false } => {
+      if (val === undefined || val === null) return { ok: true, value: null };
+      if (typeof val !== 'string') return { ok: false };
+      if (val.length > 100) return { ok: false };
+      return { ok: true, value: val === '' ? null : val };
+    };
+
+    const fnRes = validateOptionalText(raw.firstName);
+    if (!fnRes.ok) {
+      results.push({ email: normalizedEmail, success: false, error: 'firstName must be a string of 100 characters or fewer' });
+      continue;
+    }
+    const lnRes = validateOptionalText(raw.lastName);
+    if (!lnRes.ok) {
+      results.push({ email: normalizedEmail, success: false, error: 'lastName must be a string of 100 characters or fewer' });
+      continue;
+    }
+    const deptRes = validateOptionalText(raw.department);
+    if (!deptRes.ok) {
+      results.push({ email: normalizedEmail, success: false, error: 'department must be a string of 100 characters or fewer' });
+      continue;
+    }
+
+    try {
+      const invitation = await queryOne(
+        `INSERT INTO invitations (org_id, email, role, invited_by_user_id, first_name, last_name, department)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, org_id, email, role, status, expires_at, created_at, link_id,
+                   is_platform_admin_invite, invited_by_user_id, first_name, last_name, department`,
+        [orgId, normalizedEmail, raw.role, profile.id, fnRes.value, lnRes.value, deptRes.value],
+      );
+      results.push({ email: normalizedEmail, success: true, invitation });
+    } catch (dbErr: unknown) {
+      if (isUniqueViolation(dbErr)) {
+        results.push({ email: normalizedEmail, success: false, error: 'An invitation for this email is already pending' });
+      } else if ((dbErr as { code?: string })?.code === '23503') {
+        results.push({ email: normalizedEmail, success: false, error: 'Organization not found' });
+      } else {
+        // Unexpected DB error for this row. The request-level internalError never
+        // sees it (the loop intentionally swallows per-row failures), so log it
+        // here for App Insights, and return a CONSTANT message — never the raw
+        // driver text (CWE-209, ADR-0014, #25 — the leak was still open inside
+        // this loop).
+        const message = dbErr instanceof Error ? dbErr.message : String(dbErr);
+        const stack = dbErr instanceof Error && dbErr.stack ? `\n${dbErr.stack}` : '';
+        context.error(`invitation-bulk-create row failed: ${message}${stack}`);
+        results.push({ email: normalizedEmail, success: false, error: 'Could not create invitation' });
+      }
+    }
+  }
+
+  return reply(200, { results });
 });

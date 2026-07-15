@@ -3,57 +3,57 @@ import { adminEndpoint } from '../shared/endpoint';
 import { validateLessonFields } from '../shared/validate';
 
 export default adminEndpoint('lesson-update', async ({ req, reply }) => {
-    const body = await req.json() as {
-      lessonId?: unknown;
-      moduleId?: unknown;
-      title?: unknown;
-      lessonType?: unknown;
-      contentText?: unknown;
-      durationMinutes?: unknown;
-      videoStoragePath?: unknown;
-      azureBlobPath?: unknown;
-      documentStoragePath?: unknown;
-    };
+  const body = await req.json() as {
+    lessonId?: unknown;
+    moduleId?: unknown;
+    title?: unknown;
+    lessonType?: unknown;
+    contentText?: unknown;
+    durationMinutes?: unknown;
+    videoStoragePath?: unknown;
+    azureBlobPath?: unknown;
+    documentStoragePath?: unknown;
+  };
 
-    const { lessonId, moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath } = body;
+  const { lessonId, moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath } = body;
 
-    // Required: lessonId (update-only field)
-    if (!lessonId || typeof lessonId !== 'string') {
-      return reply(400, { error: 'lessonId is required' });
-    }
+  // Required: lessonId (update-only field)
+  if (!lessonId || typeof lessonId !== 'string') {
+    return reply(400, { error: 'lessonId is required' });
+  }
 
-    // Shared field validation (moduleId, title, lessonType, and all optional fields)
-    const sharedError = validateLessonFields(body);
-    if (sharedError) {
-      return reply(400, { error: sharedError });
-    }
+  // Shared field validation (moduleId, title, lessonType, and all optional fields)
+  const sharedError = validateLessonFields(body);
+  if (sharedError) {
+    return reply(400, { error: sharedError });
+  }
 
-    // Full-row UPDATE (old client always sent full payload — not a sparse patch).
-    // video_url is literal NULL (deprecated column, old payload parity).
-    // sort_order is NOT touched — old update payload never included it.
-    // Params: [moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath, lessonId]
-    const lesson = await queryOne(
-      `UPDATE lessons
-       SET module_id=$1, title=$2, lesson_type=$3, content_text=$4, duration_minutes=$5,
-           video_storage_path=$6, video_url=NULL, azure_blob_path=$7, document_storage_path=$8
-       WHERE id=$9
-       RETURNING *`,
-      [
-        moduleId as string,
-        title as string,
-        lessonType as string,
-        (contentText as string | null | undefined) ?? null,
-        (durationMinutes as number | null | undefined) ?? null,
-        (videoStoragePath as string | null | undefined) ?? null,
-        (azureBlobPath as string | null | undefined) ?? null,
-        (documentStoragePath as string | null | undefined) ?? null,
-        lessonId as string,
-      ],
-    );
+  // Full-row UPDATE (old client always sent full payload — not a sparse patch).
+  // video_url is literal NULL (deprecated column, old payload parity).
+  // sort_order is NOT touched — old update payload never included it.
+  // Params: [moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath, lessonId]
+  const lesson = await queryOne(
+    `UPDATE lessons
+     SET module_id=$1, title=$2, lesson_type=$3, content_text=$4, duration_minutes=$5,
+         video_storage_path=$6, video_url=NULL, azure_blob_path=$7, document_storage_path=$8
+     WHERE id=$9
+     RETURNING *`,
+    [
+      moduleId as string,
+      title as string,
+      lessonType as string,
+      (contentText as string | null | undefined) ?? null,
+      (durationMinutes as number | null | undefined) ?? null,
+      (videoStoragePath as string | null | undefined) ?? null,
+      (azureBlobPath as string | null | undefined) ?? null,
+      (documentStoragePath as string | null | undefined) ?? null,
+      lessonId as string,
+    ],
+  );
 
-    if (!lesson) {
-      return reply(404, { error: 'Lesson not found' });
-    }
+  if (!lesson) {
+    return reply(404, { error: 'Lesson not found' });
+  }
 
-    return reply(200, { lesson });
+  return reply(200, { lesson });
 });

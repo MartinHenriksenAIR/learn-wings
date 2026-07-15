@@ -14,70 +14,70 @@ const COLUMN_MAP: Record<string, string> = {
 };
 
 export default adminEndpoint('course-update', async ({ req, reply }) => {
-    const body = await req.json() as {
-      courseId?: unknown;
-      updates?: unknown;
-    };
+  const body = await req.json() as {
+    courseId?: unknown;
+    updates?: unknown;
+  };
 
-    const { courseId, updates } = body;
+  const { courseId, updates } = body;
 
-    // Validate courseId
-    if (!courseId || typeof courseId !== 'string') {
-      return reply(400, { error: 'courseId is required' });
-    }
+  // Validate courseId
+  if (!courseId || typeof courseId !== 'string') {
+    return reply(400, { error: 'courseId is required' });
+  }
 
-    // Validate updates: must be a non-null object with at least one whitelisted key
-    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-      return reply(400, { error: 'No valid fields to update' });
-    }
+  // Validate updates: must be a non-null object with at least one whitelisted key
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+    return reply(400, { error: 'No valid fields to update' });
+  }
 
-    const updatesObj = updates as Record<string, unknown>;
+  const updatesObj = updates as Record<string, unknown>;
 
-    // Validate individual fields and build SET clause
-    const setClauses: string[] = [];
-    const params: unknown[] = [];
+  // Validate individual fields and build SET clause
+  const setClauses: string[] = [];
+  const params: unknown[] = [];
 
-    for (const [clientKey, column] of Object.entries(COLUMN_MAP)) {
-      if (!(clientKey in updatesObj)) continue;
+  for (const [clientKey, column] of Object.entries(COLUMN_MAP)) {
+    if (!(clientKey in updatesObj)) continue;
 
-      const value = updatesObj[clientKey];
+    const value = updatesObj[clientKey];
 
-      if (clientKey === 'title') {
-        if (!value || typeof value !== 'string' || (value as string).trim() === '') {
-          return reply(400, { error: 'title must be a non-empty string' });
-        }
-      } else if (clientKey === 'description') {
-        if (value !== null && typeof value !== 'string') {
-          return reply(400, { error: 'description must be a string or null' });
-        }
-      } else if (clientKey === 'level') {
-        if (!VALID_LEVELS.includes(value as CourseLevel)) {
-          return reply(400, { error: 'level must be basic, intermediate, or advanced' });
-        }
-      } else if (clientKey === 'thumbnailUrl') {
-        if (value !== null && typeof value !== 'string') {
-          return reply(400, { error: 'thumbnailUrl must be a string or null' });
-        }
-      } else if (clientKey === 'isPublished') {
-        if (typeof value !== 'boolean') {
-          return reply(400, { error: 'isPublished must be a boolean' });
-        }
+    if (clientKey === 'title') {
+      if (!value || typeof value !== 'string' || (value as string).trim() === '') {
+        return reply(400, { error: 'title must be a non-empty string' });
       }
-
-      params.push(value);
-      setClauses.push(`${column} = $${params.length}`);
+    } else if (clientKey === 'description') {
+      if (value !== null && typeof value !== 'string') {
+        return reply(400, { error: 'description must be a string or null' });
+      }
+    } else if (clientKey === 'level') {
+      if (!VALID_LEVELS.includes(value as CourseLevel)) {
+        return reply(400, { error: 'level must be basic, intermediate, or advanced' });
+      }
+    } else if (clientKey === 'thumbnailUrl') {
+      if (value !== null && typeof value !== 'string') {
+        return reply(400, { error: 'thumbnailUrl must be a string or null' });
+      }
+    } else if (clientKey === 'isPublished') {
+      if (typeof value !== 'boolean') {
+        return reply(400, { error: 'isPublished must be a boolean' });
+      }
     }
 
-    // Must have at least one field to update
-    if (setClauses.length === 0) {
-      return reply(400, { error: 'No valid fields to update' });
-    }
+    params.push(value);
+    setClauses.push(`${column} = $${params.length}`);
+  }
 
-    params.push(courseId);
-    const sql = `UPDATE courses SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`;
+  // Must have at least one field to update
+  if (setClauses.length === 0) {
+    return reply(400, { error: 'No valid fields to update' });
+  }
 
-    const course = await queryOne(sql, params);
-    if (!course) return reply(404, { error: 'Course not found' });
+  params.push(courseId);
+  const sql = `UPDATE courses SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`;
 
-    return reply(200, { course });
+  const course = await queryOne(sql, params);
+  if (!course) return reply(404, { error: 'Course not found' });
+
+  return reply(200, { course });
 });

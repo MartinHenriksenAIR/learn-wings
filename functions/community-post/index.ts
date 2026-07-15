@@ -13,41 +13,41 @@ interface PostRow {
 }
 
 export default endpoint('community-post', async ({ req, profile, reply }) => {
-    const body = await req.json() as { postId?: unknown };
-    const { postId } = body;
+  const body = await req.json() as { postId?: unknown };
+  const { postId } = body;
 
-    if (!postId || typeof postId !== 'string') {
-      return reply(400, { error: 'postId is required' });
-    }
+  if (!postId || typeof postId !== 'string') {
+    return reply(400, { error: 'postId is required' });
+  }
 
-    const post = await queryOne<PostRow>(`
-      SELECT p.*,
-        row_to_json(c.*) AS category,
-        json_build_object('id', pr.id, 'full_name', pr.full_name) AS profile,
-        CASE WHEN o.id IS NULL THEN NULL ELSE json_build_object('id', o.id, 'name', o.name) END AS organization
-      FROM community_posts p
-      JOIN community_categories c ON c.id = p.category_id
-      JOIN profiles pr ON pr.id = p.user_id
-      LEFT JOIN organizations o ON o.id = p.org_id
-      WHERE p.id = $1
-    `, [postId]);
+  const post = await queryOne<PostRow>(`
+    SELECT p.*,
+      row_to_json(c.*) AS category,
+      json_build_object('id', pr.id, 'full_name', pr.full_name) AS profile,
+      CASE WHEN o.id IS NULL THEN NULL ELSE json_build_object('id', o.id, 'name', o.name) END AS organization
+    FROM community_posts p
+    JOIN community_categories c ON c.id = p.category_id
+    JOIN profiles pr ON pr.id = p.user_id
+    LEFT JOIN organizations o ON o.id = p.org_id
+    WHERE p.id = $1
+  `, [postId]);
 
-    // Not found → null (parity with Supabase .maybeSingle())
-    if (!post) return reply(200, { post: null });
+  // Not found → null (parity with Supabase .maybeSingle())
+  if (!post) return reply(200, { post: null });
 
-    // Scope visibility check
-    if (post.scope === 'org') {
-      const canAccess = profile.is_platform_admin ||
-        await isActiveMember(profile.id, post.org_id!);
-      if (!canAccess) return reply(200, { post: null });
-    }
+  // Scope visibility check
+  if (post.scope === 'org') {
+    const canAccess = profile.is_platform_admin ||
+      await isActiveMember(profile.id, post.org_id!);
+    if (!canAccess) return reply(200, { post: null });
+  }
 
-    // Hidden visibility check
-    if (post.is_hidden) {
-      const canSeeHidden = profile.is_platform_admin ||
-        (post.scope === 'org' && await isOrgAdmin(profile.id, post.org_id!));
-      if (!canSeeHidden) return reply(200, { post: null });
-    }
+  // Hidden visibility check
+  if (post.is_hidden) {
+    const canSeeHidden = profile.is_platform_admin ||
+      (post.scope === 'org' && await isOrgAdmin(profile.id, post.org_id!));
+    if (!canSeeHidden) return reply(200, { post: null });
+  }
 
-    return reply(200, { post });
+  return reply(200, { post });
 });
