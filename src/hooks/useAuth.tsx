@@ -6,7 +6,7 @@ import { callApi } from '@/lib/api-client';
 import { clearPostLoginRedirect } from '@/lib/post-login-redirect';
 import type { Profile, OrgMembership, Organization } from '@/lib/types';
 
-export interface AppUser { id: string; tid: string; email: string; name: string; }
+interface AppUser { id: string; tid: string; email: string; name: string; }
 export type ViewMode = 'learner' | 'org_admin' | 'platform_admin';
 
 interface AuthContextType {

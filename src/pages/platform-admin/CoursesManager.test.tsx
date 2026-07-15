@@ -41,16 +41,6 @@ vi.mock('@/components/ui/sonner', () => ({
 vi.mock('@/components/ui/file-upload', () => ({
   FileUpload: () => <div data-testid="file-upload" />,
 }));
-vi.mock('@/components/ui/search-filter', () => ({
-  SearchFilter: ({ searchValue, onSearchChange }: { searchValue: string; onSearchChange: (v: string) => void }) => (
-    <input
-      data-testid="search-filter"
-      value={searchValue}
-      onChange={(e) => onSearchChange(e.target.value)}
-    />
-  ),
-}));
-
 import CoursesManager from './CoursesManager';
 
 const successResponse = [

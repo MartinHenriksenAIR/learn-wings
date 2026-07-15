@@ -5,7 +5,7 @@ import type { Profile, Organization } from './types';
 // Enums
 export type CommunityScope = 'org' | 'global';
 export type ReportStatus = 'pending' | 'reviewed' | 'dismissed';
-export type ReportTargetType = 'post' | 'comment';
+type ReportTargetType = 'post' | 'comment';
 export type BusinessArea = 'hr' | 'finance' | 'sales' | 'support' | 'ops' | 'it' | 'legal' | 'other';
 
 // Extended idea status (includes new values)

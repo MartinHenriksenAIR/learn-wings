@@ -500,7 +500,7 @@ export default function CoursePlayer() {
             {currentLesson.lesson_type === 'document' && (
               <div className="space-y-4">
                 {currentLesson.content_text && (
-                  <div className="prose prose-sm max-w-none">
+                  <div className="max-w-none">
                     <p>{currentLesson.content_text}</p>
                   </div>
                 )}
