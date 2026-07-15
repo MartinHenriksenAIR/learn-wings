@@ -13,8 +13,8 @@ import { internalError } from './errors';
  * preflight, authenticate → getProfile → 401, the AuthError→401 catch, the
  * generic internalError catch, and the app.http registration trailer.
  *
- * Ordering guarantee (byte-identical to the legacy envelope — will be pinned
- * by every migrated endpoint's tests as the fleet migrates):
+ * Ordering guarantee (byte-identical to the legacy envelope — pinned by every
+ * migrated endpoint's tests; the fleet-wide migration is complete):
  *   1. origin = req.headers.get('origin')
  *   2. OPTIONS → corsPreflightResponse(origin), before any auth work
  *   3. authenticate(req)

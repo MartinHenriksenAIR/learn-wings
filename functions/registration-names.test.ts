@@ -2,8 +2,7 @@
 // (endpoint / adminEndpoint / legacy app.http). Route names are load-time string
 // literals: a typo'd, duplicated, or missing name passes every per-endpoint test
 // (those call the handler directly with app.http mocked) and fails only at DEPLOY
-// time, when the Functions host silently drops or shadows the route. Especially
-// relevant while the ~100-file endpoint()-factory migration rewrites every trailer.
+// time, when the Functions host silently drops or shadows the route.
 // Sources are read with fs and matched by regex — deliberately NOT imported, since
 // importing would fire the app.http side effects and open DB pools.
 import { describe, it, expect } from 'vitest';
