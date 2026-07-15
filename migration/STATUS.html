@@ -117,8 +117,8 @@
 
   <p class="note"><strong>Actionable work now lives on the GitHub issue board</strong>
   (<code>gh issue list</code>) — slices, bugs, hardening, CI debt each have an issue carrying
-  file scope and acceptance criteria. Claims = assignee + draft PR (see <code>AGENTS.md</code>
-  collaboration rules). This section keeps only what is NOT issue-shaped.</p>
+  file scope and acceptance criteria. Draft PRs show what's in flight (see <code>AGENTS.md</code>
+  collaboration). This section keeps only what is NOT issue-shaped.</p>
 
   <h3>Accepted trade-offs (reviewed, deliberately kept)</h3>
   <ul class="items">
@@ -179,7 +179,7 @@
     <li>Read <code>migration/azure/README.md</code> — seeded UUIDs and how to elevate a profile</li>
     <li>Read <code>docs/adr/</code> — 15 ADRs define what is and isn't allowed</li>
     <li>Check <code>AGENTS.md</code> for agent constraints before taking any action (<code>CLAUDE.md</code> is just its import shim)</li>
-    <li>Check claims: <code>gh issue list --state open</code> + <code>gh pr list --state open</code> (draft PRs = active claims) — collaboration rules in <code>AGENTS.md</code></li>
+    <li>Check the board: <code>gh issue list --state open</code> + <code>gh pr list --state open</code> (draft PRs = in-flight work) — collaboration in <code>AGENTS.md</code></li>
     <li>Starting work → invoke the <code>pickup</code> skill; ending a session → <code>handoff</code></li>
   </ol>
 </section>
