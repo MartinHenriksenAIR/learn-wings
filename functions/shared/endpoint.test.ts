@@ -115,6 +115,28 @@ describe('endpoint', () => {
     expect(String(ctxError.mock.calls[0][0])).toContain('db exploded');
   });
 
+  it('non-Error throw from run (string) → constant 500 and context.error still logs', async () => {
+    const run = vi.fn(async () => { throw 'boom'; });
+    const handler = endpoint('t-run-nonerror-500', run as any);
+    const ctxError = vi.fn();
+    const res = await handler(baseReq({}), { error: ctxError } as any);
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+    expect(ctxError).toHaveBeenCalledTimes(1);
+  });
+
+  it('getProfile rejecting with a generic Error → constant 500 and context.error logs the original message', async () => {
+    mockGetProfile.mockRejectedValueOnce(new Error('db down'));
+    const handler = endpoint('t-profile-500', ok);
+    const ctxError = vi.fn();
+    const res = await handler(baseReq({}), { error: ctxError } as any);
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+    expect(ctxError).toHaveBeenCalledTimes(1);
+    expect(String(ctxError.mock.calls[0][0])).toContain('db down');
+    expect(ok).not.toHaveBeenCalled();
+  });
+
   it('thrown Reply from run is rendered as-is (409 with body)', async () => {
     const run = vi.fn(async () => { throw new Reply(409, { error: 'Conflict', code: 'DUP' }); });
     const handler = endpoint('t-run-reply', run as any);

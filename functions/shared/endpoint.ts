@@ -13,8 +13,8 @@ import { internalError } from './errors';
  * preflight, authenticate → getProfile → 401, the AuthError→401 catch, the
  * generic internalError catch, and the app.http registration trailer.
  *
- * Ordering guarantee (byte-identical to the legacy envelope — pinned by every
- * migrated endpoint's tests):
+ * Ordering guarantee (byte-identical to the legacy envelope — will be pinned
+ * by every migrated endpoint's tests as the fleet migrates):
  *   1. origin = req.headers.get('origin')
  *   2. OPTIONS → corsPreflightResponse(origin), before any auth work
  *   3. authenticate(req)
@@ -48,7 +48,7 @@ export interface AuthedCtx {
   context: InvocationContext;
   origin: string | null;
   user: AuthUser;                    // from shared/auth
-  profile: CallerProfile;           // from shared/profile — non-null by construction
+  profile: CallerProfile;            // from shared/profile — non-null by construction
   reply(status: number, body: unknown): HttpResponseInit;   // exactly corsResponse(origin, status, body)
   requireOrgAdmin(orgId: string, forbiddenError?: string): Promise<void>;
   requireActiveMember(orgId: string, forbiddenError?: string): Promise<void>;
@@ -56,10 +56,12 @@ export interface AuthedCtx {
 
 export type AzureHandler = (req: HttpRequest, context: InvocationContext) => Promise<HttpResponseInit>;
 
+export type EndpointRun = (ctx: AuthedCtx) => Promise<HttpResponseInit>;
+
 function makeHandler(
   requireAdmin: boolean,
   opts: { forbiddenError?: string } | undefined,
-  run: (ctx: AuthedCtx) => Promise<HttpResponseInit>,
+  run: EndpointRun,
 ): AzureHandler {
   return async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
     const origin = req.headers.get('origin');
@@ -93,7 +95,15 @@ function makeHandler(
       };
       return await run(ctx);
     } catch (err: unknown) {
-      if (err instanceof Reply) return corsResponse(origin, err.status, err.body);
+      if (err instanceof Reply) {
+        try {
+          return corsResponse(origin, err.status, err.body);
+        } catch (renderErr: unknown) {
+          // Non-serializable Reply body (circular ref, BigInt): the render itself
+          // threw — fall through to the constant 500 so nothing escapes the handler.
+          return internalError(context, origin, renderErr);
+        }
+      }
       if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
       return internalError(context, origin, err);
     }
@@ -107,16 +117,16 @@ function register(name: string, handler: AzureHandler): AzureHandler {
   return handler;
 }
 
-export function endpoint(name: string, run: (ctx: AuthedCtx) => Promise<HttpResponseInit>): AzureHandler {
+export function endpoint(name: string, run: EndpointRun): AzureHandler {
   return register(name, makeHandler(false, undefined, run));
 }
 
-export function adminEndpoint(name: string, run: (ctx: AuthedCtx) => Promise<HttpResponseInit>): AzureHandler;
-export function adminEndpoint(name: string, opts: { forbiddenError?: string }, run: (ctx: AuthedCtx) => Promise<HttpResponseInit>): AzureHandler;
+export function adminEndpoint(name: string, run: EndpointRun): AzureHandler;
+export function adminEndpoint(name: string, opts: { forbiddenError?: string }, run: EndpointRun): AzureHandler;
 export function adminEndpoint(
   name: string,
-  optsOrRun: { forbiddenError?: string } | ((ctx: AuthedCtx) => Promise<HttpResponseInit>),
-  maybeRun?: (ctx: AuthedCtx) => Promise<HttpResponseInit>,
+  optsOrRun: { forbiddenError?: string } | EndpointRun,
+  maybeRun?: EndpointRun,
 ): AzureHandler {
   const opts = typeof optsOrRun === 'function' ? undefined : optsOrRun;
   const run = typeof optsOrRun === 'function' ? optsOrRun : maybeRun!;
