@@ -1,30 +1,20 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isOrgAdmin } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
+import { isOrgAdmin } from '../shared/profile';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('enrollments', async ({ req, profile, reply }) => {
     const body = await req.json() as { orgId?: unknown; userId?: unknown; courseId?: unknown };
     const { orgId, userId, courseId } = body;
 
     // Validate: any present field must be a non-empty string
     if (orgId !== undefined && (typeof orgId !== 'string' || orgId === '')) {
-      return corsResponse(origin, 400, { error: 'orgId must be a string' });
+      return reply(400, { error: 'orgId must be a string' });
     }
     if (userId !== undefined && (typeof userId !== 'string' || userId === '')) {
-      return corsResponse(origin, 400, { error: 'userId must be a string' });
+      return reply(400, { error: 'userId must be a string' });
     }
     if (courseId !== undefined && (typeof courseId !== 'string' || courseId === '')) {
-      return corsResponse(origin, 400, { error: 'courseId must be a string' });
+      return reply(400, { error: 'courseId must be a string' });
     }
 
     // Narrowed typed locals — runtime guards above guarantee these are string | undefined
@@ -63,12 +53,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       params,
     );
 
-    return corsResponse(origin, 200, { enrollments: rows });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('enrollments', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { enrollments: rows });
+});

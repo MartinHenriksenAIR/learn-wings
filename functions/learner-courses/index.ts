@@ -1,28 +1,15 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isActiveMember } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 import { courseVisibilityPredicate } from '../shared/course-visibility';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('learner-courses', async ({ req, profile, reply, requireActiveMember }) => {
     const { orgId } = await req.json() as { orgId?: unknown };
 
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' });
+      return reply(400, { error: 'orgId is required' });
     }
 
-    const authorized = profile.is_platform_admin || await isActiveMember(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
+    await requireActiveMember(orgId);
 
     // Query 1: Available published courses for the org (shared visibility predicate;
     // equivalent to the old JOIN form — UNIQUE(org_id, course_id) on org_course_access
@@ -44,12 +31,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [profile.id, orgId],
     );
 
-    return corsResponse(origin, 200, { courses, enrollments });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('learner-courses', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { courses, enrollments });
+});
