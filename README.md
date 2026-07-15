@@ -60,7 +60,7 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | `src/` | Frontend SPA — `pages/` (by role), `components/`, `hooks/useAuth.tsx`, `lib/` (api-client, types, msal-config) |
 | `functions/` | ~100 Azure Functions (one folder each) + `shared/` (auth, db, profile, cors) + `index.ts` barrel |
 | `migration/azure/` | The canonical Postgres schema (`01-schema.sql`), seed data (`02-seed.sql`), and apply guide |
-| `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history), `lovable-supabase-removal/` (historical planning) |
+| `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history) |
 | `docs/adr/` | The 15 architecture decision records |
 | `.claude/` | Agent collaboration system — `rules/` (hard-won conventions), `skills/` (`pickup`/`handoff`/`slice-workflow`), `collab.json` (branch topology), and the `guard-trunk` hook |
 | `supabase/` | **Dead** — the original Supabase Deno functions + migrations, kept only as authz-provenance reference. Deleted in the final migration slice (#13). |
@@ -137,9 +137,7 @@ The hard-won rules that keep this codebase stable are codified — read them bef
 | [`docs/adr/`](docs/adr/) | The 15 architecture decision records (what is and isn't allowed). |
 | [`AGENTS.md`](AGENTS.md) | Agent + contributor instructions. |
 | [`migration/azure/README.md`](migration/azure/README.md) | The Supabase→Azure schema port: what was stripped, added, ported, and flagged. |
-| [`AZURE_DEPLOYMENT_GUIDE.md`](AZURE_DEPLOYMENT_GUIDE.md) | Reference Azure deployment guide. |
-
-> Note: a few root-level docs from early 2026 (`QUICK_START.md`, `DEPLOYMENT_SUMMARY.md`) predate the migration-era approach that actually shipped. Treat `migration/STATUS.html`, the ADRs, and `migration/azure/README.md` as authoritative.
+| [`.claude/rules/`](.claude/rules/) | Frontend and backend conventions. |
 
 ## Collaboration & deployment
 

@@ -3,7 +3,7 @@
 - **Date:** 2026-06-03
 - **Branch:** `feature/lovable-migration`
 - **Status:** Approved design — ready for implementation planning
-- **Related:** `docs/superpowers/plans/2026-05-17-lovable-supabase-migration.md`, `migration/lovable-supabase-removal/`
+- **Related:** the 2026-05-17 migration plan and the `migration/lovable-supabase-removal/` discovery ledgers — both deleted 2026-07-16 (docs-slimming pass); recover from git history if needed
 
 ---
 

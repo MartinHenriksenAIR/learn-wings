@@ -37,6 +37,13 @@ For genuinely tiny single-edit changes, do them inline; the skill itself signals
 - `.claude/rules/frontend.md` and `.claude/rules/functions.md` hold the hard-won per-tree conventions — read them before touching either tree.
 - `docs/adr/` holds the architecture decision records — they define what is and isn't allowed; read them before structural changes. Plain markdown, edited by hand (the adr-kit tooling was removed 2026-06-06).
 
+## Documentation policy
+- Docs describing current state must stay true or be deleted — git history is the archive; never leave "outdated, see X" markers.
+- Plans, handovers, and working notes are ephemeral: delete them once consumed.
+- ADRs are append-only — supersede with a new ADR, never edit or delete one.
+- Docs change in the same PR as the code they describe.
+- `migration/STATUS.html` stays bounded (a checkpoint, edited in place); `migration/WORKLOG.md` stays append-only.
+
 ## Deploys
 - Merging to `main` deploys automatically: the SWA workflow ships the frontend (and builds a preview environment per PR), the functions workflow ships the backend. Never deploy from work branches; announce the deploy on the merged PR (`deploying trunk @<sha>` → `deployed, smoke ok`).
 - Do not mutate Azure resources (no `az` create/delete/update) without explicit user instruction.
