@@ -1,9 +1,5 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { queryOne, isUniqueViolation } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isOrgAdmin } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
 const ALLOWED_ROLES = new Set(['org_admin', 'learner']);
 // Basic email regex — matches the BulkInviteDialog / invitation-create validation.
@@ -35,40 +31,32 @@ type RowResult = {
  * `token` / `token_hash` are NEVER exposed in the response (same security note as
  * invitation-create).
  */
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('invitation-bulk-create', async ({ req, context, profile, reply, requireOrgAdmin }) => {
     const body = await req.json() as { orgId?: unknown; invites?: unknown };
     const { orgId, invites } = body;
 
     // Request-level validation: shape errors abort the whole request with 400.
     if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' });
+      return reply(400, { error: 'orgId is required' });
     }
     if (invites === undefined || invites === null) {
-      return corsResponse(origin, 400, { error: 'invites is required' });
+      return reply(400, { error: 'invites is required' });
     }
     if (!Array.isArray(invites)) {
-      return corsResponse(origin, 400, { error: 'invites must be an array' });
+      return reply(400, { error: 'invites must be an array' });
     }
     if (invites.length === 0) {
-      return corsResponse(origin, 400, { error: 'invites must not be empty' });
+      return reply(400, { error: 'invites must not be empty' });
     }
     if (invites.length > MAX_INVITES) {
-      return corsResponse(origin, 400, { error: `invites must not exceed ${MAX_INVITES} entries` });
+      return reply(400, { error: `invites must not exceed ${MAX_INVITES} entries` });
     }
 
     // Authorization: platform admin OR org admin of the target org.
     // RLS provenance: supabase/migrations/20260130144031_*.sql —
     // "Admins can insert invitations" policy (WITH CHECK is_platform_admin()
     // OR (org_id IS NOT NULL AND is_org_admin(org_id))). Same gate as invitation-create.
-    const authorized = profile.is_platform_admin || await isOrgAdmin(profile.id, orgId);
-    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
+    await requireOrgAdmin(orgId);
 
     // Per-row processing. Each row resolves to a result entry — never throws out
     // of this loop. Sequential by design (see header comment).
@@ -138,12 +126,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       }
     }
 
-    return corsResponse(origin, 200, { results });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('invitation-bulk-create', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { results });
+});

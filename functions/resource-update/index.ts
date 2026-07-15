@@ -1,9 +1,6 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isOrgAdmin } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
+import { isOrgAdmin } from '../shared/profile';
 import { RESOURCE_PROFILE_PROJECTION } from '../shared/resources';
 
 const RESOURCE_TYPES = ['link', 'document', 'template', 'guide'];
@@ -17,60 +14,53 @@ interface ResourceRow {
   user_id: string;
 }
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('resource-update', async ({ req, profile, reply }) => {
     const body = await req.json() as { resourceId?: unknown; updates?: unknown };
     const { resourceId, updates } = body;
 
     if (!resourceId || typeof resourceId !== 'string') {
-      return corsResponse(origin, 400, { error: 'resourceId is required' });
+      return reply(400, { error: 'resourceId is required' });
     }
     if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-      return corsResponse(origin, 400, { error: 'updates must be an object' });
+      return reply(400, { error: 'updates must be an object' });
     }
 
     const updatesObj = updates as Record<string, unknown>;
     const updateKeys = Object.keys(updatesObj);
     for (const key of updateKeys) {
       if (!ALLOWED_UPDATE_FIELDS.has(key)) {
-        return corsResponse(origin, 400, { error: `Invalid update field: ${key}` });
+        return reply(400, { error: `Invalid update field: ${key}` });
       }
     }
     if (updateKeys.length === 0) {
-      return corsResponse(origin, 400, { error: 'No update fields provided' });
+      return reply(400, { error: 'No update fields provided' });
     }
 
     for (const key of updateKeys) {
       const v = updatesObj[key];
       if (key === 'tags') {
         if (!Array.isArray(v) || !v.every((t) => typeof t === 'string')) {
-          return corsResponse(origin, 400, { error: 'tags must be an array of strings' });
+          return reply(400, { error: 'tags must be an array of strings' });
         }
       } else if (key === 'is_pinned') {
         if (typeof v !== 'boolean') {
-          return corsResponse(origin, 400, { error: 'is_pinned must be a boolean' });
+          return reply(400, { error: 'is_pinned must be a boolean' });
         }
       } else if (key === 'resource_type') {
         if (typeof v !== 'string' || !RESOURCE_TYPES.includes(v)) {
-          return corsResponse(origin, 400, {
+          return reply(400, {
             error: `resource_type must be one of: ${RESOURCE_TYPES.join(', ')}`,
           });
         }
       } else if (key === 'title') {
         // title is NOT NULL in schema — must be a non-empty string
         if (!v || typeof v !== 'string') {
-          return corsResponse(origin, 400, { error: 'title must be a non-empty string' });
+          return reply(400, { error: 'title must be a non-empty string' });
         }
       } else {
         // description, url — string or null (nullable in schema)
         if (v !== null && typeof v !== 'string') {
-          return corsResponse(origin, 400, { error: `${key} must be a string or null` });
+          return reply(400, { error: `${key} must be a string or null` });
         }
       }
     }
@@ -79,7 +69,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       `SELECT id, org_id, user_id FROM community_resources WHERE id = $1`,
       [resourceId],
     );
-    if (!resource) return corsResponse(origin, 404, { error: 'Resource not found' });
+    if (!resource) return reply(404, { error: 'Resource not found' });
 
     // Authorization (OR of RLS policies, provenance 20260202125517):
     //   - platform admin (suite convention)
@@ -96,7 +86,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     // Returning 404 here keeps an authenticated caller from distinguishing
     // "exists but I'm not allowed" from "doesn't exist" — prevents
     // cross-org enumeration of resource IDs.
-    if (!authorized) return corsResponse(origin, 404, { error: 'Resource not found' });
+    if (!authorized) return reply(404, { error: 'Resource not found' });
 
     // Dynamic UPDATE over the whitelisted keys + return shape with embedded profile (CTE).
     const params: unknown[] = [];
@@ -120,12 +110,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       params,
     );
 
-    return corsResponse(origin, 200, { resource: updated });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('resource-update', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { resource: updated });
+});

@@ -1,19 +1,9 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
-
+export default adminEndpoint('azure-document-upload-url', async ({ req, reply }) => {
     const { fileName, contentType: reqContentType } = await req.json() as { fileName: string; contentType?: string };
-    if (!fileName) return corsResponse(origin, 400, { error: 'fileName is required' });
+    if (!fileName) return reply(400, { error: 'fileName is required' });
 
     const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME!;
     const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY!;
@@ -26,11 +16,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const sasToken = generateSasToken(accountName, accountKey, containerName, uniqueName, 'cw', 30);
     const uploadUrl = buildBlobUrl(accountName, containerName, uniqueName, sasToken);
 
-    return corsResponse(origin, 200, { uploadUrl, blobPath: uniqueName, contentType });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('azure-document-upload-url', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { uploadUrl, blobPath: uniqueName, contentType });
+});
