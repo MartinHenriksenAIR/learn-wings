@@ -1,3 +1,4 @@
+// Hand-rolled (not shared/endpoint.ts): bespoke response contract (connection failures return 200 {success:false} — a deliberate ADR-0014 carve-out) and an oid-only admin probe.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';

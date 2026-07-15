@@ -1,3 +1,4 @@
+// Hand-rolled (not shared/endpoint.ts): lazy Resend client plus bespoke authz (org-admin in ANY org, oid-only lookup) and a custom 403 body.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';

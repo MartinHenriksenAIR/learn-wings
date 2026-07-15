@@ -1,3 +1,4 @@
+// Hand-rolled (not shared/endpoint.ts): legacy oid-only identity lookup (entra_oid without tid) and a custom 403 body — pending identity normalization.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';

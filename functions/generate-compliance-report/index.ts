@@ -1,3 +1,4 @@
+// Hand-rolled (not shared/endpoint.ts): binary PDF response and token-only auth (oid-scoped SQL lookups, no getProfile).
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';

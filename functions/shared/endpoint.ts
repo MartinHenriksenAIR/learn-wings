@@ -14,7 +14,7 @@ import { internalError } from './errors';
  * generic internalError catch, and the app.http registration trailer.
  *
  * Ordering guarantee (byte-identical to the legacy envelope — pinned by every
- * migrated endpoint's tests; 90 endpoints use the factory, and 10 deliberately
+ * migrated endpoint's tests; 90 endpoints use the factory, and 8 deliberately
  * hand-rolled endpoints remain — grep app.http for the list):
  *   1. origin = req.headers.get('origin')
  *   2. OPTIONS → corsPreflightResponse(origin), before any auth work

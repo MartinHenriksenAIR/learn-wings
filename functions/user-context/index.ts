@@ -1,3 +1,4 @@
+// Hand-rolled (not shared/endpoint.ts): provisions the profile on first login (the factory 401s when getProfile misses) and serves GET as well as POST.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';

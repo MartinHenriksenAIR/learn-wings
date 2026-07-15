@@ -28,7 +28,7 @@ Everything is **org-scoped**: data belongs to an organization, and members see o
 | Email | **Resend** (transactional invitations) |
 | Hosting | Azure **Static Web Apps** (frontend) + Azure Functions (API) |
 
-Architecture decisions are recorded in **[`docs/adr/`](docs/adr/)** (ADR-0001 … ADR-0014) — read them before structural changes.
+Architecture decisions are recorded in **[`docs/adr/`](docs/adr/)** (ADR-0001 … ADR-0015) — read them before structural changes.
 
 ## How it fits together
 
@@ -40,7 +40,8 @@ callApi()  ───────────────────────
    │   POST /api/<endpoint>  (Authorization: Bearer <token>)
    ▼
 Azure Function  ─────────────────────────►  functions/<name>/index.ts  (×~100)
-   │   every handler follows the same skeleton, leaning on 4 shared helpers:
+   │   the envelope is owned by endpoint()/adminEndpoint() in functions/shared/endpoint.ts
+   │   (ADR-0015; a handful of hand-rolled exceptions), leaning on 4 shared helpers:
    │     authenticate()  verify the Entra JWT            functions/shared/auth.ts
    │     getProfile()    Entra identity → DB profile     functions/shared/profile.ts
    │                     + isActiveMember / isOrgAdmin    (authorization lives HERE)
@@ -60,7 +61,7 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | `functions/` | ~100 Azure Functions (one folder each) + `shared/` (auth, db, profile, cors) + `index.ts` barrel |
 | `migration/azure/` | The canonical Postgres schema (`01-schema.sql`), seed data (`02-seed.sql`), and apply guide |
 | `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history), `lovable-supabase-removal/` (historical planning) |
-| `docs/adr/` | The 14 architecture decision records |
+| `docs/adr/` | The 15 architecture decision records |
 | `.claude/` | Agent collaboration system — `rules/` (hard-won conventions), `skills/` (`pickup`/`handoff`/`slice-workflow`), `collab.json` (branch topology), and the `guard-trunk` hook |
 | `supabase/` | **Dead** — the original Supabase Deno functions + migrations, kept only as authz-provenance reference. Deleted in the final migration slice (#13). |
 
@@ -133,7 +134,7 @@ The hard-won rules that keep this codebase stable are codified — read them bef
 |-----|------------|
 | [`migration/STATUS.html`](migration/STATUS.html) | **Live ledger** — current checkpoint, operational quirks, pointers. Authoritative. |
 | [`migration/WORKLOG.md`](migration/WORKLOG.md) | Append-only history of every merged change. |
-| [`docs/adr/`](docs/adr/) | The 14 architecture decision records (what is and isn't allowed). |
+| [`docs/adr/`](docs/adr/) | The 15 architecture decision records (what is and isn't allowed). |
 | [`AGENTS.md`](AGENTS.md) | Agent + contributor instructions. |
 | [`migration/azure/README.md`](migration/azure/README.md) | The Supabase→Azure schema port: what was stripped, added, ported, and flagged. |
 | [`AZURE_DEPLOYMENT_GUIDE.md`](AZURE_DEPLOYMENT_GUIDE.md) | Reference Azure deployment guide. |
