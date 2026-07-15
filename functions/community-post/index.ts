@@ -1,9 +1,6 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isActiveMember, isOrgAdmin } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
+import { isActiveMember, isOrgAdmin } from '../shared/profile';
 
 interface PostRow {
   id: string;
@@ -15,19 +12,12 @@ interface PostRow {
   [key: string]: unknown;
 }
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
-
+export default endpoint('community-post', async ({ req, profile, reply }) => {
     const body = await req.json() as { postId?: unknown };
     const { postId } = body;
 
     if (!postId || typeof postId !== 'string') {
-      return corsResponse(origin, 400, { error: 'postId is required' });
+      return reply(400, { error: 'postId is required' });
     }
 
     const post = await queryOne<PostRow>(`
@@ -43,28 +33,21 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     `, [postId]);
 
     // Not found → null (parity with Supabase .maybeSingle())
-    if (!post) return corsResponse(origin, 200, { post: null });
+    if (!post) return reply(200, { post: null });
 
     // Scope visibility check
     if (post.scope === 'org') {
       const canAccess = profile.is_platform_admin ||
         await isActiveMember(profile.id, post.org_id!);
-      if (!canAccess) return corsResponse(origin, 200, { post: null });
+      if (!canAccess) return reply(200, { post: null });
     }
 
     // Hidden visibility check
     if (post.is_hidden) {
       const canSeeHidden = profile.is_platform_admin ||
         (post.scope === 'org' && await isOrgAdmin(profile.id, post.org_id!));
-      if (!canSeeHidden) return corsResponse(origin, 200, { post: null });
+      if (!canSeeHidden) return reply(200, { post: null });
     }
 
-    return corsResponse(origin, 200, { post });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('community-post', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { post });
+});
