@@ -1,9 +1,7 @@
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { adminEndpoint } from '../shared/endpoint';
 
-export default adminEndpoint('azure-upload-url', {
-  forbiddenError: 'Only platform admins can upload videos',
-}, async ({ req, reply }) => {
+export default adminEndpoint('azure-upload-url', async ({ req, reply }) => {
   const { fileName, contentType: reqContentType } = await req.json() as { fileName: string; contentType?: string };
   if (!fileName) return reply(400, { error: 'fileName is required' });
 
@@ -22,4 +20,4 @@ export default adminEndpoint('azure-upload-url', {
   const uploadUrl = buildBlobUrl(accountName, containerName, uniqueName, sasToken);
 
   return reply(200, { uploadUrl, blobPath: uniqueName, contentType });
-});
+}, { forbiddenError: 'Only platform admins can upload videos' });

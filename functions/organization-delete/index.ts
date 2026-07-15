@@ -5,7 +5,7 @@ interface OrgRow {
   id: string;
 }
 
-export default endpoint('organization-delete', async ({ req, profile, reply }) => {
+export default endpoint('organization-delete', async ({ req, reply, requirePlatformAdmin }) => {
   const body = await req.json() as { orgId?: unknown };
   const { orgId } = body;
 
@@ -17,9 +17,7 @@ export default endpoint('organization-delete', async ({ req, profile, reply }) =
   // Authorization: platform-admin-only.
   // RLS provenance: supabase/migrations/20260127153401_*.sql lines 269-272 —
   // "Platform admins can do everything with orgs" was the only DELETE-capable policy.
-  if (!profile.is_platform_admin) {
-    return reply(403, { error: 'Forbidden' });
-  }
+  requirePlatformAdmin();
 
   // DELETE ... RETURNING gives us the not-found signal (null) in one round trip.
   // Cascade deletes (org_memberships, invitations, org_settings, ai_champions,

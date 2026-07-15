@@ -172,89 +172,67 @@ describe('endpoint', () => {
     expect(config.handler).toBe(handler);
   });
 
-  describe('requireOrgAdmin', () => {
+  // The two org-scoped guards share one contract (admin short-circuit, DB probe
+  // with (profile.id, orgId), 403 Forbidden on denial) — asserted once for both.
+  describe.each([
+    { name: 'requireOrgAdmin', mock: mockIsOrgAdmin, invoke: (ctx: AuthedCtx) => ctx.requireOrgAdmin('org-1') },
+    { name: 'requireActiveMember', mock: mockIsActiveMember, invoke: (ctx: AuthedCtx) => ctx.requireActiveMember('org-1') },
+  ])('$name', ({ name, mock, invoke }) => {
     const run = vi.fn(async (ctx: AuthedCtx) => {
-      await ctx.requireOrgAdmin('org-1');
+      await invoke(ctx);
       return ctx.reply(200, { ok: true });
     });
 
-    it('platform admin resolves WITHOUT calling isOrgAdmin (DB probe skipped)', async () => {
+    it('platform admin resolves WITHOUT the DB probe', async () => {
       mockGetProfile.mockResolvedValueOnce(adminProfile);
-      const handler = endpoint('t-orgadmin-admin', run as any);
+      const handler = endpoint(`t-${name}-admin`, run as any);
       const res = await handler(baseReq({}), {} as any);
       expect(res.status).toBe(200);
-      expect(mockIsOrgAdmin).not.toHaveBeenCalled();
+      expect(mock).not.toHaveBeenCalled();
     });
 
-    it('non-admin with isOrgAdmin true resolves; called with (profile.id, orgId)', async () => {
-      mockIsOrgAdmin.mockResolvedValueOnce(true);
-      const handler = endpoint('t-orgadmin-yes', run as any);
+    it('non-admin with probe true resolves; probe called with (profile.id, orgId)', async () => {
+      mock.mockResolvedValueOnce(true);
+      const handler = endpoint(`t-${name}-yes`, run as any);
       const res = await handler(baseReq({}), {} as any);
       expect(res.status).toBe(200);
-      expect(mockIsOrgAdmin).toHaveBeenCalledWith('user-1', 'org-1');
+      expect(mock).toHaveBeenCalledWith('user-1', 'org-1');
     });
 
-    it('non-admin with isOrgAdmin false → 403 Forbidden (thrown Reply rendered)', async () => {
-      mockIsOrgAdmin.mockResolvedValueOnce(false);
-      const handler = endpoint('t-orgadmin-no', run as any);
+    it('non-admin with probe false → 403 Forbidden (thrown Reply rendered)', async () => {
+      mock.mockResolvedValueOnce(false);
+      const handler = endpoint(`t-${name}-no`, run as any);
       const res = await handler(baseReq({}), {} as any);
       expect(res.status).toBe(403);
       expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
-    });
-
-    it('custom forbiddenError message override', async () => {
-      mockIsOrgAdmin.mockResolvedValueOnce(false);
-      const customRun = vi.fn(async (ctx: AuthedCtx) => {
-        await ctx.requireOrgAdmin('org-1', 'Org admins only');
-        return ctx.reply(200, { ok: true });
-      });
-      const handler = endpoint('t-orgadmin-custom', customRun as any);
-      const res = await handler(baseReq({}), {} as any);
-      expect(res.status).toBe(403);
-      expect(JSON.parse(res.body as string)).toEqual({ error: 'Org admins only' });
     });
   });
 
-  describe('requireActiveMember', () => {
+  describe('requirePlatformAdmin', () => {
+    // Different shape from the org-scoped guards: no DB probe involved — the
+    // gate reads profile.is_platform_admin only (hence sync, not async).
     const run = vi.fn(async (ctx: AuthedCtx) => {
-      await ctx.requireActiveMember('org-1');
+      ctx.requirePlatformAdmin();
       return ctx.reply(200, { ok: true });
     });
 
-    it('platform admin resolves WITHOUT calling isActiveMember (DB probe skipped)', async () => {
+    it('platform admin passes and run completes', async () => {
       mockGetProfile.mockResolvedValueOnce(adminProfile);
-      const handler = endpoint('t-member-admin', run as any);
+      const handler = endpoint('t-platform-admin-ok', run as any);
       const res = await handler(baseReq({}), {} as any);
       expect(res.status).toBe(200);
+      expect(JSON.parse(res.body as string)).toEqual({ ok: true });
+      expect(mockIsOrgAdmin).not.toHaveBeenCalled();
       expect(mockIsActiveMember).not.toHaveBeenCalled();
     });
 
-    it('non-admin with isActiveMember true resolves; called with (profile.id, orgId)', async () => {
-      mockIsActiveMember.mockResolvedValueOnce(true);
-      const handler = endpoint('t-member-yes', run as any);
-      const res = await handler(baseReq({}), {} as any);
-      expect(res.status).toBe(200);
-      expect(mockIsActiveMember).toHaveBeenCalledWith('user-1', 'org-1');
-    });
-
-    it('non-member → 403 Forbidden (thrown Reply rendered)', async () => {
-      mockIsActiveMember.mockResolvedValueOnce(false);
-      const handler = endpoint('t-member-no', run as any);
+    it('non-admin → 403 Forbidden (thrown Reply rendered); still no DB probe', async () => {
+      const handler = endpoint('t-platform-admin-no', run as any);
       const res = await handler(baseReq({}), {} as any);
       expect(res.status).toBe(403);
       expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
-    });
-
-    it('custom forbiddenError message override', async () => {
-      mockIsActiveMember.mockResolvedValueOnce(false);
-      const customRun = vi.fn(async (ctx: AuthedCtx) => {
-        await ctx.requireActiveMember('org-1', 'Members only');
-        return ctx.reply(200, { ok: true });
-      });
-      const handler = endpoint('t-member-custom', customRun as any);
-      const res = await handler(baseReq({}), {} as any);
-      expect(res.status).toBe(403);
-      expect(JSON.parse(res.body as string)).toEqual({ error: 'Members only' });
+      expect(mockIsOrgAdmin).not.toHaveBeenCalled();
+      expect(mockIsActiveMember).not.toHaveBeenCalled();
     });
   });
 });
@@ -274,7 +252,7 @@ describe('adminEndpoint', () => {
     expect(ok).toHaveBeenCalledTimes(1);
   });
 
-  it('non-admin → 403 Forbidden and run NOT called (2-arg overload, default message)', async () => {
+  it('non-admin → 403 Forbidden and run NOT called (no opts, default message)', async () => {
     mockGetProfile.mockResolvedValueOnce(nonAdminProfile);
     const handler = adminEndpoint('t-admin-403', ok);
     const res = await handler(baseReq({}), {} as any);
@@ -283,9 +261,9 @@ describe('adminEndpoint', () => {
     expect(ok).not.toHaveBeenCalled();
   });
 
-  it('non-admin → 403 with custom forbiddenError (3-arg overload)', async () => {
+  it('non-admin → 403 with custom forbiddenError (trailing opts)', async () => {
     mockGetProfile.mockResolvedValueOnce(nonAdminProfile);
-    const handler = adminEndpoint('t-admin-custom', { forbiddenError: 'Platform admins only' }, ok);
+    const handler = adminEndpoint('t-admin-custom', ok, { forbiddenError: 'Platform admins only' });
     const res = await handler(baseReq({}), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Platform admins only' });
@@ -347,13 +325,9 @@ describe('adminEndpoint', () => {
     expect(mockAuthenticate).not.toHaveBeenCalled();
   });
 
-  it('registers with app.http exactly like endpoint()', async () => {
-    const handler = adminEndpoint('my-admin-endpoint', ok);
+  it('registers with app.http under the given name (full config shape pinned by the endpoint() test)', async () => {
+    adminEndpoint('my-admin-endpoint', ok);
     expect(mockAppHttp).toHaveBeenCalledTimes(1);
-    const [name, config] = mockAppHttp.mock.calls[0] as [string, any];
-    expect(name).toBe('my-admin-endpoint');
-    expect(config.methods).toEqual(['POST', 'OPTIONS']);
-    expect(config.authLevel).toBe('anonymous');
-    expect(config.handler).toBe(handler);
+    expect(mockAppHttp.mock.calls[0][0]).toBe('my-admin-endpoint');
   });
 });

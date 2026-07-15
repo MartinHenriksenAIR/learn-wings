@@ -2,7 +2,7 @@ import { queryOne, isUniqueViolation } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { validateOrgName, validateOrgSlug, normalizeOrgName } from '../shared/org-validation';
 
-export default endpoint('organization-create', async ({ req, profile, reply }) => {
+export default endpoint('organization-create', async ({ req, reply, requirePlatformAdmin }) => {
   const body = await req.json() as Record<string, unknown>;
   const { name, slug, logo_url, seat_limit } = body;
 
@@ -31,9 +31,7 @@ export default endpoint('organization-create', async ({ req, profile, reply }) =
   // Authorization: platform-admin-only.
   // RLS provenance: supabase/migrations/20260127153401_*.sql lines 269-276 —
   // "Platform admins can do everything with orgs" was the only INSERT-capable policy.
-  if (!profile.is_platform_admin) {
-    return reply(403, { error: 'Forbidden' });
-  }
+  requirePlatformAdmin();
 
   try {
     const organization = await queryOne(

@@ -2,7 +2,7 @@ import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isActiveMember } from '../shared/profile';
 
-export default endpoint('community-post-create', async ({ req, profile, reply, requireOrgAdmin }) => {
+export default endpoint('community-post-create', async ({ req, profile, reply, requireOrgAdmin, requirePlatformAdmin }) => {
   const body = await req.json() as {
     scope?: unknown;
     orgId?: unknown;
@@ -77,9 +77,7 @@ export default endpoint('community-post-create', async ({ req, profile, reply, r
   if (categoryRow.is_restricted) {
     if (vScope === 'global') {
       // Only platform admins can post in restricted categories globally
-      if (!profile.is_platform_admin) {
-        return reply(403, { error: 'Forbidden' });
-      }
+      requirePlatformAdmin();
     } else {
       // scope='org': platform admin OR org admin
       await requireOrgAdmin(vOrgId!);

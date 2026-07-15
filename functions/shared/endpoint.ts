@@ -14,7 +14,8 @@ import { internalError } from './errors';
  * generic internalError catch, and the app.http registration trailer.
  *
  * Ordering guarantee (byte-identical to the legacy envelope — pinned by every
- * migrated endpoint's tests; the fleet-wide migration is complete):
+ * migrated endpoint's tests; 90 endpoints use the factory, and 10 deliberately
+ * hand-rolled endpoints remain — grep app.http for the list):
  *   1. origin = req.headers.get('origin')
  *   2. OPTIONS → corsPreflightResponse(origin), before any auth work
  *   3. authenticate(req)
@@ -51,8 +52,12 @@ export interface AuthedCtx {
   user: AuthUser;                    // from shared/auth
   profile: CallerProfile;            // from shared/profile — non-null by construction
   reply(status: number, body: unknown): HttpResponseInit;   // exactly corsResponse(origin, status, body)
-  requireOrgAdmin(orgId: string, forbiddenError?: string): Promise<void>;
-  requireActiveMember(orgId: string, forbiddenError?: string): Promise<void>;
+  // Guards throw Reply(403, { error: 'Forbidden' }) on denial. Custom 403 bodies:
+  // use `throw new Reply(403, {...})` in the endpoint instead.
+  requireOrgAdmin(orgId: string): Promise<void>;
+  requireActiveMember(orgId: string): Promise<void>;
+  // For endpoints that must validate before gating — adminEndpoint gates before body parse.
+  requirePlatformAdmin(): void;
 }
 
 export type AzureHandler = (req: HttpRequest, context: InvocationContext) => Promise<HttpResponseInit>;
@@ -83,15 +88,19 @@ function makeHandler(
         reply: (status, body) => corsResponse(origin, status, body),
         // Platform admins short-circuit WITHOUT the DB probe — parity with the
         // legacy `profile.is_platform_admin || await isOrgAdmin(...)` pattern.
-        requireOrgAdmin: async (orgId, forbiddenError) => {
+        requireOrgAdmin: async (orgId) => {
           if (profile.is_platform_admin) return;
           if (await isOrgAdmin(profile.id, orgId)) return;
-          throw new Reply(403, { error: forbiddenError ?? 'Forbidden' });
+          throw new Reply(403, { error: 'Forbidden' });
         },
-        requireActiveMember: async (orgId, forbiddenError) => {
+        requireActiveMember: async (orgId) => {
           if (profile.is_platform_admin) return;
           if (await isActiveMember(profile.id, orgId)) return;
-          throw new Reply(403, { error: forbiddenError ?? 'Forbidden' });
+          throw new Reply(403, { error: 'Forbidden' });
+        },
+        // No DB probe — reads profile.is_platform_admin only.
+        requirePlatformAdmin: () => {
+          if (!profile.is_platform_admin) throw new Reply(403, { error: 'Forbidden' });
         },
       };
       return await run(ctx);
@@ -111,8 +120,8 @@ function makeHandler(
   };
 }
 
-// Registration is the same load-time side effect every endpoint file performs
-// today via its trailer — app.http cannot throw (functions.md rule holds).
+// app.http registration is the same load-time side effect every endpoint file
+// performed pre-migration; functions.md forbids ADDING load-time code that can throw.
 function register(name: string, handler: AzureHandler): AzureHandler {
   app.http(name, { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
   return handler;
@@ -122,14 +131,10 @@ export function endpoint(name: string, run: EndpointRun): AzureHandler {
   return register(name, makeHandler(false, undefined, run));
 }
 
-export function adminEndpoint(name: string, run: EndpointRun): AzureHandler;
-export function adminEndpoint(name: string, opts: { forbiddenError?: string }, run: EndpointRun): AzureHandler;
 export function adminEndpoint(
   name: string,
-  optsOrRun: { forbiddenError?: string } | EndpointRun,
-  maybeRun?: EndpointRun,
+  run: EndpointRun,
+  opts?: { forbiddenError?: string },
 ): AzureHandler {
-  const opts = typeof optsOrRun === 'function' ? undefined : optsOrRun;
-  const run = typeof optsOrRun === 'function' ? optsOrRun : maybeRun!;
   return register(name, makeHandler(true, opts, run));
 }

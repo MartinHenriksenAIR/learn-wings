@@ -1,7 +1,7 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 
-export default endpoint('community-reports', async ({ req, profile, reply, requireOrgAdmin }) => {
+export default endpoint('community-reports', async ({ req, reply, requireOrgAdmin, requirePlatformAdmin }) => {
   const body = await req.json() as {
     orgId?: unknown;
     scope?: unknown;
@@ -33,11 +33,11 @@ export default endpoint('community-reports', async ({ req, profile, reply, requi
     whereClauses.push(`r.org_id = $${params.length}`);
   } else if (scope === 'global') {
     // global scope: platform admin only
-    if (!profile.is_platform_admin) return reply(403, { error: 'Forbidden' });
+    requirePlatformAdmin();
     whereClauses.push('r.org_id IS NULL');
   } else {
     // no filter: platform admin only (documented deviation — tighter than RLS)
-    if (!profile.is_platform_admin) return reply(403, { error: 'Forbidden' });
+    requirePlatformAdmin();
   }
 
   if (status !== undefined) {

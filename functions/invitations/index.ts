@@ -16,7 +16,7 @@ import { isOrgAdmin } from '../shared/profile';
  *     20260201171353_*.sql and the safe RPC).
  *   - scope='platform': platform-admin-only; orgId optional narrows the result.
  */
-export default endpoint('invitations', async ({ req, profile, reply }) => {
+export default endpoint('invitations', async ({ req, profile, reply, requirePlatformAdmin }) => {
   const body = await req.json() as { scope?: unknown; orgId?: unknown };
   const { scope, orgId } = body;
 
@@ -56,9 +56,7 @@ export default endpoint('invitations', async ({ req, profile, reply }) => {
     }
   } else {
     // scope === 'platform' — platform-admin-only
-    if (!profile.is_platform_admin) {
-      return reply(403, { error: 'Forbidden' });
-    }
+    requirePlatformAdmin();
     if (vOrgId) add('org_id', vOrgId);
   }
 
