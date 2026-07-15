@@ -1,26 +1,17 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { query, queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
-
+export default adminEndpoint('course-structure-admin', async ({ req, reply }) => {
     const body = await req.json() as { courseId?: unknown };
     const { courseId } = body;
 
     if (!courseId || typeof courseId !== 'string') {
-      return corsResponse(origin, 400, { error: 'courseId is required' });
+      return reply(400, { error: 'courseId is required' });
     }
 
     const course = await queryOne('SELECT * FROM courses WHERE id = $1', [courseId]);
     if (!course) {
-      return corsResponse(origin, 200, { course: null, modules: [] });
+      return reply(200, { course: null, modules: [] });
     }
 
     // `, id` tie-breaker (issue #46): legacy rows may carry duplicate sort_order
@@ -46,11 +37,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       lessons: lessonsByModule.get(m['id'] as string) ?? [],
     }));
 
-    return corsResponse(origin, 200, { course, modules: modulesWithLessons });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('course-structure-admin', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { course, modules: modulesWithLessons });
+});

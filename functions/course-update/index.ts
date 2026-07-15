@@ -1,8 +1,5 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 
 const VALID_LEVELS = ['basic', 'intermediate', 'advanced'] as const;
 type CourseLevel = typeof VALID_LEVELS[number];
@@ -16,13 +13,7 @@ const COLUMN_MAP: Record<string, string> = {
   isPublished: 'is_published',
 };
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
-
+export default adminEndpoint('course-update', async ({ req, reply }) => {
     const body = await req.json() as {
       courseId?: unknown;
       updates?: unknown;
@@ -32,12 +23,12 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     // Validate courseId
     if (!courseId || typeof courseId !== 'string') {
-      return corsResponse(origin, 400, { error: 'courseId is required' });
+      return reply(400, { error: 'courseId is required' });
     }
 
     // Validate updates: must be a non-null object with at least one whitelisted key
     if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-      return corsResponse(origin, 400, { error: 'No valid fields to update' });
+      return reply(400, { error: 'No valid fields to update' });
     }
 
     const updatesObj = updates as Record<string, unknown>;
@@ -53,23 +44,23 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
       if (clientKey === 'title') {
         if (!value || typeof value !== 'string' || (value as string).trim() === '') {
-          return corsResponse(origin, 400, { error: 'title must be a non-empty string' });
+          return reply(400, { error: 'title must be a non-empty string' });
         }
       } else if (clientKey === 'description') {
         if (value !== null && typeof value !== 'string') {
-          return corsResponse(origin, 400, { error: 'description must be a string or null' });
+          return reply(400, { error: 'description must be a string or null' });
         }
       } else if (clientKey === 'level') {
         if (!VALID_LEVELS.includes(value as CourseLevel)) {
-          return corsResponse(origin, 400, { error: 'level must be basic, intermediate, or advanced' });
+          return reply(400, { error: 'level must be basic, intermediate, or advanced' });
         }
       } else if (clientKey === 'thumbnailUrl') {
         if (value !== null && typeof value !== 'string') {
-          return corsResponse(origin, 400, { error: 'thumbnailUrl must be a string or null' });
+          return reply(400, { error: 'thumbnailUrl must be a string or null' });
         }
       } else if (clientKey === 'isPublished') {
         if (typeof value !== 'boolean') {
-          return corsResponse(origin, 400, { error: 'isPublished must be a boolean' });
+          return reply(400, { error: 'isPublished must be a boolean' });
         }
       }
 
@@ -79,20 +70,14 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     // Must have at least one field to update
     if (setClauses.length === 0) {
-      return corsResponse(origin, 400, { error: 'No valid fields to update' });
+      return reply(400, { error: 'No valid fields to update' });
     }
 
     params.push(courseId);
     const sql = `UPDATE courses SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`;
 
     const course = await queryOne(sql, params);
-    if (!course) return corsResponse(origin, 404, { error: 'Course not found' });
+    if (!course) return reply(404, { error: 'Course not found' });
 
-    return corsResponse(origin, 200, { course });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('course-update', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { course });
+});

@@ -1,17 +1,8 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 import { validateLessonFields } from '../shared/validate';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
-
+export default adminEndpoint('lesson-create', async ({ req, reply }) => {
     const body = await req.json() as {
       moduleId?: unknown;
       title?: unknown;
@@ -28,7 +19,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     // Shared field validation (moduleId, title, lessonType, and all optional fields)
     const sharedError = validateLessonFields(body);
     if (sharedError) {
-      return corsResponse(origin, 400, { error: sharedError });
+      return reply(400, { error: sharedError });
     }
 
     // sort_order is server-owned (issue #46): computed as MAX+1 within the module
@@ -52,11 +43,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       ],
     );
 
-    return corsResponse(origin, 200, { lesson });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('lesson-create', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { lesson });
+});

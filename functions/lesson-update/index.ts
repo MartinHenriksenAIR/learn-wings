@@ -1,17 +1,8 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 import { validateLessonFields } from '../shared/validate';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
-
+export default adminEndpoint('lesson-update', async ({ req, reply }) => {
     const body = await req.json() as {
       lessonId?: unknown;
       moduleId?: unknown;
@@ -28,13 +19,13 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     // Required: lessonId (update-only field)
     if (!lessonId || typeof lessonId !== 'string') {
-      return corsResponse(origin, 400, { error: 'lessonId is required' });
+      return reply(400, { error: 'lessonId is required' });
     }
 
     // Shared field validation (moduleId, title, lessonType, and all optional fields)
     const sharedError = validateLessonFields(body);
     if (sharedError) {
-      return corsResponse(origin, 400, { error: sharedError });
+      return reply(400, { error: sharedError });
     }
 
     // Full-row UPDATE (old client always sent full payload — not a sparse patch).
@@ -61,14 +52,8 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     );
 
     if (!lesson) {
-      return corsResponse(origin, 404, { error: 'Lesson not found' });
+      return reply(404, { error: 'Lesson not found' });
     }
 
-    return corsResponse(origin, 200, { lesson });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('lesson-update', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { lesson });
+});

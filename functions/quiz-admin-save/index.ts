@@ -1,8 +1,5 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { withTransaction } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 import { PoolClient } from 'pg';
 
 interface QuizOption {
@@ -16,13 +13,7 @@ interface QuizQuestion {
   options: unknown;
 }
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
-
+export default adminEndpoint('quiz-admin-save', async ({ req, reply }) => {
     const body = await req.json() as {
       lessonId?: unknown;
       passingScore?: unknown;
@@ -33,17 +24,17 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     // ── Validate lessonId ────────────────────────────────────────────────────
     if (!lessonId || typeof lessonId !== 'string') {
-      return corsResponse(origin, 400, { error: 'lessonId is required' });
+      return reply(400, { error: 'lessonId is required' });
     }
 
     // ── Validate passingScore ────────────────────────────────────────────────
     if (!Number.isInteger(passingScore) || (passingScore as number) < 0 || (passingScore as number) > 100) {
-      return corsResponse(origin, 400, { error: 'passingScore must be an integer between 0 and 100' });
+      return reply(400, { error: 'passingScore must be an integer between 0 and 100' });
     }
 
     // ── Validate questions array ─────────────────────────────────────────────
     if (!Array.isArray(questions) || questions.length < 1) {
-      return corsResponse(origin, 400, { error: 'At least one question is required' });
+      return reply(400, { error: 'At least one question is required' });
     }
 
     // ── Validate each question and its options ───────────────────────────────
@@ -51,15 +42,15 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       const q = questions[qi] as QuizQuestion;
 
       if (!q.questionText || typeof q.questionText !== 'string' || (q.questionText as string).trim() === '') {
-        return corsResponse(origin, 400, { error: `Question ${qi}: questionText is required` });
+        return reply(400, { error: `Question ${qi}: questionText is required` });
       }
 
       if (!Number.isInteger(q.sortOrder)) {
-        return corsResponse(origin, 400, { error: `Question ${qi}: sortOrder must be an integer` });
+        return reply(400, { error: `Question ${qi}: sortOrder must be an integer` });
       }
 
       if (!Array.isArray(q.options) || (q.options as QuizOption[]).length < 2) {
-        return corsResponse(origin, 400, { error: 'Each question needs at least 2 options' });
+        return reply(400, { error: 'Each question needs at least 2 options' });
       }
 
       const opts = q.options as QuizOption[];
@@ -69,17 +60,17 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         const o = opts[oi];
 
         if (!o.optionText || typeof o.optionText !== 'string' || (o.optionText as string).trim() === '') {
-          return corsResponse(origin, 400, { error: `Question ${qi}, option ${oi}: optionText is required` });
+          return reply(400, { error: `Question ${qi}, option ${oi}: optionText is required` });
         }
 
         if (typeof o.isCorrect !== 'boolean') {
-          return corsResponse(origin, 400, { error: `Question ${qi}, option ${oi}: isCorrect must be a boolean` });
+          return reply(400, { error: `Question ${qi}, option ${oi}: isCorrect must be a boolean` });
         }
       }
 
       const hasCorrect = opts.some((o) => o.isCorrect === true);
       if (!hasCorrect) {
-        return corsResponse(origin, 400, { error: 'Each question needs a correct answer' });
+        return reply(400, { error: 'Each question needs a correct answer' });
       }
     }
 
@@ -134,11 +125,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return savedQuiz;
     });
 
-    return corsResponse(origin, 200, { quiz });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('quiz-admin-save', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { quiz });
+});

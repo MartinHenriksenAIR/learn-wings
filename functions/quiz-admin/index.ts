@@ -1,21 +1,12 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { query, queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
-
+export default adminEndpoint('quiz-admin', async ({ req, reply }) => {
     const body = await req.json() as { lessonId?: unknown };
     const { lessonId } = body;
 
     if (!lessonId || typeof lessonId !== 'string') {
-      return corsResponse(origin, 400, { error: 'lessonId is required' });
+      return reply(400, { error: 'lessonId is required' });
     }
 
     const quiz = await queryOne<{ id: string; lesson_id: string; passing_score: number }>(
@@ -25,7 +16,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     // No quiz for this lesson — return empty editor state (maybeSingle parity; NOT 404)
     if (!quiz) {
-      return corsResponse(origin, 200, { quiz: null, questions: [] });
+      return reply(200, { quiz: null, questions: [] });
     }
 
     // Both queries are keyed solely on quiz.id — run them in parallel.
@@ -65,11 +56,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       options: optionsByQuestion.get(q.id) ?? [],
     }));
 
-    return corsResponse(origin, 200, { quiz, questions: questionsWithOptions });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('quiz-admin', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { quiz, questions: questionsWithOptions });
+});

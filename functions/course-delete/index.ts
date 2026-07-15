@@ -1,22 +1,13 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { query, queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 import { deleteBlob } from '../shared/blob';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
-
+export default adminEndpoint('course-delete', async ({ req, reply }) => {
     const body = await req.json() as { courseId?: unknown };
     const { courseId } = body;
 
     if (!courseId || typeof courseId !== 'string') {
-      return corsResponse(origin, 400, { error: 'courseId is required' });
+      return reply(400, { error: 'courseId is required' });
     }
 
     // Collect descendant blob paths before deletion.
@@ -37,7 +28,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [courseId],
     );
 
-    if (!deleted) return corsResponse(origin, 404, { error: 'Course not found' });
+    if (!deleted) return reply(404, { error: 'Course not found' });
 
     // Best-effort blob cleanup — deleteBlob never throws; it warns server-side per failed path,
     // and counts are returned to the client.
@@ -49,11 +40,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       console.warn(`[course-delete] ${blobsFailed} blob(s) failed to delete for course`, courseId);
     }
 
-    return corsResponse(origin, 200, { success: true, blobsDeleted, blobsFailed });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
-  }
-}
-
-export default handler;
-app.http('course-delete', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+    return reply(200, { success: true, blobsDeleted, blobsFailed });
+});
