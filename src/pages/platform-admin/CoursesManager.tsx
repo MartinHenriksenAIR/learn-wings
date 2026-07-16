@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -33,8 +34,11 @@ import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check,
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 
-/** Cache key for the admin course list + access matrix (one query, one ship). */
-export const coursesAdminQueryKey = ['courses-admin'] as const;
+/**
+ * Cache key for the admin course list + access matrix (one query, one ship).
+ * Re-exported from the factory so CourseEditor can import it unchanged.
+ */
+export const coursesAdminQueryKey = queryKeys.coursesAdmin.all;
 
 interface CoursesAdminData {
   /** Courses with thumbnail_url already re-signed for display. */

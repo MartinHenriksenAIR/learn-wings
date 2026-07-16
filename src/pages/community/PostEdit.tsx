@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PostForm } from '@/components/community/PostForm';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,12 +18,12 @@ export default function PostEdit() {
   const scope = (routeScope || 'org') as CommunityScope;
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
-    queryKey: ['community-categories'],
+    queryKey: queryKeys.communityCategories.all,
     queryFn: fetchCategories,
   });
 
   const { data: post, isLoading: postLoading } = useQuery({
-    queryKey: ['community-post', postId],
+    queryKey: queryKeys.communityPost.detail(postId),
     queryFn: () => fetchPost(postId!),
     enabled: !!postId,
   });

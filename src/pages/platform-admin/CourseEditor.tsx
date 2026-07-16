@@ -26,6 +26,7 @@ import { AzureDocumentUpload } from '@/components/ui/azure-document-upload';
 import { QuizEditorDialog } from '@/components/platform-admin/QuizEditorDialog';
 
 import { callApi } from '@/lib/api-client';
+import { queryKeys } from '@/lib/query-keys';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
 import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Pencil } from 'lucide-react';
@@ -36,7 +37,7 @@ import { cn } from '@/lib/utils';
 import { coursesAdminQueryKey } from './CoursesManager';
 
 /** Cache key for one course's full admin structure (course + modules + lessons). */
-const courseStructureQueryKey = (courseId: string) => ['course-structure-admin', courseId] as const;
+const courseStructureQueryKey = (courseId: string) => queryKeys.courseStructureAdmin.detail(courseId);
 
 interface CourseStructureData {
   course: Course | null;

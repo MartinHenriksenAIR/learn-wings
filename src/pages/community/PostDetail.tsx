@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
 import {
   AlertDialog,
@@ -72,14 +73,14 @@ export default function PostDetail() {
 
   // Fetch post
   const { data: post, isLoading: postLoading } = useQuery({
-    queryKey: ['community-post', postId],
+    queryKey: queryKeys.communityPost.detail(postId),
     queryFn: () => fetchPost(postId!),
     enabled: !!postId,
   });
 
   // Fetch comments
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
-    queryKey: ['community-comments', postId],
+    queryKey: queryKeys.communityComments.list(postId),
     queryFn: () => fetchComments(postId!),
     enabled: !!postId,
   });
@@ -95,7 +96,7 @@ export default function PostDetail() {
     mutationFn: ({ content, parentId }: { content: string; parentId?: string }) =>
       createComment({ post_id: postId!, content, parent_comment_id: parentId }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to add comment', description: error.message, variant: 'destructive' });
@@ -106,14 +107,14 @@ export default function PostDetail() {
     mutationFn: ({ commentId, content }: { commentId: string; content: string }) =>
       updateComment(commentId, content),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
     },
   });
 
   const deleteCommentMutation = useMutation({
     mutationFn: deleteComment,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
       toast({ title: 'Comment deleted' });
     },
   });
@@ -132,14 +133,14 @@ export default function PostDetail() {
   const toggleHideMutation = useMutation({
     mutationFn: (hidden: boolean) => togglePostHidden(postId!, hidden),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-post', postId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityPost.detail(postId) });
     },
   });
 
   const toggleLockMutation = useMutation({
     mutationFn: (locked: boolean) => togglePostLocked(postId!, locked),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-post', postId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityPost.detail(postId) });
     },
   });
 
@@ -147,7 +148,7 @@ export default function PostDetail() {
     mutationFn: ({ commentId, hidden }: { commentId: string; hidden: boolean }) =>
       toggleCommentHidden(commentId, hidden),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-comments', postId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
     },
   });
 

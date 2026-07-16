@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -55,7 +56,7 @@ export default function PlatformCommunityModeration() {
 
   // Fetch all reports across all scopes (no-filter mode = platform-admin only)
   const { data: reports = [], isLoading } = useQuery({
-    queryKey: ['platform-reports', activeTab],
+    queryKey: queryKeys.platformReports.list(activeTab),
     queryFn: async () => {
       const data = await fetchReports(undefined, { status: activeTab });
       return data as ReportWithDetails[];
@@ -88,7 +89,7 @@ export default function PlatformCommunityModeration() {
       await updateReport(reportId, { status, admin_notes: notes || null });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform-reports'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformReports.all });
       setReviewDialogOpen(false);
       setSelectedReport(null);
       toast.success(t('moderation.reportUpdated'));
@@ -116,7 +117,7 @@ export default function PlatformCommunityModeration() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform-reports'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformReports.all });
       toast.success(t('moderation.visibilityUpdated'));
     },
     onError: () => {
@@ -130,7 +131,7 @@ export default function PlatformCommunityModeration() {
       await togglePostLocked(postId, lock);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform-reports'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformReports.all });
       toast.success(t('moderation.lockUpdated'));
     },
     onError: () => {
