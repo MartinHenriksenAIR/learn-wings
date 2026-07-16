@@ -57,6 +57,8 @@ export default function LearnerCourses() {
     onSuccess: (_data, variables) => {
       flash(`enr-${variables.courseId}`);
       queryClient.invalidateQueries({ queryKey: queryKeys.learnerCourses.list(currentOrg?.id) });
+      // Enrolling changes what the learner dashboard shows — keep its cache fresh.
+      queryClient.invalidateQueries({ queryKey: queryKeys.learnerDashboard.detail(currentOrg?.id) });
     },
     onError: (error) => {
       toast({
@@ -76,7 +78,8 @@ export default function LearnerCourses() {
         description: t('courses.unenrolledDescription', { courseTitle: unenrollDialog.course?.title }),
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.learnerCourses.list(currentOrg?.id) });
-      setUnenrollDialog({ open: false, course: null, enrollment: null });
+      // Unenrolling changes what the learner dashboard shows — keep its cache fresh.
+      queryClient.invalidateQueries({ queryKey: queryKeys.learnerDashboard.detail(currentOrg?.id) });
     },
     onError: (error) => {
       toast({
@@ -85,6 +88,9 @@ export default function LearnerCourses() {
         variant: 'destructive',
       });
     },
+    // Close the dialog whether or not the request succeeded, matching the
+    // pre-migration handler (which closed unconditionally after the request).
+    onSettled: () => setUnenrollDialog({ open: false, course: null, enrollment: null }),
   });
 
   const handleEnroll = (courseId: string) => {

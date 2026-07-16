@@ -14,10 +14,8 @@ import type { Course, Enrollment } from '@/lib/types';
  */
 export function useLearnerCourses(
   orgId: string | undefined,
-  options: { enabled?: boolean } = {},
+  options: { enabled?: boolean; staleTime?: number } = {},
 ) {
-  const enabled = options.enabled ?? !!orgId;
-
   return useQuery({
     queryKey: queryKeys.learnerCourses.list(orgId),
     queryFn: async () => {
@@ -38,6 +36,7 @@ export function useLearnerCourses(
         enrollments: data.enrollments,
       };
     },
-    enabled,
+    staleTime: options.staleTime ?? 60 * 1000,
+    enabled: (options.enabled ?? true) && !!orgId,
   });
 }
