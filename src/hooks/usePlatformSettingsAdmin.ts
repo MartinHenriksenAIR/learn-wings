@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
-export type PlatformSetting = { key: string; value: Record<string, unknown> };
+type PlatformSetting = { key: string; value: Record<string, unknown> };
 
 /**
  * The one way to fetch `/api/platform-settings` from the frontend.

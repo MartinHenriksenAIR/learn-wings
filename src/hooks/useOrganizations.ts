@@ -3,12 +3,6 @@ import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { Organization } from '@/lib/types';
 
-/**
- * Single shared cache key for the platform-wide org list (#87).
- * Re-exported from the factory so existing consumers keep compiling unchanged.
- */
-export const organizationsQueryKey = queryKeys.organizations.all;
-
 interface UseOrganizationsOptions {
   /** Gate the fetch (e.g. platform admins only). Defaults to true. */
   enabled?: boolean;

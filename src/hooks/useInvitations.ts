@@ -11,7 +11,7 @@ import type { Invitation } from '@/lib/types';
  * The two scopes produce different server-side authorization paths, so the
  * cache key encodes both orgId and scope to prevent cross-scope collisions.
  */
-export type InvitationScope = 'platform' | 'org';
+type InvitationScope = 'platform' | 'org';
 
 /**
  * The one way to fetch `/api/invitations` from the frontend.

@@ -2,14 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
-export interface ModuleProgress {
+interface ModuleProgress {
   id: string;
   title: string;
   sortOrder: number;
-  lessons: LessonProgress[];
+  lessons: UserLessonProgress[];
 }
 
-export interface LessonProgress {
+interface UserLessonProgress {
   id: string;
   title: string;
   lessonType: string;
@@ -21,7 +21,7 @@ export interface LessonProgress {
   latestQuizPassed?: boolean;
 }
 
-export interface QuizAttemptData {
+interface QuizAttemptData {
   id: string;
   quizId: string;
   lessonTitle: string;

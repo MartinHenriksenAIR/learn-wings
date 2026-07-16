@@ -8,7 +8,7 @@ import { queryKeys } from '@/lib/query-keys';
  * The endpoint returns richer rows (see AIChampionsList), but this hook's
  * contract is intentionally the narrow projection its one consumer uses.
  */
-export interface AiChampionRow {
+interface AiChampionRow {
   user_id: string;
 }
 

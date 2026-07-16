@@ -7,7 +7,7 @@ import type { OrgMembership, Profile, OrgRole } from '@/lib/types';
  * The raw membership row shape returned by `/api/org-memberships`.
  * The endpoint joins profile columns inline rather than nesting an object.
  */
-export interface MembershipRow {
+interface MembershipRow {
   id: string;
   org_id: string;
   user_id: string;
@@ -23,7 +23,7 @@ export interface MembershipRow {
 }
 
 /** Reshaped form that the two consumer pages both work with. */
-export type MemberWithProfile = OrgMembership & { profile: Profile };
+type MemberWithProfile = OrgMembership & { profile: Profile };
 
 function reshapeMembership(row: MembershipRow): MemberWithProfile {
   return {
