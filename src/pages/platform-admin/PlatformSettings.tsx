@@ -60,6 +60,7 @@ interface FeatureSettings {
 }
 
 type SettingsKey = 'branding' | 'user_access' | 'email' | 'features';
+type SettingsValue = BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings;
 
 const defaultBranding: BrandingSettings = {
   platform_name: 'AIR Academy',
@@ -107,7 +108,6 @@ const featureKeys: (keyof FeatureSettings)[] = [
 export default function PlatformSettings() {
   const { t } = useTranslation();
   const { flashed, flash } = useFlash();
-  const [savingKey, setSavingKey] = useState<SettingsKey | null>(null);
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsKey>('branding');
 
@@ -147,18 +147,21 @@ export default function PlatformSettings() {
   // ("Saved" / green) instead of firing a success toast (toast policy); errors
   // keep their toast.
   const saveSettingMutation = useToastMutation({
-    mutationFn: ({ key, value }: { key: SettingsKey; value: BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings }) =>
+    mutationFn: ({ key, value }: { key: SettingsKey; value: SettingsValue }) =>
       callApi('/api/platform-settings-update', { key, value }),
     errorTitle: t('platformSettings.saveFailed'),
     onSuccess: (_data, variables) => {
       flash(variables.key);
     },
-    onSettled: () => setSavingKey(null),
   });
 
-  const saveSetting = (key: SettingsKey, value: BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings) => {
+  // Per-panel disabled state derived from the single shared mutation: only the
+  // panel whose save is in flight is disabled (matches the old `saving === key`).
+  const isSaving = (key: SettingsKey) =>
+    saveSettingMutation.isPending && saveSettingMutation.variables?.key === key;
+
+  const saveSetting = (key: SettingsKey, value: SettingsValue) => {
     if (!query.isSuccess) return;
-    setSavingKey(key);
     saveSettingMutation.mutate({ key, value });
   };
 
@@ -318,7 +321,7 @@ export default function PlatformSettings() {
                 done={flashed('branding')}
                 idleLabel={t('platformSettings.branding.save')}
                 onClick={() => saveSetting('branding', branding)}
-                disabled={savingKey === 'branding'}
+                disabled={isSaving('branding')}
               />
             </CardContent>
           </Card>
@@ -370,7 +373,7 @@ export default function PlatformSettings() {
                 done={flashed('user_access')}
                 idleLabel={t('platformSettings.userAccess.save')}
                 onClick={() => saveSetting('user_access', { ...userAccess, default_role: 'learner' })}
-                disabled={savingKey === 'user_access'}
+                disabled={isSaving('user_access')}
               />
             </CardContent>
           </Card>
@@ -488,7 +491,7 @@ export default function PlatformSettings() {
                   done={flashed('email')}
                   idleLabel={t('platformSettings.email.save')}
                   onClick={() => saveSetting('email', email)}
-                  disabled={savingKey === 'email'}
+                  disabled={isSaving('email')}
                 />
               </div>
             </CardContent>
@@ -526,7 +529,7 @@ export default function PlatformSettings() {
                 done={flashed('features')}
                 idleLabel={t('platformSettings.features.save')}
                 onClick={() => saveSetting('features', features)}
-                disabled={savingKey === 'features'}
+                disabled={isSaving('features')}
               />
             </CardContent>
           </Card>
