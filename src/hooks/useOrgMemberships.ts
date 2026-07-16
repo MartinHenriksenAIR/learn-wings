@@ -15,6 +15,8 @@ export interface MembershipRow {
   status: 'active' | 'invited' | 'disabled';
   created_at: string;
   full_name: string;
+  // The endpoint returns email/avatar_url, but Profile has no slot for them
+  // and neither consumer renders them — kept here to document the wire shape.
   email: string;
   avatar_url: string | null;
   department: string | null;
@@ -62,7 +64,10 @@ interface UseOrgMembershipsOptions {
  * so both OrganizationDetail and OrgMembersTab get an identical shape.
  * Site-specific concerns (filtering, error toasts) stay at the site.
  */
-export function useOrgMemberships(orgId: string | undefined, options: UseOrgMembershipsOptions = {}) {
+export function useOrgMemberships(
+  orgId: string | undefined,
+  options: UseOrgMembershipsOptions = {},
+) {
   return useQuery({
     queryKey: queryKeys.orgMemberships.list(orgId),
     queryFn: async () => {
