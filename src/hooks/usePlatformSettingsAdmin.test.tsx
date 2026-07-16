@@ -15,8 +15,8 @@ const settings = [
   { key: 'features', value: { certificates_enabled: true } },
 ];
 
-function Consumer({ testId, enabled }: { testId: string; enabled?: boolean }) {
-  const { data } = usePlatformSettingsAdmin(enabled === undefined ? {} : { enabled });
+function Consumer({ testId }: { testId: string }) {
+  const { data } = usePlatformSettingsAdmin();
   return <div data-testid={testId}>{(data ?? []).map((s) => s.key).join(',')}</div>;
 }
 
@@ -59,16 +59,6 @@ describe('usePlatformSettingsAdmin', () => {
     expect(screen.getByTestId('second')).toHaveTextContent('branding,features');
 
     expect(mockCallApi).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not fetch when enabled is false', async () => {
-    mockCallApi.mockResolvedValue({ settings });
-
-    renderWithClient(<Consumer testId="gated" enabled={false} />);
-
-    await Promise.resolve();
-    expect(mockCallApi).not.toHaveBeenCalled();
-    expect(screen.getByTestId('gated')).toHaveTextContent('');
   });
 
   it('normalizes a malformed (non-array) response to an empty list', async () => {

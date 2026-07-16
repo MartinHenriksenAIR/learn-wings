@@ -8,13 +8,6 @@ interface OrgAnalyticsDataResult {
   quizAttempts: Array<{ user_id: string; score: number }>;
 }
 
-interface UseOrgAnalyticsDataOptions {
-  /** Gate the fetch. Defaults to true. */
-  enabled?: boolean;
-  /** Per-observer staleTime override. Defaults to 60s. */
-  staleTime?: number;
-}
-
 /**
  * The one way to fetch `/api/org-analytics-data` from the frontend.
  *
@@ -22,17 +15,14 @@ interface UseOrgAnalyticsDataOptions {
  * so multiple mounts produce one network request. Site-specific derivations
  * (stats, userStats, departments) stay at the call site in useMemo.
  */
-export function useOrgAnalyticsData(
-  orgId: string | undefined,
-  options: UseOrgAnalyticsDataOptions = {},
-) {
+export function useOrgAnalyticsData(orgId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.orgAnalyticsData.detail(orgId),
     queryFn: async () => {
       const data = await callApi<OrgAnalyticsDataResult>('/api/org-analytics-data', { orgId });
       return data;
     },
-    staleTime: options.staleTime ?? 60 * 1000,
-    enabled: (options.enabled ?? true) && !!orgId,
+    staleTime: 60 * 1000,
+    enabled: !!orgId,
   });
 }

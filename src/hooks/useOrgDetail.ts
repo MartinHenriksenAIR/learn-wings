@@ -3,16 +3,6 @@ import { callApi, ApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { Organization } from '@/lib/types';
 
-interface UseOrgDetailOptions {
-  /** Gate the fetch. Defaults to true when orgId is provided. */
-  enabled?: boolean;
-  /**
-   * Per-observer staleTime override. Defaults to 60s — org details rarely
-   * change mid-session.
-   */
-  staleTime?: number;
-}
-
 /**
  * The one way to fetch a single org's details via `/api/organizations` from
  * the frontend (platform-admin use-case).
@@ -25,7 +15,7 @@ interface UseOrgDetailOptions {
  * 404 responses are surfaced as a resolved `null` value so consumers can
  * distinguish "not found" from a thrown error.
  */
-export function useOrgDetail(orgId: string | undefined, options: UseOrgDetailOptions = {}) {
+export function useOrgDetail(orgId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.orgDetail.detail(orgId),
     queryFn: async () => {
@@ -42,7 +32,7 @@ export function useOrgDetail(orgId: string | undefined, options: UseOrgDetailOpt
         throw err;
       }
     },
-    staleTime: options.staleTime ?? 60 * 1000,
-    enabled: (options.enabled ?? true) && !!orgId,
+    staleTime: 60 * 1000,
+    enabled: !!orgId,
   });
 }

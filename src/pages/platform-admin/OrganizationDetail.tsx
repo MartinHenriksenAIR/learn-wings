@@ -153,6 +153,7 @@ export default function OrganizationDetail() {
       });
       setAddUserOpen(false);
       invalidateMemberships();
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
     },
   });
 
@@ -182,6 +183,7 @@ export default function OrganizationDetail() {
         description: 'The user can no longer access this organization.',
       });
       invalidateMemberships();
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
     },
   });
 
@@ -195,6 +197,7 @@ export default function OrganizationDetail() {
         description: 'The user can now access this organization again.',
       });
       invalidateMemberships();
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
     },
   });
 

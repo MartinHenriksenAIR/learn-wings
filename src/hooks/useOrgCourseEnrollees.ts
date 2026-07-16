@@ -12,13 +12,6 @@ interface OrgCourseEnrolleesResult {
   }>;
 }
 
-interface UseOrgCourseEnrolleesOptions {
-  /** Gate the fetch. Defaults to true. */
-  enabled?: boolean;
-  /** Per-observer staleTime override. Defaults to 60s. */
-  staleTime?: number;
-}
-
 /**
  * The one way to fetch `/api/org-course-enrollees` from the frontend.
  *
@@ -27,11 +20,7 @@ interface UseOrgCourseEnrolleesOptions {
  * courseId being truthy, so closing the course detail dialog (setting
  * courseId to undefined) disables the query.
  */
-export function useOrgCourseEnrollees(
-  orgId: string | undefined,
-  courseId: string | undefined,
-  options: UseOrgCourseEnrolleesOptions = {},
-) {
+export function useOrgCourseEnrollees(orgId: string | undefined, courseId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.orgCourseEnrollees.detail(orgId, courseId),
     queryFn: async () => {
@@ -41,7 +30,7 @@ export function useOrgCourseEnrollees(
       });
       return data;
     },
-    staleTime: options.staleTime ?? 60 * 1000,
-    enabled: (options.enabled ?? true) && !!orgId && !!courseId,
+    staleTime: 60 * 1000,
+    enabled: !!orgId && !!courseId,
   });
 }

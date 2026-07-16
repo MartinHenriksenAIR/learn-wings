@@ -13,16 +13,6 @@ import type { Invitation } from '@/lib/types';
  */
 export type InvitationScope = 'platform' | 'org';
 
-interface UseInvitationsOptions {
-  /** Gate the fetch. Defaults to true when orgId is provided. */
-  enabled?: boolean;
-  /**
-   * Per-observer staleTime override. Defaults to 30s — invitations change
-   * when members are added/invited, so a shorter window keeps the view fresh.
-   */
-  staleTime?: number;
-}
-
 /**
  * The one way to fetch `/api/invitations` from the frontend.
  *
@@ -32,11 +22,7 @@ interface UseInvitationsOptions {
  *
  * Site-specific concerns (filtering, error toasts) stay at the site.
  */
-export function useInvitations(
-  orgId: string | undefined,
-  scope: InvitationScope,
-  options: UseInvitationsOptions = {},
-) {
+export function useInvitations(orgId: string | undefined, scope: InvitationScope) {
   return useQuery({
     queryKey: queryKeys.invitations.list(orgId, scope),
     queryFn: async () => {
@@ -46,7 +32,7 @@ export function useInvitations(
       );
       return Array.isArray(invitations) ? invitations : [];
     },
-    staleTime: options.staleTime ?? 30 * 1000,
-    enabled: (options.enabled ?? true) && !!orgId,
+    staleTime: 30 * 1000,
+    enabled: !!orgId,
   });
 }

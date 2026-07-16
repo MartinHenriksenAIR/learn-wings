@@ -46,16 +46,6 @@ function reshapeMembership(row: MembershipRow): MemberWithProfile {
   };
 }
 
-interface UseOrgMembershipsOptions {
-  /** Gate the fetch. Defaults to true when orgId is provided. */
-  enabled?: boolean;
-  /**
-   * Per-observer staleTime override. Defaults to 30s — memberships change
-   * more frequently than orgs, so a shorter window keeps the view fresh.
-   */
-  staleTime?: number;
-}
-
 /**
  * The one way to fetch `/api/org-memberships` from the frontend.
  *
@@ -64,10 +54,7 @@ interface UseOrgMembershipsOptions {
  * so both OrganizationDetail and OrgMembersTab get an identical shape.
  * Site-specific concerns (filtering, error toasts) stay at the site.
  */
-export function useOrgMemberships(
-  orgId: string | undefined,
-  options: UseOrgMembershipsOptions = {},
-) {
+export function useOrgMemberships(orgId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.orgMemberships.list(orgId),
     queryFn: async () => {
@@ -78,7 +65,7 @@ export function useOrgMemberships(
       const rows = Array.isArray(memberships) ? memberships : [];
       return rows.map(reshapeMembership);
     },
-    staleTime: options.staleTime ?? 30 * 1000,
-    enabled: (options.enabled ?? true) && !!orgId,
+    staleTime: 30 * 1000,
+    enabled: !!orgId,
   });
 }

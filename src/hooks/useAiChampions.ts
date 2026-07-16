@@ -12,28 +12,15 @@ export interface AiChampionRow {
   user_id: string;
 }
 
-interface UseAiChampionsOptions {
-  /** Gate the fetch. Defaults to true when orgId is provided. */
-  enabled?: boolean;
-  /**
-   * Per-observer staleTime override. Defaults to 60s — champion assignments
-   * change rarely, so consumers mounting within a minute share one fetch.
-   */
-  staleTime?: number;
-}
-
 /**
  * The one way OrgMembersTab fetches `/api/ai-champions` from the frontend.
  *
  * Shares the `['ai-champions', orgId]` cache entry with AIChampionsList (same
  * endpoint, same request body), so both surfaces read one network response.
  */
-export function useAiChampions(
-  orgId: string | undefined,
-  options: UseAiChampionsOptions = {},
-) {
+export function useAiChampions(orgId: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.aiChampions.list(orgId as string),
+    queryKey: queryKeys.aiChampions.list(orgId),
     queryFn: async () => {
       const { champions } = await callApi<{ champions: AiChampionRow[] }>(
         '/api/ai-champions',
@@ -41,7 +28,7 @@ export function useAiChampions(
       );
       return Array.isArray(champions) ? champions : [];
     },
-    staleTime: options.staleTime ?? 60 * 1000,
-    enabled: (options.enabled ?? true) && !!orgId,
+    staleTime: 60 * 1000,
+    enabled: !!orgId,
   });
 }

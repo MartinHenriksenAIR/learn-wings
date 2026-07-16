@@ -4,17 +4,6 @@ import { queryKeys } from '@/lib/query-keys';
 
 export type PlatformSetting = { key: string; value: Record<string, unknown> };
 
-interface UsePlatformSettingsAdminOptions {
-  /** Gate the fetch (e.g. platform admins only). Defaults to true. */
-  enabled?: boolean;
-  /**
-   * Per-observer staleTime override. Defaults to 60s — platform settings
-   * rarely change mid-session, so consumers mounting within a minute share
-   * one fetch.
-   */
-  staleTime?: number;
-}
-
 /**
  * The one way to fetch `/api/platform-settings` from the frontend.
  *
@@ -23,7 +12,7 @@ interface UsePlatformSettingsAdminOptions {
  * Named `usePlatformSettingsAdmin` to avoid colliding with the theming context
  * hook `usePlatformSettings` in `src/hooks/usePlatformSettings.tsx`.
  */
-export function usePlatformSettingsAdmin(options: UsePlatformSettingsAdminOptions = {}) {
+export function usePlatformSettingsAdmin() {
   return useQuery({
     queryKey: queryKeys.platformSettings.all,
     queryFn: async () => {
@@ -33,7 +22,6 @@ export function usePlatformSettingsAdmin(options: UsePlatformSettingsAdminOption
       );
       return Array.isArray(settings) ? settings : [];
     },
-    staleTime: options.staleTime ?? 60 * 1000,
-    enabled: options.enabled ?? true,
+    staleTime: 60 * 1000,
   });
 }

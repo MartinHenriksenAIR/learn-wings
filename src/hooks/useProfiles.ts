@@ -3,17 +3,6 @@ import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { Profile } from '@/lib/types';
 
-interface UseProfilesOptions {
-  /** Gate the fetch (e.g. platform admins only). Defaults to true. */
-  enabled?: boolean;
-  /**
-   * Per-observer staleTime override. Defaults to 60s — the profile list
-   * rarely changes mid-session, so consumers mounting within a minute share
-   * one fetch.
-   */
-  staleTime?: number;
-}
-
 /**
  * The one way to fetch `/api/profiles` from the frontend.
  *
@@ -22,14 +11,13 @@ interface UseProfilesOptions {
  * network request instead of two. Site-specific concerns (filtering,
  * projections, error toasts) stay at the site.
  */
-export function useProfiles(options: UseProfilesOptions = {}) {
+export function useProfiles() {
   return useQuery({
     queryKey: queryKeys.profiles.all,
     queryFn: async () => {
       const { profiles } = await callApi<{ profiles: Profile[] }>('/api/profiles', {});
       return Array.isArray(profiles) ? profiles : [];
     },
-    staleTime: options.staleTime ?? 60 * 1000,
-    enabled: options.enabled ?? true,
+    staleTime: 60 * 1000,
   });
 }

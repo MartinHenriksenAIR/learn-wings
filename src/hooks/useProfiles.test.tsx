@@ -33,8 +33,8 @@ const profiles = [
   },
 ];
 
-function Consumer({ testId, enabled }: { testId: string; enabled?: boolean }) {
-  const { data } = useProfiles(enabled === undefined ? {} : { enabled });
+function Consumer({ testId }: { testId: string }) {
+  const { data } = useProfiles();
   return <div data-testid={testId}>{(data ?? []).map((p) => p.full_name).join(',')}</div>;
 }
 
@@ -66,16 +66,6 @@ describe('useProfiles', () => {
     // The whole point of the shared hook: one network call, not one per consumer.
     expect(mockCallApi).toHaveBeenCalledTimes(1);
     expect(mockCallApi).toHaveBeenCalledWith('/api/profiles', {});
-  });
-
-  it('does not fetch when enabled is false', async () => {
-    mockCallApi.mockResolvedValue({ profiles });
-
-    renderWithClient(<Consumer testId="gated" enabled={false} />);
-
-    await Promise.resolve();
-    expect(mockCallApi).not.toHaveBeenCalled();
-    expect(screen.getByTestId('gated')).toHaveTextContent('');
   });
 
   it('normalizes a malformed (non-array) response to an empty list', async () => {

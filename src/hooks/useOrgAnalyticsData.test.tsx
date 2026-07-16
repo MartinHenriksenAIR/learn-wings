@@ -31,15 +31,6 @@ function Consumer({ orgId }: { orgId: string | undefined }) {
   );
 }
 
-function GatedConsumer({ orgId, enabled }: { orgId: string | undefined; enabled: boolean }) {
-  const { data } = useOrgAnalyticsData(orgId, { enabled });
-  return (
-    <div data-testid="gated">
-      {data ? `members:${data.members.length}` : 'none'}
-    </div>
-  );
-}
-
 function renderWithClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
@@ -71,15 +62,5 @@ describe('useOrgAnalyticsData', () => {
     await Promise.resolve();
     expect(mockCallApi).not.toHaveBeenCalled();
     expect(screen.getByTestId('result')).toHaveTextContent('none');
-  });
-
-  it('does not fetch when enabled is false', async () => {
-    mockCallApi.mockResolvedValue(analyticsResponse);
-
-    renderWithClient(<GatedConsumer orgId="org-1" enabled={false} />);
-
-    await Promise.resolve();
-    expect(mockCallApi).not.toHaveBeenCalled();
-    expect(screen.getByTestId('gated')).toHaveTextContent('none');
   });
 });

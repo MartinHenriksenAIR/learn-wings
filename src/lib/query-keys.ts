@@ -171,7 +171,7 @@ export const queryKeys = {
      * Full key: ['ai-champions', orgId]
      * Used by AIChampionsList.tsx.
      */
-    list: (orgId: string) => ['ai-champions', orgId] as const,
+    list: (orgId: string | undefined) => ['ai-champions', orgId] as const,
   },
 
   // ── Org management (platform-admin) ────────────────────────────────────────

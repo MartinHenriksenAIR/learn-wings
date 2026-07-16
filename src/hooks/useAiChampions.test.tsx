@@ -58,20 +58,6 @@ describe('useAiChampions', () => {
     expect(screen.getByTestId('gated')).toHaveTextContent('');
   });
 
-  it('does not fetch when enabled is false even with an orgId', async () => {
-    mockCallApi.mockResolvedValue({ champions });
-
-    function Gated() {
-      const { data } = useAiChampions('org-1', { enabled: false });
-      return <div data-testid="disabled">{(data ?? []).length}</div>;
-    }
-    renderWithClient(<Gated />);
-
-    await Promise.resolve();
-    expect(mockCallApi).not.toHaveBeenCalled();
-    expect(screen.getByTestId('disabled')).toHaveTextContent('0');
-  });
-
   it('normalizes a malformed (non-array) response to an empty list', async () => {
     mockCallApi.mockResolvedValue({ champions: { nope: true } });
 
