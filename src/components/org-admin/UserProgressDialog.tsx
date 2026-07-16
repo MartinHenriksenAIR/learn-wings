@@ -21,7 +21,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { useUserProgress } from '@/hooks/useUserProgress';
+import { useUserProgress, type CourseProgress } from '@/hooks/useUserProgress';
 import {
   Loader2,
   CheckCircle2,
@@ -41,49 +41,6 @@ interface UserProgressDialogProps {
   orgId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-interface CourseProgress {
-  enrollmentId: string;
-  courseId: string;
-  courseTitle: string;
-  courseLevel: string;
-  enrollmentStatus: string;
-  enrolledAt: string;
-  completedAt: string | null;
-  modules: ModuleProgress[];
-  totalLessons: number;
-  completedLessons: number;
-  quizAttempts: QuizAttemptData[];
-}
-
-interface ModuleProgress {
-  id: string;
-  title: string;
-  sortOrder: number;
-  lessons: LessonProgress[];
-}
-
-interface LessonProgress {
-  id: string;
-  title: string;
-  lessonType: string;
-  sortOrder: number;
-  status: 'not_started' | 'in_progress' | 'completed';
-  completedAt: string | null;
-  quizId?: string;
-  latestQuizScore?: number;
-  latestQuizPassed?: boolean;
-}
-
-interface QuizAttemptData {
-  id: string;
-  quizId: string;
-  lessonTitle: string;
-  score: number;
-  passed: boolean;
-  startedAt: string;
-  finishedAt: string | null;
 }
 
 export function UserProgressDialog({
