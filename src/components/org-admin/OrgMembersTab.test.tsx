@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // --- mock react-i18next (no i18n provider needed) ---
@@ -60,6 +61,17 @@ import { OrgMembersTab } from './OrgMembersTab';
 
 const mockCallApi = vi.mocked(callApi);
 
+// The component now reads from the shared TanStack Query hooks, so every render
+// needs a QueryClient in context. retry:false keeps error paths deterministic.
+function renderTab() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <OrgMembersTab />
+    </QueryClientProvider>,
+  );
+}
+
 const membershipRow = {
   id: 'm-2',
   org_id: 'org-1',
@@ -100,17 +112,22 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
       throw new Error(`Unexpected callApi path: ${path}`);
     });
 
-    render(<OrgMembersTab />);
+    renderTab();
 
     // The mocked t() returns the i18n key verbatim, so the action labels are the
     // keys themselves (analytics.members.makeAiChampion / removeAiChampion).
     const item = await screen.findByRole('button', { name: 'analytics.members.makeAiChampion' });
 
     fireEvent.click(item);
-    expect(createCalls).toBe(1);
+    // The in-flight guard (setTogglingChampion) fires synchronously in the click
+    // handler, so the item disables immediately.
     expect(item).toBeDisabled();
+    // useMutation dispatches the mutationFn on a microtask, so the request fires
+    // one tick after the click (the old imperative code called it synchronously).
+    await waitFor(() => expect(createCalls).toBe(1));
 
-    // Second fast click while the first request is still in flight
+    // Second fast click while the first request is still in flight — the button
+    // is disabled, so onClick never fires and no second request is dispatched.
     fireEvent.click(item);
     expect(createCalls).toBe(1);
 
@@ -164,7 +181,7 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
   });
 
   it('copy link writes to clipboard and morphs to "Copied!" with no toast', async () => {
-    render(<OrgMembersTab />);
+    renderTab();
 
     const copyBtn = await screen.findByRole('button', { name: 'analytics.members.copyLink' });
     fireEvent.click(copyBtn);
@@ -179,7 +196,7 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
   });
 
   it('revoke shows inline "Revoked" feedback, removes the row, and fires no success toast', async () => {
-    render(<OrgMembersTab />);
+    renderTab();
 
     const revokeBtn = await screen.findByRole('button', { name: 'analytics.members.revoke' });
     fireEvent.click(revokeBtn);
