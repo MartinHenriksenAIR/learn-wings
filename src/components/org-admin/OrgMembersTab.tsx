@@ -277,17 +277,12 @@ export function OrgMembersTab() {
         ? 'Failed to remove AI Champion status'
         : 'Failed to assign AI Champion status',
     onSuccess: (_data, { member, isCurrentlyChampion }) => {
-      // Update the shared champions cache so the derived Set flips immediately
-      // (parity with the old local-Set add/remove — no refetch).
-      queryClient.setQueryData<{ user_id: string }[]>(
-        queryKeys.aiChampions.list(currentOrg?.id as string),
-        (prev) => {
-          const list = prev ?? [];
-          return isCurrentlyChampion
-            ? list.filter((c) => c.user_id !== member.user_id)
-            : [...list, { user_id: member.user_id }];
-        },
-      );
+      // Invalidate rather than hand-patch the cache: the ['ai-champions', orgId]
+      // entry is shared with AIChampionsList, which reads full champion rows
+      // (id/profile/assigned_at). Writing a partial { user_id } row here would
+      // corrupt that consumer's render, so refetch the real rows instead —
+      // consistent with how the role/member mutations invalidate.
+      queryClient.invalidateQueries({ queryKey: queryKeys.aiChampions.list(currentOrg?.id) });
       if (isCurrentlyChampion) {
         toast({ title: 'AI Champion status removed', description: `${member.profile?.full_name} is no longer an AI Champion.` });
       } else {

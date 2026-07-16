@@ -98,11 +98,15 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
   it('second click while in-flight does not fire a second API call; guard clears in finally', async () => {
     let createCalls = 0;
     let resolveCreate: ((v: unknown) => void) | undefined;
+    // The champion toggle invalidates the ['ai-champions'] cache on success
+    // (rather than hand-patching it), so the badge flip is driven by this
+    // refetch returning the newly-created champion.
+    let champions: Array<{ user_id: string }> = [];
 
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/org-memberships') return { memberships: [membershipRow] };
       if (path === '/api/invitations') return { invitations: [] };
-      if (path === '/api/ai-champions') return { champions: [] };
+      if (path === '/api/ai-champions') return { champions };
       if (path === '/api/ai-champion-create') {
         createCalls++;
         return new Promise((res) => {
@@ -131,7 +135,9 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
     fireEvent.click(item);
     expect(createCalls).toBe(1);
 
-    // Let the request finish — the guard clears in finally and the badge state flips
+    // Let the request finish — the server now reports the member as a champion,
+    // so the post-success refetch flips the badge and the guard clears.
+    champions = [{ user_id: 'u-2' }];
     await act(async () => {
       resolveCreate?.({});
     });
