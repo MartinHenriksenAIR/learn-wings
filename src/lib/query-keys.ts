@@ -9,6 +9,11 @@
  * Keys must stay byte-for-byte identical to the literals they replace; do NOT
  * change string literals or parameter order here without updating every call
  * site and the test file in the same commit.
+ *
+ * Adding a family: give it an `all` prefix constant ONLY if something
+ * invalidates it by prefix — a detail-only family with an unused `all` is
+ * dead surface. Match each method's parameter nullability to what its call
+ * site actually passes (e.g. `string | undefined` for `currentOrg?.id`).
  */
 export const queryKeys = {
   // ── Organizations ──────────────────────────────────────────────────────────
@@ -28,7 +33,7 @@ export const queryKeys = {
     all: ['community-posts'] as const,
     /**
      * Full key: ['community-posts', scope, orgId, selectedCategory, searchQuery, selectedTags]
-     * Parameter order matches CommunityFeed.tsx line 70.
+     * Parameter order matches the query in CommunityFeed.tsx.
      */
     list: (
       scope: string,
@@ -78,7 +83,7 @@ export const queryKeys = {
     all: ['ideas'] as const,
     /**
      * Full key: ['ideas', orgId, tab, searchQuery, selectedBusinessArea, selectedTags, profileId]
-     * Parameter order matches IdeaLibrary.tsx line 90.
+     * Parameter order matches the query in IdeaLibrary.tsx.
      */
     list: (
       orgId: string | undefined,
@@ -112,7 +117,7 @@ export const queryKeys = {
     all: ['ideas-admin'] as const,
     /**
      * Full key: ['ideas-admin', orgId, searchQuery, selectedBusinessArea]
-     * Parameter order matches OrgIdeasManagement.tsx line 92.
+     * Parameter order matches the query in OrgIdeasManagement.tsx.
      */
     list: (
       orgId: string | undefined,
@@ -127,7 +132,7 @@ export const queryKeys = {
     all: ['community-resources'] as const,
     /**
      * Full key: ['community-resources', orgId, debouncedSearch, selectedType, selectedTag]
-     * Parameter order matches ResourceLibrary.tsx line 72.
+     * Parameter order matches the query in ResourceLibrary.tsx.
      */
     list: (
       orgId: string | undefined,
@@ -144,7 +149,7 @@ export const queryKeys = {
     all: ['org-reports'] as const,
     /**
      * Full key: ['org-reports', orgId, activeTab]
-     * Parameter order matches OrgCommunityModeration.tsx line 62.
+     * Parameter order matches the query in OrgCommunityModeration.tsx.
      */
     list: (orgId: string | undefined, activeTab: string) =>
       ['org-reports', orgId, activeTab] as const,
@@ -155,7 +160,7 @@ export const queryKeys = {
     all: ['platform-reports'] as const,
     /**
      * Full key: ['platform-reports', activeTab]
-     * Parameter order matches PlatformCommunityModeration.tsx line 58.
+     * Parameter order matches the query in PlatformCommunityModeration.tsx.
      */
     list: (activeTab: string) => ['platform-reports', activeTab] as const,
   },
