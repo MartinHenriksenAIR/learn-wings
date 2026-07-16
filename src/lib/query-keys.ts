@@ -287,4 +287,23 @@ export const queryKeys = {
      */
     detail: (lessonId: string) => ['quiz-admin', lessonId] as const,
   },
+
+  // ── Learner courses (learner) ──────────────────────────────────────────────
+  learnerCourses: {
+    /**
+     * Full key: ['learner-courses', orgId]
+     * Used by useLearnerCourses / Courses.tsx.
+     * Exposed as `list` because enroll/unenroll mutations invalidate by this key.
+     */
+    list: (orgId: string | undefined) => ['learner-courses', orgId] as const,
+  },
+
+  // ── Learner dashboard (learner) ────────────────────────────────────────────
+  learnerDashboard: {
+    /**
+     * Full key: ['learner-dashboard', orgId]
+     * Used by useLearnerDashboard / Dashboard.tsx.
+     */
+    detail: (orgId: string | undefined) => ['learner-dashboard', orgId] as const,
+  },
 } as const;

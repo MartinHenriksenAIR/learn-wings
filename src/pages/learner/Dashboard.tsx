@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -12,8 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useFlash } from '@/hooks/useFlash';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { callApi, callApiRaw } from '@/lib/api-client';
-import { getSignedLmsAssetUrl } from '@/lib/storage';
+import { useLearnerDashboard } from '@/hooks/useLearnerDashboard';
+import { callApiRaw } from '@/lib/api-client';
 import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Clock, Award, Play, ArrowRight, TrendingUp } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
@@ -26,53 +26,15 @@ export default function LearnerDashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { flashed, flash } = useFlash();
-  const [enrollments, setEnrollments] = useState<(Enrollment & { course: Course })[]>([]);
-  const [progressData, setProgressData] = useState<Record<string, { total: number; completed: number }>>({});
-  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // Canonical profile-gated guard (useOrgGuard): while the user context is
-      // still resolving keep the spinner; with no org available stop loading;
-      // the redundant !currentOrg check is for TypeScript narrowing only.
-      if (orgGuard !== 'ready' || !currentOrg) {
-        if (orgGuard === 'no-org') {
-          setLoading(false);
-        }
-        return;
-      }
+  const query = useLearnerDashboard(currentOrg?.id, {
+    enabled: orgGuard === 'ready' && !!currentOrg,
+  });
 
-      try {
-        const data = await callApi<{
-          enrollments: Array<Enrollment & { course: Course }>;
-          progress: Record<string, { total: number; completed: number }>;
-        }>('/api/learner-dashboard', { orgId: currentOrg.id });
-
-        setEnrollments(data.enrollments as any);
-        setProgressData(data.progress);
-
-        // Resolve thumbnail signed URLs
-        const thumbMap: Record<string, string> = {};
-        await Promise.all(
-          data.enrollments.map(async (e: any) => {
-            if (e.course?.thumbnail_url) {
-              const url = await getSignedLmsAssetUrl(e.course.thumbnail_url);
-              if (url) thumbMap[e.course_id] = url;
-            }
-          })
-        );
-        setThumbnailUrls(thumbMap);
-      } catch (error) {
-        console.error('Error loading dashboard:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [orgGuard, currentOrg]);
+  const enrollments: (Enrollment & { course: Course })[] = query.data?.enrollments ?? [];
+  const progressData: Record<string, { total: number; completed: number }> = query.data?.progress ?? {};
+  const thumbnailUrls: Record<string, string> = query.data?.thumbnailUrls ?? {};
 
   const inProgressCourses = enrollments.filter(e => e.status === 'enrolled');
   const completedCourses = enrollments.filter(e => e.status === 'completed');
@@ -109,7 +71,7 @@ export default function LearnerDashboard() {
     }
   };
 
-  if (loading) {
+  if (orgGuard === 'loading' || query.isLoading) {
     return (
       <AppLayout title={t('dashboard.title')}>
         <PageSpinner />

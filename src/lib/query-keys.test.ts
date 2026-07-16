@@ -190,4 +190,20 @@ describe('queryKeys', () => {
   it('userProgress.detail with undefined params', () => {
     expect(queryKeys.userProgress.detail(undefined, undefined)).toEqual(['user-progress', undefined, undefined]);
   });
+
+  // learner-courses
+  it('learnerCourses.list returns the parameterized key', () => {
+    expect(queryKeys.learnerCourses.list('org-1')).toEqual(['learner-courses', 'org-1']);
+  });
+  it('learnerCourses.list with undefined orgId', () => {
+    expect(queryKeys.learnerCourses.list(undefined)).toEqual(['learner-courses', undefined]);
+  });
+
+  // learner-dashboard
+  it('learnerDashboard.detail returns the parameterized key', () => {
+    expect(queryKeys.learnerDashboard.detail('org-1')).toEqual(['learner-dashboard', 'org-1']);
+  });
+  it('learnerDashboard.detail with undefined orgId', () => {
+    expect(queryKeys.learnerDashboard.detail(undefined)).toEqual(['learner-dashboard', undefined]);
+  });
 });
