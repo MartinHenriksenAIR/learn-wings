@@ -121,4 +121,36 @@ describe('queryKeys', () => {
   it('quizAdmin.detail returns the parameterized key', () => {
     expect(queryKeys.quizAdmin.detail('lesson-1')).toEqual(['quiz-admin', 'lesson-1']);
   });
+
+  // profiles
+  it('profiles.all returns the root key (prefix for invalidation)', () => {
+    expect(queryKeys.profiles.all).toEqual(['profiles']);
+  });
+
+  // org-memberships
+  it('orgMemberships.list returns the parameterized key', () => {
+    expect(queryKeys.orgMemberships.list('org-1')).toEqual(['org-memberships', 'org-1']);
+  });
+  it('orgMemberships.list with undefined orgId', () => {
+    expect(queryKeys.orgMemberships.list(undefined)).toEqual(['org-memberships', undefined]);
+  });
+
+  // invitations
+  it('invitations.list returns the parameterized key for platform scope', () => {
+    expect(queryKeys.invitations.list('org-1', 'platform')).toEqual(['invitations', 'org-1', 'platform']);
+  });
+  it('invitations.list returns the parameterized key for org scope', () => {
+    expect(queryKeys.invitations.list('org-1', 'org')).toEqual(['invitations', 'org-1', 'org']);
+  });
+  it('invitations.list with undefined orgId', () => {
+    expect(queryKeys.invitations.list(undefined, 'platform')).toEqual(['invitations', undefined, 'platform']);
+  });
+
+  // org-detail
+  it('orgDetail.detail returns the parameterized key', () => {
+    expect(queryKeys.orgDetail.detail('org-1')).toEqual(['org-detail', 'org-1']);
+  });
+  it('orgDetail.detail with undefined orgId', () => {
+    expect(queryKeys.orgDetail.detail(undefined)).toEqual(['org-detail', undefined]);
+  });
 });

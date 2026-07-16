@@ -174,6 +174,50 @@ export const queryKeys = {
     list: (orgId: string) => ['ai-champions', orgId] as const,
   },
 
+  // ── Org management (platform-admin) ────────────────────────────────────────
+
+  profiles: {
+    /**
+     * ['profiles'] — use for invalidation prefix.
+     * Covers the platform-wide user list fetched by OrganizationsManager and
+     * OrganizationDetail. An `all` prefix is warranted because org-create and
+     * org-member-add mutations invalidate by prefix after adding users.
+     */
+    all: ['profiles'] as const,
+  },
+
+  orgMemberships: {
+    /**
+     * Full key: ['org-memberships', orgId]
+     * Used by OrganizationDetail.tsx and OrgMembersTab.tsx.
+     * `all` is NOT exposed — nothing invalidates by prefix (each mutation
+     * targets a specific orgId and can invalidate the exact key).
+     */
+    list: (orgId: string | undefined) => ['org-memberships', orgId] as const,
+  },
+
+  invitations: {
+    /**
+     * Full key: ['invitations', orgId, scope]
+     * scope: 'platform' (OrganizationDetail) | 'org' (OrgMembersTab).
+     * The scope encodes the server-side auth path, so different scopes must
+     * not share a cache entry. No `all` prefix — mutations invalidate the
+     * exact (orgId, scope) pair.
+     */
+    list: (orgId: string | undefined, scope: string) =>
+      ['invitations', orgId, scope] as const,
+  },
+
+  orgDetail: {
+    /**
+     * Full key: ['org-detail', orgId]
+     * Used by OrganizationDetail.tsx (platform-admin, fetches single org via
+     * `/api/organizations` with `{ orgId }`). Separate from
+     * `organizations.all` because the request body differs.
+     */
+    detail: (orgId: string | undefined) => ['org-detail', orgId] as const,
+  },
+
   // ── LMS / Courses (platform-admin) ─────────────────────────────────────────
   coursesAdmin: {
     /** ['courses-admin'] — the admin course list + access matrix (one query) */
