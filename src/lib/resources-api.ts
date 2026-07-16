@@ -30,7 +30,7 @@ export interface CreateResourceInput {
   tags?: string[];
 }
 
-export interface UpdateResourceInput {
+interface UpdateResourceInput {
   title?: string;
   description?: string;
   resource_type?: string;
@@ -46,7 +46,7 @@ export const RESOURCE_TYPES = [
   { value: 'guide', label: 'Guide', icon: 'BookOpen' },
 ] as const;
 
-export interface FetchResourcesResult {
+interface FetchResourcesResult {
   resources: CommunityResource[];
   allTags: string[];
 }

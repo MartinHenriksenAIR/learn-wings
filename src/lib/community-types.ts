@@ -5,7 +5,7 @@ import type { Profile, Organization } from './types';
 // Enums
 export type CommunityScope = 'org' | 'global';
 export type ReportStatus = 'pending' | 'reviewed' | 'dismissed';
-export type ReportTargetType = 'post' | 'comment';
+type ReportTargetType = 'post' | 'comment';
 export type BusinessArea = 'hr' | 'finance' | 'sales' | 'support' | 'ops' | 'it' | 'legal' | 'other';
 
 // Extended idea status (includes new values)
@@ -166,14 +166,14 @@ export const BUSINESS_AREAS: { value: BusinessArea; label: string }[] = [
 ];
 
 // Idea status options for admin workflow
-export const IDEA_STATUS_OPTIONS: { value: IdeaStatusExtended; label: string; color: string }[] = [
-  { value: 'draft', label: 'Draft', color: 'bg-muted text-muted-foreground' },
-  { value: 'submitted', label: 'Submitted', color: 'bg-blue-100 text-blue-800' },
-  { value: 'in_review', label: 'In Review', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'accepted', label: 'Accepted', color: 'bg-green-100 text-green-800' },
-  { value: 'rejected', label: 'Rejected', color: 'bg-red-100 text-red-800' },
-  { value: 'in_progress', label: 'In Progress', color: 'bg-purple-100 text-purple-800' },
-  { value: 'done', label: 'Done', color: 'bg-emerald-100 text-emerald-800' },
+export const IDEA_STATUS_OPTIONS: { value: IdeaStatusExtended; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'in_review', label: 'In Review' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'done', label: 'Done' },
 ];
 
 // Form types

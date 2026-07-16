@@ -7,11 +7,11 @@
 // The slug regex matches the DB-level unique constraint's expectation of
 // lowercase URL-safe tokens.
 
-export const ORG_NAME_MIN_LENGTH = 2;
-export const ORG_NAME_MAX_LENGTH = 100;
-export const ORG_SLUG_MIN_LENGTH = 2;
-export const ORG_SLUG_MAX_LENGTH = 50;
-export const ORG_SLUG_REGEX = /^[a-z0-9-]+$/;
+const ORG_NAME_MIN_LENGTH = 2;
+const ORG_NAME_MAX_LENGTH = 100;
+const ORG_SLUG_MIN_LENGTH = 2;
+const ORG_SLUG_MAX_LENGTH = 50;
+const ORG_SLUG_REGEX = /^[a-z0-9-]+$/;
 
 /**
  * Returns an error message for an invalid org name, or null when valid. The

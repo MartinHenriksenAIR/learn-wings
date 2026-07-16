@@ -22,7 +22,7 @@ body:
     id: summary
     attributes:
       label: Summary
-      description: What needs to happen and why. For slices, link the cutover spec section.
+      description: What needs to happen and why.
     validations:
       required: true
   - type: textarea
@@ -40,7 +40,6 @@ body:
     id: acceptance
     attributes:
       label: Acceptance criteria
-      description: For slices, reference the 5-gate DoD (slice-workflow skill / cutover spec §4).
   - type: input
     id: depends
     attributes:

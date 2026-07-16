@@ -1,13 +1,13 @@
 // AIR Academy Type Definitions
 
 export type OrgRole = 'org_admin' | 'learner';
-export type MembershipStatus = 'active' | 'invited' | 'disabled';
-export type InvitationStatus = 'pending' | 'accepted' | 'expired';
+type MembershipStatus = 'active' | 'invited' | 'disabled';
+type InvitationStatus = 'pending' | 'accepted' | 'expired';
 export type CourseLevel = 'basic' | 'intermediate' | 'advanced';
 export type LessonType = 'video' | 'document' | 'quiz';
-export type EnrollmentStatus = 'enrolled' | 'completed';
-export type ProgressStatus = 'not_started' | 'in_progress' | 'completed';
-export type AccessType = 'enabled' | 'disabled';
+type EnrollmentStatus = 'enrolled' | 'completed';
+type ProgressStatus = 'not_started' | 'in_progress' | 'completed';
+type AccessType = 'enabled' | 'disabled';
 
 export interface Profile {
   id: string;
@@ -140,17 +140,6 @@ export interface LessonProgress {
   completed_at: string | null;
 }
 
-export interface QuizAttempt {
-  id: string;
-  org_id: string;
-  user_id: string;
-  quiz_id: string;
-  score: number;
-  passed: boolean;
-  started_at: string;
-  finished_at: string | null;
-}
-
 export interface CourseReview {
   id: string;
   org_id: string;
@@ -161,16 +150,6 @@ export interface CourseReview {
   created_at: string;
   updated_at: string;
   profile?: Profile;
-}
-
-// User context
-export interface UserContext {
-  profile: Profile | null;
-  memberships: OrgMembership[];
-  currentOrg: Organization | null;
-  isPlatformAdmin: boolean;
-  isOrgAdmin: boolean;
-  isLoading: boolean;
 }
 
 // Analytics types
@@ -185,7 +164,7 @@ export interface OrgAnalytics {
   courseProgress: CourseProgressSummary[];
 }
 
-export interface CourseProgressSummary {
+interface CourseProgressSummary {
   courseId: string;
   courseTitle: string;
   enrolledCount: number;
@@ -194,12 +173,7 @@ export interface CourseProgressSummary {
   avgProgress: number;
 }
 
-export interface PlatformAnalytics extends OrgAnalytics {
-  totalOrganizations: number;
-  orgBreakdown: OrgAnalyticsSummary[];
-}
-
-export interface OrgAnalyticsSummary {
+interface OrgAnalyticsSummary {
   orgId: string;
   orgName: string;
   totalUsers: number;

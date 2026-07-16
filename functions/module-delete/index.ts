@@ -1,60 +1,45 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { query, queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { requirePlatformAdmin } from '../shared/guards';
+import { adminEndpoint } from '../shared/endpoint';
 import { deleteBlob } from '../shared/blob';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const gate = await requirePlatformAdmin(req, origin);
-    if (!gate.ok) return gate.response;
+export default adminEndpoint('module-delete', async ({ req, reply }) => {
+  const body = await req.json() as { moduleId?: unknown };
+  const { moduleId } = body;
 
-    const body = await req.json() as { moduleId?: unknown };
-    const { moduleId } = body;
-
-    if (!moduleId || typeof moduleId !== 'string') {
-      return corsResponse(origin, 400, { error: 'moduleId is required' });
-    }
-
-    // Collect descendant blob paths before deletion.
-    // Intentionally not transactional — blob deletes are irreversible and cannot join a DB
-    // transaction; the tiny race window (lesson created between SELECT and DELETE) is acceptable
-    // for an admin tool.
-    const blobRows = await query<{ azure_blob_path: string }>(
-      `SELECT azure_blob_path
-         FROM lessons
-        WHERE module_id = $1
-          AND azure_blob_path IS NOT NULL`,
-      [moduleId],
-    );
-
-    const deleted = await queryOne(
-      `DELETE FROM course_modules WHERE id = $1 RETURNING id`,
-      [moduleId],
-    );
-
-    if (!deleted) {
-      return corsResponse(origin, 404, { error: 'Module not found' });
-    }
-
-    // Best-effort blob cleanup — deleteBlob never throws; it warns server-side per failed path,
-    // and counts are returned to the client.
-    const blobPaths = blobRows.map((r) => r.azure_blob_path);
-    const results = await Promise.all(blobPaths.map((p) => deleteBlob(p)));
-    const blobsDeleted = results.filter(Boolean).length;
-    const blobsFailed = results.length - blobsDeleted;
-    if (blobsFailed > 0) {
-      console.warn(`[module-delete] ${blobsFailed} blob(s) failed to delete for module`, moduleId);
-    }
-
-    return corsResponse(origin, 200, { success: true, blobsDeleted, blobsFailed });
-  } catch (err: unknown) {
-    return internalError(context, origin, err);
+  if (!moduleId || typeof moduleId !== 'string') {
+    return reply(400, { error: 'moduleId is required' });
   }
-}
 
-export default handler;
-app.http('module-delete', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+  // Collect descendant blob paths before deletion.
+  // Intentionally not transactional — blob deletes are irreversible and cannot join a DB
+  // transaction; the tiny race window (lesson created between SELECT and DELETE) is acceptable
+  // for an admin tool.
+  const blobRows = await query<{ azure_blob_path: string }>(
+    `SELECT azure_blob_path
+       FROM lessons
+      WHERE module_id = $1
+        AND azure_blob_path IS NOT NULL`,
+    [moduleId],
+  );
+
+  const deleted = await queryOne(
+    `DELETE FROM course_modules WHERE id = $1 RETURNING id`,
+    [moduleId],
+  );
+
+  if (!deleted) {
+    return reply(404, { error: 'Module not found' });
+  }
+
+  // Best-effort blob cleanup — deleteBlob never throws; it warns server-side per failed path,
+  // and counts are returned to the client.
+  const blobPaths = blobRows.map((r) => r.azure_blob_path);
+  const results = await Promise.all(blobPaths.map((p) => deleteBlob(p)));
+  const blobsDeleted = results.filter(Boolean).length;
+  const blobsFailed = results.length - blobsDeleted;
+  if (blobsFailed > 0) {
+    console.warn(`[module-delete] ${blobsFailed} blob(s) failed to delete for module`, moduleId);
+  }
+
+  return reply(200, { success: true, blobsDeleted, blobsFailed });
+});

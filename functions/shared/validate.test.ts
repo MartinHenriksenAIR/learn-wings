@@ -1,42 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isStringOrNull, isNonEmptyStringOrNull, isIntOrNull, validateLessonFields } from './validate';
-
-// ---------------------------------------------------------------------------
-// Predicates
-// ---------------------------------------------------------------------------
-
-describe('isStringOrNull', () => {
-  it('accepts a non-empty string', () => expect(isStringOrNull('hello')).toBe(true));
-  it('accepts an empty string', () => expect(isStringOrNull('')).toBe(true));
-  it('accepts null', () => expect(isStringOrNull(null)).toBe(true));
-  it('rejects undefined', () => expect(isStringOrNull(undefined)).toBe(false));
-  it('rejects a number', () => expect(isStringOrNull(42)).toBe(false));
-  it('rejects a boolean', () => expect(isStringOrNull(true)).toBe(false));
-  it('rejects an object', () => expect(isStringOrNull({})).toBe(false));
-  it('rejects an array', () => expect(isStringOrNull([])).toBe(false));
-});
-
-describe('isNonEmptyStringOrNull', () => {
-  it('accepts a non-empty string', () => expect(isNonEmptyStringOrNull('path/to/file')).toBe(true));
-  it('accepts null', () => expect(isNonEmptyStringOrNull(null)).toBe(true));
-  it('rejects empty string', () => expect(isNonEmptyStringOrNull('')).toBe(false));
-  it('rejects undefined', () => expect(isNonEmptyStringOrNull(undefined)).toBe(false));
-  it('rejects a number', () => expect(isNonEmptyStringOrNull(123)).toBe(false));
-  it('rejects a boolean', () => expect(isNonEmptyStringOrNull(false)).toBe(false));
-  it('rejects an object', () => expect(isNonEmptyStringOrNull({})).toBe(false));
-});
-
-describe('isIntOrNull', () => {
-  it('accepts zero', () => expect(isIntOrNull(0)).toBe(true));
-  it('accepts a positive integer', () => expect(isIntOrNull(30)).toBe(true));
-  it('accepts a negative integer', () => expect(isIntOrNull(-5)).toBe(true));
-  it('accepts null', () => expect(isIntOrNull(null)).toBe(true));
-  it('rejects a float', () => expect(isIntOrNull(1.5)).toBe(false));
-  it('rejects a string', () => expect(isIntOrNull('30')).toBe(false));
-  it('rejects undefined', () => expect(isIntOrNull(undefined)).toBe(false));
-  it('rejects a boolean', () => expect(isIntOrNull(true)).toBe(false));
-  it('rejects NaN', () => expect(isIntOrNull(NaN)).toBe(false));
-});
+import { validateLessonFields } from './validate';
 
 // ---------------------------------------------------------------------------
 // validateLessonFields
@@ -115,6 +78,12 @@ describe('validateLessonFields — optional fields', () => {
   it('rejects contentText as a boolean', () => {
     expect(validateLessonFields({ ...validBase, contentText: true })).toBe('contentText must be a string or null');
   });
+  it('rejects contentText as an object', () => {
+    expect(validateLessonFields({ ...validBase, contentText: {} })).toBe('contentText must be a string or null');
+  });
+  it('rejects contentText as an array', () => {
+    expect(validateLessonFields({ ...validBase, contentText: [] })).toBe('contentText must be a string or null');
+  });
 
   // durationMinutes
   it('accepts durationMinutes as an integer', () => {
@@ -126,6 +95,9 @@ describe('validateLessonFields — optional fields', () => {
   it('accepts durationMinutes as null', () => {
     expect(validateLessonFields({ ...validBase, durationMinutes: null })).toBeNull();
   });
+  it('accepts durationMinutes as a negative integer', () => {
+    expect(validateLessonFields({ ...validBase, durationMinutes: -5 })).toBeNull();
+  });
   it('rejects durationMinutes as a float', () => {
     expect(validateLessonFields({ ...validBase, durationMinutes: 1.5 })).toBe(
       'durationMinutes must be an integer or null',
@@ -133,6 +105,16 @@ describe('validateLessonFields — optional fields', () => {
   });
   it('rejects durationMinutes as a string', () => {
     expect(validateLessonFields({ ...validBase, durationMinutes: 'five' })).toBe(
+      'durationMinutes must be an integer or null',
+    );
+  });
+  it('rejects durationMinutes as a boolean', () => {
+    expect(validateLessonFields({ ...validBase, durationMinutes: true })).toBe(
+      'durationMinutes must be an integer or null',
+    );
+  });
+  it('rejects durationMinutes as NaN', () => {
+    expect(validateLessonFields({ ...validBase, durationMinutes: NaN })).toBe(
       'durationMinutes must be an integer or null',
     );
   });

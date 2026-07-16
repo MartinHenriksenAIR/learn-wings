@@ -1,23 +1,19 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { Calendar, ExternalLink, ArrowRight } from 'lucide-react';
+import { Calendar, ExternalLink } from 'lucide-react';
 import { format, isFuture, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
 interface UpcomingEventsProps {
   events: CommunityPost[];
-  onViewAll?: () => void;
   onEventClick?: (event: CommunityPost) => void;
-  maxVisible?: number;
   className?: string;
 }
 
 export function UpcomingEvents({
   events,
-  onViewAll,
   onEventClick,
-  maxVisible = 3,
   className,
 }: UpcomingEventsProps) {
   const { t } = useTranslation();
@@ -26,7 +22,7 @@ export function UpcomingEvents({
   const upcomingEvents = events
     .filter((e) => e.event_date && (isFuture(new Date(e.event_date)) || isToday(new Date(e.event_date))))
     .sort((a, b) => new Date(a.event_date!).getTime() - new Date(b.event_date!).getTime())
-    .slice(0, maxVisible);
+    .slice(0, 3);
 
   if (upcomingEvents.length === 0) {
     return null;
@@ -39,17 +35,6 @@ export function UpcomingEvents({
           <Calendar aria-hidden="true" className="h-[15px] w-[15px] text-primary" />
           {t('community.upcomingEvents')}
         </h3>
-        {onViewAll && events.length > maxVisible && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onViewAll}
-            className="h-auto px-2 py-1 text-xs font-bold text-muted-foreground hover:text-primary"
-          >
-            {t('community.viewAll')}
-            <ArrowRight aria-hidden="true" className="ml-1 h-3.5 w-3.5" />
-          </Button>
-        )}
       </div>
       <div className="flex flex-col gap-3">
         {upcomingEvents.map((event) => {

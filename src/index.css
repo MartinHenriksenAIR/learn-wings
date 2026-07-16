@@ -71,15 +71,7 @@
     --sidebar-ring: 228 80% 31%;
 
     /* Custom gradients - navy hero */
-    --gradient-primary: linear-gradient(120deg, #10298f 0%, #1b3cb8 70%, #2a4fd0 100%);
-    --gradient-accent: linear-gradient(120deg, #10298f 0%, #1b3cb8 70%, #2a4fd0 100%);
     --gradient-hero: linear-gradient(120deg, #10298f 0%, #1b3cb8 70%, #2a4fd0 100%);
-
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.05);
   }
 
   /* The app ships light-only; this block just stays coherent (navy-tinted darks) */
@@ -203,24 +195,8 @@
     text-wrap: balance;
   }
 
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
-
-  .gradient-accent {
-    background: var(--gradient-accent);
-  }
-
   .gradient-hero {
     background: var(--gradient-hero);
-  }
-
-  .shadow-card {
-    box-shadow: var(--shadow-md);
-  }
-
-  .shadow-card-hover {
-    box-shadow: var(--shadow-lg);
   }
 }
 

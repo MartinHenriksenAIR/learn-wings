@@ -1,7 +1,7 @@
 ---
 id: "ADR-0012"
 title: "Auth stub pattern — SAS functions deferred until Task 9 JWKS validation"
-status: accepted
+status: superseded
 date: 2026-05-20
 deciders: ['dawid@ai-raadgivning.dk']
 tags: ['auth', 'azure-functions', 'testing', 'deployment-gate']
@@ -9,6 +9,8 @@ policy:
   boundaries: {'rules': [{'forbid': 'shared/auth.ts stub -> production traffic before Task 9'}]}
   rationales: ['stub throws for real tokens to prevent accidental permissive auth', '_mockUser injection is the only test contract until JWKS lands']
 ---
+
+> **Superseded (2026-07-16):** this record's own supersession clause has been fulfilled — Task 9 shipped and `shared/auth.ts` performs full JWKS validation (see ADR-0005); retained as history.
 
 ## Context
 

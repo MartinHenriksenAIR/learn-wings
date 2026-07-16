@@ -10,14 +10,13 @@ Single source of truth for all coding agents. `CLAUDE.md` imports this file — 
 
 ## Session start
 1. Read `migration/STATUS.html` — the live ledger (checkpoint, operational quirks, pointers).
-2. Check claims: `gh issue list --state open` (backlog) + `gh pr list --state open` (draft PRs = active claims).
-3. Starting work → invoke the `pickup` skill. Ending a session → `handoff`. Executing a slice → `slice-workflow`.
+2. Check the board: `gh issue list --state open` (backlog) + `gh pr list --state open` (what's in flight).
+3. Starting work → invoke the `pickup` skill. Ending a session → `handoff`.
 
-## Collaboration rules (two developers + their agents)
-- **Trunk = the `trunk` branch named in `.claude/collab.json`** (currently `main`) — the single source of truth for branch topology; the guard hook and the pickup/handoff skills read it, so re-pointing the trunk edits that one file. The trunk receives changes ONLY via pull requests, enforced by the server-side ruleset on `main`; the local `guard-trunk` hook is best-effort fast feedback on top (its known gaps are documented in the hook header and all land on the server-side wall).
-- **Work branches:** `<firstname>/<issue#>-<slug>` off fresh trunk (e.g. `emil/7-collab-setup`). Open a draft PR immediately — the draft PR is the claim.
-- **Before claiming:** check the other developer's claimed issues / draft PRs for file-scope overlap ("Files touched" on the issue). Hub-file APPENDS (barrel imports, routes, i18n keys) don't block parallel work — rebase and keep both. Editing the SAME logic or changing shared-contract semantics (`functions/shared/*`, `src/lib/api-client.ts`, DB schema, `AGENTS.md`/`CLAUDE.md`, `.claude/*`) does — serialize, or land the contract change first as its own small PR. Full grading in the `pickup` skill.
-- **Review:** cross-review when both developers are active; `/code-review` + self-merge allowed when solo. Rebase work branches on trunk when it moves.
+## Collaboration
+- **Trunk = the `trunk` branch named in `.claude/collab.json`** (currently `main`); changes land via PR — enforced by the server-side ruleset on `main` (the local `guard-trunk` hook is fast feedback on top).
+- Work on branches; open a draft PR early so what's in flight is visible.
+- Glance at open PRs before starting overlapping work; give a heads-up before big shared-contract changes (`functions/shared/*`, DB schema). Rebase work branches on trunk when it moves.
 - **Deploys: only from trunk, never from work branches** — merging to `main` deploys automatically (see Deploys). Announce on the merged PR.
 - **Bookkeeping:** merged PRs append a dated `migration/WORKLOG.md` entry (append-only) and update `migration/STATUS.html`'s checkpoint.
 
@@ -36,6 +35,13 @@ For genuinely tiny single-edit changes, do them inline; the skill itself signals
 ## Conventions
 - `.claude/rules/frontend.md` and `.claude/rules/functions.md` hold the hard-won per-tree conventions — read them before touching either tree.
 - `docs/adr/` holds the architecture decision records — they define what is and isn't allowed; read them before structural changes. Plain markdown, edited by hand (the adr-kit tooling was removed 2026-06-06).
+
+## Documentation policy
+- Docs describing current state must stay true or be deleted — git history is the archive; never leave "outdated, see X" markers.
+- Plans, handovers, and working notes are ephemeral: delete them once consumed.
+- ADRs are append-only — supersede with a new ADR, never edit or delete one.
+- Docs change in the same PR as the code they describe.
+- `migration/STATUS.html` stays bounded (a checkpoint, edited in place); `migration/WORKLOG.md` stays append-only.
 
 ## Deploys
 - Merging to `main` deploys automatically: the SWA workflow ships the frontend (and builds a preview environment per PR), the functions workflow ships the backend. Never deploy from work branches; announce the deploy on the merged PR (`deploying trunk @<sha>` → `deployed, smoke ok`).

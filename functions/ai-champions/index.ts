@@ -1,42 +1,23 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile, isActiveMember } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
+export default endpoint('ai-champions', async ({ req, reply, requireActiveMember }) => {
+  const body = await req.json() as { orgId?: unknown };
+  const { orgId } = body;
 
-    const body = await req.json() as { orgId?: unknown };
-    const { orgId } = body;
-
-    if (!orgId || typeof orgId !== 'string') {
-      return corsResponse(origin, 400, { error: 'orgId is required' });
-    }
-
-    // Authorization: platform admin OR active member of the org
-    const canAccess = profile.is_platform_admin || await isActiveMember(profile.id, orgId);
-    if (!canAccess) return corsResponse(origin, 403, { error: 'Forbidden' });
-
-    const champions = await query(
-      `SELECT a.*, json_build_object('id', pr.id, 'full_name', pr.full_name, 'department', pr.department) AS profile
-       FROM ai_champions a JOIN profiles pr ON pr.id = a.user_id
-       WHERE a.org_id = $1 ORDER BY a.assigned_at DESC`,
-      [orgId],
-    );
-
-    return corsResponse(origin, 200, { champions });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
+  if (!orgId || typeof orgId !== 'string') {
+    return reply(400, { error: 'orgId is required' });
   }
-}
 
-export default handler;
-app.http('ai-champions', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+  // Authorization: platform admin OR active member of the org
+  await requireActiveMember(orgId);
+
+  const champions = await query(
+    `SELECT a.*, json_build_object('id', pr.id, 'full_name', pr.full_name, 'department', pr.department) AS profile
+     FROM ai_champions a JOIN profiles pr ON pr.id = a.user_id
+     WHERE a.org_id = $1 ORDER BY a.assigned_at DESC`,
+    [orgId],
+  );
+
+  return reply(200, { champions });
+});

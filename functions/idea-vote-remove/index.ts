@@ -1,37 +1,19 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { query } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
+export default endpoint('idea-vote-remove', async ({ req, profile, reply }) => {
+  const body = await req.json() as { ideaId?: unknown };
+  const { ideaId } = body;
 
-    const body = await req.json() as { ideaId?: unknown };
-    const { ideaId } = body;
-
-    if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' });
-    }
-
-    // Blind delete — no idea load; idempotent (parity with old client blind-delete)
-    await query(
-      `DELETE FROM idea_votes WHERE idea_id = $1 AND user_id = $2`,
-      [ideaId, profile.id],
-    );
-
-    return corsResponse(origin, 200, { ok: true });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
+  if (!ideaId || typeof ideaId !== 'string') {
+    return reply(400, { error: 'ideaId is required' });
   }
-}
 
-export default handler;
-app.http('idea-vote-remove', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+  // Blind delete — no idea load; idempotent (parity with old client blind-delete)
+  await query(
+    `DELETE FROM idea_votes WHERE idea_id = $1 AND user_id = $2`,
+    [ideaId, profile.id],
+  );
+
+  return reply(200, { ok: true });
+});

@@ -1,9 +1,5 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
-import { corsPreflightResponse, corsResponse } from '../shared/cors';
-import { internalError } from '../shared/errors';
-import { getProfile } from '../shared/profile';
+import { endpoint } from '../shared/endpoint';
 
 // Author-writable fields. status, user_id, org_id, submitted_at, admin_notes,
 // rejection_reason, category_id, course/lesson context are NOT editable here —
@@ -37,90 +33,76 @@ interface IdeaRow {
   status: string;
 }
 
-async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const origin = req.headers.get('origin');
-  if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
-  try {
-    const user = await authenticate(req);
-    const profile = await getProfile(user);
-    if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
+export default endpoint('idea-update', async ({ req, profile, reply }) => {
+  const body = await req.json() as { ideaId?: unknown; updates?: unknown };
+  const { ideaId, updates } = body;
 
-    const body = await req.json() as { ideaId?: unknown; updates?: unknown };
-    const { ideaId, updates } = body;
+  if (!ideaId || typeof ideaId !== 'string') {
+    return reply(400, { error: 'ideaId is required' });
+  }
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+    return reply(400, { error: 'updates must be an object' });
+  }
 
-    if (!ideaId || typeof ideaId !== 'string') {
-      return corsResponse(origin, 400, { error: 'ideaId is required' });
-    }
-    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-      return corsResponse(origin, 400, { error: 'updates must be an object' });
-    }
+  const updatesObj = updates as Record<string, unknown>;
 
-    const updatesObj = updates as Record<string, unknown>;
+  // Filter to recognized whitelisted keys only (unknown keys are silently ignored).
+  const updateKeys = Object.keys(updatesObj).filter((k) => ALLOWED_UPDATE_FIELDS.has(k));
+  if (updateKeys.length === 0) {
+    return reply(400, { error: 'No valid update fields provided' });
+  }
 
-    // Filter to recognized whitelisted keys only (unknown keys are silently ignored).
-    const updateKeys = Object.keys(updatesObj).filter((k) => ALLOWED_UPDATE_FIELDS.has(k));
-    if (updateKeys.length === 0) {
-      return corsResponse(origin, 400, { error: 'No valid update fields provided' });
-    }
-
-    // Per-field validation on present whitelisted keys.
-    for (const key of updateKeys) {
-      const v = updatesObj[key];
-      if (key === 'tags') {
-        if (!Array.isArray(v) || !v.every((t) => typeof t === 'string')) {
-          return corsResponse(origin, 400, { error: 'tags must be an array of strings' });
-        }
-      } else if (key === 'business_area') {
-        if (v !== null && !BUSINESS_AREAS.includes(v as string)) {
-          return corsResponse(origin, 400, {
-            error: `business_area must be one of: ${BUSINESS_AREAS.join(', ')}`,
-          });
-        }
-      } else {
-        // STRING_FIELDS: string or null
-        if (v !== null && typeof v !== 'string') {
-          return corsResponse(origin, 400, { error: `${key} must be a string` });
-        }
+  // Per-field validation on present whitelisted keys.
+  for (const key of updateKeys) {
+    const v = updatesObj[key];
+    if (key === 'tags') {
+      if (!Array.isArray(v) || !v.every((t) => typeof t === 'string')) {
+        return reply(400, { error: 'tags must be an array of strings' });
+      }
+    } else if (key === 'business_area') {
+      if (v !== null && !BUSINESS_AREAS.includes(v as string)) {
+        return reply(400, {
+          error: `business_area must be one of: ${BUSINESS_AREAS.join(', ')}`,
+        });
+      }
+    } else {
+      // STRING_FIELDS: string or null
+      if (v !== null && typeof v !== 'string') {
+        return reply(400, { error: `${key} must be a string` });
       }
     }
-
-    // Load idea
-    const idea = await queryOne<IdeaRow>(
-      `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
-      [ideaId],
-    );
-    if (!idea) return corsResponse(origin, 404, { error: 'Idea not found' });
-
-    // Author-only: no admin bypass (org-admin writes go through idea-status-update).
-    if (idea.user_id !== profile.id) {
-      return corsResponse(origin, 403, { error: 'Forbidden' });
-    }
-
-    // Draft-only.
-    if (idea.status !== 'draft') {
-      return corsResponse(origin, 409, { error: 'Only draft ideas can be edited' });
-    }
-
-    // Build dynamic UPDATE over the provided whitelisted keys only.
-    const params: unknown[] = [];
-    const setClauses = updateKeys.map((key) => {
-      params.push(updatesObj[key]);
-      return `${key} = $${params.length}`;
-    });
-    params.push(ideaId);
-    const idIndex = params.length;
-
-    const updatedIdea = await queryOne(
-      `UPDATE ideas SET ${setClauses.join(', ')} WHERE id = $${idIndex} RETURNING *`,
-      params,
-    );
-
-    return corsResponse(origin, 200, { idea: updatedIdea });
-  } catch (err: unknown) {
-    if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
-    return internalError(context, origin, err);
   }
-}
 
-export default handler;
-app.http('idea-update', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });
+  // Load idea
+  const idea = await queryOne<IdeaRow>(
+    `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
+    [ideaId],
+  );
+  if (!idea) return reply(404, { error: 'Idea not found' });
+
+  // Author-only: no admin bypass (org-admin writes go through idea-status-update).
+  if (idea.user_id !== profile.id) {
+    return reply(403, { error: 'Forbidden' });
+  }
+
+  // Draft-only.
+  if (idea.status !== 'draft') {
+    return reply(409, { error: 'Only draft ideas can be edited' });
+  }
+
+  // Build dynamic UPDATE over the provided whitelisted keys only.
+  const params: unknown[] = [];
+  const setClauses = updateKeys.map((key) => {
+    params.push(updatesObj[key]);
+    return `${key} = $${params.length}`;
+  });
+  params.push(ideaId);
+  const idIndex = params.length;
+
+  const updatedIdea = await queryOne(
+    `UPDATE ideas SET ${setClauses.join(', ')} WHERE id = $${idIndex} RETURNING *`,
+    params,
+  );
+
+  return reply(200, { idea: updatedIdea });
+});

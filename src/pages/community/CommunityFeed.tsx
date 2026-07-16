@@ -266,7 +266,6 @@ export default function CommunityFeed() {
           ) : posts.length === 0 ? (
             <CommunityEmptyState
               variant="posts"
-              scope={scope}
               onAction={() => setShowPostForm(true)}
               actionLabel={t('community.createFirstPost')}
               hasActiveFilters={hasActiveFilters}

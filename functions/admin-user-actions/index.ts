@@ -1,3 +1,4 @@
+// Hand-rolled (not shared/endpoint.ts): legacy oid-only identity lookup (entra_oid without tid) and a custom 403 body — pending identity normalization.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
@@ -72,5 +73,5 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
 export default handler;
 // Route must not start with 'admin' — a reserved route prefix in Azure Functions
-// (admin/runtime/host). Suffix style matches quiz-options-admin.
+// (admin/runtime/host). Suffix style matches courses-admin.
 app.http('user-actions-admin', { methods: ['POST', 'OPTIONS'], authLevel: 'anonymous', handler });

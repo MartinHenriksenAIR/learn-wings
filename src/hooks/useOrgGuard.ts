@@ -1,6 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 
-export type OrgGuardState = 'loading' | 'no-org' | 'ready';
+type OrgGuardState = 'loading' | 'no-org' | 'ready';
 
 /**
  * The canonical profile-gated org loading guard (Dashboard pattern, #87).

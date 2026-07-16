@@ -18,7 +18,7 @@ const SCHEMA_PATH = resolve(__dirname, '../../../migration/azure/01-schema.sql')
 let cached: string | undefined;
 
 /** The canonical Azure schema as text (read once, reused). */
-export function readSchema(): string {
+function readSchema(): string {
   return (cached ??= readFileSync(SCHEMA_PATH, 'utf8'));
 }
 

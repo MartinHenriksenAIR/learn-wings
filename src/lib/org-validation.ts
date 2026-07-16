@@ -6,19 +6,19 @@ import { z } from 'zod';
 // src/lib/org-validation.test.ts pins both against the same fixture table,
 // so a drift in either copy fails the suite.
 
-export const ORG_NAME_MIN_LENGTH = 2;
-export const ORG_NAME_MAX_LENGTH = 100;
-export const ORG_SLUG_MIN_LENGTH = 2;
-export const ORG_SLUG_MAX_LENGTH = 50;
-export const ORG_SLUG_REGEX = /^[a-z0-9-]+$/;
+const ORG_NAME_MIN_LENGTH = 2;
+const ORG_NAME_MAX_LENGTH = 100;
+const ORG_SLUG_MIN_LENGTH = 2;
+const ORG_SLUG_MAX_LENGTH = 50;
+const ORG_SLUG_REGEX = /^[a-z0-9-]+$/;
 
-export const orgNameSchema = z
+const orgNameSchema = z
   .string()
   .trim()
   .min(ORG_NAME_MIN_LENGTH, `Name must be at least ${ORG_NAME_MIN_LENGTH} characters`)
   .max(ORG_NAME_MAX_LENGTH, `Name must be less than ${ORG_NAME_MAX_LENGTH} characters`);
 
-export const orgSlugSchema = z
+const orgSlugSchema = z
   .string()
   .min(ORG_SLUG_MIN_LENGTH, `Slug must be at least ${ORG_SLUG_MIN_LENGTH} characters`)
   .max(ORG_SLUG_MAX_LENGTH, `Slug must be less than ${ORG_SLUG_MAX_LENGTH} characters`)

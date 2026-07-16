@@ -912,3 +912,39 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Closes #28** — satisfies its acceptance criteria ("Password rotated + DATABASE_URL app setting updated before prod cutover") and doubles as the pre-cutover rotation gate; a matching comment is on the issue. **Filed #115** in the same session (bind `www.ai-uddannelse.dk`, Option B — www canonical + apex forward).
 
 **Op-note.** DB credential drift is invisible to the unauth smoke; confirming the deployed app's DB path actually works needs an authenticated request or a direct connection via the app's own config. Work branch `martin/status-bookkeeping` for this ledger update.
+
+---
+
+## 2026-07-15 — Cleanup branch: shared endpoint envelope factory + fleet migration (PR #129, in review)
+
+**Who:** emil & Claude. Branch `cleanup`, 18 commits, draft PR #129. This entry is the branch-closing docs/bookkeeping pass; merge + deploy will be announced on the PR.
+
+**Factory.** New deep module `functions/shared/endpoint.ts`: `endpoint()` / `adminEndpoint()` absorb the HTTP envelope every handler used to hand-roll (~20 lines × ~100 endpoints) — origin/CORS, OPTIONS→204 preflight, authenticate → getProfile → 401, the platform-admin 403 gate (before `run`, so before any body parsing), `AuthError`→401, the ADR-0014 constant-500 catch, and the `app.http` registration. Handlers get an `AuthedCtx` with `reply()` plus authz helpers (`requireOrgAdmin` / `requireActiveMember` / `requirePlatformAdmin`) that encode the platform-admin-bypass convention and throw `Reply(403, …)` (custom 403 bodies via `throw new Reply(403, {...})`). Frozen dependency set (shared auth/profile/cors/errors only) so contract tests keep mocking exactly those modules. **90 endpoints migrated in verified batches, per-endpoint contract tests unchanged**; `shared/guards.ts` retired; **8 hand-rolled endpoints remain as deliberate exceptions**, each now carrying a one-line pointer comment (first-login provisioning in `user-context`; binary PDF + token-only auth in the two generators; lazy email/SMTP clients with bespoke authz/response shapes; legacy oid-only identity lookups pending normalization). Recorded as **ADR-0015**; `.claude/rules/functions.md` rewritten — new endpoints MUST use the factory.
+
+**Fleet guard.** New `functions/registration-names.test.ts`: route↔folder parity, route uniqueness, reserved-prefix check (`admin`/`runtime`/`host`), barrel cross-check (every folder imported in `functions/index.ts`), folder-must-have-index — the silently-never-registers bug class is now test-caught instead of convention-guarded.
+
+**Reviews.** `/code-review` fix sweep applied on-branch (barrel guard, `requirePlatformAdmin` ctx helper, API simplification, doc accuracy); an over-engineering pass removed dead flexibility (NavLink wrapper, dead props/variants, speculative params, placeholder `shared/index.ts`); a security review found **no new vulnerabilities**.
+
+**Dead-code sweep.** Deleted 5 orphaned endpoints — `quiz-options`, `quiz-options-admin`, `invitation-link`, `azure-delete-blob`, `courses` (all zero-caller, each with WORKLOG provenance — e.g. `quiz-options-admin` orphaned since Slice 2's `quiz-admin` batched read) — plus 16 unused vendored ui components, 15 unused npm deps, ~111 dead i18n key pairs, and dead CSS/assets/types. **Net ≈ −4,800 lines.**
+
+**Runtime parity verification.** 285/285 unauthenticated envelope probes **byte-identical** between the old and new function hosts; the 5 deleted routes 404 as expected; frontend boot identical (Playwright).
+
+**Verify (this docs pass, post-pointer-comments).** Root `npm run lint` exit 0 (0 errors) + `npx tsc --noEmit -p tsconfig.app.json` exit 0; functions `npm run build` exit 0 + `npm test` **1576 pass / 3 skip** (109 files).
+
+**Bookkeeping.** ADR-0015 added (README ADR counts bumped 14→15, architecture sketch now names the factory); `functions/shared/endpoint.ts` header count corrected (10→8 hand-rolled); STATUS.html checkpoint gains the PR #129 "In flight" entry + the decommissioned-routes note. Stale-doc sweep deliberately left history as history: dated handover docs, `docs/superpowers/` plans/specs, `migration/lovable-supabase-removal/` ledgers, `migration/azure/` schema-provenance comments, prior WORKLOG entries, and accepted ADR texts (ADR-0008/0012 mention `azure-delete-blob` as historical decision context).
+
+---
+
+## 2026-07-16 — Documentation-slimming pass (cleanup branch, docs-only)
+
+**Who:** emil & Claude. Branch `cleanup` (rides PR #129). No code touched.
+
+**What.** Deleted the superseded documentation corpus — 34 files: the pre-migration root stack docs (`QUICK_START.md`, `AZURE_DEPLOYMENT_GUIDE.md`, `DEPLOYMENT_SUMMARY.md`), the consumed handover (`docs/handover-supabase-migration-2026-05-20.md`), all 5 dated implementation plans (`docs/superpowers/plans/`), 3 consumed design specs (two-person collab, PR-45 fix pass, course-review entry point — the **2026-06-03 cutover spec stays**, it is the `slice-workflow` skill's source of truth), the entire `migration/lovable-supabase-removal/` discovery/evidence tree, the dead adr-kit cache `docs/adr/.adr/`, and the orphaned `.github/agents/auditor.agent.md`. **Why (one line):** docs describing current state rot and mislead agents, ephemera should die once consumed — git history preserves every deleted byte, so deletion loses nothing. Reference fixes: README's repo-layout row, doc-map table, and "outdated companions" note rewritten to point only at living docs; the kept cutover spec's `Related:` line now says its companions were deleted. Codified as the new **`## Documentation policy`** section in `AGENTS.md`. Basis: Anthropic memory/context-engineering guidance (curated, current context beats bulk), Google documentation best practices (docs that can't be kept true should be deleted), and standard ADR practice (append-only; supersede, never edit).
+
+---
+
+## 2026-07-16 — Docs-triage follow-through (cleanup branch, docs-only)
+
+**Who:** emil & Claude. Branch `cleanup` (rides PR #129). No code touched.
+
+**What.** Follow-through on the documentation triage: retired the `slice-workflow` skill and the cutover design spec `docs/superpowers/specs/2026-06-03-supabase-azure-cutover-design.md` (migration complete — Slice 8 was the last; both were consumed ephemera, git history preserves them); removed `docs/adr/adr-index.json` (dead adr-kit residue, zero references); trimmed `migration/STATUS.html` back to its checkpoint role (short Current-State asof + ~5-line Done summary — the per-slice detail lives here in the WORKLOG; ~30.5 KB → ~15.8 KB); marked ADR-0012 `superseded` (its own supersession clause fulfilled — Task 9 shipped and `shared/auth.ts` does full JWKS validation, see ADR-0005); `git mv`'d ADR-0006 to `...nodejs-20...` so the filename matches its 2026-06-12 Node ~20 amendment. Dangling pointers fixed so nothing references the retired docs: `AGENTS.md` session-start, `README.md` (two skill lists), `.github/ISSUE_TEMPLATE/task.yml`, the `pickup`/`handoff` skills, and STATUS.html's pickup list + Collaboration line.
