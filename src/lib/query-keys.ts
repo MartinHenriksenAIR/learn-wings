@@ -219,6 +219,18 @@ export const queryKeys = {
     detail: (orgId: string | undefined) => ['org-detail', orgId] as const,
   },
 
+  // ── Platform settings (platform-admin) ────────────────────────────────────
+  platformSettings: {
+    /**
+     * ['platform-settings'] — the platform-wide settings list fetched by
+     * PlatformSettings. This IS the query key (the list takes no params), not
+     * merely an invalidation prefix: no mutation currently invalidates it,
+     * because saves write partial updates client-side and rely on local form
+     * state. Kept as `all` for shape-consistency with the other list families.
+     */
+    all: ['platform-settings'] as const,
+  },
+
   // ── LMS / Courses (platform-admin) ─────────────────────────────────────────
   coursesAdmin: {
     /** ['courses-admin'] — the admin course list + access matrix (one query) */

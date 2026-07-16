@@ -122,6 +122,11 @@ describe('queryKeys', () => {
     expect(queryKeys.quizAdmin.detail('lesson-1')).toEqual(['quiz-admin', 'lesson-1']);
   });
 
+  // platform-settings
+  it('platformSettings.all returns the root key', () => {
+    expect(queryKeys.platformSettings.all).toEqual(['platform-settings']);
+  });
+
   // profiles
   it('profiles.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.profiles.all).toEqual(['profiles']);
