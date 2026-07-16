@@ -1,6 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState, useMemo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import {
@@ -31,7 +30,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Search, BookOpen, ChevronRight, Users, Loader2 } from 'lucide-react';
-import { callApi } from '@/lib/api-client';
+import { useOrgCourseProgress } from '@/hooks/useOrgCourseProgress';
+import { useOrgCourseEnrollees } from '@/hooks/useOrgCourseEnrollees';
 import { LevelBadge } from '@/components/ui/level-badge';
 import { CourseLevel } from '@/lib/types';
 
@@ -57,71 +57,43 @@ interface CourseEnrollee {
 }
 
 export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
-  const [loading, setLoading] = useState(true);
-  const [courseStats, setCourseStats] = useState<CourseStats[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped');
   const [selectedCourse, setSelectedCourse] = useState<CourseStats | null>(null);
-  const [enrollees, setEnrollees] = useState<CourseEnrollee[]>([]);
-  const [loadingEnrollees, setLoadingEnrollees] = useState(false);
 
-  // Fetch course data
-  useEffect(() => {
-    const fetchCourseStats = async () => {
-      if (!orgId) return;
+  // Fetch course data via shared query hook
+  const courseProgressQuery = useOrgCourseProgress(orgId);
 
-      setLoading(true);
+  // Derive courseStats with avgProgress — byte-for-byte from the old fetchCourseStats
+  const courseStats = useMemo((): CourseStats[] => {
+    const data = courseProgressQuery.data;
+    if (!data) return [];
+    return data.courses.map((course) => ({
+      id: course.id,
+      title: course.title,
+      level: course.level,
+      enrolled: course.enrolled,
+      completed: course.completed,
+      avgProgress: course.enrolled > 0 ? Math.round((course.completed / course.enrolled) * 100) : 0,
+    }));
+  }, [courseProgressQuery.data]);
 
-      try {
-        const data = await callApi<{
-          courses: Array<{ id: string; title: string; level: CourseLevel; enrolled: number; completed: number }>;
-        }>('/api/org-course-progress', { orgId });
+  // Fetch enrollees for the selected course — enabled only while a course is selected
+  const enrolleesQuery = useOrgCourseEnrollees(orgId, selectedCourse?.id);
 
-        setCourseStats(
-          data.courses.map((course) => ({
-            id: course.id,
-            title: course.title,
-            level: course.level,
-            enrolled: course.enrolled,
-            completed: course.completed,
-            avgProgress: course.enrolled > 0 ? Math.round((course.completed / course.enrolled) * 100) : 0,
-          }))
-        );
-      } catch (error) {
-        console.error('Error loading course stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCourseStats();
-  }, [orgId]);
-
-  // Fetch enrollees for selected course
-  const fetchEnrollees = async (courseId: string) => {
-    setLoadingEnrollees(true);
-
-    try {
-      const data = await callApi<{
-        enrollees: Array<{ user_id: string; full_name: string; status: 'enrolled' | 'completed'; enrolled_at: string; completed_at: string | null }>;
-      }>('/api/org-course-enrollees', { orgId, courseId });
-
-      setEnrollees(
-        data.enrollees.map((e) => ({
-          userId: e.user_id,
-          name: e.full_name || 'Unknown',
-          status: e.status,
-          enrolledAt: e.enrolled_at,
-          completedAt: e.completed_at,
-        }))
-      );
-    } catch (error) {
-      console.error('Error loading enrollees:', error);
-    } finally {
-      setLoadingEnrollees(false);
-    }
-  };
+  // Derive enrollees (snake_case → camelCase) — byte-for-byte from the old fetchEnrollees
+  const enrollees = useMemo((): CourseEnrollee[] => {
+    const data = enrolleesQuery.data;
+    if (!data) return [];
+    return data.enrollees.map((e) => ({
+      userId: e.user_id,
+      name: e.full_name || 'Unknown',
+      status: e.status,
+      enrolledAt: e.enrolled_at,
+      completedAt: e.completed_at,
+    }));
+  }, [enrolleesQuery.data]);
 
   // Filter courses
   const filteredCourses = useMemo(() => {
@@ -154,7 +126,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
       className="flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
       onClick={() => {
         setSelectedCourse(course);
-        fetchEnrollees(course.id);
       }}
     >
       <div className="flex-1 min-w-0">
@@ -178,7 +149,7 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
     </div>
   );
 
-  if (loading) {
+  if (courseProgressQuery.isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -243,7 +214,7 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
         </Card>
       ) : viewMode === 'grouped' ? (
         <Accordion type="multiple" defaultValue={['basic', 'intermediate', 'advanced']} className="space-y-2">
-          {Object.entries(groupedByLevel).map(([level, courses]) => 
+          {Object.entries(groupedByLevel).map(([level, courses]) =>
             courses.length > 0 && (
               <AccordionItem key={level} value={level} className="border rounded-lg px-4">
                 <AccordionTrigger className="hover:no-underline">
@@ -282,7 +253,7 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
             </DialogTitle>
           </DialogHeader>
 
-          {loadingEnrollees ? (
+          {enrolleesQuery.isLoading ? (
             <div className="flex h-32 items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganizations } from '@/hooks/useOrganizations';
+import { useOrgAnalyticsData } from '@/hooks/useOrgAnalyticsData';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi, callApiRaw } from '@/lib/api-client';
 import { buildPublicUrl } from '@/lib/storage-url';
@@ -36,6 +37,14 @@ interface UserStats {
   avgQuizScore: number;
 }
 
+const ZERO_STATS = {
+  totalUsers: 0,
+  activeUsers7Days: 0,
+  activeUsers30Days: 0,
+  avgQuizScore: 0,
+  completionRate: 0,
+};
+
 export default function OrgAnalytics() {
   const { t } = useTranslation();
   const location = useLocation();
@@ -43,18 +52,8 @@ export default function OrgAnalytics() {
   const isGlobalView = location.pathname === '/app/admin/analytics/global';
   const { currentOrg, isPlatformAdmin, refreshUserContext } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
-  const [loading, setLoading] = useState(true);
   const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeUsers7Days: 0,
-    activeUsers30Days: 0,
-    avgQuizScore: 0,
-    completionRate: 0,
-  });
-  const [userStats, setUserStats] = useState<UserStats[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [logoDialogOpen, setLogoDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -82,81 +81,72 @@ export default function OrgAnalytics() {
   }, [orgsError]);
 
   // Determine which org ID to use for queries
-  const effectiveOrgId = isGlobalView 
+  const effectiveOrgId = isGlobalView
     ? (selectedOrgId === 'all' ? null : selectedOrgId)
     : currentOrg?.id;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!isGlobalView && !currentOrg) {
-        setLoading(false);
-        return;
-      }
+  // Fetch org analytics data via shared query hook. Disabled when no org is selected
+  // (effectiveOrgId null) — disabled query → isLoading false, matching the old
+  // "global all" path that skipped the fetch and showed empty stats immediately.
+  const analyticsQuery = useOrgAnalyticsData(effectiveOrgId ?? undefined);
 
-      setLoading(true);
-      const orgFilter = effectiveOrgId;
+  // Derive stats from query data — byte-for-byte reduction from the old fetchData
+  const stats = useMemo(() => {
+    const data = analyticsQuery.data;
+    if (!data) return ZERO_STATS;
 
-      if (orgFilter) {
-        // Org-specific view: fetch from Azure API
-        try {
-          const data = await callApi<{
-            members: Array<{ user_id: string; full_name: string; email: string; department?: string }>;
-            enrollments: Array<{ user_id: string; status: string; course_id: string }>;
-            quizAttempts: Array<{ user_id: string; score: number }>;
-          }>('/api/org-analytics-data', { orgId: orgFilter });
+    const totalUsers = data.members.length;
+    const totalEnrollments = data.enrollments.length;
+    const completedEnrollments = data.enrollments.filter(e => e.status === 'completed').length;
+    const completionRate = totalEnrollments > 0
+      ? Math.round((completedEnrollments / totalEnrollments) * 100) : 0;
+    const avgQuizScore = data.quizAttempts.length > 0
+      ? Math.round(data.quizAttempts.reduce((acc, a) => acc + a.score, 0) / data.quizAttempts.length) : 0;
 
-          const totalUsers = data.members.length;
-          const totalEnrollments = data.enrollments.length;
-          const completedEnrollments = data.enrollments.filter(e => e.status === 'completed').length;
-          const completionRate = totalEnrollments > 0
-            ? Math.round((completedEnrollments / totalEnrollments) * 100) : 0;
-          const avgQuizScore = data.quizAttempts.length > 0
-            ? Math.round(data.quizAttempts.reduce((acc, a) => acc + a.score, 0) / data.quizAttempts.length) : 0;
+    return { totalUsers, activeUsers7Days: 0, activeUsers30Days: 0, avgQuizScore, completionRate };
+  }, [analyticsQuery.data]);
 
-          setStats({ totalUsers, activeUsers7Days: 0, activeUsers30Days: 0, avgQuizScore, completionRate });
+  const departments = useMemo(() => {
+    const data = analyticsQuery.data;
+    if (!data) return [];
+    const depts = data.members.map(m => m.department).filter((d): d is string => Boolean(d));
+    return [...new Set(depts)];
+  }, [analyticsQuery.data]);
 
-          const depts = data.members.map(m => m.department).filter((d): d is string => Boolean(d));
-          setDepartments([...new Set(depts)]);
+  const userStats = useMemo((): UserStats[] => {
+    const data = analyticsQuery.data;
+    if (!data) return [];
 
-          const enrollmentMap = new Map<string, { total: number; completed: number }>();
-          data.enrollments.forEach(e => {
-            const existing = enrollmentMap.get(e.user_id) || { total: 0, completed: 0 };
-            existing.total += 1;
-            if (e.status === 'completed') existing.completed += 1;
-            enrollmentMap.set(e.user_id, existing);
-          });
+    const enrollmentMap = new Map<string, { total: number; completed: number }>();
+    data.enrollments.forEach(e => {
+      const existing = enrollmentMap.get(e.user_id) || { total: 0, completed: 0 };
+      existing.total += 1;
+      if (e.status === 'completed') existing.completed += 1;
+      enrollmentMap.set(e.user_id, existing);
+    });
 
-          const attemptMap = new Map<string, { totalScore: number; attempts: number }>();
-          data.quizAttempts.forEach(a => {
-            const existing = attemptMap.get(a.user_id) || { totalScore: 0, attempts: 0 };
-            existing.totalScore += a.score;
-            existing.attempts += 1;
-            attemptMap.set(a.user_id, existing);
-          });
+    const attemptMap = new Map<string, { totalScore: number; attempts: number }>();
+    data.quizAttempts.forEach(a => {
+      const existing = attemptMap.get(a.user_id) || { totalScore: 0, attempts: 0 };
+      existing.totalScore += a.score;
+      existing.attempts += 1;
+      attemptMap.set(a.user_id, existing);
+    });
 
-          setUserStats(data.members.map(m => {
-            const enrollStats = enrollmentMap.get(m.user_id) || { total: 0, completed: 0 };
-            const attemptStats = attemptMap.get(m.user_id) || { totalScore: 0, attempts: 0 };
-            return {
-              id: m.user_id,
-              name: m.full_name,
-              department: m.department || null,
-              enrollments: enrollStats.total,
-              completed: enrollStats.completed,
-              avgQuizScore: attemptStats.attempts > 0
-                ? Math.round(attemptStats.totalScore / attemptStats.attempts) : 0,
-            };
-          }));
-        } catch (err) {
-          console.error('Failed to fetch analytics data:', err);
-        }
-      }
-      // Global view (all orgs) not yet supported via API — show empty stats
-      setLoading(false);
-    };
-
-    fetchData();
-  }, [currentOrg, effectiveOrgId, isGlobalView]);
+    return data.members.map(m => {
+      const enrollStats = enrollmentMap.get(m.user_id) || { total: 0, completed: 0 };
+      const attemptStats = attemptMap.get(m.user_id) || { totalScore: 0, attempts: 0 };
+      return {
+        id: m.user_id,
+        name: m.full_name,
+        department: m.department || null,
+        enrollments: enrollStats.total,
+        completed: enrollStats.completed,
+        avgQuizScore: attemptStats.attempts > 0
+          ? Math.round(attemptStats.totalScore / attemptStats.attempts) : 0,
+      };
+    });
+  }, [analyticsQuery.data]);
 
   // Generate compliance report
   const handleGenerateReport = async () => {
@@ -216,7 +206,7 @@ export default function OrgAnalytics() {
     return <Navigate to="/app/dashboard" replace />;
   }
 
-  if (loading || settingsLoading) {
+  if (analyticsQuery.isLoading || settingsLoading) {
     return (
       <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
         <PageSpinner />

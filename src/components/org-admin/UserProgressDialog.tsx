@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { callApi } from '@/lib/api-client';
+import { useUserProgress } from '@/hooks/useUserProgress';
 import {
   Loader2,
   CheckCircle2,
@@ -93,9 +93,13 @@ export function UserProgressDialog({
   open,
   onOpenChange,
 }: UserProgressDialogProps) {
-  const [loading, setLoading] = useState(true);
-  const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([]);
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
+
+  // Fetch gated on dialog open — query key includes userId so switching users
+  // yields a fresh cache entry; stale data from a previous user is never shown.
+  const query = useUserProgress(orgId, userId, { enabled: open });
+  const courseProgress: CourseProgress[] = query.data?.courses ?? [];
+  const loading = query.isLoading;
 
   // Summary stats
   const totalEnrolled = courseProgress.length;
@@ -105,32 +109,10 @@ export function UserProgressDialog({
     ? Math.round(allQuizAttempts.reduce((acc, a) => acc + a.score, 0) / allQuizAttempts.length)
     : 0;
   const lastActivity = allQuizAttempts.length > 0
-    ? allQuizAttempts.sort((a, b) => 
+    ? allQuizAttempts.sort((a, b) =>
         new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
       )[0]?.startedAt
     : null;
-
-  useEffect(() => {
-    if (open && userId && orgId) {
-      fetchUserProgress();
-    }
-  }, [open, userId, orgId]);
-
-  const fetchUserProgress = async () => {
-    setLoading(true);
-    try {
-      // Slice 3c: the old 5-query fan-out is aggregated server-side.
-      const { courses } = await callApi<{ courses: CourseProgress[] }>(
-        '/api/user-progress',
-        { orgId, userId },
-      );
-      setCourseProgress(courses);
-    } catch (error) {
-      console.error('Error fetching user progress:', error); // parity: no toast
-      setCourseProgress([]); // review fix: don't render a previous user's data under this user's name
-    }
-    setLoading(false);
-  };
 
   const toggleCourse = (courseId: string) => {
     setExpandedCourses(prev => {

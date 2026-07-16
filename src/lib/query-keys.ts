@@ -231,6 +231,41 @@ export const queryKeys = {
     all: ['platform-settings'] as const,
   },
 
+  // ── Org analytics (org-admin) ──────────────────────────────────────────────
+  orgAnalyticsData: {
+    /**
+     * Full key: ['org-analytics-data', orgId]
+     * Used by useOrgAnalyticsData / OrgAnalytics.tsx.
+     */
+    detail: (orgId: string | undefined) => ['org-analytics-data', orgId] as const,
+  },
+
+  orgCourseProgress: {
+    /**
+     * Full key: ['org-course-progress', orgId]
+     * Used by useOrgCourseProgress / CourseProgressTab.tsx.
+     */
+    detail: (orgId: string | undefined) => ['org-course-progress', orgId] as const,
+  },
+
+  orgCourseEnrollees: {
+    /**
+     * Full key: ['org-course-enrollees', orgId, courseId]
+     * Used by useOrgCourseEnrollees / CourseProgressTab.tsx.
+     */
+    detail: (orgId: string | undefined, courseId: string | undefined) =>
+      ['org-course-enrollees', orgId, courseId] as const,
+  },
+
+  userProgress: {
+    /**
+     * Full key: ['user-progress', orgId, userId]
+     * Used by useUserProgress / UserProgressDialog.tsx.
+     */
+    detail: (orgId: string | undefined, userId: string | undefined) =>
+      ['user-progress', orgId, userId] as const,
+  },
+
   // ── LMS / Courses (platform-admin) ─────────────────────────────────────────
   coursesAdmin: {
     /** ['courses-admin'] — the admin course list + access matrix (one query) */

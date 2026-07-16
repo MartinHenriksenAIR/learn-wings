@@ -158,4 +158,36 @@ describe('queryKeys', () => {
   it('orgDetail.detail with undefined orgId', () => {
     expect(queryKeys.orgDetail.detail(undefined)).toEqual(['org-detail', undefined]);
   });
+
+  // org-analytics-data
+  it('orgAnalyticsData.detail returns the parameterized key', () => {
+    expect(queryKeys.orgAnalyticsData.detail('org-1')).toEqual(['org-analytics-data', 'org-1']);
+  });
+  it('orgAnalyticsData.detail with undefined orgId', () => {
+    expect(queryKeys.orgAnalyticsData.detail(undefined)).toEqual(['org-analytics-data', undefined]);
+  });
+
+  // org-course-progress
+  it('orgCourseProgress.detail returns the parameterized key', () => {
+    expect(queryKeys.orgCourseProgress.detail('org-1')).toEqual(['org-course-progress', 'org-1']);
+  });
+  it('orgCourseProgress.detail with undefined orgId', () => {
+    expect(queryKeys.orgCourseProgress.detail(undefined)).toEqual(['org-course-progress', undefined]);
+  });
+
+  // org-course-enrollees
+  it('orgCourseEnrollees.detail returns the parameterized key', () => {
+    expect(queryKeys.orgCourseEnrollees.detail('org-1', 'course-1')).toEqual(['org-course-enrollees', 'org-1', 'course-1']);
+  });
+  it('orgCourseEnrollees.detail with undefined params', () => {
+    expect(queryKeys.orgCourseEnrollees.detail(undefined, undefined)).toEqual(['org-course-enrollees', undefined, undefined]);
+  });
+
+  // user-progress
+  it('userProgress.detail returns the parameterized key', () => {
+    expect(queryKeys.userProgress.detail('org-1', 'user-1')).toEqual(['user-progress', 'org-1', 'user-1']);
+  });
+  it('userProgress.detail with undefined params', () => {
+    expect(queryKeys.userProgress.detail(undefined, undefined)).toEqual(['user-progress', undefined, undefined]);
+  });
 });
