@@ -47,6 +47,6 @@ export function useInvitations(
       return Array.isArray(invitations) ? invitations : [];
     },
     staleTime: options.staleTime ?? 30 * 1000,
-    enabled: options.enabled ?? !!orgId,
+    enabled: (options.enabled ?? true) && !!orgId,
   });
 }

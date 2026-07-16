@@ -79,6 +79,6 @@ export function useOrgMemberships(
       return rows.map(reshapeMembership);
     },
     staleTime: options.staleTime ?? 30 * 1000,
-    enabled: options.enabled ?? !!orgId,
+    enabled: (options.enabled ?? true) && !!orgId,
   });
 }

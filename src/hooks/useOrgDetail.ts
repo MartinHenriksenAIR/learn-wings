@@ -43,6 +43,6 @@ export function useOrgDetail(orgId: string | undefined, options: UseOrgDetailOpt
       }
     },
     staleTime: options.staleTime ?? 60 * 1000,
-    enabled: options.enabled ?? !!orgId,
+    enabled: (options.enabled ?? true) && !!orgId,
   });
 }
