@@ -178,10 +178,11 @@ export const queryKeys = {
 
   profiles: {
     /**
-     * ['profiles'] — use for invalidation prefix.
-     * Covers the platform-wide user list fetched by OrganizationsManager and
-     * OrganizationDetail. An `all` prefix is warranted because org-create and
-     * org-member-add mutations invalidate by prefix after adding users.
+     * ['profiles'] — the platform-wide user list fetched by OrganizationsManager
+     * and OrganizationDetail. This IS the query key (the list takes no params),
+     * not merely an invalidation prefix: no mutation currently invalidates it,
+     * because adding an existing profile to an org does not change the profile
+     * list. Kept as `all` for shape-consistency with the other list families.
      */
     all: ['profiles'] as const,
   },
