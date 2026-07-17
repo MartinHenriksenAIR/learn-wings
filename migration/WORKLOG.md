@@ -968,3 +968,15 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Deferred to follow-up (filed this session):** `CoursePlayer.tsx` (cascading course→quiz→signed-URL fetches), the community form components, `EnrollUserDialog`'s composite course fetch, migrating the `PlatformSettingsContext`/`AuthContext` providers (which would let `Settings`/`OrgSettings` share cache), and normalizing `AIChampionsList` onto `useAiChampions`. Left the B1/D/E `enabled` idiom unified as `(options.enabled ?? true) && !!<param>` across the hook family.
 
 **Verify (per batch + final).** Root `npm run lint` exit 0 (0 errors) · `npm test` **325 pass** (53 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Net ≈ +4,369 / −1,692 across ~68 files. New-frontend-fetching convention recorded in `.claude/rules/frontend.md`. Merge + deploy announced on PR #134.
+
+---
+
+## 2026-07-17 — Frontend deepening shipped via PR #155 (supersedes #134); s8emil spam-flag diagnosed
+
+**Who:** emil & Claude. Merge + deploy from the main session; smoke sweep via Playwright MCP on prod.
+
+**The CI mystery resolved.** PR #134 sat with zero check-runs through pushes and a close/reopen while GitHub's status page was green. Root cause was **not** the 07-16 REST-API incident: GitHub spam-flagged the `s8emil` account (~07-16 13:00 UTC, after a burst of empty re-trigger commits, PR close/reopen cycles, and ~20 rapid issue creations). Flagged accounts get their content shadow-hidden (PRs #129/#130/#134 and issues #135–#154 return 404 to everyone else, profile 404s unauthenticated) and **Actions schedules no workflow runs for their events**. Diagnostic tell: `vercel`/`devin` check-suites existed on the head commit but no `github-actions` suite. Proof: PR #155, same branch + same commits but authored by `emkataumre`, scheduled CI instantly and went green. Appeal to be filed via support.github.com as s8emil; quirk recorded in STATUS.html.
+
+**Merge + deploy.** #134 closed as superseded; **PR #155 merged → `main` @ `774f530`** (issue #132 auto-closed). All three trunk workflows green (CI, SWA, functions). Signed-in Playwright smoke on prod (`black-forest-0d7f96c03.7.azurestaticapps.net`), all three role views: platform-admin (orgs list, the decomposed OrganizationDetail with stat cards/members/invitations, Edit dialog pre-fill, `OrgNotFoundScreen` on a bogus org id, PlatformSettings tabs), org-admin (analytics overview + org-switch refetch, OrgMembersTab incl. the AI-champion badge, Learning Progress + UserProgressDialog, Courses + enrollees dialog), learner (dashboard empty-state, courses catalog with signed thumbnails, **enroll→dual-key-invalidation→unenroll round-trip observed live**), community feed (AI Champions sidebar consistent with the members tab). Zero app console errors — the only console entries were Microsoft's login-page favicon 404 and the deliberate bogus-org 404 probe.
+
+**Observation for later:** a learner shows "In Progress" with 4/4 lessons done (completion likely gated on something beyond lesson count) — pre-existing behavior, noted during the sweep, not a regression.
