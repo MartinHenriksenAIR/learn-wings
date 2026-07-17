@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,13 +62,13 @@ export default function CommunityFeed() {
 
   // Fetch categories
   const { data: categories = [] } = useQuery({
-    queryKey: ['community-categories'],
+    queryKey: queryKeys.communityCategories.all,
     queryFn: fetchCategories,
   });
 
   // Fetch posts
   const { data: posts = [], isLoading } = useQuery({
-    queryKey: ['community-posts', scope, currentOrg?.id, selectedCategory, searchQuery, selectedTags],
+    queryKey: queryKeys.communityPosts.list(scope, currentOrg?.id, selectedCategory, searchQuery, selectedTags),
     queryFn: () => fetchPosts({
       scope,
       org_id: scope === 'org' ? currentOrg?.id : undefined,
@@ -82,7 +83,7 @@ export default function CommunityFeed() {
   const createPostMutation = useMutation({
     mutationFn: createPost,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-posts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityPosts.all });
       toast({ title: 'Post created successfully!' });
     },
     onError: (error: Error) => {
@@ -95,7 +96,7 @@ export default function CommunityFeed() {
     mutationFn: ({ postId, hidden }: { postId: string; hidden: boolean }) =>
       togglePostHidden(postId, hidden),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-posts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityPosts.all });
     },
   });
 
@@ -103,7 +104,7 @@ export default function CommunityFeed() {
     mutationFn: ({ postId, locked }: { postId: string; locked: boolean }) =>
       togglePostLocked(postId, locked),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-posts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityPosts.all });
     },
   });
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // --- mock react-i18next (no i18n provider needed) ---
@@ -20,7 +21,7 @@ vi.mock('@/lib/api-client', () => ({
 }));
 
 vi.mock('@/lib/storage', () => ({
-  getSignedLmsAssetUrl: vi.fn(),
+  getSignedLmsAssetUrl: vi.fn().mockResolvedValue(null),
 }));
 
 // --- mock sonner toast ---
@@ -56,11 +57,18 @@ const baseAuthState = {
   effectiveIsOrgAdmin: false,
 };
 
-function renderCourses() {
+function makeClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+}
+
+function renderCourses(client?: QueryClient) {
+  const qc = client ?? makeClient();
   return render(
-    <MemoryRouter>
-      <LearnerCourses />
-    </MemoryRouter>
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <LearnerCourses />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -103,9 +111,17 @@ describe('LearnerCourses — profile-gated loading guard', () => {
   it('fetches and resolves the spinner once the profile and org resolve (keep-waiting → ready)', async () => {
     vi.mocked(callApi).mockResolvedValue({ courses: [], enrollments: [] });
 
+    const qc = makeClient();
+
     // Initial render: context unresolved → spinner, no fetch
     mockUseAuth.mockReturnValue({ ...baseAuthState, user: baseAuthState.user, profile: null, currentOrg: null });
-    const { rerender } = renderCourses();
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <LearnerCourses />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
     expect(document.querySelector('.animate-spin')).not.toBeNull();
     expect(callApi).not.toHaveBeenCalled();
 
@@ -113,9 +129,11 @@ describe('LearnerCourses — profile-gated loading guard', () => {
     const currentOrg = { id: 'org-1', name: 'Org One' };
     mockUseAuth.mockReturnValue({ ...baseAuthState, profile: baseAuthState.profile, currentOrg });
     rerender(
-      <MemoryRouter>
-        <LearnerCourses />
-      </MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <LearnerCourses />
+        </MemoryRouter>
+      </QueryClientProvider>
     );
 
     await waitFor(() => {

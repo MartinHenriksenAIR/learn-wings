@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { callApi } from '@/lib/api-client';
+import { queryKeys } from '@/lib/query-keys';
 import { Loader2, Plus, Trash2, GripVertical, CheckCircle2, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -52,7 +53,7 @@ interface QuizAdminResponse {
 }
 
 /** Cache key for one lesson's admin quiz (quiz + questions + options). */
-const quizAdminQueryKey = (lessonId: string) => ['quiz-admin', lessonId] as const;
+const quizAdminQueryKey = (lessonId: string) => queryKeys.quizAdmin.detail(lessonId);
 
 export function QuizEditorDialog({
   lessonId,

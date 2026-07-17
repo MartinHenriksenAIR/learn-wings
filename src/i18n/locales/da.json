@@ -9,7 +9,6 @@
     "next": "Næste",
     "previous": "Forrige",
     "all": "Alle",
-    "no": "Nej",
     "actions": "Handlinger",
     "continue": "Fortsæt",
     "download": "Download",
@@ -48,9 +47,7 @@
     }
   },
   "auth": {
-    "signIn": "Log ind",
     "email": "E-mail",
-    "password": "Adgangskode",
     "platformDescription": "Enterprise læringsplatform",
     "accessProvidedByOrg": "Adgang leveres af din organisation",
     "passwordResetInfo": "Nulstilling af adgangskode håndteres af din organisations IT-administrator via Microsoft Entra ID.",
@@ -123,7 +120,6 @@
   },
   "courses": {
     "title": "Kursuskatalog",
-    "enroll": "Tilmeld",
     "progress": "Fremgang",
     "level": "Niveau",
     "levels": {
@@ -667,7 +663,6 @@
     "title": "Certifikater",
     "noCertificates": "Ingen certifikater endnu",
     "noCertificatesDescription": "Gennemfør kurser for at optjene certifikater. De vises her, når du er færdig.",
-    "download": "Download",
     "certificateOfCompletion": "Certifikat for gennemførelse",
     "issuedTo": "Udstedt til {{name}} · {{date}}",
     "hasSuccessfullyCompleted": "har gennemført",

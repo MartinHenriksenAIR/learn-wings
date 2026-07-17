@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // --- mock react-i18next (no i18n provider needed) ---
@@ -61,10 +62,15 @@ const successResponse = {
 };
 
 function renderPage() {
+  // `retry: false` so hook queries surface load errors immediately (matching
+  // the old imperative fetch, which never retried).
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <PlatformSettings />
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <PlatformSettings />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

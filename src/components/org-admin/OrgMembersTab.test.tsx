@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // --- mock react-i18next (no i18n provider needed) ---
@@ -60,6 +61,17 @@ import { OrgMembersTab } from './OrgMembersTab';
 
 const mockCallApi = vi.mocked(callApi);
 
+// The component now reads from the shared TanStack Query hooks, so every render
+// needs a QueryClient in context. retry:false keeps error paths deterministic.
+function renderTab() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <OrgMembersTab />
+    </QueryClientProvider>,
+  );
+}
+
 const membershipRow = {
   id: 'm-2',
   org_id: 'org-1',
@@ -86,11 +98,15 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
   it('second click while in-flight does not fire a second API call; guard clears in finally', async () => {
     let createCalls = 0;
     let resolveCreate: ((v: unknown) => void) | undefined;
+    // The champion toggle invalidates the ['ai-champions'] cache on success
+    // (rather than hand-patching it), so the badge flip is driven by this
+    // refetch returning the newly-created champion.
+    let champions: Array<{ user_id: string }> = [];
 
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/org-memberships') return { memberships: [membershipRow] };
       if (path === '/api/invitations') return { invitations: [] };
-      if (path === '/api/ai-champions') return { champions: [] };
+      if (path === '/api/ai-champions') return { champions };
       if (path === '/api/ai-champion-create') {
         createCalls++;
         return new Promise((res) => {
@@ -100,21 +116,28 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
       throw new Error(`Unexpected callApi path: ${path}`);
     });
 
-    render(<OrgMembersTab />);
+    renderTab();
 
     // The mocked t() returns the i18n key verbatim, so the action labels are the
     // keys themselves (analytics.members.makeAiChampion / removeAiChampion).
     const item = await screen.findByRole('button', { name: 'analytics.members.makeAiChampion' });
 
     fireEvent.click(item);
-    expect(createCalls).toBe(1);
+    // The in-flight guard (setTogglingChampion) fires synchronously in the click
+    // handler, so the item disables immediately.
     expect(item).toBeDisabled();
+    // useMutation dispatches the mutationFn on a microtask, so the request fires
+    // one tick after the click (the old imperative code called it synchronously).
+    await waitFor(() => expect(createCalls).toBe(1));
 
-    // Second fast click while the first request is still in flight
+    // Second fast click while the first request is still in flight — the button
+    // is disabled, so onClick never fires and no second request is dispatched.
     fireEvent.click(item);
     expect(createCalls).toBe(1);
 
-    // Let the request finish — the guard clears in finally and the badge state flips
+    // Let the request finish — the server now reports the member as a champion,
+    // so the post-success refetch flips the badge and the guard clears.
+    champions = [{ user_id: 'u-2' }];
     await act(async () => {
       resolveCreate?.({});
     });
@@ -164,7 +187,7 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
   });
 
   it('copy link writes to clipboard and morphs to "Copied!" with no toast', async () => {
-    render(<OrgMembersTab />);
+    renderTab();
 
     const copyBtn = await screen.findByRole('button', { name: 'analytics.members.copyLink' });
     fireEvent.click(copyBtn);
@@ -179,7 +202,7 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
   });
 
   it('revoke shows inline "Revoked" feedback, removes the row, and fires no success toast', async () => {
-    render(<OrgMembersTab />);
+    renderTab();
 
     const revokeBtn = await screen.findByRole('button', { name: 'analytics.members.revoke' });
     fireEvent.click(revokeBtn);

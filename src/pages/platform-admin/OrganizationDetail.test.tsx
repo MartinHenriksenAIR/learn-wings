@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // --- mock react-i18next (no i18n provider needed) ---
@@ -100,12 +101,17 @@ const membershipRow = {
 };
 
 function renderPage() {
+  // `retry: false` so hook queries surface load errors immediately (matching
+  // the old imperative fetch, which never retried).
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={['/app/admin/organizations/org-1']}>
-      <Routes>
-        <Route path="/app/admin/organizations/:orgId" element={<OrganizationDetail />} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/app/admin/organizations/org-1']}>
+        <Routes>
+          <Route path="/app/admin/organizations/:orgId" element={<OrganizationDetail />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

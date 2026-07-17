@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,6 +20,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
+import { useToastMutation } from '@/hooks/useToastMutation';
+import { usePlatformSettingsAdmin } from '@/hooks/usePlatformSettingsAdmin';
 import { Loader2, Palette, Users, Mail, ToggleLeft, AlertTriangle } from 'lucide-react';
 
 interface BrandingSettings {
@@ -58,6 +60,7 @@ interface FeatureSettings {
 }
 
 type SettingsKey = 'branding' | 'user_access' | 'email' | 'features';
+type SettingsValue = BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings;
 
 const defaultBranding: BrandingSettings = {
   platform_name: 'AIR Academy',
@@ -105,9 +108,6 @@ const featureKeys: (keyof FeatureSettings)[] = [
 export default function PlatformSettings() {
   const { t } = useTranslation();
   const { flashed, flash } = useFlash();
-  const [loading, setLoading] = useState(true);
-  const [populated, setPopulated] = useState(false);
-  const [saving, setSaving] = useState<SettingsKey | null>(null);
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsKey>('branding');
 
@@ -116,65 +116,53 @@ export default function PlatformSettings() {
   const [email, setEmail] = useState<EmailSettings>(defaultEmail);
   const [features, setFeatures] = useState<FeatureSettings>(defaultFeatures);
 
-  const fetchSettings = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { settings } = await callApi<{ settings: Array<{ key: string; value: Record<string, unknown> }> }>('/api/platform-settings', {});
-      settings.forEach((setting) => {
-        const value = (setting.value as Record<string, unknown>) || {};
-        switch (setting.key) {
-          case 'branding':
-            setBranding({ ...defaultBranding, ...(value as Partial<BrandingSettings>) });
-            break;
-          case 'user_access':
-            setUserAccess({ ...defaultUserAccess, ...(value as Partial<UserAccessSettings>) });
-            break;
-          case 'email':
-            setEmail({ ...defaultEmail, ...(value as Partial<EmailSettings>) });
-            break;
-          case 'features':
-            setFeatures({ ...defaultFeatures, ...(value as Partial<FeatureSettings>) });
-            break;
-        }
-      });
-      setPopulated(true);
-    } catch (error) {
-      toast({
-        title: t('platformSettings.loadFailedTitle'),
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-    // deps deliberately empty: closes only over module constants and stable setters — referencing component state here would create a stale closure
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const query = usePlatformSettingsAdmin();
 
+  // Seed local form state from the server — runs the same switch as the old
+  // fetchSettings so merge semantics are byte-for-byte identical.
   useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+    if (!query.data) return;
+    query.data.forEach((setting) => {
+      const value = (setting.value as Record<string, unknown>) || {};
+      switch (setting.key) {
+        case 'branding':
+          setBranding({ ...defaultBranding, ...(value as Partial<BrandingSettings>) });
+          break;
+        case 'user_access':
+          setUserAccess({ ...defaultUserAccess, ...(value as Partial<UserAccessSettings>) });
+          break;
+        case 'email':
+          setEmail({ ...defaultEmail, ...(value as Partial<EmailSettings>) });
+          break;
+        case 'features':
+          setFeatures({ ...defaultFeatures, ...(value as Partial<FeatureSettings>) });
+          break;
+      }
+    });
+  }, [query.data]);
 
   // Per-panel save. Sends ONLY the panel's fields under `value`; the server
   // merges with the stored config (`value || $2::jsonb`), so partial/malformed
   // writes never clobber other keys (#90). Routine saves morph the button
   // ("Saved" / green) instead of firing a success toast (toast policy); errors
   // keep their toast.
-  const saveSetting = async (key: SettingsKey, value: BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings) => {
-    if (!populated) return;
-    setSaving(key);
-    try {
-      await callApi('/api/platform-settings-update', { key, value });
-      flash(key);
-    } catch (error) {
-      toast({
-        title: t('platformSettings.saveFailed'),
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(null);
-    }
+  const saveSettingMutation = useToastMutation({
+    mutationFn: ({ key, value }: { key: SettingsKey; value: SettingsValue }) =>
+      callApi('/api/platform-settings-update', { key, value }),
+    errorTitle: t('platformSettings.saveFailed'),
+    onSuccess: (_data, variables) => {
+      flash(variables.key);
+    },
+  });
+
+  // Per-panel disabled state derived from the single shared mutation: only the
+  // panel whose save is in flight is disabled (matches the old `saving === key`).
+  const isSaving = (key: SettingsKey) =>
+    saveSettingMutation.isPending && saveSettingMutation.variables?.key === key;
+
+  const saveSetting = (key: SettingsKey, value: SettingsValue) => {
+    if (!query.isSuccess) return;
+    saveSettingMutation.mutate({ key, value });
   };
 
   const handleTestSmtpConnection = async () => {
@@ -210,7 +198,7 @@ export default function PlatformSettings() {
     }
   };
 
-  if (loading) {
+  if (query.isLoading) {
     return (
       <AppLayout breadcrumbs={[{ label: t('platformSettings.title') }]}>
         <PageSpinner />
@@ -218,7 +206,7 @@ export default function PlatformSettings() {
     );
   }
 
-  if (!populated) {
+  if (!query.isSuccess) {
     return (
       <AppLayout breadcrumbs={[{ label: t('platformSettings.title') }]}>
         <div className="flex h-64 items-center justify-center">
@@ -227,7 +215,7 @@ export default function PlatformSettings() {
             title={t('platformSettings.loadFailedTitle')}
             description={t('platformSettings.loadFailedDescription')}
             action={
-              <Button variant="outline" onClick={fetchSettings}>
+              <Button variant="outline" onClick={() => query.refetch()}>
                 {t('platformSettings.retry')}
               </Button>
             }
@@ -333,7 +321,7 @@ export default function PlatformSettings() {
                 done={flashed('branding')}
                 idleLabel={t('platformSettings.branding.save')}
                 onClick={() => saveSetting('branding', branding)}
-                disabled={saving === 'branding'}
+                disabled={isSaving('branding')}
               />
             </CardContent>
           </Card>
@@ -385,7 +373,7 @@ export default function PlatformSettings() {
                 done={flashed('user_access')}
                 idleLabel={t('platformSettings.userAccess.save')}
                 onClick={() => saveSetting('user_access', { ...userAccess, default_role: 'learner' })}
-                disabled={saving === 'user_access'}
+                disabled={isSaving('user_access')}
               />
             </CardContent>
           </Card>
@@ -503,7 +491,7 @@ export default function PlatformSettings() {
                   done={flashed('email')}
                   idleLabel={t('platformSettings.email.save')}
                   onClick={() => saveSetting('email', email)}
-                  disabled={saving === 'email'}
+                  disabled={isSaving('email')}
                 />
               </div>
             </CardContent>
@@ -541,7 +529,7 @@ export default function PlatformSettings() {
                 done={flashed('features')}
                 idleLabel={t('platformSettings.features.save')}
                 onClick={() => saveSetting('features', features)}
-                disabled={saving === 'features'}
+                disabled={isSaving('features')}
               />
             </CardContent>
           </Card>

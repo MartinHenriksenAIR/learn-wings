@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,14 +58,14 @@ export default function IdeaDetail() {
 
   // Fetch idea
   const { data: idea, isLoading: ideaLoading } = useQuery({
-    queryKey: ['idea', ideaId],
+    queryKey: queryKeys.idea.detail(ideaId),
     queryFn: () => fetchIdea(ideaId!),
     enabled: !!ideaId,
   });
 
   // Fetch comments
   const { data: comments = [] } = useQuery({
-    queryKey: ['idea-comments', ideaId],
+    queryKey: queryKeys.ideaComments.list(ideaId),
     queryFn: () => fetchIdeaComments(ideaId!),
     enabled: !!ideaId,
   });
@@ -85,8 +86,8 @@ export default function IdeaDetail() {
     mutationFn: (content: string) =>
       createIdeaComment(ideaId!, currentOrg!.id, content),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['idea-comments', ideaId] });
-      queryClient.invalidateQueries({ queryKey: ['idea', ideaId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ideaComments.list(ideaId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
       setNewComment('');
       // Routine: the new comment appearing in the thread is the feedback
       // (matches PostDetail) — no success toast (toast policy). Errors keep toasts.
@@ -101,7 +102,7 @@ export default function IdeaDetail() {
   const voteMutation = useMutation({
     mutationFn: () => voteForIdea(ideaId!, currentOrg!.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['idea', ideaId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
     },
     onError: () => {
       toast.error('Failed to vote');
@@ -112,7 +113,7 @@ export default function IdeaDetail() {
   const unvoteMutation = useMutation({
     mutationFn: () => removeVoteFromIdea(ideaId!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['idea', ideaId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
     },
     onError: () => {
       toast.error('Failed to remove vote');
@@ -128,8 +129,8 @@ export default function IdeaDetail() {
         rejection_reason: newStatus === 'rejected' ? rejectionReason : undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['idea', ideaId] });
-      queryClient.invalidateQueries({ queryKey: ['ideas'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
       flash('ideaStatus');
     },
     onError: () => {

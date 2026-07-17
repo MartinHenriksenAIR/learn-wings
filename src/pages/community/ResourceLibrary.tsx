@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,7 +70,7 @@ export default function ResourceLibrary() {
 
   // Single fetch: filtered resources for display + the org's distinct tags for the dropdown.
   const { data, isLoading } = useQuery({
-    queryKey: ['community-resources', currentOrg?.id, debouncedSearch, selectedType, selectedTag],
+    queryKey: queryKeys.communityResources.list(currentOrg?.id, debouncedSearch, selectedType, selectedTag),
     queryFn: () =>
       fetchResources(currentOrg!.id, {
         search: debouncedSearch || undefined,
@@ -89,7 +90,7 @@ export default function ResourceLibrary() {
         org_id: currentOrg!.id,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-resources'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityResources.all });
       toast({ title: 'Resource added successfully!' });
     },
     onError: (error: Error) => {
@@ -102,7 +103,7 @@ export default function ResourceLibrary() {
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateResource>[1] }) =>
       updateResource(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-resources'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityResources.all });
       toast({ title: 'Resource updated!' });
       setEditingResource(null);
     },
@@ -115,7 +116,7 @@ export default function ResourceLibrary() {
   const deleteMutation = useMutation({
     mutationFn: deleteResource,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-resources'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityResources.all });
       toast({ title: 'Resource deleted' });
       setDeleteConfirm(null);
     },
@@ -129,7 +130,7 @@ export default function ResourceLibrary() {
     mutationFn: ({ id, pinned }: { id: string; pinned: boolean }) =>
       toggleResourcePinned(id, pinned),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-resources'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.communityResources.all });
     },
   });
 

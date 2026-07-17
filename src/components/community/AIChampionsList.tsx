@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { useTranslation } from 'react-i18next';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles } from 'lucide-react';
@@ -26,7 +27,7 @@ interface AIChampionsListProps {
 export function AIChampionsList({ orgId }: AIChampionsListProps) {
   const { t } = useTranslation();
   const { data: champions = [], isLoading } = useQuery({
-    queryKey: ['ai-champions', orgId],
+    queryKey: queryKeys.aiChampions.list(orgId),
     queryFn: async () => {
       const data = await callApi<{ champions: AIChampion[] }>('/api/ai-champions', { orgId });
       return data.champions;

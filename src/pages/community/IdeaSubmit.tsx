@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -113,13 +114,13 @@ export default function IdeaSubmit() {
 
   // Load existing draft if editing
   const { data: existingIdea, isLoading: isLoadingIdea } = useQuery({
-    queryKey: ['idea', ideaId],
+    queryKey: queryKeys.idea.detail(ideaId),
     queryFn: () => fetchIdea(ideaId!),
     enabled: !!ideaId,
   });
 
   const { data: orgTags = [] } = useQuery({
-    queryKey: ['idea-tags', currentOrg?.id],
+    queryKey: queryKeys.ideaTags.list(currentOrg?.id),
     queryFn: () => fetchOrgTags(currentOrg!.id),
     enabled: !!currentOrg,
   });
@@ -164,7 +165,7 @@ export default function IdeaSubmit() {
     },
     onSuccess: (data) => {
       setDraftId(data.id);
-      queryClient.invalidateQueries({ queryKey: ['ideas'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
       toast.success(t('ideas.draftSaved'));
       navigate('/app/community/org/ideas?tab=drafts');
     },
@@ -194,7 +195,7 @@ export default function IdeaSubmit() {
       return submitIdea(ideaId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ideas'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
       toast.success(t('ideas.ideaSubmitted'));
       navigate('/app/community/org/ideas');
     },
@@ -210,7 +211,7 @@ export default function IdeaSubmit() {
       return deleteIdea(draftId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ideas'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
       toast.success('Draft deleted');
       navigate('/app/community/org/ideas');
     },

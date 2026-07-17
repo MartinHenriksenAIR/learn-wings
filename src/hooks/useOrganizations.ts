@@ -1,9 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { callApi } from '@/lib/api-client';
+import { queryKeys } from '@/lib/query-keys';
 import type { Organization } from '@/lib/types';
-
-/** Single shared cache key for the platform-wide org list (#87). */
-export const organizationsQueryKey = ['organizations'] as const;
 
 interface UseOrganizationsOptions {
   /** Gate the fetch (e.g. platform admins only). Defaults to true. */
@@ -24,7 +22,7 @@ interface UseOrganizationsOptions {
  */
 export function useOrganizations(options: UseOrganizationsOptions = {}) {
   return useQuery({
-    queryKey: organizationsQueryKey,
+    queryKey: queryKeys.organizations.all,
     queryFn: async () => {
       const { organizations } = await callApi<{ organizations: Organization[] }>(
         '/api/organizations',

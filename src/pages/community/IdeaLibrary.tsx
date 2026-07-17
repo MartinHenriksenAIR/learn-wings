@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,7 +88,7 @@ export default function IdeaLibrary() {
 
   // Fetch ideas - for drafts tab, filter by current user
   const { data: ideas = [], isLoading } = useQuery({
-    queryKey: ['ideas', currentOrg?.id, safeTab, searchQuery, selectedBusinessArea, selectedTags, profile?.id],
+    queryKey: queryKeys.ideas.list(currentOrg?.id, safeTab, searchQuery, selectedBusinessArea, selectedTags, profile?.id),
     queryFn: () => fetchIdeas(currentOrg!.id, {
       status: tabStatusFilters[safeTab].length > 0 ? tabStatusFilters[safeTab] : undefined,
       search: searchQuery || undefined,
@@ -99,7 +100,7 @@ export default function IdeaLibrary() {
   });
 
   const { data: orgTags = [] } = useQuery({
-    queryKey: ['idea-tags', currentOrg?.id],
+    queryKey: queryKeys.ideaTags.list(currentOrg?.id),
     queryFn: () => fetchOrgTags(currentOrg!.id),
     enabled: !!currentOrg,
   });
@@ -108,7 +109,7 @@ export default function IdeaLibrary() {
   const deleteMutation = useMutation({
     mutationFn: deleteIdea,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ideas'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
       toast.success('Idea deleted successfully');
     },
     onError: (error) => {

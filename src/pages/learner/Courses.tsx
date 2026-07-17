@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
@@ -20,113 +21,89 @@ import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useFlash } from '@/hooks/useFlash';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
+import { useLearnerCourses } from '@/hooks/useLearnerCourses';
 import { callApi } from '@/lib/api-client';
+import { queryKeys } from '@/lib/query-keys';
 import { Course, Enrollment } from '@/lib/types';
-import { getSignedLmsAssetUrl } from '@/lib/storage';
 import { BookOpen, Check, CheckCircle2, Loader2, LogOut, Play, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerCourses() {
-  const { user, currentOrg } = useAuth();
+  const { currentOrg } = useAuth();
   const orgGuard = useOrgGuard();
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { flashed, flash } = useFlash();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [enrolling, setEnrolling] = useState<string | null>(null);
   const [unenrollDialog, setUnenrollDialog] = useState<{ open: boolean; course: Course | null; enrollment: Enrollment | null }>({
     open: false,
     course: null,
     enrollment: null,
   });
-  const [unenrolling, setUnenrolling] = useState(false);
 
-  const fetchData = async () => {
-    // Canonical profile-gated guard (useOrgGuard): while the user context is
-    // still resolving keep the spinner; with no org available stop loading;
-    // the redundant !currentOrg check is for TypeScript narrowing only.
-    if (orgGuard !== 'ready' || !currentOrg) {
-      if (orgGuard === 'no-org') {
-        setLoading(false);
-      }
-      return;
-    }
+  const query = useLearnerCourses(currentOrg?.id, {
+    enabled: orgGuard === 'ready' && !!currentOrg,
+  });
 
-    try {
-      const data = await callApi<{ courses: Course[]; enrollments: Enrollment[] }>(
-        '/api/learner-courses', { orgId: currentOrg.id }
-      );
+  const courses = query.data?.courses ?? [];
+  const enrollments = query.data?.enrollments ?? [];
 
-      const coursesWithFreshThumbnails = await Promise.all(
-        data.courses.map(async (course) => ({
-          ...course,
-          thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
-        })),
-      );
-
-      setCourses(coursesWithFreshThumbnails);
-      setEnrollments(data.enrollments);
-    } catch (error) {
-      console.error('Error loading courses:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgGuard, currentOrg]);
-
-  const handleEnroll = async (courseId: string) => {
-    if (!user || !currentOrg) return;
-
-    setEnrolling(courseId);
-
-    try {
-      await callApi('/api/enroll', { orgId: currentOrg.id, courseId });
-      // Routine confirmation: in-button "Enrolled" morph, no success toast.
-      flash(`enr-${courseId}`);
-      fetchData();
-    } catch (error) {
+  const enrollMutation = useMutation({
+    mutationFn: ({ orgId, courseId }: { orgId: string; courseId: string }) =>
+      callApi('/api/enroll', { orgId, courseId }),
+    onSuccess: (_data, variables) => {
+      flash(`enr-${variables.courseId}`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.learnerCourses.list(currentOrg?.id) });
+      // Enrolling changes what the learner dashboard shows — keep its cache fresh.
+      queryClient.invalidateQueries({ queryKey: queryKeys.learnerDashboard.detail(currentOrg?.id) });
+    },
+    onError: (error) => {
       toast({
         title: t('courses.enrollmentFailed'),
         description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
-    }
+    },
+  });
 
-    setEnrolling(null);
-  };
-
-  const handleUnenroll = async () => {
-    if (!unenrollDialog.enrollment) return;
-
-    setUnenrolling(true);
-
-    try {
-      await callApi('/api/unenroll', { enrollmentId: unenrollDialog.enrollment.id });
+  const unenrollMutation = useMutation({
+    mutationFn: ({ enrollmentId }: { enrollmentId: string }) =>
+      callApi('/api/unenroll', { enrollmentId }),
+    onSuccess: () => {
       toast({
         title: t('courses.unenrolledFromCourse'),
         description: t('courses.unenrolledDescription', { courseTitle: unenrollDialog.course?.title }),
       });
-      fetchData();
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.learnerCourses.list(currentOrg?.id) });
+      // Unenrolling changes what the learner dashboard shows — keep its cache fresh.
+      queryClient.invalidateQueries({ queryKey: queryKeys.learnerDashboard.detail(currentOrg?.id) });
+    },
+    onError: (error) => {
       toast({
         title: t('courses.unenrollFailed'),
         description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
-    }
+    },
+    // Close the dialog whether or not the request succeeded, matching the
+    // pre-migration handler (which closed unconditionally after the request).
+    onSettled: () => setUnenrollDialog({ open: false, course: null, enrollment: null }),
+  });
 
-    setUnenrolling(false);
-    setUnenrollDialog({ open: false, course: null, enrollment: null });
+  const handleEnroll = (courseId: string) => {
+    if (!currentOrg) return;
+    enrollMutation.mutate({ orgId: currentOrg.id, courseId });
   };
+
+  const handleUnenroll = () => {
+    if (!unenrollDialog.enrollment) return;
+    unenrollMutation.mutate({ enrollmentId: unenrollDialog.enrollment.id });
+  };
+
+  const unenrolling = unenrollMutation.isPending;
 
   const getEnrollmentStatus = (courseId: string) => {
     return enrollments.find(e => e.course_id === courseId);
@@ -163,7 +140,7 @@ export default function LearnerCourses() {
     return matchesSearch && matchesLevel && matchesStatus;
   });
 
-  if (loading) {
+  if (orgGuard === 'loading' || query.isLoading) {
     return (
       <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
         <PageSpinner />
@@ -255,6 +232,7 @@ export default function LearnerCourses() {
             const enrollment = getEnrollmentStatus(course.id);
             const isCompleted = enrollment?.status === 'completed';
             const justEnrolled = flashed(`enr-${course.id}`);
+            const isEnrolling = enrollMutation.isPending && enrollMutation.variables?.courseId === course.id;
 
             return (
               <div
@@ -316,10 +294,10 @@ export default function LearnerCourses() {
                     ) : (
                       <Button
                         onClick={() => handleEnroll(course.id)}
-                        disabled={enrolling === course.id}
+                        disabled={isEnrolling}
                         className="h-auto flex-1 rounded-[10px] border border-[#cfd6ef] bg-card px-3 py-[9px] text-[13px] font-bold text-primary hover:bg-accent"
                       >
-                        {enrolling === course.id ? (
+                        {isEnrolling ? (
                           <>
                             <Loader2 className="animate-spin" />
                             {t('common.enrolling')}

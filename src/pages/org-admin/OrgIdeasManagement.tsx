@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,7 +90,7 @@ export default function OrgIdeasManagement() {
 
   // Fetch ALL non-draft ideas
   const { data: allIdeas = [], isLoading } = useQuery({
-    queryKey: ['ideas-admin', currentOrg?.id, searchQuery, selectedBusinessArea],
+    queryKey: queryKeys.ideasAdmin.list(currentOrg?.id, searchQuery, selectedBusinessArea),
     queryFn: () => fetchIdeas(currentOrg!.id, {
       search: searchQuery || undefined,
       business_area: selectedBusinessArea ? [selectedBusinessArea as BusinessArea] : undefined,
@@ -108,7 +109,7 @@ export default function OrgIdeasManagement() {
         rejection_reason: newStatus === 'rejected' ? rejectionReason : undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ideas-admin'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ideasAdmin.all });
       setStatusDialogOpen(false);
       setSelectedIdea(null);
       toast.success(t('ideaManagement.statusUpdated'));
@@ -144,7 +145,7 @@ export default function OrgIdeasManagement() {
         status: targetStatus,
         admin_notes: idea.admin_notes || undefined,
       });
-      queryClient.invalidateQueries({ queryKey: ['ideas-admin'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ideasAdmin.all });
       // Routine inline status change: the card moving columns is the feedback (no toast).
     } catch {
       toast.error(t('ideaManagement.statusUpdateFailed'));

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,7 +60,7 @@ export default function OrgCommunityModeration() {
 
   // Fetch reports for org
   const { data: reports = [], isLoading } = useQuery({
-    queryKey: ['org-reports', currentOrg?.id, activeTab],
+    queryKey: queryKeys.orgReports.list(currentOrg?.id, activeTab),
     queryFn: async () => {
       const data = await fetchReports(currentOrg!.id, { status: activeTab });
       return data as ReportWithDetails[];
@@ -81,7 +82,7 @@ export default function OrgCommunityModeration() {
       await updateReport(reportId, { status, admin_notes: notes || null });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-reports'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.orgReports.all });
       setReviewDialogOpen(false);
       setSelectedReport(null);
       toast.success(t('moderation.reportUpdated'));
@@ -109,7 +110,7 @@ export default function OrgCommunityModeration() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-reports'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.orgReports.all });
       toast.success(t('moderation.visibilityUpdated'));
     },
     onError: () => {
@@ -123,7 +124,7 @@ export default function OrgCommunityModeration() {
       await togglePostLocked(postId, lock);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['org-reports'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.orgReports.all });
       toast.success(t('moderation.lockUpdated'));
     },
     onError: () => {

@@ -27,7 +27,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
 import { callApi, ApiError } from '@/lib/api-client';
 import { useOrganizations } from '@/hooks/useOrganizations';
-import { Organization, Profile, OrgRole } from '@/lib/types';
+import { useProfiles } from '@/hooks/useProfiles';
+import { Organization, OrgRole } from '@/lib/types';
 import { Building2, Plus, Loader2, ChevronRight, UserPlus, Mail, Search } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
@@ -48,7 +49,7 @@ export default function OrganizationsManager() {
     () => (orgsData ?? []).map((o) => ({ ...o, memberCount: o.member_count })),
     [orgsData]
   );
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const { data: profiles = [], error: profilesError } = useProfiles();
   const [searchQuery, setSearchQuery] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
@@ -75,23 +76,17 @@ export default function OrganizationsManager() {
     }
   }, [orgsError]);
 
-  const fetchProfiles = async () => {
-    try {
-      const { profiles } = await callApi<{ profiles: Profile[] }>('/api/profiles', {});
-      if (profiles) setProfiles(profiles);
-    } catch (err) {
+  // Profile list failures surface the same way the old inline fetch did.
+  useEffect(() => {
+    if (profilesError) {
       toast({
         title: 'Failed to load users',
-        description: err instanceof Error ? err.message : 'Unknown error',
+        description: profilesError instanceof Error ? profilesError.message : 'Unknown error',
         variant: 'destructive',
       });
-      console.error('OrganizationsManager: failed to load profiles', err);
+      console.error('OrganizationsManager: failed to load profiles', profilesError);
     }
-  };
-
-  useEffect(() => {
-    fetchProfiles();
-  }, []);
+  }, [profilesError]);
 
   const handleCreate = async () => {
     setErrors({});

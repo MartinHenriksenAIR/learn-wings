@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useFlash } from '@/hooks/useFlash';
+import { useOrgMemberships } from '@/hooks/useOrgMemberships';
+import { useInvitations } from '@/hooks/useInvitations';
+import { useAiChampions } from '@/hooks/useAiChampions';
+import { useToastMutation } from '@/hooks/useToastMutation';
+import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQueryErrorToast';
+import { queryKeys } from '@/lib/query-keys';
 import { callApi } from '@/lib/api-client';
 import { cn, getAvatarColor, getInitials } from '@/lib/utils';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
@@ -75,10 +82,52 @@ const inviteSchema = z.object({
 export function OrgMembersTab() {
   const { t } = useTranslation();
   const { user, profile, currentOrg } = useAuth();
-  const [members, setMembers] = useState<(OrgMembership & { profile: Profile })[]>([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [aiChampions, setAiChampions] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // ── Data layer (shared TanStack Query hooks) ───────────────────────────────
+  // useOrgMemberships returns the same reshaped (OrgMembership & { profile })[]
+  // the tab used to hand-roll; useInvitations uses the 'org' scope (org-admin
+  // authz path); useAiChampions supplies the champion user_ids we fold to a Set.
+  const membershipsQuery = useOrgMemberships(currentOrg?.id);
+  const invitationsQuery = useInvitations(currentOrg?.id, 'org');
+  const championsQuery = useAiChampions(currentOrg?.id);
+
+  const members = useMemo(
+    () => membershipsQuery.data ?? [],
+    [membershipsQuery.data],
+  );
+  const invitations = useMemo(
+    () => invitationsQuery.data ?? [],
+    [invitationsQuery.data],
+  );
+  const aiChampions = useMemo(
+    () => new Set((championsQuery.data ?? []).map((c) => c.user_id)),
+    [championsQuery.data],
+  );
+
+  // Query-error toasts reproduce TanStack v5's missing useQuery onError.
+  // Members / invitations failures toast; the champions failure stays SILENT
+  // (parity: the old client swallowed champion-fetch errors — badges simply
+  // don't render). No toastTitle → console-only, same as OrganizationDetail's
+  // profiles query.
+  useQueryErrorToast({
+    isError: membershipsQuery.isError,
+    error: membershipsQuery.error,
+    toastTitle: 'Failed to load members',
+    logLabel: 'OrgMembersTab: failed to load members',
+  });
+  useQueryErrorToast({
+    isError: invitationsQuery.isError,
+    error: invitationsQuery.error,
+    toastTitle: 'Failed to load invitations',
+    logLabel: 'OrgMembersTab: failed to load invitations',
+  });
+  useQueryErrorToast({
+    isError: championsQuery.isError,
+    error: championsQuery.error,
+    logLabel: 'OrgMembersTab: failed to load AI champions',
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -87,7 +136,6 @@ export function OrgMembersTab() {
   const [inviteLastName, setInviteLastName] = useState('');
   const [inviteDepartment, setInviteDepartment] = useState('');
   const [inviteRole, setInviteRole] = useState<OrgRole>('learner');
-  const [inviting, setInviting] = useState(false);
   // In-button morph feedback for copy-link ("Copied!") and revoke ("Revoked"),
   // keyed by invitation link/id — replaces the routine success toasts.
   const { flashed: copyFlashed, flash: flashCopy } = useFlash();
@@ -106,117 +154,30 @@ export function OrgMembersTab() {
     member: (OrgMembership & { profile: Profile }) | null;
   } | null>(null);
 
-  const fetchData = async () => {
-    if (!currentOrg) {
-      setLoading(false);
-      return;
-    }
+  // ── Cache helpers (targeted invalidation replaces imperative refetch) ──────
+  const invalidateMemberships = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.orgMemberships.list(currentOrg?.id) });
+  const invalidateInvitations = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.invitations.list(currentOrg?.id, 'org') });
 
-    try {
-      // The three fetches are independent and each handles its own errors —
-      // run them concurrently (same pattern as CoursesManager's Promise.all).
-      await Promise.all([
-        (async () => {
-          try {
-            type MembershipRow = {
-              id: string;
-              org_id: string;
-              user_id: string;
-              role: OrgRole;
-              status: 'active' | 'invited' | 'disabled';
-              created_at: string;
-              full_name: string;
-              email: string;
-              avatar_url: string | null;
-              department: string | null;
-            };
-            const { memberships } = await callApi<{ memberships: MembershipRow[] }>(
-              '/api/org-memberships',
-              { orgId: currentOrg.id },
-            );
-            const reshaped: (OrgMembership & { profile: Profile })[] = memberships.map((row) => ({
-              id: row.id,
-              org_id: row.org_id,
-              user_id: row.user_id,
-              role: row.role,
-              status: row.status,
-              created_at: row.created_at,
-              profile: {
-                id: row.user_id,
-                full_name: row.full_name,
-                first_name: null,
-                last_name: null,
-                department: row.department,
-                is_platform_admin: false,
-                created_at: row.created_at,
-                preferred_language: null,
-              },
-            }));
-            setMembers(reshaped);
-          } catch (err) {
-            toast({
-              title: 'Failed to load members',
-              description: err instanceof Error ? err.message : 'Unexpected error',
-              variant: 'destructive',
-            });
-          }
-        })(),
-        (async () => {
-          try {
-            const { invitations: inviteData } = await callApi<{ invitations: Invitation[] }>(
-              '/api/invitations',
-              { scope: 'org', orgId: currentOrg.id },
-            );
-            setInvitations(inviteData);
-          } catch (err) {
-            toast({
-              title: 'Failed to load invitations',
-              description: err instanceof Error ? err.message : 'Unexpected error',
-              variant: 'destructive',
-            });
-          }
-        })(),
-        (async () => {
-          try {
-            const { champions } = await callApi<{ champions: { user_id: string }[] }>(
-              '/api/ai-champions',
-              { orgId: currentOrg.id },
-            );
-            setAiChampions(new Set(champions.map((c) => c.user_id)));
-          } catch {
-            // parity: the old client ignored champion-fetch errors (badges simply don't render)
-          }
-        })(),
-      ]);
-    } finally {
-      setLoading(false);
-    }
+  // Behavior-identical replacement for the old `fetchData` handed to the bulk /
+  // enroll dialogs: both used to refetch all three lists on success.
+  const refetchAll = () => {
+    if (!currentOrg) return;
+    invalidateMemberships();
+    invalidateInvitations();
+    queryClient.invalidateQueries({ queryKey: queryKeys.aiChampions.list(currentOrg.id) });
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [currentOrg]);
-
-  const handleInvite = async () => {
-    if (!currentOrg || !user) return;
-
-    const result = inviteSchema.safeParse({ email: inviteEmail, role: inviteRole });
-    if (!result.success) {
-      toast({
-        title: 'Invalid input',
-        description: result.error.errors[0].message,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setInviting(true);
-
-    try {
+  // ── Mutations ──────────────────────────────────────────────────────────────
+  // `useToastMutation` bakes in the shared destructive-toast-on-failure idiom
+  // (title + err.message); success behavior stays per-handler.
+  const inviteMutation = useToastMutation({
+    mutationFn: async () => {
       const { invitation } = await callApi<{ invitation: { id: string; link_id: string } }>(
         '/api/invitation-create',
         {
-          orgId: currentOrg.id,
+          orgId: currentOrg?.id,
           email: inviteEmail,
           role: inviteRole,
           firstName: inviteFirstName || undefined,
@@ -229,13 +190,16 @@ export function OrgMembersTab() {
       if (invitation?.link_id) {
         const emailResult = await sendInvitationEmail({
           email: inviteEmail,
-          orgName: currentOrg.name,
+          orgName: currentOrg?.name ?? null,
           role: inviteRole,
           linkId: invitation.link_id,
         });
         emailSent = emailResult.success;
       }
-
+      return { emailSent };
+    },
+    errorTitle: 'Failed to create invitation',
+    onSuccess: ({ emailSent }) => {
       // Invitation creation is a submission — keep the success toast (toast policy).
       toast({
         title: 'Invitation created!',
@@ -249,16 +213,99 @@ export function OrgMembersTab() {
       setInviteLastName('');
       setInviteDepartment('');
       setInviteRole('learner');
-      fetchData();
-    } catch (err) {
+      invalidateInvitations();
+    },
+  });
+
+  const removeMemberMutation = useToastMutation({
+    mutationFn: (member: OrgMembership & { profile: Profile }) =>
+      callApi('/api/org-membership-delete', { id: member.id }),
+    errorTitle: 'Failed to remove member',
+    onSuccess: (_data, member) => {
       toast({
-        title: 'Failed to create invitation',
-        description: err instanceof Error ? err.message : 'Unexpected error',
+        title: 'Member removed',
+        description: `${member.profile?.full_name} has been removed from the organization.`,
+      });
+      invalidateMemberships();
+    },
+    // The dialog closed unconditionally in the old `finally` — reproduce with onSettled.
+    onSettled: () => setRemoveMemberDialog(null),
+  });
+
+  const cancelInvitationMutation = useToastMutation({
+    mutationFn: (invitation: Invitation) =>
+      callApi('/api/invitation-update', { id: invitation.id, status: 'expired' }),
+    errorTitle: 'Failed to cancel invitation',
+    onSuccess: (_data, invitation) => {
+      // Instant on-success removal (no refetch), matching the old local-state
+      // filter: drop the row from the cached list via setQueryData.
+      queryClient.setQueryData<Invitation[]>(
+        queryKeys.invitations.list(currentOrg?.id, 'org'),
+        (prev) => prev?.filter((inv) => inv.id !== invitation.id) ?? [],
+      );
+    },
+  });
+
+  const changeRoleMutation = useToastMutation({
+    mutationFn: ({ member, newRole }: { member: OrgMembership & { profile: Profile }; newRole: OrgRole }) =>
+      callApi('/api/org-membership-update', { id: member.id, role: newRole }),
+    errorTitle: 'Failed to change role',
+    onSuccess: (_data, { member, newRole }) => {
+      toast({
+        title: 'Role updated',
+        description: `${member.profile?.full_name} is now ${newRole === 'org_admin' ? 'an Admin' : 'a Learner'}.`,
+      });
+      invalidateMemberships();
+    },
+    onSettled: () => setUpdatingRole(null),
+  });
+
+  const toggleChampionMutation = useToastMutation({
+    mutationFn: ({
+      member,
+      isCurrentlyChampion,
+    }: {
+      member: OrgMembership & { profile: Profile };
+      isCurrentlyChampion: boolean;
+    }) =>
+      isCurrentlyChampion
+        ? callApi('/api/ai-champion-delete', { orgId: currentOrg?.id, userId: member.user_id })
+        // assigned_by is derived server-side from the caller's profile (issue #11 audit item)
+        : callApi('/api/ai-champion-create', { orgId: currentOrg?.id, userId: member.user_id }),
+    errorTitle: ({ isCurrentlyChampion }) =>
+      isCurrentlyChampion
+        ? 'Failed to remove AI Champion status'
+        : 'Failed to assign AI Champion status',
+    onSuccess: (_data, { member, isCurrentlyChampion }) => {
+      // Invalidate rather than hand-patch the cache: the ['ai-champions', orgId]
+      // entry is shared with AIChampionsList, which reads full champion rows
+      // (id/profile/assigned_at). Writing a partial { user_id } row here would
+      // corrupt that consumer's render, so refetch the real rows instead —
+      // consistent with how the role/member mutations invalidate.
+      queryClient.invalidateQueries({ queryKey: queryKeys.aiChampions.list(currentOrg?.id) });
+      if (isCurrentlyChampion) {
+        toast({ title: 'AI Champion status removed', description: `${member.profile?.full_name} is no longer an AI Champion.` });
+      } else {
+        toast({ title: 'AI Champion assigned!', description: `${member.profile?.full_name} is now an AI Champion.` });
+      }
+    },
+    onSettled: () => setTogglingChampion(null),
+  });
+
+  const handleInvite = () => {
+    if (!currentOrg || !user) return;
+
+    const result = inviteSchema.safeParse({ email: inviteEmail, role: inviteRole });
+    if (!result.success) {
+      toast({
+        title: 'Invalid input',
+        description: result.error.errors[0].message,
         variant: 'destructive',
       });
-    } finally {
-      setInviting(false);
+      return;
     }
+
+    inviteMutation.mutate();
   };
 
   const handleCopyInviteLink = async (linkId: string) => {
@@ -268,99 +315,35 @@ export function OrgMembersTab() {
     flashCopy(linkId);
   };
 
-  const handleRemoveMember = async () => {
+  const handleRemoveMember = () => {
     if (!removeMemberDialog?.member) return;
-
-    const memberToRemove = removeMemberDialog.member;
-    try {
-      await callApi('/api/org-membership-delete', { id: memberToRemove.id });
-      toast({
-        title: 'Member removed',
-        description: `${memberToRemove.profile?.full_name} has been removed from the organization.`,
-      });
-      fetchData();
-    } catch (err) {
-      toast({
-        title: 'Failed to remove member',
-        description: err instanceof Error ? err.message : 'Unexpected error',
-        variant: 'destructive',
-      });
-    } finally {
-      setRemoveMemberDialog(null);
-    }
+    removeMemberMutation.mutate(removeMemberDialog.member);
   };
 
-  const handleCancelInvitation = async (invitation: Invitation) => {
-    // Optimistic inline feedback ("Revoked"), then drop the row once the request
-    // succeeds — no success toast (toast policy: revoke is routine). Errors keep toasts.
+  const handleCancelInvitation = (invitation: Invitation) => {
+    // Optimistic inline feedback ("Revoked") fires immediately; the row drops
+    // once the request succeeds (setQueryData in onSuccess). Errors keep toasts.
     flashRevoke(invitation.id);
-    try {
-      await callApi('/api/invitation-update', { id: invitation.id, status: 'expired' });
-      setInvitations((prev) => prev.filter((inv) => inv.id !== invitation.id));
-    } catch (err) {
-      toast({
-        title: 'Failed to cancel invitation',
-        description: err instanceof Error ? err.message : 'Unexpected error',
-        variant: 'destructive',
-      });
-    }
+    cancelInvitationMutation.mutate(invitation);
   };
 
-  const handleChangeRole = async () => {
+  const handleChangeRole = () => {
     if (!roleChangeDialog?.member) return;
 
     const { member, newRole } = roleChangeDialog;
     setUpdatingRole(member.id);
     setRoleChangeDialog(null);
-
-    try {
-      await callApi('/api/org-membership-update', { id: member.id, role: newRole });
-      toast({
-        title: 'Role updated',
-        description: `${member.profile?.full_name} is now ${newRole === 'org_admin' ? 'an Admin' : 'a Learner'}.`,
-      });
-      fetchData();
-    } catch (err) {
-      toast({
-        title: 'Failed to change role',
-        description: err instanceof Error ? err.message : 'Unexpected error',
-        variant: 'destructive',
-      });
-    } finally {
-      setUpdatingRole(null);
-    }
+    changeRoleMutation.mutate({ member, newRole });
   };
 
-  const handleToggleAiChampion = async (member: OrgMembership & { profile: Profile }) => {
+  const handleToggleAiChampion = (member: OrgMembership & { profile: Profile }) => {
     if (!currentOrg) return;
 
     const isCurrentlyChampion = aiChampions.has(member.user_id);
-    // In-flight guard (same pattern as updatingRole): set before the await,
-    // cleared in finally, so a double-click can't fire a second request.
+    // In-flight guard (same pattern as updatingRole): set before mutate, cleared
+    // in onSettled, so a double-click can't fire a second request.
     setTogglingChampion(member.id);
-
-    try {
-      if (isCurrentlyChampion) {
-        try {
-          await callApi('/api/ai-champion-delete', { orgId: currentOrg.id, userId: member.user_id });
-          toast({ title: 'AI Champion status removed', description: `${member.profile?.full_name} is no longer an AI Champion.` });
-          setAiChampions((prev) => { const next = new Set(prev); next.delete(member.user_id); return next; });
-        } catch (err) {
-          toast({ title: 'Failed to remove AI Champion status', description: err instanceof Error ? err.message : 'Unexpected error', variant: 'destructive' });
-        }
-      } else {
-        try {
-          // assigned_by is derived server-side from the caller's profile (issue #11 audit item)
-          await callApi('/api/ai-champion-create', { orgId: currentOrg.id, userId: member.user_id });
-          toast({ title: 'AI Champion assigned!', description: `${member.profile?.full_name} is now an AI Champion.` });
-          setAiChampions((prev) => new Set([...prev, member.user_id]));
-        } catch (err) {
-          toast({ title: 'Failed to assign AI Champion status', description: err instanceof Error ? err.message : 'Unexpected error', variant: 'destructive' });
-        }
-      }
-    } finally {
-      setTogglingChampion(null);
-    }
+    toggleChampionMutation.mutate({ member, isCurrentlyChampion });
   };
 
   const filteredMembers = members.filter((member) => {
@@ -373,7 +356,12 @@ export function OrgMembersTab() {
 
   const hasFilters = searchQuery !== '' || roleFilter !== 'all';
 
-  if (loading) {
+  // Loading gate: only meaningful when an org is selected — disabled queries
+  // (no org) report isLoading=false, so this falls through to the empty state.
+  if (
+    currentOrg &&
+    (membershipsQuery.isLoading || invitationsQuery.isLoading || championsQuery.isLoading)
+  ) {
     return <PageSpinner />;
   }
 
@@ -486,8 +474,8 @@ export function OrgMembersTab() {
               <Button variant="outline" onClick={() => setInviteOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleInvite} disabled={inviting}>
-                {inviting ? (
+              <Button onClick={handleInvite} disabled={inviteMutation.isPending}>
+                {inviteMutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
                   <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -505,7 +493,7 @@ export function OrgMembersTab() {
         onOpenChange={setBulkInviteOpen}
         orgId={currentOrg.id}
         orgName={currentOrg.name}
-        onSuccess={fetchData}
+        onSuccess={refetchAll}
       />
 
       {/* Enroll User Dialog */}
@@ -515,7 +503,7 @@ export function OrgMembersTab() {
         orgId={currentOrg.id}
         orgName={currentOrg.name}
         members={members}
-        onSuccess={fetchData}
+        onSuccess={refetchAll}
       />
 
       {/* Members table */}
