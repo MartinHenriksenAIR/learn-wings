@@ -22,6 +22,12 @@ export const queryKeys = {
     all: ['organizations'] as const,
   },
 
+  // ── Branding assets (signed display URLs) ────────────────────────────────────
+  brandingAsset: {
+    /** ['branding-asset', blobPath] — one signed-URL cache entry per stored path. */
+    signed: (blobPath: string) => ['branding-asset', blobPath] as const,
+  },
+
   // ── Community feed ─────────────────────────────────────────────────────────
   communityCategories: {
     /** ['community-categories'] */

@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
 import { getInitials } from '@/lib/utils';
 import { FileUpload } from '@/components/ui/file-upload';
-import { buildPublicUrl } from '@/lib/storage-url';
+import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const profileSchema = z.object({
@@ -35,6 +35,7 @@ export default function Settings() {
   const { profile, user, memberships, isPlatformAdmin, refreshUserContext } = useAuth();
   const { t, i18n } = useTranslation();
   const { flashed, flash } = useFlash();
+  const { data: avatarSrc } = useSignedBrandingUrl(profile?.avatar_url);
 
   // Profile state
   const [firstName, setFirstName] = useState('');
@@ -99,8 +100,8 @@ export default function Settings() {
 
     setAvatarSaving(true);
     try {
-      // Persist the raw container-relative blob path; display composes the
-      // public URL via buildPublicUrl.
+      // Persist the raw container-relative blob path; display signs it for
+      // viewing via useSignedBrandingUrl.
       await callApi('/api/profile-update', { avatar_url: storagePath });
       await refreshUserContext();
     } catch (error) {
@@ -190,8 +191,8 @@ export default function Settings() {
           <CardContent className="space-y-3.5 px-[26px] py-6">
             <div className="mb-1 flex items-center gap-3.5">
               <Avatar className="h-[52px] w-[52px] shrink-0 rounded-2xl">
-                {profile?.avatar_url && (
-                  <AvatarImage src={buildPublicUrl(profile.avatar_url)} alt="" className="object-cover" />
+                {avatarSrc && (
+                  <AvatarImage src={avatarSrc} alt="" className="object-cover" />
                 )}
                 <AvatarFallback
                   aria-hidden="true"
