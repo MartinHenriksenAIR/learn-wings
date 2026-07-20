@@ -44,6 +44,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useFlash } from '@/hooks/useFlash';
 import { useOrgMemberships } from '@/hooks/useOrgMemberships';
 import { useInvitations } from '@/hooks/useInvitations';
+import { useOrgDetail } from '@/hooks/useOrgDetail';
 import { useAiChampions } from '@/hooks/useAiChampions';
 import { useToastMutation } from '@/hooks/useToastMutation';
 import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQueryErrorToast';
@@ -93,6 +94,8 @@ export function OrgMembersTab() {
   const membershipsQuery = useOrgMemberships(currentOrg?.id);
   const invitationsQuery = useInvitations(currentOrg?.id, 'org');
   const championsQuery = useAiChampions(currentOrg?.id);
+  const orgDetailQuery = useOrgDetail(currentOrg?.id);
+  const orgDetail = orgDetailQuery.data;
 
   const members = useMemo(
     () => membershipsQuery.data ?? [],
@@ -107,16 +110,21 @@ export function OrgMembersTab() {
     [championsQuery.data],
   );
 
-  // Seats consumed = active members + pending invitations (both already
-  // fetched here), measured against the org's seat_limit.
+  // Seats consumed = active members + pending invitations, measured against
+  // the org's seat_limit. Prefer the org-wide server aggregates (`orgDetail`)
+  // — the caller-scoped `invitations` list only contains invites THIS admin
+  // created, so it undercounts pending seats when a co-admin (or platform
+  // admin) has outstanding invites in the same org. Fall back to the
+  // already-fetched lists only while `orgDetail` is still loading.
+  const activeMemberCount = members.filter((m) => m.status === 'active').length;
   const seatUsage = useMemo(
     () =>
       getSeatUsage({
-        activeMembers: members.filter((m) => m.status === 'active').length,
-        pendingInvites: invitations.length,
-        seatLimit: currentOrg?.seat_limit ?? null,
+        activeMembers: orgDetail?.member_count ?? activeMemberCount,
+        pendingInvites: orgDetail?.pending_invite_count ?? invitations.length,
+        seatLimit: orgDetail?.seat_limit ?? currentOrg?.seat_limit ?? null,
       }),
-    [members, invitations, currentOrg?.seat_limit],
+    [orgDetail, activeMemberCount, invitations.length, currentOrg?.seat_limit],
   );
   const atSeatLimit = !seatUsage.isUnlimited && seatUsage.atLimit;
 
@@ -182,6 +190,9 @@ export function OrgMembersTab() {
     invalidateMemberships();
     invalidateInvitations();
     queryClient.invalidateQueries({ queryKey: queryKeys.aiChampions.list(currentOrg.id) });
+    // Also refresh the org-wide seat aggregates (member_count / pending_invite_count)
+    // so seatUsage reflects the post-mutation state, not just the caller-scoped lists.
+    queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(currentOrg?.id) });
   };
 
   // ── Mutations ──────────────────────────────────────────────────────────────
