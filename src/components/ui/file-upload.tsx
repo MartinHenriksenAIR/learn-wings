@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { callApi } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -45,7 +45,27 @@ export function FileUpload({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  // Local preview of the just-uploaded image: the stored value is a raw blob
+  // path, which <img> can't load without a signed URL (#158). `forValue` ties
+  // the preview to the value it belongs to, so a parent-supplied value (e.g. a
+  // pre-signed URL, or a reset) is never shadowed by a stale preview.
+  const [preview, setPreview] = useState<{ url: string; forValue: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!preview) return;
+    return () => URL.revokeObjectURL(preview.url);
+  }, [preview]);
+
+  // Drop the preview once the parent adopts a different value than the one it
+  // was made for — e.g. a post-save refetch re-signs the path, or a consumer
+  // stores a public URL instead of the blob path. Without this the object URL
+  // lingers (invisibly) until unmount; clearing it lets the effect above revoke
+  // it now. Safe because setPreview and the parent's onChange→value update batch
+  // into one render, so a live preview is never seen as diverged.
+  useEffect(() => {
+    if (preview && preview.forValue !== value) setPreview(null);
+  }, [value, preview]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,6 +106,9 @@ export function FileUpload({
       });
 
       setProgress(100);
+      if (accept === 'image') {
+        setPreview({ url: URL.createObjectURL(file), forValue: uploadData.blobPath });
+      }
       // Store the blob path; use it as both the display value and storage path
       onChange(uploadData.blobPath, uploadData.blobPath);
     } catch (err: any) {
@@ -98,6 +121,7 @@ export function FileUpload({
   };
 
   const handleRemove = async () => {
+    setPreview(null);
     onChange(null, null);
     setFileName(null);
     setProgress(0);
@@ -123,7 +147,7 @@ export function FileUpload({
           {accept === 'image' ? (
             <div className="relative aspect-video bg-muted">
               <img
-                src={value}
+                src={preview && preview.forValue === value ? preview.url : value}
                 alt="Uploaded file"
                 className="w-full h-full object-cover"
               />
