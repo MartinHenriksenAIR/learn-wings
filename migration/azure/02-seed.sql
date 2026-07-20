@@ -156,6 +156,14 @@ INSERT INTO public.platform_settings (key, value) VALUES
    }'::jsonb);
 
 -- ---------------------------------------------------------------------
+-- Seat pricing (issue #127) — price starts unset; platform admin sets it
+-- before the request flow is usable.
+-- ---------------------------------------------------------------------
+INSERT INTO public.platform_settings (key, value)
+VALUES ('seat_pricing', '{"annual_price_per_seat": null, "currency": "DKK", "notification_email": "jacob@ai-raadgivning.dk"}'::jsonb)
+ON CONFLICT (key) DO NOTHING;
+
+-- ---------------------------------------------------------------------
 -- Community categories — the migrations' default set, MINUS the two
 -- later removed by migration ("ideas-opportunities" and
 -- "resources-templates"). These match the final migrated state.

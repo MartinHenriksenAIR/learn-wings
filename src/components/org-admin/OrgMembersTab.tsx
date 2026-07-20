@@ -76,6 +76,8 @@ import { getInviteLink } from '@/lib/config';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { BulkInviteDialog } from '@/components/org-admin/BulkInviteDialog';
 import { EnrollUserDialog } from '@/components/org-admin/EnrollUserDialog';
+import { RequestSeatsDialog } from '@/components/org-admin/RequestSeatsDialog';
+import { useSeatRequests } from '@/hooks/useSeatRequests';
 
 const inviteSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -128,6 +130,13 @@ export function OrgMembersTab() {
   );
   const atSeatLimit = !seatUsage.isUnlimited && seatUsage.atLimit;
 
+  // Seat requests: at most one pending request per org at a time — the
+  // standing "Request more seats" button and at-cap nudge both fold into a
+  // pending-state readout (with Cancel) whenever one exists.
+  const { data: seatRequests = [] } = useSeatRequests(currentOrg?.id);
+  const pendingSeatRequest = seatRequests.find((r) => r.status === 'pending') ?? null;
+  const hasFiniteSeatLimit = (orgDetail?.seat_limit ?? currentOrg?.seat_limit ?? null) !== null;
+
   // Query-error toasts reproduce TanStack v5's missing useQuery onError.
   // Members / invitations failures toast; the champions failure stays SILENT
   // (parity: the old client swallowed champion-fetch errors — badges simply
@@ -172,6 +181,7 @@ export function OrgMembersTab() {
   const [togglingChampion, setTogglingChampion] = useState<string | null>(null);
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [requestSeatsOpen, setRequestSeatsOpen] = useState(false);
   const [removeMemberDialog, setRemoveMemberDialog] = useState<{
     open: boolean;
     member: (OrgMembership & { profile: Profile }) | null;
@@ -325,6 +335,15 @@ export function OrgMembersTab() {
       }
     },
     onSettled: () => setTogglingChampion(null),
+  });
+
+  const cancelSeatRequestMutation = useToastMutation({
+    mutationFn: (id: string) => callApi('/api/seat-request-cancel', { id }),
+    errorTitle: t('seatRequests.cancel'),
+    onSuccess: () => {
+      toast({ title: t('seatRequests.cancelled') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seatRequests.list(currentOrg?.id) });
+    },
   });
 
   // Surface the backend seat cap (409) inline in the invite dialog, alongside
@@ -522,9 +541,20 @@ export function OrgMembersTab() {
               </div>
             </div>
             {(atSeatLimit || inviteErrorMessage) && (
-              <p className="text-xs font-medium text-destructive">
-                {inviteErrorMessage ?? t('seats.limitReached')}
-              </p>
+              <>
+                <p className="text-xs font-medium text-destructive">
+                  {inviteErrorMessage ?? t('seats.limitReached')}
+                </p>
+                {atSeatLimit && !pendingSeatRequest && (
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs"
+                    onClick={() => { setInviteOpen(false); setRequestSeatsOpen(true); }}
+                  >
+                    {t('seatRequests.atCap')}
+                  </Button>
+                )}
+              </>
             )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setInviteOpen(false)}>
@@ -541,6 +571,30 @@ export function OrgMembersTab() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {hasFiniteSeatLimit && (
+          pendingSeatRequest ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t('seatRequests.pending', {
+                  seats: pendingSeatRequest.additional_seats,
+                  date: new Date(pendingSeatRequest.created_at).toLocaleDateString(),
+                })}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => cancelSeatRequestMutation.mutate(pendingSeatRequest.id)}
+                disabled={cancelSeatRequestMutation.isPending}
+              >
+                {t('seatRequests.cancel')}
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" onClick={() => setRequestSeatsOpen(true)}>
+              {t('seatRequests.requestMore')}
+            </Button>
+          )
+        )}
       </div>
 
       {/* Bulk Invite Dialog */}
@@ -562,6 +616,11 @@ export function OrgMembersTab() {
         members={members}
         onSuccess={refetchAll}
       />
+
+      {/* Request Seats Dialog */}
+      {currentOrg?.id && (
+        <RequestSeatsDialog orgId={currentOrg.id} open={requestSeatsOpen} onOpenChange={setRequestSeatsOpen} />
+      )}
 
       {/* Members table */}
       {filteredMembers.length === 0 ? (

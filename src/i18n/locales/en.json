@@ -4,6 +4,30 @@
     "unlimited": "Unlimited seats",
     "limitReached": "Seat limit reached"
   },
+  "seatRequests": {
+    "requestMore": "Request more seats",
+    "dialogTitle": "Request more seats",
+    "dialogDescription": "Ask AI Rådgivning to add more seats to your organization. You will receive an invoice.",
+    "additionalSeats": "Additional seats",
+    "estimate": "{{seats}} × {{price}} {{currency}}/yr = {{total}} {{currency}}/yr excl. VAT",
+    "vatNote": "+ 25% VAT is added on the invoice.",
+    "notConfigured": "Seat pricing isn’t available online yet — please contact AI Rådgivning.",
+    "submit": "Send request",
+    "submitted": "Seat request sent",
+    "pending": "Request pending — {{seats}} seats, submitted {{date}}",
+    "cancel": "Cancel request",
+    "cancelled": "Seat request cancelled",
+    "atCap": "You’ve used all your seats. Request more to keep adding members.",
+    "sectionTitle": "Seat requests",
+    "fulfil": "Mark fulfilled",
+    "fulfilled": "Seat request fulfilled — seat limit increased",
+    "colRequester": "Requested by",
+    "colSeats": "Seats",
+    "colPrice": "Price/yr (excl. VAT)",
+    "colStatus": "Status",
+    "colDate": "Requested",
+    "empty": "No seat requests."
+  },
   "common": {
     "save": "Save",
     "saved": "Saved",
@@ -666,6 +690,13 @@
       "course_reviews_enabled": "Course reviews",
       "course_reviews_enabled_hint": "Allow learners to leave reviews on courses.",
       "save": "Save feature settings"
+    },
+    "seatPricing": {
+      "tab": "Seat pricing",
+      "annualPrice": "Annual price per seat (DKK, excl. VAT)",
+      "currency": "Currency",
+      "notificationEmail": "Requests are emailed to",
+      "save": "Save seat pricing"
     }
   },
   "certificates": {

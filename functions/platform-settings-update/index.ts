@@ -1,7 +1,7 @@
 import { queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
 
-const ALLOWED_KEYS = ['branding', 'user_access', 'email', 'features'] as const;
+const ALLOWED_KEYS = ['branding', 'user_access', 'email', 'features', 'seat_pricing'] as const;
 type SettingKey = typeof ALLOWED_KEYS[number];
 
 // Per-field shape validation (issue #90). Field lists derive from the frontend's
@@ -13,6 +13,8 @@ const isStringOrNull: FieldCheck = (v) => v === null || typeof v === 'string';
 const isBoolean: FieldCheck = (v) => typeof v === 'boolean';
 const isFiniteNumber: FieldCheck = (v) => typeof v === 'number' && Number.isFinite(v);
 const isOneOf = (...allowed: string[]): FieldCheck => (v) => typeof v === 'string' && allowed.includes(v);
+const isNonNegativeNumberOrNull: FieldCheck = (v) =>
+  v === null || (typeof v === 'number' && Number.isFinite(v) && v >= 0);
 
 const FIELD_SHAPES: Record<SettingKey, Record<string, FieldCheck>> = {
   branding: {
@@ -46,6 +48,11 @@ const FIELD_SHAPES: Record<SettingKey, Record<string, FieldCheck>> = {
     course_reviews_enabled: isBoolean,
     community_enabled: isBoolean,
   },
+  seat_pricing: {
+    annual_price_per_seat: isNonNegativeNumberOrNull,
+    currency: isString,
+    notification_email: isString,
+  },
 };
 
 interface PlatformSettingsUpdateBody {
@@ -57,7 +64,7 @@ export default adminEndpoint('platform-settings-update', async ({ req, profile, 
   const body = await req.json() as PlatformSettingsUpdateBody;
 
   if (typeof body.key !== 'string' || !(ALLOWED_KEYS as readonly string[]).includes(body.key)) {
-    return reply(400, { error: 'key must be one of: branding, user_access, email, features' });
+    return reply(400, { error: 'key must be one of: branding, user_access, email, features, seat_pricing' });
   }
   const key = body.key as SettingKey;
 

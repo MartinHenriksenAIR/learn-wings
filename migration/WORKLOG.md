@@ -1077,6 +1077,24 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 
 ---
 
+## 2026-07-20 — #127 seat-request flow implemented (PR #183, not yet merged)
+
+**Who:** martin & Claude. Branch `feat/seat-request-flow-127`, PR #183. Subagent-driven implementation (16 tasks, fresh implementer per task, per-task + final review).
+
+**Scope A — seat-request flow.** Org admins no longer resize `seat_limit` directly; instead they request N additional seats at a platform-admin-set **binding annual ex-moms DKK price**, server-snapshotted onto the request at creation time (the client-displayed price is never trusted). The request persists and emails the platform admin (`jacob@ai-raadgivning.dk`, configurable) to invoice offline; the platform admin clicks "Mark fulfilled" and `seat_limit += N`. No online payment. Price is `NULL` by default, which gates the whole flow (both UI and server) until a platform admin sets it.
+
+**DB.** New `seat_requests` table + `seat_request_status` enum + a `seat_pricing` row in `platform_settings` (`migration/azure/01-schema.sql`, `02-seed.sql`); additive, idempotent prod-apply script `migration/azure/03-seat-requests.sql` (not yet applied to prod — see deploy prerequisites below).
+
+**Backend.** 5 new Azure Functions: `seat-pricing` (read), `seat-request-create`, `seat-requests` (list), `seat-request-cancel`, `seat-request-fulfill`; `platform-settings-update` extended to accept the `seat_pricing` key; new `functions/shared/seat-request-notify.ts` (best-effort Resend email — a send failure never blocks the request from persisting).
+
+**Frontend.** `useSeatPricing`/`useSeatRequests` hooks; `RequestSeatsDialog` wired into `OrgMembersTab` (a standing "Request more seats" entry point + an at-cap nudge; one pending request at a time, with cancel); a `SeatRequestsSection` fulfil UI on `OrganizationDetail` for platform admins; a seat-pricing panel in Platform Settings. i18n en+da throughout.
+
+**Design/plan docs.** `docs/superpowers/specs/2026-07-20-seat-request-flow-design.md`, `docs/superpowers/plans/2026-07-20-seat-request-flow.md`.
+
+**Not yet merged/deployed — three human-gated prerequisites before the flow is live.** (1) Apply `migration/azure/03-seat-requests.sql` to prod via `psql` (Azure Cloud Shell + a temporary firewall rule, per `migration/azure/README.md`) — without it the `seat_pricing` row doesn't exist and the Platform Settings save 404s. (2) Confirm `RESEND_API_KEY` is set in prod, else the notification email silently no-ops (the request still persists and shows in-app). (3) Once deployed, a platform admin must set the annual price in Platform Settings — until then the org-side request flow stays gated. This entry records the branch checkpoint; merge/deploy + smoke gets its own WORKLOG entry once PR #183 lands.
+
+---
+
 ## 2026-07-20 — #167/#168 UI polish: static stat cards + distinct resource tag color (PR #185)
 
 **Who:** martin & Claude. Branch `polish/dashboard-hover-resource-tags-167-168` (worktree), PR #185. Frontend-only. Picked from the 07-20 review batch (#166–#169); #166 and #169 handled in other sessions.

@@ -11,6 +11,7 @@ consumers).
 |------|---------|
 | `01-schema.sql` | Types, tables, indexes, ported functions, triggers. Single `BEGIN/COMMIT`. |
 | `02-seed.sql`   | Synthetic, FK-valid, end-to-end-usable seed data. Single `BEGIN/COMMIT`. |
+| `03-seat-requests.sql` | Additive, idempotent migration for #127 (seat-request flow) — apply to prod directly. |
 | `README.md`     | This file. |
 
 Plain SQL only — no `psql` meta-commands (`\i`, `\dt`, …). PG15-compatible.
@@ -265,15 +266,15 @@ ON CONFLICT (org_id, user_id) DO UPDATE SET role = 'org_admin', status = 'active
 
 ## Summary
 
-- **Tables:** 30 (`organizations, profiles, org_memberships, invitations,
+- **Tables:** 31 (`organizations, profiles, org_memberships, invitations,
   courses, course_modules, lessons, quizzes, quiz_questions, quiz_options,
   org_course_access, enrollments, lesson_progress, quiz_attempts,
   course_reviews, platform_settings, org_settings, community_categories,
   community_posts, community_comments, community_reports,
   community_resources, ai_champions, ai_conversations, idea_categories,
   ideas, idea_votes, idea_comments, idea_evaluations,
-  idea_specifications`).
-- **Enums:** 12 (incl. the fully-expanded `idea_status`).
+  idea_specifications, seat_requests`).
+- **Enums:** 13 (incl. the fully-expanded `idea_status` and `seat_request_status`).
 - **Ported RPCs:** 3 (`can_user_access_lms_asset`, `user_can_access_quiz`,
   `get_invitation_link_id`) — all auth.uid() → `p_user_id`.
 - **Kept trigger fn:** `set_updated_at` (11 triggers) + `hash_invitation_token`.
