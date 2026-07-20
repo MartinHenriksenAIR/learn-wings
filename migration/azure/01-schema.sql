@@ -67,6 +67,7 @@ CREATE TYPE public.community_scope     AS ENUM ('org', 'global');
 CREATE TYPE public.report_status       AS ENUM ('pending', 'reviewed', 'dismissed');
 CREATE TYPE public.report_target_type  AS ENUM ('post', 'comment');
 CREATE TYPE public.business_area       AS ENUM ('hr', 'finance', 'sales', 'support', 'ops', 'it', 'legal', 'other');
+CREATE TYPE public.seat_request_status AS ENUM ('pending', 'fulfilled', 'cancelled');
 
 -- idea_status: base values plus the four ADD VALUE entries from later
 -- migrations. (Supabase ADDed these incrementally; we declare the full
@@ -110,6 +111,29 @@ CREATE TABLE public.profiles (
   entra_tid          text,                         -- ADDED (Entra tenant id)
   created_at         timestamptz NOT NULL DEFAULT now()
 );
+
+-- ---- seat_requests (issue #127) ----
+-- An org admin requests additional seats; a platform admin fulfils it offline
+-- (invoice), then marks it fulfilled which bumps organizations.seat_limit.
+-- unit_price_snapshot is the binding annual ex-moms price captured at request time.
+CREATE TABLE public.seat_requests (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id               uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  requested_by_user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  additional_seats     integer NOT NULL CHECK (additional_seats >= 1),
+  unit_price_snapshot  numeric(12,2) NOT NULL,
+  currency             text NOT NULL DEFAULT 'DKK',
+  status               public.seat_request_status NOT NULL DEFAULT 'pending',
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  fulfilled_at         timestamptz,
+  fulfilled_by_user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  cancelled_at         timestamptz
+);
+
+-- One pending request per org (backs the "one-at-a-time" rule at the DB layer).
+CREATE UNIQUE INDEX seat_requests_one_pending_per_org
+  ON public.seat_requests (org_id) WHERE status = 'pending';
+CREATE INDEX seat_requests_org_id_idx ON public.seat_requests (org_id);
 
 -- ---- org_memberships ----
 CREATE TABLE public.org_memberships (
