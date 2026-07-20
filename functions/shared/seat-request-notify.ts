@@ -24,18 +24,26 @@ export interface SeatRequestEmailParams {
 }
 
 export function renderSeatRequestEmail(p: SeatRequestEmailParams): { subject: string; html: string } {
+  // User- and org-supplied strings are HTML-escaped before interpolation to
+  // prevent HTML injection into the platform admin's mail client (#195).
+  const org = escapeHtml(p.orgName);
+  const requesterName = escapeHtml(p.requesterName);
+  const requesterEmail = escapeHtml(p.requesterEmail);
+  const currency = escapeHtml(p.currency);
+  const requestId = escapeHtml(p.requestId);
+  const createdAt = escapeHtml(p.createdAt);
   const total = p.additionalSeats * p.unitPrice;
-  const money = (n: number) => `${n.toLocaleString('da-DK')} ${p.currency}`;
+  const money = (n: number) => `${n.toLocaleString('da-DK')} ${currency}`;
   const subject = `Anmodning om ${p.additionalSeats} ekstra pladser — ${p.orgName}`;
   const html = `
     <h2>Ny anmodning om ekstra pladser</h2>
-    <p><strong>Organisation:</strong> ${p.orgName}</p>
-    <p><strong>Anmodet af:</strong> ${p.requesterName} (${p.requesterEmail})</p>
+    <p><strong>Organisation:</strong> ${org}</p>
+    <p><strong>Anmodet af:</strong> ${requesterName} (${requesterEmail})</p>
     <p><strong>Nuværende forbrug:</strong> ${p.usedSeats} pladser brugt af ${p.seatLimit ?? 'ubegrænset'}</p>
     <p><strong>Ønsket antal ekstra pladser:</strong> ${p.additionalSeats}</p>
     <p><strong>Pris:</strong> ${p.additionalSeats} × ${money(p.unitPrice)}/år =
        <strong>${money(total)}/år</strong> ekskl. moms (+ 25% moms tilføjes på fakturaen)</p>
-    <p style="color:#777;font-size:12px">Anmodnings-ID: ${p.requestId} · ${p.createdAt}</p>
+    <p style="color:#777;font-size:12px">Anmodnings-ID: ${requestId} · ${createdAt}</p>
   `;
   return { subject, html };
 }
@@ -59,7 +67,7 @@ export async function notifySeatRequest(context: InvocationContext, p: SeatReque
 // --- Requester-facing emails (#193) --------------------------------------
 // These go to the requesting org admin, not the platform admin. They embed
 // user- and org-supplied strings, so every interpolated string is HTML-escaped
-// via this local helper. (The platform-admin template above is left untouched.)
+// via this local helper — as is the platform-admin template above (#195).
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
