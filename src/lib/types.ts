@@ -28,6 +28,7 @@ export interface Organization {
   seat_limit: number | null;
   created_at: string;
   member_count?: number;
+  pending_invite_count?: number;
 }
 
 export interface OrgMembership {

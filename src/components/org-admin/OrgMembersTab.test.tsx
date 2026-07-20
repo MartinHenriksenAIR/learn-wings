@@ -14,10 +14,21 @@ vi.mock('@/components/ui/sonner', () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
-// --- mock api-client so no network fires ---
-vi.mock('@/lib/api-client', () => ({
-  callApi: vi.fn(),
-}));
+// --- mock api-client so no network fires (ApiError mirrors the real class so
+// --- `instanceof ApiError` checks in the component resolve) ---
+vi.mock('@/lib/api-client', () => {
+  class MockApiError extends Error {
+    status: number;
+    code?: string;
+    constructor(message: string, status: number, code?: string) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.code = code;
+    }
+  }
+  return { callApi: vi.fn(), ApiError: MockApiError };
+});
 
 // --- useAuth mock factory ---
 const mockUseAuth = vi.fn();

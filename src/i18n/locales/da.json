@@ -1,4 +1,9 @@
 {
+  "seats": {
+    "usage": "{{used}} af {{limit}} pladser brugt · {{remaining}} tilbage",
+    "unlimited": "Ubegrænset antal pladser",
+    "limitReached": "Pladsgrænse nået"
+  },
   "common": {
     "save": "Gem",
     "saved": "Gemt",

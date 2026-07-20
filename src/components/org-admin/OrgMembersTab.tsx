@@ -48,8 +48,10 @@ import { useAiChampions } from '@/hooks/useAiChampions';
 import { useToastMutation } from '@/hooks/useToastMutation';
 import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQueryErrorToast';
 import { queryKeys } from '@/lib/query-keys';
-import { callApi } from '@/lib/api-client';
+import { callApi, ApiError } from '@/lib/api-client';
+import { getSeatUsage } from '@/lib/seats';
 import { cn, getAvatarColor, getInitials } from '@/lib/utils';
+import { SeatUsageNote } from '@/components/SeatUsageNote';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
 import {
   Users,
@@ -104,6 +106,19 @@ export function OrgMembersTab() {
     () => new Set((championsQuery.data ?? []).map((c) => c.user_id)),
     [championsQuery.data],
   );
+
+  // Seats consumed = active members + pending invitations (both already
+  // fetched here), measured against the org's seat_limit.
+  const seatUsage = useMemo(
+    () =>
+      getSeatUsage({
+        activeMembers: members.filter((m) => m.status === 'active').length,
+        pendingInvites: invitations.length,
+        seatLimit: currentOrg?.seat_limit ?? null,
+      }),
+    [members, invitations, currentOrg?.seat_limit],
+  );
+  const atSeatLimit = !seatUsage.isUnlimited && seatUsage.atLimit;
 
   // Query-error toasts reproduce TanStack v5's missing useQuery onError.
   // Members / invitations failures toast; the champions failure stays SILENT
@@ -292,6 +307,14 @@ export function OrgMembersTab() {
     onSettled: () => setTogglingChampion(null),
   });
 
+  // Surface the backend seat cap (409) inline in the invite dialog, alongside
+  // the failure toast, so it doesn't read as a generic error.
+  const inviteErrorMessage =
+    inviteMutation.error instanceof ApiError &&
+    inviteMutation.error.code === 'SEAT_LIMIT_REACHED'
+      ? inviteMutation.error.message
+      : null;
+
   const handleInvite = () => {
     if (!currentOrg || !user) return;
 
@@ -405,7 +428,14 @@ export function OrgMembersTab() {
           <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
           {t('analytics.members.bulkInvite')}
         </Button>
-        <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <Dialog
+          open={inviteOpen}
+          onOpenChange={(open) => {
+            setInviteOpen(open);
+            // Clear any prior seat-cap error when the dialog (re)opens.
+            if (open) inviteMutation.reset();
+          }}
+        >
           <DialogTrigger asChild>
             <Button className="shrink-0">
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -416,6 +446,7 @@ export function OrgMembersTab() {
             <DialogHeader>
               <DialogTitle>Invite Team Member</DialogTitle>
               <DialogDescription>Send an invitation to join {currentOrg?.name}.</DialogDescription>
+              <SeatUsageNote usage={seatUsage} className="pt-1" />
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -470,11 +501,16 @@ export function OrgMembersTab() {
                 </Select>
               </div>
             </div>
+            {(atSeatLimit || inviteErrorMessage) && (
+              <p className="text-xs font-medium text-destructive">
+                {inviteErrorMessage ?? t('seats.limitReached')}
+              </p>
+            )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setInviteOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleInvite} disabled={inviteMutation.isPending}>
+              <Button onClick={handleInvite} disabled={inviteMutation.isPending || atSeatLimit}>
                 {inviteMutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
@@ -493,6 +529,7 @@ export function OrgMembersTab() {
         onOpenChange={setBulkInviteOpen}
         orgId={currentOrg.id}
         orgName={currentOrg.name}
+        seatUsage={seatUsage}
         onSuccess={refetchAll}
       />
 
@@ -518,7 +555,12 @@ export function OrgMembersTab() {
           }
           action={
             !hasFilters ? (
-              <Button onClick={() => setInviteOpen(true)}>
+              <Button
+                onClick={() => {
+                  inviteMutation.reset();
+                  setInviteOpen(true);
+                }}
+              >
                 <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
                 {t('analytics.members.inviteMember')}
               </Button>

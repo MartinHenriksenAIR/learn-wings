@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -25,12 +26,15 @@ import { toast } from '@/components/ui/sonner';
 import { Upload, Download, FileSpreadsheet, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
+import { SeatUsageNote } from '@/components/SeatUsageNote';
+import type { SeatUsage } from '@/lib/seats';
 
 interface BulkInviteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orgId: string;
   orgName: string;
+  seatUsage: SeatUsage;
   onSuccess: () => void;
 }
 
@@ -51,9 +55,12 @@ export function BulkInviteDialog({
   onOpenChange,
   orgId,
   orgName,
+  seatUsage,
   onSuccess,
 }: BulkInviteDialogProps) {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const atSeatLimit = !seatUsage.isUnlimited && seatUsage.atLimit;
   const [parsedData, setParsedData] = useState<ParsedInvite[]>([]);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -187,6 +194,7 @@ export function BulkInviteDialog({
           success: boolean;
           invitation?: { id: string; link_id: string };
           error?: string;
+          code?: string;
         }>;
       }>('/api/invitation-bulk-create', { orgId, invites });
 
@@ -210,9 +218,11 @@ export function BulkInviteDialog({
           if (idx !== -1) {
             parsedData[idx].valid = false;
             parsedData[idx].error =
-              row.error === 'An invitation for this email is already pending'
-                ? 'Already invited'
-                : row.error || 'Unknown error';
+              row.code === 'SEAT_LIMIT_REACHED'
+                ? t('seats.limitReached')
+                : row.error === 'An invitation for this email is already pending'
+                  ? 'Already invited'
+                  : row.error || 'Unknown error';
           }
         }
       }
@@ -266,6 +276,7 @@ export function BulkInviteDialog({
           <DialogDescription>
             Upload a CSV file to invite multiple members to {orgName}.
           </DialogDescription>
+          <SeatUsageNote usage={seatUsage} className="pt-1" />
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 py-4">
@@ -387,6 +398,10 @@ export function BulkInviteDialog({
           )}
         </div>
 
+        {atSeatLimit && !results && (
+          <p className="text-xs font-medium text-destructive">{t('seats.limitReached')}</p>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={handleClose}>
             {results ? 'Close' : 'Cancel'}
@@ -394,7 +409,7 @@ export function BulkInviteDialog({
           {!results && (
             <Button
               onClick={handleBulkInvite}
-              disabled={processing || validCount === 0}
+              disabled={processing || validCount === 0 || atSeatLimit}
             >
               {processing ? (
                 <>
