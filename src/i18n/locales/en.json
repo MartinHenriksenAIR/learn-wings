@@ -817,7 +817,6 @@
     "deleteIrreversible": "This action cannot be undone.",
     "selectOrganization": "Select organization",
     "allOrganizations": "All Organizations",
-    "searchOrganizations": "Search organizations...",
     "searchOrganizationPrompt": "Search organization...",
     "noOrganizationFound": "No organization found.",
     "enableAllCourses": "Enable All Courses",

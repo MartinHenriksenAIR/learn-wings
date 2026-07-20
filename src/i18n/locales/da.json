@@ -817,7 +817,6 @@
     "deleteIrreversible": "Denne handling kan ikke fortrydes.",
     "selectOrganization": "Vælg organisation",
     "allOrganizations": "Alle organisationer",
-    "searchOrganizations": "Søg organisationer...",
     "searchOrganizationPrompt": "Søg organisation...",
     "noOrganizationFound": "Ingen organisation fundet.",
     "enableAllCourses": "Aktivér alle kurser",
