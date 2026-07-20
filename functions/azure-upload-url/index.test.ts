@@ -196,6 +196,12 @@ describe('azure-upload-url', () => {
       'cw',
       30,
     );
+    expect(mockBuildBlobUrl).toHaveBeenCalledWith(
+      expect.any(String),
+      'email-assets',
+      body.blobPath,
+      expect.any(String),
+    );
   });
 
   it('with no assetType, keeps legacy behaviour: default container, bare <uuid>.<ext> blobPath', async () => {
