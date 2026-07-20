@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { consumePostLoginRedirect } from '@/lib/post-login-redirect';
+import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import logoLight from '@/assets/logo-light.png';
@@ -23,9 +24,9 @@ export default function Login() {
       if (redirect) {
         navigate(redirect, { replace: true });
       } else if (isPlatformAdmin) {
-        navigate('/app/admin/platform/organizations');
+        navigate(routes.platformAdmin.organizations);
       } else if (isOrgAdmin) {
-        navigate('/app/admin/org');
+        navigate(routes.orgAdmin.root);
       } else {
         navigate('/app/dashboard');
       }

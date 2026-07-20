@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
+import { routes } from '@/lib/routes';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -482,7 +483,7 @@ export default function CoursesManager() {
                   {/* Course: thumb chip + title */}
                   <button
                     type="button"
-                    onClick={() => navigate(`/app/admin/platform/courses/${course.id}`)}
+                    onClick={() => navigate(routes.platformAdmin.courseEditor(course.id))}
                     className="flex min-w-0 items-center gap-3 text-left"
                   >
                     {course.thumbnail_url ? (
@@ -523,7 +524,7 @@ export default function CoursesManager() {
                   <span className="flex justify-end gap-1.5">
                     <button
                       type="button"
-                      onClick={() => navigate(`/app/admin/platform/courses/${course.id}`)}
+                      onClick={() => navigate(routes.platformAdmin.courseEditor(course.id))}
                       title={t('coursesManager.editCourse')}
                       aria-label={t('coursesManager.editCourse')}
                       className="grid h-[30px] w-[30px] place-items-center rounded-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-primary"

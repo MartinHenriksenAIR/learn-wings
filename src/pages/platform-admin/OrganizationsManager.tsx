@@ -26,6 +26,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
 import { callApi, ApiError } from '@/lib/api-client';
+import { routes } from '@/lib/routes';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { useProfiles } from '@/hooks/useProfiles';
 import { Organization, OrgRole } from '@/lib/types';
@@ -406,7 +407,7 @@ export default function OrganizationsManager() {
               <button
                 key={org.id}
                 type="button"
-                onClick={() => navigate(`/app/admin/platform/organizations/${org.id}`)}
+                onClick={() => navigate(routes.platformAdmin.organizationDetail(org.id))}
                 className="grid w-full grid-cols-[2.2fr_1.2fr_0.9fr_1fr_1fr_0.4fr] items-center gap-3 border-t border-[#f3f4f8] px-5 py-3.5 text-left transition-colors hover:bg-[#f7f8fa]"
               >
                 {/* Organization: icon chip + name */}

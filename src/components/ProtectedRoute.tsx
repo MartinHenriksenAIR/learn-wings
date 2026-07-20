@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { savePostLoginRedirect } from '@/lib/post-login-redirect';
+import { routes } from '@/lib/routes';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -36,7 +37,7 @@ export function ProtectedRoute({
   
   // Redirect platform admins away from learner-only routes
   if (learnerOnly && effectiveIsPlatformAdmin) {
-    return <Navigate to="/app/admin/platform/organizations" replace />;
+    return <Navigate to={routes.platformAdmin.organizations} replace />;
   }
   
   // Check platform admin requirement

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { useAuth } from '@/hooks/useAuth';
 import { useViewModeLabels } from '@/components/layout/view-mode-labels';
+import { routes } from '@/lib/routes';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -27,7 +28,7 @@ const DEFAULT_BREADCRUMB_HREFS: Record<string, string> = {
   'Courses': '/app/courses',
   'Idea Library': '/app/community/org/ideas',
   'Resources': '/app/community/org/resources',
-  'Organizations': '/app/admin/platform/organizations',
+  'Organizations': routes.platformAdmin.organizations,
 };
 
 const CRUMB_LINK_CLASSES = 'font-medium text-muted-foreground transition-colors hover:text-primary';
@@ -37,7 +38,7 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
   const { t } = useTranslation();
 
   // Platform admins go to Organizations, others go to Dashboard
-  const homeHref = effectiveIsPlatformAdmin ? '/app/admin/platform/organizations' : '/app/dashboard';
+  const homeHref = effectiveIsPlatformAdmin ? routes.platformAdmin.organizations : '/app/dashboard';
 
   const viewModeLabels = useViewModeLabels();
 

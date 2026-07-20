@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { PlatformSettingsProvider } from "@/hooks/usePlatformSettings";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { routes } from "@/lib/routes";
 
 // Pages
 import Login from "./pages/Login";
@@ -63,19 +64,19 @@ function AppRoutes() {
       <Route path="/app/community/org/resources" element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
-      <Route path="/app/admin/org" element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
-      <Route path="/app/admin/org/settings" element={<ProtectedRoute requireOrgAdmin><OrgSettings /></ProtectedRoute>} />
-      <Route path="/app/admin/org/ideas" element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />
-      <Route path="/app/admin/org/moderation" element={<ProtectedRoute requireOrgAdmin><OrgCommunityModeration /></ProtectedRoute>} />
-      
+      <Route path={routes.orgAdmin.root} element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
+      <Route path={routes.orgAdmin.settings} element={<ProtectedRoute requireOrgAdmin><OrgSettings /></ProtectedRoute>} />
+      <Route path={routes.orgAdmin.ideas} element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />
+      <Route path={routes.orgAdmin.moderation} element={<ProtectedRoute requireOrgAdmin><OrgCommunityModeration /></ProtectedRoute>} />
+
       {/* Protected platform admin routes */}
-      <Route path="/app/admin/platform/organizations" element={<ProtectedRoute requirePlatformAdmin><OrganizationsManager /></ProtectedRoute>} />
-      <Route path="/app/admin/platform/organizations/:orgId" element={<ProtectedRoute requirePlatformAdmin><OrganizationDetail /></ProtectedRoute>} />
-      <Route path="/app/admin/platform/courses" element={<ProtectedRoute requirePlatformAdmin><CoursesManager /></ProtectedRoute>} />
-      <Route path="/app/admin/platform/courses/:courseId" element={<ProtectedRoute requirePlatformAdmin><CourseEditor /></ProtectedRoute>} />
-      <Route path="/app/admin/platform/analytics" element={<ProtectedRoute requirePlatformAdmin><OrgAnalytics /></ProtectedRoute>} />
-      <Route path="/app/admin/platform/settings" element={<ProtectedRoute requirePlatformAdmin><PlatformSettings /></ProtectedRoute>} />
-      <Route path="/app/admin/platform/moderation" element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
+      <Route path={routes.platformAdmin.organizations} element={<ProtectedRoute requirePlatformAdmin><OrganizationsManager /></ProtectedRoute>} />
+      <Route path={routes.platformAdmin.organizationDetailPattern} element={<ProtectedRoute requirePlatformAdmin><OrganizationDetail /></ProtectedRoute>} />
+      <Route path={routes.platformAdmin.courses} element={<ProtectedRoute requirePlatformAdmin><CoursesManager /></ProtectedRoute>} />
+      <Route path={routes.platformAdmin.courseEditorPattern} element={<ProtectedRoute requirePlatformAdmin><CourseEditor /></ProtectedRoute>} />
+      <Route path={routes.platformAdmin.analytics} element={<ProtectedRoute requirePlatformAdmin><OrgAnalytics /></ProtectedRoute>} />
+      <Route path={routes.platformAdmin.settings} element={<ProtectedRoute requirePlatformAdmin><PlatformSettings /></ProtectedRoute>} />
+      <Route path={routes.platformAdmin.moderation} element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
       <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
       {/* Redirects */}
