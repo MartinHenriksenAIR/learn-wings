@@ -194,4 +194,23 @@ describe('community-reports', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
+
+  it('projects target hide/lock state via post + comment joins', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    const res = await handler(baseReq({}), {} as any);
+    expect(res.status).toBe(200);
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('LEFT JOIN community_posts tp');
+    expect(sql).toContain("r.target_type = 'post' AND tp.id = r.target_id");
+    expect(sql).toMatch(/CASE WHEN r\.target_type = 'post' THEN tp\.is_hidden ELSE tc\.is_hidden END AS target_is_hidden/);
+    expect(sql).toMatch(/CASE WHEN r\.target_type = 'post' THEN tp\.is_locked ELSE NULL END AS target_is_locked/);
+  });
+
+  it('passes target_is_hidden / target_is_locked through in the response', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    const row = { ...sampleReport, target_is_hidden: true, target_is_locked: false };
+    mockQuery.mockResolvedValueOnce([row]);
+    const res = await handler(baseReq({}), {} as any);
+    expect(JSON.parse(res.body as string)).toEqual({ reports: [row] });
+  });
 });

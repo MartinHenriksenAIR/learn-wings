@@ -9,7 +9,12 @@ import { Upload, X, FileText, Video, Image as ImageIcon, Loader2 } from 'lucide-
 export type FileUploadType = 'image' | 'video' | 'document';
 
 interface FileUploadProps {
-  bucket: string;
+  /**
+   * Declares upload intent so the backend routes the blob to the right
+   * container. `org-logo`/`avatar` go to the public branding container;
+   * omitted → the private default (videos, documents, thumbnails).
+   */
+  assetType?: 'org-logo' | 'avatar';
   folder?: string;
   accept?: FileUploadType;
   value?: string | null;
@@ -32,7 +37,7 @@ const fileIcons: Record<FileUploadType, React.ReactNode> = {
 };
 
 export function FileUpload({
-  bucket,
+  assetType,
   folder = '',
   accept = 'image',
   value,
@@ -86,7 +91,7 @@ export function FileUpload({
       // Get a signed Azure upload URL
       const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>(
         '/api/azure-upload-url',
-        { fileName: file.name, contentType: file.type }
+        { fileName: file.name, contentType: file.type, ...(assetType && { assetType }) }
       );
 
       if (!uploadData?.uploadUrl) throw new Error('Failed to get upload URL');

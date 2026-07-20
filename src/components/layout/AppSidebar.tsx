@@ -17,7 +17,8 @@ import {
 import { useAuth, ViewMode } from '@/hooks/useAuth';
 import { useViewModeLabels } from '@/components/layout/view-mode-labels';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -115,6 +116,7 @@ export function AppSidebar() {
   ];
 
   const initials = getInitials(profile?.full_name);
+  const { data: avatarSrc } = useSignedBrandingUrl(profile?.avatar_url);
 
   const getCurrentRoleLabel = () => {
     if (isPlatformAdmin) {
@@ -236,6 +238,9 @@ export function AppSidebar() {
               className="h-auto w-full justify-start gap-2.5 rounded-xl p-2 text-sidebar-foreground hover:bg-[#f3f4f8] hover:text-foreground"
             >
               <Avatar className="h-9 w-9">
+                {avatarSrc && (
+                  <AvatarImage src={avatarSrc} alt="" className="object-cover" />
+                )}
                 <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
                   {initials}
                 </AvatarFallback>

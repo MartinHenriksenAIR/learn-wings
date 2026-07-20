@@ -10,7 +10,7 @@ vi.mock('./sas', () => ({
   buildBlobUrl: mockBuildBlobUrl,
 }));
 
-import { deleteBlob } from './blob';
+import { deleteBlob, resolveAssetContainer, isBrandingAssetType, isBrandingAssetPath } from './blob';
 
 const BLOB_PATH = 'videos/lesson-1.mp4';
 const BLOB_URL = 'https://testaccount.blob.core.windows.net/lms-videos/blob?sp=d&sig=abc';
@@ -93,5 +93,61 @@ describe('deleteBlob', () => {
       'd',
       10,
     );
+  });
+});
+
+describe('resolveAssetContainer', () => {
+  beforeEach(() => {
+    process.env.AZURE_STORAGE_CONTAINER_NAME = 'lms-videos';
+  });
+  afterEach(() => {
+    delete process.env.AZURE_STORAGE_CONTAINER_NAME;
+  });
+
+  it("routes 'org-logo' to the private default container with an org-logos/ prefix", () => {
+    expect(resolveAssetContainer('org-logo')).toEqual({ container: 'lms-videos', prefix: 'org-logos/' });
+  });
+
+  it("routes 'avatar' to the private default container with an avatars/ prefix", () => {
+    expect(resolveAssetContainer('avatar')).toEqual({ container: 'lms-videos', prefix: 'avatars/' });
+  });
+
+  it('gives no prefix for an unknown assetType (allow-list, not error)', () => {
+    expect(resolveAssetContainer('bogus')).toEqual({ container: 'lms-videos', prefix: '' });
+  });
+
+  it('gives no prefix when assetType is absent', () => {
+    expect(resolveAssetContainer(undefined)).toEqual({ container: 'lms-videos', prefix: '' });
+  });
+
+  it('falls back to lms-videos when AZURE_STORAGE_CONTAINER_NAME is unset', () => {
+    delete process.env.AZURE_STORAGE_CONTAINER_NAME;
+    expect(resolveAssetContainer('org-logo')).toEqual({ container: 'lms-videos', prefix: 'org-logos/' });
+  });
+});
+
+describe('isBrandingAssetType', () => {
+  it('accepts org-logo and avatar', () => {
+    expect(isBrandingAssetType('org-logo')).toBe(true);
+    expect(isBrandingAssetType('avatar')).toBe(true);
+  });
+  it('rejects unknown/absent types', () => {
+    expect(isBrandingAssetType('video')).toBe(false);
+    expect(isBrandingAssetType(undefined)).toBe(false);
+    expect(isBrandingAssetType('')).toBe(false);
+  });
+});
+
+describe('isBrandingAssetPath', () => {
+  it('accepts a flat org-logos/ or avatars/ path', () => {
+    expect(isBrandingAssetPath('org-logos/abc-123.png')).toBe(true);
+    expect(isBrandingAssetPath('avatars/abc-123.jpg')).toBe(true);
+  });
+  it('rejects non-branding, nested, and traversal paths', () => {
+    expect(isBrandingAssetPath('lessons/secret.mp4')).toBe(false);
+    expect(isBrandingAssetPath('avatars/../lessons/secret.mp4')).toBe(false);
+    expect(isBrandingAssetPath('org-logos/sub/deep.png')).toBe(false);
+    expect(isBrandingAssetPath('avatars/')).toBe(false);
+    expect(isBrandingAssetPath('')).toBe(false);
   });
 });

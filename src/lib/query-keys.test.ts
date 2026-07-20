@@ -99,7 +99,7 @@ describe('queryKeys', () => {
     expect(queryKeys.platformReports.all).toEqual(['platform-reports']);
   });
   it('platformReports.list returns the full parameterized key', () => {
-    expect(queryKeys.platformReports.list('pending')).toEqual(['platform-reports', 'pending']);
+    expect(queryKeys.platformReports.list('all', 'pending')).toEqual(['platform-reports', 'all', 'pending']);
   });
 
   // ai-champions

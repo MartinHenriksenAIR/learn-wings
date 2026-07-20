@@ -94,16 +94,7 @@ export default function LearnerDashboard() {
     );
   }
 
-  // ----- Stat-card extras (derived from data this page already fetched) -----
-  const enrolledTitles = enrollments
-    .map(e => e.course?.title)
-    .filter(Boolean)
-    .join('  ·  ');
   const nextUp = inProgressCourses[0];
-  const latestCompleted = completedCourses.reduce<(Enrollment & { course: Course }) | null>(
-    (latest, e) => (!latest || (e.completed_at ?? '') > (latest.completed_at ?? '') ? e : latest),
-    null
-  );
 
   // ----- Hero variants: in-progress / all caught up / first-time user -----
   const heroProgress = nextUp ? progressData[nextUp.course_id] : undefined;
@@ -160,58 +151,24 @@ export default function LearnerDashboard() {
           label={t('dashboard.coursesEnrolled')}
           value={enrollments.length}
           icon={<BookOpen className="h-5 w-5" />}
-          extra={
-            enrollments.length > 0
-              ? <span className="line-clamp-2">{enrolledTitles}</span>
-              : t('dashboard.extraNoEnrollments')
-          }
           onClick={() => navigate('/app/courses')}
         />
         <StatCard
           label={t('dashboard.inProgress')}
           value={inProgressCourses.length}
           icon={<Clock className="h-5 w-5" />}
-          extra={
-            nextUp
-              ? t('dashboard.extraNextUp', { course: nextUp.course?.title })
-              : t('dashboard.extraNothingInProgress')
-          }
           onClick={() => navigate(nextUp ? `/app/learn/${nextUp.course_id}` : '/app/courses')}
         />
         <StatCard
           label={t('dashboard.completed')}
           value={completedCourses.length}
           icon={<Award className="h-5 w-5" />}
-          extra={
-            latestCompleted
-              ? t('dashboard.extraLatestCompleted', {
-                  course: latestCompleted.course?.title,
-                  date: new Date(latestCompleted.completed_at!).toLocaleDateString(),
-                })
-              : t('dashboard.extraNoCompleted')
-          }
           onClick={() => navigate('/app/courses')}
         />
         <StatCard
           label={t('dashboard.overallProgress')}
           value={`${Math.round(totalProgress)}%`}
           icon={<TrendingUp className="h-5 w-5" />}
-          extra={
-            <span className="flex items-center gap-2">
-              <span className="block h-[5px] flex-1 overflow-hidden rounded bg-[#eceef3]">
-                <span
-                  className="block h-full rounded bg-primary transition-[width] duration-[400ms]"
-                  style={{ width: `${Math.round(totalProgress)}%` }}
-                />
-              </span>
-              <span className="whitespace-nowrap">
-                {t('dashboard.extraCoursesDone', {
-                  completed: completedCourses.length,
-                  total: enrollments.length,
-                })}
-              </span>
-            </span>
-          }
           onClick={() => navigate('/app/courses')}
         />
       </div>

@@ -22,6 +22,12 @@ export const queryKeys = {
     all: ['organizations'] as const,
   },
 
+  // ── Branding assets (signed display URLs) ────────────────────────────────────
+  brandingAsset: {
+    /** ['branding-asset', blobPath] — one signed-URL cache entry per stored path. */
+    signed: (blobPath: string) => ['branding-asset', blobPath] as const,
+  },
+
   // ── Community feed ─────────────────────────────────────────────────────────
   communityCategories: {
     /** ['community-categories'] */
@@ -159,10 +165,12 @@ export const queryKeys = {
     /** ['platform-reports'] — use for invalidation prefix */
     all: ['platform-reports'] as const,
     /**
-     * Full key: ['platform-reports', activeTab]
-     * Parameter order matches the query in PlatformCommunityModeration.tsx.
+     * Full key: ['platform-reports', scope, activeTab]
+     * scope is 'all' | 'global' | <orgId>; parameter order matches the query
+     * in PlatformCommunityModeration.tsx.
      */
-    list: (activeTab: string) => ['platform-reports', activeTab] as const,
+    list: (scope: string, activeTab: string) =>
+      ['platform-reports', scope, activeTab] as const,
   },
 
   // ── AI Champions ───────────────────────────────────────────────────────────

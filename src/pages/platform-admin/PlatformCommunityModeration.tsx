@@ -16,30 +16,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
-import { canViewReportedContent } from '@/lib/community-report-link';
 import { ReportedContentDialog } from '@/components/community/ReportedContentDialog';
+import { ReportActions } from '@/components/community/ReportActions';
 import { useOrganizations } from '@/hooks/useOrganizations';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Loader2,
-  Eye,
-  EyeOff,
-  Lock,
-  Unlock,
   CheckCircle,
   XCircle,
   Flag,
   MessageSquare,
   FileText,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react';
 
 interface ReportWithDetails extends Omit<CommunityReport, 'reporter'> {
@@ -56,12 +51,20 @@ export default function PlatformCommunityModeration() {
   const [adminNotes, setAdminNotes] = useState('');
   // Report whose content is shown in the "View content" dialog (#160).
   const [viewReport, setViewReport] = useState<ReportWithDetails | null>(null);
+  // Scope filter: 'all' | 'global' | <orgId> (#164).
+  const [scope, setScope] = useState<string>('all');
+  const [scopeOpen, setScopeOpen] = useState(false);
 
-  // Fetch all reports across all scopes (no-filter mode = platform-admin only)
+  // Fetch reports for the selected scope: all orgs + global, global only, or one org.
   const { data: reports = [], isLoading } = useQuery({
-    queryKey: queryKeys.platformReports.list(activeTab),
+    queryKey: queryKeys.platformReports.list(scope, activeTab),
     queryFn: async () => {
-      const data = await fetchReports(undefined, { status: activeTab });
+      const data =
+        scope === 'all'
+          ? await fetchReports(undefined, { status: activeTab })
+          : scope === 'global'
+            ? await fetchReports(undefined, { scope: 'global', status: activeTab })
+            : await fetchReports(scope, { status: activeTab });
       return data as ReportWithDetails[];
     },
   });
@@ -184,6 +187,13 @@ export default function PlatformCommunityModeration() {
     { key: 'dismissed', label: t('moderation.tabs.dismissed') },
   ];
 
+  const scopeLabel =
+    scope === 'all'
+      ? t('platformModeration.scopeAll')
+      : scope === 'global'
+        ? t('platformModeration.scopeGlobal')
+        : orgsMap?.get(scope) ?? t('platformModeration.scopeOrganization');
+
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       {/* Header */}
@@ -192,6 +202,61 @@ export default function PlatformCommunityModeration() {
           {t('platformModeration.title')}
         </h1>
         <p className="text-sm text-muted-foreground">{t('platformModeration.description')}</p>
+      </div>
+
+      {/* Scope filter (#164) */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-muted-foreground">
+          {t('platformModeration.scopeSelectLabel')}
+        </span>
+        <Popover open={scopeOpen} onOpenChange={setScopeOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              role="combobox"
+              aria-expanded={scopeOpen}
+              className="w-[240px] justify-between"
+            >
+              {scopeLabel}
+              <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[240px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder={t('platformModeration.scopeSearchPlaceholder')} />
+              <CommandList>
+                <CommandEmpty>{t('platformModeration.scopeNoResults')}</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value={t('platformModeration.scopeAll')}
+                    onSelect={() => { setScope('all'); setScopeOpen(false); }}
+                  >
+                    <Check className={cn('mr-2 h-4 w-4', scope === 'all' ? 'opacity-100' : 'opacity-0')} />
+                    {t('platformModeration.scopeAll')}
+                  </CommandItem>
+                  <CommandItem
+                    value={t('platformModeration.scopeGlobal')}
+                    onSelect={() => { setScope('global'); setScopeOpen(false); }}
+                  >
+                    <Check className={cn('mr-2 h-4 w-4', scope === 'global' ? 'opacity-100' : 'opacity-0')} />
+                    {t('platformModeration.scopeGlobal')}
+                  </CommandItem>
+                  {(orgsData ?? []).map((org) => (
+                    <CommandItem
+                      key={org.id}
+                      value={org.name}
+                      onSelect={() => { setScope(org.id); setScopeOpen(false); }}
+                    >
+                      <Check className={cn('mr-2 h-4 w-4', scope === org.id ? 'opacity-100' : 'opacity-0')} />
+                      {org.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Tabs */}
@@ -217,7 +282,7 @@ export default function PlatformCommunityModeration() {
         <div className="flex flex-col gap-3">
           {reports.map((report) => {
             const isPost = report.target_type === 'post';
-            const scope = getScopeLabel(report);
+            const scopeBadge = getScopeLabel(report);
             return (
               <Card key={report.id}>
                 <CardContent className="px-[22px] py-[18px]">
@@ -243,12 +308,12 @@ export default function PlatformCommunityModeration() {
                     <span
                       className={cn(
                         'rounded-[7px] px-[11px] py-1 text-[11px] font-bold',
-                        scope.global
+                        scopeBadge.global
                           ? 'bg-[#f3f4f8] text-muted-foreground'
                           : 'bg-accent text-accent-foreground'
                       )}
                     >
-                      {scope.label}
+                      {scopeBadge.label}
                     </span>
                     <div className="flex-1" />
                     <span className="text-[11.5px] font-semibold text-muted-foreground">
@@ -271,108 +336,19 @@ export default function PlatformCommunityModeration() {
                     </p>
                   )}
 
-                  {/* Action controls — kept exactly as today (view/hide/show/lock/unlock/review/dismiss) */}
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setViewReport(report)}
-                          disabled={!canViewReportedContent(report)}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          {t('moderation.viewContent')}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{t('moderation.viewContent')}</TooltipContent>
-                    </Tooltip>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleContentVisibility.mutate({
-                        type: report.target_type,
-                        id: report.target_id,
-                        hide: true,
-                      })}
-                      disabled={toggleContentVisibility.isPending}
-                    >
-                      <EyeOff className="h-3.5 w-3.5" />
-                      {isPost ? t('moderation.hidePost') : t('moderation.hideComment')}
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleContentVisibility.mutate({
-                        type: report.target_type,
-                        id: report.target_id,
-                        hide: false,
-                      })}
-                      disabled={toggleContentVisibility.isPending}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      {isPost ? t('moderation.showPost') : t('moderation.showComment')}
-                    </Button>
-
-                    {isPost && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => togglePostLock.mutate({
-                            postId: report.target_id,
-                            lock: true,
-                          })}
-                          disabled={togglePostLock.isPending}
-                        >
-                          <Lock className="h-3.5 w-3.5" />
-                          {t('moderation.lockPost')}
-                        </Button>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => togglePostLock.mutate({
-                            postId: report.target_id,
-                            lock: false,
-                          })}
-                          disabled={togglePostLock.isPending}
-                        >
-                          <Unlock className="h-3.5 w-3.5" />
-                          {t('moderation.unlockPost')}
-                        </Button>
-                      </>
-                    )}
-
-                    {report.status === 'pending' && (
-                      <>
-                        <div className="flex-1" />
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => updateReportMutation.mutate({
-                            reportId: report.id,
-                            status: 'dismissed',
-                          })}
-                          disabled={updateReportMutation.isPending}
-                        >
-                          <XCircle className="h-3.5 w-3.5" />
-                          {t('moderation.dismiss')}
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          onClick={() => openReviewDialog(report)}
-                          disabled={updateReportMutation.isPending}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          {t('moderation.markReviewed')}
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                  <ReportActions
+                    report={report}
+                    onViewContent={() => setViewReport(report)}
+                    onSetHidden={(hide) =>
+                      toggleContentVisibility.mutate({ type: report.target_type, id: report.target_id, hide })
+                    }
+                    onSetLocked={(lock) => togglePostLock.mutate({ postId: report.target_id, lock })}
+                    onDismiss={() => updateReportMutation.mutate({ reportId: report.id, status: 'dismissed' })}
+                    onReview={() => openReviewDialog(report)}
+                    visibilityPending={toggleContentVisibility.isPending}
+                    lockPending={togglePostLock.isPending}
+                    updatePending={updateReportMutation.isPending}
+                  />
                 </CardContent>
               </Card>
             );

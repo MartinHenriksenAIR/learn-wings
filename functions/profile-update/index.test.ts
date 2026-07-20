@@ -152,6 +152,37 @@ describe('profile-update', () => {
     expect(nullCount).toBeGreaterThanOrEqual(2);
   });
 
+  // 9b. avatar_url round-trips through the update as the raw container-relative path
+  it('updates avatar_url with the raw container-relative path', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ...profileRow, avatar_url: 'avatars/abc.png' });
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/abc.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+    expect(body.profile.avatar_url).toBe('avatars/abc.png');
+
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    // SET touches avatar_url but NOT full_name (avatar-only update)
+    const setClause = sql.split('RETURNING')[0];
+    expect(setClause).toContain('avatar_url =');
+    expect(setClause).not.toContain('full_name');
+    expect(params).toContain('avatars/abc.png');
+    expect(params).toContain('p1');
+  });
+
+  // 9c. empty-string avatar_url clears the photo (stored as NULL)
+  it('stores empty-string avatar_url as NULL (clears the photo)', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ...profileRow, avatar_url: null });
+
+    const res = await handler(baseReq({ avatar_url: '' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql.split('RETURNING')[0]).toContain('avatar_url =');
+    expect(params).toContain(null);
+  });
+
   // 10. 404 when the profile row vanishes between getProfile and the UPDATE
   it('returns 404 when the UPDATE matches no row (profile deleted mid-request)', async () => {
     mockQueryOne.mockResolvedValueOnce(null); // UPDATE ... RETURNING → no row
