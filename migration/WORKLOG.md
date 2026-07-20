@@ -1006,3 +1006,25 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Code-review follow-ups (xhigh review of the PR).** (1) New `src/lib/routes.ts` — single source of truth for the admin route paths (styled after the `queryKeys` factory); adopted across the route table + every `navigate()`/href/sidebar site, so `OrgAnalytics`'s `isGlobalView` compares against the same constant that defines its route (kills the string-literal drift the review flagged as its top finding). (2) i18n'd the analytics page title/breadcrumbs via the existing `nav.*` keys instead of hardcoded English. (3) New `OrgAnalytics.test.tsx` pins the global-vs-org view branch so a future rename can't silently flip it. Follow-up **#178** filed: extend the route-constants module app-wide (learner/community/auth). Deferred by agreement (out of scope here, tracked in Productive): view-mode in the URL; the in-page `?tab=` back/forward sync bug.
 
 **Verify.** Merged trunk in first; `OrgAnalytics.tsx` auto-merged across regions — my `isGlobalView`/title changes and #159's `effectiveOrgId`/report-guard changes are both present and verified. Root `npm run lint` 0 errors · `npm test` **329 pass** · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions `npm run build` + `npm test` **109 files pass** (untouched by this PR; re-verified after the trunk merge). Merged via PR #174 → `main`; SWA frontend deploy auto-fires (no functions deploy — none changed). #120 closed (core scope shipped; the two deferred concerns recorded on the issue).
+
+---
+
+## 2026-07-20 — Public branding assets: org logo (#162) + profile photo (#165)
+
+**Who:** Martin + Claude
+
+**Done (PR #182):**
+- Shipped org-logo (#162) and profile-photo/avatar (#165) upload + display as **public branding assets**. Prior state: the `FileUpload` `bucket` prop was a no-op — everything landed in the private `lms-videos` container and logos/avatars rendered via an unsigned, container-less URL (broken).
+- `azure-upload-url` now takes an `assetType` intent (`org-logo`/`avatar`) and routes to the public `email-assets` container (ADR-0008), folder-prefixed (`org-logos/`, `avatars/`); unknown/absent → private default (unchanged for videos/docs/thumbnails). Shared `PUBLIC_CONTAINER` constant both sides. No new Azure container, no `az`.
+- DB stores the **container-relative blob path** in `organizations.logo_url` / `profiles.avatar_url`; display composes via `buildPublicUrl` (account-root + container + path). `VITE_STORAGE_BASE_URL` unchanged (account-root). Dead `bucket` prop retired → `assetType`.
+- Surfaces: logo on EditOrganizationDialog / OrgDetailHeader / OrganizationsManager / OrgAnalytics; avatar upload+display on Settings, display in AppSidebar profile menu + MembersTable + OrgMembersTab.
+
+**Decided (grilled with Martin):** reuse existing public `email-assets` (no owner Azure step); client declares intent, server owns the container/prefix allow-list; store raw path + compose at display (env-portable).
+
+**Whole-branch review caught + fixed (2 Critical):**
+- `azure-upload-url` was `adminEndpoint` (platform-admin only) → avatar (all users) and real org-admin logo uploads would 403. Relaxed: public branding assetTypes open to any authenticated user; course content stays admin-only. Real authz is at `organization-update` (org-admin for `logo_url`) / `profile-update` (own row), so an orphan blob is inert.
+- Settings avatar persisted `''` on upload failure → wiped the existing photo. Guarded to persist only on success (matches OrgAnalytics logo).
+
+**Deferred (tracked):** community-feed author avatars → **#180** (needs endpoint `avatar_url`); `TeamPerformanceTab` team-table avatars (same data-not-ready class); remove-photo UI (needs FileUpload to distinguish remove from failure).
+
+**Verification:** frontend lint 0 / tsc 0 / 329 tests / build ok; functions build ok / 1602 tests. Real upload→display E2E deferred to post-deploy smoke.
