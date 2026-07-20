@@ -36,3 +36,7 @@ local.settings.json
 # Claude Code local state (per-machine, never committed)
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Helm (autonomous task runner) — only the committed context manifest is tracked
+.helm/*
+!.helm/context.md
