@@ -108,4 +108,89 @@ describe('azure-upload-url', () => {
       expect((call[0] as string)).not.toContain('FROM profiles WHERE id =');
     }
   });
+
+  it('routes assetType "org-logo" to the public email-assets container under org-logos/', async () => {
+    const req = {
+      ...baseReq,
+      json: async () => ({ fileName: 'logo.png', contentType: 'image/png', assetType: 'org-logo' }),
+    };
+
+    const res = await handler(req as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    expect(body.blobPath).toMatch(/^org-logos\/[^/]+\.png$/);
+    expect(mockGenerateSasToken).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'email-assets',
+      body.blobPath,
+      'cw',
+      30,
+    );
+    expect(mockBuildBlobUrl).toHaveBeenCalledWith(
+      expect.any(String),
+      'email-assets',
+      body.blobPath,
+      expect.any(String),
+    );
+  });
+
+  it('routes assetType "avatar" to the public email-assets container under avatars/', async () => {
+    const req = {
+      ...baseReq,
+      json: async () => ({ fileName: 'photo.jpg', contentType: 'image/jpeg', assetType: 'avatar' }),
+    };
+
+    const res = await handler(req as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    expect(body.blobPath).toMatch(/^avatars\/[^/]+\.jpg$/);
+    expect(mockGenerateSasToken).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'email-assets',
+      body.blobPath,
+      'cw',
+      30,
+    );
+  });
+
+  it('with no assetType, keeps legacy behaviour: default container, bare <uuid>.<ext> blobPath', async () => {
+    const res = await handler(baseReq as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    expect(body.blobPath).toMatch(/^[^/]+\.mp4$/);
+    expect(mockGenerateSasToken).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'lms-videos',
+      body.blobPath,
+      'cw',
+      30,
+    );
+  });
+
+  it('falls through to the private default when assetType is not a recognized value', async () => {
+    const req = {
+      ...baseReq,
+      json: async () => ({ fileName: 'weird.bin', contentType: 'application/octet-stream', assetType: 'not-a-real-type' }),
+    };
+
+    const res = await handler(req as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    expect(body.blobPath).toMatch(/^[^/]+\.bin$/);
+    expect(mockGenerateSasToken).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'lms-videos',
+      body.blobPath,
+      'cw',
+      30,
+    );
+  });
 });
