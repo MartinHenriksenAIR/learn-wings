@@ -36,7 +36,7 @@ export function ProtectedRoute({
   
   // Redirect platform admins away from learner-only routes
   if (learnerOnly && effectiveIsPlatformAdmin) {
-    return <Navigate to="/app/admin/organizations" replace />;
+    return <Navigate to="/app/admin/platform/organizations" replace />;
   }
   
   // Check platform admin requirement

@@ -23,9 +23,9 @@ export default function Login() {
       if (redirect) {
         navigate(redirect, { replace: true });
       } else if (isPlatformAdmin) {
-        navigate('/app/admin/organizations');
+        navigate('/app/admin/platform/organizations');
       } else if (isOrgAdmin) {
-        navigate('/app/admin/analytics');
+        navigate('/app/admin/org');
       } else {
         navigate('/app/dashboard');
       }

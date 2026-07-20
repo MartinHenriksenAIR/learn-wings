@@ -370,7 +370,7 @@ export default function CourseEditor() {
       // The cached admin list still holds the deleted course; drop it so the
       // list page does a fresh load instead of flashing the deleted row.
       queryClient.removeQueries({ queryKey: coursesAdminQueryKey });
-      navigate('/app/admin/courses');
+      navigate('/app/admin/platform/courses');
     },
   });
   const deleting = deleteCourseMutation.isPending;
@@ -425,7 +425,7 @@ export default function CourseEditor() {
       <AppLayout title={t('courseEditor.title')}>
         <div className="text-center py-12">
           <p className="text-muted-foreground">{t('courseEditor.courseNotFound')}</p>
-          <Button variant="outline" onClick={() => navigate('/app/admin/courses')} className="mt-4">
+          <Button variant="outline" onClick={() => navigate('/app/admin/platform/courses')} className="mt-4">
             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> {t('courseEditor.backToCourses')}
           </Button>
         </div>
@@ -436,13 +436,13 @@ export default function CourseEditor() {
   return (
     <AppLayout
       title={t('courseEditor.title')}
-      breadcrumbs={[{ label: t('coursesManager.tabCourses'), href: '/app/admin/courses' }, { label: course.title }]}
+      breadcrumbs={[{ label: t('coursesManager.tabCourses'), href: '/app/admin/platform/courses' }, { label: course.title }]}
     >
       <div className="mx-auto max-w-[860px]">
         {/* Back link */}
         <button
           type="button"
-          onClick={() => navigate('/app/admin/courses')}
+          onClick={() => navigate('/app/admin/platform/courses')}
           className="mb-3.5 inline-flex items-center gap-[7px] rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground transition-colors hover:text-primary"
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />

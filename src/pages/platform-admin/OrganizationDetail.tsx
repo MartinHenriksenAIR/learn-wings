@@ -294,7 +294,7 @@ export default function OrganizationDetail() {
         description: 'The organization has been permanently deleted.',
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
-      navigate('/app/admin/organizations');
+      navigate('/app/admin/platform/organizations');
     },
   });
 
@@ -365,7 +365,7 @@ export default function OrganizationDetail() {
       <AppLayout
         title={t('orgDetail.loadingBreadcrumb')}
         breadcrumbs={[
-          { label: t('organizations.title'), href: '/app/admin/organizations' },
+          { label: t('organizations.title'), href: '/app/admin/platform/organizations' },
           { label: t('orgDetail.loadingBreadcrumb') },
         ]}
       >
@@ -379,7 +379,7 @@ export default function OrganizationDetail() {
       <OrgNotFoundScreen
         loadFailed={orgQuery.isError}
         onRetry={() => orgQuery.refetch()}
-        onBack={() => navigate('/app/admin/organizations')}
+        onBack={() => navigate('/app/admin/platform/organizations')}
       />
     );
   }
@@ -388,14 +388,14 @@ export default function OrganizationDetail() {
     <AppLayout
       title={org.name}
       breadcrumbs={[
-        { label: t('organizations.title'), href: '/app/admin/organizations' },
+        { label: t('organizations.title'), href: '/app/admin/platform/organizations' },
         { label: org.name },
       ]}
     >
       {/* Back link */}
       <button
         type="button"
-        onClick={() => navigate('/app/admin/organizations')}
+        onClick={() => navigate('/app/admin/platform/organizations')}
         className="mb-3.5 inline-flex items-center gap-[7px] rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground transition-colors hover:text-primary"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />

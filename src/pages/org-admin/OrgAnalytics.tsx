@@ -49,7 +49,7 @@ export default function OrgAnalytics() {
   const { t } = useTranslation();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isGlobalView = location.pathname === '/app/admin/analytics/global';
+  const isGlobalView = location.pathname === '/app/admin/platform/analytics';
   const { currentOrg, isPlatformAdmin, refreshUserContext } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
@@ -206,9 +206,14 @@ export default function OrgAnalytics() {
     return <Navigate to="/app/dashboard" replace />;
   }
 
+  const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization';
+  const breadcrumbs = isGlobalView
+    ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
+    : [{ label: 'Organization' }];
+
   if (analyticsQuery.isLoading || settingsLoading) {
     return (
-      <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
+      <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
         <PageSpinner />
       </AppLayout>
     );
@@ -217,7 +222,7 @@ export default function OrgAnalytics() {
   // For org-specific view, require currentOrg
   if (!isGlobalView && !currentOrg) {
     return (
-      <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
+      <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground">No organization selected.</p>
@@ -226,11 +231,6 @@ export default function OrgAnalytics() {
       </AppLayout>
     );
   }
-
-  const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization';
-  const breadcrumbs = isGlobalView
-    ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
-    : [{ label: 'Organization' }];
 
   const subtitle = isGlobalView
     ? selectedOrgId === 'all'

@@ -22,7 +22,7 @@ export function OrgNotFoundScreen({ loadFailed, onRetry, onBack }: OrgNotFoundSc
     <AppLayout
       title={loadFailed ? t('orgDetail.loadFailedTitle') : t('orgDetail.notFoundTitle')}
       breadcrumbs={[
-        { label: t('organizations.title'), href: '/app/admin/organizations' },
+        { label: t('organizations.title'), href: '/app/admin/platform/organizations' },
         { label: loadFailed ? t('orgDetail.loadFailedTitle') : t('orgDetail.notFoundBreadcrumb') },
       ]}
     >

@@ -96,7 +96,7 @@ export function AppSidebar() {
   // Build org admin items based on feature toggles
   const orgAdminItems = [
 
-    ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: '/app/admin/analytics', icon: BarChart3 }] : []),
+    ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: '/app/admin/org', icon: BarChart3 }] : []),
     ...(features.community_enabled ? [
       { title: t('nav.ideasOverview'), url: '/app/admin/org/ideas', icon: Lightbulb },
       { title: t('nav.moderation'), url: '/app/admin/org/moderation', icon: Flag },
@@ -106,9 +106,9 @@ export function AppSidebar() {
 
   // Build platform admin items based on feature toggles
   const platformAdminItems = [
-    { title: t('nav.organizations'), url: '/app/admin/organizations', icon: Building2 },
-    { title: t('nav.courseManager'), url: '/app/admin/courses', icon: GraduationCap },
-    ...(features.analytics_enabled ? [{ title: t('nav.globalAnalytics'), url: '/app/admin/analytics/global', icon: BarChart3 }] : []),
+    { title: t('nav.organizations'), url: '/app/admin/platform/organizations', icon: Building2 },
+    { title: t('nav.courseManager'), url: '/app/admin/platform/courses', icon: GraduationCap },
+    ...(features.analytics_enabled ? [{ title: t('nav.globalAnalytics'), url: '/app/admin/platform/analytics', icon: BarChart3 }] : []),
     ...(features.community_enabled ? [{ title: t('nav.communityModeration'), url: '/app/admin/platform/moderation', icon: Flag }] : []),
     { title: t('nav.platformSettings'), url: '/app/admin/platform/settings', icon: SettingsIcon },
   ];

@@ -65,7 +65,7 @@ describe('Login post-auth navigation', () => {
     render(<Login />);
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/app/admin/organizations');
+      expect(mockNavigate).toHaveBeenCalledWith('/app/admin/platform/organizations');
     });
   });
 
