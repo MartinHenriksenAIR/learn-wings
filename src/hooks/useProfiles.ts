@@ -3,6 +3,14 @@ import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { Profile } from '@/lib/types';
 
+interface UseProfilesOptions {
+  /**
+   * Gate the fetch. Defaults to true. PlatformSettings passes `false` until its
+   * "Platform Admins" tab is active so the profile list isn't fetched eagerly.
+   */
+  enabled?: boolean;
+}
+
 /**
  * The one way to fetch `/api/profiles` from the frontend.
  *
@@ -11,7 +19,7 @@ import type { Profile } from '@/lib/types';
  * network request instead of two. Site-specific concerns (filtering,
  * projections, error toasts) stay at the site.
  */
-export function useProfiles() {
+export function useProfiles(options: UseProfilesOptions = {}) {
   return useQuery({
     queryKey: queryKeys.profiles.all,
     queryFn: async () => {
@@ -19,5 +27,6 @@ export function useProfiles() {
       return Array.isArray(profiles) ? profiles : [];
     },
     staleTime: 60 * 1000,
+    enabled: options.enabled ?? true,
   });
 }
