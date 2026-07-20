@@ -689,6 +689,13 @@
       "course_reviews_enabled": "Course reviews",
       "course_reviews_enabled_hint": "Allow learners to leave reviews on courses.",
       "save": "Save feature settings"
+    },
+    "seatPricing": {
+      "tab": "Seat pricing",
+      "annualPrice": "Annual price per seat (DKK, excl. VAT)",
+      "currency": "Currency",
+      "notificationEmail": "Requests are emailed to",
+      "save": "Save seat pricing"
     }
   },
   "certificates": {

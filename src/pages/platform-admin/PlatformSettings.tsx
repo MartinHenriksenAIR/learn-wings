@@ -22,7 +22,7 @@ import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 import { useToastMutation } from '@/hooks/useToastMutation';
 import { usePlatformSettingsAdmin } from '@/hooks/usePlatformSettingsAdmin';
-import { Loader2, Palette, Users, Mail, ToggleLeft, AlertTriangle } from 'lucide-react';
+import { Loader2, Palette, Users, Mail, ToggleLeft, AlertTriangle, DollarSign } from 'lucide-react';
 
 interface BrandingSettings {
   platform_name: string;
@@ -59,8 +59,14 @@ interface FeatureSettings {
   course_reviews_enabled: boolean;
 }
 
-type SettingsKey = 'branding' | 'user_access' | 'email' | 'features';
-type SettingsValue = BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings;
+interface SeatPricingSettings {
+  annual_price_per_seat: number | null;
+  currency: string;
+  notification_email: string;
+}
+
+type SettingsKey = 'branding' | 'user_access' | 'email' | 'features' | 'seat_pricing';
+type SettingsValue = BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings | SeatPricingSettings;
 
 const defaultBranding: BrandingSettings = {
   platform_name: 'AIR Academy',
@@ -97,6 +103,12 @@ const defaultFeatures: FeatureSettings = {
   course_reviews_enabled: false,
 };
 
+const defaultSeatPricing: SeatPricingSettings = {
+  annual_price_per_seat: null,
+  currency: 'DKK',
+  notification_email: 'jacob@ai-raadgivning.dk',
+};
+
 const featureKeys: (keyof FeatureSettings)[] = [
   'certificates_enabled',
   'quizzes_enabled',
@@ -115,6 +127,7 @@ export default function PlatformSettings() {
   const [userAccess, setUserAccess] = useState<UserAccessSettings>(defaultUserAccess);
   const [email, setEmail] = useState<EmailSettings>(defaultEmail);
   const [features, setFeatures] = useState<FeatureSettings>(defaultFeatures);
+  const [seatPricing, setSeatPricing] = useState<SeatPricingSettings>(defaultSeatPricing);
 
   const query = usePlatformSettingsAdmin();
 
@@ -136,6 +149,9 @@ export default function PlatformSettings() {
           break;
         case 'features':
           setFeatures({ ...defaultFeatures, ...(value as Partial<FeatureSettings>) });
+          break;
+        case 'seat_pricing':
+          setSeatPricing({ ...defaultSeatPricing, ...(value as Partial<SeatPricingSettings>) });
           break;
       }
     });
@@ -230,6 +246,7 @@ export default function PlatformSettings() {
     { key: 'user_access', label: t('platformSettings.tabs.userAccess'), icon: <Users className="h-4 w-4" /> },
     { key: 'email', label: t('platformSettings.tabs.email'), icon: <Mail className="h-4 w-4" /> },
     { key: 'features', label: t('platformSettings.tabs.features'), icon: <ToggleLeft className="h-4 w-4" /> },
+    { key: 'seat_pricing', label: t('platformSettings.seatPricing.tab'), icon: <DollarSign className="h-4 w-4" /> },
   ];
 
   const brandingColors: { key: keyof BrandingSettings; label: string; placeholder: string }[] = [
@@ -530,6 +547,55 @@ export default function PlatformSettings() {
                 idleLabel={t('platformSettings.features.save')}
                 onClick={() => saveSetting('features', features)}
                 disabled={isSaving('features')}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'seat_pricing' && (
+          <Card>
+            <CardContent className="space-y-[18px] px-[26px] py-6">
+              <div className="space-y-1.5">
+                <Label htmlFor="annual_price_per_seat" className="text-xs font-bold text-[#4a4f60]">
+                  {t('platformSettings.seatPricing.annualPrice')}
+                </Label>
+                <Input
+                  id="annual_price_per_seat"
+                  type="number"
+                  min={0}
+                  value={seatPricing.annual_price_per_seat ?? ''}
+                  onChange={(e) =>
+                    setSeatPricing({
+                      ...seatPricing,
+                      annual_price_per_seat: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                  placeholder="1200"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="seat_currency" className="text-xs font-bold text-[#4a4f60]">
+                  {t('platformSettings.seatPricing.currency')}
+                </Label>
+                <Input id="seat_currency" value={seatPricing.currency} disabled />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="seat_notification_email" className="text-xs font-bold text-[#4a4f60]">
+                  {t('platformSettings.seatPricing.notificationEmail')}
+                </Label>
+                <Input
+                  id="seat_notification_email"
+                  type="email"
+                  value={seatPricing.notification_email}
+                  onChange={(e) => setSeatPricing({ ...seatPricing, notification_email: e.target.value })}
+                  placeholder="jacob@ai-raadgivning.dk"
+                />
+              </div>
+              <SaveButton
+                done={flashed('seat_pricing')}
+                idleLabel={t('platformSettings.seatPricing.save')}
+                onClick={() => saveSetting('seat_pricing', seatPricing)}
+                disabled={isSaving('seat_pricing')}
               />
             </CardContent>
           </Card>

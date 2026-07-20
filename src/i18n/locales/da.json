@@ -689,6 +689,13 @@
       "course_reviews_enabled": "Kursusanmeldelser",
       "course_reviews_enabled_hint": "Tillad elever at skrive anmeldelser af kurser.",
       "save": "Gem funktionsindstillinger"
+    },
+    "seatPricing": {
+      "tab": "Pladspriser",
+      "annualPrice": "Årlig pris pr. plads (DKK, ekskl. moms)",
+      "currency": "Valuta",
+      "notificationEmail": "Anmodninger sendes til",
+      "save": "Gem pladspriser"
     }
   },
   "certificates": {
