@@ -182,6 +182,13 @@ export function OrgMembersTab() {
     queryClient.invalidateQueries({ queryKey: queryKeys.orgMemberships.list(currentOrg?.id) });
   const invalidateInvitations = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.invitations.list(currentOrg?.id, 'org') });
+  // Refresh the org-wide seat aggregates (member_count / pending_invite_count)
+  // that seatUsage reads from. Every mutation that changes the org's active
+  // member or pending invite count calls this so the "seats used · remaining"
+  // note updates immediately after the user's own action — the caller-scoped
+  // lists alone don't move these org-wide totals.
+  const invalidateOrgDetail = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(currentOrg?.id) });
 
   // Behavior-identical replacement for the old `fetchData` handed to the bulk /
   // enroll dialogs: both used to refetch all three lists on success.
@@ -190,9 +197,7 @@ export function OrgMembersTab() {
     invalidateMemberships();
     invalidateInvitations();
     queryClient.invalidateQueries({ queryKey: queryKeys.aiChampions.list(currentOrg.id) });
-    // Also refresh the org-wide seat aggregates (member_count / pending_invite_count)
-    // so seatUsage reflects the post-mutation state, not just the caller-scoped lists.
-    queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(currentOrg?.id) });
+    invalidateOrgDetail();
   };
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -240,6 +245,7 @@ export function OrgMembersTab() {
       setInviteDepartment('');
       setInviteRole('learner');
       invalidateInvitations();
+      invalidateOrgDetail();
     },
   });
 
@@ -253,6 +259,7 @@ export function OrgMembersTab() {
         description: `${member.profile?.full_name} has been removed from the organization.`,
       });
       invalidateMemberships();
+      invalidateOrgDetail();
     },
     // The dialog closed unconditionally in the old `finally` — reproduce with onSettled.
     onSettled: () => setRemoveMemberDialog(null),
@@ -269,6 +276,8 @@ export function OrgMembersTab() {
         queryKeys.invitations.list(currentOrg?.id, 'org'),
         (prev) => prev?.filter((inv) => inv.id !== invitation.id) ?? [],
       );
+      // Cancelling frees a seat — refresh the org-wide pending-invite aggregate.
+      invalidateOrgDetail();
     },
   });
 
