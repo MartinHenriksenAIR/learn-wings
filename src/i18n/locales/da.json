@@ -708,6 +708,15 @@
     "subtitleOrg": "Medlemmer, engagement og læring hos {{orgName}}.",
     "subtitleGlobalAll": "Engagement og læring på tværs af alle organisationer.",
     "subtitleGlobalOne": "Engagement og læring for den valgte organisation.",
+    "courseOrgBreakdown": {
+      "title": "Efter organisation",
+      "caption": "Antal tilmeldinger pr. organisation.",
+      "colOrg": "Organisation",
+      "colEnrolled": "Tilmeldte",
+      "colCompleted": "Gennemført",
+      "colRate": "Andel",
+      "empty": "Ingen organisationer har adgang til dette kursus."
+    },
     "members": {
       "searchPlaceholder": "Søg medlemmer...",
       "allRoles": "Alle roller",

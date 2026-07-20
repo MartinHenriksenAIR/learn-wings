@@ -142,10 +142,13 @@ describe('org-course-enrollees', () => {
       expect(JSON.parse(res.body as string)).toEqual({ error: 'courseId is required' });
     });
 
-    it('lists distinct learners for a course across all orgs for a platform admin', async () => {
+    it('lists one row per (learner, org) enrollment with org name for a platform admin', async () => {
       mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+      // #163: un-deduped — a learner enrolled through two orgs appears once per org,
+      // each row carrying its org so the dialog can show an Organization column.
       const rows = [
-        { user_id: 'u1', full_name: 'Alice', status: 'completed', enrolled_at: '2024-01-01', completed_at: '2024-02-01' },
+        { user_id: 'u1', full_name: 'Alice', org_id: 'o1', org_name: 'Acme', status: 'completed', enrolled_at: '2024-01-01', completed_at: '2024-02-01' },
+        { user_id: 'u1', full_name: 'Alice', org_id: 'o2', org_name: 'Globex', status: 'enrolled', enrolled_at: '2024-01-03', completed_at: null },
       ];
       mockQuery.mockResolvedValueOnce(rows);
 
@@ -156,11 +159,15 @@ describe('org-course-enrollees', () => {
       expect(mockIsOrgAdmin).not.toHaveBeenCalled();
 
       const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-      // one row per learner even if enrolled through several orgs (unique React keys)
-      expect(sql).toContain('DISTINCT ON');
+      // per-enrollment rows (NOT deduped) — org dimension carried on each row
+      expect(sql).not.toContain('DISTINCT ON');
+      expect(sql).toContain('JOIN organizations');
+      expect(sql).toContain('org_name');
+      expect(sql).toContain('e.org_id');
       // filtered by course only — no org bind param
       expect(sql).toContain('e.course_id = $1');
-      expect(sql).not.toContain('e.org_id');
+      expect(sql).toContain('ORDER BY p.full_name');
+      expect(sql).not.toContain('SELECT *');
       expect(params).toEqual(['c-1']);
     });
   });
