@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { FileUpload } from '@/components/ui/file-upload';
-import { buildPublicUrl } from '@/lib/storage-url';
+import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
 import type { Organization } from '@/lib/types';
 
 export interface EditOrgPayload {
@@ -49,6 +49,8 @@ export function EditOrganizationDialog({
   const [slug, setSlug] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [seatLimit, setSeatLimit] = useState<string>('');
+  // logoUrl holds the raw container-relative path (for save); sign it for display.
+  const { data: logoDisplaySrc } = useSignedBrandingUrl(logoUrl);
 
   // Seed the form from the org each time the dialog opens.
   useEffect(() => {
@@ -86,10 +88,10 @@ export function EditOrganizationDialog({
               assetType="org-logo"
               folder={orgId}
               accept="image"
-              value={logoUrl ? buildPublicUrl(logoUrl) : null}
+              value={logoDisplaySrc ?? null}
               onChange={(url, storagePath) => {
-                // Store the raw container-relative path; compose the public URL
-                // for display via buildPublicUrl (value prop above).
+                // Store the raw container-relative path; it's signed for display
+                // via the value prop above (useSignedBrandingUrl).
                 setLogoUrl(url && storagePath ? storagePath : null);
               }}
               maxSizeMB={5}

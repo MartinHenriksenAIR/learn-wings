@@ -1,10 +1,6 @@
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { endpoint } from '../shared/endpoint';
-import { resolveAssetContainer } from '../shared/blob';
-
-// Public branding assets any authenticated user may upload; everything else
-// (course videos/documents/thumbnails → private container) stays admin-only.
-const PUBLIC_ASSET_TYPES = new Set(['org-logo', 'avatar']);
+import { resolveAssetContainer, isBrandingAssetType } from '../shared/blob';
 
 export default endpoint('azure-upload-url', async ({ req, reply, requirePlatformAdmin }) => {
   const { fileName, contentType: reqContentType, assetType } = await req.json() as { fileName: string; contentType?: string; assetType?: string };
@@ -14,8 +10,8 @@ export default endpoint('azure-upload-url', async ({ req, reply, requirePlatform
   // the blob is inert until its path is persisted, and that step is separately
   // authorized (organization-update requires org admin for logo_url; profile-
   // update writes only the caller's own avatar_url). Every other upload targets
-  // the private content container and remains platform-admin only.
-  if (!assetType || !PUBLIC_ASSET_TYPES.has(assetType)) {
+  // the course-content container and remains platform-admin only.
+  if (!isBrandingAssetType(assetType)) {
     requirePlatformAdmin();
   }
 

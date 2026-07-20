@@ -150,7 +150,7 @@ describe('azure-upload-url', () => {
     }
   });
 
-  it('routes assetType "org-logo" to the public email-assets container under org-logos/', async () => {
+  it('routes assetType "org-logo" to the org-logos/ prefix in the private default container', async () => {
     const req = {
       ...baseReq,
       json: async () => ({ fileName: 'logo.png', contentType: 'image/png', assetType: 'org-logo' }),
@@ -164,20 +164,20 @@ describe('azure-upload-url', () => {
     expect(mockGenerateSasToken).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
-      'email-assets',
+      'lms-videos',
       body.blobPath,
       'cw',
       30,
     );
     expect(mockBuildBlobUrl).toHaveBeenCalledWith(
       expect.any(String),
-      'email-assets',
+      'lms-videos',
       body.blobPath,
       expect.any(String),
     );
   });
 
-  it('routes assetType "avatar" to the public email-assets container under avatars/', async () => {
+  it('routes assetType "avatar" to the avatars/ prefix in the private default container', async () => {
     const req = {
       ...baseReq,
       json: async () => ({ fileName: 'photo.jpg', contentType: 'image/jpeg', assetType: 'avatar' }),
@@ -191,14 +191,14 @@ describe('azure-upload-url', () => {
     expect(mockGenerateSasToken).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
-      'email-assets',
+      'lms-videos',
       body.blobPath,
       'cw',
       30,
     );
     expect(mockBuildBlobUrl).toHaveBeenCalledWith(
       expect.any(String),
-      'email-assets',
+      'lms-videos',
       body.blobPath,
       expect.any(String),
     );

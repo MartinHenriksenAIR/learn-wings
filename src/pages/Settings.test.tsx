@@ -28,6 +28,9 @@ vi.mock('react-i18next', () => ({
 // --- useAuth mock factory ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
+// Avatar signing hits a query hook; stub it so this focused save-feedback test
+// needs no QueryClientProvider (avatar display is exercised elsewhere).
+vi.mock('@/hooks/useSignedBrandingUrl', () => ({ useSignedBrandingUrl: () => ({ data: undefined }) }));
 
 import Settings from './Settings';
 

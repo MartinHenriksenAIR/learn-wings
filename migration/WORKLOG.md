@@ -1093,6 +1093,22 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 
 ---
 
+## 2026-07-20 — Branding assets fix: signed URLs, not public access (#162/#165, PR #188)
+
+**Who:** Martin + Claude
+
+**Why:** #182 (public branding assets) shipped broken — uploads 404'd, display would 409. Root cause (found by driving the live upload): the storage account `staieducationmigration` has `allowBlobPublicAccess=false` (Microsoft's secure default) AND the `email-assets` container was never created (ADR-0008's pre-cutover TODO). The unsigned-public-URL design was incompatible with the account posture.
+
+**Decision (grilled with Martin, security/compliance lens):** keep the account locked down; serve branding assets via short-lived signed URLs (the mechanism course thumbnails already use) rather than enabling account-wide public blob access (Defender/CIS flag it; MS disables it by default). CDN-fronted-private container considered but deferred as scale-premature — B is a clean first step toward it.
+
+**Backend:** org-logo/avatar uploads route to the PRIVATE default container (`lms-videos`) folder-prefixed `org-logos/`/`avatars/` — no new container, no `az`. New `branding-asset-url` endpoint: any authed user (branding assets are non-sensitive, shown app-wide), but strict branding-path validation (`^(org-logos|avatars)/[A-Za-z0-9._-]+$`) so it can never sign arbitrary private course content in the same container; 120-min read SAS. `resolveAssetContainer` reworked; `isBrandingAssetType`/`isBrandingAssetPath` added. Non-admin upload relaxation from #182 retained (real authz stays at organization-update / profile-update).
+
+**Frontend:** `useSignedBrandingUrl` hook (cached per path) + shared `BrandingAvatar`; every logo/avatar display signs on view (sidebar, Settings, org detail/list, OrgAnalytics, member tables). Raw-path storage unchanged. Removed the dead `buildPublicUrl` / `storage-url.ts`.
+
+**Verify:** frontend lint 0 / tsc 0 / 347 tests / build ok; functions build ok / 1647 tests (new endpoint registered per the fleet guard). Real signed-in upload→display round-trip = post-deploy owner check (this approach is account-compatible; #182's public approach was not).
+
+---
+
 ## 2026-07-20 — #119 Danish default language + browser matching (PR #186)
 
 **Who:** martin & Claude. Branch `feat/danish-default-language-119`, PR #186. Frontend-only. Scoped with martin ("do it now vs wait"): recon showed **most of #119 was already built** — i18next + `LanguageDetector` already browser-match en/da, `en`/`da` are at full 828-key parity, and a language switcher already exists (Settings + sidebar). The only gap was the default: an unrecognized browser language (or no detection signal) fell back to English.

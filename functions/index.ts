@@ -8,6 +8,7 @@ import './ai-champions/index';
 import './asset-signed-url/index';
 import './azure-document-upload-url/index';
 import './azure-upload-url/index';
+import './branding-asset-url/index';
 import './azure-view-url/index';
 import './community-categories/index';
 import './community-comment-create/index';
