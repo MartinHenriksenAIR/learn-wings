@@ -1090,3 +1090,19 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **#168 — Resource Library tag color vs "Open resource" button.** `TagList` chips used `bg-accent` — the same navy tint as the "Open resource" button — so tags read as the same element. Switched to `bg-muted` / `text-muted-foreground` (neutral gray token). `--accent` and `--secondary` are the *same* colour in the light theme and dark mode isn't wired up, so `--muted` is the correct distinct token; the change is in the shared component, so tags stay consistent across resources/posts/ideas.
 
 **Verify.** Root `npm run lint` 0 errors · `npm test` **352 pass** (63 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. Purely presentational (class removal + one token swap); visual confirmation deferred to the PR preview env (dashboards are Entra-gated, not drivable locally). Merged via PR #185 → `main`; SWA frontend deploy auto-fires (no functions changed).
+
+---
+
+## 2026-07-20 — Branding assets fix: signed URLs, not public access (#162/#165, PR #188)
+
+**Who:** Martin + Claude
+
+**Why:** #182 (public branding assets) shipped broken — uploads 404'd, display would 409. Root cause (found by driving the live upload): the storage account `staieducationmigration` has `allowBlobPublicAccess=false` (Microsoft's secure default) AND the `email-assets` container was never created (ADR-0008's pre-cutover TODO). The unsigned-public-URL design was incompatible with the account posture.
+
+**Decision (grilled with Martin, security/compliance lens):** keep the account locked down; serve branding assets via short-lived signed URLs (the mechanism course thumbnails already use) rather than enabling account-wide public blob access (Defender/CIS flag it; MS disables it by default). CDN-fronted-private container considered but deferred as scale-premature — B is a clean first step toward it.
+
+**Backend:** org-logo/avatar uploads route to the PRIVATE default container (`lms-videos`) folder-prefixed `org-logos/`/`avatars/` — no new container, no `az`. New `branding-asset-url` endpoint: any authed user (branding assets are non-sensitive, shown app-wide), but strict branding-path validation (`^(org-logos|avatars)/[A-Za-z0-9._-]+$`) so it can never sign arbitrary private course content in the same container; 120-min read SAS. `resolveAssetContainer` reworked; `isBrandingAssetType`/`isBrandingAssetPath` added. Non-admin upload relaxation from #182 retained (real authz stays at organization-update / profile-update).
+
+**Frontend:** `useSignedBrandingUrl` hook (cached per path) + shared `BrandingAvatar`; every logo/avatar display signs on view (sidebar, Settings, org detail/list, OrgAnalytics, member tables). Raw-path storage unchanged. Removed the dead `buildPublicUrl` / `storage-url.ts`.
+
+**Verify:** frontend lint 0 / tsc 0 / 347 tests / build ok; functions build ok / 1647 tests (new endpoint registered per the fleet guard). Real signed-in upload→display round-trip = post-deploy owner check (this approach is account-compatible; #182's public approach was not).
