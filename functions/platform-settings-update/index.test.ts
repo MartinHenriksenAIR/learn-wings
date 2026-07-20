@@ -222,4 +222,34 @@ describe('platform-settings-update', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
+
+  // 11. seat_pricing — accepts a valid update
+  it('accepts a valid seat_pricing update', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQueryOne.mockResolvedValueOnce({ key: 'seat_pricing', value: { annual_price_per_seat: 1200, currency: 'DKK', notification_email: 'jacob@ai-raadgivning.dk' } });
+    const res = await handler(baseReq({ key: 'seat_pricing', value: { annual_price_per_seat: 1200, currency: 'DKK', notification_email: 'jacob@ai-raadgivning.dk' } }), {} as any);
+    expect(res.status).toBe(200);
+  });
+
+  // 12. seat_pricing — accepts a null seat price (unsetting)
+  it('accepts a null seat price (unsetting)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQueryOne.mockResolvedValueOnce({ key: 'seat_pricing', value: { annual_price_per_seat: null } });
+    const res = await handler(baseReq({ key: 'seat_pricing', value: { annual_price_per_seat: null } }), {} as any);
+    expect(res.status).toBe(200);
+  });
+
+  // 13. seat_pricing — rejects a negative seat price
+  it('rejects a negative seat price', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    const res = await handler(baseReq({ key: 'seat_pricing', value: { annual_price_per_seat: -5 } }), {} as any);
+    expect(res.status).toBe(400);
+  });
+
+  // 14. seat_pricing — rejects an unknown field
+  it('rejects an unknown seat_pricing field', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    const res = await handler(baseReq({ key: 'seat_pricing', value: { bogus: 1 } }), {} as any);
+    expect(res.status).toBe(400);
+  });
 });
