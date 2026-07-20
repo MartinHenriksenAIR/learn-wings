@@ -90,13 +90,18 @@ export default function Settings() {
   };
 
   const handleAvatarChange = async (_url: string | null, storagePath: string | null) => {
-    if (!profile) return;
+    // Only persist a successful upload. A null storagePath means the upload
+    // failed — FileUpload signals failure with onChange(null, null) — and
+    // persisting then would silently wipe an existing photo. (Same guard the
+    // org-logo upload uses in OrgAnalytics.) FileUpload surfaces the error to
+    // the user for retry.
+    if (!profile || !storagePath) return;
 
     setAvatarSaving(true);
     try {
-      // Persist the raw container-relative blob path; an empty string clears the
-      // photo. Display composes the public URL via buildPublicUrl.
-      await callApi('/api/profile-update', { avatar_url: storagePath ?? '' });
+      // Persist the raw container-relative blob path; display composes the
+      // public URL via buildPublicUrl.
+      await callApi('/api/profile-update', { avatar_url: storagePath });
       await refreshUserContext();
     } catch (error) {
       toast({

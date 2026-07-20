@@ -47,13 +47,54 @@ describe('azure-upload-url', () => {
     expect(body.contentType).toBe('video/mp4');
   });
 
-  it('returns 403 when getProfile returns non-admin', async () => {
+  it('returns 403 for a non-admin uploading course content (default container)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
 
     const res = await handler(baseReq as any, {} as any);
 
     expect(res.status).toBe(403);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'Only platform admins can upload videos' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+  });
+
+  it('allows a non-admin to upload a public branding asset (avatar)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const req = {
+      ...baseReq,
+      json: async () => ({ fileName: 'photo.jpg', contentType: 'image/jpeg', assetType: 'avatar' }),
+    };
+
+    const res = await handler(req as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    expect(body.blobPath).toMatch(/^avatars\/[^/]+\.jpg$/);
+  });
+
+  it('allows a non-admin to upload a public branding asset (org-logo)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const req = {
+      ...baseReq,
+      json: async () => ({ fileName: 'logo.png', contentType: 'image/png', assetType: 'org-logo' }),
+    };
+
+    const res = await handler(req as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    expect(body.blobPath).toMatch(/^org-logos\/[^/]+\.png$/);
+  });
+
+  it('returns 403 for a non-admin when assetType is unrecognized (private default)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const req = {
+      ...baseReq,
+      json: async () => ({ fileName: 'weird.bin', contentType: 'application/octet-stream', assetType: 'not-a-real-type' }),
+    };
+
+    const res = await handler(req as any, {} as any);
+
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
   it('returns 401 when getProfile returns null', async () => {
