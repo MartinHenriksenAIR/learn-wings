@@ -99,6 +99,9 @@ describe('org-analytics-data', () => {
       // members query dedups by user; enrollments/attempts span all orgs (no org bind param)
       const [membersSql] = mockQuery.mock.calls[0] as [string, unknown[]];
       expect(membersSql).toContain('DISTINCT ON');
+      // department is a profiles column, not an org_memberships one (om.department would 500)
+      expect(membersSql).toContain('p.department');
+      expect(membersSql).not.toContain('om.department');
       const enrollmentsCall = mockQuery.mock.calls[1] as [string, unknown[]?];
       expect(enrollmentsCall[0]).not.toContain('$1');
       expect(enrollmentsCall[0]).not.toContain('org_id =');

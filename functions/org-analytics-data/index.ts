@@ -25,9 +25,10 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       const [members, enrollments, quizAttempts] = await Promise.all([
         // DISTINCT ON (p.id): one row per user even if they belong to several orgs,
         // so totalUsers counts distinct people and the Team table has unique row keys.
-        // department is taken from an arbitrary membership (aggregate view — acceptable).
+        // department lives on profiles (not org_memberships), so it's per-user and
+        // deterministic under DISTINCT ON (p.id) — cf. generate-compliance-report.
         query(
-          `SELECT DISTINCT ON (p.id) om.user_id, p.full_name, p.email, om.department
+          `SELECT DISTINCT ON (p.id) om.user_id, p.full_name, p.email, p.department
              FROM org_memberships om JOIN profiles p ON p.id = om.user_id
             WHERE om.status = 'active'
             ORDER BY p.id`
