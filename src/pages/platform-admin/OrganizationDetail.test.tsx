@@ -106,9 +106,9 @@ function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/app/admin/organizations/org-1']}>
+      <MemoryRouter initialEntries={['/app/admin/platform/organizations/org-1']}>
         <Routes>
-          <Route path="/app/admin/organizations/:orgId" element={<OrganizationDetail />} />
+          <Route path="/app/admin/platform/organizations/:orgId" element={<OrganizationDetail />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>

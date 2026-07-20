@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Building2, ArrowLeft, RefreshCw } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
+import { routes } from '@/lib/routes';
 
 interface OrgNotFoundScreenProps {
   /** True when the org query erred (retryable); false for an honest 404. */
@@ -22,7 +23,7 @@ export function OrgNotFoundScreen({ loadFailed, onRetry, onBack }: OrgNotFoundSc
     <AppLayout
       title={loadFailed ? t('orgDetail.loadFailedTitle') : t('orgDetail.notFoundTitle')}
       breadcrumbs={[
-        { label: t('organizations.title'), href: '/app/admin/organizations' },
+        { label: t('organizations.title'), href: routes.platformAdmin.organizations },
         { label: loadFailed ? t('orgDetail.loadFailedTitle') : t('orgDetail.notFoundBreadcrumb') },
       ]}
     >
