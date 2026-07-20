@@ -19,6 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SeatUsageNote } from '@/components/SeatUsageNote';
+import type { SeatUsage } from '@/lib/seats';
 import type { OrgRole } from '@/lib/types';
 
 export interface InvitePayload {
@@ -33,6 +35,9 @@ interface InviteUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orgName: string;
+  seatUsage: SeatUsage;
+  /** Server error to surface inline (e.g. the seat-cap 409). */
+  errorMessage?: string | null;
   onSubmit: (payload: InvitePayload) => void;
   pending: boolean;
 }
@@ -41,8 +46,17 @@ interface InviteUserDialogProps {
  * Invite-user dialog. Owns its own form state (email/first/last/department/
  * role), reset each time the dialog opens.
  */
-export function InviteUserDialog({ open, onOpenChange, orgName, onSubmit, pending }: InviteUserDialogProps) {
+export function InviteUserDialog({
+  open,
+  onOpenChange,
+  orgName,
+  seatUsage,
+  errorMessage,
+  onSubmit,
+  pending,
+}: InviteUserDialogProps) {
   const { t } = useTranslation();
+  const atLimit = !seatUsage.isUnlimited && seatUsage.atLimit;
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -66,6 +80,7 @@ export function InviteUserDialog({ open, onOpenChange, orgName, onSubmit, pendin
         <DialogHeader>
           <DialogTitle>{t('orgDetail.inviteDialogTitle', { org: orgName })}</DialogTitle>
           <DialogDescription>{t('orgDetail.inviteDialogDescription')}</DialogDescription>
+          <SeatUsageNote usage={seatUsage} className="pt-1" />
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
@@ -120,13 +135,18 @@ export function InviteUserDialog({ open, onOpenChange, orgName, onSubmit, pendin
             </Select>
           </div>
         </div>
+        {(atLimit || errorMessage) && (
+          <p className="text-xs font-medium text-destructive">
+            {errorMessage ?? t('seats.limitReached')}
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
           <Button
             onClick={() => onSubmit({ email, firstName, lastName, department, role })}
-            disabled={pending}
+            disabled={pending || atLimit}
           >
             {pending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />

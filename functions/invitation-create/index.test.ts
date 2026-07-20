@@ -1,15 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrgAdmin } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockClientQuery, mockWithTransaction, mockGetProfile, mockIsOrgAdmin } = vi.hoisted(() => {
   class MockAuthError extends Error {}
+  const mockClientQuery = vi.fn();
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQueryOne: vi.fn(),
+    mockClientQuery,
+    mockWithTransaction: vi.fn(async (cb: (client: { query: typeof mockClientQuery }) => unknown) => cb({ query: mockClientQuery })),
     mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: vi.fn(), queryOne: mockQueryOne }));
+vi.mock('../shared/db', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/db')>()),
+  query: vi.fn(),
+  queryOne: vi.fn(),
+  withTransaction: mockWithTransaction,
+}));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: mockIsOrgAdmin, isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -38,9 +45,15 @@ const insertedRow = {
   department: null,
 };
 
+// pg QueryResult shape: the handler reads `.rows`.
+const rows = (...r: unknown[]) => ({ rows: r });
+// First client.query is the seat-usage lookup (org row + active-member/pending-invite counts).
+const seatRow = (seat_limit: number | null, active_count: number, pending_count: number) => ({ seat_limit, active_count, pending_count });
+
 describe('invitation-create', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWithTransaction.mockImplementation(async (cb) => cb({ query: mockClientQuery }));
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
     mockIsOrgAdmin.mockResolvedValue(false);
@@ -112,18 +125,27 @@ describe('invitation-create', () => {
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
     expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
-    expect(mockQueryOne).not.toHaveBeenCalled();
+    expect(mockWithTransaction).not.toHaveBeenCalled();
+    expect(mockClientQuery).not.toHaveBeenCalled();
   });
 
   it('happy path (platform admin): inserts with lowercased email + invited_by_user_id + returns row including link_id', async () => {
-    mockQueryOne.mockResolvedValueOnce(insertedRow);
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 5, 2))); // seat_limit null — never blocks
+    mockClientQuery.mockResolvedValueOnce(rows(insertedRow));
     const res = await handler(baseReq(validBody), {} as any);
 
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ invitation: insertedRow });
     expect(mockIsOrgAdmin).not.toHaveBeenCalled(); // platform-admin bypass
 
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    // First query: seat-usage lookup (row lock + active-member/pending-invite counts)
+    const [seatSql, seatParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
+    expect(seatSql).toContain('FOR UPDATE');
+    expect(seatSql).toContain(`m.status = 'active'`);
+    expect(seatSql).toContain(`i.status = 'pending'`);
+    expect(seatParams).toEqual(['org-1']);
+
+    const [sql, params] = mockClientQuery.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO invitations');
     expect(sql).toContain('link_id');
     expect(sql).not.toMatch(/\btoken\b/);
@@ -134,7 +156,8 @@ describe('invitation-create', () => {
   it('happy path (org admin): authorizes via isOrgAdmin and returns invitation', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValueOnce(true);
-    mockQueryOne.mockResolvedValueOnce(insertedRow);
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
+    mockClientQuery.mockResolvedValueOnce(rows(insertedRow));
 
     const res = await handler(baseReq(validBody), {} as any);
 
@@ -144,42 +167,97 @@ describe('invitation-create', () => {
   });
 
   it('happy path: omitted firstName/lastName/department slots become null', async () => {
-    mockQueryOne.mockResolvedValueOnce(insertedRow);
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
+    mockClientQuery.mockResolvedValueOnce(rows(insertedRow));
     await handler(baseReq(validBody), {} as any);
-    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [, params] = mockClientQuery.mock.calls[1] as [string, unknown[]];
     expect(params[4]).toBeNull();
     expect(params[5]).toBeNull();
     expect(params[6]).toBeNull();
   });
 
   it('happy path: empty-string firstName coerced to null on insert', async () => {
-    mockQueryOne.mockResolvedValueOnce(insertedRow);
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
+    mockClientQuery.mockResolvedValueOnce(rows(insertedRow));
     await handler(
       baseReq({ ...validBody, firstName: '', lastName: 'Doe', department: 'Eng' }),
       {} as any,
     );
-    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [, params] = mockClientQuery.mock.calls[1] as [string, unknown[]];
     expect(params[4]).toBeNull();
     expect(params[5]).toBe('Doe');
     expect(params[6]).toBe('Eng');
   });
 
+  it('returns 409 SEAT_LIMIT_REACHED when active + pending are at the seat limit', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 5, 0)));
+
+    const res = await handler(baseReq(validBody), {} as any);
+
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' });
+    expect(mockClientQuery).toHaveBeenCalledTimes(1); // no INSERT attempted
+  });
+
+  it('returns 409 SEAT_LIMIT_REACHED when active alone is under the limit but active+pending hits it', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 3, 2)));
+
+    const res = await handler(baseReq(validBody), {} as any);
+
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' });
+    expect(mockClientQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows creation when active + pending are below the seat limit', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 2, 1)));
+    mockClientQuery.mockResolvedValueOnce(rows(insertedRow));
+
+    const res = await handler(baseReq(validBody), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ invitation: insertedRow });
+  });
+
+  it('allows creation when seat_limit is null regardless of counts', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 1000, 1000)));
+    mockClientQuery.mockResolvedValueOnce(rows(insertedRow));
+
+    const res = await handler(baseReq(validBody), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ invitation: insertedRow });
+  });
+
+  it('returns 404 when the organization does not exist (seat-usage lookup)', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows()); // no row
+
+    const res = await handler(baseReq(validBody), {} as any);
+
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization not found' });
+    expect(mockClientQuery).toHaveBeenCalledTimes(1);
+  });
+
   it('returns 409 on unique violation (23505)', async () => {
-    mockQueryOne.mockRejectedValueOnce(Object.assign(new Error('duplicate key value'), { code: '23505' }));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
+    mockClientQuery.mockRejectedValueOnce(Object.assign(new Error('duplicate key value'), { code: '23505' }));
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(409);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'An invitation for this email is already pending' });
   });
 
   it('returns 404 on foreign-key violation (23503)', async () => {
-    mockQueryOne.mockRejectedValueOnce(Object.assign(new Error('insert violates fk'), { code: '23503' }));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
+    mockClientQuery.mockRejectedValueOnce(Object.assign(new Error('insert violates fk'), { code: '23503' }));
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization not found' });
   });
 
   it('returns 500 on generic db error', async () => {
-    mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
+    mockClientQuery.mockRejectedValueOnce(new Error('connection refused'));
     const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });

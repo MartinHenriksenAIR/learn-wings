@@ -18,6 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SeatUsageNote } from '@/components/SeatUsageNote';
+import type { SeatUsage } from '@/lib/seats';
 import type { OrgRole, Profile } from '@/lib/types';
 
 export interface AddUserPayload {
@@ -30,6 +32,9 @@ interface AddExistingUserDialogProps {
   onOpenChange: (open: boolean) => void;
   orgName: string;
   availableUsers: Profile[];
+  seatUsage: SeatUsage;
+  /** Server error to surface inline (e.g. the seat-cap 409). */
+  errorMessage?: string | null;
   onSubmit: (payload: AddUserPayload) => void;
   pending: boolean;
 }
@@ -43,10 +48,13 @@ export function AddExistingUserDialog({
   onOpenChange,
   orgName,
   availableUsers,
+  seatUsage,
+  errorMessage,
   onSubmit,
   pending,
 }: AddExistingUserDialogProps) {
   const { t } = useTranslation();
+  const atLimit = !seatUsage.isUnlimited && seatUsage.atLimit;
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<OrgRole>('learner');
 
@@ -64,6 +72,7 @@ export function AddExistingUserDialog({
         <DialogHeader>
           <DialogTitle>{t('orgDetail.addDialogTitle', { org: orgName })}</DialogTitle>
           <DialogDescription>{t('orgDetail.addDialogDescription')}</DialogDescription>
+          <SeatUsageNote usage={seatUsage} className="pt-1" />
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
@@ -100,13 +109,18 @@ export function AddExistingUserDialog({
             </Select>
           </div>
         </div>
+        {(atLimit || errorMessage) && (
+          <p className="text-xs font-medium text-destructive">
+            {errorMessage ?? t('seats.limitReached')}
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
           <Button
             onClick={() => onSubmit({ userId: selectedUserId, role: selectedRole })}
-            disabled={pending || !selectedUserId}
+            disabled={pending || !selectedUserId || atLimit}
           >
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             {t('orgDetail.addUser')}

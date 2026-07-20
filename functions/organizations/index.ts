@@ -9,7 +9,11 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
     await requireActiveMember(orgId);
 
     const organization = await queryOne(
-      `SELECT id, name, slug, logo_url, seat_limit, created_at FROM organizations WHERE id = $1`,
+      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at,
+        (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count,
+        (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
+       FROM organizations o
+       WHERE o.id = $1`,
       [orgId],
     );
     if (!organization) return reply(404, { error: 'Organization not found' });
@@ -24,7 +28,8 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
   if (profile.is_platform_admin) {
     const organizations = await query(
       `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at,
-        (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count
+        (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count,
+        (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
        FROM organizations o
        ORDER BY o.created_at DESC`,
     );
@@ -33,7 +38,8 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
 
   const organizations = await query(
     `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at,
-      (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count
+      (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count,
+      (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
      FROM organizations o
      JOIN org_memberships om ON om.org_id = o.id
      WHERE om.user_id = $1 AND om.status = 'active'

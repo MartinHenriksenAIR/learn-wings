@@ -1,4 +1,9 @@
 {
+  "seats": {
+    "usage": "{{used}} of {{limit}} seats used · {{remaining}} remaining",
+    "unlimited": "Unlimited seats",
+    "limitReached": "Seat limit reached"
+  },
   "common": {
     "save": "Save",
     "saved": "Saved",
