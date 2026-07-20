@@ -282,7 +282,7 @@ export default function PlatformCommunityModeration() {
         <div className="flex flex-col gap-3">
           {reports.map((report) => {
             const isPost = report.target_type === 'post';
-            const scope = getScopeLabel(report);
+            const scopeBadge = getScopeLabel(report);
             return (
               <Card key={report.id}>
                 <CardContent className="px-[22px] py-[18px]">
@@ -308,12 +308,12 @@ export default function PlatformCommunityModeration() {
                     <span
                       className={cn(
                         'rounded-[7px] px-[11px] py-1 text-[11px] font-bold',
-                        scope.global
+                        scopeBadge.global
                           ? 'bg-[#f3f4f8] text-muted-foreground'
                           : 'bg-accent text-accent-foreground'
                       )}
                     >
-                      {scope.label}
+                      {scopeBadge.label}
                     </span>
                     <div className="flex-1" />
                     <span className="text-[11.5px] font-semibold text-muted-foreground">
