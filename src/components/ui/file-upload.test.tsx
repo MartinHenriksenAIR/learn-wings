@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import React, { useState } from 'react';
 
 // --- mock api-client (upload-URL handshake) ---
@@ -46,6 +46,12 @@ function uploadFile(container: HTMLElement) {
   fireEvent.change(input, { target: { files: [file] } });
 }
 
+// jsdom does not implement these; capture whatever is really there so afterEach
+// can restore it and the mocks can't leak into sibling files if test isolation
+// is ever turned off.
+const realCreateObjectURL = URL.createObjectURL;
+const realRevokeObjectURL = URL.revokeObjectURL;
+
 describe('FileUpload — image preview after upload (#158)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,6 +63,16 @@ describe('FileUpload — image preview after upload (#158)', () => {
       blobPath: 'thumbnails/pic.png',
       contentType: 'image/png',
     });
+  });
+
+  afterEach(() => {
+    // Unmount now, while the URL mocks are still installed, so components'
+    // revoke-on-unmount cleanup runs against the mock rather than the restored
+    // (jsdom-absent) original.
+    cleanup();
+    vi.unstubAllGlobals();
+    URL.createObjectURL = realCreateObjectURL;
+    URL.revokeObjectURL = realRevokeObjectURL;
   });
 
   it('shows a local object-URL preview, not the raw blob path', async () => {
@@ -107,5 +123,66 @@ describe('FileUpload — image preview after upload (#158)', () => {
 
     await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-url'));
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('does not create an object-URL preview for non-image uploads', async () => {
+    mockCallApi.mockResolvedValue({
+      uploadUrl: 'https://acct.blob.core.windows.net/lms-assets/docs/spec.pdf?sig=abc',
+      blobPath: 'docs/spec.pdf',
+      contentType: 'application/pdf',
+    });
+
+    function DocHarness() {
+      const [value, setValue] = useState<string | null>(null);
+      return (
+        <FileUpload
+          bucket="lms-assets"
+          folder="docs"
+          accept="document"
+          value={value}
+          onChange={(url) => setValue(url)}
+        />
+      );
+    }
+
+    const { container } = render(<DocHarness />);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['pdf-bytes'], 'spec.pdf', { type: 'application/pdf' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByText('spec.pdf')).toBeInTheDocument());
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('revokes the stale preview once the parent value diverges (e.g. post-save re-sign)', async () => {
+    const signedUrl = 'https://acct.blob.core.windows.net/lms-assets/thumbnails/pic.png?sig=signed';
+
+    function ResignHarness() {
+      const [value, setValue] = useState<string | null>(null);
+      return (
+        <>
+          <FileUpload
+            bucket="lms-assets"
+            folder="thumbnails"
+            accept="image"
+            value={value}
+            onChange={(url) => setValue(url)}
+          />
+          <button onClick={() => setValue(signedUrl)}>resign</button>
+        </>
+      );
+    }
+
+    const { container } = render(<ResignHarness />);
+    uploadFile(container);
+
+    expect(await screen.findByRole('img')).toHaveAttribute('src', 'blob:preview-url');
+
+    // Simulate the parent swapping the raw blob path for a re-signed URL.
+    fireEvent.click(screen.getByRole('button', { name: 'resign' }));
+
+    await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-url'));
+    expect(screen.getByRole('img')).toHaveAttribute('src', signedUrl);
   });
 });

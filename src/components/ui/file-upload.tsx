@@ -57,6 +57,16 @@ export function FileUpload({
     return () => URL.revokeObjectURL(preview.url);
   }, [preview]);
 
+  // Drop the preview once the parent adopts a different value than the one it
+  // was made for — e.g. a post-save refetch re-signs the path, or a consumer
+  // stores a public URL instead of the blob path. Without this the object URL
+  // lingers (invisibly) until unmount; clearing it lets the effect above revoke
+  // it now. Safe because setPreview and the parent's onChange→value update batch
+  // into one render, so a live preview is never seen as diverged.
+  useEffect(() => {
+    if (preview && preview.forValue !== value) setPreview(null);
+  }, [value, preview]);
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
