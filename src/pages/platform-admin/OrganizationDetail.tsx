@@ -409,6 +409,14 @@ export default function OrganizationDetail() {
       ? inviteMutation.error.message
       : null;
 
+  // Same treatment for the add-existing-user dialog: adding a member consumes
+  // a seat too, so the same 409 can fire there.
+  const addUserErrorMessage =
+    addUserMutation.error instanceof ApiError &&
+    addUserMutation.error.code === 'SEAT_LIMIT_REACHED'
+      ? addUserMutation.error.message
+      : null;
+
   return (
     <AppLayout
       title={org.name}
@@ -449,7 +457,10 @@ export default function OrganizationDetail() {
           inviteMutation.reset();
           setInviteOpen(true);
         }}
-        onAddUserClick={() => setAddUserOpen(true)}
+        onAddUserClick={() => {
+          addUserMutation.reset();
+          setAddUserOpen(true);
+        }}
         onRoleChange={(member, newRole) => setRoleChangeDialog({ open: true, member, newRole })}
         onDisable={(id) => disableMemberMutation.mutate(id)}
         onReactivate={(id) => reactivateMemberMutation.mutate(id)}
@@ -479,6 +490,8 @@ export default function OrganizationDetail() {
         onOpenChange={setAddUserOpen}
         orgName={org.name}
         availableUsers={availableUsers}
+        seatUsage={seatUsage}
+        errorMessage={addUserErrorMessage}
         onSubmit={handleAddUser}
         pending={addUserMutation.isPending}
       />
