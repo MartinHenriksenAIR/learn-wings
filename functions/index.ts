@@ -93,6 +93,7 @@ import './resource-delete/index';
 import './resource-update/index';
 import './resources/index';
 import './seat-pricing/index';
+import './seat-request-cancel/index';
 import './seat-request-create/index';
 import './seat-requests/index';
 import './send-invitation-email/index';
