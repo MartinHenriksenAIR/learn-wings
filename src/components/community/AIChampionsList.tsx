@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { useTranslation } from 'react-i18next';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import { Sparkles } from 'lucide-react';
 import { callApi } from '@/lib/api-client';
 import { getAvatarColor, getInitials } from '@/lib/utils';
@@ -10,6 +10,7 @@ interface ChampionProfile {
   id: string;
   full_name: string;
   department: string | null;
+  avatar_url: string | null;
 }
 
 interface AIChampion {
@@ -49,14 +50,13 @@ export function AIChampionsList({ orgId }: AIChampionsListProps) {
       <div className="flex flex-col gap-[11px]">
         {champions.map((champion) => (
           <div key={champion.id} className="flex items-center gap-2.5">
-            <Avatar className="h-[30px] w-[30px] shrink-0">
-              <AvatarFallback
-                className="text-[10.5px] font-bold text-white"
-                style={{ backgroundColor: getAvatarColor(champion.profile?.full_name) }}
-              >
-                {getInitials(champion.profile?.full_name, '??')}
-              </AvatarFallback>
-            </Avatar>
+            <BrandingAvatar
+              avatarPath={champion.profile?.avatar_url}
+              fallback={getInitials(champion.profile?.full_name, '??')}
+              className="h-[30px] w-[30px] shrink-0"
+              fallbackClassName="text-[10.5px] font-bold text-white"
+              fallbackStyle={{ backgroundColor: getAvatarColor(champion.profile?.full_name) }}
+            />
             <div className="flex min-w-0 flex-col">
               <p className="truncate text-[12.5px] font-bold">
                 {champion.profile?.full_name || t('community.unknownUser')}

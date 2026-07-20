@@ -36,7 +36,7 @@ export default endpoint('idea-comments', async ({ req, profile, reply }) => {
   if (!canAccess) return reply(200, { comments: [] });
 
   const comments = await query(
-    `SELECT c.*, json_build_object('id', pr.id, 'full_name', pr.full_name) AS profile
+    `SELECT c.*, json_build_object('id', pr.id, 'full_name', pr.full_name, 'avatar_url', pr.avatar_url) AS profile
      FROM idea_comments c
      JOIN profiles pr ON pr.id = c.user_id
      WHERE c.idea_id = $1

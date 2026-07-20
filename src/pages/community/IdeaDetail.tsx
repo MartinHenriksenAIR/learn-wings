@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import {
   Select,
   SelectContent,
@@ -507,14 +508,13 @@ export default function IdeaDetail() {
               {comments.map((comment) => (
                 <div key={comment.id} className="rounded-2xl border border-border bg-card px-5 py-4">
                   <div className="flex gap-3">
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarFallback
-                        className="text-[11px] font-bold text-white"
-                        style={{ backgroundColor: getAvatarColor(comment.profile?.full_name) }}
-                      >
-                        {getInitials(comment.profile?.full_name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <BrandingAvatar
+                      avatarPath={comment.profile?.avatar_url}
+                      fallback={getInitials(comment.profile?.full_name)}
+                      className="h-8 w-8 shrink-0"
+                      fallbackClassName="text-[11px] font-bold text-white"
+                      fallbackStyle={{ backgroundColor: getAvatarColor(comment.profile?.full_name) }}
+                    />
                     <div className="flex-1">
                       <div className="mb-1 flex items-center gap-2">
                         <span className="text-[13px] font-bold">
