@@ -399,7 +399,11 @@
     "title": "Fællesskabsmoderation",
     "description": "Gennemse rapporteret indhold på tværs af platformen og alle organisationer",
     "scopeGlobal": "Global",
-    "scopeOrganization": "Organisation"
+    "scopeOrganization": "Organisation",
+    "scopeAll": "Alle organisationer",
+    "scopeSelectLabel": "Område",
+    "scopeSearchPlaceholder": "Søg organisationer...",
+    "scopeNoResults": "Ingen organisationer fundet"
   },
   "ideaManagement": {
     "title": "Idéoversigt",

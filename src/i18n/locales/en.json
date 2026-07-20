@@ -399,7 +399,11 @@
     "title": "Community Moderation",
     "description": "Review reported content across the platform and all organizations",
     "scopeGlobal": "Global",
-    "scopeOrganization": "Organization"
+    "scopeOrganization": "Organization",
+    "scopeAll": "All organizations",
+    "scopeSelectLabel": "Scope",
+    "scopeSearchPlaceholder": "Search organizations...",
+    "scopeNoResults": "No organizations found"
   },
   "ideaManagement": {
     "title": "Ideas Overview",
