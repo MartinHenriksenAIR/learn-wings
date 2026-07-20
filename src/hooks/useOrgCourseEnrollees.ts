@@ -6,6 +6,10 @@ interface OrgCourseEnrolleesResult {
   enrollees: Array<{
     user_id: string;
     full_name: string;
+    // org_id / org_name are present only on the all-orgs ('all') response (#163),
+    // where rows are per (learner, org) enrollment; absent on the single-org path.
+    org_id?: string;
+    org_name?: string;
     status: 'enrolled' | 'completed';
     enrolled_at: string;
     completed_at: string | null;
