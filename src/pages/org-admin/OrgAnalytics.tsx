@@ -184,12 +184,11 @@ export default function OrgAnalytics() {
 
     setUploading(true);
     try {
-      // storagePath is the Azure blob path returned by file-upload component
-      const logoUrl = buildPublicUrl(storagePath);
-
+      // storagePath is the container-relative Azure blob path; store it raw and
+      // compose the public URL at display time via buildPublicUrl.
       await callApi('/api/organization-update', {
         orgId: currentOrg.id,
-        updates: { logo_url: logoUrl },
+        updates: { logo_url: storagePath },
       });
 
       toast.success('Logo updated successfully');
@@ -282,7 +281,7 @@ export default function OrgAnalytics() {
             <div className="relative group shrink-0">
               {currentOrg.logo_url ? (
                 <img
-                  src={currentOrg.logo_url}
+                  src={buildPublicUrl(currentOrg.logo_url)}
                   alt={`${currentOrg.name} logo`}
                   className="h-16 w-16 rounded-xl object-contain bg-muted"
                 />
@@ -320,7 +319,7 @@ export default function OrgAnalytics() {
                       </div>
                     </div>
                     <FileUpload
-                      bucket="org-logos"
+                      assetType="org-logo"
                       folder={currentOrg.id}
                       accept="image"
                       maxSizeMB={2}

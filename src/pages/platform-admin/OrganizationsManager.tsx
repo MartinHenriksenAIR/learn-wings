@@ -242,15 +242,13 @@ export default function OrganizationsManager() {
           <div className="space-y-2">
             <Label>{t('organizations.logoOptional')}</Label>
             <FileUpload
-              bucket="org-logos"
+              assetType="org-logo"
               accept="image"
-              value={logoUrl}
+              value={logoUrl ? buildPublicUrl(logoUrl) : null}
               onChange={(url, storagePath) => {
-                if (url && storagePath) {
-                  setLogoUrl(buildPublicUrl(storagePath));
-                } else {
-                  setLogoUrl(null);
-                }
+                // Store the raw container-relative path; compose the public URL
+                // for display via buildPublicUrl (value prop above).
+                setLogoUrl(url && storagePath ? storagePath : null);
               }}
               maxSizeMB={5}
             />
@@ -414,7 +412,7 @@ export default function OrganizationsManager() {
                 <span className="flex min-w-0 items-center gap-3">
                   {org.logo_url ? (
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted">
-                      <img src={org.logo_url} alt="" className="max-h-full max-w-full object-contain" />
+                      <img src={buildPublicUrl(org.logo_url)} alt="" className="max-h-full max-w-full object-contain" />
                     </span>
                   ) : (
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">

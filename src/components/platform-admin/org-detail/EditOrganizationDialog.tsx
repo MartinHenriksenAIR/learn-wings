@@ -83,16 +83,14 @@ export function EditOrganizationDialog({
               </div>
             </div>
             <FileUpload
-              bucket="org-logos"
+              assetType="org-logo"
               folder={orgId}
               accept="image"
-              value={logoUrl}
+              value={logoUrl ? buildPublicUrl(logoUrl) : null}
               onChange={(url, storagePath) => {
-                if (url && storagePath) {
-                  setLogoUrl(buildPublicUrl(storagePath));
-                } else {
-                  setLogoUrl(null);
-                }
+                // Store the raw container-relative path; compose the public URL
+                // for display via buildPublicUrl (value prop above).
+                setLogoUrl(url && storagePath ? storagePath : null);
               }}
               maxSizeMB={5}
             />
