@@ -396,7 +396,11 @@
     "title": "Fællesskabsmoderation",
     "description": "Gennemse rapporteret indhold på tværs af platformen og alle organisationer",
     "scopeGlobal": "Global",
-    "scopeOrganization": "Organisation"
+    "scopeOrganization": "Organisation",
+    "scopeAll": "Alle organisationer",
+    "scopeSelectLabel": "Område",
+    "scopeSearchPlaceholder": "Søg organisationer...",
+    "scopeNoResults": "Ingen organisationer fundet"
   },
   "ideaManagement": {
     "title": "Idéoversigt",
@@ -444,8 +448,8 @@
     "contentUnavailable": "Dette indhold er ikke længere tilgængeligt — det kan være blevet slettet.",
     "hidePost": "Skjul opslag",
     "hideComment": "Skjul kommentar",
-    "showPost": "Vis opslag",
-    "showComment": "Vis kommentar",
+    "showPost": "Vis opslag igen",
+    "showComment": "Vis kommentar igen",
     "lockPost": "Lås kommentarer",
     "unlockPost": "Lås kommentarer op",
     "dismiss": "Afvis",
