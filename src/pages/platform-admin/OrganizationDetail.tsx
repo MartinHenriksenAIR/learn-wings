@@ -10,6 +10,7 @@ import { useOrgDetail } from '@/hooks/useOrgDetail';
 import { useOrgMemberships } from '@/hooks/useOrgMemberships';
 import { useInvitations } from '@/hooks/useInvitations';
 import { useProfiles } from '@/hooks/useProfiles';
+import { useSeatRequests } from '@/hooks/useSeatRequests';
 import { callApi, ApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { getSeatUsage } from '@/lib/seats';
@@ -24,6 +25,7 @@ import { orgSchema } from '@/lib/org-validation';
 import { OrgDetailHeader } from '@/components/platform-admin/org-detail/OrgDetailHeader';
 import { OrgStatCards } from '@/components/platform-admin/org-detail/OrgStatCards';
 import { OrgSeatLimitCard } from '@/components/platform-admin/org-detail/OrgSeatLimitCard';
+import { SeatRequestsSection } from '@/components/platform-admin/org-detail/SeatRequestsSection';
 import { MembersSection } from '@/components/platform-admin/org-detail/MembersSection';
 import { PendingInvitationsList } from '@/components/platform-admin/org-detail/PendingInvitationsList';
 import {
@@ -69,6 +71,7 @@ export default function OrganizationDetail() {
   const membershipsQuery = useOrgMemberships(orgId);
   const invitationsQuery = useInvitations(orgId, 'platform');
   const profilesQuery = useProfiles();
+  const { data: seatRequests = [] } = useSeatRequests(orgId);
 
   const org = orgQuery.data ?? null;
   const members = useMemo<Member[]>(() => membershipsQuery.data ?? [], [membershipsQuery.data]);
@@ -309,6 +312,17 @@ export default function OrganizationDetail() {
     },
   });
 
+  const fulfilSeatRequestMutation = useToastMutation({
+    mutationFn: (id: string) => callApi('/api/seat-request-fulfill', { id }),
+    errorTitle: t('seatRequests.fulfil'),
+    onSuccess: () => {
+      toast({ title: t('seatRequests.fulfilled') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seatRequests.list(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
+    },
+  });
+
   // ── Handlers (validation + selection wiring) ───────────────────────────────
   const handleAddUser = (payload: AddUserPayload) => {
     const result = addUserSchema.safeParse({ userId: payload.userId, role: payload.role });
@@ -450,6 +464,12 @@ export default function OrganizationDetail() {
       {org.seat_limit ? (
         <OrgSeatLimitCard usedCount={seatUsage.usedSeats} seatLimit={org.seat_limit} />
       ) : null}
+
+      <SeatRequestsSection
+        requests={seatRequests}
+        onFulfil={(id) => fulfilSeatRequestMutation.mutate(id)}
+        fulfilingId={fulfilSeatRequestMutation.isPending ? (fulfilSeatRequestMutation.variables as string) : null}
+      />
 
       <MembersSection
         members={members}
