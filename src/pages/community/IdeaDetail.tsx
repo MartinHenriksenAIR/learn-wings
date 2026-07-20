@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -158,12 +159,12 @@ export default function IdeaDetail() {
   };
 
   if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
 
   if (ideaLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
+      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: 'Idea' }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -173,7 +174,7 @@ export default function IdeaDetail() {
 
   if (!idea) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }]}>
+      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library' }]}>
         <div className="py-12 text-center">
           <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -181,7 +182,7 @@ export default function IdeaDetail() {
           </h1>
           <p className="mb-4 text-sm text-muted-foreground">{t('community.ideaNotFoundDescription')}</p>
           <Button
-            onClick={() => navigate('/app/community/org/ideas')}
+            onClick={() => navigate(routes.community.ideas)}
             className="rounded-[11px] text-[13px] font-bold"
           >
             <ArrowLeft aria-hidden="true" className="h-4 w-4" />

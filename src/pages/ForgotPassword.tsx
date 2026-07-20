@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import logoLight from '@/assets/logo-light.png';
+import { routes } from '@/lib/routes';
 
 // Match Login's soft slate canvas + centered card chrome.
 const PAGE_GRADIENT_CLASSES = 'bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)]';
@@ -17,7 +18,7 @@ export default function ForgotPassword() {
         <p className="text-balance text-sm leading-[1.55] text-muted-foreground">
           {t('auth.passwordResetInfo')}
         </p>
-        <Link to="/login">
+        <Link to={routes.auth.login}>
           <Button variant="ghost" size="sm" className="gap-2">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             {t('auth.backToSignIn')}

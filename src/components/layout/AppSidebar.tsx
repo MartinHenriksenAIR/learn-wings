@@ -83,16 +83,16 @@ export function AppSidebar() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/login');
+    navigate(routes.auth.login);
   };
 
   const viewModeLabels = useViewModeLabels();
 
   // Build learner items based on feature toggles
   const learnerItems = [
-    { title: t('nav.dashboard'), url: '/app/dashboard', icon: LayoutDashboard },
-    { title: t('nav.courses'), url: '/app/courses', icon: BookOpen },
-    ...(features.community_enabled ? [{ title: t('nav.community'), url: '/app/community', icon: MessageSquare }] : []),
+    { title: t('nav.dashboard'), url: routes.learner.dashboard, icon: LayoutDashboard },
+    { title: t('nav.courses'), url: routes.learner.courses, icon: BookOpen },
+    ...(features.community_enabled ? [{ title: t('nav.community'), url: routes.community.feed, icon: MessageSquare }] : []),
   ];
 
   // Build org admin items based on feature toggles
@@ -284,7 +284,7 @@ export function AppSidebar() {
                 <DropdownMenuSeparator className="bg-border" />
               </>
             )}
-            <DropdownMenuItem className={MENU_ITEM_CLASSES} onClick={() => navigate('/app/settings')}>
+            <DropdownMenuItem className={MENU_ITEM_CLASSES} onClick={() => navigate(routes.settings)}>
               <SettingsIcon className="mr-2 h-4 w-4" />
               {t('nav.settings')}
             </DropdownMenuItem>

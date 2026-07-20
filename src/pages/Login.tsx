@@ -28,7 +28,7 @@ export default function Login() {
       } else if (isOrgAdmin) {
         navigate(routes.orgAdmin.root);
       } else {
-        navigate('/app/dashboard');
+        navigate(routes.learner.dashboard);
       }
     }
   }, [user, isPlatformAdmin, isOrgAdmin, isLoading, navigate]);

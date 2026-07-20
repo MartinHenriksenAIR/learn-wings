@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -123,7 +124,7 @@ export default function PostDetail() {
     mutationFn: () => deletePost(postId!),
     onSuccess: () => {
       toast({ title: 'Post deleted' });
-      navigate(`/app/community?scope=${scope}`);
+      navigate(`${routes.community.feed}?scope=${scope}`);
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to delete post', description: error.message, variant: 'destructive' });
@@ -203,12 +204,12 @@ export default function PostDetail() {
   // org-scoped report must not be bounced just because their own org has community
   // disabled (or they have no org selected). Backend authz already permits them.
   if (!settingsLoading && !features.community_enabled && !effectiveIsPlatformAdmin) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
 
   if (postLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Post' }]}>
+      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Post' }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -223,7 +224,7 @@ export default function PostDetail() {
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('community.postNotFound')}</h1>
           <p className="mb-4 text-sm text-muted-foreground">{t('community.postNotFoundDescription')}</p>
           <Button
-            onClick={() => navigate(`/app/community?scope=${scope}`)}
+            onClick={() => navigate(`${routes.community.feed}?scope=${scope}`)}
             className="rounded-[11px] text-[13px] font-bold"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -245,7 +246,7 @@ export default function PostDetail() {
         {/* Back button */}
         <Button
           variant="ghost"
-          onClick={() => navigate(`/app/community?scope=${scope}`)}
+          onClick={() => navigate(`${routes.community.feed}?scope=${scope}`)}
           className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
         >
           <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
@@ -365,7 +366,7 @@ export default function PostDetail() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(`/app/community/${scope}/posts/${post.id}/edit`)}
+                    onClick={() => navigate(routes.community.postEdit(scope, post.id))}
                     className="h-auto rounded-lg px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:text-primary"
                   >
                     <Edit2 aria-hidden="true" className="h-[13px] w-[13px]" />

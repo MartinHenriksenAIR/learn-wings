@@ -1,4 +1,5 @@
 // Platform configuration
+import { routes } from '@/lib/routes';
 
 /**
  * Resolve the platform's public base URL.
@@ -22,5 +23,5 @@ export const PLATFORM_BASE_URL = resolvePlatformBaseUrl(
  * Generate an invite link using the platform's base URL
  */
 export function getInviteLink(linkId: string): string {
-  return `${PLATFORM_BASE_URL}/signup?invite=${linkId}`;
+  return `${PLATFORM_BASE_URL}${routes.auth.signup}?invite=${linkId}`;
 }

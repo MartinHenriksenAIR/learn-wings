@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -128,7 +129,7 @@ export default function IdeaLibrary() {
   const hasActiveFilters = Boolean(searchQuery || selectedBusinessArea || selectedTags.length > 0);
 
   if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
 
   // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
@@ -155,11 +156,11 @@ export default function IdeaLibrary() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }]}>
+    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library' }]}>
       {/* Back to community */}
       <Button
         variant="ghost"
-        onClick={() => navigate('/app/community?scope=org')}
+        onClick={() => navigate(`${routes.community.feed}?scope=org`)}
         className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
       >
         <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
@@ -177,7 +178,7 @@ export default function IdeaLibrary() {
           </p>
         </div>
         <Button
-          onClick={() => navigate('/app/community/org/ideas/new')}
+          onClick={() => navigate(routes.community.ideaNew)}
           className="group h-auto whitespace-nowrap rounded-[11px] px-4 py-2.5 text-[13px] font-bold"
         >
           <Plus aria-hidden="true" className="h-[15px] w-[15px] group-hover:animate-bulb-wiggle" />
@@ -263,7 +264,7 @@ export default function IdeaLibrary() {
       ) : filteredIdeas.length === 0 ? (
         <CommunityEmptyState
           variant={safeTab === 'drafts' ? 'drafts' : 'ideas'}
-          onAction={() => navigate('/app/community/org/ideas/new')}
+          onAction={() => navigate(routes.community.ideaNew)}
           actionLabel={safeTab === 'drafts' ? t('community.startNewIdea') : t('community.submitFirstIdea')}
           hasActiveFilters={hasActiveFilters}
           filterDescription={t('community.noIdeasMatchFilters')}
@@ -282,9 +283,9 @@ export default function IdeaLibrary() {
               onClick={() => {
                 // Drafts go to edit mode, other ideas go to detail view
                 if (idea.status === 'draft') {
-                  navigate(`/app/community/org/ideas/edit/${idea.id}`);
+                  navigate(routes.community.ideaEdit(idea.id));
                 } else {
-                  navigate(`/app/community/org/ideas/${idea.id}`);
+                  navigate(routes.community.ideaDetail(idea.id));
                 }
               }}
               onDelete={() => deleteMutation.mutate(idea.id)}

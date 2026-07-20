@@ -16,20 +16,33 @@ import { useAuth } from '@/hooks/useAuth';
 import { useViewModeLabels } from '@/components/layout/view-mode-labels';
 import { routes } from '@/lib/routes';
 
-interface AppLayoutProps {
-  children: ReactNode;
-  breadcrumbs?: { label: string; href?: string }[];
-  title?: string;
+// Default hrefs for common intermediate crumbs, keyed by a STABLE route id — not
+// the display label. Keying by the English label meant the Danish locale (whose
+// translated label never matched) silently dropped the link; a stable id keeps
+// the default href resolving in every locale.
+const DEFAULT_BREADCRUMB_HREFS = {
+  community: routes.community.feed,
+  courses: routes.learner.courses,
+  ideaLibrary: routes.community.ideas,
+  resources: routes.community.resources,
+  organizations: routes.platformAdmin.organizations,
+} as const;
+
+export type BreadcrumbHrefKey = keyof typeof DEFAULT_BREADCRUMB_HREFS;
+
+export interface Crumb {
+  label: string;
+  /** Explicit href — wins over `hrefKey`. */
+  href?: string;
+  /** Stable route id to resolve a default href, locale-independently. */
+  hrefKey?: BreadcrumbHrefKey;
 }
 
-// Default href map for common breadcrumb labels that don't have an explicit href
-const DEFAULT_BREADCRUMB_HREFS: Record<string, string> = {
-  'Community': '/app/community',
-  'Courses': '/app/courses',
-  'Idea Library': '/app/community/org/ideas',
-  'Resources': '/app/community/org/resources',
-  'Organizations': routes.platformAdmin.organizations,
-};
+interface AppLayoutProps {
+  children: ReactNode;
+  breadcrumbs?: Crumb[];
+  title?: string;
+}
 
 const CRUMB_LINK_CLASSES = 'font-medium text-muted-foreground transition-colors hover:text-primary';
 
@@ -38,7 +51,7 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
   const { t } = useTranslation();
 
   // Platform admins go to Organizations, others go to Dashboard
-  const homeHref = effectiveIsPlatformAdmin ? routes.platformAdmin.organizations : '/app/dashboard';
+  const homeHref = effectiveIsPlatformAdmin ? routes.platformAdmin.organizations : routes.learner.dashboard;
 
   const viewModeLabels = useViewModeLabels();
 
@@ -61,7 +74,7 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
                 </BreadcrumbItem>
                 {breadcrumbs.map((crumb, index) => {
                   const isLast = index === breadcrumbs.length - 1;
-                  const resolvedHref = crumb.href ?? DEFAULT_BREADCRUMB_HREFS[crumb.label];
+                  const resolvedHref = crumb.href ?? (crumb.hrefKey ? DEFAULT_BREADCRUMB_HREFS[crumb.hrefKey] : undefined);
                   return (
                     <Fragment key={index}>
                       <BreadcrumbSeparator className="text-[#c3c7d3] [&>svg]:size-[13px]" />

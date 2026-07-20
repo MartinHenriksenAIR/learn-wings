@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { StatCard } from '@/components/ui/stat-card';
 import { ProgressRing } from '@/components/ui/progress-ring';
 import { LevelBadge } from '@/components/ui/level-badge';
@@ -108,7 +109,7 @@ export default function LearnerDashboard() {
         cta: t('dashboard.heroResumeCta'),
         progressLabel: heroTotal > 0 ? t('dashboard.heroLessonsDone', { done: heroDone, total: heroTotal }) : null,
         pct: heroTotal > 0 ? (heroDone / heroTotal) * 100 : 0,
-        to: `/app/learn/${nextUp.course_id}`,
+        to: routes.learner.coursePlayer(nextUp.course_id),
       }
     : completedCourses.length > 0
       ? {
@@ -121,7 +122,7 @@ export default function LearnerDashboard() {
             total: enrollments.length,
           }),
           pct: 100,
-          to: '/app/courses',
+          to: routes.learner.courses,
         }
       : {
           badge: t('dashboard.heroFirstTimeBadge'),
@@ -130,7 +131,7 @@ export default function LearnerDashboard() {
           cta: t('dashboard.browseCourses'),
           progressLabel: t('dashboard.heroPickFirstCourse'),
           pct: 0,
-          to: '/app/courses',
+          to: routes.learner.courses,
         };
 
   const firstName = profile?.first_name || profile?.full_name;
@@ -151,25 +152,25 @@ export default function LearnerDashboard() {
           label={t('dashboard.coursesEnrolled')}
           value={enrollments.length}
           icon={<BookOpen className="h-5 w-5" />}
-          onClick={() => navigate('/app/courses')}
+          onClick={() => navigate(routes.learner.courses)}
         />
         <StatCard
           label={t('dashboard.inProgress')}
           value={inProgressCourses.length}
           icon={<Clock className="h-5 w-5" />}
-          onClick={() => navigate(nextUp ? `/app/learn/${nextUp.course_id}` : '/app/courses')}
+          onClick={() => navigate(nextUp ? routes.learner.coursePlayer(nextUp.course_id) : routes.learner.courses)}
         />
         <StatCard
           label={t('dashboard.completed')}
           value={completedCourses.length}
           icon={<Award className="h-5 w-5" />}
-          onClick={() => navigate('/app/courses')}
+          onClick={() => navigate(routes.learner.courses)}
         />
         <StatCard
           label={t('dashboard.overallProgress')}
           value={`${Math.round(totalProgress)}%`}
           icon={<TrendingUp className="h-5 w-5" />}
-          onClick={() => navigate('/app/courses')}
+          onClick={() => navigate(routes.learner.courses)}
         />
       </div>
 
@@ -225,7 +226,7 @@ export default function LearnerDashboard() {
         <div className="mb-3.5 flex items-center justify-between">
           <h2 className="font-display text-[17px] font-bold">{t('dashboard.continueLearning')}</h2>
           <Button asChild variant="ghost" size="sm" className="text-[13px] font-bold text-primary hover:text-primary">
-            <Link to="/app/courses">
+            <Link to={routes.learner.courses}>
               {t('dashboard.viewAllCourses')}
               <ArrowRight aria-hidden="true" className="ml-1 h-4 w-4" />
             </Link>
@@ -239,7 +240,7 @@ export default function LearnerDashboard() {
             description={t('dashboard.startLearning')}
             action={
               <Button asChild>
-                <Link to="/app/courses">{t('dashboard.browseCourses')}</Link>
+                <Link to={routes.learner.courses}>{t('dashboard.browseCourses')}</Link>
               </Button>
             }
           />
@@ -285,7 +286,7 @@ export default function LearnerDashboard() {
                       asChild
                       className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
                     >
-                      <Link to={`/app/learn/${enrollment.course_id}`}>
+                      <Link to={routes.learner.coursePlayer(enrollment.course_id)}>
                         <Play aria-hidden="true" className="h-3.5 w-3.5" />
                         {t('common.continue')}
                       </Link>

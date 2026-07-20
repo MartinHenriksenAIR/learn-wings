@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -167,7 +168,7 @@ export default function IdeaSubmit() {
       setDraftId(data.id);
       queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
       toast.success(t('ideas.draftSaved'));
-      navigate('/app/community/org/ideas?tab=drafts');
+      navigate(`${routes.community.ideas}?tab=drafts`);
     },
     onError: () => {
       toast.error('Failed to save draft');
@@ -197,7 +198,7 @@ export default function IdeaSubmit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
       toast.success(t('ideas.ideaSubmitted'));
-      navigate('/app/community/org/ideas');
+      navigate(routes.community.ideas);
     },
     onError: () => {
       toast.error('Failed to submit idea');
@@ -213,7 +214,7 @@ export default function IdeaSubmit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
       toast.success('Draft deleted');
-      navigate('/app/community/org/ideas');
+      navigate(routes.community.ideas);
     },
     onError: () => {
       toast.error('Failed to delete draft');
@@ -255,7 +256,7 @@ export default function IdeaSubmit() {
   ];
 
   if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
 
   // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
@@ -292,12 +293,12 @@ export default function IdeaSubmit() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: isEditMode ? 'Edit Draft' : 'Submit Idea' }]}>
+    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: isEditMode ? 'Edit Draft' : 'Submit Idea' }]}>
       <div className="max-w-[680px]">
         {/* Back to idea library */}
         <Button
           variant="ghost"
-          onClick={() => navigate('/app/community/org/ideas')}
+          onClick={() => navigate(routes.community.ideas)}
           className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
         >
           <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />

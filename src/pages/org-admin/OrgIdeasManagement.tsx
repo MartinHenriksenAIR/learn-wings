@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -278,7 +279,7 @@ export default function OrgIdeasManagement() {
                             setDraggedIdeaId(null);
                             setDragOverColumn(null);
                           }}
-                          onClick={() => navigate(`/app/community/org/ideas/${idea.id}`)}
+                          onClick={() => navigate(routes.community.ideaDetail(idea.id))}
                           className={cn(
                             'group cursor-grab rounded-xl border border-[#e4e6ee] bg-card px-[15px] py-[13px] transition-[transform,box-shadow,opacity]',
                             'hover:shadow-[0_8px_22px_rgba(20,24,46,0.10)]',

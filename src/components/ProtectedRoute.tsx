@@ -32,7 +32,7 @@ export function ProtectedRoute({
     // Remember where the user was headed so Login can restore it after the
     // Entra round trip (deep links / Copy link, #16).
     savePostLoginRedirect(location.pathname + location.search + location.hash);
-    return <Navigate to="/login" replace />;
+    return <Navigate to={routes.auth.login} replace />;
   }
   
   // Redirect platform admins away from learner-only routes
@@ -42,12 +42,12 @@ export function ProtectedRoute({
   
   // Check platform admin requirement
   if (requirePlatformAdmin && !isPlatformAdmin) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
   
   // Check org admin requirement (platform admins have org admin privileges)
   if (requireOrgAdmin && !effectiveIsOrgAdmin) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
   
   return <>{children}</>;
