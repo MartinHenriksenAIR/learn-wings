@@ -93,6 +93,11 @@ export interface CommunityReport {
    * NULL for post targets and for orphaned comment reports (comment deleted).
    */
   post_id?: string | null;
+  /** Target's current moderation state, joined by community-reports (#169).
+   *  post target → the post's flags; comment target → the comment's is_hidden
+   *  (+ null lock); NULL when the target was deleted. */
+  target_is_hidden?: boolean | null;
+  target_is_locked?: boolean | null;
   // Joined relations
   reporter?: Profile;
   reviewer?: Profile;
