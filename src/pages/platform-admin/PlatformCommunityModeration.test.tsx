@@ -29,6 +29,17 @@ vi.mock('@/lib/api-client', () => ({
   callApi: vi.fn(),
 }));
 
+// --- stub the reported-content dialog (its internals are tested separately) ---
+vi.mock('@/components/community/ReportedContentDialog', () => ({
+  ReportedContentDialog: ({
+    open,
+    report,
+  }: {
+    open: boolean;
+    report: { target_id?: string } | null;
+  }) => (open ? <div data-testid="reported-content-dialog">{report?.target_id}</div> : null),
+}));
+
 // --- mock sonner ---
 vi.mock('sonner', () => ({
   toast: {
@@ -138,8 +149,8 @@ describe('PlatformCommunityModeration', () => {
     expect(screen.getByText('Acme Corp')).toBeInTheDocument();
   });
 
-  it('view-content button for org report opens /app/community/org/posts/<target_id>', async () => {
-    // Render with only the org-scoped report so no global card is present
+  it('view-content opens the reported-content dialog in-app, never a new tab (#160)', async () => {
+    // Render with only the org-scoped report so exactly one card is present
     mockFetchReports.mockResolvedValue([orgReport]);
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
@@ -149,42 +160,38 @@ describe('PlatformCommunityModeration', () => {
       expect(screen.getByText('Offensive content')).toBeInTheDocument();
     });
 
-    // Only one report rendered — the first button in the document is the View content button
+    // Dialog closed until the button is clicked
+    expect(screen.queryByTestId('reported-content-dialog')).not.toBeInTheDocument();
+
+    // First button on the card is View content
     const firstButton = screen.getAllByRole('button')[0];
     firstButton.click();
 
-    expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy).toHaveBeenCalledWith(
-      `/app/community/org/posts/post-org-1`,
-      '_blank',
-      'noopener,noreferrer'
-    );
+    // Opens the in-app dialog with the reported target — and does NOT open a new tab
+    const dialog = await screen.findByTestId('reported-content-dialog');
+    expect(dialog).toHaveTextContent('post-org-1');
+    expect(openSpy).not.toHaveBeenCalled();
 
     openSpy.mockRestore();
   });
 
-  it('view-content button for global report opens /app/community/global/posts/<target_id>', async () => {
-    // Render with only the global report so no org card is present
-    mockFetchReports.mockResolvedValue([globalReport]);
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+  it('disables view-content for an orphaned comment report (#86)', async () => {
+    const orphanReport = {
+      ...orgReport,
+      id: 'report-orphan',
+      target_type: 'comment' as const,
+      target_id: 'comment-orphan',
+      post_id: null,
+    };
+    mockFetchReports.mockResolvedValue([orphanReport]);
 
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Spam content')).toBeInTheDocument();
+      expect(screen.getByText('Offensive content')).toBeInTheDocument();
     });
 
-    // Only one report rendered — the first button in the document is the View content button
     const firstButton = screen.getAllByRole('button')[0];
-    firstButton.click();
-
-    expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy).toHaveBeenCalledWith(
-      `/app/community/global/posts/post-global-1`,
-      '_blank',
-      'noopener,noreferrer'
-    );
-
-    openSpy.mockRestore();
+    expect(firstButton).toBeDisabled();
   });
 });

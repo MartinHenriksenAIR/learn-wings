@@ -15,6 +15,9 @@ interface CommentThreadProps {
   isAdmin?: boolean;
   isLocked?: boolean;
   isLoading?: boolean;
+  /** Read-only mode (e.g. the moderation "View content" dialog): render the
+   * thread for viewing only — no composer, reply, copy-link, or locked banner. */
+  readOnly?: boolean;
   highlightedCommentId?: string | null;
   onAddComment: (content: string, parentId?: string) => Promise<void>;
   onEditComment?: (commentId: string, content: string) => Promise<void>;
@@ -30,6 +33,7 @@ export function CommentThread({
   isAdmin = false,
   isLocked = false,
   isLoading = false,
+  readOnly = false,
   highlightedCommentId = null,
   onAddComment,
   onEditComment,
@@ -130,12 +134,12 @@ export function CommentThread({
                 comment={comment}
                 currentUserId={currentUserId}
                 isAdmin={isAdmin}
-                onReply={isLocked ? undefined : (parentId) => setReplyingTo(parentId)}
+                onReply={readOnly || isLocked ? undefined : (parentId) => setReplyingTo(parentId)}
                 onEdit={onEditComment ? handleEdit : undefined}
                 onDelete={onDeleteComment ? handleDelete : undefined}
                 onReport={onReportComment}
                 onToggleHide={onToggleHideComment}
-                onCopyLink={handleCopyCommentLink}
+                onCopyLink={readOnly ? undefined : handleCopyCommentLink}
                 highlightedCommentId={highlightedCommentId}
               />
             </div>
@@ -180,7 +184,7 @@ export function CommentThread({
       )}
 
       {/* Locked banner */}
-      {isLocked && (
+      {!readOnly && isLocked && (
         <div className="flex items-center gap-2.5 rounded-[14px] border border-[#efddb2] bg-[#fbf2dd] px-[18px] py-3.5 text-[13px] font-semibold text-[#8a5e10]">
           <Lock aria-hidden="true" className="h-[15px] w-[15px] shrink-0" />
           {t('community.commentsLocked')}
@@ -188,7 +192,7 @@ export function CommentThread({
       )}
 
       {/* Add comment composer */}
-      {!isLocked && currentUserId && (
+      {!readOnly && !isLocked && currentUserId && (
         <div className="flex items-end gap-2.5 rounded-2xl border border-border bg-card p-4">
           <Textarea
             placeholder={t('community.addCommentPlaceholder')}
