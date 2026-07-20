@@ -1,6 +1,6 @@
 import { isUniqueViolation, queryOne, withTransaction } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-import { notifySeatRequest } from '../shared/seat-request-notify';
+import { notifySeatRequest, notifySeatRequestReceived } from '../shared/seat-request-notify';
 
 const MAX_SEATS = 1000;
 
@@ -76,8 +76,8 @@ export default endpoint('seat-request-create', async ({ req, context, profile, r
   if (outcome.kind === 'unlimited') return reply(409, { error: 'Organization has no seat limit', code: 'ORG_UNLIMITED' });
 
   // Notify the platform admin (best-effort — notifySeatRequest never throws).
-  const requester = await queryOne<{ full_name: string; email: string | null }>(
-    `SELECT full_name, email FROM profiles WHERE id = $1`, [profile.id],
+  const requester = await queryOne<{ full_name: string; email: string | null; preferred_language: string | null }>(
+    `SELECT full_name, email, preferred_language FROM profiles WHERE id = $1`, [profile.id],
   );
   await notifySeatRequest(context, {
     recipient: pricingRow?.value?.notification_email ?? 'jacob@ai-raadgivning.dk',
@@ -91,6 +91,14 @@ export default endpoint('seat-request-create', async ({ req, context, profile, r
     currency,
     requestId: outcome.request.id as string,
     createdAt: outcome.request.created_at as string,
+  });
+
+  // Notify the requester that their request was received (best-effort, requester only).
+  await notifySeatRequestReceived(context, {
+    recipient: requester?.email ?? null,
+    orgName: outcome.orgName,
+    additionalSeats,
+    language: requester?.preferred_language ?? null,
   });
 
   return reply(200, { request: outcome.request });

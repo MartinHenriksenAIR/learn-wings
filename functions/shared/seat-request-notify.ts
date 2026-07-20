@@ -55,3 +55,121 @@ export async function notifySeatRequest(context: InvocationContext, p: SeatReque
     context.error('seat-request notification email failed', err);
   }
 }
+
+// --- Requester-facing emails (#193) --------------------------------------
+// These go to the requesting org admin, not the platform admin. They embed
+// user- and org-supplied strings, so every interpolated string is HTML-escaped
+// via this local helper. (The platform-admin template above is left untouched.)
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Danish is the default: only an explicit 'en' preference selects English.
+function isEnglish(language: string | null): boolean {
+  return language === 'en';
+}
+
+export interface SeatRequestReceivedParams {
+  recipient: string | null;      // requester's email; null → skip the send
+  orgName: string;
+  additionalSeats: number;
+  language: string | null;       // requester's preferred_language ('en' | 'da' | null)
+}
+
+export interface SeatRequestFulfilledParams {
+  recipient: string | null;
+  orgName: string;
+  additionalSeats: number;
+  seatLimit: number;
+  language: string | null;
+}
+
+export function renderSeatRequestReceivedEmail(p: SeatRequestReceivedParams): { subject: string; html: string } {
+  const org = escapeHtml(p.orgName);
+  const n = p.additionalSeats;
+  if (isEnglish(p.language)) {
+    return {
+      subject: `Request received — ${org}`,
+      html: `
+    <h2>Request received</h2>
+    <p>We have received your request for ${n} extra seat(s) for <strong>${org}</strong>.</p>
+    <p>Your ${n} seat(s) will be available within 24 hours.</p>
+  `,
+    };
+  }
+  return {
+    subject: `Anmodning modtaget — ${org}`,
+    html: `
+    <h2>Anmodning modtaget</h2>
+    <p>Vi har modtaget din anmodning om ${n} ekstra plads(er) til <strong>${org}</strong>.</p>
+    <p>Dine ${n} plads(er) vil være tilgængelige inden for 24 timer.</p>
+  `,
+  };
+}
+
+export function renderSeatRequestFulfilledEmail(p: SeatRequestFulfilledParams): { subject: string; html: string } {
+  const org = escapeHtml(p.orgName);
+  const n = p.additionalSeats;
+  const limit = p.seatLimit;
+  if (isEnglish(p.language)) {
+    return {
+      subject: `Your extra seats are now active — ${org}`,
+      html: `
+    <h2>Your extra seats are now active</h2>
+    <p>Your ${n} extra seat(s) for <strong>${org}</strong> are now active.</p>
+    <p>Your new seat limit is <strong>${limit}</strong>.</p>
+  `,
+    };
+  }
+  return {
+    subject: `Dine ekstra pladser er nu aktive — ${org}`,
+    html: `
+    <h2>Dine ekstra pladser er nu aktive</h2>
+    <p>Dine ${n} ekstra plads(er) til <strong>${org}</strong> er nu aktive.</p>
+    <p>Din nye pladsgrænse er <strong>${limit}</strong>.</p>
+  `,
+  };
+}
+
+// Best-effort, same contract as notifySeatRequest: a null recipient or a Resend
+// failure is logged and swallowed — the request/fulfilment must never be blocked.
+export async function notifySeatRequestReceived(context: InvocationContext, p: SeatRequestReceivedParams): Promise<void> {
+  if (!p.recipient) {
+    context.log('seat-request received email skipped — requester has no email');
+    return;
+  }
+  try {
+    const { subject, html } = renderSeatRequestReceivedEmail(p);
+    await getResend().emails.send({
+      from: 'AI Uddannelse <no-reply@ai-uddannelse.dk>',
+      to: [p.recipient],
+      subject,
+      html,
+    });
+  } catch (err) {
+    context.error('seat-request received email failed', err);
+  }
+}
+
+export async function notifySeatRequestFulfilled(context: InvocationContext, p: SeatRequestFulfilledParams): Promise<void> {
+  if (!p.recipient) {
+    context.log('seat-request fulfilled email skipped — requester has no email');
+    return;
+  }
+  try {
+    const { subject, html } = renderSeatRequestFulfilledEmail(p);
+    await getResend().emails.send({
+      from: 'AI Uddannelse <no-reply@ai-uddannelse.dk>',
+      to: [p.recipient],
+      subject,
+      html,
+    });
+  } catch (err) {
+    context.error('seat-request fulfilled email failed', err);
+  }
+}
