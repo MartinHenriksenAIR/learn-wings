@@ -16,14 +16,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
-import { canViewReportedContent } from '@/lib/community-report-link';
 import { ReportedContentDialog } from '@/components/community/ReportedContentDialog';
+import { ReportActions } from '@/components/community/ReportActions';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
 import { cn } from '@/lib/utils';
@@ -31,10 +26,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Loader2,
-  Eye,
-  EyeOff,
-  Lock,
-  Unlock,
   CheckCircle,
   XCircle,
   Flag,
@@ -271,108 +262,19 @@ export default function PlatformCommunityModeration() {
                     </p>
                   )}
 
-                  {/* Action controls — kept exactly as today (view/hide/show/lock/unlock/review/dismiss) */}
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setViewReport(report)}
-                          disabled={!canViewReportedContent(report)}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          {t('moderation.viewContent')}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{t('moderation.viewContent')}</TooltipContent>
-                    </Tooltip>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleContentVisibility.mutate({
-                        type: report.target_type,
-                        id: report.target_id,
-                        hide: true,
-                      })}
-                      disabled={toggleContentVisibility.isPending}
-                    >
-                      <EyeOff className="h-3.5 w-3.5" />
-                      {isPost ? t('moderation.hidePost') : t('moderation.hideComment')}
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleContentVisibility.mutate({
-                        type: report.target_type,
-                        id: report.target_id,
-                        hide: false,
-                      })}
-                      disabled={toggleContentVisibility.isPending}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      {isPost ? t('moderation.showPost') : t('moderation.showComment')}
-                    </Button>
-
-                    {isPost && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => togglePostLock.mutate({
-                            postId: report.target_id,
-                            lock: true,
-                          })}
-                          disabled={togglePostLock.isPending}
-                        >
-                          <Lock className="h-3.5 w-3.5" />
-                          {t('moderation.lockPost')}
-                        </Button>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => togglePostLock.mutate({
-                            postId: report.target_id,
-                            lock: false,
-                          })}
-                          disabled={togglePostLock.isPending}
-                        >
-                          <Unlock className="h-3.5 w-3.5" />
-                          {t('moderation.unlockPost')}
-                        </Button>
-                      </>
-                    )}
-
-                    {report.status === 'pending' && (
-                      <>
-                        <div className="flex-1" />
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => updateReportMutation.mutate({
-                            reportId: report.id,
-                            status: 'dismissed',
-                          })}
-                          disabled={updateReportMutation.isPending}
-                        >
-                          <XCircle className="h-3.5 w-3.5" />
-                          {t('moderation.dismiss')}
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          onClick={() => openReviewDialog(report)}
-                          disabled={updateReportMutation.isPending}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          {t('moderation.markReviewed')}
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                  <ReportActions
+                    report={report}
+                    onViewContent={() => setViewReport(report)}
+                    onSetHidden={(hide) =>
+                      toggleContentVisibility.mutate({ type: report.target_type, id: report.target_id, hide })
+                    }
+                    onSetLocked={(lock) => togglePostLock.mutate({ postId: report.target_id, lock })}
+                    onDismiss={() => updateReportMutation.mutate({ reportId: report.id, status: 'dismissed' })}
+                    onReview={() => openReviewDialog(report)}
+                    visibilityPending={toggleContentVisibility.isPending}
+                    lockPending={togglePostLock.isPending}
+                    updatePending={updateReportMutation.isPending}
+                  />
                 </CardContent>
               </Card>
             );
