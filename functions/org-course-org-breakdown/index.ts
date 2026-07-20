@@ -10,12 +10,18 @@ import { adminEndpoint } from '../shared/endpoint';
  * before body parse): the breakdown is inherently cross-org, so an org admin
  * must never reach it.
  *
- * Lists EVERY org that has the course access-enabled, including orgs with zero
- * enrollments (LEFT JOIN → 0/0 "gap" rows) — an adoption signal for platform
- * admins. Counts are org-scoped enrollments; UNIQUE(org_id, user_id, course_id)
- * makes "enrollments within an org" and "distinct learners within an org" equal.
- * Summed across orgs these can exceed the dialog's distinct-learner headline
- * (#159) only when one learner is enrolled in the course through several orgs.
+ * Org population = orgs with the course access-enabled UNION orgs with ≥1
+ * enrollment in it. The enabled set gives 0-enrollment "gap" rows (adoption
+ * signal for platform admins); the enrollment set keeps this table reconciled
+ * with the enrollee list and the #159 headline, which both count enrollments in
+ * EVERY org regardless of current access (e.g. an org whose access was revoked
+ * after a learner enrolled). Without the union such an org would appear in the
+ * enrollee list but be missing here, and the per-org total would fall short.
+ *
+ * Counts are org-scoped enrollments; UNIQUE(org_id, user_id, course_id) makes
+ * "enrollments within an org" and "distinct learners within an org" equal.
+ * Summed across orgs these can still exceed the dialog's distinct-learner
+ * headline (#159) when one learner is enrolled through several orgs.
  */
 export default adminEndpoint('org-course-org-breakdown', async ({ req, reply }) => {
   const { courseId } = await req.json() as { courseId?: string };
@@ -28,10 +34,14 @@ export default adminEndpoint('org-course-org-breakdown', async ({ req, reply }) 
     `SELECT o.id AS org_id, o.name AS org_name,
             COUNT(e.id)::int AS enrolled,
             COUNT(e.id) FILTER (WHERE e.status = 'completed')::int AS completed
-       FROM org_course_access oca
-       JOIN organizations o ON o.id = oca.org_id
-       LEFT JOIN enrollments e ON e.course_id = oca.course_id AND e.org_id = oca.org_id
-      WHERE oca.course_id = $1 AND oca.access = 'enabled'
+       FROM organizations o
+       JOIN (
+         SELECT oca.org_id FROM org_course_access oca
+          WHERE oca.course_id = $1 AND oca.access = 'enabled'
+         UNION
+         SELECT e.org_id FROM enrollments e WHERE e.course_id = $1
+       ) rel ON rel.org_id = o.id
+       LEFT JOIN enrollments e ON e.course_id = $1 AND e.org_id = o.id
       GROUP BY o.id, o.name
       ORDER BY enrolled DESC, o.name`,
     [courseId],

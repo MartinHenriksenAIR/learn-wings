@@ -84,10 +84,13 @@ describe('org-course-org-breakdown', () => {
     expect(JSON.parse(res.body as string).orgs).toEqual(rows);
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // every org with the course access-enabled — incl. 0-enrollment gap rows (LEFT JOIN)
-    expect(sql).toContain('JOIN organizations');
-    expect(sql).toContain('LEFT JOIN enrollments');
+    // Org population = (course access-enabled) UNION (has ≥1 enrollment), so the table
+    // reconciles with the enrollee list even when access was revoked with enrollments left
+    // behind, and still shows 0-enrollment "gap" rows for enabled orgs (LEFT JOIN).
+    expect(sql).toContain('FROM organizations o');
+    expect(sql).toContain('UNION');
     expect(sql).toContain("oca.access = 'enabled'");
+    expect(sql).toContain('LEFT JOIN enrollments');
     expect(sql).toContain('oca.course_id = $1');
     // per-org enrollment counts (org-scoped; UNIQUE(org,user,course) => distinct within an org)
     expect(sql).toContain("FILTER (WHERE e.status = 'completed')");
