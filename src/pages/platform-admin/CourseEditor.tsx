@@ -479,7 +479,6 @@ export default function CourseEditor() {
               <div className="space-y-1.5">
                 <Label>{t('courseEditor.thumbnail')}</Label>
                 <FileUpload
-                  bucket="lms-assets"
                   folder="thumbnails"
                   accept="image"
                   value={editThumbnailUrl}
