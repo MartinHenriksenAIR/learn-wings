@@ -155,7 +155,7 @@
 </section>
 
 <section id="current-state">
-  <h2>Current State <span class="asof">(post-frontend-deepening checkpoint — 2026-07-17)</span></h2>
+  <h2>Current State <span class="asof">(checkpoint — 2026-07-20)</span></h2>
   <dl class="checkpoint">
     <dt>Branch</dt>
     <dd><strong>Trunk is <code>main</code></strong>; the migration branch <code>feature/lovable-migration</code> is retired. <strong>MVP shipped: PR #99 (<code>mvp</code> → <code>main</code>) merged 2026-06-24 as <code>fd66153</code></strong> — the umbrella that brought the full backlog sweep (35 issues), CI test gates, the navy UI re-skin, backend hardening, and the collaboration system (re-pointed at <code>main</code>) to trunk. Deploys auto-fired green (functions run <code>28097464299</code> + SWA <code>28097464267</code> + CI <code>28097464257</code>); unauth smoke 6/6 401 + OPTIONS 204 on the regionalized host. Check <code>git log -1 origin/main</code> for the live SHA.</dd>
@@ -165,6 +165,7 @@
     Post-MVP hardening landed: #105 course-visibility drift guard, #103 DB TLS verify-full, #28 credential-drift fix (2026-07-13).
     <strong>Cleanup merged: PR #129 @<code>86f3194</code> (2026-07-16), deployed + smoke ok</strong> (signed-in Playwright sweep: 12 endpoints, 21/21 API calls 200, zero console errors) — shared endpoint envelope factory (<strong>ADR-0015</strong>; 90 endpoints migrated, 8 hand-rolled exceptions, fleet guard <code>functions/registration-names.test.ts</code>), 5 orphaned routes decommissioned, dead-code + over-engineering sweeps, docs corpus slimmed ~85% + Documentation policy in <code>AGENTS.md</code>. <strong>New-endpoint convention: use the factory</strong> — see ADR-0015 + <code>.claude/rules/functions.md</code>.
     <strong>Frontend deepening merged: PR #155 @<code>774f530</code> (2026-07-17, issue #132; supersedes hidden PR #134 — see the s8emil-flag quirk), deployed + smoke ok</strong> (signed-in Playwright sweep across all three role views incl. an enroll→invalidate→unenroll round-trip; zero app console errors) — query-key factory (<code>src/lib/query-keys.ts</code>), shared TanStack Query hooks (<code>src/hooks/*</code>), <code>OrganizationDetail.tsx</code> decomposed 1,155→477 lines into <code>src/components/platform-admin/org-detail/*</code>. <strong>New frontend convention: reads via shared query hooks + the key factory; mutations invalidate factory keys</strong> — see <code>.claude/rules/frontend.md</code>. Deferred pieces: #135; cleanup backlog: #136 (+#137–#154, currently hidden by the flag).
+    <strong>#158 course thumbnail preview shipped: PR #172 (2026-07-20), frontend-only.</strong> <code>FileUpload</code> now shows a local object-URL preview of a just-uploaded image (the stored value is a raw blob path that needs signing). <strong>Adjacent finding → #162/#165:</strong> the <code>FileUpload</code> <code>bucket</code> prop is a no-op — every upload lands in one private container (<code>AZURE_STORAGE_CONTAINER_NAME</code>, default <code>lms-videos</code>), so org logos (displayed via an unsigned <code>buildPublicUrl</code>) are broken; owner decision 2026-07-20 to make logos/avatars <em>public</em> branding assets (validated public container + container-correct URL).
     Full history + per-slice detail: <code>migration/WORKLOG.md</code>.</dd>
     <dt>In flight</dt>
     <dd>Nothing.</dd>

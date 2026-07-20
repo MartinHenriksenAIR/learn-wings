@@ -12,6 +12,34 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const user = await authenticate(req);
     const { orgId } = await req.json() as { orgId: string };
 
+    // All-orgs aggregate (Global Analytics "All Organizations", #159). The 'all'
+    // sentinel is UUID-safe, so it can never collide with a real org id. This
+    // cross-org view is platform-admin-only — org admins stay isolated to their org.
+    if (orgId === 'all') {
+      const admin = await queryOne<{ is_admin: boolean }>(
+        `SELECT EXISTS(SELECT 1 FROM profiles WHERE entra_oid = $1 AND is_platform_admin = TRUE) AS is_admin`,
+        [user.id]
+      );
+      if (!admin?.is_admin) return corsResponse(origin, 403, { error: 'Forbidden' });
+
+      const [members, enrollments, quizAttempts] = await Promise.all([
+        // DISTINCT ON (p.id): one row per user even if they belong to several orgs,
+        // so totalUsers counts distinct people and the Team table has unique row keys.
+        // department lives on profiles (not org_memberships), so it's per-user and
+        // deterministic under DISTINCT ON (p.id) — cf. generate-compliance-report.
+        query(
+          `SELECT DISTINCT ON (p.id) om.user_id, p.full_name, p.email, p.department
+             FROM org_memberships om JOIN profiles p ON p.id = om.user_id
+            WHERE om.status = 'active'
+            ORDER BY p.id`
+        ),
+        query('SELECT * FROM enrollments'),
+        query('SELECT * FROM quiz_attempts'),
+      ]);
+
+      return corsResponse(origin, 200, { members, enrollments, quizAttempts, org: null });
+    }
+
     // Auth check: platform admin OR org admin for this org
     // Join through profiles so we match on entra_oid, not profiles.id
     const authCheck = await queryOne<{ can_access: boolean }>(

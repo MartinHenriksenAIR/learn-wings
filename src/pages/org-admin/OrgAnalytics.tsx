@@ -81,14 +81,14 @@ export default function OrgAnalytics() {
     }
   }, [orgsError]);
 
-  // Determine which org ID to use for queries
-  const effectiveOrgId = isGlobalView
-    ? (selectedOrgId === 'all' ? null : selectedOrgId)
-    : currentOrg?.id;
+  // Determine which org ID to use for queries. In global view selectedOrgId is either the
+  // 'all' sentinel or a concrete org id — both truthy, so the analytics queries stay enabled
+  // and every tab renders. 'all' flows through to the backend, which returns the platform-admin
+  // cross-org aggregate (#159); previously this collapsed to null and showed an empty view.
+  const effectiveOrgId = isGlobalView ? selectedOrgId : currentOrg?.id;
 
-  // Fetch org analytics data via shared query hook. Disabled when no org is selected
-  // (effectiveOrgId null) — disabled query → isLoading false, matching the old
-  // "global all" path that skipped the fetch and showed empty stats immediately.
+  // Fetch org analytics data via shared query hook. Enabled for both a concrete org and the
+  // 'all' aggregate; only disabled in org view before currentOrg resolves.
   const analyticsQuery = useOrgAnalyticsData(effectiveOrgId ?? undefined);
 
   // Derive stats from query data — byte-for-byte reduction from the old fetchData
@@ -151,7 +151,8 @@ export default function OrgAnalytics() {
 
   // Generate compliance report
   const handleGenerateReport = async () => {
-    if (!effectiveOrgId) {
+    // The compliance report is per-org — not offered for the 'all' aggregate.
+    if (!effectiveOrgId || effectiveOrgId === 'all') {
       toast.error('Please select an organization');
       return;
     }

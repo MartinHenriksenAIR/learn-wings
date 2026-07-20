@@ -113,4 +113,36 @@ describe('org-course-progress', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
+
+  // ── All-orgs aggregate (orgId 'all') — platform admins only ──────────────
+  describe('all-orgs aggregate (orgId "all")', () => {
+    it('returns 403 for a non-platform-admin (org admins stay isolated)', async () => {
+      mockIsOrgAdmin.mockResolvedValue(true); // even a genuine org admin must not get cross-org data
+
+      const res = await handler(baseReq({ orgId: 'all' }), {} as any);
+
+      expect(res.status).toBe(403);
+      expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('aggregates distinct-user counts across all orgs for a platform admin', async () => {
+      mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+      const rows = [{ id: 'c1', title: 'A', level: 'basic', enrolled: 7, completed: 3 }];
+      mockQuery.mockResolvedValueOnce(rows);
+
+      const res = await handler(baseReq({ orgId: 'all' }), {} as any);
+
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body as string).courses).toEqual(rows);
+      expect(mockIsOrgAdmin).not.toHaveBeenCalled();
+
+      const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+      // counts must be distinct users, not enrollment rows, once summed across orgs
+      expect(sql).toContain('COUNT(DISTINCT e.user_id)');
+      // no org bind param — the aggregate spans every org
+      expect(sql).not.toContain('$1');
+      expect(params ?? []).toEqual([]);
+    });
+  });
 });
