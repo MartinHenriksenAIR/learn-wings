@@ -44,9 +44,9 @@ function MiniBar({ pct }: { pct: number }) {
 
 /**
  * Visual-first analytics overview: a row of stat cards (icon chips, ProgressRings
- * for completion / quiz score, mini bars under the engagement metrics) with a
- * hover-reveal extra info line, plus activity / learning summary cards and the
- * AI Act compliance report card. Uses only data the page already computes.
+ * for completion / quiz score, mini bars under the engagement metrics), plus
+ * activity / learning summary cards and the AI Act compliance report card.
+ * Uses only data the page already computes.
  */
 export function AnalyticsOverview({
   stats,
@@ -69,7 +69,6 @@ export function AnalyticsOverview({
     visual: ReactNode;
     value: ReactNode;
     label: string;
-    extra: string;
   }> = [
     {
       key: 'total',
@@ -80,7 +79,6 @@ export function AnalyticsOverview({
       ),
       value: stats.totalUsers,
       label: allOrgsView ? t('analytics.totalUsers') : t('analytics.totalMembers'),
-      extra: t('analytics.totalMembersExtra'),
     },
     {
       key: 'active7',
@@ -94,7 +92,6 @@ export function AnalyticsOverview({
       ),
       value: stats.activeUsers7Days,
       label: t('analytics.active7Days'),
-      extra: t('analytics.engagementThisWeek', { pct: active7Pct }),
     },
     {
       key: 'active30',
@@ -108,7 +105,6 @@ export function AnalyticsOverview({
       ),
       value: stats.activeUsers30Days,
       label: t('analytics.active30Days'),
-      extra: t('analytics.engagementThisMonth', { pct: active30Pct }),
     },
     {
       key: 'completion',
@@ -124,7 +120,6 @@ export function AnalyticsOverview({
       ),
       value: `${stats.completionRate}%`,
       label: t('analytics.completionRate'),
-      extra: t('analytics.quizExtra'),
     },
     {
       key: 'quiz',
@@ -140,7 +135,6 @@ export function AnalyticsOverview({
       ),
       value: `${stats.avgQuizScore}%`,
       label: t('analytics.avgQuizScore'),
-      extra: t('analytics.quizExtra'),
     },
   ];
 
@@ -151,17 +145,11 @@ export function AnalyticsOverview({
         {cards.map((card) => (
           <div
             key={card.key}
-            className="group rounded-2xl border border-border bg-card px-[18px] py-4 transition-[transform,box-shadow] duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_30px_rgba(20,24,46,0.10)]"
+            className="rounded-2xl border border-border bg-card px-[18px] py-4"
           >
             <div className="mb-3 flex min-h-[46px] items-center">{card.visual}</div>
             <span className="block text-[21px] font-extrabold tracking-[-0.02em]">{card.value}</span>
             <span className="mt-px block text-xs font-medium text-muted-foreground">{card.label}</span>
-            {/* Revealed on hover AND on focus (group-focus-within reaches any
-                focusable child), mirroring the StatCard primitive so keyboard
-                and touch users can reach the panel too. */}
-            <div className="max-h-0 overflow-hidden text-[11.5px] leading-snug text-muted-foreground opacity-0 transition-[max-height,opacity,margin-top] duration-[280ms] ease-out group-hover:mt-[11px] group-hover:max-h-[84px] group-hover:opacity-100 group-focus-within:mt-[11px] group-focus-within:max-h-[84px] group-focus-within:opacity-100">
-              {card.extra}
-            </div>
           </div>
         ))}
       </div>

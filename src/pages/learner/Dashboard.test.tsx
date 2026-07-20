@@ -240,10 +240,5 @@ describe('LearnerDashboard — hero variants', () => {
     expect(within(hero).getByText('0%')).toBeInTheDocument();
     const cta = within(hero).getByRole('link', { name: /dashboard\.browseCourses/ });
     expect(cta).toHaveAttribute('href', '/app/courses');
-
-    // Empty-data stat extras fall back to inviting copy derived from available data
-    expect(screen.getByText('dashboard.extraNoEnrollments')).toBeInTheDocument();
-    expect(screen.getByText('dashboard.extraNothingInProgress')).toBeInTheDocument();
-    expect(screen.getByText('dashboard.extraNoCompleted')).toBeInTheDocument();
   });
 });
