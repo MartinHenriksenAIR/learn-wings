@@ -66,8 +66,9 @@ export function RequestSeatsDialog({ orgId, open, onOpenChange }: RequestSeatsDi
                 type="number"
                 min={1}
                 max={1000}
+                step={1}
                 value={seats}
-                onChange={(e) => setSeats(Math.max(1, Math.min(1000, Number(e.target.value) || 1)))}
+                onChange={(e) => setSeats(Math.max(1, Math.min(1000, Math.round(Number(e.target.value) || 1))))}
               />
             </div>
             <p className="text-sm font-medium">
@@ -79,7 +80,7 @@ export function RequestSeatsDialog({ orgId, open, onOpenChange }: RequestSeatsDi
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t('seatRequests.cancel')}
+            {t('common.cancel')}
           </Button>
           <Button onClick={() => mutation.mutate()} disabled={!priceConfigured || mutation.isPending}>
             {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
