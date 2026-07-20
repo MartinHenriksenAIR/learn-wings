@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
 import { getInitials } from '@/lib/utils';
+import { routes } from '@/lib/routes';
 import logoLightDa from '@/assets/logo-light.png';
 import logoLightEn from '@/assets/logo-light-en.png';
 
@@ -96,21 +97,21 @@ export function AppSidebar() {
   // Build org admin items based on feature toggles
   const orgAdminItems = [
 
-    ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: '/app/admin/analytics', icon: BarChart3 }] : []),
+    ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: routes.orgAdmin.root, icon: BarChart3 }] : []),
     ...(features.community_enabled ? [
-      { title: t('nav.ideasOverview'), url: '/app/admin/org/ideas', icon: Lightbulb },
-      { title: t('nav.moderation'), url: '/app/admin/org/moderation', icon: Flag },
+      { title: t('nav.ideasOverview'), url: routes.orgAdmin.ideas, icon: Lightbulb },
+      { title: t('nav.moderation'), url: routes.orgAdmin.moderation, icon: Flag },
     ] : []),
-    { title: t('nav.settings'), url: '/app/admin/org/settings', icon: SettingsIcon },
+    { title: t('nav.settings'), url: routes.orgAdmin.settings, icon: SettingsIcon },
   ];
 
   // Build platform admin items based on feature toggles
   const platformAdminItems = [
-    { title: t('nav.organizations'), url: '/app/admin/organizations', icon: Building2 },
-    { title: t('nav.courseManager'), url: '/app/admin/courses', icon: GraduationCap },
-    ...(features.analytics_enabled ? [{ title: t('nav.globalAnalytics'), url: '/app/admin/analytics/global', icon: BarChart3 }] : []),
-    ...(features.community_enabled ? [{ title: t('nav.communityModeration'), url: '/app/admin/platform/moderation', icon: Flag }] : []),
-    { title: t('nav.platformSettings'), url: '/app/admin/platform/settings', icon: SettingsIcon },
+    { title: t('nav.organizations'), url: routes.platformAdmin.organizations, icon: Building2 },
+    { title: t('nav.courseManager'), url: routes.platformAdmin.courses, icon: GraduationCap },
+    ...(features.analytics_enabled ? [{ title: t('nav.globalAnalytics'), url: routes.platformAdmin.analytics, icon: BarChart3 }] : []),
+    ...(features.community_enabled ? [{ title: t('nav.communityModeration'), url: routes.platformAdmin.moderation, icon: Flag }] : []),
+    { title: t('nav.platformSettings'), url: routes.platformAdmin.settings, icon: SettingsIcon },
   ];
 
   const initials = getInitials(profile?.full_name);

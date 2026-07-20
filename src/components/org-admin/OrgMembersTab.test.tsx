@@ -14,15 +14,34 @@ vi.mock('@/components/ui/sonner', () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
-// --- mock api-client so no network fires ---
-vi.mock('@/lib/api-client', () => ({
-  callApi: vi.fn(),
-}));
+// --- mock api-client so no network fires (ApiError mirrors the real class so
+// --- `instanceof ApiError` checks in the component resolve) ---
+vi.mock('@/lib/api-client', () => {
+  class MockApiError extends Error {
+    status: number;
+    code?: string;
+    constructor(message: string, status: number, code?: string) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.code = code;
+    }
+  }
+  return { callApi: vi.fn(), ApiError: MockApiError };
+});
 
 // --- useAuth mock factory ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
+}));
+
+// --- useOrgDetail mock factory — the component reads server-wide seat
+// --- aggregates (member_count / pending_invite_count) from this hook rather
+// --- than fetching '/api/organizations' itself (#126) ---
+const mockUseOrgDetail = vi.fn();
+vi.mock('@/hooks/useOrgDetail', () => ({
+  useOrgDetail: (...args: unknown[]) => mockUseOrgDetail(...args),
 }));
 
 // --- keep the heavy child dialogs out of this focused test ---
@@ -93,6 +112,9 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
       profile: { id: 'admin-1', full_name: 'Org Admin', is_platform_admin: false },
       currentOrg: { id: 'org-1', name: 'Acme' },
     });
+    // No org-detail aggregates yet loaded — seatUsage falls back to the
+    // locally-fetched members/invitations lists (unrelated to this test).
+    mockUseOrgDetail.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
   });
 
   it('second click while in-flight does not fire a second API call; guard clears in finally', async () => {
@@ -173,6 +195,7 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
       profile: { id: 'admin-1', full_name: 'Org Admin', is_platform_admin: false },
       currentOrg: { id: 'org-1', name: 'Acme' },
     });
+    mockUseOrgDetail.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText },
@@ -224,5 +247,68 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
       expect(screen.queryByText('pending@example.com')).toBeNull(),
     );
     expect(mockToast).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrgMembersTab — seat usage uses the org-wide server aggregate (#126)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      user: { id: 'oid-1' },
+      profile: { id: 'admin-1', full_name: 'Org Admin', is_platform_admin: false },
+      currentOrg: { id: 'org-1', name: 'Acme' },
+    });
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/org-memberships') return { memberships: [membershipRow] };
+      // This admin has created NO invitations of their own — the caller-scoped
+      // list is empty, which is exactly the undercounting bug being fixed.
+      if (path === '/api/invitations') return { invitations: [] };
+      if (path === '/api/ai-champions') return { champions: [] };
+      throw new Error(`Unexpected callApi path: ${path}`);
+    });
+  });
+
+  it('disables invite and shows the limit-reached note from orgDetail.pending_invite_count, even though this admin\'s own invitation list is empty', async () => {
+    // A co-admin (invisible to this caller's /api/invitations scope) has 1
+    // pending invite outstanding. The server-wide aggregate reports it; the
+    // caller-scoped `invitations` list (mocked empty above) does not.
+    mockUseOrgDetail.mockReturnValue({
+      data: {
+        id: 'org-1',
+        name: 'Acme',
+        seat_limit: 2,
+        member_count: 1,
+        pending_invite_count: 1,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderTab();
+
+    const inviteTrigger = await screen.findByRole('button', { name: 'analytics.members.inviteMember' });
+    fireEvent.click(inviteTrigger);
+
+    // 1 active member + 1 org-wide pending invite === seat_limit (2): at cap.
+    // If the component still summed the caller-scoped `invitations` array
+    // (length 0) this would read 1/2 used and NOT be at the limit.
+    await screen.findByText('seats.limitReached');
+    expect(screen.getByRole('button', { name: 'Create Invitation' })).toBeDisabled();
+  });
+
+  it('does not show limit-reached while orgDetail is still loading (falls back to local counts)', async () => {
+    mockUseOrgDetail.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null });
+
+    renderTab();
+
+    const inviteTrigger = await screen.findByRole('button', { name: 'analytics.members.inviteMember' });
+    fireEvent.click(inviteTrigger);
+
+    // Fallback: 1 active member + 0 caller-scoped invitations, no seat_limit
+    // known yet (currentOrg has none in this test) — unlimited, so no cap note.
+    await screen.findByRole('button', { name: 'Create Invitation' });
+    expect(screen.queryByText('seats.limitReached')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Create Invitation' })).not.toBeDisabled();
   });
 });

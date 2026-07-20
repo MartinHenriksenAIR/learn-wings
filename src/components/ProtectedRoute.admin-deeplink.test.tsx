@@ -53,11 +53,11 @@ function setMsal({ account, inProgress }: { account: typeof mockAccount | null; 
 
 function AdminApp({ guard }: { guard: { requirePlatformAdmin?: boolean; requireOrgAdmin?: boolean } }) {
   return (
-    <MemoryRouter initialEntries={['/app/admin/organizations/org-1']}>
+    <MemoryRouter initialEntries={['/app/admin/platform/organizations/org-1']}>
       <AuthProvider>
         <Routes>
           <Route
-            path="/app/admin/organizations/:orgId"
+            path="/app/admin/platform/organizations/:orgId"
             element={<ProtectedRoute {...guard}><div>ORG DETAIL</div></ProtectedRoute>}
           />
           <Route path="/app/dashboard" element={<div>DASHBOARD</div>} />

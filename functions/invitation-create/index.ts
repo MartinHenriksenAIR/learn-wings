@@ -1,5 +1,6 @@
-import { queryOne, isUniqueViolation } from '../shared/db';
+import { isUniqueViolation, withTransaction } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
+import { isAtSeatLimit, lockSeatUsage } from '../shared/seats';
 
 const ALLOWED_ROLES = new Set(['org_admin', 'learner']);
 // Basic email regex — matches the BulkInviteDialog row validation.
@@ -64,17 +65,29 @@ export default endpoint('invitation-create', async ({ req, profile, reply, requi
   // Normalize email casing (matches BulkInviteDialog row normalization).
   const normalizedEmail = email.toLowerCase().trim();
 
+  // Seat-limit enforcement (issue #126): counts ACTIVE members + PENDING invitations,
+  // since both consume a seat. The seat-usage lookup and the INSERT run in ONE
+  // transaction with `FOR UPDATE` on the organization row so concurrent creates
+  // cannot race past the cap (see functions/shared/seats.ts).
   try {
-    // `token`, `token_hash`, `status`, `expires_at`, `link_id`,
-    // `is_platform_admin_invite` all have DB defaults — let the DB populate them.
-    const invitation = await queryOne(
-      `INSERT INTO invitations (org_id, email, role, invited_by_user_id, first_name, last_name, department)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, org_id, email, role, status, expires_at, created_at, link_id,
-                 is_platform_admin_invite, invited_by_user_id, first_name, last_name, department`,
-      [orgId, normalizedEmail, role, profile.id, fnVal, lnVal, deptVal],
-    );
-    return reply(200, { invitation });
+    const result = await withTransaction(async (client) => {
+      const usage = await lockSeatUsage(client, orgId);
+      if (!usage.exists) return { kind: 'not_found' as const };
+      if (isAtSeatLimit(usage)) return { kind: 'seat_limit' as const };
+      // `token`, `token_hash`, `status`, `expires_at`, `link_id`,
+      // `is_platform_admin_invite` all have DB defaults — let the DB populate them.
+      const insertRes = await client.query(
+        `INSERT INTO invitations (org_id, email, role, invited_by_user_id, first_name, last_name, department)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, org_id, email, role, status, expires_at, created_at, link_id,
+                   is_platform_admin_invite, invited_by_user_id, first_name, last_name, department`,
+        [orgId, normalizedEmail, role, profile.id, fnVal, lnVal, deptVal],
+      );
+      return { kind: 'created' as const, invitation: insertRes.rows[0] };
+    });
+    if (result.kind === 'not_found') return reply(404, { error: 'Organization not found' });
+    if (result.kind === 'seat_limit') return reply(409, { error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' });
+    return reply(200, { invitation: result.invitation });
   } catch (dbErr: unknown) {
     if (isUniqueViolation(dbErr)) {
       return reply(409, { error: 'An invitation for this email is already pending' });
