@@ -1090,3 +1090,17 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **#168 — Resource Library tag color vs "Open resource" button.** `TagList` chips used `bg-accent` — the same navy tint as the "Open resource" button — so tags read as the same element. Switched to `bg-muted` / `text-muted-foreground` (neutral gray token). `--accent` and `--secondary` are the *same* colour in the light theme and dark mode isn't wired up, so `--muted` is the correct distinct token; the change is in the shared component, so tags stay consistent across resources/posts/ideas.
 
 **Verify.** Root `npm run lint` 0 errors · `npm test` **352 pass** (63 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. Purely presentational (class removal + one token swap); visual confirmation deferred to the PR preview env (dashboards are Entra-gated, not drivable locally). Merged via PR #185 → `main`; SWA frontend deploy auto-fires (no functions changed).
+
+---
+
+## 2026-07-20 — #119 Danish default language + browser matching (PR #186)
+
+**Who:** martin & Claude. Branch `feat/danish-default-language-119`, PR #186. Frontend-only. Scoped with martin ("do it now vs wait"): recon showed **most of #119 was already built** — i18next + `LanguageDetector` already browser-match en/da, `en`/`da` are at full 828-key parity, and a language switcher already exists (Settings + sidebar). The only gap was the default: an unrecognized browser language (or no detection signal) fell back to English.
+
+**What shipped.** `src/i18n/index.ts` — `fallbackLng: 'en'` → `['da', 'en']`. The first entry is the language i18next renders when the detected browser language is neither en nor da → **Danish default**; `en` stays in the chain as a secondary fallback for any key ever missing in da. LanguageDetector (`navigator` in the detection order) and the switcher are unchanged, so en browsers still get English and users can still override. `src/pages/Settings.tsx` — language selector's value fallback `'en'` → `'da'` (defensive; only hit if both `profile.preferred_language` and `i18n.language` are unset). New `src/i18n/index.test.ts` guards Danish-first ordering, en retained in the chain, and navigator matching intact.
+
+**Test landscape.** Most tests mock `react-i18next` (t returns the key) so are unaffected by the fallback change; the few that import the real `@/i18n` (CourseEditor, CoursesManager, OrganizationsManager) rely on jsdom's `navigator` resolving to en (en-US → en), so rendered language doesn't shift — confirmed by the full suite passing green.
+
+**Follow-up filed → #187.** The Danish default applies to **UI chrome** (locale JSON) only; authored *content* (course material #123, AI Act PDF #71, webinar page #125) isn't locale-driven, so a Danish-default user still sees content in whatever language it was authored in. Tracked separately in #187 with a dependency list (stems from #119; related content surfaces #123/#71/#125).
+
+**Verify.** Root `npm run lint` 0 errors · `npm test` **355 pass** (64 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. CI green (3/3). Merged via PR #186 → `main`; SWA frontend deploy auto-fires (no functions changed). #119 closed.

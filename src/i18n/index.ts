@@ -13,7 +13,11 @@ i18n
       en: { translation: en },
       da: { translation: da },
     },
-    fallbackLng: 'en',
+    // Danish is the default (issue #119): the first entry is the language used
+    // when the browser's language is neither en nor da. LanguageDetector still
+    // browser-matches en/da below; 'en' stays in the chain as a secondary
+    // fallback for any key ever missing in da.
+    fallbackLng: ['da', 'en'],
     supportedLngs: ['en', 'da'],
     interpolation: {
       escapeValue: false,
