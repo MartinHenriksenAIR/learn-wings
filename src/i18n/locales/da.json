@@ -62,6 +62,8 @@
     "title": "Indstillinger",
     "profile": "Profil",
     "updateProfile": "Opdater dine personlige oplysninger.",
+    "profilePhoto": "Profilbillede",
+    "profilePhotoHint": "Kvadratisk billede anbefales. PNG eller JPG, maks. 2 MB.",
     "firstName": "Fornavn",
     "lastName": "Efternavn",
     "department": "Afdeling",
@@ -76,6 +78,7 @@
     "languageUpdated": "Sprog opdateret",
     "languageUpdateFailed": "Kunne ikke opdatere sprog",
     "profileUpdateFailed": "Kunne ikke opdatere profil",
+    "photoUpdateFailed": "Kunne ikke opdatere profilbillede",
     "emailCannotBeChanged": "E-mail kan ikke ændres."
   },
   "languages": {

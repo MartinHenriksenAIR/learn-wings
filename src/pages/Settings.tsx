@@ -21,6 +21,9 @@ import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
 import { getInitials } from '@/lib/utils';
+import { FileUpload } from '@/components/ui/file-upload';
+import { buildPublicUrl } from '@/lib/storage-url';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required').max(50, 'First name is too long'),
@@ -42,6 +45,9 @@ export default function Settings() {
 
   // Language state
   const [languageSaving, setLanguageSaving] = useState(false);
+
+  // Profile-photo state
+  const [avatarSaving, setAvatarSaving] = useState(false);
 
   // Sync profile fields when profile loads
   useEffect(() => {
@@ -80,6 +86,26 @@ export default function Settings() {
       });
     } finally {
       setLanguageSaving(false);
+    }
+  };
+
+  const handleAvatarChange = async (_url: string | null, storagePath: string | null) => {
+    if (!profile) return;
+
+    setAvatarSaving(true);
+    try {
+      // Persist the raw container-relative blob path; an empty string clears the
+      // photo. Display composes the public URL via buildPublicUrl.
+      await callApi('/api/profile-update', { avatar_url: storagePath ?? '' });
+      await refreshUserContext();
+    } catch (error) {
+      toast({
+        title: t('settings.photoUpdateFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setAvatarSaving(false);
     }
   };
 
@@ -158,16 +184,33 @@ export default function Settings() {
         <Card className="mb-4">
           <CardContent className="space-y-3.5 px-[26px] py-6">
             <div className="mb-1 flex items-center gap-3.5">
-              <span
-                aria-hidden="true"
-                className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-accent text-[17px] font-extrabold text-accent-foreground"
-              >
-                {getInitials(displayName)}
-              </span>
+              <Avatar className="h-[52px] w-[52px] shrink-0 rounded-2xl">
+                {profile?.avatar_url && (
+                  <AvatarImage src={buildPublicUrl(profile.avatar_url)} alt="" className="object-cover" />
+                )}
+                <AvatarFallback
+                  aria-hidden="true"
+                  className="rounded-2xl bg-accent text-[17px] font-extrabold text-accent-foreground"
+                >
+                  {getInitials(displayName)}
+                </AvatarFallback>
+              </Avatar>
               <div className="min-w-0">
                 <h3 className="text-[15px] font-extrabold">{t('settings.profile')}</h3>
                 <p className="truncate text-[12.5px] text-muted-foreground">{t('settings.updateProfile')}</p>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-[#4a4f60]">{t('settings.profilePhoto')}</Label>
+              <FileUpload
+                assetType="avatar"
+                accept="image"
+                onChange={handleAvatarChange}
+                maxSizeMB={2}
+                disabled={avatarSaving}
+              />
+              <p className="text-[11.5px] text-muted-foreground">{t('settings.profilePhotoHint')}</p>
             </div>
 
             <div className="space-y-1.5">

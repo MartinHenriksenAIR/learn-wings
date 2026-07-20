@@ -6,13 +6,14 @@ interface ProfileUpdateBody {
   last_name?: unknown;
   department?: unknown;
   preferred_language?: unknown;
+  avatar_url?: unknown;
 }
 
 export default endpoint('profile-update', async ({ req, profile, reply }) => {
   const body = await req.json() as ProfileUpdateBody;
 
   // Validate types — all provided values must be strings
-  for (const key of ['first_name', 'last_name', 'department', 'preferred_language'] as const) {
+  for (const key of ['first_name', 'last_name', 'department', 'preferred_language', 'avatar_url'] as const) {
     if (body[key] !== undefined && typeof body[key] !== 'string') {
       return reply(400, { error: `${key} must be a string` });
     }
@@ -23,6 +24,7 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
   const lastName   = body.last_name   !== undefined ? (body.last_name   as string).trim() : undefined;
   const department = body.department  !== undefined ? (body.department  as string).trim() : undefined;
   const prefLang   = body.preferred_language !== undefined ? (body.preferred_language as string).trim() : undefined;
+  const avatarUrl  = body.avatar_url  !== undefined ? (body.avatar_url  as string).trim() : undefined;
 
   // last_name without first_name: reject (full_name derivation requires first_name)
   if (lastName !== undefined && firstName === undefined) {
@@ -54,6 +56,11 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
     return reply(400, { error: "preferred_language must be 'en' or 'da'" });
   }
 
+  // Validate avatar_url max 255 chars (empty string is allowed → stored as NULL to clear the photo)
+  if (avatarUrl !== undefined && avatarUrl.length > 255) {
+    return reply(400, { error: 'avatar_url must be 255 characters or fewer' });
+  }
+
   // Build dynamic parameterized SET clause
   const setClauses: string[] = [];
   const params: unknown[] = [];
@@ -81,6 +88,14 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
   if (prefLang !== undefined) {
     params.push(prefLang);
     setClauses.push(`preferred_language = $${params.length}`);
+  }
+
+  if (avatarUrl !== undefined) {
+    // Empty string clears the photo (stored as NULL); otherwise store the raw
+    // container-relative blob path verbatim (display composes the URL).
+    const avatarStored = avatarUrl.length > 0 ? avatarUrl : null;
+    params.push(avatarStored);
+    setClauses.push(`avatar_url = $${params.length}`);
   }
 
   if (setClauses.length === 0) {
