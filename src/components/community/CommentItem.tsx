@@ -52,6 +52,17 @@ export function CommentItem({
   const canEdit = isAuthor && !comment.is_hidden;
   const canDelete = isAuthor || isAdmin;
 
+  // Only show the "⋯" menu when at least one action is actually available —
+  // otherwise (e.g. the read-only moderation viewer, #160) it opens empty.
+  const hasActions = Boolean(
+    onReply ||
+      (canEdit && onEdit) ||
+      (onReport && !isAuthor) ||
+      onCopyLink ||
+      (isAdmin && onToggleHide) ||
+      (canDelete && onDelete),
+  );
+
   const handleSaveEdit = () => {
     if (editContent.trim() && onEdit) {
       onEdit(comment.id, editContent.trim());
@@ -90,6 +101,7 @@ export function CommentItem({
               </span>
             )}
           </div>
+          {hasActions && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-7 w-7 rounded-lg p-0 text-[#9aa0af]">
@@ -142,6 +154,7 @@ export function CommentItem({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
         </div>
 
         {isEditing ? (
