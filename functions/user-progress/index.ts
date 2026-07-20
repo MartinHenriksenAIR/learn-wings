@@ -25,7 +25,7 @@ interface LessonOut {
 }
 interface ModuleOut { id: string; title: string; sortOrder: number; lessons: LessonOut[] }
 
-export default endpoint('user-progress', async ({ req, profile, reply, requireOrgAdmin }) => {
+export default endpoint('user-progress', async ({ req, profile, reply, requireOrgAdmin, requirePlatformAdmin }) => {
   const body = await req.json() as { orgId?: unknown; userId?: unknown };
   const { orgId, userId } = body;
 
@@ -36,12 +36,19 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
     return reply(400, { error: 'userId is required' });
   }
 
+  // All-orgs aggregate (Global Analytics "All Organizations", #159): the user's progress
+  // across EVERY org, platform-admin-only (org admins stay isolated). The 'all' sentinel is
+  // UUID-safe. Being platform-admin, the visibility filter is empty here too, so this simply
+  // drops the org scope from every query and dedups enrollments by course.
+  const allOrgs = orgId === 'all';
+
   // Authorization: platform admin OR org admin of the target org.
   // RLS provenance: supabase/migrations/20260127153401_*.sql:412-449 —
   // "Org admins can view enrollments/progress/attempts in their org" (is_org_admin(org_id))
   // + platform-admin-ALL policies. Self-access deliberately omitted (admin dialog only;
   // learner-side reads live in Slice 1 endpoints).
-  await requireOrgAdmin(orgId);
+  if (allOrgs) requirePlatformAdmin();
+  else await requireOrgAdmin(orgId);
 
   // 1. Enrollments + course metadata. Non-platform-admins see only published, org-accessible
   //    courses (the old PostgREST embed nulled RLS-hidden courses and the dialog skipped them).
@@ -50,17 +57,32 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
   //    only — a multi-org admin viewing org A no longer sees a course visible solely via org B.
   //    Scoped-to-the-org-being-viewed is the intended semantics (documented in the PR/plan).
   //    ORDER BY c.title is a deliberate tightening (determinism).
+  //    All-orgs path: DISTINCT ON (course) collapses the same course reached via several orgs
+  //    to one card (unique React keys), preferring a completed enrollment.
   const visibilityFilter = profile.is_platform_admin
     ? ''
     : `AND ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}`;
-  const enrollments = await query<EnrollmentRow>(
-    `SELECT e.id, e.course_id, e.status, e.enrolled_at, e.completed_at, c.title, c.level
-       FROM enrollments e
-       JOIN courses c ON c.id = e.course_id
-      WHERE e.org_id = $1 AND e.user_id = $2 ${visibilityFilter}
-      ORDER BY c.title`,
-    [orgId, userId],
-  );
+  const enrollments = allOrgs
+    ? await query<EnrollmentRow>(
+        `SELECT id, course_id, status, enrolled_at, completed_at, title, level FROM (
+           SELECT DISTINCT ON (e.course_id) e.id, e.course_id, e.status, e.enrolled_at,
+                  e.completed_at, c.title, c.level
+             FROM enrollments e
+             JOIN courses c ON c.id = e.course_id
+            WHERE e.user_id = $1
+            ORDER BY e.course_id, (e.status = 'completed') DESC, e.enrolled_at ASC
+         ) sub
+        ORDER BY title`,
+        [userId],
+      )
+    : await query<EnrollmentRow>(
+        `SELECT e.id, e.course_id, e.status, e.enrolled_at, e.completed_at, c.title, c.level
+           FROM enrollments e
+           JOIN courses c ON c.id = e.course_id
+          WHERE e.org_id = $1 AND e.user_id = $2 ${visibilityFilter}
+          ORDER BY c.title`,
+        [orgId, userId],
+      );
   if (enrollments.length === 0) {
     return reply(200, { courses: [] });
   }
@@ -71,19 +93,35 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
   const [progressRows, attemptRows, structureRows] = await Promise.all([
     // 2. The user's lesson progress in this org. Parity: the old client fetched ALL of the
     //    user's progress in the org (not just enrolled courses) — filtered during assembly.
-    query<ProgressRow>(
-      `SELECT lesson_id, status, completed_at FROM lesson_progress
-        WHERE org_id = $1 AND user_id = $2`,
-      [orgId, userId],
-    ),
+    //    All-orgs: span every org; ORDER BY completed-last so a lesson completed in ANY org
+    //    wins when the progressMap dedups by lesson_id.
+    allOrgs
+      ? query<ProgressRow>(
+          `SELECT lesson_id, status, completed_at FROM lesson_progress
+            WHERE user_id = $1
+            ORDER BY (status = 'completed')`,
+          [userId],
+        )
+      : query<ProgressRow>(
+          `SELECT lesson_id, status, completed_at FROM lesson_progress
+            WHERE org_id = $1 AND user_id = $2`,
+          [orgId, userId],
+        ),
     // 3. The user's quiz attempts in this org, latest first (the dialog's ordering).
     //    Parity: fetches ALL attempts in the org, like the old client — filtered during assembly.
-    query<AttemptRow>(
-      `SELECT id, quiz_id, score, passed, started_at, finished_at
-         FROM quiz_attempts WHERE org_id = $1 AND user_id = $2
-        ORDER BY started_at DESC`,
-      [orgId, userId],
-    ),
+    allOrgs
+      ? query<AttemptRow>(
+          `SELECT id, quiz_id, score, passed, started_at, finished_at
+             FROM quiz_attempts WHERE user_id = $1
+            ORDER BY started_at DESC`,
+          [userId],
+        )
+      : query<AttemptRow>(
+          `SELECT id, quiz_id, score, passed, started_at, finished_at
+             FROM quiz_attempts WHERE org_id = $1 AND user_id = $2
+            ORDER BY started_at DESC`,
+          [orgId, userId],
+        ),
     // 4. Structure for the enrolled courses (modules already filtered transitively by step 1).
     query<StructureRow>(
       `SELECT cm.id AS module_id, cm.course_id, cm.title AS module_title,
