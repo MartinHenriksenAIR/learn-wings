@@ -22,7 +22,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
-import { buildReportContentLink } from '@/lib/community-report-link';
+import { canViewReportedContent } from '@/lib/community-report-link';
+import { ReportedContentDialog } from '@/components/community/ReportedContentDialog';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
 import { cn } from '@/lib/utils';
@@ -53,6 +54,8 @@ export default function PlatformCommunityModeration() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
+  // Report whose content is shown in the "View content" dialog (#160).
+  const [viewReport, setViewReport] = useState<ReportWithDetails | null>(null);
 
   // Fetch all reports across all scopes (no-filter mode = platform-admin only)
   const { data: reports = [], isLoading } = useQuery({
@@ -173,17 +176,6 @@ export default function PlatformCommunityModeration() {
     return { label: orgName, global: false };
   };
 
-  // null for orphaned comment reports (parent post id missing) — the View
-  // content button is disabled rather than opening a broken link (#86).
-  const getContentLink = (report: ReportWithDetails) =>
-    buildReportContentLink(report, report.org_id ? 'org' : 'global');
-
-  const openContentInNewTab = (report: ReportWithDetails) => {
-    const path = getContentLink(report);
-    if (!path) return;
-    window.open(path, '_blank', 'noopener,noreferrer');
-  };
-
   const breadcrumbs = [{ label: t('platformModeration.title') }];
 
   const tabs: { key: ReportStatus; label: string }[] = [
@@ -286,8 +278,8 @@ export default function PlatformCommunityModeration() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => openContentInNewTab(report)}
-                          disabled={!getContentLink(report)}
+                          onClick={() => setViewReport(report)}
+                          disabled={!canViewReportedContent(report)}
                         >
                           <Eye className="h-3.5 w-3.5" />
                           {t('moderation.viewContent')}
@@ -387,6 +379,13 @@ export default function PlatformCommunityModeration() {
           })}
         </div>
       )}
+
+      {/* Reported content viewer (#160) */}
+      <ReportedContentDialog
+        open={!!viewReport}
+        onOpenChange={(o) => { if (!o) setViewReport(null); }}
+        report={viewReport}
+      />
 
       {/* Review dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>

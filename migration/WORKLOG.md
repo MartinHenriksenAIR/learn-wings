@@ -1009,6 +1009,20 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 
 ---
 
+## 2026-07-20 — #160 Moderation "View content" opens a login page — fixed (PR #179)
+
+**Who:** martin & Claude. Branch `fix/moderation-view-content-160` (git worktree), PR #179. Frontend-only. Design settled up front via a grilling pass (dialog vs navigation; comment case = full thread + highlight; post case unified to also show the thread).
+
+**Root cause.** Community Moderation's "View content" did `window.open(path, '_blank', 'noopener,noreferrer')`. The new tab boots a fresh SPA instance with no MSAL session, so `ProtectedRoute` bounced it to `/login` instead of showing the reported content.
+
+**Fix.** New read-only `ReportedContentDialog` (shared by `PlatformCommunityModeration` + `OrgCommunityModeration`) renders the reported post (header + hidden/locked/scope badges + body) followed by the full comment thread; comment reports highlight and scroll to the reported comment. It reuses the existing `CommentThread` via a new **additive `readOnly` prop** (suppresses composer/reply/locked-banner/copy-link; `PostDetail` passes nothing and is unchanged) and fetches through **PostDetail's own query keys** (`communityPost.detail` / `communityComments.list`), so the cache is shared. No backend change: `community-post` already returns hidden posts to platform/org admins (`canSeeHidden`) and `community-comments` computes `includeHidden` server-side from the caller's admin status. `community-report-link.ts`'s URL builder was replaced by a `canViewReportedContent()` predicate that keeps the #86 orphaned-comment behavior (comment target with no `post_id` → button stays disabled).
+
+**Finding caught while driving (real browser).** In read-only mode `CommentItem` still rendered the "⋯" actions trigger, which opened an **empty** menu (every item is gated on a now-undefined callback). Added a `hasActions` gate so the trigger only shows when ≥1 action is available — also tidies any caller passing no actions. TDD'd (`CommentItem.test.tsx`).
+
+**Verify.** TDD throughout (red→green per unit). Drove the real dialog in Chromium via a throwaway Vite harness (post + comment cases, primed query cache, no auth needed) — reported comment highlights, no empty menus, 0 console errors; harness removed after. Merged current trunk (`origin/main`, incl. #126 seat-cap) into the branch — clean auto-merge (i18n `seats` + `moderation` keys in separate sections). Post-merge gates: root `npm run lint` 0 errors · `npm test` **349 pass** · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. i18n en+da added for the dialog strings. Merged via PR #179 → `main`; SWA frontend deploy auto-fires (no functions deploy — none changed).
+
+---
+
 ## 2026-07-20 — #126 Auth Rules: invite seat-cap (scope A) shipped (PR #177)
 
 **Who:** martin & Claude. Branch `feat/invite-seat-cap-126`, PR #177. Scope grilled with martin, then subagent-driven implementation (fresh implementer per task, per-task + final whole-branch review).
