@@ -67,6 +67,8 @@
     "title": "Settings",
     "profile": "Profile",
     "updateProfile": "Update your personal information.",
+    "profilePhoto": "Profile photo",
+    "profilePhotoHint": "Square image recommended. PNG or JPG, max 2MB.",
     "firstName": "First Name",
     "lastName": "Last Name",
     "department": "Department",
@@ -81,6 +83,7 @@
     "languageUpdated": "Language updated",
     "languageUpdateFailed": "Failed to update language",
     "profileUpdateFailed": "Failed to update profile",
+    "photoUpdateFailed": "Failed to update profile photo",
     "emailCannotBeChanged": "Email cannot be changed."
   },
   "languages": {

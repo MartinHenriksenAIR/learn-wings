@@ -10,7 +10,7 @@ vi.mock('./sas', () => ({
   buildBlobUrl: mockBuildBlobUrl,
 }));
 
-import { deleteBlob } from './blob';
+import { deleteBlob, resolveAssetContainer, PUBLIC_CONTAINER } from './blob';
 
 const BLOB_PATH = 'videos/lesson-1.mp4';
 const BLOB_URL = 'https://testaccount.blob.core.windows.net/lms-videos/blob?sp=d&sig=abc';
@@ -93,5 +93,38 @@ describe('deleteBlob', () => {
       'd',
       10,
     );
+  });
+});
+
+describe('resolveAssetContainer', () => {
+  afterEach(() => {
+    delete process.env.AZURE_STORAGE_CONTAINER_NAME;
+  });
+
+  it('exports PUBLIC_CONTAINER as email-assets', () => {
+    expect(PUBLIC_CONTAINER).toBe('email-assets');
+  });
+
+  it("routes 'org-logo' to the public container with an org-logos/ prefix", () => {
+    expect(resolveAssetContainer('org-logo')).toEqual({ container: 'email-assets', prefix: 'org-logos/' });
+  });
+
+  it("routes 'avatar' to the public container with an avatars/ prefix", () => {
+    expect(resolveAssetContainer('avatar')).toEqual({ container: 'email-assets', prefix: 'avatars/' });
+  });
+
+  it('falls back to the private default container for an unknown assetType (allow-list, not error)', () => {
+    process.env.AZURE_STORAGE_CONTAINER_NAME = 'lms-videos';
+    expect(resolveAssetContainer('bogus')).toEqual({ container: 'lms-videos', prefix: '' });
+  });
+
+  it('falls back to the private default container when assetType is absent', () => {
+    process.env.AZURE_STORAGE_CONTAINER_NAME = 'lms-videos';
+    expect(resolveAssetContainer(undefined)).toEqual({ container: 'lms-videos', prefix: '' });
+  });
+
+  it('falls back to lms-videos when AZURE_STORAGE_CONTAINER_NAME is unset', () => {
+    delete process.env.AZURE_STORAGE_CONTAINER_NAME;
+    expect(resolveAssetContainer()).toEqual({ container: 'lms-videos', prefix: '' });
   });
 });
