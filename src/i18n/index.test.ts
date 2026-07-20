@@ -20,4 +20,11 @@ describe('i18n default language (#119)', () => {
     expect(i18n.options.supportedLngs).toContain('en');
     expect(i18n.options.detection?.order).toContain('navigator');
   });
+
+  it('syncs <html lang> to the active language on change (#189)', async () => {
+    await i18n.changeLanguage('en');
+    expect(document.documentElement.lang).toBe('en');
+    await i18n.changeLanguage('da');
+    expect(document.documentElement.lang).toBe('da');
+  });
 });

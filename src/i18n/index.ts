@@ -29,4 +29,14 @@ i18n
     },
   });
 
+// Keep the document's lang attribute in sync with the language actually shown
+// (#189): screen readers and browser "translate page" read it. Use
+// resolvedLanguage, not the raw detected code — an unsupported browser language
+// renders the Danish fallback, so the document should declare 'da'.
+const syncDocumentLang = () => {
+  document.documentElement.lang = i18n.resolvedLanguage ?? 'da';
+};
+i18n.on('initialized', syncDocumentLang);
+i18n.on('languageChanged', syncDocumentLang);
+
 export default i18n;

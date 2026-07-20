@@ -1120,3 +1120,13 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Follow-up filed → #187.** The Danish default applies to **UI chrome** (locale JSON) only; authored *content* (course material #123, AI Act PDF #71, webinar page #125) isn't locale-driven, so a Danish-default user still sees content in whatever language it was authored in. Tracked separately in #187 with a dependency list (stems from #119; related content surfaces #123/#71/#125).
 
 **Verify.** Root `npm run lint` 0 errors · `npm test` **355 pass** (64 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. CI green (3/3). Merged via PR #186 → `main`; SWA frontend deploy auto-fires (no functions changed). #119 closed.
+
+---
+
+## 2026-07-20 — #189 sync `<html lang>` to the active UI language (PR #190)
+
+**Who:** martin & Claude. Branch `fix/html-lang-sync-i18n`, PR #190. Frontend-only. Follow-up to #119/#186, surfaced in the #186 code review: `index.html` statically declared `<html lang="da">` and never tracked the language actually shown, so an English-viewing (browser-matched) user got English UI on a Danish-declared document — a minor a11y / browser-translate mismatch (screen-reader pronunciation, "translate page" source-guess).
+
+**What shipped.** `src/i18n/index.ts` — added `initialized` + `languageChanged` listeners that set `document.documentElement.lang = i18n.resolvedLanguage ?? 'da'`. Uses `resolvedLanguage` (not the raw detected code) so an unsupported browser language, which renders the Danish fallback, correctly labels the document `da`. New test in `src/i18n/index.test.ts` asserts `<html lang>` follows a language switch (en↔da).
+
+**Verify.** Root `npm run lint` 0 errors · `npm test` **356 pass** (64 files, +1) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. Merged via PR #190 → `main`; SWA frontend deploy auto-fires (no functions changed). #189 closed.
