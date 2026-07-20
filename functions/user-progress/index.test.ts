@@ -228,4 +228,48 @@ describe('user-progress', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
+
+  // ── All-orgs aggregate (orgId 'all') — platform admins only ──────────────
+  describe('all-orgs aggregate (orgId "all")', () => {
+    it('returns 403 for a non-platform-admin (org admins stay isolated)', async () => {
+      mockIsOrgAdmin.mockResolvedValue(true);
+      const res = await handler(baseReq({ orgId: 'all', userId: 'p2' }), {} as any);
+      expect(res.status).toBe(403);
+      expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('still 400s when userId is missing', async () => {
+      mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+      const res = await handler(baseReq({ orgId: 'all' }), {} as any);
+      expect(res.status).toBe(400);
+      expect(JSON.parse(res.body as string)).toEqual({ error: 'userId is required' });
+    });
+
+    it('platform admin: aggregates the user across all orgs, deduped by course, no org/visibility filter', async () => {
+      mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+      mockHappyPath();
+      const res = await handler(baseReq({ orgId: 'all', userId: 'p2' }), {} as any);
+
+      expect(res.status).toBe(200);
+      const { courses } = JSON.parse(res.body as string);
+      expect(courses).toHaveLength(1);
+      expect(mockIsOrgAdmin).not.toHaveBeenCalled();
+
+      // enrollment query: one row per course across orgs, no org bind, no publish filter
+      const [enrSql, enrParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+      expect(enrSql).toContain('DISTINCT ON (e.course_id)');
+      expect(enrSql).not.toContain('is_published');
+      expect(enrSql).not.toContain('e.org_id');
+      expect(enrParams).toEqual(['p2']); // userId only — no orgId
+
+      // progress + attempts filter by user only (span every org)
+      const [progSql, progParams] = mockQuery.mock.calls[1] as [string, unknown[]];
+      expect(progSql).not.toContain('org_id');
+      expect(progParams).toEqual(['p2']);
+      const [attSql, attParams] = mockQuery.mock.calls[2] as [string, unknown[]];
+      expect(attSql).not.toContain('org_id');
+      expect(attParams).toEqual(['p2']);
+    });
+  });
 });

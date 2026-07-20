@@ -21,6 +21,7 @@ import { useOrgAnalyticsData } from '@/hooks/useOrgAnalyticsData';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi, callApiRaw } from '@/lib/api-client';
 import { buildPublicUrl } from '@/lib/storage-url';
+import { routes } from '@/lib/routes';
 import { Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
@@ -49,7 +50,7 @@ export default function OrgAnalytics() {
   const { t } = useTranslation();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isGlobalView = location.pathname === '/app/admin/analytics/global';
+  const isGlobalView = location.pathname === routes.platformAdmin.analytics;
   const { currentOrg, isPlatformAdmin, refreshUserContext } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
@@ -80,14 +81,14 @@ export default function OrgAnalytics() {
     }
   }, [orgsError]);
 
-  // Determine which org ID to use for queries
-  const effectiveOrgId = isGlobalView
-    ? (selectedOrgId === 'all' ? null : selectedOrgId)
-    : currentOrg?.id;
+  // Determine which org ID to use for queries. In global view selectedOrgId is either the
+  // 'all' sentinel or a concrete org id — both truthy, so the analytics queries stay enabled
+  // and every tab renders. 'all' flows through to the backend, which returns the platform-admin
+  // cross-org aggregate (#159); previously this collapsed to null and showed an empty view.
+  const effectiveOrgId = isGlobalView ? selectedOrgId : currentOrg?.id;
 
-  // Fetch org analytics data via shared query hook. Disabled when no org is selected
-  // (effectiveOrgId null) — disabled query → isLoading false, matching the old
-  // "global all" path that skipped the fetch and showed empty stats immediately.
+  // Fetch org analytics data via shared query hook. Enabled for both a concrete org and the
+  // 'all' aggregate; only disabled in org view before currentOrg resolves.
   const analyticsQuery = useOrgAnalyticsData(effectiveOrgId ?? undefined);
 
   // Derive stats from query data — byte-for-byte reduction from the old fetchData
@@ -150,7 +151,8 @@ export default function OrgAnalytics() {
 
   // Generate compliance report
   const handleGenerateReport = async () => {
-    if (!effectiveOrgId) {
+    // The compliance report is per-org — not offered for the 'all' aggregate.
+    if (!effectiveOrgId || effectiveOrgId === 'all') {
       toast.error('Please select an organization');
       return;
     }
@@ -206,9 +208,14 @@ export default function OrgAnalytics() {
     return <Navigate to="/app/dashboard" replace />;
   }
 
+  const pageTitle = isGlobalView ? t('nav.globalAnalytics') : t('nav.organization');
+  const breadcrumbs = isGlobalView
+    ? [{ label: t('nav.platformAdmin') }, { label: t('nav.globalAnalytics') }]
+    : [{ label: t('nav.organization') }];
+
   if (analyticsQuery.isLoading || settingsLoading) {
     return (
-      <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
+      <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
         <PageSpinner />
       </AppLayout>
     );
@@ -217,7 +224,7 @@ export default function OrgAnalytics() {
   // For org-specific view, require currentOrg
   if (!isGlobalView && !currentOrg) {
     return (
-      <AppLayout title="Analytics" breadcrumbs={[{ label: 'Analytics' }]}>
+      <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground">No organization selected.</p>
@@ -226,11 +233,6 @@ export default function OrgAnalytics() {
       </AppLayout>
     );
   }
-
-  const pageTitle = isGlobalView ? 'Global Analytics' : 'Organization';
-  const breadcrumbs = isGlobalView
-    ? [{ label: 'Platform Admin' }, { label: 'Global Analytics' }]
-    : [{ label: 'Organization' }];
 
   const subtitle = isGlobalView
     ? selectedOrgId === 'all'

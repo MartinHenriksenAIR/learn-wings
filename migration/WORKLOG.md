@@ -995,6 +995,17 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 
 **Verify.** Root `npm run lint` 0 errors · `npm test` **327 pass** (55 files, +2) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched (src-only diff); CI green on all three checks. Merged via PR #172 → `main` (#158 auto-closes via "Fixes #158"); SWA frontend deploy auto-fires (no functions deploy — none changed).
 
+---
+
+## 2026-07-20 — #120 URL paths reflect the current view shipped (PR #174) + route-constants refactor
+
+**Who:** martin & Claude. Branch `feat/url-reflects-view-120`, PR #174. Frontend-only route rename + xhigh code-review follow-ups (this session). Merged trunk in first — over #158 (PR #172) and #159 (Global Analytics all-orgs aggregate) — before shipping.
+
+**Rename (Productive #9 "URL Changes").** Admin route paths now read like the view: org-admin under `/app/admin/org/*` (the Organization page is the `/app/admin/org` root), platform-admin under `/app/admin/platform/*`. Six paths changed (org Organization `analytics`→`org`; global analytics, organizations (+`:orgId`), courses (+`:courseId`) → `platform/*`). Old paths 404 — clean rename, no back-compat redirects (pre-GA internal tool). Also repointed dead breadcrumb hrefs (`/app/community/ideas|resources` → the real `/app/community/org/*`) and dropped two dead crumb-map entries; `OrgAnalytics` loading/empty states retitled "Analytics"→"Organization".
+
+**Code-review follow-ups (xhigh review of the PR).** (1) New `src/lib/routes.ts` — single source of truth for the admin route paths (styled after the `queryKeys` factory); adopted across the route table + every `navigate()`/href/sidebar site, so `OrgAnalytics`'s `isGlobalView` compares against the same constant that defines its route (kills the string-literal drift the review flagged as its top finding). (2) i18n'd the analytics page title/breadcrumbs via the existing `nav.*` keys instead of hardcoded English. (3) New `OrgAnalytics.test.tsx` pins the global-vs-org view branch so a future rename can't silently flip it. Follow-up **#178** filed: extend the route-constants module app-wide (learner/community/auth). Deferred by agreement (out of scope here, tracked in Productive): view-mode in the URL; the in-page `?tab=` back/forward sync bug.
+
+**Verify.** Merged trunk in first; `OrgAnalytics.tsx` auto-merged across regions — my `isGlobalView`/title changes and #159's `effectiveOrgId`/report-guard changes are both present and verified. Root `npm run lint` 0 errors · `npm test` **329 pass** · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions `npm run build` + `npm test` **109 files pass** (untouched by this PR; re-verified after the trunk merge). Merged via PR #174 → `main`; SWA frontend deploy auto-fires (no functions deploy — none changed). #120 closed (core scope shipped; the two deferred concerns recorded on the issue).
 
 ---
 

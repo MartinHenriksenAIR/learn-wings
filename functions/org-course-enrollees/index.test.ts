@@ -120,4 +120,48 @@ describe('org-course-enrollees', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
+
+  // ── All-orgs aggregate (orgId 'all') — platform admins only ──────────────
+  describe('all-orgs aggregate (orgId "all")', () => {
+    it('returns 403 for a non-platform-admin (org admins stay isolated)', async () => {
+      mockIsOrgAdmin.mockResolvedValue(true);
+
+      const res = await handler(baseReq({ orgId: 'all', courseId: 'c-1' }), {} as any);
+
+      expect(res.status).toBe(403);
+      expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('still 400s when courseId is missing', async () => {
+      mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+
+      const res = await handler(baseReq({ orgId: 'all' }), {} as any);
+
+      expect(res.status).toBe(400);
+      expect(JSON.parse(res.body as string)).toEqual({ error: 'courseId is required' });
+    });
+
+    it('lists distinct learners for a course across all orgs for a platform admin', async () => {
+      mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+      const rows = [
+        { user_id: 'u1', full_name: 'Alice', status: 'completed', enrolled_at: '2024-01-01', completed_at: '2024-02-01' },
+      ];
+      mockQuery.mockResolvedValueOnce(rows);
+
+      const res = await handler(baseReq({ orgId: 'all', courseId: 'c-1' }), {} as any);
+
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body as string).enrollees).toEqual(rows);
+      expect(mockIsOrgAdmin).not.toHaveBeenCalled();
+
+      const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+      // one row per learner even if enrolled through several orgs (unique React keys)
+      expect(sql).toContain('DISTINCT ON');
+      // filtered by course only — no org bind param
+      expect(sql).toContain('e.course_id = $1');
+      expect(sql).not.toContain('e.org_id');
+      expect(params).toEqual(['c-1']);
+    });
+  });
 });

@@ -72,9 +72,9 @@ function renderPage(courseId = 'course-1') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/app/admin/courses/${courseId}`]}>
+      <MemoryRouter initialEntries={[`/app/admin/platform/courses/${courseId}`]}>
         <Routes>
-          <Route path="/app/admin/courses/:courseId" element={<CourseEditor />} />
+          <Route path="/app/admin/platform/courses/:courseId" element={<CourseEditor />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>

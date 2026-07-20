@@ -13,6 +13,7 @@ import { useProfiles } from '@/hooks/useProfiles';
 import { callApi, ApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { getSeatUsage } from '@/lib/seats';
+import { routes } from '@/lib/routes';
 import { OrgMembership, Profile, OrgRole } from '@/lib/types';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { ArrowLeft } from 'lucide-react';
@@ -304,7 +305,7 @@ export default function OrganizationDetail() {
         description: 'The organization has been permanently deleted.',
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
-      navigate('/app/admin/organizations');
+      navigate(routes.platformAdmin.organizations);
     },
   });
 
@@ -375,7 +376,7 @@ export default function OrganizationDetail() {
       <AppLayout
         title={t('orgDetail.loadingBreadcrumb')}
         breadcrumbs={[
-          { label: t('organizations.title'), href: '/app/admin/organizations' },
+          { label: t('organizations.title'), href: routes.platformAdmin.organizations },
           { label: t('orgDetail.loadingBreadcrumb') },
         ]}
       >
@@ -389,7 +390,7 @@ export default function OrganizationDetail() {
       <OrgNotFoundScreen
         loadFailed={orgQuery.isError}
         onRetry={() => orgQuery.refetch()}
-        onBack={() => navigate('/app/admin/organizations')}
+        onBack={() => navigate(routes.platformAdmin.organizations)}
       />
     );
   }
@@ -421,14 +422,14 @@ export default function OrganizationDetail() {
     <AppLayout
       title={org.name}
       breadcrumbs={[
-        { label: t('organizations.title'), href: '/app/admin/organizations' },
+        { label: t('organizations.title'), href: routes.platformAdmin.organizations },
         { label: org.name },
       ]}
     >
       {/* Back link */}
       <button
         type="button"
-        onClick={() => navigate('/app/admin/organizations')}
+        onClick={() => navigate(routes.platformAdmin.organizations)}
         className="mb-3.5 inline-flex items-center gap-[7px] rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground transition-colors hover:text-primary"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
