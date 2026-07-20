@@ -46,8 +46,16 @@ export default function OrganizationsManager() {
     error: orgsError,
     refetch: refetchOrgs,
   } = useOrganizations();
-  const orgs = useMemo<(Organization & { memberCount: number })[]>(
-    () => (orgsData ?? []).map((o) => ({ ...o, memberCount: o.member_count })),
+  const orgs = useMemo<(Organization & { memberCount: number; usedSeats: number })[]>(
+    () =>
+      (orgsData ?? []).map((o) => ({
+        ...o,
+        memberCount: o.member_count ?? 0,
+        // A seat is consumed by an active member OR a pending invite, so the
+        // seat ratio / atLimit must count both (the plain Members column below
+        // still shows active members only).
+        usedSeats: (o.member_count ?? 0) + (o.pending_invite_count ?? 0),
+      })),
     [orgsData]
   );
   const { data: profiles = [], error: profilesError } = useProfiles();
@@ -400,7 +408,7 @@ export default function OrganizationsManager() {
             <span aria-hidden="true" />
           </div>
           {filteredOrgs.map((org) => {
-            const atLimit = !!org.seat_limit && org.memberCount >= org.seat_limit;
+            const atLimit = !!org.seat_limit && org.usedSeats >= org.seat_limit;
             return (
               <button
                 key={org.id}
@@ -430,10 +438,10 @@ export default function OrganizationsManager() {
                   {org.seat_limit ? (
                     <>
                       <span className={`text-[13px] font-semibold ${atLimit ? 'text-destructive' : 'text-[#4a4f60]'}`}>
-                        {org.memberCount}/{org.seat_limit}
+                        {org.usedSeats}/{org.seat_limit}
                       </span>
                       <SeatUsageBar
-                        used={org.memberCount}
+                        used={org.usedSeats}
                         limit={org.seat_limit}
                         className="mt-1.5 h-[5px]"
                       />

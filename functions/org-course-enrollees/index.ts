@@ -12,20 +12,19 @@ export default endpoint('org-course-enrollees', async ({ req, reply, requireOrgA
   }
 
   // All-orgs aggregate (Global Analytics "All Organizations", #159) — platform-admin-only.
-  // DISTINCT ON (e.user_id) collapses a learner enrolled in the course through several orgs
-  // to one row (unique React keys downstream), preferring a completed enrollment; the outer
-  // query restores the name ordering the single-org path uses.
+  // #163: one row per (learner, org) enrollment — NOT deduped — each carrying its org so the
+  // dialog can show an Organization column. A learner enrolled in the course through two orgs
+  // appears once per org; UNIQUE(org_id, user_id, course_id) caps that at one row per org, so
+  // (user_id, org_id) is a stable unique key downstream. Ordered by learner name, then org.
   if (orgId === 'all') {
     requirePlatformAdmin();
     const enrollees = await query(
-      `SELECT user_id, full_name, status, enrolled_at, completed_at FROM (
-         SELECT DISTINCT ON (e.user_id) e.user_id, p.full_name, e.status, e.enrolled_at, e.completed_at
-           FROM enrollments e
-           JOIN profiles p ON p.id = e.user_id
-          WHERE e.course_id = $1
-          ORDER BY e.user_id, (e.status = 'completed') DESC, e.enrolled_at ASC
-       ) sub
-      ORDER BY full_name`,
+      `SELECT e.user_id, p.full_name, e.org_id, o.name AS org_name, e.status, e.enrolled_at, e.completed_at
+         FROM enrollments e
+         JOIN profiles p ON p.id = e.user_id
+         JOIN organizations o ON o.id = e.org_id
+        WHERE e.course_id = $1
+        ORDER BY p.full_name, o.name`,
       [courseId],
     );
     return reply(200, { enrollees });

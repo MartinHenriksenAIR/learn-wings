@@ -10,8 +10,9 @@ import { useOrgDetail } from '@/hooks/useOrgDetail';
 import { useOrgMemberships } from '@/hooks/useOrgMemberships';
 import { useInvitations } from '@/hooks/useInvitations';
 import { useProfiles } from '@/hooks/useProfiles';
-import { callApi } from '@/lib/api-client';
+import { callApi, ApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
+import { getSeatUsage } from '@/lib/seats';
 import { routes } from '@/lib/routes';
 import { OrgMembership, Profile, OrgRole } from '@/lib/types';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
@@ -249,6 +250,11 @@ export default function OrganizationDetail() {
     onSuccess: () => {
       setInviteOpen(false);
       invalidateInvitations();
+      // A new pending invite consumes a seat: refresh the org's server-computed
+      // pending_invite_count (detail + shared list) so "seats used / remaining"
+      // updates immediately.
+      queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
     },
   });
 
@@ -259,6 +265,10 @@ export default function OrganizationDetail() {
     onSuccess: () => {
       toast({ title: 'Invitation cancelled' });
       invalidateInvitations();
+      // Cancelling frees a seat: refresh pending_invite_count so the seat math
+      // stays truthful.
+      queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
     },
   });
 
@@ -385,6 +395,29 @@ export default function OrganizationDetail() {
     );
   }
 
+  // Seats consumed = active members + server-computed pending invites.
+  const seatUsage = getSeatUsage({
+    activeMembers: activeMembers.length,
+    pendingInvites: org.pending_invite_count ?? 0,
+    seatLimit: org.seat_limit,
+  });
+
+  // Surface the backend seat cap (409) inline in the invite dialog, in addition
+  // to the failure toast, so it doesn't read as a generic error.
+  const inviteErrorMessage =
+    inviteMutation.error instanceof ApiError &&
+    inviteMutation.error.code === 'SEAT_LIMIT_REACHED'
+      ? inviteMutation.error.message
+      : null;
+
+  // Same treatment for the add-existing-user dialog: adding a member consumes
+  // a seat too, so the same 409 can fire there.
+  const addUserErrorMessage =
+    addUserMutation.error instanceof ApiError &&
+    addUserMutation.error.code === 'SEAT_LIMIT_REACHED'
+      ? addUserMutation.error.message
+      : null;
+
   return (
     <AppLayout
       title={org.name}
@@ -407,6 +440,7 @@ export default function OrganizationDetail() {
 
       <OrgStatCards
         activeCount={activeMembers.length}
+        usedSeats={seatUsage.usedSeats}
         adminCount={adminCount}
         learnerCount={learnerCount}
         pendingInviteCount={invitations.length}
@@ -414,14 +448,20 @@ export default function OrganizationDetail() {
       />
 
       {org.seat_limit ? (
-        <OrgSeatLimitCard usedCount={activeMembers.length} seatLimit={org.seat_limit} />
+        <OrgSeatLimitCard usedCount={seatUsage.usedSeats} seatLimit={org.seat_limit} />
       ) : null}
 
       <MembersSection
         members={members}
         updatingRoleId={updatingRoleId}
-        onInviteClick={() => setInviteOpen(true)}
-        onAddUserClick={() => setAddUserOpen(true)}
+        onInviteClick={() => {
+          inviteMutation.reset();
+          setInviteOpen(true);
+        }}
+        onAddUserClick={() => {
+          addUserMutation.reset();
+          setAddUserOpen(true);
+        }}
         onRoleChange={(member, newRole) => setRoleChangeDialog({ open: true, member, newRole })}
         onDisable={(id) => disableMemberMutation.mutate(id)}
         onReactivate={(id) => reactivateMemberMutation.mutate(id)}
@@ -440,6 +480,8 @@ export default function OrganizationDetail() {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         orgName={org.name}
+        seatUsage={seatUsage}
+        errorMessage={inviteErrorMessage}
         onSubmit={handleInvite}
         pending={inviteMutation.isPending}
       />
@@ -449,6 +491,8 @@ export default function OrganizationDetail() {
         onOpenChange={setAddUserOpen}
         orgName={org.name}
         availableUsers={availableUsers}
+        seatUsage={seatUsage}
+        errorMessage={addUserErrorMessage}
         onSubmit={handleAddUser}
         pending={addUserMutation.isPending}
       />

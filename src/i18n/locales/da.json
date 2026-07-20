@@ -1,4 +1,9 @@
 {
+  "seats": {
+    "usage": "{{used}} af {{limit}} pladser brugt · {{remaining}} tilbage",
+    "unlimited": "Ubegrænset antal pladser",
+    "limitReached": "Pladsgrænse nået"
+  },
   "common": {
     "save": "Gem",
     "saved": "Gemt",
@@ -440,6 +445,9 @@
     "typePost": "Opslag",
     "typeComment": "Kommentar",
     "viewContent": "Se indhold",
+    "viewContentTitle": "Rapporteret indhold",
+    "viewContentDescription": "Gennemgå det rapporterede opslag og dets kommentarer.",
+    "contentUnavailable": "Dette indhold er ikke længere tilgængeligt — det kan være blevet slettet.",
     "hidePost": "Skjul opslag",
     "hideComment": "Skjul kommentar",
     "showPost": "Vis opslag",
@@ -703,6 +711,15 @@
     "subtitleOrg": "Medlemmer, engagement og læring hos {{orgName}}.",
     "subtitleGlobalAll": "Engagement og læring på tværs af alle organisationer.",
     "subtitleGlobalOne": "Engagement og læring for den valgte organisation.",
+    "courseOrgBreakdown": {
+      "title": "Efter organisation",
+      "caption": "Antal tilmeldinger pr. organisation.",
+      "colOrg": "Organisation",
+      "colEnrolled": "Tilmeldte",
+      "colCompleted": "Gennemført",
+      "colRate": "Andel",
+      "empty": "Ingen organisationer har adgang til dette kursus."
+    },
     "members": {
       "searchPlaceholder": "Søg medlemmer...",
       "allRoles": "Alle roller",

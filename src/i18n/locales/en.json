@@ -1,4 +1,9 @@
 {
+  "seats": {
+    "usage": "{{used}} of {{limit}} seats used · {{remaining}} remaining",
+    "unlimited": "Unlimited seats",
+    "limitReached": "Seat limit reached"
+  },
   "common": {
     "save": "Save",
     "saved": "Saved",
@@ -440,6 +445,9 @@
     "typePost": "Post",
     "typeComment": "Comment",
     "viewContent": "View content",
+    "viewContentTitle": "Reported content",
+    "viewContentDescription": "Review the reported post and its comments.",
+    "contentUnavailable": "This content is no longer available — it may have been deleted.",
     "hidePost": "Hide post",
     "hideComment": "Hide comment",
     "showPost": "Show post",
@@ -703,6 +711,15 @@
     "subtitleOrg": "Members, engagement and learning at {{orgName}}.",
     "subtitleGlobalAll": "Engagement and learning across all organizations.",
     "subtitleGlobalOne": "Engagement and learning for the selected organization.",
+    "courseOrgBreakdown": {
+      "title": "By organization",
+      "caption": "Per-organization enrollment counts.",
+      "colOrg": "Organization",
+      "colEnrolled": "Enrolled",
+      "colCompleted": "Completed",
+      "colRate": "Rate",
+      "empty": "No organizations have this course enabled."
+    },
     "members": {
       "searchPlaceholder": "Search members...",
       "allRoles": "All roles",

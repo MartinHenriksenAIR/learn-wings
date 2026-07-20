@@ -183,6 +183,14 @@ describe('queryKeys', () => {
     expect(queryKeys.orgCourseEnrollees.detail(undefined, undefined)).toEqual(['org-course-enrollees', undefined, undefined]);
   });
 
+  // org-course-org-breakdown
+  it('orgCourseOrgBreakdown.detail returns the parameterized key', () => {
+    expect(queryKeys.orgCourseOrgBreakdown.detail('course-1')).toEqual(['org-course-org-breakdown', 'course-1']);
+  });
+  it('orgCourseOrgBreakdown.detail with undefined courseId', () => {
+    expect(queryKeys.orgCourseOrgBreakdown.detail(undefined)).toEqual(['org-course-org-breakdown', undefined]);
+  });
+
   // user-progress
   it('userProgress.detail returns the parameterized key', () => {
     expect(queryKeys.userProgress.detail('org-1', 'user-1')).toEqual(['user-progress', 'org-1', 'user-1']);

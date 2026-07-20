@@ -1028,3 +1028,49 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Deferred (tracked):** community-feed author avatars → **#180** (needs endpoint `avatar_url`); `TeamPerformanceTab` team-table avatars (same data-not-ready class); remove-photo UI (needs FileUpload to distinguish remove from failure).
 
 **Verification:** frontend lint 0 / tsc 0 / 329 tests / build ok; functions build ok / 1602 tests. Real upload→display E2E deferred to post-deploy smoke.
+
+---
+
+## 2026-07-20 — #160 Moderation "View content" opens a login page — fixed (PR #179)
+
+**Who:** martin & Claude. Branch `fix/moderation-view-content-160` (git worktree), PR #179. Frontend-only. Design settled up front via a grilling pass (dialog vs navigation; comment case = full thread + highlight; post case unified to also show the thread).
+
+**Root cause.** Community Moderation's "View content" did `window.open(path, '_blank', 'noopener,noreferrer')`. The new tab boots a fresh SPA instance with no MSAL session, so `ProtectedRoute` bounced it to `/login` instead of showing the reported content.
+
+**Fix.** New read-only `ReportedContentDialog` (shared by `PlatformCommunityModeration` + `OrgCommunityModeration`) renders the reported post (header + hidden/locked/scope badges + body) followed by the full comment thread; comment reports highlight and scroll to the reported comment. It reuses the existing `CommentThread` via a new **additive `readOnly` prop** (suppresses composer/reply/locked-banner/copy-link; `PostDetail` passes nothing and is unchanged) and fetches through **PostDetail's own query keys** (`communityPost.detail` / `communityComments.list`), so the cache is shared. No backend change: `community-post` already returns hidden posts to platform/org admins (`canSeeHidden`) and `community-comments` computes `includeHidden` server-side from the caller's admin status. `community-report-link.ts`'s URL builder was replaced by a `canViewReportedContent()` predicate that keeps the #86 orphaned-comment behavior (comment target with no `post_id` → button stays disabled).
+
+**Finding caught while driving (real browser).** In read-only mode `CommentItem` still rendered the "⋯" actions trigger, which opened an **empty** menu (every item is gated on a now-undefined callback). Added a `hasActions` gate so the trigger only shows when ≥1 action is available — also tidies any caller passing no actions. TDD'd (`CommentItem.test.tsx`).
+
+**Verify.** TDD throughout (red→green per unit). Drove the real dialog in Chromium via a throwaway Vite harness (post + comment cases, primed query cache, no auth needed) — reported comment highlights, no empty menus, 0 console errors; harness removed after. Merged current trunk (`origin/main`, incl. #126 seat-cap) into the branch — clean auto-merge (i18n `seats` + `moderation` keys in separate sections). Post-merge gates: root `npm run lint` 0 errors · `npm test` **349 pass** · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. i18n en+da added for the dialog strings. Merged via PR #179 → `main`; SWA frontend deploy auto-fires (no functions deploy — none changed).
+
+---
+
+## 2026-07-20 — #126 Auth Rules: invite seat-cap (scope A) shipped (PR #177)
+
+**Who:** martin & Claude. Branch `feat/invite-seat-cap-126`, PR #177. Scope grilled with martin, then subagent-driven implementation (fresh implementer per task, per-task + final whole-branch review).
+
+**Scope.** "Auth Rules" (#126) split into three; this PR delivers **scope A — the invite seat-cap**. The other two are filed as their own issues: **#176** (honor pending org invites on self-signup — auto-add at first Entra login) and **#175** (explicit accept-invitation flow). The #127 tension (free self-signup vs "invitation-only") resolves via #176: you don't need an invite to have an account, but if you were invited you land in the right org however you arrive.
+
+**The rule.** An org's `active_members + pending_invitations` must never exceed `organizations.seat_limit` (NULL = unlimited). Absolute — no role exemption, platform admins included. A pending invite reserves a seat, so converting it later (#175/#176) is seat-neutral; disabled memberships free a seat (active-only), per #66.
+
+**Backend.** New shared helper `functions/shared/seats.ts` (`lockSeatUsage`/`isAtSeatLimit`/`seatsRemaining`) — one `FOR UPDATE`-locked query counting active members + pending invitations, the single source of truth. Enforced on all four seat-consuming create paths: `invitation-create` (txn), `invitation-bulk-create` (partial-fill in request order, per-row `SAVEPOINT`s so a duplicate can't poison the batch), `org-membership-create` (#66's active-only check -> active+pending), `admin-user-actions` add-membership (cap added + latent `?? 'member'` -> `'learner'` enum-default bug fixed). `organizations` gains a server-computed `pending_invite_count` (+`member_count` on single-org). 409 body `{error:'Organization is at seat limit', code:'SEAT_LIMIT_REACHED'}` uniform across paths. No DB migration; application-level enforcement with the existing lock pattern.
+
+**Frontend.** Shared `src/lib/seats.ts` + `SeatUsageNote`; every "seats used" site counts active+pending. All seat-consuming dialogs (single invite, bulk, add-existing-user) show "X of Y used · Z remaining", disable at the cap, surface the 409 inline; unlimited orgs show "Unlimited". Org-admin usage reads the org-wide server aggregate via `useOrgDetail` (the invitations LIST is scoped to `invited_by_user_id`, so an org admin can't see co-admins' invites); counts refresh after every invite/cancel/remove. Strings in en + da.
+
+**Verify.** Root `npm run lint` 0 errors · `npm test` **342 pass** (58 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions `npm run build` clean · `npm test` **1601 pass** (110 files, 3 skipped). Final whole-branch review (opus): ready to merge, no Critical/Important; one accepted Minor (bulk catch's `ROLLBACK`/`RELEASE` not try-wrapped — safe, infra-only, propagates to 500). Merged via PR #177 -> `main`; SWA + functions deploys auto-fire (functions changed). #126 closed (scope A delivered; B/C tracked in #176/#175).
+
+---
+
+## 2026-07-20 — #163 combined all-orgs course overview: per-org breakdown shipped (PR #181)
+
+**Who:** martin & Claude. Branch `worktree-all-orgs-course-overview-163`, PR #181. Scope grilled with martin: the issue was largely pre-satisfied by #159 (PR #173, which already rendered a flat cross-org per-course rollup), so the session redefined #163 as the **organization dimension** the flat rollup sums away.
+
+**What shipped.** In the course detail dialog, **all-orgs mode only**: a **"By organization"** table (org · enrolled · completed · rate) listing every org with the course access-enabled — incl. 0/0 "gap" rows (adoption signal) — plus an **Organization column** on the enrollee list, un-deduped to one row per (learner, org) enrollment. Single-org view unchanged (main list + dialog identical to before).
+
+**Backend.** New platform-admin-only endpoint `org-course-org-breakdown` (`adminEndpoint`): per-org enrolled/completed for a course across every enabled org (`org_course_access` JOIN `organizations` LEFT JOIN `enrollments` so gap orgs show 0/0; `ORDER BY enrolled DESC`). `org-course-enrollees` `'all'` branch: dropped the `DISTINCT ON` dedup, joined `organizations`, returns `org_id`+`org_name` per enrollment row (composite React key downstream).
+
+**Frontend.** New `useOrgCourseOrgBreakdown` hook (lazy, keyed by courseId) + `orgCourseOrgBreakdown` query-key family; `useOrgCourseEnrollees` result type gains optional org fields. `CourseProgressTab` renders the breakdown + org column in all-orgs mode. Strings in en + da (`analytics.courseOrgBreakdown.*`).
+
+**Count semantics (Option A, agreed with martin).** Headline course numbers (main row + dialog stat cards) stay **distinct learners** (#159, untouched); the per-org table + enrollee list are **enrollment-level** and labeled as such. Sums exceed the distinct headline only when a learner is enrolled in the same course through multiple orgs.
+
+**Verify.** Brought trunk in via a merge commit (20 commits; i18n JSON auto-merged, no conflicts). Root `npm run lint` 0 errors · `npm test` **349 pass** (60 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions `npm run build` clean · `npm test` **1620 pass** (111 files, 3 skipped). Runtime: mounted the real `CourseProgressTab` in a throwaway Vite harness with the query cache pre-seeded (no Entra/DB reachable locally) — all-orgs dialog rendered the breakdown (incl. the 0/0 gap row) + the org column with **0 console errors**; the Option A divergence (distinct headline 141 vs per-org sum 142 for a two-org learner) rendered as designed; single-org dialog showed neither. Not exercised against a live multi-org DB (same boundary #159 shipped under). **Pre-merge `/code-review` (xhigh)** flagged one real edge case: the breakdown originally listed only access-enabled orgs, but the enrollee list + #159 headline count enrollments in every org regardless of access — so an org whose access was revoked with enrollments left behind would show in the enrollee list yet be missing from the table (per-org total short). Fixed: breakdown population is now `(access-enabled) UNION (has ≥1 enrollment)`, so it reconciles with the enrollee list and still shows gap rows. Merged via PR #181 → `main`; SWA + functions deploys auto-fire (functions changed). #163 closed.

@@ -257,6 +257,17 @@ export const queryKeys = {
       ['org-course-enrollees', orgId, courseId] as const,
   },
 
+  orgCourseOrgBreakdown: {
+    /**
+     * Full key: ['org-course-org-breakdown', courseId]
+     * Used by useOrgCourseOrgBreakdown / CourseProgressTab.tsx — the per-org
+     * engagement breakdown shown in the all-orgs course dialog (#163). Keyed by
+     * courseId only (the endpoint is platform-admin, cross-org by construction).
+     */
+    detail: (courseId: string | undefined) =>
+      ['org-course-org-breakdown', courseId] as const,
+  },
+
   userProgress: {
     /**
      * Full key: ['user-progress', orgId, userId]

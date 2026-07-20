@@ -1,5 +1,6 @@
 import { isUniqueViolation, withTransaction } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
+import { isAtSeatLimit, lockSeatUsage } from '../shared/seats';
 
 const ALLOWED_ROLES = new Set(['org_admin', 'learner']);
 // 'invited' is deliberately NOT accepted here — the invitation flow (invitation-create /
@@ -33,8 +34,9 @@ export default endpoint('org-membership-create', async ({ req, reply, requireOrg
   const effectiveStatus = status ?? 'active';
 
   // Seat-limit enforcement (issue #66): the UI disables the add button at the limit,
-  // but the backend must hold the line for any caller. Counts ACTIVE members only —
-  // parity with OrganizationDetail's activeMembers semantics.
+  // but the backend must hold the line for any caller. Counts active members +
+  // pending invitations (issue #126) — both consume a seat, so the cap is coherent
+  // no matter which create path fills it.
   //
   // The seat count and the INSERT run in ONE transaction with `FOR UPDATE` on the
   // organization row (review finding C-2). Without the lock, two concurrent adds at
@@ -43,20 +45,9 @@ export default endpoint('org-membership-create', async ({ req, reply, requireOrg
   // re-counts with that insert already visible and is correctly rejected.
   try {
     const result = await withTransaction(async (client) => {
-      const orgRes = await client.query<{ seat_limit: number | null; active_count: number }>(
-        `SELECT o.seat_limit,
-                (SELECT COUNT(*)::int FROM org_memberships m
-                  WHERE m.org_id = o.id AND m.status = 'active') AS active_count
-           FROM organizations o
-          WHERE o.id = $1
-          FOR UPDATE OF o`,
-        [orgId],
-      );
-      const org = orgRes.rows[0];
-      if (!org) return { kind: 'not_found' as const };
-      if (org.seat_limit !== null && Number(org.active_count) >= Number(org.seat_limit)) {
-        return { kind: 'seat_limit' as const };
-      }
+      const usage = await lockSeatUsage(client, orgId);
+      if (!usage.exists) return { kind: 'not_found' as const };
+      if (isAtSeatLimit(usage)) return { kind: 'seat_limit' as const };
       const insertRes = await client.query(
         `INSERT INTO org_memberships (org_id, user_id, role, status)
          VALUES ($1, $2, $3, $4)

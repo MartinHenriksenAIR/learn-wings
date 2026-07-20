@@ -34,8 +34,8 @@ const validBody = { orgId: 'org-1', userId: 'user-1', role: 'learner' };
 
 // pg QueryResult shape: the handler reads `.rows`.
 const rows = (...r: unknown[]) => ({ rows: r });
-// First client.query is the seat-limit lookup (org row + active-member count).
-const seatRow = (seat_limit: number | null, active_count: number) => ({ seat_limit, active_count });
+// First client.query is the seat-limit lookup (org row + active-member count + pending-invitation count).
+const seatRow = (seat_limit: number | null, active_count: number, pending_count: number) => ({ seat_limit, active_count, pending_count });
 
 describe('org-membership-create', () => {
   beforeEach(() => {
@@ -136,7 +136,7 @@ describe('org-membership-create', () => {
       status: 'active',
       created_at: '2026-06-07T12:00:00.000Z',
     };
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 5))); // seat_limit null — never blocks
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 5, 0))); // seat_limit null — never blocks
     mockClientQuery.mockResolvedValueOnce(rows(inserted));
 
     const res = await handler(baseReq(validBody), {} as any);
@@ -145,7 +145,7 @@ describe('org-membership-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ membership: inserted });
     expect(mockIsOrgAdmin).not.toHaveBeenCalled(); // platform-admin bypass
 
-    // First query: seat-limit lookup counts ACTIVE members only (disabled don't count)
+    // First query: seat-limit lookup counts active members + pending invitations
     const [seatSql, seatParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
     expect(seatSql).toContain('seat_limit');
     expect(seatSql).toContain(`m.status = 'active'`);
@@ -158,7 +158,7 @@ describe('org-membership-create', () => {
   });
 
   it('runs the seat check and INSERT in one transaction with a row lock (C-2: no check-then-insert race)', async () => {
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 4)));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 4, 0)));
     mockClientQuery.mockResolvedValueOnce(rows({ id: 'm0' }));
 
     await handler(baseReq(validBody), {} as any);
@@ -181,7 +181,7 @@ describe('org-membership-create', () => {
       status: 'disabled',
       created_at: '2026-06-07T12:00:00.000Z',
     };
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0)));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
     mockClientQuery.mockResolvedValueOnce(rows(inserted));
 
     const res = await handler(
@@ -198,7 +198,7 @@ describe('org-membership-create', () => {
   });
 
   it('returns 409 SEAT_LIMIT_REACHED when active members are at the seat limit', async () => {
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 5)));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 5, 0)));
 
     const res = await handler(baseReq(validBody), {} as any);
 
@@ -208,7 +208,7 @@ describe('org-membership-create', () => {
   });
 
   it('returns 409 SEAT_LIMIT_REACHED when active members exceed the seat limit', async () => {
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 7)));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 7, 0)));
 
     const res = await handler(baseReq(validBody), {} as any);
 
@@ -217,9 +217,30 @@ describe('org-membership-create', () => {
     expect(mockClientQuery).toHaveBeenCalledTimes(1);
   });
 
+  it('returns 409 SEAT_LIMIT_REACHED when active + pending reach the limit even though active alone is under it', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 3, 2))); // 3 active + 2 pending = 5 == limit
+
+    const res = await handler(baseReq(validBody), {} as any);
+
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' });
+    expect(mockClientQuery).toHaveBeenCalledTimes(1); // no INSERT attempted
+  });
+
+  it('allows creation when active + pending are below the seat limit', async () => {
+    const inserted = { id: 'm6', org_id: 'org-1', user_id: 'user-1', role: 'learner', status: 'active', created_at: '2026-06-07T12:00:00.000Z' };
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 2, 2))); // 2 active + 2 pending = 4 < limit
+    mockClientQuery.mockResolvedValueOnce(rows(inserted));
+
+    const res = await handler(baseReq(validBody), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ membership: inserted });
+  });
+
   it('allows creation when active members are below the seat limit', async () => {
     const inserted = { id: 'm3', org_id: 'org-1', user_id: 'user-1', role: 'learner', status: 'active', created_at: '2026-06-07T12:00:00.000Z' };
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 4)));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 4, 0)));
     mockClientQuery.mockResolvedValueOnce(rows(inserted));
 
     const res = await handler(baseReq(validBody), {} as any);
@@ -230,7 +251,7 @@ describe('org-membership-create', () => {
 
   it('allows creation when seat_limit is null even with many active members', async () => {
     const inserted = { id: 'm4', org_id: 'org-1', user_id: 'user-1', role: 'learner', status: 'active', created_at: '2026-06-07T12:00:00.000Z' };
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 1000)));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 1000, 0)));
     mockClientQuery.mockResolvedValueOnce(rows(inserted));
 
     const res = await handler(baseReq(validBody), {} as any);
@@ -239,9 +260,9 @@ describe('org-membership-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ membership: inserted });
   });
 
-  it('seat-limit count excludes disabled members (SQL counts active only)', async () => {
+  it('seat-limit count is active + pending (excludes disabled members and invited memberships)', async () => {
     const inserted = { id: 'm5', org_id: 'org-1', user_id: 'user-1', role: 'learner', status: 'active', created_at: '2026-06-07T12:00:00.000Z' };
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 2))); // 2 active (disabled members not counted)
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 2, 0))); // 2 active (disabled members not counted)
     mockClientQuery.mockResolvedValueOnce(rows(inserted));
 
     const res = await handler(baseReq(validBody), {} as any);
@@ -249,6 +270,7 @@ describe('org-membership-create', () => {
     expect(res.status).toBe(200);
     const [seatSql] = mockClientQuery.mock.calls[0] as [string, unknown[]];
     expect(seatSql).toContain(`m.status = 'active'`);
+    expect(seatSql).toContain(`i.status = 'pending'`);
     expect(seatSql).not.toContain('invited');
     expect(seatSql).not.toContain('disabled');
   });
@@ -264,7 +286,7 @@ describe('org-membership-create', () => {
   });
 
   it('returns 409 on duplicate (org_id, user_id) unique violation (23505)', async () => {
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0)));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
     mockClientQuery.mockRejectedValueOnce(Object.assign(new Error('duplicate key value'), { code: '23505' }));
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(409);
@@ -272,7 +294,7 @@ describe('org-membership-create', () => {
   });
 
   it('returns 404 on foreign-key violation (23503)', async () => {
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0)));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
     mockClientQuery.mockRejectedValueOnce(Object.assign(new Error('insert violates fk'), { code: '23503' }));
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(404);
@@ -280,7 +302,7 @@ describe('org-membership-create', () => {
   });
 
   it('returns 500 on generic db error', async () => {
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0)));
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 0, 0)));
     mockClientQuery.mockRejectedValueOnce(new Error('connection refused'));
     const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);

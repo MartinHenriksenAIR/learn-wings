@@ -1,7 +1,8 @@
 // Hand-rolled (not shared/endpoint.ts): legacy oid-only identity lookup (entra_oid without tid) and a custom 403 body — pending identity normalization.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
-import { query, queryOne } from '../shared/db';
+import { query, queryOne, withTransaction } from '../shared/db';
+import { isAtSeatLimit, lockSeatUsage } from '../shared/seats';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 
@@ -52,13 +53,22 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         );
         break;
 
-      case 'add-membership':
-        await query(
-          `INSERT INTO org_memberships (org_id, user_id, role, status)
-           VALUES ($1, $2, $3, 'active')`,
-          [body.org_id, body.target_user_id, body.role ?? 'member']
-        );
+      case 'add-membership': {
+        const result = await withTransaction(async (client) => {
+          const usage = await lockSeatUsage(client, body.org_id as string);
+          if (!usage.exists) return { kind: 'not_found' as const };
+          if (isAtSeatLimit(usage)) return { kind: 'seat_limit' as const };
+          await client.query(
+            `INSERT INTO org_memberships (org_id, user_id, role, status)
+             VALUES ($1, $2, $3, 'active')`,
+            [body.org_id, body.target_user_id, body.role ?? 'learner'],
+          );
+          return { kind: 'created' as const };
+        });
+        if (result.kind === 'not_found') return corsResponse(origin, 404, { error: 'Organization not found' });
+        if (result.kind === 'seat_limit') return corsResponse(origin, 409, { error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' });
         break;
+      }
 
       default:
         return corsResponse(origin, 400, { error: `Unknown action: ${body.action}` });
