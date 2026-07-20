@@ -38,7 +38,6 @@ vi.mock('@/components/org-admin/analytics/CourseProgressTab', () => ({ CoursePro
 vi.mock('@/components/org-admin/OrgMembersTab', () => ({ OrgMembersTab: () => null }));
 vi.mock('@/components/ui/file-upload', () => ({ FileUpload: () => null }));
 vi.mock('@/lib/api-client', () => ({ callApi: vi.fn(), callApiRaw: vi.fn() }));
-vi.mock('@/lib/storage-url', () => ({ buildPublicUrl: vi.fn(() => '') }));
 
 // Data hooks: mocked so no network fires; return values set per test.
 vi.mock('@/hooks/useAuth', () => ({ useAuth: vi.fn() }));

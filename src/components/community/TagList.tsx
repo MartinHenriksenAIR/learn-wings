@@ -25,7 +25,7 @@ export function TagList({
         <Badge
           key={tag}
           variant="secondary"
-          className="rounded-[7px] border-transparent bg-accent px-2.5 py-[3px] text-[11.5px] font-semibold text-accent-foreground"
+          className="rounded-[7px] border-transparent bg-muted px-2.5 py-[3px] text-[11.5px] font-semibold text-muted-foreground"
         >
           #{tag}
         </Badge>

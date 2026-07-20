@@ -1009,6 +1009,28 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 
 ---
 
+## 2026-07-20 — Public branding assets: org logo (#162) + profile photo (#165)
+
+**Who:** Martin + Claude
+
+**Done (PR #182):**
+- Shipped org-logo (#162) and profile-photo/avatar (#165) upload + display as **public branding assets**. Prior state: the `FileUpload` `bucket` prop was a no-op — everything landed in the private `lms-videos` container and logos/avatars rendered via an unsigned, container-less URL (broken).
+- `azure-upload-url` now takes an `assetType` intent (`org-logo`/`avatar`) and routes to the public `email-assets` container (ADR-0008), folder-prefixed (`org-logos/`, `avatars/`); unknown/absent → private default (unchanged for videos/docs/thumbnails). Shared `PUBLIC_CONTAINER` constant both sides. No new Azure container, no `az`.
+- DB stores the **container-relative blob path** in `organizations.logo_url` / `profiles.avatar_url`; display composes via `buildPublicUrl` (account-root + container + path). `VITE_STORAGE_BASE_URL` unchanged (account-root). Dead `bucket` prop retired → `assetType`.
+- Surfaces: logo on EditOrganizationDialog / OrgDetailHeader / OrganizationsManager / OrgAnalytics; avatar upload+display on Settings, display in AppSidebar profile menu + MembersTable + OrgMembersTab.
+
+**Decided (grilled with Martin):** reuse existing public `email-assets` (no owner Azure step); client declares intent, server owns the container/prefix allow-list; store raw path + compose at display (env-portable).
+
+**Whole-branch review caught + fixed (2 Critical):**
+- `azure-upload-url` was `adminEndpoint` (platform-admin only) → avatar (all users) and real org-admin logo uploads would 403. Relaxed: public branding assetTypes open to any authenticated user; course content stays admin-only. Real authz is at `organization-update` (org-admin for `logo_url`) / `profile-update` (own row), so an orphan blob is inert.
+- Settings avatar persisted `''` on upload failure → wiped the existing photo. Guarded to persist only on success (matches OrgAnalytics logo).
+
+**Deferred (tracked):** community-feed author avatars → **#180** (needs endpoint `avatar_url`); `TeamPerformanceTab` team-table avatars (same data-not-ready class); remove-photo UI (needs FileUpload to distinguish remove from failure).
+
+**Verification:** frontend lint 0 / tsc 0 / 329 tests / build ok; functions build ok / 1602 tests. Real upload→display E2E deferred to post-deploy smoke.
+
+---
+
 ## 2026-07-20 — #160 Moderation "View content" opens a login page — fixed (PR #179)
 
 **Who:** martin & Claude. Branch `fix/moderation-view-content-160` (git worktree), PR #179. Frontend-only. Design settled up front via a grilling pass (dialog vs navigation; comment case = full thread + highlight; post case unified to also show the thread).
@@ -1052,6 +1074,62 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Count semantics (Option A, agreed with martin).** Headline course numbers (main row + dialog stat cards) stay **distinct learners** (#159, untouched); the per-org table + enrollee list are **enrollment-level** and labeled as such. Sums exceed the distinct headline only when a learner is enrolled in the same course through multiple orgs.
 
 **Verify.** Brought trunk in via a merge commit (20 commits; i18n JSON auto-merged, no conflicts). Root `npm run lint` 0 errors · `npm test` **349 pass** (60 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions `npm run build` clean · `npm test` **1620 pass** (111 files, 3 skipped). Runtime: mounted the real `CourseProgressTab` in a throwaway Vite harness with the query cache pre-seeded (no Entra/DB reachable locally) — all-orgs dialog rendered the breakdown (incl. the 0/0 gap row) + the org column with **0 console errors**; the Option A divergence (distinct headline 141 vs per-org sum 142 for a two-org learner) rendered as designed; single-org dialog showed neither. Not exercised against a live multi-org DB (same boundary #159 shipped under). **Pre-merge `/code-review` (xhigh)** flagged one real edge case: the breakdown originally listed only access-enabled orgs, but the enrollee list + #159 headline count enrollments in every org regardless of access — so an org whose access was revoked with enrollments left behind would show in the enrollee list yet be missing from the table (per-org total short). Fixed: breakdown population is now `(access-enabled) UNION (has ≥1 enrollment)`, so it reconciles with the enrollee list and still shows gap rows. Merged via PR #181 → `main`; SWA + functions deploys auto-fire (functions changed). #163 closed.
+
+---
+
+## 2026-07-20 — #167/#168 UI polish: static stat cards + distinct resource tag color (PR #185)
+
+**Who:** martin & Claude. Branch `polish/dashboard-hover-resource-tags-167-168` (worktree), PR #185. Frontend-only. Picked from the 07-20 review batch (#166–#169); #166 and #169 handled in other sessions.
+
+**#167 — remove hover animation on dashboard stat cards.** The top stat cards **lifted** (translate + shadow) *and* **expanded a hidden info panel** on hover. Owner chose "static, drop panel" (of three options offered): both behaviours removed, cards stay at their resting look, and the hover-only info line is dropped (not kept always-on). Fix spanned **two** surfaces — the issue named the shared `StatCard`, but the org-admin dashboard cards are hand-rolled:
+- `src/components/ui/stat-card.tsx` — dropped the lift, the expanding panel, the `group` class, and the now-unused `extra` prop (learner dashboard).
+- `src/components/org-admin/analytics/AnalyticsOverview.tsx` — `OrgAnalytics`'s cards mirrored the same lift + panel; removed to match.
+- `src/pages/learner/Dashboard.tsx` — dropped the four `extra={…}` props and their data derivations (`enrolledTitles`, `latestCompleted`; `nextUp` kept — it also feeds the hero).
+- Orphaned `dashboard.extra*` (6) + `analytics.*Extra` (4) i18n keys removed from en + da; `stat-card.test.tsx` + `Dashboard.test.tsx` updated for the dropped panel.
+
+**#168 — Resource Library tag color vs "Open resource" button.** `TagList` chips used `bg-accent` — the same navy tint as the "Open resource" button — so tags read as the same element. Switched to `bg-muted` / `text-muted-foreground` (neutral gray token). `--accent` and `--secondary` are the *same* colour in the light theme and dark mode isn't wired up, so `--muted` is the correct distinct token; the change is in the shared component, so tags stay consistent across resources/posts/ideas.
+
+**Verify.** Root `npm run lint` 0 errors · `npm test` **352 pass** (63 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. Purely presentational (class removal + one token swap); visual confirmation deferred to the PR preview env (dashboards are Entra-gated, not drivable locally). Merged via PR #185 → `main`; SWA frontend deploy auto-fires (no functions changed).
+
+---
+
+## 2026-07-20 — Branding assets fix: signed URLs, not public access (#162/#165, PR #188)
+
+**Who:** Martin + Claude
+
+**Why:** #182 (public branding assets) shipped broken — uploads 404'd, display would 409. Root cause (found by driving the live upload): the storage account `staieducationmigration` has `allowBlobPublicAccess=false` (Microsoft's secure default) AND the `email-assets` container was never created (ADR-0008's pre-cutover TODO). The unsigned-public-URL design was incompatible with the account posture.
+
+**Decision (grilled with Martin, security/compliance lens):** keep the account locked down; serve branding assets via short-lived signed URLs (the mechanism course thumbnails already use) rather than enabling account-wide public blob access (Defender/CIS flag it; MS disables it by default). CDN-fronted-private container considered but deferred as scale-premature — B is a clean first step toward it.
+
+**Backend:** org-logo/avatar uploads route to the PRIVATE default container (`lms-videos`) folder-prefixed `org-logos/`/`avatars/` — no new container, no `az`. New `branding-asset-url` endpoint: any authed user (branding assets are non-sensitive, shown app-wide), but strict branding-path validation (`^(org-logos|avatars)/[A-Za-z0-9._-]+$`) so it can never sign arbitrary private course content in the same container; 120-min read SAS. `resolveAssetContainer` reworked; `isBrandingAssetType`/`isBrandingAssetPath` added. Non-admin upload relaxation from #182 retained (real authz stays at organization-update / profile-update).
+
+**Frontend:** `useSignedBrandingUrl` hook (cached per path) + shared `BrandingAvatar`; every logo/avatar display signs on view (sidebar, Settings, org detail/list, OrgAnalytics, member tables). Raw-path storage unchanged. Removed the dead `buildPublicUrl` / `storage-url.ts`.
+
+**Verify:** frontend lint 0 / tsc 0 / 347 tests / build ok; functions build ok / 1647 tests (new endpoint registered per the fleet guard). Real signed-in upload→display round-trip = post-deploy owner check (this approach is account-compatible; #182's public approach was not).
+
+---
+
+## 2026-07-20 — #119 Danish default language + browser matching (PR #186)
+
+**Who:** martin & Claude. Branch `feat/danish-default-language-119`, PR #186. Frontend-only. Scoped with martin ("do it now vs wait"): recon showed **most of #119 was already built** — i18next + `LanguageDetector` already browser-match en/da, `en`/`da` are at full 828-key parity, and a language switcher already exists (Settings + sidebar). The only gap was the default: an unrecognized browser language (or no detection signal) fell back to English.
+
+**What shipped.** `src/i18n/index.ts` — `fallbackLng: 'en'` → `['da', 'en']`. The first entry is the language i18next renders when the detected browser language is neither en nor da → **Danish default**; `en` stays in the chain as a secondary fallback for any key ever missing in da. LanguageDetector (`navigator` in the detection order) and the switcher are unchanged, so en browsers still get English and users can still override. `src/pages/Settings.tsx` — language selector's value fallback `'en'` → `'da'` (defensive; only hit if both `profile.preferred_language` and `i18n.language` are unset). New `src/i18n/index.test.ts` guards Danish-first ordering, en retained in the chain, and navigator matching intact.
+
+**Test landscape.** Most tests mock `react-i18next` (t returns the key) so are unaffected by the fallback change; the few that import the real `@/i18n` (CourseEditor, CoursesManager, OrganizationsManager) rely on jsdom's `navigator` resolving to en (en-US → en), so rendered language doesn't shift — confirmed by the full suite passing green.
+
+**Follow-up filed → #187.** The Danish default applies to **UI chrome** (locale JSON) only; authored *content* (course material #123, AI Act PDF #71, webinar page #125) isn't locale-driven, so a Danish-default user still sees content in whatever language it was authored in. Tracked separately in #187 with a dependency list (stems from #119; related content surfaces #123/#71/#125).
+
+**Verify.** Root `npm run lint` 0 errors · `npm test` **355 pass** (64 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. CI green (3/3). Merged via PR #186 → `main`; SWA frontend deploy auto-fires (no functions changed). #119 closed.
+
+---
+
+## 2026-07-20 — #189 sync `<html lang>` to the active UI language (PR #190)
+
+**Who:** martin & Claude. Branch `fix/html-lang-sync-i18n`, PR #190. Frontend-only. Follow-up to #119/#186, surfaced in the #186 code review: `index.html` statically declared `<html lang="da">` and never tracked the language actually shown, so an English-viewing (browser-matched) user got English UI on a Danish-declared document — a minor a11y / browser-translate mismatch (screen-reader pronunciation, "translate page" source-guess).
+
+**What shipped.** `src/i18n/index.ts` — added `initialized` + `languageChanged` listeners that set `document.documentElement.lang = i18n.resolvedLanguage ?? 'da'`. Uses `resolvedLanguage` (not the raw detected code) so an unsupported browser language, which renders the Danish fallback, correctly labels the document `da`. New test in `src/i18n/index.test.ts` asserts `<html lang>` follows a language switch (en↔da).
+
+**Verify.** Root `npm run lint` 0 errors · `npm test` **356 pass** (64 files, +1) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Functions untouched. Merged via PR #190 → `main`; SWA frontend deploy auto-fires (no functions changed). #189 closed.
 
 ---
 

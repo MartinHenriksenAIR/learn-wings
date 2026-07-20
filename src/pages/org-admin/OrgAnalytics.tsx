@@ -20,7 +20,7 @@ import { useOrganizations } from '@/hooks/useOrganizations';
 import { useOrgAnalyticsData } from '@/hooks/useOrgAnalyticsData';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { callApi, callApiRaw } from '@/lib/api-client';
-import { buildPublicUrl } from '@/lib/storage-url';
+import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
 import { routes } from '@/lib/routes';
 import { Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -52,6 +52,7 @@ export default function OrgAnalytics() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isGlobalView = location.pathname === routes.platformAdmin.analytics;
   const { currentOrg, isPlatformAdmin, refreshUserContext } = useAuth();
+  const { data: orgLogoSrc } = useSignedBrandingUrl(currentOrg?.logo_url);
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
@@ -184,12 +185,11 @@ export default function OrgAnalytics() {
 
     setUploading(true);
     try {
-      // storagePath is the Azure blob path returned by file-upload component
-      const logoUrl = buildPublicUrl(storagePath);
-
+      // storagePath is the container-relative Azure blob path; store it raw and
+      // sign it for display at view time (useSignedBrandingUrl).
       await callApi('/api/organization-update', {
         orgId: currentOrg.id,
-        updates: { logo_url: logoUrl },
+        updates: { logo_url: storagePath },
       });
 
       toast.success('Logo updated successfully');
@@ -280,9 +280,9 @@ export default function OrgAnalytics() {
         <Card className="mb-6">
           <CardContent className="flex items-center gap-4 p-6">
             <div className="relative group shrink-0">
-              {currentOrg.logo_url ? (
+              {orgLogoSrc ? (
                 <img
-                  src={currentOrg.logo_url}
+                  src={orgLogoSrc}
                   alt={`${currentOrg.name} logo`}
                   className="h-16 w-16 rounded-xl object-contain bg-muted"
                 />
@@ -320,7 +320,7 @@ export default function OrgAnalytics() {
                       </div>
                     </div>
                     <FileUpload
-                      bucket="org-logos"
+                      assetType="org-logo"
                       folder={currentOrg.id}
                       accept="image"
                       maxSizeMB={2}

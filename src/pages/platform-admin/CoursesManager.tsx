@@ -348,7 +348,6 @@ export default function CoursesManager() {
           <div className="space-y-2">
             <Label>{t('coursesManager.thumbnail')}</Label>
             <FileUpload
-              bucket="lms-assets"
               folder="thumbnails"
               accept="image"
               value={thumbnailUrl}

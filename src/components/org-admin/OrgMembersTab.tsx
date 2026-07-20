@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import {
@@ -608,14 +608,13 @@ export function OrgMembersTab() {
               >
                 {/* Member: avatar + name/email */}
                 <span className="flex min-w-0 items-center gap-[11px]">
-                  <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarFallback
-                      className="text-[11px] font-bold text-white"
-                      style={{ backgroundColor: getAvatarColor(member.profile?.full_name) }}
-                    >
-                      {getInitials(member.profile?.full_name, '??')}
-                    </AvatarFallback>
-                  </Avatar>
+                  <BrandingAvatar
+                    avatarPath={member.profile?.avatar_url}
+                    fallback={getInitials(member.profile?.full_name, '??')}
+                    className="h-8 w-8 shrink-0"
+                    fallbackClassName="text-[11px] font-bold text-white"
+                    fallbackStyle={{ backgroundColor: getAvatarColor(member.profile?.full_name) }}
+                  />
                   <span className="flex min-w-0 flex-col">
                     <span className="flex items-center gap-1.5 text-[13px] font-bold">
                       {member.profile?.full_name}

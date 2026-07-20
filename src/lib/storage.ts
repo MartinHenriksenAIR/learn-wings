@@ -21,6 +21,23 @@ export async function getSignedAssetUrl(path: string | null): Promise<string | n
 }
 
 /**
+ * Get a short-lived signed URL for a branding asset (org logo / avatar) via the
+ * /api/branding-asset-url endpoint. Any authenticated user may view branding
+ * assets (the endpoint validates the path is a branding path). Returns null on
+ * failure so callers fall back to a placeholder/initials.
+ */
+export async function getSignedBrandingUrl(path: string | null): Promise<string | null> {
+  if (!path) return null;
+  try {
+    const { url } = await callApi<{ url: string }>('/api/branding-asset-url', { blobPath: path });
+    return url ?? null;
+  } catch (e) {
+    console.error('Error signing branding asset URL:', e);
+    return null;
+  }
+}
+
+/**
  * Extract lms-assets storage path from either a raw path or storage URL.
  */
 export function extractLmsAssetPath(value: string | null): string | null {

@@ -28,7 +28,6 @@ function Harness({ onChangeSpy }: { onChangeSpy: (url: string | null, path: stri
   const [value, setValue] = useState<string | null>(null);
   return (
     <FileUpload
-      bucket="lms-assets"
       folder="thumbnails"
       accept="image"
       value={value}
@@ -99,7 +98,6 @@ describe('FileUpload — image preview after upload (#158)', () => {
   it('falls back to the value prop when there is no local preview (e.g. pre-signed URL from parent)', () => {
     render(
       <FileUpload
-        bucket="lms-assets"
         accept="image"
         value="https://acct.blob.core.windows.net/lms-assets/thumbnails/existing.png?sig=live"
         onChange={vi.fn()}
@@ -136,7 +134,6 @@ describe('FileUpload — image preview after upload (#158)', () => {
       const [value, setValue] = useState<string | null>(null);
       return (
         <FileUpload
-          bucket="lms-assets"
           folder="docs"
           accept="document"
           value={value}
@@ -163,7 +160,6 @@ describe('FileUpload — image preview after upload (#158)', () => {
       return (
         <>
           <FileUpload
-            bucket="lms-assets"
             folder="thumbnails"
             accept="image"
             value={value}

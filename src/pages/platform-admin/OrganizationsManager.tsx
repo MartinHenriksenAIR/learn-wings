@@ -33,9 +33,26 @@ import { Organization, OrgRole } from '@/lib/types';
 import { Building2, Plus, Loader2, ChevronRight, UserPlus, Mail, Search } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
-import { buildPublicUrl } from '@/lib/storage-url';
+import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
 import { orgSchema } from '@/lib/org-validation';
 import { SeatUsageBar } from '@/components/platform-admin/SeatUsageBar';
+
+/** Org-list row logo: signs the stored branding path for display; placeholder otherwise. */
+function OrgRowLogo({ logoPath }: { logoPath: string | null }) {
+  const { data: src } = useSignedBrandingUrl(logoPath);
+  if (src) {
+    return (
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted">
+        <img src={src} alt="" className="max-h-full max-w-full object-contain" />
+      </span>
+    );
+  }
+  return (
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+      <Building2 className="h-[17px] w-[17px]" aria-hidden="true" />
+    </span>
+  );
+}
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
@@ -64,6 +81,8 @@ export default function OrganizationsManager() {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  // logoUrl holds the raw container-relative path (for create); sign it for the preview.
+  const { data: logoDisplaySrc } = useSignedBrandingUrl(logoUrl);
   const [seatLimit, setSeatLimit] = useState<string>('');
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -250,15 +269,13 @@ export default function OrganizationsManager() {
           <div className="space-y-2">
             <Label>{t('organizations.logoOptional')}</Label>
             <FileUpload
-              bucket="org-logos"
+              assetType="org-logo"
               accept="image"
-              value={logoUrl}
+              value={logoDisplaySrc ?? null}
               onChange={(url, storagePath) => {
-                if (url && storagePath) {
-                  setLogoUrl(buildPublicUrl(storagePath));
-                } else {
-                  setLogoUrl(null);
-                }
+                // Store the raw container-relative path; it's signed for display
+                // via the value prop above (useSignedBrandingUrl).
+                setLogoUrl(url && storagePath ? storagePath : null);
               }}
               maxSizeMB={5}
             />
@@ -420,15 +437,7 @@ export default function OrganizationsManager() {
               >
                 {/* Organization: icon chip + name */}
                 <span className="flex min-w-0 items-center gap-3">
-                  {org.logo_url ? (
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted">
-                      <img src={org.logo_url} alt="" className="max-h-full max-w-full object-contain" />
-                    </span>
-                  ) : (
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
-                      <Building2 className="h-[17px] w-[17px]" aria-hidden="true" />
-                    </span>
-                  )}
+                  <OrgRowLogo logoPath={org.logo_url} />
                   <span className="truncate text-[13.5px] font-bold">{org.name}</span>
                 </span>
                 {/* Slug (mono) */}

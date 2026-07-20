@@ -21,6 +21,9 @@ import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
 import { getInitials } from '@/lib/utils';
+import { FileUpload } from '@/components/ui/file-upload';
+import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const profileSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required').max(50, 'First name is too long'),
@@ -32,6 +35,7 @@ export default function Settings() {
   const { profile, user, memberships, isPlatformAdmin, refreshUserContext } = useAuth();
   const { t, i18n } = useTranslation();
   const { flashed, flash } = useFlash();
+  const { data: avatarSrc } = useSignedBrandingUrl(profile?.avatar_url);
 
   // Profile state
   const [firstName, setFirstName] = useState('');
@@ -42,6 +46,9 @@ export default function Settings() {
 
   // Language state
   const [languageSaving, setLanguageSaving] = useState(false);
+
+  // Profile-photo state
+  const [avatarSaving, setAvatarSaving] = useState(false);
 
   // Sync profile fields when profile loads
   useEffect(() => {
@@ -80,6 +87,31 @@ export default function Settings() {
       });
     } finally {
       setLanguageSaving(false);
+    }
+  };
+
+  const handleAvatarChange = async (_url: string | null, storagePath: string | null) => {
+    // Only persist a successful upload. A null storagePath means the upload
+    // failed — FileUpload signals failure with onChange(null, null) — and
+    // persisting then would silently wipe an existing photo. (Same guard the
+    // org-logo upload uses in OrgAnalytics.) FileUpload surfaces the error to
+    // the user for retry.
+    if (!profile || !storagePath) return;
+
+    setAvatarSaving(true);
+    try {
+      // Persist the raw container-relative blob path; display signs it for
+      // viewing via useSignedBrandingUrl.
+      await callApi('/api/profile-update', { avatar_url: storagePath });
+      await refreshUserContext();
+    } catch (error) {
+      toast({
+        title: t('settings.photoUpdateFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setAvatarSaving(false);
     }
   };
 
@@ -158,16 +190,33 @@ export default function Settings() {
         <Card className="mb-4">
           <CardContent className="space-y-3.5 px-[26px] py-6">
             <div className="mb-1 flex items-center gap-3.5">
-              <span
-                aria-hidden="true"
-                className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-2xl bg-accent text-[17px] font-extrabold text-accent-foreground"
-              >
-                {getInitials(displayName)}
-              </span>
+              <Avatar className="h-[52px] w-[52px] shrink-0 rounded-2xl">
+                {avatarSrc && (
+                  <AvatarImage src={avatarSrc} alt="" className="object-cover" />
+                )}
+                <AvatarFallback
+                  aria-hidden="true"
+                  className="rounded-2xl bg-accent text-[17px] font-extrabold text-accent-foreground"
+                >
+                  {getInitials(displayName)}
+                </AvatarFallback>
+              </Avatar>
               <div className="min-w-0">
                 <h3 className="text-[15px] font-extrabold">{t('settings.profile')}</h3>
                 <p className="truncate text-[12.5px] text-muted-foreground">{t('settings.updateProfile')}</p>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-[#4a4f60]">{t('settings.profilePhoto')}</Label>
+              <FileUpload
+                assetType="avatar"
+                accept="image"
+                onChange={handleAvatarChange}
+                maxSizeMB={2}
+                disabled={avatarSaving}
+              />
+              <p className="text-[11.5px] text-muted-foreground">{t('settings.profilePhotoHint')}</p>
             </div>
 
             <div className="space-y-1.5">
@@ -256,7 +305,7 @@ export default function Settings() {
             </div>
             <div className="flex items-center gap-4">
               <Select
-                value={profile?.preferred_language || i18n.language || 'en'}
+                value={profile?.preferred_language || i18n.language || 'da'}
                 onValueChange={handleLanguageChange}
                 disabled={languageSaving}
               >
