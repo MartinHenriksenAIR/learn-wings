@@ -214,4 +214,15 @@ describe('queryKeys', () => {
   it('learnerDashboard.detail with undefined orgId', () => {
     expect(queryKeys.learnerDashboard.detail(undefined)).toEqual(['learner-dashboard', undefined]);
   });
+
+  // seat-pricing
+  it('seatPricing.all is stable', () => {
+    expect(queryKeys.seatPricing.all).toEqual(['seat-pricing']);
+  });
+
+  // seat-requests
+  it('seatRequests.list is keyed by orgId', () => {
+    expect(queryKeys.seatRequests.all).toEqual(['seat-requests']);
+    expect(queryKeys.seatRequests.list('org-1')).toEqual(['seat-requests', 'org-1']);
+  });
 });

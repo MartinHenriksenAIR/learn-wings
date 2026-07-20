@@ -317,4 +317,17 @@ export const queryKeys = {
      */
     detail: (orgId: string | undefined) => ['learner-dashboard', orgId] as const,
   },
+
+  // ── Seat requests (issue #127) ─────────────────────────────────────────────
+  seatPricing: {
+    /** ['seat-pricing'] — the single platform-wide price (read-only for org admins). */
+    all: ['seat-pricing'] as const,
+  },
+
+  seatRequests: {
+    /** ['seat-requests'] — invalidation prefix. */
+    all: ['seat-requests'] as const,
+    /** Full key: ['seat-requests', orgId] */
+    list: (orgId: string | undefined) => ['seat-requests', orgId] as const,
+  },
 } as const;

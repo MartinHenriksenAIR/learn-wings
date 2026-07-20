@@ -181,3 +181,26 @@ interface OrgAnalyticsSummary {
   activeUsers: number;
   completionRate: number;
 }
+
+// Seat requests (issue #127)
+export type SeatRequestStatus = 'pending' | 'fulfilled' | 'cancelled';
+
+export interface SeatRequest {
+  id: string;
+  org_id: string;
+  requested_by_user_id: string | null;
+  additional_seats: number;
+  unit_price_snapshot: number;
+  currency: string;
+  status: SeatRequestStatus;
+  created_at: string;
+  fulfilled_at: string | null;
+  cancelled_at: string | null;
+  requester_name?: string | null;
+  requester_email?: string | null;
+}
+
+export interface SeatPricing {
+  annual_price_per_seat: number | null;
+  currency: string;
+}
