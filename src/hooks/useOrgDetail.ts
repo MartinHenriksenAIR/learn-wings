@@ -5,7 +5,9 @@ import type { Organization } from '@/lib/types';
 
 /**
  * The one way to fetch a single org's details via `/api/organizations` from
- * the frontend (platform-admin use-case).
+ * the frontend. Originally a platform-admin use-case (`OrganizationDetail`);
+ * also used by org admins (`OrgMembersTab`) to read the org-wide
+ * `member_count` / `pending_invite_count` aggregates for seat usage.
  *
  * The endpoint accepts `{ orgId }` and returns `{ organization }` — distinct
  * from `useOrganizations` which passes `{}` and returns the full list. The

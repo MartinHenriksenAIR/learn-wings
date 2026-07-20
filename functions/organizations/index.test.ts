@@ -48,11 +48,11 @@ describe('organizations', () => {
   });
 
   // 3. List all orgs as platform admin
-  it('returns all organizations for platform admin (no outer JOIN) with member_count', async () => {
+  it('returns all organizations for platform admin (no outer JOIN) with member_count and pending_invite_count', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([
-      { id: 'org-1', member_count: 5 },
-      { id: 'org-2', member_count: 0 },
+      { id: 'org-1', member_count: 5, pending_invite_count: 2 },
+      { id: 'org-2', member_count: 0, pending_invite_count: 0 },
     ]);
 
     const res = await handler(baseReq({}), {} as any);
@@ -60,28 +60,30 @@ describe('organizations', () => {
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
     expect(body.organizations).toHaveLength(2);
-    expect(body.organizations[0]).toMatchObject({ id: 'org-1', member_count: 5 });
-    expect(body.organizations[1]).toMatchObject({ id: 'org-2', member_count: 0 });
+    expect(body.organizations[0]).toMatchObject({ id: 'org-1', member_count: 5, pending_invite_count: 2 });
+    expect(body.organizations[1]).toMatchObject({ id: 'org-2', member_count: 0, pending_invite_count: 0 });
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     // Platform-admin branch has NO outer JOIN to org_memberships — only the inline subquery
     expect(sql).not.toContain('JOIN org_memberships');
     expect(sql).toContain('member_count');
     expect(sql).toContain('org_memberships om2');
+    expect(sql).toContain('pending_invite_count');
+    expect(sql).toContain("i.status = 'pending'");
     expect(sql).toContain('ORDER BY o.created_at DESC');
     expect(params ?? []).toEqual([]);
   });
 
   // 4. List orgs as regular member
-  it('returns member orgs for non-admin user via JOIN on org_memberships with member_count', async () => {
-    mockQuery.mockResolvedValueOnce([{ id: 'org-1', member_count: 3 }]);
+  it('returns member orgs for non-admin user via JOIN on org_memberships with member_count and pending_invite_count', async () => {
+    mockQuery.mockResolvedValueOnce([{ id: 'org-1', member_count: 3, pending_invite_count: 1 }]);
 
     const res = await handler(baseReq({}), {} as any);
 
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
     expect(body.organizations).toHaveLength(1);
-    expect(body.organizations[0]).toMatchObject({ id: 'org-1', member_count: 3 });
+    expect(body.organizations[0]).toMatchObject({ id: 'org-1', member_count: 3, pending_invite_count: 1 });
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('JOIN org_memberships om');
@@ -89,6 +91,8 @@ describe('organizations', () => {
     expect(sql).toContain('member_count');
     // Subquery alias must differ from outer JOIN alias to avoid collision
     expect(sql).toContain('org_memberships om2');
+    expect(sql).toContain('pending_invite_count');
+    expect(sql).toContain("i.status = 'pending'");
     expect(sql).toContain('ORDER BY o.created_at DESC');
     expect(params).toEqual(['p1']);
   });
@@ -110,16 +114,24 @@ describe('organizations', () => {
   });
 
   // 5. Single org as active member
-  it('returns single organization for active member', async () => {
+  it('returns single organization for active member with member_count and pending_invite_count', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', name: 'X' });
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', name: 'X', member_count: 4, pending_invite_count: 2 });
 
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
 
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
-    expect(body.organization).toMatchObject({ id: 'org-1', name: 'X' });
+    expect(body.organization).toMatchObject({ id: 'org-1', name: 'X', member_count: 4, pending_invite_count: 2 });
     expect(mockIsActiveMember).toHaveBeenCalledWith('p1', 'org-1');
+
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('org_memberships om2');
+    expect(sql).toContain("om2.status = 'active'");
+    expect(sql).toContain('member_count');
+    expect(sql).toContain("i.status = 'pending'");
+    expect(sql).toContain('pending_invite_count');
+    expect(params).toEqual(['org-1']);
   });
 
   // 6. Single org 403 for non-member non-admin
