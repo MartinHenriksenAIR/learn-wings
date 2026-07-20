@@ -1,5 +1,28 @@
 import { generateSasToken, buildBlobUrl } from './sas';
 
+/** The public Azure Blob container (ADR-0008) used for branding assets that must be viewable without a SAS token. */
+export const PUBLIC_CONTAINER = 'email-assets';
+
+/**
+ * Resolves a client-declared upload `assetType` to a container + folder prefix.
+ *
+ * The client only ever declares intent (`assetType`); this hardcoded allow-list is the
+ * sole place that maps intent to a container, so the client can never target an
+ * arbitrary container. An absent or unrecognized `assetType` falls through to the
+ * existing private default — this is intentionally not an error: the enum is an
+ * allow-list, not a validated input.
+ */
+export function resolveAssetContainer(assetType?: string): { container: string; prefix: string } {
+  switch (assetType) {
+    case 'org-logo':
+      return { container: PUBLIC_CONTAINER, prefix: 'org-logos/' };
+    case 'avatar':
+      return { container: PUBLIC_CONTAINER, prefix: 'avatars/' };
+    default:
+      return { container: process.env.AZURE_STORAGE_CONTAINER_NAME ?? 'lms-videos', prefix: '' };
+  }
+}
+
 /**
  * Deletes a blob from Azure Blob Storage using a short-lived SAS token.
  *

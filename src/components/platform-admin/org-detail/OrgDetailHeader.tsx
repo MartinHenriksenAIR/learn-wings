@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Building2, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { buildPublicUrl } from '@/lib/storage-url';
 import type { Organization } from '@/lib/types';
 
 interface OrgDetailHeaderProps {
@@ -19,7 +20,7 @@ export function OrgDetailHeader({ org, onEdit, onDelete }: OrgDetailHeaderProps)
   return (
     <div className="mb-6 flex flex-wrap items-center gap-4">
       {org.logo_url ? (
-        <img src={org.logo_url} alt="" className="h-14 w-14 shrink-0 rounded-2xl bg-muted object-contain" />
+        <img src={buildPublicUrl(org.logo_url)} alt="" className="h-14 w-14 shrink-0 rounded-2xl bg-muted object-contain" />
       ) : (
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-accent text-primary">
           <Building2 className="h-[26px] w-[26px]" aria-hidden="true" />

@@ -7,7 +7,8 @@ import {
   User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { buildPublicUrl } from '@/lib/storage-url';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +63,9 @@ export function MembersTable({
             {/* Name: avatar + name */}
             <span className="flex min-w-0 items-center gap-[11px]">
               <Avatar className="h-8 w-8 shrink-0">
+                {member.profile?.avatar_url && (
+                  <AvatarImage src={buildPublicUrl(member.profile.avatar_url)} alt="" className="object-cover" />
+                )}
                 <AvatarFallback
                   className="text-[11px] font-bold text-white"
                   style={{ backgroundColor: getAvatarColor(member.profile?.full_name) }}
