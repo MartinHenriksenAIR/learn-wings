@@ -48,8 +48,7 @@ vi.mock('@/components/ui/select', () => {
   return { Select, SelectItem, SelectTrigger: pass, SelectValue: pass, SelectContent: pass };
 });
 
-import { PlatformAdminsSection } from './PlatformAdminsSection';
-import type { PlatformAdmin } from '@/hooks/usePlatformAdmins';
+import { PlatformAdminsSection, type PlatformAdmin } from './PlatformAdminsSection';
 
 const admins: PlatformAdmin[] = [
   { id: 'p1', full_name: 'Ada Admin', email: 'ada@contoso.com' },

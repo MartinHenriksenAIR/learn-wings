@@ -83,7 +83,6 @@ import './organization-delete/index';
 import './organization-update/index';
 import './organizations/index';
 import './platform-admin-update/index';
-import './platform-admins/index';
 import './platform-settings/index';
 import './platform-settings-update/index';
 import './profile-update/index';

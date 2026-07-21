@@ -186,11 +186,12 @@ export const queryKeys = {
 
   profiles: {
     /**
-     * ['profiles'] — the platform-wide user list fetched by OrganizationsManager
-     * and OrganizationDetail. This IS the query key (the list takes no params),
-     * not merely an invalidation prefix: no mutation currently invalidates it,
-     * because adding an existing profile to an org does not change the profile
-     * list. Kept as `all` for shape-consistency with the other list families.
+     * ['profiles'] — the platform-wide user list fetched by OrganizationsManager,
+     * OrganizationDetail, and PlatformSettings (whose "Platform Admins" section
+     * derives both the current-admins and grant-candidate lists from it, #198).
+     * This IS the query key (the list takes no params); the platform-admin
+     * grant/revoke mutations invalidate it by prefix so the derived lists
+     * refresh. Kept as `all` for shape-consistency with the other list families.
      */
     all: ['profiles'] as const,
   },
@@ -237,16 +238,6 @@ export const queryKeys = {
      * state. Kept as `all` for shape-consistency with the other list families.
      */
     all: ['platform-settings'] as const,
-  },
-
-  // ── Platform admins (platform-admin) ───────────────────────────────────────
-  platformAdmins: {
-    /**
-     * ['platform-admins'] — the list of profiles holding is_platform_admin,
-     * shown in the Platform Settings "Platform Admins" section (#128). Grant and
-     * revoke mutations invalidate this prefix.
-     */
-    all: ['platform-admins'] as const,
   },
 
   // ── Org analytics (org-admin) ──────────────────────────────────────────────
