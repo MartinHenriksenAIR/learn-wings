@@ -136,8 +136,8 @@ function renderPost() {
 async function submitReport() {
   fireEvent.click(await screen.findByRole('button', { name: /report/i }));
   await screen.findByRole('dialog');
-  fireEvent.click(screen.getByLabelText(/spam or misleading/i));
-  fireEvent.click(screen.getByRole('button', { name: /submit report/i }));
+  fireEvent.click(screen.getByLabelText('community.reportDialog.reasonSpam'));
+  fireEvent.click(screen.getByRole('button', { name: 'community.reportDialog.submit' }));
 }
 
 describe('PostDetail — duplicate-report 409 handling (#21)', () => {
@@ -179,7 +179,7 @@ describe('PostDetail — duplicate-report 409 handling (#21)', () => {
 
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
-        title: 'Failed to submit report',
+        title: 'community.toasts.reportSubmitFailed',
         variant: 'destructive',
       }));
     });
@@ -194,7 +194,7 @@ describe('PostDetail — duplicate-report 409 handling (#21)', () => {
     await submitReport();
 
     await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Report submitted' }));
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'community.toasts.reportSubmitted' }));
     });
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();

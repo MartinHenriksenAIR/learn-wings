@@ -85,10 +85,10 @@ export default function CommunityFeed() {
     mutationFn: createPost,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPosts.all });
-      toast({ title: 'Post created successfully!' });
+      toast({ title: t('community.toasts.postCreated') });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to create post', description: error.message, variant: 'destructive' });
+      toast({ title: t('community.toasts.postCreateFailed'), description: error.message, variant: 'destructive' });
     },
   });
 

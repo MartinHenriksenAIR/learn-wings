@@ -99,7 +99,7 @@ export default function PostDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to add comment', description: error.message, variant: 'destructive' });
+      toast({ title: t('community.toasts.commentAddFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -115,18 +115,18 @@ export default function PostDetail() {
     mutationFn: deleteComment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
-      toast({ title: 'Comment deleted' });
+      toast({ title: t('community.toasts.commentDeleted') });
     },
   });
 
   const deletePostMutation = useMutation({
     mutationFn: () => deletePost(postId!),
     onSuccess: () => {
-      toast({ title: 'Post deleted' });
+      toast({ title: t('community.toasts.postDeleted') });
       navigate(`${routes.community.feed}?scope=${scope}`);
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to delete post', description: error.message, variant: 'destructive' });
+      toast({ title: t('community.toasts.postDeleteFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -161,14 +161,14 @@ export default function PostDetail() {
         reason,
       }),
     onSuccess: () => {
-      toast({ title: 'Report submitted', description: 'Thank you for helping keep our community safe.' });
+      toast({ title: t('community.toasts.reportSubmitted'), description: t('community.toasts.reportSubmittedDescription') });
       setShowReportDialog(false);
     },
     onError: (error: Error) => {
       // 409 (already reported) is handled at the dialog boundary (#21) — it gets
       // its own informational toast there, not a misleading failure toast here.
       if (error instanceof ApiError && error.status === 409) return;
-      toast({ title: 'Failed to submit report', description: error.message, variant: 'destructive' });
+      toast({ title: t('community.toasts.reportSubmitFailed'), description: error.message, variant: 'destructive' });
     },
   });
 

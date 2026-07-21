@@ -111,10 +111,10 @@ export default function IdeaLibrary() {
     mutationFn: deleteIdea,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
-      toast.success('Idea deleted successfully');
+      toast.success(t('community.toasts.ideaDeleted'));
     },
     onError: (error) => {
-      toast.error('Failed to delete idea');
+      toast.error(t('community.toasts.ideaDeleteFailed'));
       console.error('Delete error:', error);
     },
   });

@@ -94,7 +94,7 @@ export default function IdeaDetail() {
       // (matches PostDetail) — no success toast (toast policy). Errors keep toasts.
     },
     onError: () => {
-      toast.error('Failed to add comment');
+      toast.error(t('community.toasts.commentAddFailed'));
     },
   });
 
@@ -106,7 +106,7 @@ export default function IdeaDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
     },
     onError: () => {
-      toast.error('Failed to vote');
+      toast.error(t('community.toasts.voteFailed'));
     },
   });
 
@@ -117,7 +117,7 @@ export default function IdeaDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
     },
     onError: () => {
-      toast.error('Failed to remove vote');
+      toast.error(t('community.toasts.unvoteFailed'));
     },
   });
 
@@ -135,7 +135,7 @@ export default function IdeaDetail() {
       flash('ideaStatus');
     },
     onError: () => {
-      toast.error('Failed to update status');
+      toast.error(t('community.toasts.statusUpdateFailed'));
     },
   });
 

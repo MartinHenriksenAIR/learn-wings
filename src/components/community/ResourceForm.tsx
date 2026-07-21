@@ -136,7 +136,7 @@ export function ResourceForm({
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://..."
+              placeholder={t('community.resourceForm.urlPlaceholder')}
             />
           </div>
 

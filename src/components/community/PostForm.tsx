@@ -271,7 +271,7 @@ export function PostForm({
                       <FormControl>
                         <Input
                           type="url"
-                          placeholder="https://..."
+                          placeholder={t('community.postForm.urlPlaceholder')}
                           {...field}
                         />
                       </FormControl>

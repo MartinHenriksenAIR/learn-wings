@@ -118,7 +118,7 @@ export function CommentThread({
   const handleCopyCommentLink = async (commentId: string) => {
     const commentUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#comment-${commentId}`;
     await navigator.clipboard.writeText(commentUrl);
-    toast({ title: 'Comment link copied' });
+    toast({ title: t('community.toasts.commentLinkCopied') });
   };
 
   return (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -20,12 +21,14 @@ interface ReportDialogProps {
   targetType: 'post' | 'comment';
 }
 
+// Stable machine `value`s (persisted upstream as the report reason); the
+// human-facing text is resolved through i18n via `labelKey` at render time.
 const REPORT_REASONS = [
-  { value: 'spam', label: 'Spam or misleading' },
-  { value: 'inappropriate', label: 'Inappropriate content' },
-  { value: 'harassment', label: 'Harassment or bullying' },
-  { value: 'off-topic', label: 'Off-topic or irrelevant' },
-  { value: 'other', label: 'Other' },
+  { value: 'spam', labelKey: 'community.reportDialog.reasonSpam' },
+  { value: 'inappropriate', labelKey: 'community.reportDialog.reasonInappropriate' },
+  { value: 'harassment', labelKey: 'community.reportDialog.reasonHarassment' },
+  { value: 'off-topic', labelKey: 'community.reportDialog.reasonOffTopic' },
+  { value: 'other', labelKey: 'community.reportDialog.reasonOther' },
 ];
 
 export function ReportDialog({
@@ -34,15 +37,23 @@ export function ReportDialog({
   onSubmit,
   targetType,
 }: ReportDialogProps) {
+  const { t } = useTranslation();
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [customReason, setCustomReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const typeLabel = t(
+    targetType === 'post'
+      ? 'community.reportDialog.typePost'
+      : 'community.reportDialog.typeComment',
+  );
+
   const handleSubmit = async () => {
-    const reason = selectedReason === 'other' 
-      ? customReason.trim() 
-      : REPORT_REASONS.find(r => r.value === selectedReason)?.label || selectedReason;
-    
+    const matched = REPORT_REASONS.find(r => r.value === selectedReason);
+    const reason = selectedReason === 'other'
+      ? customReason.trim()
+      : (matched ? t(matched.labelKey) : selectedReason);
+
     if (!reason) return;
     
     setIsSubmitting(true);
@@ -66,9 +77,9 @@ export function ReportDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Report {targetType}</DialogTitle>
+          <DialogTitle>{t('community.reportDialog.title', { type: typeLabel })}</DialogTitle>
           <DialogDescription>
-            Help us understand what's wrong with this {targetType}. Your report will be reviewed by moderators.
+            {t('community.reportDialog.description', { type: typeLabel })}
           </DialogDescription>
         </DialogHeader>
 
@@ -78,7 +89,7 @@ export function ReportDialog({
               <div key={reason.value} className="flex items-center space-x-2">
                 <RadioGroupItem value={reason.value} id={reason.value} />
                 <Label htmlFor={reason.value} className="font-normal">
-                  {reason.label}
+                  {t(reason.labelKey)}
                 </Label>
               </div>
             ))}
@@ -86,10 +97,10 @@ export function ReportDialog({
 
           {selectedReason === 'other' && (
             <div className="space-y-2">
-              <Label htmlFor="custom-reason">Please describe the issue</Label>
+              <Label htmlFor="custom-reason">{t('community.reportDialog.customLabel')}</Label>
               <Textarea
                 id="custom-reason"
-                placeholder="Describe why you're reporting this content..."
+                placeholder={t('community.reportDialog.customPlaceholder')}
                 value={customReason}
                 onChange={(e) => setCustomReason(e.target.value)}
                 className="min-h-[100px]"
@@ -104,14 +115,14 @@ export function ReportDialog({
             onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={!isValid || isSubmitting}
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            Submit Report
+            {t('community.reportDialog.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
@@ -12,6 +13,7 @@ import { Loader2 } from 'lucide-react';
 import type { CommunityScope, CreatePostInput } from '@/lib/community-types';
 
 export default function PostEdit() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { scope: routeScope, postId } = useParams<{ scope: CommunityScope; postId: string }>();
   const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
@@ -42,11 +44,11 @@ export default function PostEdit() {
       });
     },
     onSuccess: () => {
-      toast({ title: 'Post updated' });
+      toast({ title: t('community.toasts.postUpdated') });
       navigate(routes.community.postDetail(scope, postId!));
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to update post', description: error.message, variant: 'destructive' });
+      toast({ title: t('community.toasts.postUpdateFailed'), description: error.message, variant: 'destructive' });
     },
   });
 

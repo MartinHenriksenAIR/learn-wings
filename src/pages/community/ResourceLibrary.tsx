@@ -92,10 +92,10 @@ export default function ResourceLibrary() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityResources.all });
-      toast({ title: 'Resource added successfully!' });
+      toast({ title: t('community.toasts.resourceAdded') });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to add resource', description: error.message, variant: 'destructive' });
+      toast({ title: t('community.toasts.resourceAddFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -105,11 +105,11 @@ export default function ResourceLibrary() {
       updateResource(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityResources.all });
-      toast({ title: 'Resource updated!' });
+      toast({ title: t('community.toasts.resourceUpdated') });
       setEditingResource(null);
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to update resource', description: error.message, variant: 'destructive' });
+      toast({ title: t('community.toasts.resourceUpdateFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -118,11 +118,11 @@ export default function ResourceLibrary() {
     mutationFn: deleteResource,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityResources.all });
-      toast({ title: 'Resource deleted' });
+      toast({ title: t('community.toasts.resourceDeleted') });
       setDeleteConfirm(null);
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to delete resource', description: error.message, variant: 'destructive' });
+      toast({ title: t('community.toasts.resourceDeleteFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
