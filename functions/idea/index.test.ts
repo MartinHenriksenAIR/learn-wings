@@ -168,4 +168,18 @@ describe('idea', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
+
+  // #180 — idea detail author payload must carry avatar_url.
+  it('joins avatar_url into the idea author profile payload', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    const idea = { id: 'idea-1', org_id: 'org-1', user_id: 'a1', status: 'submitted', profile: { id: 'a1', full_name: 'Ann', avatar_url: 'avatars/a1.png' } };
+    mockQueryOne.mockResolvedValueOnce(idea);
+
+    const res = await handler(baseReq({ ideaId: 'idea-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("'avatar_url', pr.avatar_url");
+    expect(JSON.parse(res.body as string).idea.profile.avatar_url).toBe('avatars/a1.png');
+  });
 });

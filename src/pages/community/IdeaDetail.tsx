@@ -511,10 +511,9 @@ export default function IdeaDetail() {
                   <div className="flex gap-3">
                     <BrandingAvatar
                       avatarPath={comment.profile?.avatar_url}
-                      fallback={getInitials(comment.profile?.full_name)}
+                      name={comment.profile?.full_name}
                       className="h-8 w-8 shrink-0"
                       fallbackClassName="text-[11px] font-bold text-white"
-                      fallbackStyle={{ backgroundColor: getAvatarColor(comment.profile?.full_name) }}
                     />
                     <div className="flex-1">
                       <div className="mb-1 flex items-center gap-2">

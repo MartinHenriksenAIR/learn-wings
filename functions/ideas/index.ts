@@ -1,5 +1,6 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
+import { profileJson } from '../shared/profile-json';
 
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
@@ -92,7 +93,7 @@ export default endpoint('ideas', async ({ req, profile, reply, requireActiveMemb
 
   const ideas = await query(`
     SELECT i.*,
-      json_build_object('id', pr.id, 'full_name', pr.full_name, 'avatar_url', pr.avatar_url) AS profile,
+      ${profileJson('pr')} AS profile,
       (SELECT count(*)::int FROM idea_comments c WHERE c.idea_id = i.id) AS comment_count,
       (SELECT count(*)::int FROM idea_votes v WHERE v.idea_id = i.id) AS vote_count
     FROM ideas i

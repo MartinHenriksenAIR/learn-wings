@@ -22,10 +22,7 @@ import { routes } from '@/lib/routes';
 // the default href resolving in every locale.
 const DEFAULT_BREADCRUMB_HREFS = {
   community: routes.community.feed,
-  courses: routes.learner.courses,
   ideaLibrary: routes.community.ideas,
-  resources: routes.community.resources,
-  organizations: routes.platformAdmin.organizations,
 } as const;
 
 export type BreadcrumbHrefKey = keyof typeof DEFAULT_BREADCRUMB_HREFS;

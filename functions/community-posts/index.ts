@@ -1,6 +1,7 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isOrgAdmin } from '../shared/profile';
+import { profileJson } from '../shared/profile-json';
 
 export default endpoint('community-posts', async ({ req, profile, reply, requireActiveMember }) => {
   const body = await req.json() as {
@@ -91,7 +92,7 @@ export default endpoint('community-posts', async ({ req, profile, reply, require
   const posts = await query(`
     SELECT p.*,
       row_to_json(c.*) AS category,
-      json_build_object('id', pr.id, 'full_name', pr.full_name, 'avatar_url', pr.avatar_url) AS profile,
+      ${profileJson('pr')} AS profile,
       CASE WHEN o.id IS NULL THEN NULL ELSE json_build_object('id', o.id, 'name', o.name) END AS organization,
       (SELECT count(*)::int FROM community_comments cc WHERE cc.post_id = p.id AND ($${kIndex} OR cc.is_hidden = false)) AS comment_count
     FROM community_posts p

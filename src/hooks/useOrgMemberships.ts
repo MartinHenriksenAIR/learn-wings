@@ -15,9 +15,8 @@ interface MembershipRow {
   status: 'active' | 'invited' | 'disabled';
   created_at: string;
   full_name: string;
-  // The endpoint also returns email (no Profile slot — kept to document the
-  // wire shape) and avatar_url (flows into the reshaped Profile below for
-  // avatar display in the member tables).
+  // The endpoint also returns email and avatar_url, both of which flow into the
+  // reshaped Profile below (email for the member tables, avatar_url for avatars).
   email: string;
   avatar_url: string | null;
   department: string | null;
@@ -40,6 +39,7 @@ function reshapeMembership(row: MembershipRow): MemberWithProfile {
       first_name: null,
       last_name: null,
       department: row.department,
+      email: row.email,
       avatar_url: row.avatar_url,
       is_platform_admin: false,
       created_at: row.created_at,

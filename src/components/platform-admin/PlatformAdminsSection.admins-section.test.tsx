@@ -35,21 +35,9 @@ vi.mock('@/components/ui/alert-dialog', () => {
 
 // --- passthrough Select: each item is a button that sets the selection via the
 // parent's onValueChange (jsdom can't drive Radix Select). ---
-vi.mock('@/components/ui/select', () => {
-  const Ctx = React.createContext<((v: string) => void) | undefined>(undefined);
-  const Select = ({ children, onValueChange }: { children?: React.ReactNode; onValueChange?: (v: string) => void }) =>
-    React.createElement(Ctx.Provider, { value: onValueChange }, React.createElement('div', null, children));
-  const SelectItem = ({ children, value }: { children?: React.ReactNode; value: string }) => {
-    const onValueChange = React.useContext(Ctx);
-    return React.createElement('button', { onClick: () => onValueChange?.(value) }, children);
-  };
-  const pass = ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('div', null, children);
-  return { Select, SelectItem, SelectTrigger: pass, SelectValue: pass, SelectContent: pass };
-});
+vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
-import { PlatformAdminsSection } from './PlatformAdminsSection';
-import type { PlatformAdmin } from '@/hooks/usePlatformAdmins';
+import { PlatformAdminsSection, type PlatformAdmin } from './PlatformAdminsSection';
 
 const admins: PlatformAdmin[] = [
   { id: 'p1', full_name: 'Ada Admin', email: 'ada@contoso.com' },

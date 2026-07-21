@@ -77,7 +77,7 @@ export default function PostEdit() {
   }
 
   if (!post) {
-    return <Navigate to={routes.community.scope(scope)} replace />;
+    return <Navigate to={`${routes.community.feed}?scope=${scope}`} replace />;
   }
 
   if (!isAuthor) {

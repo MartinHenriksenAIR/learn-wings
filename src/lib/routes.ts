@@ -36,8 +36,6 @@ export const routes = {
   },
   community: {
     feed: '/app/community',
-    /** Scope-rooted community landing (redirect target). */
-    scope: (scope: string) => `/app/community/${scope}`,
     postDetailPattern: '/app/community/:scope/posts/:postId',
     postDetail: (scope: string, postId: string) => `/app/community/${scope}/posts/${postId}`,
     postEditPattern: '/app/community/:scope/posts/:postId/edit',

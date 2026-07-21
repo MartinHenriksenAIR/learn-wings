@@ -207,4 +207,18 @@ describe('community-posts', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
+
+  // #180 — the author payload must carry avatar_url so the community feed can render
+  // profile photos: the joined `profile` object includes avatar_url (no extra query / N+1).
+  it('joins avatar_url into the author profile payload', async () => {
+    const rows = [{ id: 'post-1', title: 'Hello', profile: { id: 'a1', full_name: 'Ann', avatar_url: 'avatars/a1.png' } }];
+    mockQuery.mockResolvedValueOnce(rows);
+
+    const res = await handler(baseReq({ scope: 'global' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("'avatar_url', pr.avatar_url");
+    expect(JSON.parse(res.body as string).posts[0].profile.avatar_url).toBe('avatars/a1.png');
+  });
 });

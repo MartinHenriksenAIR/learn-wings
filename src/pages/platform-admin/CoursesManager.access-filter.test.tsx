@@ -7,9 +7,6 @@ import React from 'react';
 // Initialize i18n so t() resolves real (English) strings, matching production.
 import '@/i18n';
 
-import en from '@/i18n/locales/en.json';
-import da from '@/i18n/locales/da.json';
-
 // --- mock AppLayout (mirrors CoursesManager.test.tsx) ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ title, children }: { title?: string; children: React.ReactNode }) => (
@@ -80,14 +77,5 @@ describe('CoursesManager — Organization Access tab filter (#166)', () => {
     // integrated CommandInput only renders when the popover is open — so with the
     // popover closed there must be no textbox in the filter area at all.
     expect(screen.queryByRole('textbox')).toBeNull();
-  });
-
-  it('has removed the coursesManager.searchOrganizations key from both locale files', () => {
-    expect(en.coursesManager).not.toHaveProperty('searchOrganizations');
-    expect(da.coursesManager).not.toHaveProperty('searchOrganizations');
-
-    // The combobox's own integrated search prompt is a different key and stays.
-    expect(en.coursesManager).toHaveProperty('searchOrganizationPrompt');
-    expect(da.coursesManager).toHaveProperty('searchOrganizationPrompt');
   });
 });

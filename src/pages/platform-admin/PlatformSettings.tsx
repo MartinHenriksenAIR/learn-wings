@@ -23,7 +23,6 @@ import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 import { useToastMutation } from '@/hooks/useToastMutation';
 import { usePlatformSettingsAdmin } from '@/hooks/usePlatformSettingsAdmin';
-import { usePlatformAdmins } from '@/hooks/usePlatformAdmins';
 import { useProfiles } from '@/hooks/useProfiles';
 import { PlatformAdminsSection } from '@/components/platform-admin/PlatformAdminsSection';
 import { queryKeys } from '@/lib/query-keys';
@@ -137,11 +136,22 @@ export default function PlatformSettings() {
   const query = usePlatformSettingsAdmin();
   const queryClient = useQueryClient();
 
-  // Platform-admin management (#128). Both lists are platform-admin-only reads,
-  // fetched lazily only once the admins tab is opened.
+  // Platform-admin management (#128, #198). Both lists derive from the single
+  // /api/profiles read (it already returns is_platform_admin), fetched lazily
+  // only once the admins tab is opened — the dedicated /api/platform-admins list
+  // endpoint was dropped as redundant.
   const platformAdminsTabActive = activeTab === 'platform_admins';
-  const adminsQuery = usePlatformAdmins({ enabled: platformAdminsTabActive });
   const profilesQuery = useProfiles({ enabled: platformAdminsTabActive });
+
+  // Current admins: every user already holding is_platform_admin, projected to
+  // the shape PlatformAdminsSection renders.
+  const admins = useMemo(
+    () =>
+      (profilesQuery.data ?? [])
+        .filter((p) => p.is_platform_admin)
+        .map((p) => ({ id: p.id, full_name: p.full_name, email: p.email })),
+    [profilesQuery.data],
+  );
 
   // Grant candidates: every user who is not already a platform admin.
   const grantCandidates = useMemo(
@@ -149,8 +159,9 @@ export default function PlatformSettings() {
     [profilesQuery.data],
   );
 
+  // Grant/revoke flips is_platform_admin, so refresh the profiles read that both
+  // derived lists come from.
   const invalidatePlatformAdmins = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.platformAdmins.all });
     queryClient.invalidateQueries({ queryKey: queryKeys.profiles.all });
   };
 
@@ -642,24 +653,24 @@ export default function PlatformSettings() {
         {activeTab === 'platform_admins' && (
           <Card>
             <CardContent className="px-[26px] py-6">
-              {adminsQuery.isPending ? (
+              {profilesQuery.isPending ? (
                 <div className="flex h-40 items-center justify-center">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
-              ) : !adminsQuery.isSuccess ? (
+              ) : !profilesQuery.isSuccess ? (
                 <EmptyState
                   icon={<AlertTriangle className="h-6 w-6" />}
                   title={t('platformAdmins.loadFailedTitle')}
                   description={t('platformAdmins.loadFailedDescription')}
                   action={
-                    <Button variant="outline" onClick={() => adminsQuery.refetch()}>
+                    <Button variant="outline" onClick={() => profilesQuery.refetch()}>
                       {t('platformSettings.retry')}
                     </Button>
                   }
                 />
               ) : (
                 <PlatformAdminsSection
-                  admins={adminsQuery.data}
+                  admins={admins}
                   availableUsers={grantCandidates}
                   onGrant={(userId) => grantAdminMutation.mutate(userId)}
                   onRevoke={(userId) => revokeAdminMutation.mutate(userId)}

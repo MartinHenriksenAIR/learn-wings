@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
-import { cn, getAvatarColor, getInitials } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import type { CommunityComment } from '@/lib/community-types';
 
 interface CommentItemProps {
@@ -46,7 +46,6 @@ export function CommentItem({
   const [editContent, setEditContent] = useState(comment.content);
 
   const authorName = comment.profile?.full_name;
-  const initials = getInitials(authorName);
 
   const isAuthor = currentUserId === comment.user_id;
   const canEdit = isAuthor && !comment.is_hidden;
@@ -82,10 +81,9 @@ export function CommentItem({
     >
       <BrandingAvatar
         avatarPath={comment.profile?.avatar_url}
-        fallback={initials}
+        name={authorName}
         className="h-7 w-7 flex-shrink-0"
         fallbackClassName="text-[10px] font-bold text-white"
-        fallbackStyle={{ backgroundColor: getAvatarColor(authorName) }}
       />
       <div className="flex-1 space-y-1">
         <div className="flex items-center justify-between">

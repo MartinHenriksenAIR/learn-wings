@@ -1182,3 +1182,22 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Verify (post-fix, full suite):** root `npm run lint` 0 errors · `npm test` **375 pass** (70 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0 · functions `npm run build` exit 0 · `npm test` **1730 pass** (129 files, 3 skipped). Promote re-validated the composed tip against fresh `origin/main` before push. Merged via PR #196 → `main`; SWA + functions deploys auto-fire. Closes #193 #166 #180 #128 #178 #195.
 
 ---
+
+## 2026-07-21 — Helm cleanup batch: 7 review-follow-up issues shipped (#197–#203, promote PR)
+
+**Who:** emil as conductor + a second Helm fleet run, same day as the overnight batch. The seven cleanup issues distilled from the overnight review pass (#197–#203) were filed on the board, per-issue decisions grilled and frontloaded in conversation, published via the `.helm/plan/` seam (`cleanup-2026-07-21`, two dependency edges), approved ~10:45, all merged to `integration/ralph` by ~12:50. One transient hiccup (#200's post-green review pass exited non-zero → auto re-queued and recovered) and one benign merge race (#203 re-merged the moving integration tip cleanly); zero human interventions.
+
+**What shipped (net −350 LOC of production code; +≈600 LOC of new proof tests):**
+- **#197** — shared `profileJson(alias)` fragment in `functions/shared/profile-json.ts` replaces the ~10 hand-copied author-profile `json_build_object` variants; `RESOURCE_PROFILE_PROJECTION` normalized onto it (resources gain `avatar_url`; the projected-but-never-consumed `department` dropped). `ai_champions` keeps its wider hand-rolled projection deliberately (it needs `department`). Guard test `profile-json.test.ts` fails the build if an endpoint hand-rolls the canonical fragment again.
+- **#198** — redundant `/api/platform-admins` list endpoint deleted (folder + barrel); `usePlatformAdmins` + query key deleted; PlatformSettings derives admins AND grant-candidates from the existing `useProfiles` query; profiles-error now renders as an error instead of the misleading "all users are already admins" empty-state.
+- **#199** — the 7 standalone `avatar-payload.test.ts` files folded into each endpoint's sibling `index.test.ts` (assertions preserved, updated to the `profileJson` output); new `functions/test-placement.test.ts` pins the convention.
+- **#200** — `seat-request-notify.ts`: three near-identical Resend wrappers → one `sendBestEffort()` + `FROM_ADDRESS` const; null-recipient guard now also covers the original admin notify; subjects stay RAW plain text but get CR/LF stripped (`sanitizeSubject`).
+- **#201** — `BrandingAvatar` gains an optional `name` prop deriving initials + fallback color internally (explicit props still win); the 7 hand-derived call-site clusters collapsed.
+- **#202** — routes-gate's hand-rolled comment-stripping lexer replaced by a TS-compiler-API scanner (`src/lib/routes-gate-scanner.ts`, string/template-literal visitor, file:line offender reporting); same allow-list, same verdict on the tree; fixture-backed `routes-gate-scanner.test.ts`.
+- **#203** — dead-code sweep: 3 unreachable `DEFAULT_BREADCRUMB_HREFS` entries deleted; PostEdit's `!post` redirect fixed from the 404ing `routes.community.scope()` to the PostDetail idiom `` `${routes.community.feed}?scope=${scope}` `` (deliberate behavior change) and the dead `scope` builder deleted; `GrantCandidate` de-exported; i18n-key-absence test block removed; the 5 inline Radix Select test mocks hoisted to shared `src/test/select-mock.tsx`.
+
+**Sanity pass (light, per conductor scope — no review fan-out):** 60-file diff footprint matches the plan exactly (no stray files); all four frontloaded decisions verified in the diff (extend-not-wrap avatar, avatar_url normalization, raw-but-newline-stripped subjects, PostEdit redirect idiom); the resources `department` drop confirmed consumer-free by grep.
+
+**Verify (final tip, from #203's gated post-merge re-run):** root `npm run lint` 0 errors · `npm test` **390 pass** (74 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0 · functions `npm run build` exit 0 · `npm test` **1840 pass** (124 files, 3 skipped). Promote re-validates against fresh `origin/main` before push. Closes #197 #198 #199 #200 #201 #202 #203.
+
+---

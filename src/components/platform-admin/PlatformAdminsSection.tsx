@@ -19,10 +19,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import type { PlatformAdmin } from '@/hooks/usePlatformAdmins';
+/** A current platform admin, projected from a profile (#198). */
+export interface PlatformAdmin {
+  id: string;
+  full_name: string;
+  email: string | null;
+}
 
 /** A user who could be granted platform-admin (non-admin profile). */
-export interface GrantCandidate {
+interface GrantCandidate {
   id: string;
   full_name: string;
 }

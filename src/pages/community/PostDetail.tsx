@@ -55,7 +55,6 @@ import {
   Pin,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { getAvatarColor, getInitials } from '@/lib/utils';
 import type { CommunityScope } from '@/lib/community-types';
 
 export default function PostDetail() {
@@ -236,7 +235,6 @@ export default function PostDetail() {
   }
 
   const authorName = post.profile?.full_name;
-  const initials = getInitials(authorName);
 
   const isEvent = post.category?.slug === 'events';
 
@@ -258,10 +256,9 @@ export default function PostDetail() {
           <div className="mb-3.5 flex items-center gap-2.5">
             <BrandingAvatar
               avatarPath={post.profile?.avatar_url}
-              fallback={initials}
+              name={authorName}
               className="h-[38px] w-[38px] shrink-0"
               fallbackClassName="text-xs font-bold text-white"
-              fallbackStyle={{ backgroundColor: getAvatarColor(authorName) }}
             />
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-[13.5px] font-bold">{authorName || t('community.unknownUser')}</span>

@@ -36,29 +36,8 @@ vi.mock('@/lib/api-client', () => {
   return { callApi: vi.fn(), ApiError: MockApiError };
 });
 
-// --- replace the Radix Select with a clickable list (jsdom can't drive Radix Select).
-// --- createElement (not JSX) because vi.mock factories are hoisted above the jsx-runtime import ---
-vi.mock('@/components/ui/select', async () => {
-  const ReactActual = await import('react');
-  const h = ReactActual.createElement;
-  const Ctx = ReactActual.createContext<(v: string) => void>(() => {});
-  return {
-    Select: ({
-      children,
-      onValueChange,
-    }: {
-      children?: React.ReactNode;
-      onValueChange: (v: string) => void;
-    }) => h(Ctx.Provider, { value: onValueChange }, children),
-    SelectTrigger: ({ children }: { children?: React.ReactNode }) => h('div', null, children),
-    SelectValue: ({ placeholder }: { placeholder?: string }) => h('span', null, placeholder),
-    SelectContent: ({ children }: { children?: React.ReactNode }) => h('div', null, children),
-    SelectItem: ({ children, value }: { children?: React.ReactNode; value: string }) => {
-      const onChange = ReactActual.useContext(Ctx);
-      return h('button', { type: 'button', onClick: () => onChange(value) }, children);
-    },
-  };
-});
+// --- replace the Radix Select with a clickable list (jsdom can't drive Radix Select) ---
+vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
 // --- ScrollArea uses ResizeObserver; a plain div is enough here ---
 vi.mock('@/components/ui/scroll-area', async () => {
