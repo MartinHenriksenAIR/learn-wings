@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
 import { TagList } from './TagList';
 import { MessageSquare, ThumbsUp, Trash2 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNowLocalized } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { EnhancedIdea } from '@/lib/community-types';
@@ -28,7 +28,7 @@ interface IdeaCardProps {
 }
 
 export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
   const { profile, effectiveIsOrgAdmin } = useAuth();
 
@@ -119,7 +119,7 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
         <span className="min-w-0 truncate font-medium">
           {idea.profile?.full_name || t('community.unknownUser')}
           {' · '}
-          {formatDistanceToNow(new Date(idea.created_at), { addSuffix: true })}
+          {formatDistanceToNowLocalized(new Date(idea.created_at), i18n.language)}
         </span>
       </div>
     </div>

@@ -32,7 +32,7 @@ import {
 import { BUSINESS_AREAS, IDEA_STATUS_OPTIONS } from '@/lib/community-types';
 import type { IdeaStatusExtended } from '@/lib/community-types';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNowLocalized } from '@/lib/date-locale';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -46,7 +46,7 @@ import {
 export default function IdeaDetail() {
   const { ideaId } = useParams<{ ideaId: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { profile, currentOrg, effectiveIsOrgAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
@@ -219,7 +219,7 @@ export default function IdeaDetail() {
           <p className="mb-4 text-[12.5px] font-semibold text-[#9aa0af]">
             {t('community.submittedBy', { name: idea.profile?.full_name || t('community.unknownUser') })}
             {' · '}
-            {formatDistanceToNow(new Date(idea.created_at), { addSuffix: true })}
+            {formatDistanceToNowLocalized(new Date(idea.created_at), i18n.language)}
           </p>
           <div className="flex flex-wrap items-center gap-2.5 border-t border-[#eceef3] pt-4">
             <button
@@ -518,7 +518,7 @@ export default function IdeaDetail() {
                           {comment.profile?.full_name || t('community.unknownUser')}
                         </span>
                         <span className="text-[11.5px] text-[#9aa0af]">
-                          {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                          {formatDistanceToNowLocalized(new Date(comment.created_at), i18n.language)}
                         </span>
                       </div>
                       <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#4a4f60]">

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { CategoryBadge } from './CategoryBadge';
 import { TagList } from './TagList';
 import { MessageSquare, Pin, Lock, Calendar, MapPin, ExternalLink, Eye, EyeOff } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDate, formatDistanceToNowLocalized } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
@@ -24,7 +24,7 @@ export function PostCard({
   onToggleHide,
   onToggleLock,
 }: PostCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const authorName = post.profile?.full_name;
 
   const isEvent = post.category?.slug === 'events';
@@ -48,7 +48,7 @@ export function PostCard({
         <div className="flex min-w-0 flex-col">
           <span className="truncate text-[13px] font-bold">{authorName || t('community.unknownUser')}</span>
           <span className="text-[11.5px] text-[#9aa0af]">
-            {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+            {formatDistanceToNowLocalized(new Date(post.created_at), i18n.language)}
           </span>
         </div>
         <div className="flex-1" />
@@ -88,7 +88,7 @@ export function PostCard({
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-[7px] text-xs font-bold text-accent-foreground">
             <Calendar aria-hidden="true" className="h-[13px] w-[13px]" />
-            {format(new Date(post.event_date), 'MMM d, h:mm a')}
+            {formatDate(new Date(post.event_date), 'MMM d, h:mm a', i18n.language)}
           </span>
           {post.event_location && (
             <span className="inline-flex max-w-[220px] items-center gap-2 rounded-lg bg-accent px-3 py-[7px] text-xs font-bold text-accent-foreground">

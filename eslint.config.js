@@ -130,6 +130,10 @@ export default tseslint.config(
               "getAttribute",
               "setAttribute",
               "format",
+              // Locale-aware date-fns wrappers (src/lib/date-locale.ts, #209):
+              // args are a date + a format pattern + a language code, not prose.
+              "formatDate",
+              "formatDistanceToNowLocalized",
               "parseISO",
               "createElement",
               "setValue",

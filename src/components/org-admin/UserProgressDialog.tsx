@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -33,7 +34,7 @@ import {
   Calendar,
   TrendingUp,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/date-locale';
 
 interface UserProgressDialogProps {
   userId: string;
@@ -50,6 +51,7 @@ export function UserProgressDialog({
   open,
   onOpenChange,
 }: UserProgressDialogProps) {
+  const { i18n } = useTranslation();
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
 
   // Fetch gated on dialog open — query key includes userId so switching users
@@ -142,7 +144,7 @@ export function UserProgressDialog({
                 <CardContent className="p-3 text-center">
                   <Calendar className="mx-auto h-5 w-5 text-muted-foreground" />
                   <p className="mt-1 text-sm font-bold">
-                    {lastActivity ? format(new Date(lastActivity), 'MMM d') : '—'}
+                    {lastActivity ? formatDate(new Date(lastActivity), 'MMM d', i18n.language) : '—'}
                   </p>
                   <p className="text-xs text-muted-foreground">Last Active</p>
                 </CardContent>
@@ -196,7 +198,7 @@ export function UserProgressDialog({
                             </div>
                             {course.completedAt && (
                               <p className="mt-1 text-xs text-muted-foreground">
-                                Completed on {format(new Date(course.completedAt), 'MMM d, yyyy')}
+                                Completed on {formatDate(new Date(course.completedAt), 'MMM d, yyyy', i18n.language)}
                               </p>
                             )}
                           </div>
@@ -277,7 +279,7 @@ export function UserProgressDialog({
                                           </Badge>
                                         </TableCell>
                                         <TableCell className="text-right text-xs">
-                                          {format(new Date(attempt.startedAt), 'MMM d, h:mm a')}
+                                          {formatDate(new Date(attempt.startedAt), 'MMM d, h:mm a', i18n.language)}
                                         </TableCell>
                                       </TableRow>
                                     ))}

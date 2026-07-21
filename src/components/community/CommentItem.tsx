@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNowLocalized } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
 import type { CommunityComment } from '@/lib/community-types';
 
@@ -41,7 +41,7 @@ export function CommentItem({
   highlightedCommentId = null,
   depth = 0,
 }: CommentItemProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
 
@@ -90,7 +90,7 @@ export function CommentItem({
           <div className="flex items-center gap-2">
             <span className="text-[12.5px] font-bold">{authorName || t('community.unknownUser')}</span>
             <span className="text-[11px] text-[#9aa0af]">
-              {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+              {formatDistanceToNowLocalized(new Date(comment.created_at), i18n.language)}
             </span>
             {comment.is_hidden && (
               <span className="rounded-[7px] bg-[#fbf2dd] px-2 py-0.5 text-[10.5px] font-bold text-warning">

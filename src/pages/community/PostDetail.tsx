@@ -54,7 +54,7 @@ import {
   Loader2,
   Pin,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/date-locale';
 import type { CommunityScope } from '@/lib/community-types';
 
 export default function PostDetail() {
@@ -63,7 +63,7 @@ export default function PostDetail() {
   const scope = (routeScope || 'org') as CommunityScope;
   const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
 
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -263,7 +263,7 @@ export default function PostDetail() {
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-[13.5px] font-bold">{authorName || t('community.unknownUser')}</span>
               <span className="text-[11.5px] text-[#9aa0af]">
-                {format(new Date(post.created_at), 'MMM d, yyyy · h:mm a')}
+                {formatDate(new Date(post.created_at), 'MMM d, yyyy · h:mm a', i18n.language)}
               </span>
             </div>
             <div className="flex-1" />
@@ -306,7 +306,7 @@ export default function PostDetail() {
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-[9px] text-[12.5px] font-bold text-accent-foreground">
                 <Calendar aria-hidden="true" className="h-3.5 w-3.5" />
-                {format(new Date(post.event_date), 'EEEE, MMMM d, yyyy · h:mm a')}
+                {formatDate(new Date(post.event_date), 'EEEE, MMMM d, yyyy · h:mm a', i18n.language)}
               </span>
               {post.event_location && (
                 <span className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-[9px] text-[12.5px] font-bold text-accent-foreground">

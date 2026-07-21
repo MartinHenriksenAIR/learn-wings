@@ -17,7 +17,7 @@ import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/sonner';
 import { Loader2, Mail, Calendar, Building2 } from 'lucide-react';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/date-locale';
 import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
 import { getInitials } from '@/lib/utils';
@@ -332,7 +332,7 @@ export default function Settings() {
                 <p className="text-sm font-medium">{t('settings.accountCreated')}</p>
                 <p className="text-sm text-muted-foreground">
                   {profile?.created_at
-                    ? format(new Date(profile.created_at), 'MMMM d, yyyy')
+                    ? formatDate(new Date(profile.created_at), 'MMMM d, yyyy', i18n.language)
                     : 'Unknown'}
                 </p>
               </div>

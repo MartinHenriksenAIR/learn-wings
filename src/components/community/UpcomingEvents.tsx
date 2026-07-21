@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Calendar, ExternalLink } from 'lucide-react';
-import { format, isFuture, isToday } from 'date-fns';
+import { isFuture, isToday } from 'date-fns';
+import { formatDate } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
@@ -16,7 +17,7 @@ export function UpcomingEvents({
   onEventClick,
   className,
 }: UpcomingEventsProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Filter and sort upcoming events
   const upcomingEvents = events
@@ -59,7 +60,7 @@ export function UpcomingEvents({
                     isEventToday ? 'text-primary-foreground' : 'text-primary'
                   )}
                 >
-                  {format(eventDate, 'MMM')}
+                  {formatDate(eventDate, 'MMM', i18n.language)}
                 </span>
                 <span
                   className={cn(
@@ -67,15 +68,15 @@ export function UpcomingEvents({
                     isEventToday ? 'text-primary-foreground' : 'text-primary'
                   )}
                 >
-                  {format(eventDate, 'd')}
+                  {formatDate(eventDate, 'd', i18n.language)}
                 </span>
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="line-clamp-1 text-[12.5px] font-bold leading-[1.3]">{event.title}</span>
                 <span className={cn('truncate text-[11.5px]', isEventToday ? 'font-semibold text-primary' : 'text-[#9aa0af]')}>
-                  {isEventToday ? t('community.today') : format(eventDate, 'MMM d')}
+                  {isEventToday ? t('community.today') : formatDate(eventDate, 'MMM d', i18n.language)}
                   {' · '}
-                  {format(eventDate, 'h:mm a')}
+                  {formatDate(eventDate, 'h:mm a', i18n.language)}
                   {event.event_location && ` · ${event.event_location}`}
                 </span>
               </span>
