@@ -1,6 +1,7 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isActiveMember, isOrgAdmin } from '../shared/profile';
+import { profileJson } from '../shared/profile-json';
 
 interface PostRow {
   scope: 'org' | 'global';
@@ -38,7 +39,7 @@ export default endpoint('community-comments', async ({ req, profile, reply }) =>
   const hiddenClause = includeHidden ? '' : 'AND c.is_hidden = false';
 
   const comments = await query(
-    `SELECT c.*, json_build_object('id', pr.id, 'full_name', pr.full_name, 'avatar_url', pr.avatar_url) AS profile
+    `SELECT c.*, ${profileJson('pr')} AS profile
      FROM community_comments c
      JOIN profiles pr ON pr.id = c.user_id
      WHERE c.post_id = $1 ${hiddenClause}

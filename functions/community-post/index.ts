@@ -1,6 +1,7 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isActiveMember, isOrgAdmin } from '../shared/profile';
+import { profileJson } from '../shared/profile-json';
 
 interface PostRow {
   id: string;
@@ -23,7 +24,7 @@ export default endpoint('community-post', async ({ req, profile, reply }) => {
   const post = await queryOne<PostRow>(`
     SELECT p.*,
       row_to_json(c.*) AS category,
-      json_build_object('id', pr.id, 'full_name', pr.full_name, 'avatar_url', pr.avatar_url) AS profile,
+      ${profileJson('pr')} AS profile,
       CASE WHEN o.id IS NULL THEN NULL ELSE json_build_object('id', o.id, 'name', o.name) END AS organization
     FROM community_posts p
     JOIN community_categories c ON c.id = p.category_id
