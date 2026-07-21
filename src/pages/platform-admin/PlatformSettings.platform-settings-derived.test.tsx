@@ -22,20 +22,8 @@ vi.mock('@/components/layout/AppLayout', () => ({
 }));
 
 // --- passthrough Select: each item is a button so candidate names render into
-// the DOM (jsdom can't drive the Radix Select portal). Mirrors the convention in
-// PlatformAdminsSection.admins-section.test. ---
-vi.mock('@/components/ui/select', () => {
-  const Ctx = React.createContext<((v: string) => void) | undefined>(undefined);
-  const Select = ({ children, onValueChange }: { children?: React.ReactNode; onValueChange?: (v: string) => void }) =>
-    React.createElement(Ctx.Provider, { value: onValueChange }, React.createElement('div', null, children));
-  const SelectItem = ({ children, value }: { children?: React.ReactNode; value: string }) => {
-    const onValueChange = React.useContext(Ctx);
-    return React.createElement('button', { onClick: () => onValueChange?.(value) }, children);
-  };
-  const pass = ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('div', null, children);
-  return { Select, SelectItem, SelectTrigger: pass, SelectValue: pass, SelectContent: pass };
-});
+// the DOM (jsdom can't drive the Radix Select portal). ---
+vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
 // --- passthrough AlertDialog (not exercised here, but the section imports it). ---
 vi.mock('@/components/ui/alert-dialog', () => {

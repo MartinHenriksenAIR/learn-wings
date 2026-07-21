@@ -27,7 +27,7 @@ export interface PlatformAdmin {
 }
 
 /** A user who could be granted platform-admin (non-admin profile). */
-export interface GrantCandidate {
+interface GrantCandidate {
   id: string;
   full_name: string;
 }

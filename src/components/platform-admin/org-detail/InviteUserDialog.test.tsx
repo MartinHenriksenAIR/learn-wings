@@ -32,12 +32,7 @@ vi.mock('@/components/ui/dialog', async () => {
 });
 
 // --- passthrough Select (jsdom can't drive Radix Select) ---
-vi.mock('@/components/ui/select', async () => {
-  const ReactActual = await import('react');
-  const h = ReactActual.createElement;
-  const pass = ({ children }: { children?: React.ReactNode }) => h('div', null, children);
-  return { Select: pass, SelectTrigger: pass, SelectValue: pass, SelectContent: pass, SelectItem: pass };
-});
+vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
 import { InviteUserDialog } from './InviteUserDialog';
 
