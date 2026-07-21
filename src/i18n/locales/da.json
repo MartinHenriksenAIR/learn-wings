@@ -222,6 +222,15 @@
     "underReview": "Under gennemgang",
     "approved": "Godkendt",
     "rejected": "Afvist",
+    "ideaStatus": {
+      "draft": "Kladde",
+      "submitted": "Indsendt",
+      "inReview": "Under gennemgang",
+      "accepted": "Godkendt",
+      "rejected": "Afvist",
+      "inProgress": "I gang",
+      "done": "Færdig"
+    },
     "createPost": "Opret opslag",
     "comments": "Kommentarer",
     "report": "Rapporter",

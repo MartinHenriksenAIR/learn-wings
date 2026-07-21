@@ -222,6 +222,15 @@
     "underReview": "Under Review",
     "approved": "Approved",
     "rejected": "Rejected",
+    "ideaStatus": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "inReview": "Under Review",
+      "accepted": "Approved",
+      "rejected": "Rejected",
+      "inProgress": "In Progress",
+      "done": "Done"
+    },
     "createPost": "Create Post",
     "comments": "Comments",
     "report": "Report",
