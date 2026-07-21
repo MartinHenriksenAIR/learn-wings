@@ -241,7 +241,7 @@ export default function PostDetail() {
   const isEvent = post.category?.slug === 'events';
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Post' }]}>
+    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Post' }]}>
       <div className="max-w-[760px]">
         {/* Back button */}
         <Button

@@ -42,21 +42,26 @@ export default adminEndpoint('seat-request-fulfill', async ({ req, context, prof
 
   // Notify the requester that their extra seats are now active (best-effort, requester only).
   // These fields aren't returned by the transaction, so fetch them after the successful bump.
-  const requester = await queryOne<{ email: string | null; preferred_language: string | null }>(
-    `SELECT email, preferred_language FROM profiles WHERE id = $1`,
-    [result.request.requested_by_user_id as string],
-  );
-  const org = await queryOne<{ name: string }>(
-    `SELECT name FROM organizations WHERE id = $1`,
-    [result.request.org_id as string],
-  );
-  await notifySeatRequestFulfilled(context, {
-    recipient: requester?.email ?? null,
-    orgName: org?.name ?? '',
-    additionalSeats: result.request.additional_seats as number,
-    seatLimit: result.seatLimit,
-    language: requester?.preferred_language ?? null,
-  });
+  // The fulfilment has already committed — nothing on this path may fail the response.
+  try {
+    const requester = await queryOne<{ email: string | null; preferred_language: string | null }>(
+      `SELECT email, preferred_language FROM profiles WHERE id = $1`,
+      [result.request.requested_by_user_id as string],
+    );
+    const org = await queryOne<{ name: string }>(
+      `SELECT name FROM organizations WHERE id = $1`,
+      [result.request.org_id as string],
+    );
+    await notifySeatRequestFulfilled(context, {
+      recipient: requester?.email ?? null,
+      orgName: org?.name ?? '',
+      additionalSeats: result.request.additional_seats as number,
+      seatLimit: result.seatLimit,
+      language: requester?.preferred_language ?? null,
+    });
+  } catch (err) {
+    context.error('seat-request-fulfill: requester notification lookup failed', err);
+  }
 
   return reply(200, { request: result.request, seatLimit: result.seatLimit });
 });

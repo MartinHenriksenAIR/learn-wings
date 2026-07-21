@@ -34,13 +34,22 @@ describe('renderSeatRequestReceivedEmail — language pick & escaping', () => {
     expect(html).toContain('3');
   });
 
-  it('HTML-escapes an org name containing markup', () => {
+  it('HTML-escapes the org name in the HTML body but keeps the plain-text subject raw', () => {
     const { subject, html } = renderSeatRequestReceivedEmail({
       recipient: 'a@b.dk', orgName: '<script>&"x"', additionalSeats: 1, language: 'da',
     });
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;&amp;&quot;x&quot;');
-    expect(subject).toContain('&lt;script&gt;');
+    expect(subject).toContain('<script>&"x"');
+    expect(subject).not.toContain('&lt;');
+  });
+
+  it('keeps entity-free org names readable in the subject (no double-encoding)', () => {
+    const { subject } = renderSeatRequestReceivedEmail({
+      recipient: 'a@b.dk', orgName: 'Møller & Sønner A/S', additionalSeats: 1, language: 'da',
+    });
+    expect(subject).toContain('Møller & Sønner A/S');
+    expect(subject).not.toContain('&amp;');
   });
 });
 

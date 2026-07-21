@@ -49,7 +49,7 @@ export default endpoint('community-comment-create', async ({ req, profile, reply
        INSERT INTO community_comments (post_id, user_id, content, parent_comment_id)
        VALUES ($1, $2, $3, $4) RETURNING *
      )
-     SELECT ins.*, json_build_object('id', pr.id, 'full_name', pr.full_name) AS profile
+     SELECT ins.*, json_build_object('id', pr.id, 'full_name', pr.full_name, 'avatar_url', pr.avatar_url) AS profile
      FROM ins JOIN profiles pr ON pr.id = ins.user_id`,
     [postId, profile.id, content, (parentCommentId as string | undefined) ?? null],
   );

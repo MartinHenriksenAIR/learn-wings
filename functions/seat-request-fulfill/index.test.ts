@@ -79,4 +79,19 @@ describe('seat-request-fulfill', () => {
     expect(mockNotifyFulfilled).toHaveBeenCalledTimes(1);
     expect(mockNotifyFulfilled.mock.calls[0][1]).toMatchObject({ recipient: 'requester@acme.dk', orgName: 'Acme', additionalSeats: 5, seatLimit: 15, language: 'en' });
   });
+
+  it('still returns 200 when the post-fulfilment notification lookups fail', async () => {
+    const fulfilled = { id: 'req-1', org_id: 'org-1', requested_by_user_id: 'user-9', additional_seats: 5, status: 'fulfilled' };
+    mockClientQuery.mockResolvedValueOnce(rows({ org_id: 'org-1', status: 'pending', additional_seats: 5 }));
+    mockClientQuery.mockResolvedValueOnce(rows({ seat_limit: 10 }));
+    mockClientQuery.mockResolvedValueOnce(rows({ seat_limit: 15 }));
+    mockClientQuery.mockResolvedValueOnce(rows(fulfilled));
+    mockQueryOne.mockRejectedValue(new Error('transient db error')); // requester/org lookups blow up
+    const context = { error: vi.fn(), log: vi.fn() } as any;
+    const res = await handler(baseReq({ id: 'req-1' }), context);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ request: fulfilled, seatLimit: 15 });
+    expect(mockNotifyFulfilled).not.toHaveBeenCalled();
+    expect(context.error).toHaveBeenCalled();
+  });
 });

@@ -98,11 +98,12 @@ export interface SeatRequestFulfilledParams {
 }
 
 export function renderSeatRequestReceivedEmail(p: SeatRequestReceivedParams): { subject: string; html: string } {
+  // Subjects are plain text — only HTML bodies get escaped (matches renderSeatRequestEmail).
   const org = escapeHtml(p.orgName);
   const n = p.additionalSeats;
   if (isEnglish(p.language)) {
     return {
-      subject: `Request received — ${org}`,
+      subject: `Request received — ${p.orgName}`,
       html: `
     <h2>Request received</h2>
     <p>We have received your request for ${n} extra seat(s) for <strong>${org}</strong>.</p>
@@ -111,7 +112,7 @@ export function renderSeatRequestReceivedEmail(p: SeatRequestReceivedParams): { 
     };
   }
   return {
-    subject: `Anmodning modtaget — ${org}`,
+    subject: `Anmodning modtaget — ${p.orgName}`,
     html: `
     <h2>Anmodning modtaget</h2>
     <p>Vi har modtaget din anmodning om ${n} ekstra plads(er) til <strong>${org}</strong>.</p>
@@ -126,7 +127,7 @@ export function renderSeatRequestFulfilledEmail(p: SeatRequestFulfilledParams): 
   const limit = p.seatLimit;
   if (isEnglish(p.language)) {
     return {
-      subject: `Your extra seats are now active — ${org}`,
+      subject: `Your extra seats are now active — ${p.orgName}`,
       html: `
     <h2>Your extra seats are now active</h2>
     <p>Your ${n} extra seat(s) for <strong>${org}</strong> are now active.</p>
@@ -135,7 +136,7 @@ export function renderSeatRequestFulfilledEmail(p: SeatRequestFulfilledParams): 
     };
   }
   return {
-    subject: `Dine ekstra pladser er nu aktive — ${org}`,
+    subject: `Dine ekstra pladser er nu aktive — ${p.orgName}`,
     html: `
     <h2>Dine ekstra pladser er nu aktive</h2>
     <p>Dine ${n} ekstra plads(er) til <strong>${org}</strong> er nu aktive.</p>

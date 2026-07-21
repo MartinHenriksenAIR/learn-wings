@@ -194,7 +194,7 @@ export default function IdeaDetail() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
+    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: 'Idea' }]}>
       <div className="max-w-[760px]">
         {/* Back */}
         <Button

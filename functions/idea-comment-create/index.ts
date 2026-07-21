@@ -55,7 +55,7 @@ export default endpoint('idea-comment-create', async ({ req, profile, reply, req
        INSERT INTO idea_comments (idea_id, org_id, user_id, content, parent_comment_id)
        VALUES ($1, $2, $3, $4, $5) RETURNING *
      )
-     SELECT ins.*, json_build_object('id', pr.id, 'full_name', pr.full_name) AS profile
+     SELECT ins.*, json_build_object('id', pr.id, 'full_name', pr.full_name, 'avatar_url', pr.avatar_url) AS profile
      FROM ins JOIN profiles pr ON pr.id = ins.user_id`,
     [ideaId, idea.org_id, profile.id, content, (parentCommentId as string | undefined) ?? null],
   );
