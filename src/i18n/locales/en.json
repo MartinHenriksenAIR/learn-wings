@@ -636,7 +636,8 @@
       "branding": "Branding",
       "userAccess": "User & Access",
       "email": "Email",
-      "features": "Features"
+      "features": "Features",
+      "platformAdmins": "Platform Admins"
     },
     "branding": {
       "platformName": "Platform name",
@@ -698,6 +699,24 @@
       "notificationEmail": "Requests are emailed to",
       "save": "Save seat pricing"
     }
+  },
+  "platformAdmins": {
+    "currentTitle": "Current platform admins",
+    "empty": "No platform admins yet.",
+    "revoke": "Revoke",
+    "grant": "Grant admin",
+    "confirm": "Confirm",
+    "grantLabel": "Grant platform admin",
+    "grantHint": "Promote an existing user to platform admin. They gain full platform-wide access.",
+    "selectUser": "Select a user",
+    "noCandidates": "All users are already platform admins.",
+    "grantConfirmTitle": "Grant platform admin?",
+    "grantConfirmBody": "<0>{{name}}</0> will gain full platform-admin access, including managing other admins.",
+    "revokeConfirmTitle": "Revoke platform admin?",
+    "revokeConfirmBody": "<0>{{name}}</0> will lose platform-admin access.",
+    "updateFailed": "Couldn't update platform admin",
+    "loadFailedTitle": "Couldn't load platform admins.",
+    "loadFailedDescription": "The list of platform admins was not loaded from the server. Try again."
   },
   "certificates": {
     "title": "Certificates",
@@ -817,7 +836,6 @@
     "deleteIrreversible": "This action cannot be undone.",
     "selectOrganization": "Select organization",
     "allOrganizations": "All Organizations",
-    "searchOrganizations": "Search organizations...",
     "searchOrganizationPrompt": "Search organization...",
     "noOrganizationFound": "No organization found.",
     "enableAllCourses": "Enable All Courses",

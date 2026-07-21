@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { PdfViewer } from '@/components/learner/PdfViewer';
@@ -347,7 +348,7 @@ export default function CoursePlayer() {
       <AppLayout>
         <div className="py-12 text-center">
           <p className="text-muted-foreground">{t('coursePlayer.courseNotFound')}</p>
-          <Button className="mt-4" onClick={() => navigate('/app/courses')}>
+          <Button className="mt-4" onClick={() => navigate(routes.learner.courses)}>
             {t('coursePlayer.backToCourses')}
           </Button>
         </div>
@@ -358,7 +359,7 @@ export default function CoursePlayer() {
   return (
     <AppLayout
       breadcrumbs={[
-        { label: t('nav.courses'), href: '/app/courses' },
+        { label: t('nav.courses'), href: routes.learner.courses },
         { label: course.title },
       ]}
     >
@@ -586,7 +587,7 @@ export default function CoursePlayer() {
                                   className="h-auto rounded-[10px] px-[18px] py-2.5 text-[13.5px] font-bold"
                                   onClick={() => {
                                     if (isLastLesson) {
-                                      navigate('/app/courses');
+                                      navigate(routes.learner.courses);
                                     } else {
                                       setCurrentLesson(allLessons[currentIndex + 1]);
                                       setQuizSubmitted(false);

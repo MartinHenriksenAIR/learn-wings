@@ -239,6 +239,16 @@ export const queryKeys = {
     all: ['platform-settings'] as const,
   },
 
+  // ── Platform admins (platform-admin) ───────────────────────────────────────
+  platformAdmins: {
+    /**
+     * ['platform-admins'] — the list of profiles holding is_platform_admin,
+     * shown in the Platform Settings "Platform Admins" section (#128). Grant and
+     * revoke mutations invalidate this prefix.
+     */
+    all: ['platform-admins'] as const,
+  },
+
   // ── Org analytics (org-admin) ──────────────────────────────────────────────
   orgAnalyticsData: {
     /**

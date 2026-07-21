@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -286,7 +287,7 @@ export default function LearnerCourses() {
                             : 'bg-primary text-primary-foreground hover:bg-primary/90'
                         )}
                       >
-                        <Link to={`/app/learn/${course.id}`}>
+                        <Link to={routes.learner.coursePlayer(course.id)}>
                           <Play aria-hidden="true" />
                           {isCompleted ? t('courses.reviewCourse') : t('common.continue')}
                         </Link>

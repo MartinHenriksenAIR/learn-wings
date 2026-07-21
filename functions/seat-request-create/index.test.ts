@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockClientQuery, mockWithTransaction, mockQueryOne, mockGetProfile, mockIsOrgAdmin, mockNotify } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockClientQuery, mockWithTransaction, mockQueryOne, mockGetProfile, mockIsOrgAdmin, mockNotify, mockNotifyReceived } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   const mockClientQuery = vi.fn();
   return {
     mockAuthenticate: vi.fn(), MockAuthError, mockClientQuery,
     mockWithTransaction: vi.fn(async (cb: (c: { query: typeof mockClientQuery }) => unknown) => cb({ query: mockClientQuery })),
-    mockQueryOne: vi.fn(), mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(), mockNotify: vi.fn(),
+    mockQueryOne: vi.fn(), mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(), mockNotify: vi.fn(), mockNotifyReceived: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -15,7 +15,7 @@ vi.mock('../shared/db', async (importOriginal) => ({
   query: vi.fn(), queryOne: mockQueryOne, withTransaction: mockWithTransaction,
 }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: mockIsOrgAdmin, isOrgAdminOfAny: vi.fn() }));
-vi.mock('../shared/seat-request-notify', () => ({ notifySeatRequest: mockNotify }));
+vi.mock('../shared/seat-request-notify', () => ({ notifySeatRequest: mockNotify, notifySeatRequestReceived: mockNotifyReceived }));
 
 import handler from './index';
 
@@ -95,6 +95,9 @@ describe('seat-request-create', () => {
     expect(insertParams).toEqual(['org-1', 'p1', 5, 1200, 'DKK']);
     expect(mockNotify).toHaveBeenCalledTimes(1);
     expect(mockNotify.mock.calls[0][1]).toMatchObject({ recipient: 'jacob@ai-raadgivning.dk', orgName: 'Acme', additionalSeats: 5, unitPrice: 1200 });
+    // requester-facing email goes to the requester only, not the platform admin
+    expect(mockNotifyReceived).toHaveBeenCalledTimes(1);
+    expect(mockNotifyReceived.mock.calls[0][1]).toMatchObject({ recipient: 'mette@acme.dk', orgName: 'Acme', additionalSeats: 5 });
   });
 
   it('returns 409 REQUEST_ALREADY_PENDING on the unique-index violation', async () => {

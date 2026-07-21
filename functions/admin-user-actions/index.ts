@@ -31,14 +31,9 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       role?: string;
     };
 
+    // 'toggle-platform-admin' was removed: platform-admin grant/revoke goes through
+    // /api/platform-admin-update, which enforces the last-admin guard transactionally.
     switch (body.action) {
-      case 'toggle-platform-admin':
-        await query(
-          'UPDATE profiles SET is_platform_admin = $1 WHERE id = $2',
-          [body.value, body.target_user_id]
-        );
-        break;
-
       case 'update-member-role':
         await query(
           'UPDATE org_memberships SET role = $1 WHERE id = $2',

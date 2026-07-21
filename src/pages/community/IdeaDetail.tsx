@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import {
   Select,
   SelectContent,
@@ -157,12 +159,12 @@ export default function IdeaDetail() {
   };
 
   if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
 
   if (ideaLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
+      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: 'Idea' }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -172,7 +174,7 @@ export default function IdeaDetail() {
 
   if (!idea) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }]}>
+      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library' }]}>
         <div className="py-12 text-center">
           <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -180,7 +182,7 @@ export default function IdeaDetail() {
           </h1>
           <p className="mb-4 text-sm text-muted-foreground">{t('community.ideaNotFoundDescription')}</p>
           <Button
-            onClick={() => navigate('/app/community/org/ideas')}
+            onClick={() => navigate(routes.community.ideas)}
             className="rounded-[11px] text-[13px] font-bold"
           >
             <ArrowLeft aria-hidden="true" className="h-4 w-4" />
@@ -192,7 +194,7 @@ export default function IdeaDetail() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Idea Library' }, { label: 'Idea' }]}>
+    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: 'Idea' }]}>
       <div className="max-w-[760px]">
         {/* Back */}
         <Button
@@ -507,14 +509,13 @@ export default function IdeaDetail() {
               {comments.map((comment) => (
                 <div key={comment.id} className="rounded-2xl border border-border bg-card px-5 py-4">
                   <div className="flex gap-3">
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarFallback
-                        className="text-[11px] font-bold text-white"
-                        style={{ backgroundColor: getAvatarColor(comment.profile?.full_name) }}
-                      >
-                        {getInitials(comment.profile?.full_name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <BrandingAvatar
+                      avatarPath={comment.profile?.avatar_url}
+                      fallback={getInitials(comment.profile?.full_name)}
+                      className="h-8 w-8 shrink-0"
+                      fallbackClassName="text-[11px] font-bold text-white"
+                      fallbackStyle={{ backgroundColor: getAvatarColor(comment.profile?.full_name) }}
+                    />
                     <div className="flex-1">
                       <div className="mb-1 flex items-center gap-2">
                         <span className="text-[13px] font-bold">

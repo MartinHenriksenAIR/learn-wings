@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -135,7 +136,7 @@ export default function ResourceLibrary() {
   });
 
   if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
 
   // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
@@ -162,11 +163,11 @@ export default function ResourceLibrary() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community' }, { label: 'Resources' }]}>
+    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Resources' }]}>
       {/* Back to community */}
       <Button
         variant="ghost"
-        onClick={() => navigate('/app/community?scope=org')}
+        onClick={() => navigate(`${routes.community.feed}?scope=org`)}
         className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
       >
         <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />

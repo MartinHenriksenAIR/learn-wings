@@ -7,6 +7,10 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
+// The author avatar (#180) resolves a signed URL via a query hook; stub it so
+// this focused actions-menu test needs no QueryClientProvider.
+vi.mock('@/hooks/useSignedBrandingUrl', () => ({ useSignedBrandingUrl: () => ({ data: undefined }) }));
+
 const comment: CommunityComment = {
   id: 'c1',
   post_id: 'p1',

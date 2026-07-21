@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { PostForm } from '@/components/community/PostForm';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/components/ui/sonner';
@@ -42,7 +43,7 @@ export default function PostEdit() {
     },
     onSuccess: () => {
       toast({ title: 'Post updated' });
-      navigate(`/app/community/${scope}/posts/${postId}`);
+      navigate(routes.community.postDetail(scope, postId!));
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to update post', description: error.message, variant: 'destructive' });
@@ -76,11 +77,11 @@ export default function PostEdit() {
   }
 
   if (!post) {
-    return <Navigate to={`/app/community/${scope}`} replace />;
+    return <Navigate to={routes.community.scope(scope)} replace />;
   }
 
   if (!isAuthor) {
-    return <Navigate to={`/app/community/${scope}/posts/${postId}`} replace />;
+    return <Navigate to={routes.community.postDetail(scope, postId!)} replace />;
   }
 
   return (
@@ -89,7 +90,7 @@ export default function PostEdit() {
         open
         onOpenChange={(open) => {
           if (!open) {
-            navigate(`/app/community/${scope}/posts/${postId}`);
+            navigate(routes.community.postDetail(scope, postId!));
           }
         }}
         onSubmit={async (data) => { await updatePostMutation.mutateAsync(data); }}

@@ -13,7 +13,7 @@ export default endpoint('ai-champions', async ({ req, reply, requireActiveMember
   await requireActiveMember(orgId);
 
   const champions = await query(
-    `SELECT a.*, json_build_object('id', pr.id, 'full_name', pr.full_name, 'department', pr.department) AS profile
+    `SELECT a.*, json_build_object('id', pr.id, 'full_name', pr.full_name, 'department', pr.department, 'avatar_url', pr.avatar_url) AS profile
      FROM ai_champions a JOIN profiles pr ON pr.id = a.user_id
      WHERE a.org_id = $1 ORDER BY a.assigned_at DESC`,
     [orgId],

@@ -636,7 +636,8 @@
       "branding": "Branding",
       "userAccess": "Brugere & adgang",
       "email": "E-mail",
-      "features": "Funktioner"
+      "features": "Funktioner",
+      "platformAdmins": "Platformadministratorer"
     },
     "branding": {
       "platformName": "Platformnavn",
@@ -698,6 +699,24 @@
       "notificationEmail": "Anmodninger sendes til",
       "save": "Gem pladspriser"
     }
+  },
+  "platformAdmins": {
+    "currentTitle": "Nuværende platformadministratorer",
+    "empty": "Ingen platformadministratorer endnu.",
+    "revoke": "Fjern",
+    "grant": "Tildel admin",
+    "confirm": "Bekræft",
+    "grantLabel": "Tildel platformadministrator",
+    "grantHint": "Forfrem en eksisterende bruger til platformadministrator. De får fuld adgang på tværs af hele platformen.",
+    "selectUser": "Vælg en bruger",
+    "noCandidates": "Alle brugere er allerede platformadministratorer.",
+    "grantConfirmTitle": "Tildel platformadministrator?",
+    "grantConfirmBody": "<0>{{name}}</0> får fuld platformadministrator-adgang, herunder at administrere andre administratorer.",
+    "revokeConfirmTitle": "Fjern platformadministrator?",
+    "revokeConfirmBody": "<0>{{name}}</0> mister platformadministrator-adgang.",
+    "updateFailed": "Kunne ikke opdatere platformadministrator",
+    "loadFailedTitle": "Kunne ikke indlæse platformadministratorer.",
+    "loadFailedDescription": "Listen over platformadministratorer blev ikke indlæst fra serveren. Prøv igen."
   },
   "certificates": {
     "title": "Certifikater",
@@ -817,7 +836,6 @@
     "deleteIrreversible": "Denne handling kan ikke fortrydes.",
     "selectOrganization": "Vælg organisation",
     "allOrganizations": "Alle organisationer",
-    "searchOrganizations": "Søg organisationer...",
     "searchOrganizationPrompt": "Søg organisation...",
     "noOrganizationFound": "Ingen organisation fundet.",
     "enableAllCourses": "Aktivér alle kurser",

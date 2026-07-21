@@ -89,7 +89,6 @@ export default function CoursesManager() {
     refetch: refetchOrgs,
   } = useOrganizations();
   const orgs = orgsData ?? [];
-  const [orgSearchQuery, setOrgSearchQuery] = useState('');
   const [selectedOrg, setSelectedOrg] = useState<string>('all');
   const [orgComboboxOpen, setOrgComboboxOpen] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -290,11 +289,7 @@ export default function CoursesManager() {
     return matchesSearch && matchesLevel && matchesStatus;
   });
 
-  const filteredOrgs = orgs.filter((o) => {
-    const matchesSelection = selectedOrg === 'all' || o.id === selectedOrg;
-    const matchesSearch = orgSearchQuery === '' || o.name.toLowerCase().includes(orgSearchQuery.toLowerCase());
-    return matchesSelection && matchesSearch;
-  });
+  const filteredOrgs = orgs.filter((o) => selectedOrg === 'all' || o.id === selectedOrg);
   const publishedCourses = courses.filter((c) => c.is_published);
 
   const combinedLoadError = coursesError?.message ?? (orgsError ? (orgsError as Error).message : null);
@@ -561,15 +556,6 @@ export default function CoursesManager() {
 
           {/* Filters */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative max-w-sm flex-1">
-              <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
-              <Input
-                placeholder={t('coursesManager.searchOrganizations')}
-                value={orgSearchQuery}
-                onChange={(e) => setOrgSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Popover open={orgComboboxOpen} onOpenChange={setOrgComboboxOpen}>

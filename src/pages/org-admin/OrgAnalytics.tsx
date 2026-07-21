@@ -205,7 +205,7 @@ export default function OrgAnalytics() {
 
   // Redirect if analytics are disabled
   if (!settingsLoading && !features.analytics_enabled) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
 
   const pageTitle = isGlobalView ? t('nav.globalAnalytics') : t('nav.organization');

@@ -155,7 +155,7 @@ export interface IdeaComment {
   content: string;
   parent_comment_id: string | null;
   created_at: string;
-  profile: { id: string; full_name: string | null } | null;
+  profile: { id: string; full_name: string | null; avatar_url?: string | null } | null;
 }
 
 // Business area options for forms

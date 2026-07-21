@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { MoreHorizontal, Reply, Edit2, Trash2, Flag, EyeOff, Eye, Link2 } from 'lucide-react';
@@ -80,14 +80,13 @@ export function CommentItem({
         highlightedCommentId === comment.id && 'bg-accent/60'
       )}
     >
-      <Avatar className="h-7 w-7 flex-shrink-0">
-        <AvatarFallback
-          className="text-[10px] font-bold text-white"
-          style={{ backgroundColor: getAvatarColor(authorName) }}
-        >
-          {initials}
-        </AvatarFallback>
-      </Avatar>
+      <BrandingAvatar
+        avatarPath={comment.profile?.avatar_url}
+        fallback={initials}
+        className="h-7 w-7 flex-shrink-0"
+        fallbackClassName="text-[10px] font-bold text-white"
+        fallbackStyle={{ backgroundColor: getAvatarColor(authorName) }}
+      />
       <div className="flex-1 space-y-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

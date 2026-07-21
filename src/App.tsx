@@ -42,26 +42,26 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      
+      <Route path={routes.auth.login} element={<Login />} />
+      <Route path={routes.auth.signup} element={<Signup />} />
+      <Route path={routes.auth.forgotPassword} element={<ForgotPassword />} />
+      <Route path={routes.auth.resetPassword} element={<ResetPassword />} />
+
       {/* Protected learner routes - not accessible by platform admins */}
-      <Route path="/app/dashboard" element={<ProtectedRoute learnerOnly><LearnerDashboard /></ProtectedRoute>} />
-      <Route path="/app/courses" element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
-      <Route path="/app/learn/:courseId" element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
-      <Route path="/app/certificates" element={<Navigate to="/app/dashboard" replace />} />
-      
+      <Route path={routes.learner.dashboard} element={<ProtectedRoute learnerOnly><LearnerDashboard /></ProtectedRoute>} />
+      <Route path={routes.learner.courses} element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
+      <Route path={routes.learner.coursePlayerPattern} element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
+      <Route path={routes.learner.certificates} element={<Navigate to={routes.learner.dashboard} replace />} />
+
       {/* Community routes */}
-      <Route path="/app/community" element={<ProtectedRoute><CommunityFeed /></ProtectedRoute>} />
-      <Route path="/app/community/:scope/posts/:postId/edit" element={<ProtectedRoute><PostEdit /></ProtectedRoute>} />
-      <Route path="/app/community/:scope/posts/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
-      <Route path="/app/community/org/ideas" element={<ProtectedRoute><IdeaLibrary /></ProtectedRoute>} />
-      <Route path="/app/community/org/ideas/new" element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
-      <Route path="/app/community/org/ideas/edit/:ideaId" element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
-      <Route path="/app/community/org/ideas/:ideaId" element={<ProtectedRoute><IdeaDetail /></ProtectedRoute>} />
-      <Route path="/app/community/org/resources" element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
+      <Route path={routes.community.feed} element={<ProtectedRoute><CommunityFeed /></ProtectedRoute>} />
+      <Route path={routes.community.postEditPattern} element={<ProtectedRoute><PostEdit /></ProtectedRoute>} />
+      <Route path={routes.community.postDetailPattern} element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
+      <Route path={routes.community.ideas} element={<ProtectedRoute><IdeaLibrary /></ProtectedRoute>} />
+      <Route path={routes.community.ideaNew} element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
+      <Route path={routes.community.ideaEditPattern} element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
+      <Route path={routes.community.ideaDetailPattern} element={<ProtectedRoute><IdeaDetail /></ProtectedRoute>} />
+      <Route path={routes.community.resources} element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
       
       {/* Protected org admin routes */}
       <Route path={routes.orgAdmin.root} element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
@@ -77,11 +77,11 @@ function AppRoutes() {
       <Route path={routes.platformAdmin.analytics} element={<ProtectedRoute requirePlatformAdmin><OrgAnalytics /></ProtectedRoute>} />
       <Route path={routes.platformAdmin.settings} element={<ProtectedRoute requirePlatformAdmin><PlatformSettings /></ProtectedRoute>} />
       <Route path={routes.platformAdmin.moderation} element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
-      <Route path="/app/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-      
+      <Route path={routes.settings} element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
       {/* Redirects */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/app" element={<Navigate to="/app/dashboard" replace />} />
+      <Route path={routes.root} element={<Navigate to={routes.auth.login} replace />} />
+      <Route path={routes.appRoot} element={<Navigate to={routes.learner.dashboard} replace />} />
       
       {/* 404 */}
       <Route path="*" element={<NotFound />} />

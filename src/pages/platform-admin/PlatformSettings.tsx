@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,11 @@ import { callApi } from '@/lib/api-client';
 import { toast } from '@/components/ui/sonner';
 import { useToastMutation } from '@/hooks/useToastMutation';
 import { usePlatformSettingsAdmin } from '@/hooks/usePlatformSettingsAdmin';
-import { Loader2, Palette, Users, Mail, ToggleLeft, AlertTriangle, DollarSign } from 'lucide-react';
+import { usePlatformAdmins } from '@/hooks/usePlatformAdmins';
+import { useProfiles } from '@/hooks/useProfiles';
+import { PlatformAdminsSection } from '@/components/platform-admin/PlatformAdminsSection';
+import { queryKeys } from '@/lib/query-keys';
+import { Loader2, Palette, Users, Mail, ToggleLeft, AlertTriangle, DollarSign, ShieldCheck } from 'lucide-react';
 
 interface BrandingSettings {
   platform_name: string;
@@ -65,7 +70,7 @@ interface SeatPricingSettings {
   notification_email: string;
 }
 
-type SettingsKey = 'branding' | 'user_access' | 'email' | 'features' | 'seat_pricing';
+type SettingsKey = 'branding' | 'user_access' | 'email' | 'features' | 'seat_pricing' | 'platform_admins';
 type SettingsValue = BrandingSettings | UserAccessSettings | EmailSettings | FeatureSettings | SeatPricingSettings;
 
 const defaultBranding: BrandingSettings = {
@@ -130,6 +135,38 @@ export default function PlatformSettings() {
   const [seatPricing, setSeatPricing] = useState<SeatPricingSettings>(defaultSeatPricing);
 
   const query = usePlatformSettingsAdmin();
+  const queryClient = useQueryClient();
+
+  // Platform-admin management (#128). Both lists are platform-admin-only reads,
+  // fetched lazily only once the admins tab is opened.
+  const platformAdminsTabActive = activeTab === 'platform_admins';
+  const adminsQuery = usePlatformAdmins({ enabled: platformAdminsTabActive });
+  const profilesQuery = useProfiles({ enabled: platformAdminsTabActive });
+
+  // Grant candidates: every user who is not already a platform admin.
+  const grantCandidates = useMemo(
+    () => (profilesQuery.data ?? []).filter((p) => !p.is_platform_admin),
+    [profilesQuery.data],
+  );
+
+  const invalidatePlatformAdmins = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.platformAdmins.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.profiles.all });
+  };
+
+  const grantAdminMutation = useToastMutation({
+    mutationFn: (userId: string) => callApi('/api/platform-admin-update', { userId, grant: true }),
+    errorTitle: t('platformAdmins.updateFailed'),
+    onSuccess: invalidatePlatformAdmins,
+  });
+
+  const revokeAdminMutation = useToastMutation({
+    mutationFn: (userId: string) => callApi('/api/platform-admin-update', { userId, grant: false }),
+    errorTitle: t('platformAdmins.updateFailed'),
+    onSuccess: invalidatePlatformAdmins,
+  });
+
+  const adminsPending = grantAdminMutation.isPending || revokeAdminMutation.isPending;
 
   // Seed local form state from the server — runs the same switch as the old
   // fetchSettings so merge semantics are byte-for-byte identical.
@@ -247,6 +284,7 @@ export default function PlatformSettings() {
     { key: 'email', label: t('platformSettings.tabs.email'), icon: <Mail className="h-4 w-4" /> },
     { key: 'features', label: t('platformSettings.tabs.features'), icon: <ToggleLeft className="h-4 w-4" /> },
     { key: 'seat_pricing', label: t('platformSettings.seatPricing.tab'), icon: <DollarSign className="h-4 w-4" /> },
+    { key: 'platform_admins', label: t('platformSettings.tabs.platformAdmins'), icon: <ShieldCheck className="h-4 w-4" /> },
   ];
 
   const brandingColors: { key: keyof BrandingSettings; label: string; placeholder: string }[] = [
@@ -597,6 +635,37 @@ export default function PlatformSettings() {
                 onClick={() => saveSetting('seat_pricing', seatPricing)}
                 disabled={isSaving('seat_pricing')}
               />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'platform_admins' && (
+          <Card>
+            <CardContent className="px-[26px] py-6">
+              {adminsQuery.isPending ? (
+                <div className="flex h-40 items-center justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : !adminsQuery.isSuccess ? (
+                <EmptyState
+                  icon={<AlertTriangle className="h-6 w-6" />}
+                  title={t('platformAdmins.loadFailedTitle')}
+                  description={t('platformAdmins.loadFailedDescription')}
+                  action={
+                    <Button variant="outline" onClick={() => adminsQuery.refetch()}>
+                      {t('platformSettings.retry')}
+                    </Button>
+                  }
+                />
+              ) : (
+                <PlatformAdminsSection
+                  admins={adminsQuery.data}
+                  availableUsers={grantCandidates}
+                  onGrant={(userId) => grantAdminMutation.mutate(userId)}
+                  onRevoke={(userId) => revokeAdminMutation.mutate(userId)}
+                  pending={adminsPending}
+                />
+              )}
             </CardContent>
           </Card>
         )}

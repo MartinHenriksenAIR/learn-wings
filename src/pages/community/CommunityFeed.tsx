@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SlidingTabs } from '@/components/ui/sliding-tabs';
@@ -124,7 +125,7 @@ export default function CommunityFeed() {
   const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedTags.length > 0);
 
   if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to={routes.learner.dashboard} replace />;
   }
 
   const scopeTabs = [
@@ -140,7 +141,7 @@ export default function CommunityFeed() {
   ];
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community' }]}>
+    <AppLayout breadcrumbs={[{ label: 'Community' }]}> {/* single crumb: page itself, no default href needed */}
       {/* Header */}
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
@@ -157,7 +158,7 @@ export default function CommunityFeed() {
           {scope === 'org' && (
             <Button
               variant="outline"
-              onClick={() => navigate('/app/community/org/ideas/new')}
+              onClick={() => navigate(routes.community.ideaNew)}
               className="group h-auto whitespace-nowrap rounded-[11px] border-[#dcdee6] bg-card px-4 py-2.5 text-[13px] font-bold text-[#2a2d3a] hover:border-primary hover:bg-card hover:text-primary"
             >
               <Lightbulb aria-hidden="true" className="h-[15px] w-[15px] group-hover:animate-bulb-wiggle" />
@@ -283,7 +284,7 @@ export default function CommunityFeed() {
                 <PostCard
                   key={post.id}
                   post={post}
-                  onClick={() => navigate(`/app/community/${scope}/posts/${post.id}`)}
+                  onClick={() => navigate(routes.community.postDetail(scope, post.id))}
                   isAdmin={isAdmin}
                   onToggleHide={isAdmin ? (id, hidden) => toggleHideMutation.mutate({ postId: id, hidden }) : undefined}
                   onToggleLock={isAdmin ? (id, locked) => toggleLockMutation.mutate({ postId: id, locked }) : undefined}
@@ -299,7 +300,7 @@ export default function CommunityFeed() {
           {eventPosts.length > 0 && (
             <UpcomingEvents
               events={eventPosts}
-              onEventClick={(event: CommunityPost) => navigate(`/app/community/${scope}/posts/${event.id}`)}
+              onEventClick={(event: CommunityPost) => navigate(routes.community.postDetail(scope, event.id))}
             />
           )}
 
@@ -309,7 +310,7 @@ export default function CommunityFeed() {
               <h3 className="mb-2 text-[13.5px] font-extrabold">{t('community.libraries')}</h3>
               <button
                 type="button"
-                onClick={() => navigate('/app/community/org/ideas')}
+                onClick={() => navigate(routes.community.ideas)}
                 className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-left text-[13px] font-bold text-[#2a2d3a] hover:bg-muted/60"
               >
                 <Lightbulb aria-hidden="true" className="h-[15px] w-[15px] text-warning" />
@@ -318,7 +319,7 @@ export default function CommunityFeed() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/app/community/org/resources')}
+                onClick={() => navigate(routes.community.resources)}
                 className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-left text-[13px] font-bold text-[#2a2d3a] hover:bg-muted/60"
               >
                 <FolderOpen aria-hidden="true" className="h-[15px] w-[15px] text-primary" />

@@ -1,7 +1,8 @@
-import { withTransaction } from '../shared/db';
+import { queryOne, withTransaction } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
+import { notifySeatRequestFulfilled } from '../shared/seat-request-notify';
 
-export default adminEndpoint('seat-request-fulfill', async ({ req, profile, reply }) => {
+export default adminEndpoint('seat-request-fulfill', async ({ req, context, profile, reply }) => {
   const { id } = await req.json() as { id?: unknown };
   if (!id || typeof id !== 'string') return reply(400, { error: 'id is required' });
 
@@ -38,5 +39,29 @@ export default adminEndpoint('seat-request-fulfill', async ({ req, profile, repl
   if (result.kind === 'not_found') return reply(404, { error: 'Seat request not found' });
   if (result.kind === 'not_pending') return reply(409, { error: 'Seat request is not pending', code: 'NOT_PENDING' });
   if (result.kind === 'unlimited') return reply(409, { error: 'Organization has no seat limit', code: 'ORG_UNLIMITED' });
+
+  // Notify the requester that their extra seats are now active (best-effort, requester only).
+  // These fields aren't returned by the transaction, so fetch them after the successful bump.
+  // The fulfilment has already committed — nothing on this path may fail the response.
+  try {
+    const requester = await queryOne<{ email: string | null; preferred_language: string | null }>(
+      `SELECT email, preferred_language FROM profiles WHERE id = $1`,
+      [result.request.requested_by_user_id as string],
+    );
+    const org = await queryOne<{ name: string }>(
+      `SELECT name FROM organizations WHERE id = $1`,
+      [result.request.org_id as string],
+    );
+    await notifySeatRequestFulfilled(context, {
+      recipient: requester?.email ?? null,
+      orgName: org?.name ?? '',
+      additionalSeats: result.request.additional_seats as number,
+      seatLimit: result.seatLimit,
+      language: requester?.preferred_language ?? null,
+    });
+  } catch (err) {
+    context.error('seat-request-fulfill: requester notification lookup failed', err);
+  }
+
   return reply(200, { request: result.request, seatLimit: result.seatLimit });
 });

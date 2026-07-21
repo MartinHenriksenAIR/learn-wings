@@ -92,7 +92,7 @@ export default endpoint('ideas', async ({ req, profile, reply, requireActiveMemb
 
   const ideas = await query(`
     SELECT i.*,
-      json_build_object('id', pr.id, 'full_name', pr.full_name) AS profile,
+      json_build_object('id', pr.id, 'full_name', pr.full_name, 'avatar_url', pr.avatar_url) AS profile,
       (SELECT count(*)::int FROM idea_comments c WHERE c.idea_id = i.id) AS comment_count,
       (SELECT count(*)::int FROM idea_votes v WHERE v.idea_id = i.id) AS vote_count
     FROM ideas i

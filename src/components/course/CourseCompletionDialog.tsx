@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Award, Star, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { routes } from '@/lib/routes';
 
 interface CourseCompletionDialogProps {
   open: boolean;
@@ -29,12 +30,12 @@ export function CourseCompletionDialog({
 
   const handleGoToCourses = () => {
     onOpenChange(false);
-    navigate('/app/courses');
+    navigate(routes.learner.courses);
   };
 
   const handleGoToCertificates = () => {
     onOpenChange(false);
-    navigate('/app/dashboard#certificates');
+    navigate(`${routes.learner.dashboard}#certificates`);
   };
 
   return (

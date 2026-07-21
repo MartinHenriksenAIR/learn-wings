@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CategoryBadge } from './CategoryBadge';
@@ -40,14 +40,13 @@ export function PostCard({
     >
       {/* Author row */}
       <div className="mb-2.5 flex items-center gap-2.5">
-        <Avatar className="h-[34px] w-[34px] shrink-0">
-          <AvatarFallback
-            className="text-[11.5px] font-bold text-white"
-            style={{ backgroundColor: getAvatarColor(authorName) }}
-          >
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+        <BrandingAvatar
+          avatarPath={post.profile?.avatar_url}
+          fallback={initials}
+          className="h-[34px] w-[34px] shrink-0"
+          fallbackClassName="text-[11.5px] font-bold text-white"
+          fallbackStyle={{ backgroundColor: getAvatarColor(authorName) }}
+        />
         <div className="flex min-w-0 flex-col">
           <span className="truncate text-[13px] font-bold">{authorName || t('community.unknownUser')}</span>
           <span className="text-[11.5px] text-[#9aa0af]">

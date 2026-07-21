@@ -372,7 +372,7 @@ export default function OrganizationDetail() {
   };
 
   const handleCopyInviteLink = async (linkId: string) => {
-    const link = `${window.location.origin}/signup?invite=${linkId}`;
+    const link = `${window.location.origin}${routes.auth.signup}?invite=${linkId}`;
     await navigator.clipboard.writeText(link);
     // In-button "Copied!" morph instead of a toast (toast policy: copy is routine).
     flashCopy(linkId);
