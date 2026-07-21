@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import type { IdeaStatusExtended } from '@/lib/community-types';
 import { IDEA_STATUS_OPTIONS } from '@/lib/community-types';
@@ -24,6 +25,7 @@ export function IdeaStatusBadge({
   size = 'md',
   className,
 }: IdeaStatusBadgeProps) {
+  const { t } = useTranslation();
   const statusOption = IDEA_STATUS_OPTIONS.find((s) => s.value === status);
 
   return (
@@ -36,7 +38,7 @@ export function IdeaStatusBadge({
         className
       )}
     >
-      {statusOption?.label ?? status}
+      {statusOption ? t(statusOption.labelKey) : status}
     </span>
   );
 }

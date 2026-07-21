@@ -20,7 +20,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNowLocalized } from '@/lib/date-locale';
 import { cn, getAvatarColor, getInitials } from '@/lib/utils';
 import { RESOURCE_TYPES, type CommunityResource } from '@/lib/resources-api';
 
@@ -49,7 +49,7 @@ export function ResourceCard({
   onDelete,
   onTogglePin,
 }: ResourceCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { icon: TypeIcon, classes: typeClasses } = typeStyles[resource.resource_type] || typeStyles.link;
   const canManage = isOwner || isAdmin;
 
@@ -159,7 +159,7 @@ export function ResourceCard({
           <span className="truncate">
             {authorName}
             {' · '}
-            {formatDistanceToNow(new Date(resource.created_at), { addSuffix: true })}
+            {formatDistanceToNowLocalized(new Date(resource.created_at), i18n.language)}
           </span>
         </span>
       </div>

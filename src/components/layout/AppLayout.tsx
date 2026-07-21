@@ -66,7 +66,7 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
               <BreadcrumbList className="text-[13px]">
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild className={CRUMB_LINK_CLASSES}>
-                    <Link to={homeHref}>Home</Link>
+                    <Link to={homeHref}>{t('nav.home')}</Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 {breadcrumbs.map((crumb, index) => {

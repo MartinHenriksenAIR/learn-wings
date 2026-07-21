@@ -85,10 +85,10 @@ export default function CommunityFeed() {
     mutationFn: createPost,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPosts.all });
-      toast({ title: 'Post created successfully!' });
+      toast({ title: t('community.toasts.postCreated') });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to create post', description: error.message, variant: 'destructive' });
+      toast({ title: t('community.toasts.postCreateFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -141,7 +141,7 @@ export default function CommunityFeed() {
   ];
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community' }]}> {/* single crumb: page itself, no default href needed */}
+    <AppLayout breadcrumbs={[{ label: t('community.title') }]}> {/* single crumb: page itself, no default href needed */}
       {/* Header */}
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>

@@ -170,15 +170,17 @@ export const BUSINESS_AREAS: { value: BusinessArea; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-// Idea status options for admin workflow
-export const IDEA_STATUS_OPTIONS: { value: IdeaStatusExtended; label: string }[] = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'submitted', label: 'Submitted' },
-  { value: 'in_review', label: 'In Review' },
-  { value: 'accepted', label: 'Accepted' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'done', label: 'Done' },
+// Idea status options for admin workflow. Stable machine `value`s are persisted
+// upstream; the human-facing text is resolved through i18n via `labelKey` at
+// render time (precedent: REPORT_REASONS in ReportDialog.tsx).
+export const IDEA_STATUS_OPTIONS: { value: IdeaStatusExtended; labelKey: string }[] = [
+  { value: 'draft', labelKey: 'community.ideaStatus.draft' },
+  { value: 'submitted', labelKey: 'community.ideaStatus.submitted' },
+  { value: 'in_review', labelKey: 'community.ideaStatus.inReview' },
+  { value: 'accepted', labelKey: 'community.ideaStatus.accepted' },
+  { value: 'rejected', labelKey: 'community.ideaStatus.rejected' },
+  { value: 'in_progress', labelKey: 'community.ideaStatus.inProgress' },
+  { value: 'done', labelKey: 'community.ideaStatus.done' },
 ];
 
 // Form types

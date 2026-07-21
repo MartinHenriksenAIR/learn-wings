@@ -8,7 +8,6 @@ import { routes } from '@/lib/routes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import {
   Select,
@@ -32,8 +31,8 @@ import {
 } from '@/lib/ideas-api';
 import { BUSINESS_AREAS, IDEA_STATUS_OPTIONS } from '@/lib/community-types';
 import type { IdeaStatusExtended } from '@/lib/community-types';
-import { cn, getAvatarColor, getInitials } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { formatDistanceToNowLocalized } from '@/lib/date-locale';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -47,7 +46,7 @@ import {
 export default function IdeaDetail() {
   const { ideaId } = useParams<{ ideaId: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { profile, currentOrg, effectiveIsOrgAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const queryClient = useQueryClient();
@@ -95,7 +94,7 @@ export default function IdeaDetail() {
       // (matches PostDetail) — no success toast (toast policy). Errors keep toasts.
     },
     onError: () => {
-      toast.error('Failed to add comment');
+      toast.error(t('community.toasts.commentAddFailed'));
     },
   });
 
@@ -107,7 +106,7 @@ export default function IdeaDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
     },
     onError: () => {
-      toast.error('Failed to vote');
+      toast.error(t('community.toasts.voteFailed'));
     },
   });
 
@@ -118,7 +117,7 @@ export default function IdeaDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
     },
     onError: () => {
-      toast.error('Failed to remove vote');
+      toast.error(t('community.toasts.unvoteFailed'));
     },
   });
 
@@ -136,7 +135,7 @@ export default function IdeaDetail() {
       flash('ideaStatus');
     },
     onError: () => {
-      toast.error('Failed to update status');
+      toast.error(t('community.toasts.statusUpdateFailed'));
     },
   });
 
@@ -164,7 +163,7 @@ export default function IdeaDetail() {
 
   if (ideaLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: 'Idea' }]}>
+      <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: t('community.idea') }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -174,7 +173,7 @@ export default function IdeaDetail() {
 
   if (!idea) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library' }]}>
+      <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary') }]}>
         <div className="py-12 text-center">
           <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -194,7 +193,7 @@ export default function IdeaDetail() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: 'Idea' }]}>
+    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: t('community.idea') }]}>
       <div className="max-w-[760px]">
         {/* Back */}
         <Button
@@ -220,7 +219,7 @@ export default function IdeaDetail() {
           <p className="mb-4 text-[12.5px] font-semibold text-[#9aa0af]">
             {t('community.submittedBy', { name: idea.profile?.full_name || t('community.unknownUser') })}
             {' · '}
-            {formatDistanceToNow(new Date(idea.created_at), { addSuffix: true })}
+            {formatDistanceToNowLocalized(new Date(idea.created_at), i18n.language)}
           </p>
           <div className="flex flex-wrap items-center gap-2.5 border-t border-[#eceef3] pt-4">
             <button
@@ -417,7 +416,7 @@ export default function IdeaDetail() {
                   <SelectContent>
                     {IDEA_STATUS_OPTIONS.filter(s => s.value !== 'draft').map((s) => (
                       <SelectItem key={s.value} value={s.value}>
-                        {s.label}
+                        {t(s.labelKey)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -464,14 +463,12 @@ export default function IdeaDetail() {
           {/* Comment input */}
           <div className="rounded-2xl border border-border bg-card px-5 py-4">
             <div className="flex gap-3">
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarFallback
-                  className="text-[11px] font-bold text-white"
-                  style={{ backgroundColor: getAvatarColor(profile?.full_name) }}
-                >
-                  {getInitials(profile?.full_name)}
-                </AvatarFallback>
-              </Avatar>
+              <BrandingAvatar
+                avatarPath={profile?.avatar_url}
+                name={profile?.full_name}
+                className="h-8 w-8 shrink-0"
+                fallbackClassName="text-[11px] font-bold text-white"
+              />
               <div className="flex-1 space-y-2">
                 <Textarea
                   placeholder={t('community.addCommentPlaceholder')}
@@ -521,7 +518,7 @@ export default function IdeaDetail() {
                           {comment.profile?.full_name || t('community.unknownUser')}
                         </span>
                         <span className="text-[11.5px] text-[#9aa0af]">
-                          {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                          {formatDistanceToNowLocalized(new Date(comment.created_at), i18n.language)}
                         </span>
                       </div>
                       <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#4a4f60]">

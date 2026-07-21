@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import { CommentItem } from './CommentItem';
 import { CommunityEmptyState } from './CommunityEmptyState';
 import { toast } from '@/components/ui/sonner';
@@ -12,6 +13,11 @@ interface CommentThreadProps {
   comments: CommunityComment[];
   postId: string;
   currentUserId?: string;
+  /** Current user's stored avatar path — shows their photo in the composer;
+   * omitted (props-not-passed) → the composer avatar is simply hidden. */
+  currentUserAvatarPath?: string | null;
+  /** Current user's display name — derives the composer avatar's initials fallback. */
+  currentUserName?: string | null;
   isAdmin?: boolean;
   isLocked?: boolean;
   isLoading?: boolean;
@@ -30,6 +36,8 @@ export function CommentThread({
   comments,
   postId,
   currentUserId,
+  currentUserAvatarPath,
+  currentUserName,
   isAdmin = false,
   isLocked = false,
   isLoading = false,
@@ -110,7 +118,7 @@ export function CommentThread({
   const handleCopyCommentLink = async (commentId: string) => {
     const commentUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#comment-${commentId}`;
     await navigator.clipboard.writeText(commentUrl);
-    toast({ title: 'Comment link copied' });
+    toast({ title: t('community.toasts.commentLinkCopied') });
   };
 
   return (
@@ -194,6 +202,14 @@ export function CommentThread({
       {/* Add comment composer */}
       {!readOnly && !isLocked && currentUserId && (
         <div className="flex items-end gap-2.5 rounded-2xl border border-border bg-card p-4">
+          {(currentUserAvatarPath || currentUserName) && (
+            <BrandingAvatar
+              avatarPath={currentUserAvatarPath}
+              name={currentUserName}
+              className="h-8 w-8 shrink-0 self-start"
+              fallbackClassName="text-[11px] font-bold text-white"
+            />
+          )}
           <Textarea
             placeholder={t('community.addCommentPlaceholder')}
             value={newComment}

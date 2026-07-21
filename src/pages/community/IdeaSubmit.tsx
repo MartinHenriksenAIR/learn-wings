@@ -171,7 +171,7 @@ export default function IdeaSubmit() {
       navigate(`${routes.community.ideas}?tab=drafts`);
     },
     onError: () => {
-      toast.error('Failed to save draft');
+      toast.error(t('community.toasts.draftSaveFailed'));
     },
   });
 
@@ -201,7 +201,7 @@ export default function IdeaSubmit() {
       navigate(routes.community.ideas);
     },
     onError: () => {
-      toast.error('Failed to submit idea');
+      toast.error(t('community.toasts.ideaSubmitFailed'));
     },
   });
 
@@ -213,18 +213,18 @@ export default function IdeaSubmit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ideas.all });
-      toast.success('Draft deleted');
+      toast.success(t('community.toasts.draftDeleted'));
       navigate(routes.community.ideas);
     },
     onError: () => {
-      toast.error('Failed to delete draft');
+      toast.error(t('community.toasts.draftDeleteFailed'));
     },
   });
 
   const handleSaveDraft = () => {
     const values = form.getValues();
     if (!values.title) {
-      toast.error('Please add a title to save the draft');
+      toast.error(t('community.toasts.titleRequiredForDraft'));
       return;
     }
     saveDraftMutation.mutate(values);
@@ -293,7 +293,7 @@ export default function IdeaSubmit() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: isEditMode ? 'Edit Draft' : 'Submit Idea' }]}>
+    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: isEditMode ? t('community.ideaForm.editHeading') : t('community.submitIdea') }]}>
       <div className="max-w-[680px]">
         {/* Back to idea library */}
         <Button

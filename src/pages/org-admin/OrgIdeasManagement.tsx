@@ -346,7 +346,7 @@ export default function OrgIdeasManagement() {
                 <SelectContent>
                   {IDEA_STATUS_OPTIONS.filter((s) => s.value !== 'draft').map((s) => (
                     <SelectItem key={s.value} value={s.value}>
-                      {s.label}
+                      {t(s.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>

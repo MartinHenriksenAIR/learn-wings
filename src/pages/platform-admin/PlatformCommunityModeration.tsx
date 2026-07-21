@@ -24,7 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import type { CommunityReport, ReportStatus } from '@/lib/community-types';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNowLocalized } from '@/lib/date-locale';
 import { toast } from 'sonner';
 import {
   Loader2,
@@ -42,7 +42,7 @@ interface ReportWithDetails extends Omit<CommunityReport, 'reporter'> {
 }
 
 export default function PlatformCommunityModeration() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<ReportStatus>('pending');
@@ -319,7 +319,7 @@ export default function PlatformCommunityModeration() {
                     <span className="text-[11.5px] font-semibold text-muted-foreground">
                       {t('moderation.reportedBy', {
                         name: report.reporter?.full_name || t('moderation.unknownReporter'),
-                        time: formatDistanceToNow(new Date(report.created_at), { addSuffix: true }),
+                        time: formatDistanceToNowLocalized(new Date(report.created_at), i18n.language),
                       })}
                     </span>
                   </div>

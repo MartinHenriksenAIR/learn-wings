@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { CommentThread } from './CommentThread';
 import { fetchPost, fetchComments } from '@/lib/community-api';
 import { getAvatarColor, getInitials } from '@/lib/utils';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/date-locale';
 import { Loader2, Lock } from 'lucide-react';
 import type { CommunityReport } from '@/lib/community-types';
 
@@ -34,7 +34,7 @@ interface ReportedContentDialogProps {
  * to platform/org admins, so moderators can see content they have hidden.
  */
 export function ReportedContentDialog({ open, onOpenChange, report }: ReportedContentDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Resolve which post to load: post targets ARE the post; comment targets carry
   // their parent post id (community-reports joins it out, #86).
@@ -100,7 +100,7 @@ export function ReportedContentDialog({ open, onOpenChange, report }: ReportedCo
                     {authorName || t('community.unknownUser')}
                   </span>
                   <span className="text-[11.5px] text-[#9aa0af]">
-                    {format(new Date(post.created_at), 'MMM d, yyyy · h:mm a')}
+                    {formatDate(new Date(post.created_at), 'MMM d, yyyy · h:mm a', i18n.language)}
                   </span>
                 </div>
                 <div className="flex-1" />
