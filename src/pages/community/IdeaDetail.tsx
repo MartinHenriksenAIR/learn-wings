@@ -8,7 +8,6 @@ import { routes } from '@/lib/routes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import {
   Select,
@@ -32,7 +31,7 @@ import {
 } from '@/lib/ideas-api';
 import { BUSINESS_AREAS, IDEA_STATUS_OPTIONS } from '@/lib/community-types';
 import type { IdeaStatusExtended } from '@/lib/community-types';
-import { cn, getAvatarColor, getInitials } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -464,14 +463,12 @@ export default function IdeaDetail() {
           {/* Comment input */}
           <div className="rounded-2xl border border-border bg-card px-5 py-4">
             <div className="flex gap-3">
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarFallback
-                  className="text-[11px] font-bold text-white"
-                  style={{ backgroundColor: getAvatarColor(profile?.full_name) }}
-                >
-                  {getInitials(profile?.full_name)}
-                </AvatarFallback>
-              </Avatar>
+              <BrandingAvatar
+                avatarPath={profile?.avatar_url}
+                name={profile?.full_name}
+                className="h-8 w-8 shrink-0"
+                fallbackClassName="text-[11px] font-bold text-white"
+              />
               <div className="flex-1 space-y-2">
                 <Textarea
                   placeholder={t('community.addCommentPlaceholder')}

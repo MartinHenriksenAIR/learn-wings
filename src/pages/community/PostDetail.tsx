@@ -437,6 +437,8 @@ export default function PostDetail() {
           comments={comments}
           postId={postId!}
           currentUserId={profile?.id}
+          currentUserAvatarPath={profile?.avatar_url}
+          currentUserName={profile?.full_name}
           isAdmin={isAdmin}
           isLocked={post.is_locked}
           isLoading={commentsLoading}
