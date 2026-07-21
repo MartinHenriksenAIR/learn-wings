@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn, getAvatarColor, getInitials } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import type { OrgMembership, Profile, OrgRole } from '@/lib/types';
 
 type Member = OrgMembership & { profile: Profile };
@@ -63,10 +63,10 @@ export function MembersTable({
             <span className="flex min-w-0 items-center gap-[11px]">
               <BrandingAvatar
                 avatarPath={member.profile?.avatar_url}
-                fallback={getInitials(member.profile?.full_name, '??')}
+                name={member.profile?.full_name}
+                initialsFallback="??"
                 className="h-8 w-8 shrink-0"
                 fallbackClassName="text-[11px] font-bold text-white"
-                fallbackStyle={{ backgroundColor: getAvatarColor(member.profile?.full_name) }}
               />
               <span className="truncate text-[13px] font-bold">{member.profile?.full_name}</span>
             </span>

@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import { Sparkles } from 'lucide-react';
 import { callApi } from '@/lib/api-client';
-import { getAvatarColor, getInitials } from '@/lib/utils';
 
 interface ChampionProfile {
   id: string;
@@ -52,10 +51,10 @@ export function AIChampionsList({ orgId }: AIChampionsListProps) {
           <div key={champion.id} className="flex items-center gap-2.5">
             <BrandingAvatar
               avatarPath={champion.profile?.avatar_url}
-              fallback={getInitials(champion.profile?.full_name, '??')}
+              name={champion.profile?.full_name}
+              initialsFallback="??"
               className="h-[30px] w-[30px] shrink-0"
               fallbackClassName="text-[10.5px] font-bold text-white"
-              fallbackStyle={{ backgroundColor: getAvatarColor(champion.profile?.full_name) }}
             />
             <div className="flex min-w-0 flex-col">
               <p className="truncate text-[12.5px] font-bold">

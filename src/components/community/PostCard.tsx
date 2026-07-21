@@ -6,7 +6,7 @@ import { CategoryBadge } from './CategoryBadge';
 import { TagList } from './TagList';
 import { MessageSquare, Pin, Lock, Calendar, MapPin, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { cn, getAvatarColor, getInitials } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
 interface PostCardProps {
@@ -26,7 +26,6 @@ export function PostCard({
 }: PostCardProps) {
   const { t } = useTranslation();
   const authorName = post.profile?.full_name;
-  const initials = getInitials(authorName);
 
   const isEvent = post.category?.slug === 'events';
 
@@ -42,10 +41,9 @@ export function PostCard({
       <div className="mb-2.5 flex items-center gap-2.5">
         <BrandingAvatar
           avatarPath={post.profile?.avatar_url}
-          fallback={initials}
+          name={authorName}
           className="h-[34px] w-[34px] shrink-0"
           fallbackClassName="text-[11.5px] font-bold text-white"
-          fallbackStyle={{ backgroundColor: getAvatarColor(authorName) }}
         />
         <div className="flex min-w-0 flex-col">
           <span className="truncate text-[13px] font-bold">{authorName || t('community.unknownUser')}</span>

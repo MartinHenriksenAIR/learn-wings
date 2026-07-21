@@ -51,7 +51,7 @@ import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQu
 import { queryKeys } from '@/lib/query-keys';
 import { callApi, ApiError } from '@/lib/api-client';
 import { getSeatUsage } from '@/lib/seats';
-import { cn, getAvatarColor, getInitials } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { SeatUsageNote } from '@/components/SeatUsageNote';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
 import {
@@ -669,10 +669,10 @@ export function OrgMembersTab() {
                 <span className="flex min-w-0 items-center gap-[11px]">
                   <BrandingAvatar
                     avatarPath={member.profile?.avatar_url}
-                    fallback={getInitials(member.profile?.full_name, '??')}
+                    name={member.profile?.full_name}
+                    initialsFallback="??"
                     className="h-8 w-8 shrink-0"
                     fallbackClassName="text-[11px] font-bold text-white"
-                    fallbackStyle={{ backgroundColor: getAvatarColor(member.profile?.full_name) }}
                   />
                   <span className="flex min-w-0 flex-col">
                     <span className="flex items-center gap-1.5 text-[13px] font-bold">
