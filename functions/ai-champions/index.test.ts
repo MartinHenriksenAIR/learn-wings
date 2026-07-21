@@ -116,4 +116,18 @@ describe('ai-champions', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
     expect(ctx.error).toHaveBeenCalledWith(expect.stringContaining('connection refused'));
   });
+
+  // #180 — AI champion author payload must carry avatar_url.
+  it('joins avatar_url into the champion author profile payload', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    const rows = [{ id: 'ch-1', profile: { id: 'a1', full_name: 'Ann', department: 'IT', avatar_url: 'avatars/a1.png' } }];
+    mockQuery.mockResolvedValueOnce(rows);
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("'avatar_url', pr.avatar_url");
+    expect(JSON.parse(res.body as string).champions[0].profile.avatar_url).toBe('avatars/a1.png');
+  });
 });

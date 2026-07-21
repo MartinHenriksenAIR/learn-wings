@@ -183,4 +183,19 @@ describe('community-comments', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
+
+  // #180 — comment author payload must carry avatar_url.
+  it('joins avatar_url into the comment author profile payload', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    // 1st query: the post visibility lookup; 2nd query: the comments themselves.
+    mockQuery.mockResolvedValueOnce([{ scope: 'global', org_id: null }]);
+    mockQuery.mockResolvedValueOnce([{ id: 'c1', content: 'hi', profile: { id: 'a1', full_name: 'Ann', avatar_url: 'avatars/a1.png' } }]);
+
+    const res = await handler(baseReq({ postId: 'post-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql] = mockQuery.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain("'avatar_url', pr.avatar_url");
+    expect(JSON.parse(res.body as string).comments[0].profile.avatar_url).toBe('avatars/a1.png');
+  });
 });

@@ -170,4 +170,18 @@ describe('community-post', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
+
+  // #180 — post detail author payload must carry avatar_url.
+  it('joins avatar_url into the author profile payload', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    const post = { id: 'post-1', scope: 'global', org_id: null, is_hidden: false, profile: { id: 'a1', full_name: 'Ann', avatar_url: 'avatars/a1.png' } };
+    mockQueryOne.mockResolvedValueOnce(post);
+
+    const res = await handler(baseReq({ postId: 'post-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("'avatar_url', pr.avatar_url");
+    expect(JSON.parse(res.body as string).post.profile.avatar_url).toBe('avatars/a1.png');
+  });
 });
