@@ -156,7 +156,7 @@ export default function IdeaLibrary() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library' }]}>
+    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary') }]}>
       {/* Back to community */}
       <Button
         variant="ghost"

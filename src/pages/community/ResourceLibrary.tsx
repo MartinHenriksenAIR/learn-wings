@@ -163,7 +163,7 @@ export default function ResourceLibrary() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Resources' }]}>
+    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.resources') }]}>
       {/* Back to community */}
       <Button
         variant="ghost"

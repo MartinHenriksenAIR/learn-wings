@@ -52,6 +52,7 @@
     "clear": "Ryd"
   },
   "nav": {
+    "home": "Hjem",
     "dashboard": "Dashboard",
     "courses": "Kursusoversigt",
     "community": "Fællesskab",
@@ -212,6 +213,9 @@
   "community": {
     "title": "Fællesskab",
     "ideaLibrary": "Idébibliotek",
+    "idea": "Idé",
+    "post": "Indlæg",
+    "resources": "Ressourcer",
     "submitIdea": "Indsend idé",
     "myDrafts": "Mine kladder",
     "allIdeas": "Alle idéer",

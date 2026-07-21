@@ -164,7 +164,7 @@ export default function IdeaDetail() {
 
   if (ideaLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: 'Idea' }]}>
+      <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: t('community.idea') }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -174,7 +174,7 @@ export default function IdeaDetail() {
 
   if (!idea) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library' }]}>
+      <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary') }]}>
         <div className="py-12 text-center">
           <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -194,7 +194,7 @@ export default function IdeaDetail() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: 'Idea' }]}>
+    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: t('community.idea') }]}>
       <div className="max-w-[760px]">
         {/* Back */}
         <Button

@@ -208,7 +208,7 @@ export default function PostDetail() {
 
   if (postLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Post' }]}>
+      <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.post') }]}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -218,7 +218,7 @@ export default function PostDetail() {
 
   if (!post) {
     return (
-      <AppLayout breadcrumbs={[{ label: 'Community' }]}>
+      <AppLayout breadcrumbs={[{ label: t('community.title') }]}>
         <div className="py-12 text-center">
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('community.postNotFound')}</h1>
           <p className="mb-4 text-sm text-muted-foreground">{t('community.postNotFoundDescription')}</p>
@@ -239,7 +239,7 @@ export default function PostDetail() {
   const isEvent = post.category?.slug === 'events';
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Post' }]}>
+    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.post') }]}>
       <div className="max-w-[760px]">
         {/* Back button */}
         <Button

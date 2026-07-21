@@ -52,6 +52,7 @@
     "clear": "Clear"
   },
   "nav": {
+    "home": "Home",
     "dashboard": "Dashboard",
     "courses": "Course Overview",
     "community": "Community",
@@ -212,6 +213,9 @@
   "community": {
     "title": "Community",
     "ideaLibrary": "Idea Library",
+    "idea": "Idea",
+    "post": "Post",
+    "resources": "Resources",
     "submitIdea": "Submit Idea",
     "myDrafts": "My Drafts",
     "allIdeas": "All Ideas",

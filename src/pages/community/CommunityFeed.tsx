@@ -141,7 +141,7 @@ export default function CommunityFeed() {
   ];
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community' }]}> {/* single crumb: page itself, no default href needed */}
+    <AppLayout breadcrumbs={[{ label: t('community.title') }]}> {/* single crumb: page itself, no default href needed */}
       {/* Header */}
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>

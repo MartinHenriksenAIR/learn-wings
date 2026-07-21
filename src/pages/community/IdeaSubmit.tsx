@@ -293,7 +293,7 @@ export default function IdeaSubmit() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: 'Community', hrefKey: 'community' }, { label: 'Idea Library', hrefKey: 'ideaLibrary' }, { label: isEditMode ? 'Edit Draft' : 'Submit Idea' }]}>
+    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: isEditMode ? t('community.ideaForm.editHeading') : t('community.submitIdea') }]}>
       <div className="max-w-[680px]">
         {/* Back to idea library */}
         <Button
