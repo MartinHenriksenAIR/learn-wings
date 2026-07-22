@@ -1,22 +1,20 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isFuture, isToday } from 'date-fns';
-import { Calendar, ExternalLink, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Calendar, Loader2 } from 'lucide-react';
+import { EventCard } from '@/components/community/EventCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useCommunityEvents } from '@/hooks/useCommunityEvents';
-import { formatDate } from '@/lib/date-locale';
 import type { CommunityPost } from '@/lib/community-types';
 
 /**
- * The community "Events & Office Hours" tab (#125) — the thin end-to-end
- * tracer. A clean single column: upcoming-only events (event_date today or
- * later) merged from global scope plus the user's current org, soonest first.
- * Each row is deliberately minimal — title, date/time, and a Join link — the
- * full event card is a follow-up.
+ * The community "Events & Office Hours" tab (#125). A clean single column:
+ * upcoming-only events (event_date today or later) merged from global scope
+ * plus the user's current org, soonest first. Each event renders as a full
+ * date-forward EventCard with a click-through to its post detail.
  */
 export function EventsTab() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { currentOrg } = useAuth();
 
   const globalQuery = useCommunityEvents('global', currentOrg?.id);
@@ -59,43 +57,9 @@ export function EventsTab() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      {events.map((event) => {
-        const eventDate = new Date(event.event_date!);
-        return (
-          <div
-            key={event.id}
-            className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card px-5 py-4"
-          >
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="truncate text-[14px] font-bold">{event.title}</span>
-              <span className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-                <Calendar aria-hidden="true" className="h-3.5 w-3.5" />
-                {isToday(eventDate) ? t('community.today') : formatDate(eventDate, 'PPP', i18n.language)}
-                {' · '}
-                {formatDate(eventDate, 'p', i18n.language)}
-                {event.event_location && ` · ${event.event_location}`}
-              </span>
-            </div>
-            {event.event_registration_url && (
-              <a
-                href={event.event_registration_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0"
-              >
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 rounded-lg border-input px-3 text-[12px] font-bold"
-                >
-                  <ExternalLink aria-hidden="true" className="mr-1 h-3.5 w-3.5" />
-                  {t('community.join')}
-                </Button>
-              </a>
-            )}
-          </div>
-        );
-      })}
+      {events.map((event) => (
+        <EventCard key={event.id} event={event} />
+      ))}
     </div>
   );
 }

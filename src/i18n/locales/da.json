@@ -255,6 +255,7 @@
     "today": "I dag",
     "register": "Tilmeld",
     "join": "Deltag",
+    "hostedBy": "Arrangeret af {{name}}",
     "noUpcomingEvents": "Ingen kommende arrangementer endnu. Kig forbi snart.",
     "aiChampions": "AI Champions",
     "aiChampionsBlurb": "Kontakt disse teammedlemmer for AI-vejledning og support.",

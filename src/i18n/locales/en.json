@@ -255,6 +255,7 @@
     "today": "Today",
     "register": "Register",
     "join": "Join",
+    "hostedBy": "Hosted by {{name}}",
     "noUpcomingEvents": "No upcoming events yet. Check back soon.",
     "aiChampions": "AI Champions",
     "aiChampionsBlurb": "Reach out to these team members for AI guidance and support.",
