@@ -22,7 +22,13 @@ import { PAGE_GRADIENT_CLASSES, AUTH_CARD_CLASSES } from './Login';
 
 /** Response contract of POST /api/invitation-accept (functions/invitation-accept). */
 type AcceptResponse =
-  | { kind: 'org'; orgId: string; orgName: string | null; role: string; alreadyMember: boolean }
+  | {
+      kind: 'org';
+      orgId: string;
+      orgName: string | null;
+      role: 'learner' | 'org_admin';
+      alreadyMember: boolean;
+    }
   | { kind: 'platform' };
 
 type ErrorKind = 'expired' | 'invalid' | 'alreadyAccepted' | 'emailMismatch' | 'generic';
@@ -117,7 +123,7 @@ export default function Signup() {
   const handleSignIn = () => {
     // The Entra login is a full-page redirect: stash the invite URL so Login
     // can restore it after the round trip (same machinery as ProtectedRoute).
-    savePostLoginRedirect(location.pathname + location.search);
+    savePostLoginRedirect(location.pathname + location.search + location.hash);
     signIn();
   };
 
@@ -185,7 +191,9 @@ export default function Signup() {
         </AuthShell>
       );
     }
-    const org = result.orgName ?? '';
+    // LEFT JOIN safety: orgName can't practically be null, but if it ever is,
+    // fall back to the platform name rather than rendering awkward blank copy.
+    const org = result.orgName ?? 'AI Uddannelse';
     if (result.alreadyMember) {
       // Deliberately role-free: the response echoes the invitation's role,
       // not the member's actual one (see functions/invitation-accept).
