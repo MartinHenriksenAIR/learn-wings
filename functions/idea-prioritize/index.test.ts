@@ -60,6 +60,14 @@ describe('idea-prioritize', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'effort must be an integer 1-3 or null' });
   });
 
+  it('returns 400 on a half-score (exactly one of value/effort null)', async () => {
+    const res = await handler(baseReq({ ideaId: 'idea-1', value: 3, effort: null }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'value and effort must both be set or both be null' });
+    // rejected before any DB access
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when idea not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ ideaId: 'idea-999', value: 3, effort: 1 }), {} as any);

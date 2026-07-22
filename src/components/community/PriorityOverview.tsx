@@ -52,7 +52,7 @@ export function PriorityOverview({ ideas }: PriorityOverviewProps) {
         <div className="grid grid-cols-2 gap-2">
           {BANDS.map((band) => (
             <div key={band} className="rounded-xl bg-[#f3f4f8] p-3">
-              <div className="text-[22px] font-extrabold leading-none">{bandCounts[band]}</div>
+              <div data-testid={`band-count-${band}`} className="text-[22px] font-extrabold leading-none">{bandCounts[band]}</div>
               <div className="mt-1 text-[11.5px] font-bold text-muted-foreground">
                 {t(`ideaManagement.bands.${band}`)}
               </div>
@@ -86,7 +86,7 @@ export function PriorityOverview({ ideas }: PriorityOverviewProps) {
         <h3 className="mb-3 text-[13px] font-extrabold tracking-[0.02em]">
           {t('ideaManagement.prioritize.byBusinessArea')}
         </h3>
-        <ul className="space-y-2">
+        <ul data-testid="business-area-list" className="space-y-2">
           {areaCounts.map((a) => (
             <li key={a.value} className="flex items-center justify-between text-[13px]">
               <span className="font-semibold">{a.label}</span>

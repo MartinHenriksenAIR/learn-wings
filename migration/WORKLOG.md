@@ -1315,3 +1315,19 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 - **Known nit deferred:** the tracer's `community.noUpcomingEvents` key is orphaned after slice 3 swapped in the shared empty state.
 
 **Verify (final tip):** per-slice Helm acceptance green ×3 (each slice ships its own proof test: `events-tab.test.tsx`, `EventCard.test.tsx`, `events-tab-admin.test.tsx`) · promotion re-run: root `npm test` 434 pass, 81 files (first run had one flaky `routes-gate.test.ts` failure, unrelated — green in isolation and on the clean re-run) · functions `npm test` 1840 pass (124 files, 3 skipped) · CI green on PR #216 · post-deploy signed-in Playwright smoke announced on the PR.
+
+---
+
+## 2026-07-22 — #218 Opportunity-prioritization follow-ups (a11y, tests, cleanup)
+
+**Who:** martin. PR #220. The six deferred, non-blocking items filed off the #118 build (PR #212) — none affecting correctness.
+
+**What shipped (all six items from #218):**
+- **Scoring-dialog a11y** (`IdeaScoreDialog.tsx`) — each `<label>` now linked to its Radix `SelectTrigger` via `htmlFor`/`id` (the ids hoisted to module consts so the community `i18next/no-literal-string` gate stays clean, since the trigger literal lives inside a JSX expression); the misleading "Medium" placeholder (read as if a score were already selected) replaced with a neutral `scoreDialog.placeholder` — "Select…" / "Vælg…", en+da.
+- **`PriorityOverview` test breadth** — added coverage for the quadrant band-count aggregation (four bands + unscored ignored) and the by-business-area rollup (null `business_area` ignored, `count > 0` filter, sort desc). Two `data-testid`s added to the component for the assertions, mirroring the existing `do-next-list`.
+- **`PrioritizationMatrix`** — the per-cell `scoredAt` re-filter (9× over `inScope` every render) collapsed into one `useMemo` partition: an `unscored` list + a `scoredByCell` Map (`${value}-${effort}` → ideas), so each grid cell is a single lookup. Behavior-preserving (same predicate, same order). Added a mutual-exclusivity test: a fully-scored idea lives in its cell and never in the unscored tray; a half-score counts as unscored.
+- **`idea-prioritize` endpoint** — rejects a half-score (exactly one of value/effort null) with 400 before any DB access, so stored state is always fully scored or fully cleared. TDD red→green; the clear path `(null,null)` and full scores are unaffected, and the deliberate 4xx message is a caller-facing contract per `.claude/rules/functions.md`.
+- **Prioritize-tab loading flag** (`OrgIdeasManagement.tsx`) — the tab gates on the unfiltered committed-idea query's own `isLoading` instead of the Board query's, so an active header filter's refetch no longer flickers a spinner on the (independently-keyed) Prioritize tab.
+- **Cleanup** — dropped the exported-but-unused `ScoreLevel` type from `src/lib/idea-priority.ts`.
+
+**Verify:** (rebased on trunk after #212/#217/#216 landed) root `npm run lint` 0 errors · `npm test` 477 pass · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0; functions `npm run build` exit 0 · `npm test` 1895 pass (126 files, 3 skipped; +1 half-score contract test, red→green). Independent code-review pass: no findings. Deploy + post-merge smoke announced on PR #220.

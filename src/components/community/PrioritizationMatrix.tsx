@@ -34,9 +34,25 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
     () => ideas.filter((i) => PRIORITIZABLE_STATUSES.includes(i.status)),
     [ideas],
   );
-  const unscored = inScope.filter((i) => i.value_score == null || i.effort_score == null);
-  const scoredAt = (v: number, e: number) =>
-    inScope.filter((i) => i.value_score === v && i.effort_score === e);
+
+  // Partition once per render: unscored (either score null) vs. scored, the
+  // latter bucketed by `${value}-${effort}` so each grid cell is one lookup
+  // instead of a fresh filter over inScope (9 cells × every render).
+  const { unscored, scoredByCell } = useMemo(() => {
+    const unscored: EnhancedIdea[] = [];
+    const scoredByCell = new Map<string, EnhancedIdea[]>();
+    for (const i of inScope) {
+      if (i.value_score == null || i.effort_score == null) {
+        unscored.push(i);
+        continue;
+      }
+      const key = `${i.value_score}-${i.effort_score}`;
+      const bucket = scoredByCell.get(key);
+      if (bucket) bucket.push(i);
+      else scoredByCell.set(key, [i]);
+    }
+    return { unscored, scoredByCell };
+  }, [inScope]);
 
   const drop = (value: number | null, effort: number | null) => {
     if (draggedId) onScore(draggedId, value, effort);
@@ -114,7 +130,7 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
                 onDrop={() => drop(v, e)}
                 className={cn('min-h-[110px] rounded-xl p-2', cellTint(v, e))}
               >
-                <div className="flex flex-col gap-1.5">{scoredAt(v, e).map(card)}</div>
+                <div className="flex flex-col gap-1.5">{(scoredByCell.get(`${v}-${e}`) ?? []).map(card)}</div>
               </div>
             )),
           )}

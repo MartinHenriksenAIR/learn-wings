@@ -26,6 +26,10 @@ const LEVELS = [
   { value: '1', key: 'low' },
 ] as const;
 
+// Element ids linking each <label> to its Select trigger (a11y).
+const VALUE_SELECT_ID = 'idea-score-value';
+const EFFORT_SELECT_ID = 'idea-score-effort';
+
 export function IdeaScoreDialog({
   open, onOpenChange, ideaTitle, value, effort, onSave, onClear, isPending,
 }: IdeaScoreDialogProps) {
@@ -42,13 +46,13 @@ export function IdeaScoreDialog({
   }, [open, value, effort]);
 
   const renderSelect = (
+    id: string,
     current: string,
     onChange: (v: string) => void,
-    placeholder: string,
   ) => (
     <Select value={current} onValueChange={onChange}>
-      <SelectTrigger>
-        <SelectValue placeholder={placeholder} />
+      <SelectTrigger id={id}>
+        <SelectValue placeholder={t('ideaManagement.scoreDialog.placeholder')} />
       </SelectTrigger>
       <SelectContent>
         {LEVELS.map((l) => (
@@ -69,12 +73,12 @@ export function IdeaScoreDialog({
         </DialogHeader>
         <div className="grid grid-cols-2 gap-4 py-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t('ideaManagement.scoreDialog.valueLabel')}</label>
-            {renderSelect(localValue, setLocalValue, t('ideaManagement.levels.medium'))}
+            <label htmlFor={VALUE_SELECT_ID} className="text-sm font-medium">{t('ideaManagement.scoreDialog.valueLabel')}</label>
+            {renderSelect(VALUE_SELECT_ID, localValue, setLocalValue)}
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t('ideaManagement.scoreDialog.effortLabel')}</label>
-            {renderSelect(localEffort, setLocalEffort, t('ideaManagement.levels.medium'))}
+            <label htmlFor={EFFORT_SELECT_ID} className="text-sm font-medium">{t('ideaManagement.scoreDialog.effortLabel')}</label>
+            {renderSelect(EFFORT_SELECT_ID, localEffort, setLocalEffort)}
           </div>
         </div>
         <DialogFooter className="gap-2 sm:justify-between">

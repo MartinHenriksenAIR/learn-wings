@@ -544,6 +544,7 @@
       "title": "Rate opportunity",
       "valueLabel": "Value",
       "effortLabel": "Effort",
+      "placeholder": "Select…",
       "clear": "Clear scores"
     }
   },

@@ -3,9 +3,6 @@ import type { IdeaStatusExtended } from './community-types';
 /** Statuses that appear on the prioritization matrix (Backlog + In Progress). */
 export const PRIORITIZABLE_STATUSES: readonly IdeaStatusExtended[] = ['accepted', 'in_progress'];
 
-/** Score levels: 1=Low, 2=Medium, 3=High. */
-export type ScoreLevel = 1 | 2 | 3;
-
 export type PriorityBand = 'quick_win' | 'big_bet' | 'fill_in' | 'deprioritize';
 
 /**
