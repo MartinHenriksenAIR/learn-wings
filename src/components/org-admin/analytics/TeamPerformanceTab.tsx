@@ -145,7 +145,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
 
   // Export to CSV
   const handleExportCSV = () => {
-    const headers = ['Name', 'Department', 'AI Level', 'Courses Enrolled', 'Courses Completed', 'Avg Quiz Score'];
+    const headers = ['Name', 'Department', t('assessment.analytics.aiLevel'), 'Courses Enrolled', 'Courses Completed', 'Avg Quiz Score'];
     const rows = filteredUserStats.map((user) => [
       user.name,
       user.department || 'Unassigned',

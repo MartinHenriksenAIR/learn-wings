@@ -137,13 +137,13 @@ function LevelDistributionCard({
           <div
             className="mb-4 h-3 w-full rounded-full"
             style={{ background: TRACK }}
-            aria-label="No learner data"
+            aria-label={t('assessment.analytics.noLearnerData')}
           />
         ) : (
           <div
             className="mb-4 flex h-3 w-full overflow-hidden rounded-full"
             role="img"
-            aria-label={`AI level distribution: ${legendItems.map(s => `${s.label} ${s.count}`).join(', ')}`}
+            aria-label={`${t('assessment.analytics.aiLevel')}: ${legendItems.map(s => `${s.label} ${s.count}`).join(', ')}`}
           >
             {barSegments.map((seg, i) => (
               <span

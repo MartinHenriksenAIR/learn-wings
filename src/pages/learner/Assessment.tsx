@@ -195,7 +195,7 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <TopRow onSkip={() => skipMutation.mutate()} skipDisabled={skipMutation.isPending} />
+      <TopRow onSkip={() => skipMutation.mutate()} skipDisabled={skipMutation.isPending || submitMutation.isPending} />
 
       <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col px-4 pb-16 pt-10">
         {/* Meta row */}

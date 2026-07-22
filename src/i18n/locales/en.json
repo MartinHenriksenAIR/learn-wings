@@ -1143,7 +1143,8 @@
       "distributionTitleAll": "AI level across organizations",
       "distributionSubtitle": "Based on the onboarding assessment",
       "notAssessed": "Not assessed",
-      "aiLevel": "AI level"
+      "aiLevel": "AI level",
+      "noLearnerData": "No learner data yet"
     },
     "toasts": {
       "saved": "Assessment saved — your level is updated",

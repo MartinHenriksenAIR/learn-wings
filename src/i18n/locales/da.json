@@ -1143,7 +1143,8 @@
       "distributionTitleAll": "AI-niveau på tværs af organisationer",
       "distributionSubtitle": "Baseret på onboarding-vurderingen",
       "notAssessed": "Ikke vurderet",
-      "aiLevel": "AI-niveau"
+      "aiLevel": "AI-niveau",
+      "noLearnerData": "Ingen data endnu"
     },
     "toasts": {
       "saved": "Vurdering gemt – dit niveau er opdateret",
