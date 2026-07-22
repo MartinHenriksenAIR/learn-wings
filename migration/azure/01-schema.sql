@@ -176,11 +176,18 @@ CREATE TABLE public.courses (
   description         text,
   level               public.course_level NOT NULL DEFAULT 'basic',
   language            text CHECK (language IN ('en', 'da')),
+  course_group_id     uuid,   -- #213: shared tag linking language editions of one course; NULL = standalone
   is_published        boolean NOT NULL DEFAULT false,
   thumbnail_url       text,
   created_by_user_id  uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at          timestamptz NOT NULL DEFAULT now()
 );
+
+-- #213: group lookups + at most one edition per language per group
+CREATE INDEX idx_courses_course_group_id ON public.courses (course_group_id);
+CREATE UNIQUE INDEX uq_courses_group_language
+  ON public.courses (course_group_id, language)
+  WHERE course_group_id IS NOT NULL;
 
 -- ---- course_modules ----
 CREATE TABLE public.course_modules (
