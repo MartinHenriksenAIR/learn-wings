@@ -53,7 +53,7 @@ export function EnrollUserDialog({
   members,
   onSuccess,
 }: EnrollUserDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [courses, setCourses] = useState<AvailableCourse[]>([]);
@@ -82,7 +82,7 @@ export function EnrollUserDialog({
           access: string;
           course: Course;
         }>;
-      }>('/api/org-course-access', { orgId });
+      }>('/api/org-course-access', { orgId, language: i18n.resolvedLanguage ?? 'da' });
 
       const availableCourseList = accessResult.access
         .filter((row) => row.access === 'enabled' && row.course.is_published === true)

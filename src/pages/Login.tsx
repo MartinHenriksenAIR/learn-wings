@@ -8,8 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import logoLight from '@/assets/logo-light.png';
 
-// Soft slate gradient behind both the loading spinner and the login card
-const PAGE_GRADIENT_CLASSES = 'bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)]';
+// Soft slate gradient behind both the loading spinner and the login card.
+// Exported for Signup, which renders the same auth-card treatment (#175).
+export const PAGE_GRADIENT_CLASSES = 'bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)]';
+export const AUTH_CARD_CLASSES =
+  'flex w-full max-w-[380px] flex-col items-center gap-5 rounded-[20px] border border-border bg-card px-10 py-11 shadow-[0_24px_60px_rgba(16,41,143,0.10)]';
 
 export default function Login() {
   const { signIn, user, isPlatformAdmin, isOrgAdmin, isLoading } = useAuth();
@@ -43,7 +46,7 @@ export default function Login() {
 
   return (
     <div className={`grid min-h-screen place-items-center ${PAGE_GRADIENT_CLASSES} px-4`}>
-      <div className="flex w-full max-w-[380px] flex-col items-center gap-5 rounded-[20px] border border-border bg-card px-10 py-11 shadow-[0_24px_60px_rgba(16,41,143,0.10)]">
+      <div className={AUTH_CARD_CLASSES}>
         <img
           src={logoLight}
           alt="AI Uddannelse"

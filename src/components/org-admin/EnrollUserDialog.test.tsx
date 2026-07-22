@@ -12,6 +12,7 @@ vi.mock('react-i18next', () => ({
             .map(([k, v]) => `${k}=${v}`)
             .join(',')}`
         : key,
+    i18n: { resolvedLanguage: 'da' },
   }),
 }));
 
@@ -140,5 +141,11 @@ describe('EnrollUserDialog — per-row failure reasons (#62)', () => {
     const createCalls = mockCallApi.mock.calls.filter(([p]) => p === '/api/enrollment-create');
     expect(createCalls).toHaveLength(2);
     expect(onSuccess).toHaveBeenCalled();
+
+    // The resolved UI language flows through to the course-access filter (#191)
+    expect(mockCallApi).toHaveBeenCalledWith('/api/org-course-access', {
+      orgId: 'org-1',
+      language: 'da',
+    });
   });
 });

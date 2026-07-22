@@ -175,6 +175,7 @@ CREATE TABLE public.courses (
   title               text NOT NULL,
   description         text,
   level               public.course_level NOT NULL DEFAULT 'basic',
+  language            text CHECK (language IN ('en', 'da')),
   is_published        boolean NOT NULL DEFAULT false,
   thumbnail_url       text,
   created_by_user_id  uuid REFERENCES public.profiles(id) ON DELETE SET NULL,

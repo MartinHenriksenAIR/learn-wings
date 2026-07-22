@@ -165,6 +165,7 @@ describe('CoursesManager — mutations patch the courses cache (#48)', () => {
       title: 'Course One',
       description: 'A course',
       level: 'basic',
+      language: null,
       is_published: false,
       thumbnail_url: null,
       created_by_user_id: null,
@@ -203,6 +204,7 @@ describe('CoursesManager — mutations patch the courses cache (#48)', () => {
       title: 'Course One',
       description: 'A course',
       level: 'basic',
+      language: null,
       is_published: false,
       thumbnail_url: null,
       created_by_user_id: null,
@@ -241,5 +243,67 @@ describe('CoursesManager — mutations patch the courses cache (#48)', () => {
     await waitFor(() => {
       expect(toggle.disabled).toBe(false);
     });
+  });
+});
+
+describe('CoursesManager — language field (#191)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const existingCourse = {
+    id: 'existing-1',
+    title: 'Existing Course',
+    description: 'An existing course',
+    level: 'basic',
+    language: 'en',
+    is_published: true,
+    thumbnail_url: null,
+    created_by_user_id: null,
+    created_at: '2024-01-01T00:00:00Z',
+  };
+
+  it('renders the LanguageBadge next to the LevelBadge in the course list', async () => {
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/courses-admin') return { courses: [existingCourse], accessRecords: [] };
+      if (path === '/api/organizations') return { organizations: [] };
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+
+    await screen.findByText('Existing Course');
+    expect(screen.getByText('English')).toBeInTheDocument();
+  });
+
+  it('create dialog defaults language to "da" and the create payload always carries it', async () => {
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/courses-admin') return { courses: [existingCourse], accessRecords: [] };
+      if (path === '/api/organizations') return { organizations: [] };
+      if (path === '/api/course-create') return { course: { ...existingCourse, id: 'new-1', title: 'New Course' } };
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+
+    // With an existing course in the list, the header's "New Course" button is
+    // unambiguous (the empty-state's own "New Course" action isn't rendered).
+    await screen.findByText('Existing Course');
+    fireEvent.click(screen.getByRole('button', { name: /new course/i }));
+
+    const titleInput = await screen.findByPlaceholderText('Course title');
+    fireEvent.change(titleInput, { target: { value: 'New Course' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith('/api/course-create', {
+        title: 'New Course',
+        description: '',
+        level: 'basic',
+        language: 'da',
+        thumbnailUrl: null,
+      }),
+    );
   });
 });

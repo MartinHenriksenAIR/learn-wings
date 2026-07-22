@@ -15,6 +15,13 @@ vi.mock('@/lib/storage', () => ({
   getSignedLmsAssetUrl: (...args: unknown[]) => mockGetSignedLmsAssetUrl(...args),
 }));
 
+// Fixed, settable resolvedLanguage so query-key / body assertions stay deterministic
+// while still letting individual tests exercise a different resolved language.
+const { mockResolvedLanguage } = vi.hoisted(() => ({ mockResolvedLanguage: { value: 'da' } }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ i18n: { resolvedLanguage: mockResolvedLanguage.value } }),
+}));
+
 import { useLearnerCourses } from './useLearnerCourses';
 
 const course = {
@@ -59,16 +66,35 @@ function renderWithClient(ui: React.ReactElement) {
 describe('useLearnerCourses', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolvedLanguage.value = 'da';
   });
 
-  it('calls /api/learner-courses with the correct { orgId } body', async () => {
+  it('calls /api/learner-courses with the correct { orgId, language } body', async () => {
     mockGetSignedLmsAssetUrl.mockResolvedValue('https://signed.example.com/thumb.jpg');
     mockCallApi.mockResolvedValue({ courses: [course], enrollments: [enrollment] });
 
     renderWithClient(<Consumer orgId="org-1" />);
 
     await waitFor(() => {
-      expect(mockCallApi).toHaveBeenCalledWith('/api/learner-courses', { orgId: 'org-1' });
+      expect(mockCallApi).toHaveBeenCalledWith('/api/learner-courses', {
+        orgId: 'org-1',
+        language: 'da',
+      });
+    });
+  });
+
+  it('sends the resolved language when it is en', async () => {
+    mockResolvedLanguage.value = 'en';
+    mockGetSignedLmsAssetUrl.mockResolvedValue('https://signed.example.com/thumb.jpg');
+    mockCallApi.mockResolvedValue({ courses: [course], enrollments: [enrollment] });
+
+    renderWithClient(<Consumer orgId="org-1" />);
+
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/learner-courses', {
+        orgId: 'org-1',
+        language: 'en',
+      });
     });
   });
 

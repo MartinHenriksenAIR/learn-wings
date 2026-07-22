@@ -102,18 +102,92 @@ describe('learner-courses', () => {
     expect(body.courses).toEqual(courseRows);
     expect(body.enrollments).toEqual(enrollmentRows);
 
-    // Assert courses SQL — access = 'enabled', is_published = TRUE, no SELECT *, params ['org-1']
+    // Assert courses SQL — access = 'enabled', is_published = TRUE, language filter, no SELECT *
     const [coursesSql, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(coursesSql).toContain("access = 'enabled'");
     expect(coursesSql).toContain('c.is_published = TRUE');
+    expect(coursesSql).toContain('c.language');
+    expect(coursesSql).toContain('c.language = $2');
+    // Language relaxation: an already-enrolled course is always shown regardless of language
+    expect(coursesSql).toContain('FROM enrollments e');
     expect(coursesSql).not.toContain('SELECT *');
-    expect(coursesParams).toEqual(['org-1']);
+    // No language sent — defaults to 'da'; profile.id travels as $3 for the enrolled-union
+    expect(coursesParams).toEqual(['org-1', 'da', 'p1']);
 
     // Assert enrollments SQL — user_id = $1, no SELECT *, params ['p1', 'org-1']
     const [enrollSql, enrollParams] = mockQuery.mock.calls[1] as [string, unknown[]];
     expect(enrollSql).toContain('user_id = $1');
     expect(enrollSql).not.toContain('SELECT *');
     expect(enrollParams).toEqual(['p1', 'org-1']);
+  });
+
+  // 5b. language: 'en' in body — courses query param reflects it
+  it('passes language "en" through to the courses query param', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQuery
+      .mockResolvedValueOnce([]) // courses query
+      .mockResolvedValueOnce([]); // enrollments query
+
+    const res = await handler(baseReq({ orgId: 'org-1', language: 'en' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [coursesSql, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(coursesSql).toContain('c.language = $2');
+    expect(coursesParams).toEqual(['org-1', 'en', 'p1']);
+  });
+
+  // 5b-i. Enrolled-course-across-languages: body language 'en' still retains any
+  // enrolled course regardless of its own language, via profile.id as $3.
+  it('always includes the enrolled-courses EXISTS clause with profile.id as $3', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQuery
+      .mockResolvedValueOnce([]) // courses query
+      .mockResolvedValueOnce([]); // enrollments query
+
+    const res = await handler(baseReq({ orgId: 'org-1', language: 'en' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [coursesSql, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(coursesSql).toContain('EXISTS (');
+    expect(coursesSql).toContain('FROM enrollments e');
+    expect(coursesSql).toContain('e.course_id = c.id');
+    expect(coursesSql).toContain('e.user_id = $3');
+    expect(coursesSql).toContain('e.org_id = $1');
+    expect(coursesParams).toEqual(['org-1', 'en', 'p1']);
+  });
+
+  it('keeps the org-visibility predicate outside the relaxed language OR-group (tenant isolation)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQuery
+      .mockResolvedValueOnce([]) // courses query
+      .mockResolvedValueOnce([]); // enrollments query
+
+    await handler(baseReq({ orgId: 'org-1', language: 'en' }), {} as any);
+
+    const [coursesSql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    // The published + org-enabled visibility predicate must stay an OUTER AND, never
+    // inside the OR group. Otherwise SQL precedence (`A AND B OR C` = `(A AND B) OR C`)
+    // would surface any enrolled course regardless of org/publish — a tenant leak.
+    const enabledIdx = coursesSql.indexOf("access = 'enabled'");
+    const orGroupIdx = coursesSql.indexOf('AND (');
+    const orExistsIdx = coursesSql.indexOf('OR EXISTS');
+    expect(enabledIdx).toBeGreaterThanOrEqual(0);
+    expect(orGroupIdx).toBeGreaterThan(enabledIdx); // visibility precedes the OR-group paren
+    expect(orExistsIdx).toBeGreaterThan(orGroupIdx); // the OR lives inside that group
+  });
+
+  // 5c. missing/invalid language — defaults to 'da'
+  it('defaults to "da" when language is missing or invalid', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQuery
+      .mockResolvedValueOnce([]) // courses query
+      .mockResolvedValueOnce([]); // enrollments query
+
+    const res = await handler(baseReq({ orgId: 'org-1', language: 'fr' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(coursesParams).toEqual(['org-1', 'da', 'p1']);
   });
 
   // 6. Platform-admin bypass — isActiveMember NOT called
