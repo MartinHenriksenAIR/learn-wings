@@ -91,6 +91,17 @@ export async function updateIdeaStatus(
   return res.idea;
 }
 
+// Set (or clear) an idea's Value/Effort prioritization scores (admin only).
+// value/effort are 1-3 (Low/Med/High) or null to clear. Server derives org from the idea row.
+export async function updateIdeaPriority(
+  ideaId: string,
+  value: number | null,
+  effort: number | null,
+): Promise<EnhancedIdea> {
+  const res = await callApi<{ idea: EnhancedIdea }>('/api/idea-prioritize', { ideaId, value, effort });
+  return res.idea;
+}
+
 // Delete idea — authors may delete their own ideas of ANY status; org admins may
 // delete any idea in their org (RLS provenance: migration 20260202140817 replaced
 // the draft-only policy with author-any-status + org-admin DELETE policies).

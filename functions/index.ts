@@ -47,6 +47,7 @@ import './idea-comment-create/index';
 import './idea-comments/index';
 import './idea-create/index';
 import './idea-delete/index';
+import './idea-prioritize/index';
 import './idea-status-update/index';
 import './idea-submit/index';
 import './idea-tags/index';
