@@ -32,7 +32,10 @@ see or how they take a course.
   1. A linking system to mark two courses as language editions of one another.
   2. Progress analytics combine linked editions into one line.
   3. Enrolling a learner into one edition is blocked if they are already enrolled in a sibling
-     edition (so "enrolled in both" can never happen — enforced at the data level, per-org).
+     edition. The guard is enforced in **application code** (a per-org `EXISTS` check before
+     insert), *not* a DB constraint, so a residual race or a link-after-both-populated edge could
+     still leave a learner in two editions. Combined progress analytics therefore count **DISTINCT
+     learners**, so such an edge can never inflate the numbers.
 
 ### Explicit non-goals
 
@@ -108,14 +111,17 @@ Applies wherever a course row appears in progress analytics:
 
 ### Combining rule
 
-Rows are grouped by `COALESCE(course_group_id, id)`. Within a group, `enrolled` and `completed` are
-summed across all editions. Standalone courses (NULL group) are unaffected — they group by their own
-id exactly as today.
+Rows are grouped by `COALESCE(course_group_id, id)`. Within a group, `enrolled` and `completed`
+count **distinct learners** across all editions (`COUNT(DISTINCT user_id)`). Standalone courses
+(NULL group) are unaffected — they group by their own id exactly as today.
 
-Because "enroll in both editions" is blocked per-org, summing enrolments across a group within one
-org already equals distinct learners — no per-org dedup needed. The all-orgs branch keeps
-`COUNT(DISTINCT user_id)` (a learner enrolled in different editions across two *different* orgs is
-one person and must count once).
+The enroll guard blocks a learner from holding two editions in one org, but it is enforced in
+application code (a per-org `EXISTS` check before insert), not a DB constraint — so a residual race
+or a link-after-both-populated edge could still leave that state. Counting distinct learners in
+**every** branch (single-org, per-org breakdown, and all-orgs) makes the combined line a true
+head-count regardless: an edge-case double-enrollment can never inflate it. (The all-orgs branch
+already needed `COUNT(DISTINCT user_id)` independently — a learner enrolled in different editions
+across two *different* orgs is one person and must count once.)
 
 ### Which edition represents the line (title + level) — Option A
 
@@ -163,6 +169,13 @@ language."* Standalone courses have no siblings, so their behavior is unchanged.
 per-org, matching how enrolments are scoped (`UNIQUE(org_id, user_id, course_id)`); a learner who
 belongs to two orgs and enrolls in different editions across them is one distinct person and is
 handled by the all-orgs analytics de-dup.
+
+Note this is an **application-code** guard — a read-then-insert `EXISTS` check, *not* a DB
+constraint (`course-translation-link` also does not block linking two already-populated editions).
+A small TOCTOU window and the link-after-both-populated edge therefore mean the "enrolled in both"
+state is not impossible at the data level. This is acceptable because combined analytics count
+**DISTINCT learners** in every branch (single-org, per-org breakdown, and all-orgs), so a residual
+race or a link-after-enroll edge can never inflate the numbers.
 
 ## Affected surfaces
 
@@ -213,3 +226,7 @@ None blocking. Deferred/decided:
 - Per-row DA/EN tag in the drill-in — decided **off** (can revisit).
 - Prod DB apply of the additive schema change is a human-gated follow-up (pre-launch, mock data —
   not blocking; canonical `01-schema.sql` is the source of truth).
+- Hard DB-level prevention of the double-enrolled state (e.g. a `course-translation-link` link-time
+  check that two already-populated editions can't be linked, or a group-scoped uniqueness guard) is
+  a **deferred** item — the enroll guard is app-level and combined analytics count DISTINCT learners,
+  so the residual race is harmless pre-launch (mock data).

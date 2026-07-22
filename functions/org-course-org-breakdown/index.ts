@@ -19,10 +19,13 @@ import { courseGroupMemberIds } from '../shared/course-groups';
  * after a learner enrolled). Without the union such an org would appear in the
  * enrollee list but be missing here, and the per-org total would fall short.
  *
- * Counts are org-scoped enrollments; UNIQUE(org_id, user_id, course_id) makes
- * "enrollments within an org" and "distinct learners within an org" equal.
- * Summed across orgs these can still exceed the dialog's distinct-learner
- * headline (#159) when one learner is enrolled through several orgs.
+ * Counts are DISTINCT learners per org (COUNT DISTINCT user_id across the group's
+ * editions). The per-course UNIQUE(org_id, user_id, course_id) does NOT make
+ * "enrollment rows" and "distinct learners" equal once editions are grouped — a
+ * learner could hold two sibling editions in one org (the enroll guard is app-level,
+ * not a DB constraint), so we de-dup by learner here. Summed across orgs these can
+ * still exceed the dialog's distinct-learner headline (#159) when one learner is
+ * enrolled through several orgs.
  */
 export default adminEndpoint('org-course-org-breakdown', async ({ req, reply }) => {
   const { courseId } = await req.json() as { courseId?: string };
@@ -34,8 +37,8 @@ export default adminEndpoint('org-course-org-breakdown', async ({ req, reply }) 
   const orgs = await query(
     `WITH grp AS (${courseGroupMemberIds(1)})
      SELECT o.id AS org_id, o.name AS org_name,
-            COUNT(e.id)::int AS enrolled,
-            COUNT(e.id) FILTER (WHERE e.status = 'completed')::int AS completed
+            COUNT(DISTINCT e.user_id)::int AS enrolled,
+            COUNT(DISTINCT e.user_id) FILTER (WHERE e.status = 'completed')::int AS completed
        FROM organizations o
        JOIN (
          SELECT oca.org_id FROM org_course_access oca

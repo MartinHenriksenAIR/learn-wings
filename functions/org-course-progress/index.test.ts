@@ -81,6 +81,9 @@ describe('org-course-progress', () => {
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('LEFT JOIN enrollments');
+    // Distinct-learner counts (not enrollment rows) so the combined line stays a true
+    // head-count even if a learner somehow holds two editions in the org.
+    expect(sql).toContain('COUNT(DISTINCT e.user_id)');
     expect(sql).toContain('FILTER (WHERE e.status = \'completed\')');
     expect(sql).toContain('GROUP BY');
     // Group language editions by COALESCE(course_group_id, id)

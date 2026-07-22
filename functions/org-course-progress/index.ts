@@ -15,7 +15,7 @@ export default endpoint('org-course-progress', async ({ req, reply, requireOrgAd
 
   // Representative edition per group: prefer the admin's app-language edition,
   // else the earliest-created; NULL languages never win ((x = $n) IS TRUE → false).
-  // enrolled/completed are summed over the SAME visible edition set.
+  // enrolled/completed count DISTINCT learners over the SAME visible edition set.
 
   if (orgId === 'all') {
     // All-orgs aggregate (#159) — platform-admin-only. Distinct learners across a group's
@@ -59,10 +59,15 @@ export default endpoint('org-course-progress', async ({ req, reply, requireOrgAd
          FROM courses c
         WHERE ${orgCourseAccessEnabled({ courseRef: 'c.id', orgParam: 1 })}
      ),
+     -- Distinct learners across the group's editions (org-scoped). Counting distinct
+     -- user_id rather than enrollment rows keeps the combined line a true head-count
+     -- even if a learner somehow holds two editions: the enroll guard is app-level (a
+     -- per-org EXISTS check before insert), not a DB constraint, so a residual race
+     -- can't inflate this number.
      counts AS (
        SELECT v.group_key,
-              COUNT(e.id)::int AS enrolled,
-              COUNT(e.id) FILTER (WHERE e.status = 'completed')::int AS completed
+              COUNT(DISTINCT e.user_id)::int AS enrolled,
+              COUNT(DISTINCT e.user_id) FILTER (WHERE e.status = 'completed')::int AS completed
          FROM visible v
          LEFT JOIN enrollments e ON e.course_id = v.id AND e.org_id = $1
         GROUP BY v.group_key
