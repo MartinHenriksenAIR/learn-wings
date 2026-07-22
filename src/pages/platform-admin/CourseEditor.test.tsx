@@ -57,6 +57,7 @@ const successResponse = {
     title: 'Test Course',
     description: 'A test course',
     level: 'basic',
+    language: null,
     is_published: false,
     thumbnail_url: null,
     created_at: '2024-01-01T00:00:00Z',
@@ -247,5 +248,42 @@ describe('CourseEditor — publish toggle', () => {
     // #48: the one-row publish toggle must NOT re-ship the course tree.
     const structureCalls = mockCallApi.mock.calls.filter(([path]) => path === '/api/course-structure-admin');
     expect(structureCalls).toHaveLength(1);
+  });
+});
+
+describe('CourseEditor — language field (#191)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('seeds the language select from course.language ?? "da" for a null (pre-existing) course', async () => {
+    mockCallApi.mockResolvedValueOnce(successResponse); // course.language: null
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByDisplayValue('Test Course')).toBeInTheDocument());
+
+    expect(screen.getByText('Danish')).toBeInTheDocument();
+  });
+
+  it('save payload always carries the selected language', async () => {
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/course-structure-admin') return successResponse; // course.language: null
+      if (path === '/api/course-update') return { course: successResponse.course };
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByDisplayValue('Test Course')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith('/api/course-update', {
+        courseId: 'course-1',
+        updates: expect.objectContaining({ language: 'da' }),
+      }),
+    );
   });
 });

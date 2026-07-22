@@ -4,11 +4,15 @@ import { adminEndpoint } from '../shared/endpoint';
 const VALID_LEVELS = ['basic', 'intermediate', 'advanced'] as const;
 type CourseLevel = typeof VALID_LEVELS[number];
 
+const VALID_LANGUAGES = ['en', 'da'] as const;
+type CourseLanguage = typeof VALID_LANGUAGES[number];
+
 // Column mapping from client key to DB column name
 const COLUMN_MAP: Record<string, string> = {
   title: 'title',
   description: 'description',
   level: 'level',
+  language: 'language',
   thumbnailUrl: 'thumbnail_url',
   isPublished: 'is_published',
 };
@@ -53,6 +57,10 @@ export default adminEndpoint('course-update', async ({ req, reply }) => {
     } else if (clientKey === 'level') {
       if (!VALID_LEVELS.includes(value as CourseLevel)) {
         return reply(400, { error: 'level must be basic, intermediate, or advanced' });
+      }
+    } else if (clientKey === 'language') {
+      if (!VALID_LANGUAGES.includes(value as CourseLanguage)) {
+        return reply(400, { error: "language must be 'en' or 'da'" });
       }
     } else if (clientKey === 'thumbnailUrl') {
       if (value !== null && typeof value !== 'string') {

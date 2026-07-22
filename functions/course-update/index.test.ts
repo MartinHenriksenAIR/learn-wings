@@ -147,6 +147,39 @@ describe('course-update', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when language is invalid', async () => {
+    const res = await handler(baseReq({ courseId: 'c1', updates: { language: 'fr' } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: "language must be 'en' or 'da'" });
+  });
+
+  it('returns 400 when language is null (not clearable)', async () => {
+    const res = await handler(baseReq({ courseId: 'c1', updates: { language: null } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: "language must be 'en' or 'da'" });
+  });
+
+  it('updates language to da', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ...fakeCourse, language: 'da' });
+    const res = await handler(baseReq({ courseId: 'c1', updates: { language: 'da' } }), {} as any);
+    expect(res.status).toBe(200);
+
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('language');
+    expect(params[0]).toBe('da');
+    expect(params[params.length - 1]).toBe('c1');
+  });
+
+  it('updates language to en', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ...fakeCourse, language: 'en' });
+    const res = await handler(baseReq({ courseId: 'c1', updates: { language: 'en' } }), {} as any);
+    expect(res.status).toBe(200);
+
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('language');
+    expect(params[0]).toBe('en');
+  });
+
   it('returns 400 when thumbnailUrl is not string or null', async () => {
     const res = await handler(baseReq({ courseId: 'c1', updates: { thumbnailUrl: 123 } }), {} as any);
     expect(res.status).toBe(400);
