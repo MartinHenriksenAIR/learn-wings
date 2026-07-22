@@ -37,7 +37,6 @@ const pendingOrgInvite = {
   email: 'user@x.com',
   role: 'learner',
   status: 'pending',
-  is_platform_admin_invite: false,
   expires_at: '2099-01-01T00:00:00.000Z',
   org_name: 'Acme A/S',
 };
@@ -46,7 +45,6 @@ const pendingPlatformInvite = {
   ...pendingOrgInvite,
   id: 'inv-2',
   org_id: null,
-  is_platform_admin_invite: true,
   org_name: null,
 };
 
@@ -57,7 +55,6 @@ const findCall = (substr: string) =>
 describe('invitation-accept', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockWithTransaction.mockImplementation(async (cb) => cb({ query: mockClientQuery }));
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'user@x.com' });
     mockQueryOne.mockResolvedValue({ id: 'p1' }); // profile already provisioned
     mockClientQuery.mockResolvedValue(rows());    // default: writes return no rows

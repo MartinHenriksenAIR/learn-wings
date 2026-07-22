@@ -14,8 +14,7 @@ interface LockedInvitation {
   org_id: string | null;
   email: string;
   role: string;
-  status: string;
-  is_platform_admin_invite: boolean;
+  status: 'pending' | 'accepted' | 'expired';
   expires_at: string | Date;
   org_name: string | null;
 }
@@ -67,7 +66,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       // Lock the invitation row for the whole transaction so concurrent accepts
       // of the same link serialize instead of double-consuming the invite.
       const invRes = await client.query<LockedInvitation>(
-        `SELECT i.id, i.org_id, i.email, i.role, i.status, i.is_platform_admin_invite,
+        `SELECT i.id, i.org_id, i.email, i.role, i.status,
                 i.expires_at, o.name AS org_name
            FROM invitations i
            LEFT JOIN organizations o ON o.id = i.org_id

@@ -14,7 +14,6 @@ export interface ConvertibleInvitation {
   id: string;
   org_id: string | null;
   role: string;
-  is_platform_admin_invite: boolean;
 }
 
 export type ConvertResult =
@@ -26,8 +25,9 @@ export type ConvertResult =
  * `profileId` and marks the invitation accepted — all on the caller's
  * transaction client.
  *
- * Branches on invite type (invitations_org_or_platform_admin_check pins the
- * shape): `org_id` set → org invite; `org_id` NULL → platform-admin invite.
+ * Branches on `org_id`: NULL → platform-admin invite, set → org invite.
+ * (The invitations_org_or_platform_admin_check constraint guarantees
+ * `org_id NULL ⇒ is_platform_admin_invite = true`, though not the converse.)
  *
  * Existing-member rules (issue #175, locked decision #5): an existing ACTIVE
  * membership is an idempotent success (`alreadyMember: true` — row untouched,
