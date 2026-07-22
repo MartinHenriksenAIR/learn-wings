@@ -12,6 +12,10 @@ export default endpoint('assessment-submit', async ({ req, profile, reply }) => 
 
   const { score, level } = result;
 
+  // Intentional asymmetry: every submit inserts a new attempt row (retakes are
+  // independent attempts) AND overwrites profiles.assessment_level with the latest
+  // result.  Skip (assessment-skip endpoint) is idempotent — it only sets
+  // assessment_skipped_at if not already set.
   await withTransaction(async (client) => {
     await client.query(
       `INSERT INTO assessment_attempts (user_id, score, level, answers, questionnaire_version)
