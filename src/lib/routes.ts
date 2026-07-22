@@ -29,6 +29,7 @@ export const routes = {
   learner: {
     dashboard: '/app/dashboard',
     courses: '/app/courses',
+    assessment: '/app/assessment',
     coursePlayerPattern: '/app/learn/:courseId',
     coursePlayer: (courseId: string) => `/app/learn/${courseId}`,
     /** Legacy redirect target -> dashboard. */
