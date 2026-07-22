@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Lightbulb, FileEdit, FolderOpen } from 'lucide-react';
+import { MessageSquare, Lightbulb, FileEdit, FolderOpen, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type EmptyStateVariant = 'posts' | 'ideas' | 'comments' | 'drafts' | 'resources';
+type EmptyStateVariant = 'posts' | 'ideas' | 'comments' | 'drafts' | 'resources' | 'events';
 
 interface CommunityEmptyStateProps {
   variant: EmptyStateVariant;
@@ -40,6 +40,11 @@ const variants: Record<EmptyStateVariant, { icon: typeof MessageSquare; titleKey
     icon: FolderOpen,
     titleKey: 'community.emptyState.resourcesTitle',
     descriptionKey: 'community.emptyState.resourcesDescription',
+  },
+  events: {
+    icon: Calendar,
+    titleKey: 'community.emptyState.eventsTitle',
+    descriptionKey: 'community.emptyState.eventsDescription',
   },
 };
 

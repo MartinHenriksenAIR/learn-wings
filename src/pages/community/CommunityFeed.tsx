@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,7 @@ import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import { PostCard } from '@/components/community/PostCard';
 import { PostForm } from '@/components/community/PostForm';
 import { UpcomingEvents } from '@/components/community/UpcomingEvents';
+import { EventsTab } from '@/pages/community/EventsTab';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { AIChampionsList } from '@/components/community/AIChampionsList';
 import { useAuth } from '@/hooks/useAuth';
@@ -30,13 +31,14 @@ import {
   Lightbulb,
   Globe,
   Building2,
+  Calendar,
   Loader2,
   Lock,
   X,
   FolderOpen,
   ChevronRight,
 } from 'lucide-react';
-import type { CommunityScope, CommunityPost } from '@/lib/community-types';
+import type { CommunityScope, CommunityView, CommunityPost } from '@/lib/community-types';
 
 export default function CommunityFeed() {
   const navigate = useNavigate();
@@ -46,20 +48,24 @@ export default function CommunityFeed() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const scopeParam = searchParams.get('scope') as CommunityScope | null;
-  const scope: CommunityScope = scopeParam === 'global' ? 'global' : 'org';
+  const scopeParam = searchParams.get('scope');
+  const view: CommunityView =
+    scopeParam === 'events' ? 'events' : scopeParam === 'global' ? 'global' : 'org';
+  // API calls keep the narrow scope; the events view reuses 'org' for chrome.
+  const scope: CommunityScope = view === 'global' ? 'global' : 'org';
 
   const [showPostForm, setShowPostForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  // Redirect to global if no org
+  // Redirect the org feed to global when the user has no org. The events view
+  // always includes global scope, so it needs no org and is exempt.
   useEffect(() => {
-    if (scope === 'org' && !currentOrg) {
+    if (view === 'org' && !currentOrg) {
       setSearchParams({ scope: 'global' });
     }
-  }, [scope, currentOrg, setSearchParams]);
+  }, [view, currentOrg, setSearchParams]);
 
   // Fetch categories
   const { data: categories = [] } = useQuery({
@@ -77,7 +83,7 @@ export default function CommunityFeed() {
       search: searchQuery || undefined,
       tags: selectedTags.length > 0 ? selectedTags : undefined,
     }),
-    enabled: scope === 'global' || !!currentOrg,
+    enabled: view !== 'events' && (scope === 'global' || !!currentOrg),
   });
 
   // Create post mutation
@@ -109,6 +115,18 @@ export default function CommunityFeed() {
     },
   });
 
+  // Events view (#125): admin-only creation. Platform admins post events
+  // globally; org admins post to their current org. Learners get no affordance.
+  const isEventsView = view === 'events';
+  const eventsCategoryId = categories.find((c) => c.slug === 'events')?.id;
+  const canCreateEvent = effectiveIsPlatformAdmin || effectiveIsOrgAdmin;
+  const eventScope: CommunityScope = effectiveIsPlatformAdmin ? 'global' : 'org';
+  // Fresh literal each render would re-reset the form; memoize so it's stable.
+  const eventInitialData = useMemo(
+    () => (isEventsView && eventsCategoryId ? { category_id: eventsCategoryId } : undefined),
+    [isEventsView, eventsCategoryId],
+  );
+
   const canPostRestricted = scope === 'global'
     ? effectiveIsPlatformAdmin
     : effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
@@ -134,9 +152,9 @@ export default function CommunityFeed() {
       : []),
     { key: 'global', label: t('community.globalCommunity'), icon: <Globe aria-hidden="true" className="h-3.5 w-3.5" /> },
     {
-      key: 'events_coming_soon',
-      label: <span title={t('community.comingSoon')}>{t('community.eventsOfficeHours')}</span>,
-      disabled: true,
+      key: 'events',
+      label: t('community.eventsOfficeHours'),
+      icon: <Calendar aria-hidden="true" className="h-3.5 w-3.5" />,
     },
   ];
 
@@ -155,7 +173,8 @@ export default function CommunityFeed() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
-          {scope === 'org' && (
+          {/* Submit Idea is org-feed only — hidden on the events view. */}
+          {scope === 'org' && !isEventsView && (
             <Button
               variant="outline"
               onClick={() => navigate(routes.community.ideaNew)}
@@ -165,24 +184,40 @@ export default function CommunityFeed() {
               {t('community.submitIdea')}
             </Button>
           )}
-          <Button
-            onClick={() => setShowPostForm(true)}
-            className="h-auto whitespace-nowrap rounded-[11px] px-4 py-2.5 text-[13px] font-bold"
-          >
-            <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
-            {t('community.newPost')}
-          </Button>
+          {/* Events view relabels the create button to New Event and gates it to admins. */}
+          {isEventsView ? (
+            canCreateEvent && (
+              <Button
+                onClick={() => setShowPostForm(true)}
+                className="h-auto whitespace-nowrap rounded-[11px] px-4 py-2.5 text-[13px] font-bold"
+              >
+                <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
+                {t('community.newEvent')}
+              </Button>
+            )
+          ) : (
+            <Button
+              onClick={() => setShowPostForm(true)}
+              className="h-auto whitespace-nowrap rounded-[11px] px-4 py-2.5 text-[13px] font-bold"
+            >
+              <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
+              {t('community.newPost')}
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Scope tabs */}
       <SlidingTabs
         tabs={scopeTabs}
-        active={scope}
-        onChange={(key) => setSearchParams({ scope: key as CommunityScope })}
+        active={view}
+        onChange={(key) => setSearchParams({ scope: key })}
         className="mb-5"
       />
 
+      {view === 'events' ? (
+        <EventsTab canCreateEvent={canCreateEvent} onNewEvent={() => setShowPostForm(true)} />
+      ) : (
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_300px]">
         {/* Main content */}
         <div className="flex flex-col gap-3.5">
@@ -363,8 +398,10 @@ export default function CommunityFeed() {
           )}
         </div>
       </div>
+      )}
 
-      {/* Post form dialog */}
+      {/* Post form dialog. On the events view it opens with the events category
+          preselected and posts at the admin's event scope (global vs current org). */}
       <PostForm
         open={showPostForm}
         onOpenChange={setShowPostForm}
@@ -372,9 +409,10 @@ export default function CommunityFeed() {
           await createPostMutation.mutateAsync(data);
         }}
         categories={categories}
-        scope={scope}
+        scope={isEventsView ? eventScope : scope}
         orgId={currentOrg?.id}
-        canPostRestricted={canPostRestricted}
+        canPostRestricted={isEventsView ? canCreateEvent : canPostRestricted}
+        initialData={eventInitialData}
       />
     </AppLayout>
   );
