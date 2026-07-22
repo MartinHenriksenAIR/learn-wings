@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { getSignedLmsAssetUrl } from '@/lib/storage';
@@ -16,12 +17,15 @@ export function useLearnerCourses(
   orgId: string | undefined,
   options: { enabled?: boolean; staleTime?: number } = {},
 ) {
+  const { i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage ?? 'da';
+
   return useQuery({
-    queryKey: queryKeys.learnerCourses.list(orgId),
+    queryKey: [...queryKeys.learnerCourses.list(orgId), lang],
     queryFn: async () => {
       const data = await callApi<{ courses: Course[]; enrollments: Enrollment[] }>(
         '/api/learner-courses',
-        { orgId },
+        { orgId, language: lang },
       );
 
       const coursesWithFreshThumbnails = await Promise.all(
