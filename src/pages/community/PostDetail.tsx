@@ -304,12 +304,12 @@ export default function PostDetail() {
           {/* Event date/time/place chips */}
           {isEvent && post.event_date && (
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-[9px] text-[12.5px] font-bold text-accent-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-[7px] bg-muted px-2.5 py-[5px] text-[12px] font-semibold text-muted-foreground">
                 <Calendar aria-hidden="true" className="h-3.5 w-3.5" />
                 {formatDate(new Date(post.event_date), 'EEEE, MMMM d, yyyy · h:mm a', i18n.language)}
               </span>
               {post.event_location && (
-                <span className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-[9px] text-[12.5px] font-bold text-accent-foreground">
+                <span className="inline-flex items-center gap-1.5 rounded-[7px] bg-muted px-2.5 py-[5px] text-[12px] font-semibold text-muted-foreground">
                   <MapPin aria-hidden="true" className="h-3.5 w-3.5" />
                   {post.event_location}
                 </span>
