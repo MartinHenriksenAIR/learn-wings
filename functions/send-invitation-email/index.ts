@@ -14,8 +14,25 @@ function getResend(): Resend {
   return resendClient;
 }
 
-// Only production domain allowed — Lovable preview URLs removed
-const ALLOWED_LINK_DOMAINS = ['ai-uddannelse.dk'];
+// Link targets are restricted to hosts the app actually runs on: the production
+// domain (post-#115 cutover) plus every host in ALLOWED_ORIGINS — the same env
+// CORS trusts, which is what the frontend's invite links are minted on until
+// the cutover sets VITE_PLATFORM_BASE_URL. Computed per-request so tests can
+// vary the env; Lovable preview URLs remain excluded.
+function allowedLinkDomains(): string[] {
+  const originHosts = (process.env.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .filter(Boolean)
+    .map((origin) => {
+      try {
+        return new URL(origin).hostname;
+      } catch {
+        return null;
+      }
+    })
+    .filter((host): host is string => host !== null);
+  return ['ai-uddannelse.dk', ...originHosts];
+}
 
 interface InvitationEmailRequest {
   email: string;
@@ -133,7 +150,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     // Validate invite link domain — only production domain allowed
     try {
       const linkUrl = new URL(inviteLink);
-      if (!ALLOWED_LINK_DOMAINS.includes(linkUrl.hostname)) {
+      if (!allowedLinkDomains().includes(linkUrl.hostname)) {
         return corsResponse(origin, 400, { error: 'Invalid invite link domain' });
       }
     } catch {
