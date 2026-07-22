@@ -1245,3 +1245,17 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 - **Known flag for later:** `membership_status`'s `'invited'` enum value remains dead-ish state (the seat model counts pending *invitations*, not `'invited'` memberships) — deliberately left untouched; noted in the PR for a human decision.
 
 **Verify:** functions `npm run build` exit 0 · `npm test` 1859 pass (125 files, 3 skipped; 16 new endpoint tests covering every outcome incl. lock/no-write asserts) · root `npm run lint` 0 errors · `npm test` 435 pass (79 files; 17 new Signup tests incl. stash, latch, all successes/errors, refresh-before-route) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Entra round-trip smoked live via Playwright — the PR-preview host is **not** a registered Entra redirect URI (AADSTS50011; per-PR SWA hostnames aren't in the app registration), so the seam was proven on the local dev server (`localhost:8080`, registered) against the real tenant: pre-auth card (da) → sign-in → full-page Entra redirect → landed back on `/signup?invite=<id>` with the Accept card + signed-in chip; Accept POST wired to `/api/invitation-accept` (fails to the generic card pre-merge as expected — the endpoint deploys with trunk); Try-again resets. Preview verified the pre-auth render (en). Full accept path re-smoked post-merge per the deploy ritual. Sibling **#176** (auto-adopt at first SSO login) stays open and reuses `invitation-convert`.
+
+---
+
+## 2026-07-22 — Fix: invitation emails silently undelivered (send-invitation-email 400)
+
+**Who:** emil, diagnosed live against prod with a token-replay probe (diagnosing-bugs loop), fixed inline.
+
+**Symptom:** every `invitation-create` succeeded but the follow-up `send-invitation-email` returned 400 (`Invalid invite link domain`) — 100% of invite emails since the SWA migration were never sent; fire-and-forget swallowed it in the UI.
+
+**Root cause:** the endpoint hardcoded `ALLOWED_LINK_DOMAINS = ['ai-uddannelse.dk']`, but until the #115 domain cutover the app runs on the SWA host and mints invite links on `window.location.origin` (`VITE_PLATFORM_BASE_URL` deliberately unset until cutover — see `resolvePlatformBaseUrl`, #80). The link-domain gate rejected the app's own links. Differential probe confirmed the Resend leg behind the gate is healthy (200 + message id with an allowed link).
+
+**Fix:** `allowedLinkDomains()` — the gate now accepts `ai-uddannelse.dk` plus the hostname of every entry in `ALLOWED_ORIGINS` (the same env CORS trusts; already carries the real app origins). Computed per-request for testability. Self-heals at the #115 cutover. Regression tests: SWA-host link accepted when its origin is allowed; foreign domains still 400.
+
+**Verify:** functions `npm run build` exit 0 · `npm test` 1873 pass (125 files, 3 skipped; red-then-green regression test). Post-deploy live probe: the exact previously-failing payload flips 400 → 200.

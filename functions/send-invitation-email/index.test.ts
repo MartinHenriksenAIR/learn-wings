@@ -34,6 +34,7 @@ const validBody = {
 describe('send-invitation-email', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.ALLOWED_ORIGINS;
   });
 
   it('returns 403 for users who are not admin or org admin', async () => {
@@ -69,5 +70,38 @@ describe('send-invitation-email', () => {
     );
 
     expect(res.status).toBe(400);
+  });
+
+  // Regression (2026-07-22): until the #115 domain cutover the app runs on the
+  // SWA host and mints invite links on that origin — the hardcoded
+  // ai-uddannelse.dk-only allowlist 400'd every invite email in prod.
+  it('accepts invite links on any ALLOWED_ORIGINS host', async () => {
+    process.env.ALLOWED_ORIGINS = 'https://black-forest-0d7f96c03.7.azurestaticapps.net';
+    mockQueryOne.mockResolvedValueOnce({ is_platform_admin: true });
+    mockEmailSend.mockResolvedValueOnce({ id: 'email-id-456' });
+
+    const res = await handler(
+      makeReq({
+        ...validBody,
+        inviteLink: 'https://black-forest-0d7f96c03.7.azurestaticapps.net/signup?invite=abc123',
+      }) as any,
+      {} as any
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockEmailSend).toHaveBeenCalledOnce();
+  });
+
+  it('still rejects non-allowed domains when ALLOWED_ORIGINS is set', async () => {
+    process.env.ALLOWED_ORIGINS = 'https://black-forest-0d7f96c03.7.azurestaticapps.net';
+    mockQueryOne.mockResolvedValueOnce({ is_platform_admin: true });
+
+    const res = await handler(
+      makeReq({ ...validBody, inviteLink: 'https://evil.com/signup?invite=abc' }) as any,
+      {} as any
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockEmailSend).not.toHaveBeenCalled();
   });
 });
