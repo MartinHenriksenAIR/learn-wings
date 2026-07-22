@@ -9,8 +9,12 @@ export interface LevelBadgeProps {
   className?: string;
 }
 
-/** Colors from the design prototype's `lvlStyles` ([fg, bg] per level). */
-const LEVEL_STYLES: Record<CourseLevel, { fg: string; bg: string }> = {
+/**
+ * Colors from the design prototype's `lvlStyles` ([fg, bg] per level).
+ * Exported so the assessment result ring stroke can reuse the exact same
+ * per-level colors instead of duplicating them (#117).
+ */
+export const LEVEL_STYLES: Record<CourseLevel, { fg: string; bg: string }> = {
   basic: { fg: "#1e9e6a", bg: "#e7f6ef" },
   intermediate: { fg: "#b07514", bg: "#fbf2dd" },
   advanced: { fg: "#c43d3d", bg: "#fdecec" },

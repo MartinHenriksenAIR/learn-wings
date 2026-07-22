@@ -69,8 +69,41 @@ describe('Login post-auth navigation', () => {
     });
   });
 
-  it('falls back to the learner dashboard when there is no stash', async () => {
-    mockUseAuth.mockReturnValue(baseAuth);
+  it('routes a plain learner with no assessment level and no skip to the assessment (#117)', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuth,
+      profile: { ...baseAuth.profile, assessment_level: null, assessment_skipped_at: null },
+    });
+
+    render(<Login />);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/app/assessment', { replace: true });
+    });
+  });
+
+  it('falls back to the learner dashboard when the learner already has an assessment level', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuth,
+      profile: { ...baseAuth.profile, assessment_level: 'basic', assessment_skipped_at: null },
+    });
+
+    render(<Login />);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/app/dashboard');
+    });
+  });
+
+  it('falls back to the learner dashboard when the learner has a skip timestamp', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuth,
+      profile: {
+        ...baseAuth.profile,
+        assessment_level: null,
+        assessment_skipped_at: '2026-07-01T00:00:00Z',
+      },
+    });
 
     render(<Login />);
 

@@ -1148,6 +1148,10 @@
     "toasts": {
       "saved": "Vurdering gemt – dit niveau er opdateret",
       "skipped": "Sprunget over – du kan tage vurderingen fra dit dashboard"
+    },
+    "error": {
+      "title": "Noget gik galt under indlæsning af vurderingen",
+      "retry": "Prøv igen"
     }
   },
   "invitationAccept": {

@@ -1148,6 +1148,10 @@
     "toasts": {
       "saved": "Assessment saved — your level is updated",
       "skipped": "Skipped — you can take the assessment from your dashboard"
+    },
+    "error": {
+      "title": "Something went wrong loading the assessment",
+      "retry": "Try again"
     }
   },
   "invitationAccept": {
