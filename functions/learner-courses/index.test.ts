@@ -156,6 +156,26 @@ describe('learner-courses', () => {
     expect(coursesParams).toEqual(['org-1', 'en', 'p1']);
   });
 
+  it('keeps the org-visibility predicate outside the relaxed language OR-group (tenant isolation)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQuery
+      .mockResolvedValueOnce([]) // courses query
+      .mockResolvedValueOnce([]); // enrollments query
+
+    await handler(baseReq({ orgId: 'org-1', language: 'en' }), {} as any);
+
+    const [coursesSql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    // The published + org-enabled visibility predicate must stay an OUTER AND, never
+    // inside the OR group. Otherwise SQL precedence (`A AND B OR C` = `(A AND B) OR C`)
+    // would surface any enrolled course regardless of org/publish — a tenant leak.
+    const enabledIdx = coursesSql.indexOf("access = 'enabled'");
+    const orGroupIdx = coursesSql.indexOf('AND (');
+    const orExistsIdx = coursesSql.indexOf('OR EXISTS');
+    expect(enabledIdx).toBeGreaterThanOrEqual(0);
+    expect(orGroupIdx).toBeGreaterThan(enabledIdx); // visibility precedes the OR-group paren
+    expect(orExistsIdx).toBeGreaterThan(orGroupIdx); // the OR lives inside that group
+  });
+
   // 5c. missing/invalid language — defaults to 'da'
   it('defaults to "da" when language is missing or invalid', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
