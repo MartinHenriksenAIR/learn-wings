@@ -24,12 +24,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IdeaStatusBadge } from '@/components/community/IdeaStatusBadge';
+import { PrioritizationMatrix } from '@/components/community/PrioritizationMatrix';
+import { PriorityOverview } from '@/components/community/PriorityOverview';
+import { PriorityBadge } from '@/components/community/PriorityBadge';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { fetchIdeas, updateIdeaStatus } from '@/lib/ideas-api';
+import { fetchIdeas, updateIdeaStatus, updateIdeaPriority } from '@/lib/ideas-api';
 import { BUSINESS_AREAS, IDEA_STATUS_OPTIONS } from '@/lib/community-types';
 import type { IdeaStatusExtended, BusinessArea, EnhancedIdea } from '@/lib/community-types';
 import { cn } from '@/lib/utils';
@@ -120,6 +124,15 @@ export default function OrgIdeasManagement() {
     onError: () => {
       toast.error(t('ideaManagement.statusUpdateFailed'));
     },
+  });
+
+  const [activeTab, setActiveTab] = useState<'board' | 'prioritize'>('board');
+
+  const prioritizeMutation = useMutation({
+    mutationFn: ({ ideaId, value, effort }: { ideaId: string; value: number | null; effort: number | null }) =>
+      updateIdeaPriority(ideaId, value, effort),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.ideasAdmin.all }),
+    onError: () => toast.error(t('ideaManagement.prioritize.scoreFailed')),
   });
 
   const handleDrop = async (columnKey: string) => {
@@ -221,112 +234,144 @@ export default function OrgIdeasManagement() {
         />
       </div>
 
-      {/* Kanban board */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : ideas.length === 0 ? (
-        <EmptyState
-          icon={<Lightbulb aria-hidden="true" className="h-6 w-6" />}
-          title={t('ideaManagement.emptyTitle')}
-          description={t('ideaManagement.emptyDescription')}
-        />
-      ) : (
-        <div className="grid grid-cols-1 items-start gap-3.5 md:grid-cols-2 xl:grid-cols-5">
-          {KANBAN_COLUMNS.map((column) => {
-            const columnIdeas = ideas.filter((idea) =>
-              column.statuses.includes(idea.status)
-            );
-            const isDragOver = dragOverColumn === column.key;
-            return (
-              <div
-                key={column.key}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  if (dragOverColumn !== column.key) setDragOverColumn(column.key);
-                }}
-                onDrop={() => handleDrop(column.key)}
-                className={cn(
-                  'min-h-[380px] rounded-2xl p-3 transition-colors',
-                  isDragOver ? 'bg-[#e2e7f6]' : 'bg-[#eceef3]'
-                )}
-              >
-                {/* Column header */}
-                <div className="flex items-center gap-2 px-1.5 pb-3 pt-1">
-                  <span className={cn('flex', column.iconColor)}>{column.icon}</span>
-                  <span className="text-[12.5px] font-extrabold tracking-[0.02em]">
-                    {t(`ideaManagement.columns.${column.key}`)}
-                  </span>
-                  <span className="ml-auto rounded-[7px] bg-card px-[9px] py-0.5 text-[11px] font-extrabold text-muted-foreground">
-                    {columnIdeas.length}
-                  </span>
-                </div>
+      {/* Board / Prioritize tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'board' | 'prioritize')}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="board">{t('ideaManagement.tabs.board')}</TabsTrigger>
+          <TabsTrigger value="prioritize">{t('ideaManagement.tabs.prioritize')}</TabsTrigger>
+        </TabsList>
 
-                {/* Cards */}
-                <div className="flex flex-col gap-2.5">
-                  {columnIdeas.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-[#d6d8e0] p-4 text-center text-xs text-muted-foreground">
-                      {t('ideaManagement.dropHere')}
+        <TabsContent value="board">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : ideas.length === 0 ? (
+            <EmptyState
+              icon={<Lightbulb aria-hidden="true" className="h-6 w-6" />}
+              title={t('ideaManagement.emptyTitle')}
+              description={t('ideaManagement.emptyDescription')}
+            />
+          ) : (
+            <div className="grid grid-cols-1 items-start gap-3.5 md:grid-cols-2 xl:grid-cols-5">
+              {KANBAN_COLUMNS.map((column) => {
+                const columnIdeas = ideas.filter((idea) =>
+                  column.statuses.includes(idea.status)
+                );
+                const isDragOver = dragOverColumn === column.key;
+                return (
+                  <div
+                    key={column.key}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragOverColumn !== column.key) setDragOverColumn(column.key);
+                    }}
+                    onDrop={() => handleDrop(column.key)}
+                    className={cn(
+                      'min-h-[380px] rounded-2xl p-3 transition-colors',
+                      isDragOver ? 'bg-[#e2e7f6]' : 'bg-[#eceef3]'
+                    )}
+                  >
+                    {/* Column header */}
+                    <div className="flex items-center gap-2 px-1.5 pb-3 pt-1">
+                      <span className={cn('flex', column.iconColor)}>{column.icon}</span>
+                      <span className="text-[12.5px] font-extrabold tracking-[0.02em]">
+                        {t(`ideaManagement.columns.${column.key}`)}
+                      </span>
+                      <span className="ml-auto rounded-[7px] bg-card px-[9px] py-0.5 text-[11px] font-extrabold text-muted-foreground">
+                        {columnIdeas.length}
+                      </span>
                     </div>
-                  ) : (
-                    columnIdeas.map((idea) => {
-                      const isDragged = draggedIdeaId === idea.id;
-                      return (
-                        <div
-                          key={idea.id}
-                          draggable
-                          onDragStart={() => setDraggedIdeaId(idea.id)}
-                          onDragEnd={() => {
-                            setDraggedIdeaId(null);
-                            setDragOverColumn(null);
-                          }}
-                          onClick={() => navigate(routes.community.ideaDetail(idea.id))}
-                          className={cn(
-                            'group cursor-grab rounded-xl border border-[#e4e6ee] bg-card px-[15px] py-[13px] transition-[transform,box-shadow,opacity]',
-                            'hover:shadow-[0_8px_22px_rgba(20,24,46,0.10)]',
-                            isDragged && 'rotate-2 scale-[0.98] opacity-40'
-                          )}
-                        >
-                          <div className="mb-2 flex items-center gap-1.5">
-                            <IdeaStatusBadge status={idea.status} size="sm" />
-                            {idea.business_area && (
-                              <span className="rounded-[7px] bg-[#f3f4f8] px-[9px] py-[3px] text-[10.5px] font-bold text-muted-foreground">
-                                {BUSINESS_AREAS.find((a) => a.value === idea.business_area)?.label ??
-                                  idea.business_area}
-                              </span>
-                            )}
-                            {/* "Open ->" hint surfaces the click-to-open affordance (drag = move). */}
-                            <span
-                              aria-hidden="true"
-                              className="ml-auto inline-flex items-center gap-0.5 text-[10.5px] font-extrabold text-primary opacity-0 transition-opacity group-hover:opacity-100"
-                            >
-                              {t('ideaManagement.open')}
-                              <ChevronRight className="h-3 w-3" />
-                            </span>
-                          </div>
-                          <p className="mb-2 line-clamp-2 text-[13px] font-bold leading-[1.35]">
-                            {idea.title}
-                          </p>
-                          <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
-                            <span className="inline-flex items-center gap-1">
-                              <TrendingUp className="h-[11px] w-[11px]" />
-                              {idea.vote_count || 0}
-                            </span>
-                            <span className="truncate">
-                              {idea.profile?.full_name || t('ideaManagement.unknownAuthor')}
-                            </span>
-                          </div>
+
+                    {/* Cards */}
+                    <div className="flex flex-col gap-2.5">
+                      {columnIdeas.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-[#d6d8e0] p-4 text-center text-xs text-muted-foreground">
+                          {t('ideaManagement.dropHere')}
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                      ) : (
+                        columnIdeas.map((idea) => {
+                          const isDragged = draggedIdeaId === idea.id;
+                          return (
+                            <div
+                              key={idea.id}
+                              draggable
+                              onDragStart={() => setDraggedIdeaId(idea.id)}
+                              onDragEnd={() => {
+                                setDraggedIdeaId(null);
+                                setDragOverColumn(null);
+                              }}
+                              onClick={() => navigate(routes.community.ideaDetail(idea.id))}
+                              className={cn(
+                                'group cursor-grab rounded-xl border border-[#e4e6ee] bg-card px-[15px] py-[13px] transition-[transform,box-shadow,opacity]',
+                                'hover:shadow-[0_8px_22px_rgba(20,24,46,0.10)]',
+                                isDragged && 'rotate-2 scale-[0.98] opacity-40'
+                              )}
+                            >
+                              <div className="mb-2 flex items-center gap-1.5">
+                                <IdeaStatusBadge status={idea.status} size="sm" />
+                                {idea.business_area && (
+                                  <span className="rounded-[7px] bg-[#f3f4f8] px-[9px] py-[3px] text-[10.5px] font-bold text-muted-foreground">
+                                    {BUSINESS_AREAS.find((a) => a.value === idea.business_area)?.label ??
+                                      idea.business_area}
+                                  </span>
+                                )}
+                                <PriorityBadge value={idea.value_score} effort={idea.effort_score} />
+                                {/* "Open ->" hint surfaces the click-to-open affordance (drag = move). */}
+                                <span
+                                  aria-hidden="true"
+                                  className="ml-auto inline-flex items-center gap-0.5 text-[10.5px] font-extrabold text-primary opacity-0 transition-opacity group-hover:opacity-100"
+                                >
+                                  {t('ideaManagement.open')}
+                                  <ChevronRight className="h-3 w-3" />
+                                </span>
+                              </div>
+                              <p className="mb-2 line-clamp-2 text-[13px] font-bold leading-[1.35]">
+                                {idea.title}
+                              </p>
+                              <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                                <span className="inline-flex items-center gap-1">
+                                  <TrendingUp className="h-[11px] w-[11px]" />
+                                  {idea.vote_count || 0}
+                                </span>
+                                <span className="truncate">
+                                  {idea.profile?.full_name || t('ideaManagement.unknownAuthor')}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="prioritize">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              <p className="mb-4 text-sm text-muted-foreground">
+                {t('ideaManagement.prioritize.description')}
+              </p>
+              <PrioritizationMatrix
+                ideas={ideas}
+                isScoring={prioritizeMutation.isPending}
+                onScore={(ideaId, value, effort) =>
+                  prioritizeMutation.mutate({ ideaId, value, effort })
+                }
+              />
+              <PriorityOverview ideas={ideas} />
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Status update dialog */}
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
