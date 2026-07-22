@@ -73,10 +73,11 @@ describe('ideas-api payload coercions (old client-lib parity)', () => {
   });
 
   it('updateIdeaPriority calls the right endpoint with the right payload', async () => {
-    await updateIdeaPriority('idea-1', 3, 1);
+    const result = await updateIdeaPriority('idea-1', 3, 1);
 
     const [path, body] = mockCallApi.mock.calls[0] as [string, Record<string, unknown>];
     expect(path).toBe('/api/idea-prioritize');
     expect(body).toEqual({ ideaId: 'idea-1', value: 3, effort: 1 });
+    expect(result).toEqual({ id: 'idea-1' });
   });
 });

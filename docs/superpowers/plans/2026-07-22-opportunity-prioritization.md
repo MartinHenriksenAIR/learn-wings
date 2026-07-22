@@ -92,7 +92,7 @@ Add the two score columns to the canonical schema and a numbered idempotent migr
   effort_score        smallint CHECK (effort_score BETWEEN 1 AND 3),
 ```
 
-- [ ] **Step 2: Create the live-DB migration.** Create `migration/azure/04-idea-priority-scores.sql`:
+- [ ] **Step 2: Create the live-DB migration.** Create the migration with the **next free sequence number** — provisionally `migration/azure/04-idea-priority-scores.sql`, BUT another session may be authoring a migration concurrently. Before finalizing the name, run `ls migration/azure/*.sql` against the current trunk (and re-check at rebase time in Task 10) and pick the lowest unused number so two PRs don't both ship an `04-`. Content (rename the file to match the chosen number):
 
 ```sql
 -- 04-idea-priority-scores.sql
@@ -1323,7 +1323,7 @@ Expected: all exit 0.
 
 - [ ] **Step 2: Drive the feature (verify skill).** Use the `verify` skill / the repo's cache-seeded harness pattern (memory: "Verify gated UI via cache-seeded harness") to mount `OrgIdeasManagement` with a seeded TanStack cache containing a mix of `accepted`/`in_progress`/`submitted`/`done` ideas (some scored, some not). Confirm with Playwright: five board columns incl. In Progress; the Prioritize tab shows only accepted+in_progress on the grid + unscored tray; scoring via the dialog persists (mock the mutation) and a band tag appears on the Board card; the Do-next list is ordered. Capture a screenshot.
 
-- [ ] **Step 3: Update bookkeeping.** Append a dated entry to `migration/WORKLOG.md` (append-only) summarizing #118, and update `migration/STATUS.html`'s checkpoint "In flight"/"Done" lines. Note the `04-idea-priority-scores.sql` live-DB migration as an owner action to run. Commit:
+- [ ] **Step 3: Reconcile the migration number + update bookkeeping.** After the final rebase on trunk, re-run `ls migration/azure/*.sql` and confirm the priority-scores migration still has the lowest unused sequence number (a concurrent PR may have taken it); rename it if needed. Then append a dated entry to `migration/WORKLOG.md` (append-only) summarizing #118, and update `migration/STATUS.html`'s checkpoint "In flight"/"Done" lines. Note the priority-scores live-DB migration as an owner action to run. Commit:
 ```bash
 git add migration/WORKLOG.md migration/STATUS.html
 git commit -m "$(printf 'docs: WORKLOG + STATUS for opportunity prioritization (#118)\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>')"
