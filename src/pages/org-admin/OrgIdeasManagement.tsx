@@ -107,6 +107,16 @@ export default function OrgIdeasManagement() {
 
   const ideas = allIdeas.filter((i) => i.status !== 'draft');
 
+  // Prioritize list — full committed portfolio, ignores the header filters.
+  // Same key as the Board when no filter is active → deduped into one request.
+  const { data: allIdeasUnfiltered = [] } = useQuery({
+    queryKey: queryKeys.ideasAdmin.list(currentOrg?.id, '', ''),
+    queryFn: () => fetchIdeas(currentOrg!.id, {}),
+    enabled: !!currentOrg,
+  });
+
+  const prioritizeIdeas = allIdeasUnfiltered.filter((i) => i.status !== 'draft');
+
   // Status update mutation
   const statusMutation = useMutation({
     mutationFn: () =>
@@ -205,34 +215,38 @@ export default function OrgIdeasManagement() {
             {t('ideaManagement.subtitle', { orgName: currentOrg.name })}
           </p>
         </div>
-        <Select
-          value={selectedBusinessArea || 'all'}
-          onValueChange={(v) => setSelectedBusinessArea(v === 'all' ? '' : v)}
-        >
-          <SelectTrigger className="w-full shrink-0 font-semibold md:w-[200px]">
-            <SelectValue placeholder={t('ideaManagement.allBusinessAreas')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('ideaManagement.allBusinessAreas')}</SelectItem>
-            {BUSINESS_AREAS.map((area) => (
-              <SelectItem key={area.value} value={area.value}>
-                {area.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {activeTab === 'board' && (
+          <Select
+            value={selectedBusinessArea || 'all'}
+            onValueChange={(v) => setSelectedBusinessArea(v === 'all' ? '' : v)}
+          >
+            <SelectTrigger className="w-full shrink-0 font-semibold md:w-[200px]">
+              <SelectValue placeholder={t('ideaManagement.allBusinessAreas')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('ideaManagement.allBusinessAreas')}</SelectItem>
+              {BUSINESS_AREAS.map((area) => (
+                <SelectItem key={area.value} value={area.value}>
+                  {area.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Search */}
-      <div className="relative mb-5 max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder={t('ideaManagement.searchPlaceholder')}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+      {activeTab === 'board' && (
+        <div className="relative mb-5 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t('ideaManagement.searchPlaceholder')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      )}
 
       {/* Board / Prioritize tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'board' | 'prioritize')}>
@@ -361,13 +375,13 @@ export default function OrgIdeasManagement() {
                 {t('ideaManagement.prioritize.description')}
               </p>
               <PrioritizationMatrix
-                ideas={ideas}
+                ideas={prioritizeIdeas}
                 isScoring={prioritizeMutation.isPending}
                 onScore={(ideaId, value, effort) =>
                   prioritizeMutation.mutate({ ideaId, value, effort })
                 }
               />
-              <PriorityOverview ideas={ideas} />
+              <PriorityOverview ideas={prioritizeIdeas} />
             </>
           )}
         </TabsContent>
