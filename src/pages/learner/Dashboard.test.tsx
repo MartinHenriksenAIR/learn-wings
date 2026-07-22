@@ -168,6 +168,80 @@ describe('LearnerDashboard — completion count (#18)', () => {
   });
 });
 
+describe('LearnerDashboard — assessment banner', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const withOrg = {
+    memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
+    currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
+  };
+
+  it('shows the banner when the learner has no assessment level', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      ...withOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByTestId('assessment-banner')).toBeInTheDocument();
+    expect(screen.getByText('assessment.banner.title')).toBeInTheDocument();
+    expect(screen.getByText('assessment.banner.cta')).toBeInTheDocument();
+  });
+
+  it('does NOT show the banner when the learner already has an assessment level', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      ...withOrg,
+      profile: { ...baseAuthState.profile, assessment_level: 'basic' },
+    });
+
+    renderDashboard();
+
+    // Wait for the page to settle (hero card appears) then assert banner absent
+    await screen.findByTestId('dashboard-hero');
+    expect(screen.queryByTestId('assessment-banner')).toBeNull();
+  });
+
+  it('does NOT show the banner for a platform admin even with no assessment level', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+      isPlatformAdmin: true,
+      memberships: [],
+      currentOrg: null,
+    });
+
+    renderDashboard();
+
+    // Platform admin with no org renders the no-membership state, not the dashboard
+    expect(screen.queryByTestId('assessment-banner')).toBeNull();
+  });
+
+  it('does NOT show the banner for an org admin even with no assessment level', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      ...withOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+      isOrgAdmin: true,
+    });
+
+    renderDashboard();
+
+    await screen.findByTestId('dashboard-hero');
+    expect(screen.queryByTestId('assessment-banner')).toBeNull();
+  });
+});
+
 describe('LearnerDashboard — hero variants', () => {
   beforeEach(() => {
     vi.clearAllMocks();

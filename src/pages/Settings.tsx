@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,16 +11,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { LevelBadge } from '@/components/ui/level-badge';
 import { SaveButton } from '@/components/ui/save-button';
 import { useFlash } from '@/hooks/useFlash';
 import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/sonner';
-import { Loader2, Mail, Calendar, Building2 } from 'lucide-react';
+import { Loader2, Mail, Calendar, Building2, Sparkles } from 'lucide-react';
 import { z } from 'zod';
 import { formatDate } from '@/lib/date-locale';
 import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
+import { routes } from '@/lib/routes';
 import { getInitials } from '@/lib/utils';
 import { FileUpload } from '@/components/ui/file-upload';
 import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
@@ -32,7 +36,8 @@ const profileSchema = z.object({
 });
 
 export default function Settings() {
-  const { profile, user, memberships, isPlatformAdmin, refreshUserContext } = useAuth();
+  const { profile, user, memberships, isPlatformAdmin, isOrgAdmin, refreshUserContext } = useAuth();
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { flashed, flash } = useFlash();
   const { data: avatarSrc } = useSignedBrandingUrl(profile?.avatar_url);
@@ -321,6 +326,44 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Assessment card — shown only to plain learners */}
+        {!isPlatformAdmin && !isOrgAdmin && (
+          <Card className="mb-4" data-testid="assessment-settings-card">
+            <CardContent className="space-y-3 px-[26px] py-6">
+              <div className="flex items-center gap-3.5">
+                <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-primary text-white">
+                  <Sparkles className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="text-[15px] font-extrabold">{t('assessment.settings.title')}</h3>
+              </div>
+              {profile?.assessment_level ? (
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <LevelBadge level={profile.assessment_level} />
+                    {profile.assessment_taken_at && (
+                      <span className="text-[12.5px] text-muted-foreground">
+                        {t('assessment.settings.lastTaken', {
+                          date: formatDate(new Date(profile.assessment_taken_at), 'd. MMMM yyyy', i18n.language),
+                        })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[12.5px] text-muted-foreground">{t('assessment.settings.notTaken')}</p>
+              )}
+              <p className="text-[11.5px] text-muted-foreground">{t('assessment.settings.privacyNote')}</p>
+              <Button
+                onClick={() => navigate(routes.learner.assessment)}
+                variant={profile?.assessment_level ? 'outline' : 'default'}
+                className={profile?.assessment_level ? 'border-primary text-primary hover:bg-accent' : ''}
+              >
+                {profile?.assessment_level ? t('assessment.settings.retake') : t('assessment.settings.take')}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Account Information Section */}
         <Card>
