@@ -57,7 +57,8 @@ interface KanbanColumn {
 // Column icon tints mirror the prototype palette (navy / amber / green / red).
 const KANBAN_COLUMNS: KanbanColumn[] = [
   { key: 'inbox', label: 'Inbox', icon: <Inbox className="h-[15px] w-[15px]" />, iconColor: 'text-primary', statuses: ['submitted', 'in_review'] },
-  { key: 'backlog', label: 'Backlog', icon: <FileText className="h-[15px] w-[15px]" />, iconColor: 'text-warning', statuses: ['accepted', 'in_progress'] },
+  { key: 'backlog', label: 'Backlog', icon: <FileText className="h-[15px] w-[15px]" />, iconColor: 'text-warning', statuses: ['accepted'] },
+  { key: 'inProgress', label: 'In Progress', icon: <Loader2 className="h-[15px] w-[15px]" />, iconColor: 'text-primary', statuses: ['in_progress'] },
   { key: 'done', label: 'Done', icon: <CheckCircle className="h-[15px] w-[15px]" />, iconColor: 'text-success', statuses: ['done'] },
   { key: 'rejected', label: 'Rejected', icon: <XCircle className="h-[15px] w-[15px]" />, iconColor: 'text-[#c43d3d]', statuses: ['rejected'] },
 ];
@@ -66,6 +67,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
 const COLUMN_DROP_STATUS: Record<string, IdeaStatusExtended> = {
   inbox: 'submitted',
   backlog: 'accepted',
+  inProgress: 'in_progress',
   done: 'done',
   rejected: 'rejected',
 };
@@ -231,7 +233,7 @@ export default function OrgIdeasManagement() {
           description={t('ideaManagement.emptyDescription')}
         />
       ) : (
-        <div className="grid grid-cols-1 items-start gap-3.5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 items-start gap-3.5 md:grid-cols-2 xl:grid-cols-5">
           {KANBAN_COLUMNS.map((column) => {
             const columnIdeas = ideas.filter((idea) =>
               column.statuses.includes(idea.status)

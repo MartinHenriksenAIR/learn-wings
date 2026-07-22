@@ -501,6 +501,7 @@
     "columns": {
       "inbox": "Indbakke",
       "backlog": "Backlog",
+      "inProgress": "I gang",
       "done": "Færdig",
       "rejected": "Afvist"
     },
