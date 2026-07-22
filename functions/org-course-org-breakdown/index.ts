@@ -1,5 +1,6 @@
 import { query } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
+import { courseGroupMemberIds } from '../shared/course-groups';
 
 /**
  * Per-organization engagement breakdown for a single course, across every org.
@@ -31,17 +32,18 @@ export default adminEndpoint('org-course-org-breakdown', async ({ req, reply }) 
   }
 
   const orgs = await query(
-    `SELECT o.id AS org_id, o.name AS org_name,
+    `WITH grp AS (${courseGroupMemberIds(1)})
+     SELECT o.id AS org_id, o.name AS org_name,
             COUNT(e.id)::int AS enrolled,
             COUNT(e.id) FILTER (WHERE e.status = 'completed')::int AS completed
        FROM organizations o
        JOIN (
          SELECT oca.org_id FROM org_course_access oca
-          WHERE oca.course_id = $1 AND oca.access = 'enabled'
+          WHERE oca.course_id IN (SELECT id FROM grp) AND oca.access = 'enabled'
          UNION
-         SELECT e.org_id FROM enrollments e WHERE e.course_id = $1
+         SELECT e.org_id FROM enrollments e WHERE e.course_id IN (SELECT id FROM grp)
        ) rel ON rel.org_id = o.id
-       LEFT JOIN enrollments e ON e.course_id = $1 AND e.org_id = o.id
+       LEFT JOIN enrollments e ON e.course_id IN (SELECT id FROM grp) AND e.org_id = o.id
       GROUP BY o.id, o.name
       ORDER BY enrolled DESC, o.name`,
     [courseId],
