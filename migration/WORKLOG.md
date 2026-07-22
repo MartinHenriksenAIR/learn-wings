@@ -1278,3 +1278,23 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 - **Follow-ups (deferred):** a11y on the scoring dialog (`<label htmlFor>`, placeholder-vs-selected); broader `PriorityOverview` test coverage (band counts + area rollup); drop the unused `ScoreLevel` export; optional endpoint hardening against half-scored writes. To be filed as a follow-up issue.
 
 **Verify:** root `npm run lint` 0 errors · `npm test` 458 pass · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0; functions `npm run build` exit 0 · `npm test` 1887 pass (125 files, 3 skipped) — new tests: idea-prioritize endpoint contract (11), idea-priority band truth-table + ranking, PriorityBadge, PrioritizationMatrix (population/tray/cell), PriorityOverview (ranking), updateIdeaPriority api. Prod migration 04 applied + columns verified (`value_score`, `effort_score` smallint). Deploy + post-merge smoke announced on PR #212.
+
+---
+
+## 2026-07-22 — #176 Auto-adopt pending org invites at login (self-signup)
+
+**Who:** martin, TDD + grilling design pass + 8-angle code review. PR #217.
+
+**What shipped:** `functions/user-context/index.ts` now honors pending **organization** invitations addressed to the caller's Entra email — reusing the #175 shared `convertInvitation` helper **unchanged**, so a user who signs in via SSO directly (without clicking the invite link) is auto-added to the inviting org at the invited role, invite marked `accepted`. Backend-only; response shape unchanged (the adopted org simply appears in `memberships`).
+
+**Design decisions (grilled with Martin, one at a time):**
+- **Runs on every login**, not just first-provision — so an invite created *after* a user self-signed-up is still adopted on their next sign-in (the common "won't click the link" case). Idempotent, so re-logins are safe.
+- **Org invites only.** Platform-admin invites (`org_id IS NULL`) are deliberately **skipped** — this path authenticates on email match alone (no secret link), so keys-to-the-kingdom elevation stays gated behind the explicit accept-link flow (#175).
+- **Email-match bar:** the Entra sign-in email (`preferred_username`, Microsoft-signed/tenant-authoritative), matched case-insensitively + trimmed; a blank email is skipped entirely (never matched against invitations).
+- **Best-effort:** adoption runs in its own transaction; any failure is logged via `context.error` and swallowed so **login never breaks** (retries next login). Runs *before* the memberships load so a freshly-adopted org appears in the same response.
+- **Seat-neutral** by construction (a pending invite already reserves its seat — #126; −1 pending / +1 active within the transaction).
+- **Perf:** a cheap non-transactional `SELECT … LIMIT 1` pre-check runs first; the locking transaction only opens when there is actually an invite to adopt (avoids a connection checkout + BEGIN/COMMIT on the ~always no-invite path). The in-transaction re-select under `FOR UPDATE` still guarantees no double-consume vs. a concurrent accept-link flow (READ COMMITTED re-checks `status='pending'` after the lock).
+
+**Note:** this is an Entra-gated backend endpoint with no local runtime (no local DB/login), so mock-contract tests are the verification path per `.claude/rules/functions.md`. No schema change (the `invitations` table + `invitation_status` enum already supported it); no `functions/index.ts` change (user-context already registered).
+
+**Verify:** functions `npm run build` exit 0 · `npm test` 1894 pass (126 files, 3 skipped; 10 user-context contract tests — TDD red→green, covering single/multi-org adopt, no-invite bare account, platform-admin skip, already-member idempotency, blank-email skip, case-insensitive match, adoption-failure-never-breaks-login, and the pre-check "no transaction when nothing to adopt"). Root `npm run lint` 0 errors · `npm test` 458 pass · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Gates re-run green after rebasing/merging trunk (post-#212). Deploy + post-merge smoke announced on PR #217.
