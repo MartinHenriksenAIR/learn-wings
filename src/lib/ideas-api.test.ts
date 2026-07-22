@@ -7,7 +7,7 @@ vi.mock('@/lib/api-client', () => ({
   callApiRaw: vi.fn(),
 }));
 
-import { createIdea, updateIdea } from './ideas-api';
+import { createIdea, updateIdea, updateIdeaPriority } from './ideas-api';
 import type { BusinessArea } from '@/lib/community-types';
 
 describe('ideas-api payload coercions (old client-lib parity)', () => {
@@ -70,5 +70,13 @@ describe('ideas-api payload coercions (old client-lib parity)', () => {
 
     const [, body] = mockCallApi.mock.calls[0] as [string, { updates: Record<string, unknown> }];
     expect('business_area' in body.updates).toBe(false);
+  });
+
+  it('updateIdeaPriority calls the right endpoint with the right payload', async () => {
+    await updateIdeaPriority('idea-1', 3, 1);
+
+    const [path, body] = mockCallApi.mock.calls[0] as [string, Record<string, unknown>];
+    expect(path).toBe('/api/idea-prioritize');
+    expect(body).toEqual({ ideaId: 'idea-1', value: 3, effort: 1 });
   });
 });
