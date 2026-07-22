@@ -957,6 +957,16 @@
     "descriptionLabel": "Description",
     "levelLabel": "Level",
     "languageLabel": "Language",
+    "editions": {
+      "title": "Language editions",
+      "description": "Link this course to its versions in other languages so analytics count them as one course.",
+      "linkedHeading": "Linked editions",
+      "none": "Not linked to any other language edition.",
+      "linkPlaceholder": "Choose a course to link…",
+      "linkButton": "Link",
+      "unlinkButton": "Unlink",
+      "noCandidates": "No eligible courses to link (a course must have a different language and not already be linked)."
+    },
     "saveChanges": "Save changes",
     "saved": "Saved",
     "publishToggleLabel": "Published",
