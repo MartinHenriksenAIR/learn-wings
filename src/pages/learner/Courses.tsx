@@ -118,6 +118,12 @@ export default function LearnerCourses() {
 
   const hasActiveFilters = search.trim() !== '' || levelFilter !== 'all' || statusFilter !== 'all';
 
+  // Level-matched recommendations (#117) — drives both the recommended grid and the
+  // "All courses" heading that separates it from the full catalog below.
+  const recommendedCourses = profile?.assessment_level != null
+    ? courses.filter(c => c.level === profile.assessment_level)
+    : [];
+
   const filteredCourses = courses.filter(course => {
     // Search filter
     const matchesSearch = search === '' ||
@@ -329,24 +335,20 @@ export default function LearnerCourses() {
       </div>
 
       {/* Recommended section — only shown when the learner has a known assessment level */}
-      {profile?.assessment_level != null && (() => {
-        const recommended = courses.filter(c => c.level === profile.assessment_level);
-        if (recommended.length === 0) return null;
-        return (
-          <div className="mb-8" data-testid="recommended-section">
-            <div className="mb-3.5 flex flex-wrap items-center gap-2">
-              <h2 className="font-display text-[17px] font-bold">{t('assessment.recommendations.forYou')}</h2>
-              <LevelBadge level={profile.assessment_level} />
-            </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {recommended.map((course) => renderCourseCard(course, true))}
-            </div>
+      {profile?.assessment_level != null && recommendedCourses.length > 0 && (
+        <div className="mb-8" data-testid="recommended-section">
+          <div className="mb-3.5 flex flex-wrap items-center gap-2">
+            <h2 className="font-display text-[17px] font-bold">{t('assessment.recommendations.forYou')}</h2>
+            <LevelBadge level={profile.assessment_level} />
           </div>
-        );
-      })()}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {recommendedCourses.map((course) => renderCourseCard(course, true))}
+          </div>
+        </div>
+      )}
 
       {/* All courses heading — shown when a recommended section is also visible */}
-      {profile?.assessment_level != null && courses.some(c => c.level === profile.assessment_level) && (
+      {recommendedCourses.length > 0 && (
         <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('assessment.recommendations.allCourses')}</h2>
       )}
 

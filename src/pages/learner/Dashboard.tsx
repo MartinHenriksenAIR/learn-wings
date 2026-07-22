@@ -152,7 +152,7 @@ export default function LearnerDashboard() {
           data-testid="assessment-banner"
           className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4"
         >
-          <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-primary text-white">
+          <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
             <Sparkles className="h-5 w-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">

@@ -332,7 +332,7 @@ export default function Settings() {
           <Card className="mb-4" data-testid="assessment-settings-card">
             <CardContent className="space-y-3 px-[26px] py-6">
               <div className="flex items-center gap-3.5">
-                <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-primary text-white">
+                <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
                   <Sparkles className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <h3 className="text-[15px] font-extrabold">{t('assessment.settings.title')}</h3>
