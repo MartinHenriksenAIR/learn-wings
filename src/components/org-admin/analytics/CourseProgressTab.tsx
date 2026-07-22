@@ -70,7 +70,7 @@ interface OrgBreakdownRow {
 }
 
 export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped');
@@ -80,8 +80,10 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
   // in the course dialog (#163); for a single org it is meaningless.
   const isAllOrgs = orgId === 'all';
 
-  // Fetch course data via shared query hook
-  const courseProgressQuery = useOrgCourseProgress(orgId);
+  // Fetch course data via shared query hook. The representative edition's
+  // title/level per group depends on the admin's app language (#213), so the
+  // resolved language is threaded through (and lives in the query key).
+  const courseProgressQuery = useOrgCourseProgress(orgId, i18n.resolvedLanguage);
 
   // Derive courseStats with avgProgress — byte-for-byte from the old fetchCourseStats
   const courseStats = useMemo((): CourseStats[] => {

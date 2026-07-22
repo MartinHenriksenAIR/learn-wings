@@ -18,7 +18,7 @@ const progressResponse = {
 };
 
 function Consumer({ orgId }: { orgId: string | undefined }) {
-  const { data } = useOrgCourseProgress(orgId);
+  const { data } = useOrgCourseProgress(orgId, 'da');
   return (
     <div data-testid="result">
       {data ? `courses:${data.courses.length}` : 'none'}
@@ -36,7 +36,7 @@ describe('useOrgCourseProgress', () => {
     vi.clearAllMocks();
   });
 
-  it('calls /api/org-course-progress with the correct orgId body', async () => {
+  it('calls /api/org-course-progress with the correct orgId and adminLang body', async () => {
     mockCallApi.mockResolvedValue(progressResponse);
 
     renderWithClient(<Consumer orgId="org-1" />);
@@ -46,7 +46,7 @@ describe('useOrgCourseProgress', () => {
     });
 
     expect(mockCallApi).toHaveBeenCalledTimes(1);
-    expect(mockCallApi).toHaveBeenCalledWith('/api/org-course-progress', { orgId: 'org-1' });
+    expect(mockCallApi).toHaveBeenCalledWith('/api/org-course-progress', { orgId: 'org-1', adminLang: 'da' });
   });
 
   it('does not fetch when orgId is undefined', async () => {

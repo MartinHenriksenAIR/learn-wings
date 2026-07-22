@@ -169,10 +169,10 @@ describe('queryKeys', () => {
 
   // org-course-progress
   it('orgCourseProgress.detail returns the parameterized key', () => {
-    expect(queryKeys.orgCourseProgress.detail('org-1')).toEqual(['org-course-progress', 'org-1']);
+    expect(queryKeys.orgCourseProgress.detail('org-1', 'da')).toEqual(['org-course-progress', 'org-1', 'da']);
   });
   it('orgCourseProgress.detail with undefined orgId', () => {
-    expect(queryKeys.orgCourseProgress.detail(undefined)).toEqual(['org-course-progress', undefined]);
+    expect(queryKeys.orgCourseProgress.detail(undefined, undefined)).toEqual(['org-course-progress', undefined, undefined]);
   });
 
   // org-course-enrollees
