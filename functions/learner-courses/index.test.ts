@@ -108,9 +108,11 @@ describe('learner-courses', () => {
     expect(coursesSql).toContain('c.is_published = TRUE');
     expect(coursesSql).toContain('c.language');
     expect(coursesSql).toContain('c.language = $2');
+    // Language relaxation: an already-enrolled course is always shown regardless of language
+    expect(coursesSql).toContain('FROM enrollments e');
     expect(coursesSql).not.toContain('SELECT *');
-    // No language sent — defaults to 'da'
-    expect(coursesParams).toEqual(['org-1', 'da']);
+    // No language sent — defaults to 'da'; profile.id travels as $3 for the enrolled-union
+    expect(coursesParams).toEqual(['org-1', 'da', 'p1']);
 
     // Assert enrollments SQL — user_id = $1, no SELECT *, params ['p1', 'org-1']
     const [enrollSql, enrollParams] = mockQuery.mock.calls[1] as [string, unknown[]];
@@ -131,7 +133,27 @@ describe('learner-courses', () => {
     expect(res.status).toBe(200);
     const [coursesSql, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(coursesSql).toContain('c.language = $2');
-    expect(coursesParams).toEqual(['org-1', 'en']);
+    expect(coursesParams).toEqual(['org-1', 'en', 'p1']);
+  });
+
+  // 5b-i. Enrolled-course-across-languages: body language 'en' still retains any
+  // enrolled course regardless of its own language, via profile.id as $3.
+  it('always includes the enrolled-courses EXISTS clause with profile.id as $3', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQuery
+      .mockResolvedValueOnce([]) // courses query
+      .mockResolvedValueOnce([]); // enrollments query
+
+    const res = await handler(baseReq({ orgId: 'org-1', language: 'en' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [coursesSql, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(coursesSql).toContain('EXISTS (');
+    expect(coursesSql).toContain('FROM enrollments e');
+    expect(coursesSql).toContain('e.course_id = c.id');
+    expect(coursesSql).toContain('e.user_id = $3');
+    expect(coursesSql).toContain('e.org_id = $1');
+    expect(coursesParams).toEqual(['org-1', 'en', 'p1']);
   });
 
   // 5c. missing/invalid language — defaults to 'da'
@@ -145,7 +167,7 @@ describe('learner-courses', () => {
 
     expect(res.status).toBe(200);
     const [, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
-    expect(coursesParams).toEqual(['org-1', 'da']);
+    expect(coursesParams).toEqual(['org-1', 'da', 'p1']);
   });
 
   // 6. Platform-admin bypass — isActiveMember NOT called

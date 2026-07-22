@@ -16,13 +16,21 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
   // Query 1: Available published courses for the org (shared visibility predicate;
   // equivalent to the old JOIN form — UNIQUE(org_id, course_id) on org_course_access
   // guarantees one access row per course per org), filtered to the viewer's UI language.
+  // The language filter is relaxed (never the org-visibility/publish predicate) for
+  // courses the learner is already enrolled in, so a language switch never hides them.
   const courses = await query(
     `SELECT c.id, c.title, c.description, c.level, c.language, c.is_published, c.thumbnail_url, c.created_by_user_id, c.created_at
        FROM courses c
       WHERE ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}
-            AND c.language = $2
+            AND (
+                  c.language = $2
+                  OR EXISTS (
+                    SELECT 1 FROM enrollments e
+                     WHERE e.course_id = c.id AND e.user_id = $3 AND e.org_id = $1
+                  )
+                )
       ORDER BY c.title`,
-    [orgId, lang],
+    [orgId, lang, profile.id],
   );
 
   // Query 2: Caller's own enrollments in this org, scoped to profile.id (never a client-supplied user id).
