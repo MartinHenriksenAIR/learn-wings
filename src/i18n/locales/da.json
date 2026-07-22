@@ -544,6 +544,7 @@
       "title": "Vurder mulighed",
       "valueLabel": "Værdi",
       "effortLabel": "Indsats",
+      "placeholder": "Vælg…",
       "clear": "Ryd vurdering"
     }
   },

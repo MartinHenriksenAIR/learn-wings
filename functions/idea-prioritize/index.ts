@@ -24,6 +24,12 @@ export default endpoint('idea-prioritize', async ({ req, reply, requireOrgAdmin 
   if (!isValidScore(effort)) {
     return reply(400, { error: 'effort must be an integer 1-3 or null' });
   }
+  // A half-score (one column set, the other null) has no meaning — every
+  // consumer treats it as unscored. Reject it so the stored state is always
+  // either fully scored or fully cleared.
+  if ((value === null) !== (effort === null)) {
+    return reply(400, { error: 'value and effort must both be set or both be null' });
+  }
 
   // Load idea (org_id is the authz anchor — never client-supplied).
   const idea = await queryOne<IdeaRow>(

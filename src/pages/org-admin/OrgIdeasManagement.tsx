@@ -109,7 +109,9 @@ export default function OrgIdeasManagement() {
 
   // Prioritize list — full committed portfolio, ignores the header filters.
   // Same key as the Board when no filter is active → deduped into one request.
-  const { data: allIdeasUnfiltered = [] } = useQuery({
+  // Its own loading flag so an active header filter's refetch doesn't flicker
+  // a spinner on the (independently-keyed) Prioritize tab.
+  const { data: allIdeasUnfiltered = [], isLoading: isPrioritizeLoading } = useQuery({
     queryKey: queryKeys.ideasAdmin.list(currentOrg?.id, '', ''),
     queryFn: () => fetchIdeas(currentOrg!.id, {}),
     enabled: !!currentOrg,
@@ -365,7 +367,7 @@ export default function OrgIdeasManagement() {
         </TabsContent>
 
         <TabsContent value="prioritize">
-          {isLoading ? (
+          {isPrioritizeLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
