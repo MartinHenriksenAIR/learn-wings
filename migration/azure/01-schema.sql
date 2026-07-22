@@ -441,6 +441,8 @@ CREATE TABLE public.ideas (
   systems_involved    text,
   constraints_risks   text,
   success_metrics     text,
+  value_score         smallint CHECK (value_score BETWEEN 1 AND 3),
+  effort_score        smallint CHECK (effort_score BETWEEN 1 AND 3),
   admin_notes         text,
   rejection_reason    text,
   submitted_at        timestamptz,

@@ -135,6 +135,9 @@ export interface EnhancedIdea {
   systems_involved: string | null;
   constraints_risks: string | null;
   success_metrics: string | null;
+  // Prioritization scores (#118) — admin-set Value/Effort, 1=Low 2=Med 3=High, null=unscored
+  value_score: number | null;
+  effort_score: number | null;
   // Admin-only fields
   admin_notes: string | null;
   rejection_reason: string | null;
