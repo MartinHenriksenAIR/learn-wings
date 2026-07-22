@@ -4,6 +4,12 @@ import type { Profile, Organization } from './types';
 
 // Enums
 export type CommunityScope = 'org' | 'global';
+/**
+ * The community page's view selector: the two post scopes plus the events tab
+ * (#125). API calls keep the narrow `CommunityScope`; only the page-level tab
+ * state widens to include `'events'`.
+ */
+export type CommunityView = CommunityScope | 'events';
 export type ReportStatus = 'pending' | 'reviewed' | 'dismissed';
 type ReportTargetType = 'post' | 'comment';
 export type BusinessArea = 'hr' | 'finance' | 'sales' | 'support' | 'ops' | 'it' | 'legal' | 'other';

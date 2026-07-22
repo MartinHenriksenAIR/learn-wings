@@ -11,6 +11,7 @@ import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import { PostCard } from '@/components/community/PostCard';
 import { PostForm } from '@/components/community/PostForm';
 import { UpcomingEvents } from '@/components/community/UpcomingEvents';
+import { EventsTab } from '@/pages/community/EventsTab';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { AIChampionsList } from '@/components/community/AIChampionsList';
 import { useAuth } from '@/hooks/useAuth';
@@ -30,13 +31,14 @@ import {
   Lightbulb,
   Globe,
   Building2,
+  Calendar,
   Loader2,
   Lock,
   X,
   FolderOpen,
   ChevronRight,
 } from 'lucide-react';
-import type { CommunityScope, CommunityPost } from '@/lib/community-types';
+import type { CommunityScope, CommunityView, CommunityPost } from '@/lib/community-types';
 
 export default function CommunityFeed() {
   const navigate = useNavigate();
@@ -46,20 +48,24 @@ export default function CommunityFeed() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const scopeParam = searchParams.get('scope') as CommunityScope | null;
-  const scope: CommunityScope = scopeParam === 'global' ? 'global' : 'org';
+  const scopeParam = searchParams.get('scope');
+  const view: CommunityView =
+    scopeParam === 'events' ? 'events' : scopeParam === 'global' ? 'global' : 'org';
+  // API calls keep the narrow scope; the events view reuses 'org' for chrome.
+  const scope: CommunityScope = view === 'global' ? 'global' : 'org';
 
   const [showPostForm, setShowPostForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  // Redirect to global if no org
+  // Redirect the org feed to global when the user has no org. The events view
+  // always includes global scope, so it needs no org and is exempt.
   useEffect(() => {
-    if (scope === 'org' && !currentOrg) {
+    if (view === 'org' && !currentOrg) {
       setSearchParams({ scope: 'global' });
     }
-  }, [scope, currentOrg, setSearchParams]);
+  }, [view, currentOrg, setSearchParams]);
 
   // Fetch categories
   const { data: categories = [] } = useQuery({
@@ -77,7 +83,7 @@ export default function CommunityFeed() {
       search: searchQuery || undefined,
       tags: selectedTags.length > 0 ? selectedTags : undefined,
     }),
-    enabled: scope === 'global' || !!currentOrg,
+    enabled: view !== 'events' && (scope === 'global' || !!currentOrg),
   });
 
   // Create post mutation
@@ -134,9 +140,9 @@ export default function CommunityFeed() {
       : []),
     { key: 'global', label: t('community.globalCommunity'), icon: <Globe aria-hidden="true" className="h-3.5 w-3.5" /> },
     {
-      key: 'events_coming_soon',
-      label: <span title={t('community.comingSoon')}>{t('community.eventsOfficeHours')}</span>,
-      disabled: true,
+      key: 'events',
+      label: t('community.eventsOfficeHours'),
+      icon: <Calendar aria-hidden="true" className="h-3.5 w-3.5" />,
     },
   ];
 
@@ -178,11 +184,14 @@ export default function CommunityFeed() {
       {/* Scope tabs */}
       <SlidingTabs
         tabs={scopeTabs}
-        active={scope}
-        onChange={(key) => setSearchParams({ scope: key as CommunityScope })}
+        active={view}
+        onChange={(key) => setSearchParams({ scope: key })}
         className="mb-5"
       />
 
+      {view === 'events' ? (
+        <EventsTab />
+      ) : (
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_300px]">
         {/* Main content */}
         <div className="flex flex-col gap-3.5">
@@ -363,19 +372,22 @@ export default function CommunityFeed() {
           )}
         </div>
       </div>
+      )}
 
-      {/* Post form dialog */}
-      <PostForm
-        open={showPostForm}
-        onOpenChange={setShowPostForm}
-        onSubmit={async (data) => {
-          await createPostMutation.mutateAsync(data);
-        }}
-        categories={categories}
-        scope={scope}
-        orgId={currentOrg?.id}
-        canPostRestricted={canPostRestricted}
-      />
+      {/* Post form dialog — not shown on the events view */}
+      {view !== 'events' && (
+        <PostForm
+          open={showPostForm}
+          onOpenChange={setShowPostForm}
+          onSubmit={async (data) => {
+            await createPostMutation.mutateAsync(data);
+          }}
+          categories={categories}
+          scope={scope}
+          orgId={currentOrg?.id}
+          canPostRestricted={canPostRestricted}
+        />
+      )}
     </AppLayout>
   );
 }
