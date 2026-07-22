@@ -8,8 +8,6 @@
  */
 import { describe, it, expect } from 'vitest';
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore — cross-tree import; tsconfig.app.json includes only src/ but noEmit means no rootDir error
 import { ASSESSMENT_QUESTIONS } from '../../functions/shared/assessment-questions';
 import enJson from './locales/en.json';
 import daJson from './locales/da.json';
