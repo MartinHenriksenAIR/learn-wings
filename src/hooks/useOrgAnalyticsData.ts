@@ -2,8 +2,19 @@ import { useQuery } from '@tanstack/react-query';
 import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 
-interface OrgAnalyticsDataResult {
-  members: Array<{ user_id: string; full_name: string; email: string; department?: string }>;
+export interface OrgAnalyticsMember {
+  user_id: string;
+  full_name: string;
+  email: string;
+  department?: string;
+  /** Role of this member in the org. 'learner' | 'org_admin'; null for edge cases. */
+  role?: 'learner' | 'org_admin' | null;
+  /** AI level from the onboarding assessment. null = not yet assessed. */
+  assessment_level?: 'basic' | 'intermediate' | 'advanced' | null;
+}
+
+export interface OrgAnalyticsDataResult {
+  members: OrgAnalyticsMember[];
   enrollments: Array<{ user_id: string; status: string; course_id: string }>;
   quizAttempts: Array<{ user_id: string; score: number }>;
 }
