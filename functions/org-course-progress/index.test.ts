@@ -86,7 +86,7 @@ describe('org-course-progress', () => {
     // Group language editions by COALESCE(course_group_id, id)
     expect(sql).toContain('COALESCE(');
     expect(sql).toContain('course_group_id');
-    expect(sql).toContain("(language = $2)");     // representative-by-admin-language
+    expect(sql).toContain("(language = $2) IS TRUE");     // NULL-safe representative-by-admin-language
     expect(sql).toContain('oca.access = \'enabled\'');
     // Parity: no is_published filter
     expect(sql).not.toContain('is_published');
@@ -159,7 +159,7 @@ describe('org-course-progress', () => {
       // group language editions across orgs
       expect(sql).toContain('COALESCE(');
       // representative-by-admin-language ($1 is the only bind — the language)
-      expect(sql).toContain("(language = $1)");
+      expect(sql).toContain("(language = $1) IS TRUE");
       expect(params).toEqual(['da']);
     });
   });
