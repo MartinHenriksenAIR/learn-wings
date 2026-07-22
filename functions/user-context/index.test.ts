@@ -172,7 +172,12 @@ describe('user-context', () => {
 
   it('no matching invite: bare account provisioned, and NO transaction is opened (cheap pre-check only)', async () => {
     mockQueryOne.mockResolvedValueOnce(null); // no existing profile
-    mockQueryOne.mockResolvedValueOnce({ id: 'bare-uuid', full_name: 'user', email: 'user@contoso.com', is_platform_admin: false, avatar_url: null });
+    mockQueryOne.mockResolvedValueOnce({ id: 'bare-uuid' }); // INSERT RETURNING id
+    mockQueryOne.mockResolvedValueOnce({
+      id: 'bare-uuid', full_name: 'user', email: 'user@contoso.com',
+      is_platform_admin: false, avatar_url: null,
+      assessment_level: null, assessment_skipped_at: null, assessment_taken_at: null,
+    }); // re-select with full shape
     // pre-check returns nothing (default [])
 
     const res = await handler(baseReq as any, {} as any);

@@ -39,7 +39,7 @@ describe('org-analytics-data', () => {
   });
 
   it('returns members, enrollments, quizAttempts, and org for authorized user', async () => {
-    const members = [{ id: 'mem-1', full_name: 'Alice', assessment_level: 'beginner' }];
+    const members = [{ id: 'mem-1', full_name: 'Alice', assessment_level: 'basic' }];
     const enrollments = [{ id: 'enr-1', course_id: 'c-1' }];
     const quizAttempts = [{ id: 'qa-1', score: 80 }];
     const org = { id: 'org-uuid', name: 'Test Org' };
@@ -60,7 +60,7 @@ describe('org-analytics-data', () => {
     expect(body.quizAttempts).toHaveLength(1);
     expect(body.org.name).toBe('Test Org');
     // assessment_level is present in single-org members rows
-    expect(body.members[0].assessment_level).toBe('beginner');
+    expect(body.members[0].assessment_level).toBe('basic');
     // SQL includes p.assessment_level
     const [membersSql] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(membersSql).toContain('p.assessment_level');
@@ -97,7 +97,7 @@ describe('org-analytics-data', () => {
     it('aggregates distinct members + all enrollments/attempts across orgs for a platform admin', async () => {
       const members = [
         { user_id: 'u1', role: 'org_admin', full_name: 'Alice', email: 'a@x.com', department: 'Eng', assessment_level: null },
-        { user_id: 'u2', role: 'learner', full_name: 'Bob', email: 'b@x.com', department: null, assessment_level: 'beginner' },
+        { user_id: 'u2', role: 'learner', full_name: 'Bob', email: 'b@x.com', department: null, assessment_level: 'basic' },
       ];
       const enrollments = [
         { id: 'e1', course_id: 'c1', status: 'completed', user_id: 'u1' },
@@ -120,7 +120,7 @@ describe('org-analytics-data', () => {
 
       // assessment_level is present in all-orgs members rows
       expect(body.members[0].assessment_level).toBeNull();    // org_admin → null (skipped/not prompted)
-      expect(body.members[1].assessment_level).toBe('beginner');
+      expect(body.members[1].assessment_level).toBe('basic');
 
       // members query dedups by user; enrollments/attempts span all orgs (no org bind param)
       const [membersSql] = mockQuery.mock.calls[0] as [string, unknown[]];
