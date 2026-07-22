@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -110,6 +110,13 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
   // questionId -> selected optionId
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
+  const questionHeadingRef = useRef<HTMLHeadingElement>(null);
+  // Move focus to the question heading whenever the question changes so
+  // screen-reader users hear the new question without manual navigation.
+  useEffect(() => {
+    questionHeadingRef.current?.focus();
+  }, [index]);
+
   const submitMutation = useMutation({
     mutationFn: (payload: Record<string, string>) =>
       callApi<AssessmentResult>('/api/assessment-submit', { answers: payload }),
@@ -120,7 +127,8 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
     },
     onError: (error) => {
       toast({
-        title: error instanceof Error ? error.message : String(error),
+        title: t('assessment.error.title'),
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     },
@@ -135,7 +143,8 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
     },
     onError: (error) => {
       toast({
-        title: error instanceof Error ? error.message : String(error),
+        title: t('assessment.error.title'),
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     },
@@ -195,7 +204,8 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
           <span>{t('assessment.timeEstimate')}</span>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar — tracks which question you're on (1-based), intentionally
+            matches the "Spørgsmål N af 7" label above. */}
         <div className="mb-8 h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-primary transition-[width] duration-300"
@@ -209,11 +219,16 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
           key={question.id}
           className="animate-in fade-in slide-in-from-right-4 duration-300"
         >
-          <h1 className="mb-6 font-display text-[24px] font-extrabold leading-[1.3] tracking-[-0.02em]">
+          <h1
+            ref={questionHeadingRef}
+            id="assessment-question-heading"
+            tabIndex={-1}
+            className="mb-6 font-display text-[24px] font-extrabold leading-[1.3] tracking-[-0.02em]"
+          >
             {t(`assessment.questions.${question.id}.text`)}
           </h1>
 
-          <div className="flex flex-col gap-3" role="radiogroup">
+          <div className="flex flex-col gap-3" role="radiogroup" aria-labelledby="assessment-question-heading">
             {question.options.map((optionId) => {
               const isSelected = selected === optionId;
               return (
