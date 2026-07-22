@@ -54,6 +54,7 @@ import './idea-update/index';
 import './idea-vote/index';
 import './idea-vote-remove/index';
 import './ideas/index';
+import './invitation-accept/index';
 import './invitation-create/index';
 import './invitation-bulk-create/index';
 import './invitation-update/index';
