@@ -20,22 +20,30 @@ import { internalError } from '../shared/errors';
  * authenticates on email match alone (no secret link). Seat-neutral by
  * construction — see functions/shared/invitation-convert.ts.
  */
+const PENDING_ORG_INVITE_FILTER =
+  `status = 'pending' AND org_id IS NOT NULL AND expires_at > now() AND lower(trim(email)) = $1`;
+
 async function adoptPendingInvites(profileId: string, rawEmail: string, context: InvocationContext): Promise<void> {
   const email = rawEmail.trim().toLowerCase();
   if (!email) return; // never match a blank/absent email claim against invitations
 
   try {
+    // Cheap, non-transactional pre-check first: the overwhelmingly common case
+    // is "no pending invite", and we don't want to check out a connection and
+    // run BEGIN/COMMIT on every login just to find nothing. Only open the
+    // locking transaction when there is actually something to adopt.
+    const pending = await query<{ id: string }>(
+      `SELECT id FROM invitations WHERE ${PENDING_ORG_INVITE_FILTER} LIMIT 1`,
+      [email],
+    );
+    if (pending.length === 0) return;
+
     await withTransaction(async (client) => {
-      // Lock every matching pending, unexpired org invite so a concurrent
-      // accept-link flow for the same invite serializes instead of racing.
+      // Re-select under FOR UPDATE inside the transaction so the conversion
+      // locks each invite against a concurrent accept-link flow and sees fresh
+      // state (an invite may have been accepted between the pre-check and here).
       const { rows } = await client.query<ConvertibleInvitation>(
-        `SELECT id, org_id, role
-           FROM invitations
-          WHERE status = 'pending'
-            AND org_id IS NOT NULL
-            AND expires_at > now()
-            AND lower(trim(email)) = $1
-          FOR UPDATE`,
+        `SELECT id, org_id, role FROM invitations WHERE ${PENDING_ORG_INVITE_FILTER} FOR UPDATE`,
         [email],
       );
       for (const invitation of rows) {

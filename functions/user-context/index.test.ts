@@ -41,24 +41,25 @@ const existingProfile = {
   avatar_url: null,
 };
 
-const sqlCalls = () => mockClientQuery.mock.calls.map((c) => c[0] as string);
 const findClientCall = (substr: string) =>
   mockClientQuery.mock.calls.find((c) => (c[0] as string).includes(substr));
+const invitationsQuery = () =>
+  mockQuery.mock.calls.find((c) => (c[0] as string).includes('FROM invitations'));
 
 describe('user-context', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'entra-oid-123', tid: 'entra-tid-456', email: 'user@contoso.com' });
-    // Default: adoption finds no pending invites; all client writes return no rows.
-    mockClientQuery.mockResolvedValue(rows());
-    // Default: no memberships.
+    // Defaults: pre-check finds no pending invite (query), transaction writes return no rows.
     mockQuery.mockResolvedValue([]);
+    mockClientQuery.mockResolvedValue(rows());
   });
 
   it('returns existing profile and memberships', async () => {
     const memberships = [{ org_id: 'org-1', role: 'member', organization: { name: 'Org One' } }];
     mockQueryOne.mockResolvedValueOnce(existingProfile);
-    mockQuery.mockResolvedValueOnce(memberships);
+    mockQuery.mockResolvedValueOnce([]); // invite pre-check: none
+    mockQuery.mockResolvedValueOnce(memberships); // memberships load
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
@@ -74,6 +75,7 @@ describe('user-context', () => {
     const newProfile = { id: 'new-uuid', full_name: 'user', email: 'user@contoso.com', is_platform_admin: false, avatar_url: null };
     mockQueryOne.mockResolvedValueOnce(null); // no existing profile
     mockQueryOne.mockResolvedValueOnce(newProfile); // INSERT returning
+    mockQuery.mockResolvedValueOnce([]); // invite pre-check: none
     mockQuery.mockResolvedValueOnce([]); // memberships (empty for new user)
 
     const res = await handler(baseReq as any, {} as any);
@@ -103,21 +105,24 @@ describe('user-context', () => {
 
   it('adopts a matching pending org invite: creates an active membership at the invited role and marks the invite accepted', async () => {
     mockQueryOne.mockResolvedValueOnce(existingProfile);
-    // adoption SELECT returns one matching pending org invite
-    mockClientQuery.mockResolvedValueOnce(rows({ id: 'inv-1', org_id: 'org-9', role: 'org_admin' }));
-    // convertInvitation: no existing membership -> INSERT
+    mockQuery.mockResolvedValueOnce([{ id: 'inv-1' }]); // pre-check: a pending invite exists
+    mockClientQuery.mockResolvedValueOnce(rows({ id: 'inv-1', org_id: 'org-9', role: 'org_admin' })); // FOR UPDATE re-select
+    // convertInvitation: no existing membership -> INSERT (default rows())
 
     const res = await handler(baseReq as any, {} as any);
     expect(res.status).toBe(200);
 
-    // The adoption lookup is scoped: pending, org-only, not expired, email-matched, locked.
-    const [selectSql, selectParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
-    expect(selectSql).toContain('FROM invitations');
-    expect(selectSql).toContain("status = 'pending'");
-    expect(selectSql).toContain('org_id IS NOT NULL');
-    expect(selectSql).toContain('expires_at > now()');
+    // The cheap pre-check is scoped (pending, org-only, unexpired), email-matched, and bounded.
+    const [preSql, preParams] = invitationsQuery()!;
+    expect(preSql).toContain("status = 'pending'");
+    expect(preSql).toContain('org_id IS NOT NULL');
+    expect(preSql).toContain('expires_at > now()');
+    expect(preSql).toContain('LIMIT 1');
+    expect(preParams).toEqual(['user@contoso.com']);
+
+    // The in-transaction re-select locks the rows.
+    const [selectSql] = mockClientQuery.mock.calls[0] as [string, unknown[]];
     expect(selectSql).toContain('FOR UPDATE');
-    expect(selectParams).toEqual(['user@contoso.com']);
 
     // convertInvitation ran: active membership at the invited role + invite marked accepted.
     const insertCall = findClientCall('INSERT INTO org_memberships');
@@ -131,6 +136,7 @@ describe('user-context', () => {
 
   it('adopts invites across multiple orgs (one membership per invite)', async () => {
     mockQueryOne.mockResolvedValueOnce(existingProfile);
+    mockQuery.mockResolvedValueOnce([{ id: 'inv-1' }, { id: 'inv-2' }]); // pre-check: invites exist
     mockClientQuery.mockResolvedValueOnce(
       rows({ id: 'inv-1', org_id: 'org-1', role: 'learner' }, { id: 'inv-2', org_id: 'org-2', role: 'learner' }),
     );
@@ -147,10 +153,10 @@ describe('user-context', () => {
     expect(accepts.map((c) => (c[1] as unknown[])[0])).toEqual(['inv-1', 'inv-2']);
   });
 
-  it('no matching invite: a bare account is provisioned with no membership/invite writes', async () => {
+  it('no matching invite: bare account provisioned, and NO transaction is opened (cheap pre-check only)', async () => {
     mockQueryOne.mockResolvedValueOnce(null); // no existing profile
     mockQueryOne.mockResolvedValueOnce({ id: 'bare-uuid', full_name: 'user', email: 'user@contoso.com', is_platform_admin: false, avatar_url: null });
-    // adoption SELECT returns nothing (default rows())
+    // pre-check returns nothing (default [])
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
@@ -158,13 +164,15 @@ describe('user-context', () => {
     expect(res.status).toBe(200);
     expect(body.profile.id).toBe('bare-uuid');
     expect(body.memberships).toHaveLength(0);
+    // The whole point of the optimization: no connection checkout / BEGIN when there's nothing to adopt.
+    expect(mockWithTransaction).not.toHaveBeenCalled();
     expect(findClientCall('INSERT INTO org_memberships')).toBeUndefined();
-    expect(findClientCall(`UPDATE invitations SET status = 'accepted'`)).toBeUndefined();
   });
 
   it('already an active member: idempotent — no duplicate membership, invite still marked accepted', async () => {
     mockQueryOne.mockResolvedValueOnce(existingProfile);
-    mockClientQuery.mockResolvedValueOnce(rows({ id: 'inv-1', org_id: 'org-1', role: 'learner' })); // adoption SELECT
+    mockQuery.mockResolvedValueOnce([{ id: 'inv-1' }]); // pre-check
+    mockClientQuery.mockResolvedValueOnce(rows({ id: 'inv-1', org_id: 'org-1', role: 'learner' })); // re-select
     mockClientQuery.mockResolvedValueOnce(rows({ id: 'm1', status: 'active' })); // existing membership lock
 
     const res = await handler(baseReq as any, {} as any);
@@ -181,25 +189,27 @@ describe('user-context', () => {
 
     await handler(baseReq as any, {} as any);
 
-    const [, selectParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
-    expect(selectParams).toEqual(['user@contoso.com']);
+    const [, preParams] = invitationsQuery()!;
+    expect(preParams).toEqual(['user@contoso.com']);
   });
 
-  it('skips adoption entirely when the login email is blank', async () => {
+  it('skips adoption entirely when the login email is blank (no invite query, no transaction)', async () => {
     mockAuthenticate.mockResolvedValueOnce({ id: 'oid', tid: 'tid', email: '' });
     mockQueryOne.mockResolvedValueOnce(existingProfile);
 
     const res = await handler(baseReq as any, {} as any);
 
     expect(res.status).toBe(200);
+    expect(invitationsQuery()).toBeUndefined(); // never even runs the pre-check
     expect(mockWithTransaction).not.toHaveBeenCalled();
   });
 
   it('a failed adoption never breaks login (still returns profile + memberships; error is logged)', async () => {
     const memberships = [{ org_id: 'org-1', role: 'member', organization: { name: 'Org One' } }];
     mockQueryOne.mockResolvedValueOnce(existingProfile);
+    mockQuery.mockResolvedValueOnce([{ id: 'inv-1' }]); // pre-check finds an invite
     mockWithTransaction.mockRejectedValueOnce(new Error('deadlock detected'));
-    mockQuery.mockResolvedValueOnce(memberships);
+    mockQuery.mockResolvedValueOnce(memberships); // memberships load still happens
     const context = { error: vi.fn() };
 
     const res = await handler(baseReq as any, context as any);
@@ -209,7 +219,5 @@ describe('user-context', () => {
     expect(body.profile.id).toBe('profile-uuid');
     expect(body.memberships).toHaveLength(1);
     expect(context.error).toHaveBeenCalled();
-    // sanity: the failure was in adoption, not the whole request
-    expect(sqlCalls()).toEqual([]); // client.query never ran (withTransaction rejected before invoking cb)
   });
 });
