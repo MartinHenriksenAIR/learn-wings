@@ -1298,3 +1298,20 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Note:** this is an Entra-gated backend endpoint with no local runtime (no local DB/login), so mock-contract tests are the verification path per `.claude/rules/functions.md`. No schema change (the `invitations` table + `invitation_status` enum already supported it); no `functions/index.ts` change (user-context already registered).
 
 **Verify:** functions `npm run build` exit 0 · `npm test` 1894 pass (126 files, 3 skipped; 10 user-context contract tests — TDD red→green, covering single/multi-org adopt, no-invite bare account, platform-admin skip, already-member idempotency, blank-email skip, case-insensitive match, adoption-failure-never-breaks-login, and the pre-check "no transaction when nothing to adopt"). Root `npm run lint` 0 errors · `npm test` 458 pass · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0. Gates re-run green after rebasing/merging trunk (post-#212). Deploy + post-merge smoke announced on PR #217.
+
+---
+
+## 2026-07-22 — #125 Events & Office Hours tab (Helm plan events-office-hours-125)
+
+**Who:** emil as Helm conductor; three-slice serial fleet run (plan `events-office-hours-125`), zero failures, zero interventions. Promote PR #216.
+
+**What shipped:**
+- **Tab enabled** — the "Events & Office Hours" placeholder in `CommunityFeed.tsx` is a real view: `?scope=` gains an `events` value (`CommunityView = CommunityScope | 'events'`; API calls keep the narrow `CommunityScope`), deep link `/community?scope=events` works, and the no-org redirect exempts the events view (it always includes global scope).
+- **Events view** — clean single column (no search/chips/sidebar), upcoming-only (`isFuture || isToday` on `event_date`, same semantics as `UpcomingEvents.tsx`), soonest first, merged global + current-org via new `useCommunityEvents` hook (thin wrapper on `/api/community-posts`; events-category cut + sort stay at the call site per frontend rules; shares the unfiltered feed's cache key).
+- **`EventCard`** — date-forward card (month/day block, primary-filled when today), title, host (`community.hostedBy`), time + location line, prominent **Join** button opening the Zoom/Teams `event_registration_url` in a new tab (`stopPropagation` so it never triggers navigation); card body/keyboard (Enter/Space) opens PostDetail routed by `post.scope`.
+- **New Event affordance** — header button relabels to **New Event** on the events view, gated to platform admins (form scope `global`) and org admins (form scope their org), hidden for learners; opens the existing `PostForm` with the events category preselected (`initialData`); Submit Idea hidden on the view.
+- **Empty state** — `CommunityEmptyState` gains an `events` variant (Calendar icon, en+da keys) with the New Event CTA for admins only.
+- **No backend/schema changes** — the restricted `events` category, event columns, PostForm event fields, and PostDetail event chips all pre-existed.
+- **Known nit deferred:** the tracer's `community.noUpcomingEvents` key is orphaned after slice 3 swapped in the shared empty state.
+
+**Verify (final tip):** per-slice Helm acceptance green ×3 (each slice ships its own proof test: `events-tab.test.tsx`, `EventCard.test.tsx`, `events-tab-admin.test.tsx`) · promotion re-run: root `npm test` 434 pass, 81 files (first run had one flaky `routes-gate.test.ts` failure, unrelated — green in isolation and on the clean re-run) · functions `npm test` 1840 pass (124 files, 3 skipped) · CI green on PR #216 · post-deploy signed-in Playwright smoke announced on the PR.
