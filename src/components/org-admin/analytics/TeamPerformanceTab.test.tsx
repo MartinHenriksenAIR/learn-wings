@@ -109,7 +109,6 @@ describe('TeamPerformanceTab — AI-niveau column', () => {
         userStats={users}
         departments={[]}
         orgId="all"
-        isGlobalView={true}
       />
     );
 

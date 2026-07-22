@@ -349,7 +349,7 @@ export default function OrgAnalytics() {
 
       {activeTab === 'team' &&
         (effectiveOrgId ? (
-          <TeamPerformanceTab userStats={userStats} departments={departments} orgId={effectiveOrgId} isGlobalView={isGlobalView} />
+          <TeamPerformanceTab userStats={userStats} departments={departments} orgId={effectiveOrgId} />
         ) : (
           <div className="py-12 text-center text-muted-foreground">
             Select an organization to view team performance.

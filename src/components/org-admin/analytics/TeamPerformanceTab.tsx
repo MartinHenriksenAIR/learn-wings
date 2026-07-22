@@ -76,8 +76,6 @@ interface TeamPerformanceTabProps {
   userStats: UserStats[];
   departments: string[];
   orgId: string;
-  /** Whether this is the platform-admin all-orgs view (affects column visibility in future). */
-  isGlobalView?: boolean;
 }
 
 const ITEMS_PER_PAGE = 20;
