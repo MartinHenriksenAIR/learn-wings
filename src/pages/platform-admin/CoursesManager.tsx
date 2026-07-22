@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { LevelBadge } from '@/components/ui/level-badge';
+import { LanguageBadge } from '@/components/ui/language-badge';
 import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -72,6 +73,7 @@ export default function CoursesManager() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [level, setLevel] = useState<CourseLevel>('basic');
+  const [language, setLanguage] = useState<'en' | 'da'>('da');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   // Delete state
@@ -137,12 +139,12 @@ export default function CoursesManager() {
 
   // ========== Course CRUD ==========
   const createCourseMutation = useToastMutation({
-    mutationFn: (input: { title: string; description: string; level: CourseLevel; thumbnailUrl: string | null }) =>
+    mutationFn: (input: { title: string; description: string; level: CourseLevel; language: 'en' | 'da'; thumbnailUrl: string | null }) =>
       callApi<{ course: Course }>('/api/course-create', input),
     errorTitle: 'Failed to create course',
     onSuccess: () => {
       toast({ title: t('coursesManager.courseCreated') });
-      setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic'); setThumbnailUrl(null);
+      setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic'); setLanguage('da'); setThumbnailUrl(null);
       // KEEP the refetch here: the new course's thumbnail path needs re-signing.
       queryClient.invalidateQueries({ queryKey: coursesAdminQueryKey });
     },
@@ -152,7 +154,7 @@ export default function CoursesManager() {
   const handleCreate = () => {
     if (!title.trim()) return;
     const thumbnailToPersist = extractLmsAssetPath(thumbnailUrl) ?? thumbnailUrl;
-    createCourseMutation.mutate({ title, description, level, thumbnailUrl: thumbnailToPersist });
+    createCourseMutation.mutate({ title, description, level, language, thumbnailUrl: thumbnailToPersist });
   };
 
   const togglePublishMutation = useToastMutation({
@@ -369,6 +371,16 @@ export default function CoursesManager() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2">
+            <Label>{t('coursesManager.languageLabel')}</Label>
+            <Select value={language} onValueChange={(v) => setLanguage(v as 'en' | 'da')}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="da">{t('languages.da')}</SelectItem>
+                <SelectItem value="en">{t('languages.en')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setCreateOpen(false)}>{t('common.cancel')}</Button>
@@ -492,8 +504,9 @@ export default function CoursesManager() {
                     <span className="truncate text-[13px] font-bold">{course.title}</span>
                   </button>
                   {/* Level */}
-                  <span>
+                  <span className="flex items-center gap-2">
                     <LevelBadge level={course.level} />
+                    <LanguageBadge language={course.language} />
                   </span>
                   {/* Status pill + publish switch */}
                   <span className="flex items-center gap-2">
@@ -661,6 +674,7 @@ export default function CoursesManager() {
                           )}
                           <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{course.title}</span>
                           <LevelBadge level={course.level} />
+                          <LanguageBadge language={course.language} />
                           <span
                             className={cn(
                               'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',

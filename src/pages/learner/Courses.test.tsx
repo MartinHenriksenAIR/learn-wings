@@ -6,7 +6,7 @@ import React from 'react';
 
 // --- mock react-i18next (no i18n provider needed) ---
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({ t: (k: string) => k, i18n: { resolvedLanguage: 'da' } }),
   Trans: ({ i18nKey }: { i18nKey: string }) => <>{i18nKey}</>,
 }));
 
@@ -137,7 +137,10 @@ describe('LearnerCourses — profile-gated loading guard', () => {
     );
 
     await waitFor(() => {
-      expect(callApi).toHaveBeenCalledWith('/api/learner-courses', { orgId: 'org-1' });
+      expect(callApi).toHaveBeenCalledWith('/api/learner-courses', {
+        orgId: 'org-1',
+        language: 'da',
+      });
     });
     await waitFor(() => {
       expect(document.querySelector('.animate-spin')).toBeNull();

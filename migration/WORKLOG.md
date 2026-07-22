@@ -1219,6 +1219,22 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 
 ---
 
+## 2026-07-22 — #191 course language field + language-based visibility (PR #192)
+
+**Who:** martin & Claude. Worktree branch `feat/course-language-field-191`, PR #192. Grilled the design with martin, then subagent-driven implementation (fresh implementer per task, per-task spec+quality review, Opus whole-branch review, one fix wave). Scope grew during grilling from #191's "metadata label only" to include **language-based course visibility**; the newly-identified multilingual-course-identity + analytics aggregation split out to **#213**.
+
+**What shipped.**
+- **Schema/type:** `courses.language text CHECK (language IN ('en','da'))`, nullable (`migration/azure/01-schema.sql`); `Course.language: 'en'|'da'|null`. Seed course set to `'da'`. **Prod DB migrated 2026-07-22** (idempotent `ADD COLUMN` + `UPDATE … SET language='da' WHERE NULL`; **4 rows → `da`**), run by martin from his terminal via a temp single-IP firewall rule **before** the deploy — the two filtered endpoints 500 if the column is absent.
+- **Write APIs:** `course-create` requires + validates `language`; `course-update` allows editing it (`en`/`da` only, not null-clearable).
+- **Admin UI (platform-admin only):** required language Select in the create dialog (default `da`), editable Select in the editor, `LanguageBadge` (globe + muted text, renders nothing for null) in the course list only. Option labels reuse the existing `languages.en`/`languages.da` keys; new field-label keys `coursesManager.languageLabel` / `courseEditor.languageLabel` (en "Language" / da "Sprog").
+- **Language visibility:** learners & org-admins see only courses matching their **resolved UI language** (`i18n.resolvedLanguage`, sent in the request body); platform admins (`courses-admin`) see all. Filtered endpoints: `learner-courses`, `org-course-access`. A learner's **already-enrolled** courses stay visible regardless of language — the language predicate is relaxed via `OR EXISTS(enrollments…)` while the published + org-enabled visibility predicate stays an outer AND (tenant isolation; guarded by a dedicated regression test that locks the parenthesization).
+
+**Key decisions (grilled):** existing (mock) courses backfilled to `da` + strict filtering; editor forces a value on save; filter keys off the client's resolved UI language (NOT the DB `preferred_language`, which defaults to `en` and would empty the catalog for da-UI users); org-admins filtered by their own UI language incl. enrollment.
+
+**Verify (rebased on `origin/main` @<code>f69b43b</code>):** root `npm run lint` 0 errors · `npm test` **427 pass** (79 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0 · functions `npm run build` exit 0 · `npm test` **1852 pass** (124 files, 3 skipped). Not driven against a live Entra/DB (endpoint contract tests + real render tests cover the logic; unauth smoke returns 401 before the DB). Merged via PR #192 → `main`; SWA + functions deploys auto-fire (functions changed). #191 closed; #213 opened (deferred).
+
+---
+
 ## 2026-07-22 — Accept-invitation flow (#175, PR #211)
 
 **Who:** emil, subagent-driven development (fresh implementer per slice, two-stage spec+quality review each, final whole-branch review). Design locked in a prior grilling + prototype session (strict email match, reuse of the post-login-redirect stash, explicit Accept with no peek endpoint, both invite types, idempotent/reactivate existing-member rules).

@@ -48,10 +48,10 @@ INSERT INTO public.org_settings (org_id, features) VALUES
 -- ---------------------------------------------------------------------
 -- Course -> 2 modules -> 4 lessons (video / document / quiz / text)
 -- ---------------------------------------------------------------------
-INSERT INTO public.courses (id, title, description, level, is_published, created_by_user_id) VALUES
+INSERT INTO public.courses (id, title, description, level, language, is_published, created_by_user_id) VALUES
   ('44444444-4444-4444-4444-444444444444', 'AI Fundamentals',
    'An introductory course covering AI basics and responsible use.',
-   'basic', true, '22222222-2222-2222-2222-222222222222');
+   'basic', 'da', true, '22222222-2222-2222-2222-222222222222');
 
 INSERT INTO public.course_modules (id, course_id, title, sort_order) VALUES
   ('51111111-1111-1111-1111-111111111111', '44444444-4444-4444-4444-444444444444', 'Getting Started', 0),

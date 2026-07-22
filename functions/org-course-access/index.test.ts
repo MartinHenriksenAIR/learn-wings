@@ -107,14 +107,42 @@ describe('org-course-access', () => {
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('json_build_object');
+    expect(sql).toContain("'language', c.language");
     expect(sql).toContain('JOIN courses');
     expect(sql).toContain('WHERE oca.org_id = $1');
+    expect(sql).toContain('AND c.language = $2');
     expect(sql).toContain('ORDER BY c.title');
-    expect(params).toEqual(['org-1']);
+    // No language sent — defaults to 'da'
+    expect(params).toEqual(['org-1', 'da']);
     // Admin toggle management — both 'enabled' and 'disabled' rows returned; no access filter
     expect(sql).not.toMatch(/WHERE.*oca\.access/);
     // No SELECT *
     expect(sql).not.toContain('SELECT *');
+  });
+
+  // 5b. language: 'en' in body — param reflects it
+  it('passes language "en" through to the query param', async () => {
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQuery.mockResolvedValueOnce([]);
+
+    const res = await handler(baseReq({ orgId: 'org-1', language: 'en' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('AND c.language = $2');
+    expect(params).toEqual(['org-1', 'en']);
+  });
+
+  // 5c. missing/invalid language — defaults to 'da'
+  it('defaults to "da" when language is missing or invalid', async () => {
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQuery.mockResolvedValueOnce([]);
+
+    const res = await handler(baseReq({ orgId: 'org-1', language: 'fr' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(params).toEqual(['org-1', 'da']);
   });
 
   // 6. Platform admin bypass — isOrgAdmin not called
