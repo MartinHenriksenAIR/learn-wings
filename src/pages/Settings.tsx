@@ -344,7 +344,12 @@ export default function Settings() {
                     {profile.assessment_taken_at && (
                       <span className="text-[12.5px] text-muted-foreground">
                         {t('assessment.settings.lastTaken', {
-                          date: formatDate(new Date(profile.assessment_taken_at), 'd. MMMM yyyy', i18n.language),
+                          date: formatDate(
+                            new Date(profile.assessment_taken_at),
+                            // Danish writes "22. juli 2026", English "22 July 2026" — no dot.
+                            i18n.language?.startsWith('da') ? 'd. MMMM yyyy' : 'd MMMM yyyy',
+                            i18n.language,
+                          ),
                         })}
                       </span>
                     )}

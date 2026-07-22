@@ -150,8 +150,8 @@
     "progress": "Fremgang",
     "level": "Niveau",
     "levels": {
-      "basic": "Basis",
-      "intermediate": "Mellemliggende",
+      "basic": "Begynder",
+      "intermediate": "Øvet",
       "advanced": "Avanceret"
     },
     "status": "Status",
