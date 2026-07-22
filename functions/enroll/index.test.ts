@@ -107,8 +107,9 @@ describe('enroll', () => {
   it('returns 200 with enrollment on success (security: user_id = profile.id from token)', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQueryOne
-      .mockResolvedValueOnce({ ok: true }) // availability
-      .mockResolvedValueOnce({             // INSERT RETURNING
+      .mockResolvedValueOnce({ ok: true })       // availability
+      .mockResolvedValueOnce({ blocked: false }) // sibling-edition check
+      .mockResolvedValueOnce({                   // INSERT RETURNING
         id: 'e-new', org_id: 'org-1', user_id: 'p1', course_id: 'c-1',
         status: 'enrolled', enrolled_at: '2024-01-10T00:00:00Z', completed_at: null,
       });
@@ -120,7 +121,7 @@ describe('enroll', () => {
     expect(body.enrollment).toMatchObject({ id: 'e-new', user_id: 'p1', status: 'enrolled' });
 
     // Assert INSERT SQL shape
-    const [insertSql, insertParams] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    const [insertSql, insertParams] = mockQueryOne.mock.calls[2] as [string, unknown[]];
     expect(insertSql).toContain('ON CONFLICT (org_id, user_id, course_id) DO NOTHING');
     expect(insertSql).toContain('RETURNING');
 
@@ -145,7 +146,8 @@ describe('enroll', () => {
   it('platform admin: skips isActiveMember but still checks course availability', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne
-      .mockResolvedValueOnce({ ok: true }) // availability
+      .mockResolvedValueOnce({ ok: true })       // availability
+      .mockResolvedValueOnce({ blocked: false }) // sibling-edition check
       .mockResolvedValueOnce({
         id: 'e-admin', org_id: 'org-1', user_id: 'p1', course_id: 'c-1',
         status: 'enrolled', enrolled_at: '2024-01-10T00:00:00Z', completed_at: null,
@@ -156,8 +158,8 @@ describe('enroll', () => {
     expect(res.status).toBe(200);
     expect(mockIsActiveMember).not.toHaveBeenCalled();
 
-    // Availability was still checked
-    expect(mockQueryOne).toHaveBeenCalledTimes(2);
+    // Availability + sibling check both queried before the insert
+    expect(mockQueryOne).toHaveBeenCalledTimes(3);
     const [availSql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(availSql).toContain('is_published = TRUE');
   });
@@ -171,5 +173,34 @@ describe('enroll', () => {
 
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+  });
+
+  it('returns 409 when the learner is already enrolled in a sibling edition', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQueryOne
+      .mockResolvedValueOnce({ ok: true })       // availability check
+      .mockResolvedValueOnce({ blocked: true }); // sibling-edition check
+
+    const res = await handler(baseReq({ orgId: 'org-1', courseId: 'c-en' }), {} as any);
+
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Already enrolled in this course in another language',
+    });
+    const siblingSql = mockQueryOne.mock.calls[1][0] as string;
+    expect(siblingSql).toContain('sib.course_group_id = target.course_group_id');
+  });
+
+  it('allows enrolment when no sibling edition is enrolled', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQueryOne
+      .mockResolvedValueOnce({ ok: true })        // availability
+      .mockResolvedValueOnce({ blocked: false })  // sibling check
+      .mockResolvedValueOnce({ id: 'enr-1', org_id: 'org-1', user_id: 'p1', course_id: 'c-en', status: 'enrolled', enrolled_at: 't', completed_at: null }); // insert
+
+    const res = await handler(baseReq({ orgId: 'org-1', courseId: 'c-en' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string).enrollment.id).toBe('enr-1');
   });
 });
