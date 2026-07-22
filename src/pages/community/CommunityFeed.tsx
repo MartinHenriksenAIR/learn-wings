@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -115,6 +115,18 @@ export default function CommunityFeed() {
     },
   });
 
+  // Events view (#125): admin-only creation. Platform admins post events
+  // globally; org admins post to their current org. Learners get no affordance.
+  const isEventsView = view === 'events';
+  const eventsCategoryId = categories.find((c) => c.slug === 'events')?.id;
+  const canCreateEvent = effectiveIsPlatformAdmin || effectiveIsOrgAdmin;
+  const eventScope: CommunityScope = effectiveIsPlatformAdmin ? 'global' : 'org';
+  // Fresh literal each render would re-reset the form; memoize so it's stable.
+  const eventInitialData = useMemo(
+    () => (isEventsView && eventsCategoryId ? { category_id: eventsCategoryId } : undefined),
+    [isEventsView, eventsCategoryId],
+  );
+
   const canPostRestricted = scope === 'global'
     ? effectiveIsPlatformAdmin
     : effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
@@ -161,7 +173,8 @@ export default function CommunityFeed() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
-          {scope === 'org' && (
+          {/* Submit Idea is org-feed only — hidden on the events view. */}
+          {scope === 'org' && !isEventsView && (
             <Button
               variant="outline"
               onClick={() => navigate(routes.community.ideaNew)}
@@ -171,13 +184,26 @@ export default function CommunityFeed() {
               {t('community.submitIdea')}
             </Button>
           )}
-          <Button
-            onClick={() => setShowPostForm(true)}
-            className="h-auto whitespace-nowrap rounded-[11px] px-4 py-2.5 text-[13px] font-bold"
-          >
-            <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
-            {t('community.newPost')}
-          </Button>
+          {/* Events view relabels the create button to New Event and gates it to admins. */}
+          {isEventsView ? (
+            canCreateEvent && (
+              <Button
+                onClick={() => setShowPostForm(true)}
+                className="h-auto whitespace-nowrap rounded-[11px] px-4 py-2.5 text-[13px] font-bold"
+              >
+                <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
+                {t('community.newEvent')}
+              </Button>
+            )
+          ) : (
+            <Button
+              onClick={() => setShowPostForm(true)}
+              className="h-auto whitespace-nowrap rounded-[11px] px-4 py-2.5 text-[13px] font-bold"
+            >
+              <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
+              {t('community.newPost')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -190,7 +216,7 @@ export default function CommunityFeed() {
       />
 
       {view === 'events' ? (
-        <EventsTab />
+        <EventsTab canCreateEvent={canCreateEvent} onNewEvent={() => setShowPostForm(true)} />
       ) : (
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_300px]">
         {/* Main content */}
@@ -374,20 +400,20 @@ export default function CommunityFeed() {
       </div>
       )}
 
-      {/* Post form dialog — not shown on the events view */}
-      {view !== 'events' && (
-        <PostForm
-          open={showPostForm}
-          onOpenChange={setShowPostForm}
-          onSubmit={async (data) => {
-            await createPostMutation.mutateAsync(data);
-          }}
-          categories={categories}
-          scope={scope}
-          orgId={currentOrg?.id}
-          canPostRestricted={canPostRestricted}
-        />
-      )}
+      {/* Post form dialog. On the events view it opens with the events category
+          preselected and posts at the admin's event scope (global vs current org). */}
+      <PostForm
+        open={showPostForm}
+        onOpenChange={setShowPostForm}
+        onSubmit={async (data) => {
+          await createPostMutation.mutateAsync(data);
+        }}
+        categories={categories}
+        scope={isEventsView ? eventScope : scope}
+        orgId={currentOrg?.id}
+        canPostRestricted={isEventsView ? canCreateEvent : canPostRestricted}
+        initialData={eventInitialData}
+      />
     </AppLayout>
   );
 }

@@ -241,6 +241,7 @@
     "subtitleOrg": "Connect with your {{orgName}} team",
     "subtitleGlobal": "Connect with the entire platform community",
     "newPost": "New Post",
+    "newEvent": "New Event",
     "globalCommunity": "Global Community",
     "eventsOfficeHours": "Events & Office Hours",
     "searchPosts": "Search posts...",
@@ -419,6 +420,8 @@
       "commentsDescription": "Be the first to share your thoughts on this post.",
       "resourcesTitle": "No resources yet",
       "resourcesDescription": "Share helpful links, templates, and guides with your team.",
+      "eventsTitle": "No upcoming events",
+      "eventsDescription": "Webinars and office hours will be announced here.",
       "clearFilters": "Clear filters",
       "noMatches": "No items match your current filters."
     },

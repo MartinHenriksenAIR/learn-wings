@@ -1,11 +1,19 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isFuture, isToday } from 'date-fns';
-import { Calendar, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { EventCard } from '@/components/community/EventCard';
+import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { useAuth } from '@/hooks/useAuth';
 import { useCommunityEvents } from '@/hooks/useCommunityEvents';
 import type { CommunityPost } from '@/lib/community-types';
+
+interface EventsTabProps {
+  /** Admins get the New Event CTA on the empty state; learners get the message only. */
+  canCreateEvent?: boolean;
+  /** Opens the events-preselected PostForm — same action as the header New Event button. */
+  onNewEvent?: () => void;
+}
 
 /**
  * The community "Events & Office Hours" tab (#125). A clean single column:
@@ -13,7 +21,7 @@ import type { CommunityPost } from '@/lib/community-types';
  * plus the user's current org, soonest first. Each event renders as a full
  * date-forward EventCard with a click-through to its post detail.
  */
-export function EventsTab() {
+export function EventsTab({ canCreateEvent = false, onNewEvent }: EventsTabProps) {
   const { t } = useTranslation();
   const { currentOrg } = useAuth();
 
@@ -48,10 +56,11 @@ export function EventsTab() {
 
   if (events.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-5 py-12 text-center">
-        <Calendar aria-hidden="true" className="h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">{t('community.noUpcomingEvents')}</p>
-      </div>
+      <CommunityEmptyState
+        variant="events"
+        onAction={canCreateEvent ? onNewEvent : undefined}
+        actionLabel={canCreateEvent ? t('community.newEvent') : undefined}
+      />
     );
   }
 

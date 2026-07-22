@@ -241,6 +241,7 @@
     "subtitleOrg": "Kom i kontakt med dit team i {{orgName}}",
     "subtitleGlobal": "Kom i kontakt med hele platformens fællesskab",
     "newPost": "Nyt opslag",
+    "newEvent": "Nyt arrangement",
     "globalCommunity": "Globalt fællesskab",
     "eventsOfficeHours": "Events og office hours",
     "searchPosts": "Søg i opslag...",
@@ -419,6 +420,8 @@
       "commentsDescription": "Vær den første til at dele dine tanker om dette opslag.",
       "resourcesTitle": "Ingen ressourcer endnu",
       "resourcesDescription": "Del nyttige links, skabeloner og guides med dit team.",
+      "eventsTitle": "Ingen kommende arrangementer",
+      "eventsDescription": "Webinarer og office hours bliver annonceret her.",
       "clearFilters": "Ryd filtre",
       "noMatches": "Ingen elementer matcher dine nuværende filtre."
     },
