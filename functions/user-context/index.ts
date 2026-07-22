@@ -64,18 +64,33 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const user = await authenticate(req);
 
     // First-login provisioning: look up by Entra oid+tid, create profile if absent
-    let profile = await queryOne<{ id: string; full_name: string; first_name: string | null; last_name: string | null; department: string | null; email: string; avatar_url: string | null; is_platform_admin: boolean; preferred_language: string; created_at: string }>(
-      'SELECT id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at FROM profiles WHERE entra_oid = $1 AND entra_tid = $2',
+    let profile = await queryOne<{ id: string; full_name: string; first_name: string | null; last_name: string | null; department: string | null; email: string; avatar_url: string | null; is_platform_admin: boolean; preferred_language: string; created_at: string; assessment_level: string | null; assessment_skipped_at: string | null; assessment_taken_at: string | null }>(
+      `SELECT id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at,
+              assessment_level, assessment_skipped_at,
+              (SELECT max(aa.created_at) FROM assessment_attempts aa WHERE aa.user_id = profiles.id) AS assessment_taken_at
+         FROM profiles WHERE entra_oid = $1 AND entra_tid = $2`,
       [user.id, user.tid]
     );
 
     if (!profile) {
-      // First login from this Entra identity — provision a profile row
-      profile = await queryOne(
+      // First login from this Entra identity — provision a profile row.
+      // assessment_level, assessment_skipped_at, assessment_taken_at are all null for a new profile;
+      // RETURNING * picks up the columns, and the subquery re-select below is not needed because
+      // we do an explicit re-select after INSERT to keep the shape consistent.
+      const inserted = await queryOne<{ id: string }>(
         `INSERT INTO profiles (full_name, email, entra_oid, entra_tid)
          VALUES ($1, $2, $3, $4)
-         RETURNING id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at`,
+         RETURNING id`,
         [user.email.split('@')[0], user.email, user.id, user.tid]
+      );
+      // Re-select with the full shape (including assessment fields and subquery) so both
+      // paths always return an identical response shape.
+      profile = await queryOne(
+        `SELECT id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at,
+                assessment_level, assessment_skipped_at,
+                (SELECT max(aa.created_at) FROM assessment_attempts aa WHERE aa.user_id = profiles.id) AS assessment_taken_at
+           FROM profiles WHERE id = $1`,
+        [inserted!.id]
       );
     }
 
