@@ -1259,3 +1259,22 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Fix:** `allowedLinkDomains()` — the gate now accepts `ai-uddannelse.dk` plus the hostname of every entry in `ALLOWED_ORIGINS` (the same env CORS trusts; already carries the real app origins). Computed per-request for testability. Self-heals at the #115 cutover. Regression tests: SWA-host link accepted when its origin is allowed; foreign domains still 400.
 
 **Verify:** functions `npm run build` exit 0 · `npm test` 1873 pass (125 files, 3 skipped; red-then-green regression test). Post-deploy live probe: the exact previously-failing payload flips 400 → 200.
+
+---
+
+## 2026-07-22 — #118 Opportunity prioritization (Value × Effort) in Idea Management
+
+**Who:** martin, subagent-driven (one implementer + spec/quality review per task, then a whole-branch review). PR #212.
+
+**What shipped:**
+- **Board** — new **In Progress** Kanban column between Backlog and Done in `OrgIdeasManagement.tsx` (`in_progress` split out of Backlog; the status already existed, so frontend-only, no data change).
+- **Prioritize tab** — Board/Prioritize `Tabs`. The Prioritize tab renders a 3×3 **Value × Effort** matrix (Low/Med/High per axis): drag a card into a cell, or open a scoring dialog, to set both scores; an **Unscored tray** holds ideas not yet rated. Matrix/overview population = only `accepted` + `in_progress`. Scoring is **orthogonal to Kanban status** (rating never changes status, and vice versa).
+- **Overview** — quadrant counts (Quick Win / Big Bet / Fill-in / Deprioritize), a ranked **"Do next"** list (value↓ → effort↑ → votes↓), and a **by-business-area** rollup.
+- **Board tags** — rated ideas show their priority band on the Board card (`PriorityBadge`).
+- **Filters scoped to Board** — the header search + business-area filter now affect **only the Board**; the Prioritize tab uses its own unfiltered committed-idea query (shares the Board's cache key when no filter is active) so the matrix + by-area rollup always reflect the whole portfolio. (Post-review fix; the header controls are hidden on the Prioritize tab.)
+- **Backend** — two nullable `smallint` columns `value_score`/`effort_score` (CHECK 1–3) on `ideas` (`migration/azure/01-schema.sql` + idempotent `migration/azure/04-idea-priority-scores.sql`, **run on prod 2026-07-22 before deploy**). New admin-only endpoint `functions/idea-prioritize` (shared `endpoint()` factory, `requireOrgAdmin(idea.org_id)`, writes only the two score columns; reads ride the existing `SELECT i.*`, so no read-endpoint change). Pure framework logic isolated in `src/lib/idea-priority.ts` (`getBand`, `rankIdeas`, `PRIORITIZABLE_STATUSES`).
+- **New components:** `PrioritizationMatrix`, `PriorityOverview`, `IdeaScoreDialog`, `PriorityBadge`. i18n: `ideaManagement.{tabs,levels,bands,prioritize,scoreDialog}.*` en+da (parity verified programmatically).
+- **Field-exposure note:** the two scores ride `SELECT i.*` (same path that already returns `admin_notes` to any active org member); org isolation unchanged; scores are only rendered on the admin Prioritize surface. Deliberate, per the design.
+- **Follow-ups (deferred):** a11y on the scoring dialog (`<label htmlFor>`, placeholder-vs-selected); broader `PriorityOverview` test coverage (band counts + area rollup); drop the unused `ScoreLevel` export; optional endpoint hardening against half-scored writes. To be filed as a follow-up issue.
+
+**Verify:** root `npm run lint` 0 errors · `npm test` 458 pass · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0; functions `npm run build` exit 0 · `npm test` 1887 pass (125 files, 3 skipped) — new tests: idea-prioritize endpoint contract (11), idea-priority band truth-table + ranking, PriorityBadge, PrioritizationMatrix (population/tray/cell), PriorityOverview (ranking), updateIdeaPriority api. Prod migration 04 applied + columns verified (`value_score`, `effort_score` smallint). Deploy + post-merge smoke announced on PR #212.
