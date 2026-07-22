@@ -147,6 +147,7 @@ describe('enrollment-create', () => {
     };
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true }) // course lookup
+      .mockResolvedValueOnce({ blocked: false })     // sibling-edition check
       .mockResolvedValueOnce(inserted);              // INSERT
 
     const res = await handler(baseReq(validBody), {} as any);
@@ -154,9 +155,9 @@ describe('enrollment-create', () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ enrollment: inserted });
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();   // platform-admin bypass
-    expect(mockQueryOne).toHaveBeenCalledTimes(2);   // course lookup + INSERT (no access check)
+    expect(mockQueryOne).toHaveBeenCalledTimes(3);   // course lookup + sibling check + INSERT (no access check)
 
-    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[2] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO enrollments');
     expect(sql).toContain('RETURNING id, org_id, user_id, course_id, status, enrolled_at, completed_at');
     expect(params).toEqual(['org-1', 'user-1', 'course-1', 'enrolled']);
@@ -177,6 +178,7 @@ describe('enrollment-create', () => {
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true }) // course lookup
       .mockResolvedValueOnce({ ok: true })           // org_course_access lookup
+      .mockResolvedValueOnce({ blocked: false })     // sibling-edition check
       .mockResolvedValueOnce(inserted);              // INSERT
 
     const res = await handler(baseReq(validBody), {} as any);
@@ -184,10 +186,29 @@ describe('enrollment-create', () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ enrollment: inserted });
     expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
-    expect(mockQueryOne).toHaveBeenCalledTimes(3);
+    expect(mockQueryOne).toHaveBeenCalledTimes(4);
 
-    const [, insertParams] = mockQueryOne.mock.calls[2] as [string, unknown[]];
+    const [, insertParams] = mockQueryOne.mock.calls[3] as [string, unknown[]];
     expect(insertParams).toEqual(['org-1', 'user-1', 'course-1', 'enrolled']);
+  });
+
+  it('returns 409 when the target user already holds a sibling edition', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQueryOne
+      .mockResolvedValueOnce({ is_published: true }) // course precondition
+      .mockResolvedValueOnce({ ok: true })           // org-access precondition (non-platform-admin)
+      .mockResolvedValueOnce({ blocked: true });     // sibling-edition check
+
+    const res = await handler(
+      baseReq({ orgId: 'org-1', userId: 'u-9', courseId: 'c-en' }),
+      {} as any,
+    );
+
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Already enrolled in this course in another language',
+    });
   });
 
   it('honors explicit status=completed', async () => {
@@ -202,19 +223,21 @@ describe('enrollment-create', () => {
     };
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true })
+      .mockResolvedValueOnce({ blocked: false })     // sibling-edition check
       .mockResolvedValueOnce(inserted);
 
     const res = await handler(baseReq({ ...validBody, status: 'completed' }), {} as any);
 
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ enrollment: inserted });
-    const [, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    const [, params] = mockQueryOne.mock.calls[2] as [string, unknown[]];
     expect(params).toEqual(['org-1', 'user-1', 'course-1', 'completed']);
   });
 
   it('returns 409 on duplicate (org_id, user_id, course_id) unique violation (23505)', async () => {
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true })
+      .mockResolvedValueOnce({ blocked: false })     // sibling-edition check
       .mockRejectedValueOnce(Object.assign(new Error('duplicate key value'), { code: '23505' }));
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(409);
@@ -224,6 +247,7 @@ describe('enrollment-create', () => {
   it('returns 404 on foreign-key violation (23503)', async () => {
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true })
+      .mockResolvedValueOnce({ blocked: false })     // sibling-edition check
       .mockRejectedValueOnce(Object.assign(new Error('insert violates fk'), { code: '23503' }));
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(404);
@@ -233,6 +257,7 @@ describe('enrollment-create', () => {
   it('returns 500 on generic db error', async () => {
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true })
+      .mockResolvedValueOnce({ blocked: false })     // sibling-edition check
       .mockRejectedValueOnce(new Error('connection refused'));
     const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
