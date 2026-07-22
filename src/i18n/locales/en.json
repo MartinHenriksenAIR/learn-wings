@@ -512,6 +512,34 @@
       "rejectionReasonPlaceholder": "Explain why this idea was rejected...",
       "adminNotesLabel": "Admin Notes (internal)",
       "adminNotesPlaceholder": "Notes visible only to admins..."
+    },
+    "tabs": { "board": "Board", "prioritize": "Prioritize" },
+    "levels": { "low": "Low", "medium": "Medium", "high": "High" },
+    "bands": {
+      "quick_win": "Quick Win",
+      "big_bet": "Big Bet",
+      "fill_in": "Fill-in",
+      "deprioritize": "Deprioritize"
+    },
+    "prioritize": {
+      "title": "Prioritize opportunities",
+      "description": "Rate committed ideas by value and effort to decide what to do next.",
+      "axisValue": "Value",
+      "axisEffort": "Effort",
+      "unscored": "Unscored",
+      "unscoredHint": "Drag a card onto the grid, or click it to rate.",
+      "empty": "No committed ideas to prioritize yet. Accept ideas from the Backlog to see them here.",
+      "doNext": "Do next",
+      "byBusinessArea": "By business area",
+      "count_one": "{{count}} idea",
+      "count_other": "{{count}} ideas",
+      "scoreFailed": "Failed to save priority"
+    },
+    "scoreDialog": {
+      "title": "Rate opportunity",
+      "valueLabel": "Value",
+      "effortLabel": "Effort",
+      "clear": "Clear scores"
     }
   },
   "moderation": {

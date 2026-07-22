@@ -512,6 +512,34 @@
       "rejectionReasonPlaceholder": "Forklar, hvorfor denne idé blev afvist...",
       "adminNotesLabel": "Administratornoter (intern)",
       "adminNotesPlaceholder": "Noter, der kun er synlige for administratorer..."
+    },
+    "tabs": { "board": "Tavle", "prioritize": "Prioritér" },
+    "levels": { "low": "Lav", "medium": "Middel", "high": "Høj" },
+    "bands": {
+      "quick_win": "Hurtig gevinst",
+      "big_bet": "Stor satsning",
+      "fill_in": "Udfyldning",
+      "deprioritize": "Nedprioritér"
+    },
+    "prioritize": {
+      "title": "Prioritér muligheder",
+      "description": "Vurder besluttede idéer efter værdi og indsats for at afgøre, hvad der skal gøres først.",
+      "axisValue": "Værdi",
+      "axisEffort": "Indsats",
+      "unscored": "Ikke vurderet",
+      "unscoredHint": "Træk et kort ind i gitteret, eller klik for at vurdere.",
+      "empty": "Ingen besluttede idéer at prioritere endnu. Accepter idéer fra backlog for at se dem her.",
+      "doNext": "Gør nu",
+      "byBusinessArea": "Efter forretningsområde",
+      "count_one": "{{count}} idé",
+      "count_other": "{{count}} idéer",
+      "scoreFailed": "Kunne ikke gemme prioritet"
+    },
+    "scoreDialog": {
+      "title": "Vurder mulighed",
+      "valueLabel": "Værdi",
+      "effortLabel": "Indsats",
+      "clear": "Ryd vurdering"
     }
   },
   "moderation": {
