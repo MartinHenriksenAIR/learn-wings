@@ -74,6 +74,7 @@ export default function CourseEditor() {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editLevel, setEditLevel] = useState<CourseLevel>('basic');
+  const [editLanguage, setEditLanguage] = useState<'en' | 'da'>('da');
   const [editThumbnailUrl, setEditThumbnailUrl] = useState<string | null>(null);
 
   // Module dialog state
@@ -142,6 +143,7 @@ export default function CourseEditor() {
       setEditTitle(course.title);
       setEditDescription(course.description || '');
       setEditLevel(course.level);
+      setEditLanguage(course.language ?? 'da');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course?.id]);
@@ -154,7 +156,7 @@ export default function CourseEditor() {
   }, [signedThumbnailUrl]);
 
   const saveCourseMutation = useToastMutation({
-    mutationFn: (updates: { title: string; description: string; level: CourseLevel; thumbnailUrl: string | null }) =>
+    mutationFn: (updates: { title: string; description: string; level: CourseLevel; language: 'en' | 'da'; thumbnailUrl: string | null }) =>
       callApi<{ course: Course }>('/api/course-update', { courseId, updates }),
     errorTitle: 'Failed to save course',
     onSuccess: () => {
@@ -173,6 +175,7 @@ export default function CourseEditor() {
       title: editTitle,
       description: editDescription,
       level: editLevel,
+      language: editLanguage,
       thumbnailUrl: thumbnailToPersist,
     });
   };
@@ -494,6 +497,16 @@ export default function CourseEditor() {
                     <SelectItem value="basic">{t('courses.levels.basic')}</SelectItem>
                     <SelectItem value="intermediate">{t('courses.levels.intermediate')}</SelectItem>
                     <SelectItem value="advanced">{t('courses.levels.advanced')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('courseEditor.languageLabel')}</Label>
+                <Select value={editLanguage} onValueChange={(v) => setEditLanguage(v as 'en' | 'da')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="da">{t('languages.da')}</SelectItem>
+                    <SelectItem value="en">{t('languages.en')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
