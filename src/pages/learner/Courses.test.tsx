@@ -299,4 +299,32 @@ describe('LearnerCourses — recommended section', () => {
     await screen.findByText('Basic AI Course');
     expect(screen.queryByTestId('recommended-section')).toBeNull();
   });
+
+  it('shows both the chip and the enrolled badge on a recommended card for an enrolled course', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [basicCourse, advancedCourse],
+      enrollments: [{ id: 'e-1', course_id: 'c-basic', status: 'enrolled' }],
+    });
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: 'basic' },
+    });
+
+    renderCourses();
+
+    // Wait for the recommended section to appear
+    expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
+
+    // The recommended-chip must be present
+    expect(screen.getByTestId('recommended-chip')).toBeInTheDocument();
+
+    // The enrolled status badge must appear on the recommended card (co-existing with the chip).
+    // The basic course also appears in the full catalog grid below, so there are two badges in total.
+    const enrolledBadges = screen.getAllByTestId('status-badge-enrolled');
+    expect(enrolledBadges.length).toBeGreaterThanOrEqual(1);
+
+    // The badge on the recommended card must sit at left-3 (pushed left to make room for the chip).
+    expect(enrolledBadges[0]).toHaveClass('left-3');
+  });
 });

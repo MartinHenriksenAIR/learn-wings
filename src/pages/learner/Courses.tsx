@@ -193,13 +193,19 @@ export default function LearnerCourses() {
               {t('assessment.recommendations.chip')}
             </span>
           )}
-          {!showChip && isCompleted ? (
-            <span className="absolute right-3 top-3 inline-flex items-center gap-[5px] rounded-[7px] bg-success px-[11px] py-[5px] text-[11px] font-bold text-success-foreground">
+          {isCompleted ? (
+            <span
+              data-testid="status-badge-completed"
+              className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 inline-flex items-center gap-[5px] rounded-[7px] bg-success px-[11px] py-[5px] text-[11px] font-bold text-success-foreground`}
+            >
               <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
               {t('dashboard.completed')}
             </span>
-          ) : !showChip && enrollment ? (
-            <span className="absolute right-3 top-3 inline-flex items-center rounded-[7px] bg-[rgba(13,21,60,0.45)] px-[11px] py-[5px] text-[11px] font-bold text-white">
+          ) : enrollment ? (
+            <span
+              data-testid="status-badge-enrolled"
+              className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 inline-flex items-center rounded-[7px] bg-[rgba(13,21,60,0.45)] px-[11px] py-[5px] text-[11px] font-bold text-white`}
+            >
               {t('common.enrolled')}
             </span>
           ) : null}
