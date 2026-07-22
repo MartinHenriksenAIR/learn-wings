@@ -21,7 +21,7 @@ export interface AssessmentQuestionsData {
  */
 export function useAssessmentQuestions() {
   return useQuery({
-    queryKey: queryKeys.assessment.questions(),
+    queryKey: queryKeys.assessment.questions,
     queryFn: async () => {
       const data = await callApi<AssessmentQuestionsData>('/api/assessment-questions', {});
       return {
