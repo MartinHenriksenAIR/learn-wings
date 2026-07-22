@@ -35,6 +35,7 @@ import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCi
 import { toast } from '@/components/ui/sonner';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useToastMutation } from '@/hooks/useToastMutation';
+import { useCoursesAdmin } from '@/hooks/useCoursesAdmin';
 import { cn } from '@/lib/utils';
 import { coursesAdminQueryKey } from './CoursesManager';
 
@@ -386,22 +387,12 @@ export default function CourseEditor() {
   };
 
   // ── Language editions (#213) ───────────────────────────────────────────────
-  // Candidate source is the shared admin course list — the same cache
-  // CoursesManager populates. Gated on `course` so we don't fetch before the
-  // editor has loaded (the section only renders once the course exists).
-  // CoursesManager writes { courses, accessRecords } under this key while our
-  // queryFn writes just the array, so read defensively — either shape yields a
-  // course list.
-  const coursesAdminQuery = useQuery({
-    queryKey: queryKeys.coursesAdmin.all,
-    queryFn: async () => (await callApi<{ courses: Course[] }>('/api/courses-admin', {})).courses,
-    enabled: !!course,
-    staleTime: 60 * 1000,
-  });
-  const coursesAdminData = coursesAdminQuery.data as Course[] | { courses?: Course[] } | undefined;
-  const allCourses: Course[] = Array.isArray(coursesAdminData)
-    ? coursesAdminData
-    : coursesAdminData?.courses ?? [];
+  // Candidate source is the shared admin course list — the same ['courses-admin']
+  // cache CoursesManager populates, read through the shared hook so both sites
+  // see one { courses, accessRecords } shape. Gated on `course` so we don't fetch
+  // before the editor has loaded (the section only renders once the course exists).
+  const { data: coursesData } = useCoursesAdmin({ enabled: !!course, staleTime: 60 * 1000 });
+  const allCourses = coursesData?.courses ?? [];
   const thisCourse = allCourses.find((c) => c.id === courseId);
   const siblings = thisCourse?.course_group_id
     ? allCourses.filter((c) => c.id !== courseId && c.course_group_id === thisCourse.course_group_id)
