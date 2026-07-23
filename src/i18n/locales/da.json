@@ -185,7 +185,8 @@
     "lessonTypes": {
       "video": "Video",
       "document": "Dokument",
-      "quiz": "Quiz"
+      "quiz": "Quiz",
+      "exercise": "Øvelse"
     },
     "rateThisCourse": "Bedøm dette kursus",
     "editYourReview": "Rediger din anmeldelse",

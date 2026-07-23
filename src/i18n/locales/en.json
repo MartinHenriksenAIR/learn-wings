@@ -185,7 +185,8 @@
     "lessonTypes": {
       "video": "Video",
       "document": "Document",
-      "quiz": "Quiz"
+      "quiz": "Quiz",
+      "exercise": "Exercise"
     },
     "rateThisCourse": "Rate this course",
     "editYourReview": "Edit your review",

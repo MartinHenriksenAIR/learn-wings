@@ -39,6 +39,16 @@ vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => mockUsePlatformSettings(),
 }));
 
+// useExerciseByLesson → static bucket_sort exercise (only rendered when the
+// current lesson is of type 'exercise', so it's inert for the other tests).
+vi.mock('@/hooks/useExerciseByLesson', () => ({
+  useExerciseByLesson: () => ({ data: { exercise: {
+    id: 'ex1', lesson_id: 'l-ex', exercise_kind: 'bucket_sort',
+    config: { version: 1, buckets: [{ id: 'b1', label: 'Draft' }, { id: 'b2', label: 'Human' }],
+      items: [{ id: 'i1', text: 'Brainstorm', bucketId: 'b1' }] },
+  } } }),
+}));
+
 import CoursePlayer from './CoursePlayer';
 
 const baseAuth = {
@@ -328,5 +338,51 @@ describe('CoursePlayer — completion semantics (#18)', () => {
       }));
     });
     expect(screen.queryByText(/congratulations/i)).toBeNull();
+  });
+});
+
+describe('CoursePlayer — exercise rendering (#227)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(baseAuth);
+    mockUsePlatformSettings.mockReturnValue({
+      features: {
+        certificates_enabled: false,
+        quizzes_enabled: true,
+        analytics_enabled: true,
+        course_reviews_enabled: false,
+        community_enabled: true,
+        exercises_enabled: true,
+      },
+    });
+  });
+
+  it('renders the ExercisePlayer for an exercise lesson and gives it no manual complete button', async () => {
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') {
+        return {
+          course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+          modules: [{
+            id: 'm-1', title: 'Module 1', sort_order: 0,
+            lessons: [{
+              id: 'l-ex', title: 'Sort the tasks', lesson_type: 'exercise',
+              module_id: 'm-1', sort_order: 0,
+            }],
+          }],
+          progressMap: {},
+          review: null,
+        };
+      }
+      if (url === '/api/quiz-by-lesson') return { quiz: null, questions: [] };
+      return {};
+    });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    // The bucket_sort exercise surfaces its bucket labels — proof the player rendered.
+    expect(await screen.findByText('Draft')).toBeInTheDocument();
+    expect(screen.getByText('Human')).toBeInTheDocument();
+    // Correctness-gated (ADR-0017): no manual "Mark complete" footer override for exercises.
+    expect(screen.queryByRole('button', { name: /markAsComplete/i })).toBeNull();
   });
 });
