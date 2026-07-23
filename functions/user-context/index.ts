@@ -7,6 +7,13 @@ import type { ConvertibleInvitation } from '../shared/invitation-convert';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 
+// Shared projection used by both the lookup SELECT and the post-insert re-select.
+// The scalar subquery for assessment_taken_at cannot be expressed in a RETURNING clause,
+// so both branches use a full SELECT to guarantee an identical response shape.
+const PROFILE_SELECT = `id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at,
+              assessment_level, assessment_skipped_at,
+              (SELECT max(aa.created_at) FROM assessment_attempts aa WHERE aa.user_id = profiles.id) AS assessment_taken_at`;
+
 /**
  * Auto-adopt any pending organization invitations addressed to the caller's
  * Entra email, at login (#176). Runs on EVERY user-context call — not just
@@ -64,18 +71,28 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const user = await authenticate(req);
 
     // First-login provisioning: look up by Entra oid+tid, create profile if absent
-    let profile = await queryOne<{ id: string; full_name: string; first_name: string | null; last_name: string | null; department: string | null; email: string; avatar_url: string | null; is_platform_admin: boolean; preferred_language: string; created_at: string }>(
-      'SELECT id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at FROM profiles WHERE entra_oid = $1 AND entra_tid = $2',
+    let profile = await queryOne<{ id: string; full_name: string; first_name: string | null; last_name: string | null; department: string | null; email: string; avatar_url: string | null; is_platform_admin: boolean; preferred_language: string; created_at: string; assessment_level: string | null; assessment_skipped_at: string | null; assessment_taken_at: string | null }>(
+      `SELECT ${PROFILE_SELECT}
+         FROM profiles WHERE entra_oid = $1 AND entra_tid = $2`,
       [user.id, user.tid]
     );
 
     if (!profile) {
-      // First login from this Entra identity — provision a profile row
-      profile = await queryOne(
+      // First login from this Entra identity — provision a profile row.
+      // We INSERT then re-select using PROFILE_SELECT: RETURNING cannot express the
+      // assessment_taken_at scalar subquery, so a re-select is the only way to return
+      // a shape identical to the lookup branch. assessment_* are all null for a new profile.
+      const inserted = await queryOne<{ id: string }>(
         `INSERT INTO profiles (full_name, email, entra_oid, entra_tid)
          VALUES ($1, $2, $3, $4)
-         RETURNING id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at`,
+         RETURNING id`,
         [user.email.split('@')[0], user.email, user.id, user.tid]
+      );
+      // Re-select with the full projection so both branches always return an identical shape.
+      profile = await queryOne(
+        `SELECT ${PROFILE_SELECT}
+           FROM profiles WHERE id = $1`,
+        [inserted!.id]
       );
     }
 

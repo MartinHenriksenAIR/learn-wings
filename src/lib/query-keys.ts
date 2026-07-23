@@ -329,6 +329,15 @@ export const queryKeys = {
     detail: (orgId: string | undefined) => ['learner-dashboard', orgId] as const,
   },
 
+  // ── Assessment (issue #117) ────────────────────────────────────────────────
+  assessment: {
+    /**
+     * Full key: ['assessment-questions']
+     * Used by useAssessmentQuestions. No params; fixed content with a long staleTime.
+     */
+    questions: ['assessment-questions'] as const,
+  },
+
   // ── Seat requests (issue #127) ─────────────────────────────────────────────
   seatPricing: {
     /** ['seat-pricing'] — the single platform-wide price (read-only for org admins). */

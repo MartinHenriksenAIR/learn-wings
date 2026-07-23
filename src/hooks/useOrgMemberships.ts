@@ -44,6 +44,9 @@ function reshapeMembership(row: MembershipRow): MemberWithProfile {
       is_platform_admin: false,
       created_at: row.created_at,
       preferred_language: null,
+      assessment_level: null,
+      assessment_skipped_at: null,
+      assessment_taken_at: null,
     },
   };
 }

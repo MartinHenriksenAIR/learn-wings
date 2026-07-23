@@ -39,6 +39,9 @@ const existingProfile = {
   email: 'user@contoso.com',
   is_platform_admin: false,
   avatar_url: null,
+  assessment_level: 'intermediate',
+  assessment_skipped_at: null,
+  assessment_taken_at: '2026-07-01T10:00:00.000Z',
 };
 
 const findClientCall = (substr: string) =>
@@ -66,23 +69,37 @@ describe('user-context', () => {
 
     expect(body.profile.id).toBe('profile-uuid');
     expect(body.memberships).toHaveLength(1);
+    // New assessment fields are present
+    expect(body.profile.assessment_level).toBe('intermediate');
+    expect(body.profile.assessment_skipped_at).toBeNull();
+    expect(body.profile.assessment_taken_at).toBe('2026-07-01T10:00:00.000Z');
     // Should NOT have called INSERT (profile already existed)
     const insertCall = mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT'));
     expect(insertCall).toBeUndefined();
   });
 
   it('provisions a new profile on first login', async () => {
-    const newProfile = { id: 'new-uuid', full_name: 'user', email: 'user@contoso.com', is_platform_admin: false, avatar_url: null };
-    mockQueryOne.mockResolvedValueOnce(null); // no existing profile
-    mockQueryOne.mockResolvedValueOnce(newProfile); // INSERT returning
-    mockQuery.mockResolvedValueOnce([]); // invite pre-check: none
-    mockQuery.mockResolvedValueOnce([]); // memberships (empty for new user)
+    const insertedId = { id: 'new-uuid' };
+    const newProfile = {
+      id: 'new-uuid', full_name: 'user', email: 'user@contoso.com',
+      is_platform_admin: false, avatar_url: null,
+      assessment_level: null, assessment_skipped_at: null, assessment_taken_at: null,
+    };
+    mockQueryOne.mockResolvedValueOnce(null);        // no existing profile
+    mockQueryOne.mockResolvedValueOnce(insertedId);  // INSERT RETURNING id
+    mockQueryOne.mockResolvedValueOnce(newProfile);  // re-select with full shape
+    mockQuery.mockResolvedValueOnce([]);             // invite pre-check: none
+    mockQuery.mockResolvedValueOnce([]);             // memberships (empty for new user)
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
 
     expect(body.profile.id).toBe('new-uuid');
     expect(body.memberships).toHaveLength(0);
+    // Assessment fields present on provisioned profile (all null for a new user)
+    expect(body.profile.assessment_level).toBeNull();
+    expect(body.profile.assessment_skipped_at).toBeNull();
+    expect(body.profile.assessment_taken_at).toBeNull();
     // Verify INSERT was called with Entra oid and tid
     const insertCall = mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT'));
     expect(insertCall).toBeDefined();
@@ -155,7 +172,12 @@ describe('user-context', () => {
 
   it('no matching invite: bare account provisioned, and NO transaction is opened (cheap pre-check only)', async () => {
     mockQueryOne.mockResolvedValueOnce(null); // no existing profile
-    mockQueryOne.mockResolvedValueOnce({ id: 'bare-uuid', full_name: 'user', email: 'user@contoso.com', is_platform_admin: false, avatar_url: null });
+    mockQueryOne.mockResolvedValueOnce({ id: 'bare-uuid' }); // INSERT RETURNING id
+    mockQueryOne.mockResolvedValueOnce({
+      id: 'bare-uuid', full_name: 'user', email: 'user@contoso.com',
+      is_platform_admin: false, avatar_url: null,
+      assessment_level: null, assessment_skipped_at: null, assessment_taken_at: null,
+    }); // re-select with full shape
     // pre-check returns nothing (default [])
 
     const res = await handler(baseReq as any, {} as any);

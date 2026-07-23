@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTranslation } from 'react-i18next';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -27,6 +28,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Search, ArrowUp, ArrowDown, ChevronRight, Download, Users } from 'lucide-react';
 import { UserProgressDialog } from '@/components/org-admin/UserProgressDialog';
 import { getAvatarColor, getInitials } from '@/lib/utils';
+import { LevelBadge, type CourseLevel } from '@/components/ui/level-badge';
 
 // Avg-quiz-score color thresholds (port of the prototype: green ≥80, amber ≥50,
 // red >0, muted for ungraded).
@@ -53,13 +55,21 @@ function NameCell({ name }: { name: string }) {
   );
 }
 
-interface UserStats {
+// Numeric order for AI level — used for sorting. null sorts last.
+const LEVEL_ORDER: Record<CourseLevel, number> = { basic: 0, intermediate: 1, advanced: 2 };
+function levelSortValue(level: CourseLevel | null | undefined): number {
+  if (level == null) return 3; // null last
+  return LEVEL_ORDER[level] ?? 3;
+}
+
+export interface UserStats {
   id: string;
   name: string;
   department: string | null;
   enrollments: number;
   completed: number;
   avgQuizScore: number;
+  assessment_level?: CourseLevel | null;
 }
 
 interface TeamPerformanceTabProps {
@@ -71,9 +81,10 @@ interface TeamPerformanceTabProps {
 const ITEMS_PER_PAGE = 20;
 
 export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerformanceTabProps) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'completed' | 'score'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'completed' | 'score' | 'level'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
   const [currentPage, setCurrentPage] = useState(1);
@@ -101,6 +112,9 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
             break;
           case 'score':
             comparison = b.avgQuizScore - a.avgQuizScore;
+            break;
+          case 'level':
+            comparison = levelSortValue(a.assessment_level) - levelSortValue(b.assessment_level);
             break;
           case 'name':
           default:
@@ -131,15 +145,16 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
 
   // Export to CSV
   const handleExportCSV = () => {
-    const headers = ['Name', 'Department', 'Courses Enrolled', 'Courses Completed', 'Avg Quiz Score'];
+    const headers = ['Name', 'Department', t('assessment.analytics.aiLevel'), 'Courses Enrolled', 'Courses Completed', 'Avg Quiz Score'];
     const rows = filteredUserStats.map((user) => [
       user.name,
       user.department || 'Unassigned',
+      user.assessment_level ?? '',
       user.enrollments.toString(),
       user.completed.toString(),
       `${user.avgQuizScore}%`,
     ]);
-    
+
     const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -149,6 +164,13 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const AiLevelCell = ({ level }: { level: CourseLevel | null | undefined }) =>
+    level ? (
+      <LevelBadge level={level} />
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    );
 
   const UserRow = ({ user }: { user: UserStats }) => (
     <TableRow
@@ -163,6 +185,9 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
       </TableCell>
       <TableCell className="text-muted-foreground text-sm">
         {user.department || <span className="italic">Unassigned</span>}
+      </TableCell>
+      <TableCell>
+        <AiLevelCell level={user.assessment_level} />
       </TableCell>
       <TableCell className="text-right">{user.enrollments}</TableCell>
       <TableCell className="text-right">{user.completed}</TableCell>
@@ -212,7 +237,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
             </Select>
 
             {/* Sort */}
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'name' | 'completed' | 'score')}>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'name' | 'completed' | 'score' | 'level')}>
               <SelectTrigger className="w-32">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
@@ -220,6 +245,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
                 <SelectItem value="name">Name</SelectItem>
                 <SelectItem value="completed">Progress</SelectItem>
                 <SelectItem value="score">Activity</SelectItem>
+                <SelectItem value="level">{t('assessment.analytics.aiLevel')}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -286,6 +312,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>{t('assessment.analytics.aiLevel')}</TableHead>
                       <TableHead className="text-right">Courses</TableHead>
                       <TableHead className="text-right">Completed</TableHead>
                       <TableHead className="text-right">Avg Score</TableHead>
@@ -304,6 +331,9 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
                       >
                         <TableCell>
                           <NameCell name={user.name} />
+                        </TableCell>
+                        <TableCell>
+                          <AiLevelCell level={user.assessment_level} />
                         </TableCell>
                         <TableCell className="text-right">{user.enrollments}</TableCell>
                         <TableCell className="text-right">{user.completed}</TableCell>
@@ -329,6 +359,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Department</TableHead>
+                <TableHead>{t('assessment.analytics.aiLevel')}</TableHead>
                 <TableHead className="text-right">Courses</TableHead>
                 <TableHead className="text-right">Completed</TableHead>
                 <TableHead className="text-right">Avg Score</TableHead>

@@ -150,8 +150,8 @@
     "progress": "Fremgang",
     "level": "Niveau",
     "levels": {
-      "basic": "Basis",
-      "intermediate": "Mellemliggende",
+      "basic": "Begynder",
+      "intermediate": "Øvet",
       "advanced": "Avanceret"
     },
     "status": "Status",
@@ -1030,6 +1030,130 @@
     "courseNotFound": "Kursus ikke fundet",
     "failedToLoad": "Kunne ikke indlæse kursus",
     "retry": "Prøv igen"
+  },
+  "assessment": {
+    "skip": "Spring over indtil videre",
+    "back": "Tilbage",
+    "next": "Næste",
+    "seeResult": "Se dit resultat",
+    "questionOf": "Spørgsmål {{current}} af {{total}}",
+    "timeEstimate": "~2 min",
+    "questions": {
+      "usage-frequency": {
+        "text": "Hvor ofte bruger du AI-værktøjer som ChatGPT i dit arbejde?",
+        "options": {
+          "never": "Aldrig – jeg er ikke rigtig kommet i gang endnu",
+          "tried-a-few-times": "Jeg har prøvet det et par gange",
+          "weekly": "Ugentligt",
+          "daily": "Dagligt eller næsten dagligt"
+        }
+      },
+      "task-breadth": {
+        "text": "Hvad har du brugt AI til i dine arbejdsopgaver?",
+        "options": {
+          "nothing-yet": "Ikke noget endnu",
+          "one-task-type": "Én type opgave – fx et udkast til en mail eller et resumé",
+          "a-few-task-types": "Et par forskellige typer opgaver",
+          "many-task-types": "Mange forskellige opgaver – det er en del af, hvordan jeg løser det meste"
+        }
+      },
+      "tool-range": {
+        "text": "Hvor mange forskellige AI-værktøjer har du prøvet?",
+        "options": {
+          "none": "Ingen endnu",
+          "one": "Ét – fx ChatGPT",
+          "two-to-three": "To eller tre – fx også Copilot eller Gemini",
+          "four-plus": "Fire eller flere – også mere specialiserede værktøjer"
+        }
+      },
+      "iteration-behavior": {
+        "text": "Hvad gør du typisk, når AI'ens svar ikke helt rammer det, du havde brug for?",
+        "options": {
+          "not-there-yet": "Så langt er jeg ikke nået endnu",
+          "accept-or-do-myself": "Jeg bruger som regel svaret, som det er – eller løser bare opgaven selv",
+          "rephrase-and-retry": "Jeg omformulerer mit spørgsmål og prøver igen",
+          "iterate-with-context": "Jeg følger op med rettelser, eksempler og mere kontekst, indtil resultatet sidder lige i skabet"
+        }
+      },
+      "workflow-integration": {
+        "text": "Hvor stor en del af din arbejdsdag er AI?",
+        "options": {
+          "not-part-of-day": "Det er ikke en del af min arbejdsdag",
+          "now-and-then": "Jeg bruger det af og til, når jeg lige kommer i tanke om det",
+          "fixed-part-of-tasks": "Det er en fast del af bestemte opgaver",
+          "woven-into-most": "Det er vævet ind i det meste af mit arbejde"
+        }
+      },
+      "self-sufficiency": {
+        "text": "Hvor tryg er du ved at bruge AI til en ny type opgave?",
+        "options": {
+          "no-idea-where-to-start": "Jeg ville ikke vide, hvor jeg skulle starte",
+          "need-help-or-guide": "Jeg ville have brug for hjælp eller en guide",
+          "figure-it-out-myself": "Jeg finder som regel selv ud af det",
+          "colleagues-ask-me": "Meget tryg – kolleger spørger ofte mig til råds"
+        }
+      },
+      "advanced-features": {
+        "text": "Har du prøvet nogle af de mere avancerede muligheder – fx at uploade dokumenter, bygge egne GPT'er eller sætte automatiseringer op?",
+        "options": {
+          "plain-chat-only": "Nej – jeg bruger mest almindelig chat, eller har ikke brugt AI endnu",
+          "tried-a-couple": "Jeg har prøvet et par stykker – fx at uploade et dokument, som AI'en skulle arbejde med",
+          "use-some-regularly": "Jeg bruger nogle af dem jævnligt",
+          "build-my-own": "Jeg bygger selv – egne GPT'er, automatiseringer eller AI koblet sammen med andre værktøjer"
+        }
+      }
+    },
+    "result": {
+      "eyebrow": "DIN AI-VURDERING",
+      "scoreOf": "{{score}} af {{max}} point",
+      "startHere": "Start her – udvalgt til dit niveau",
+      "goToDashboard": "Gå til dit dashboard",
+      "startCourse": "Start kursus",
+      "personas": {
+        "basic": "Udforsker",
+        "intermediate": "Hverdagsbruger",
+        "advanced": "Superbruger"
+      },
+      "blurbs": {
+        "basic": "Du er i starten af din AI-rejse – og det er et rigtig godt sted at stå. Vi anbefaler kurser, der bygger et solidt fundament helt fra bunden – helt uden forudsætninger.",
+        "intermediate": "Du bruger allerede AI og har styr på det grundlæggende. Vi anbefaler kurser, der hjælper dig med at arbejde smartere – skarpere prompts, flere anvendelser og AI som en naturlig del af din hverdag.",
+        "advanced": "AI er allerede en fast del af din måde at arbejde på. Vi anbefaler avancerede kurser om automatiseringer, egne GPT'er, og hvordan du får mest muligt ud af de nyeste værktøjer."
+      }
+    },
+    "banner": {
+      "title": "Hvor er du på din AI-rejse?",
+      "body": "Tag den korte vurdering (2 min.), så anbefaler vi kurser, der passer til dit niveau.",
+      "cta": "Tag vurderingen · 2 min"
+    },
+    "recommendations": {
+      "forYou": "Anbefalet til dig",
+      "chip": "Anbefalet",
+      "allCourses": "Alle kurser"
+    },
+    "settings": {
+      "title": "AI-vurdering",
+      "lastTaken": "Senest taget {{date}}",
+      "notTaken": "Ikke taget endnu",
+      "retake": "Tag vurderingen igen",
+      "take": "Tag vurderingen",
+      "privacyNote": "Din vurdering bruges kun til at anbefale kurser. Kun dit niveau er synligt for administratorer – aldrig dine svar."
+    },
+    "analytics": {
+      "distributionTitle": "AI-niveau i organisationen",
+      "distributionTitleAll": "AI-niveau på tværs af organisationer",
+      "distributionSubtitle": "Baseret på onboarding-vurderingen",
+      "notAssessed": "Ikke vurderet",
+      "aiLevel": "AI-niveau",
+      "noLearnerData": "Ingen data endnu"
+    },
+    "toasts": {
+      "saved": "Vurdering gemt – dit niveau er opdateret",
+      "skipped": "Sprunget over – du kan tage vurderingen fra dit dashboard"
+    },
+    "error": {
+      "title": "Noget gik galt under indlæsning af vurderingen",
+      "retry": "Prøv igen"
+    }
   },
   "invitationAccept": {
     "invitedTitle": "Du er inviteret",

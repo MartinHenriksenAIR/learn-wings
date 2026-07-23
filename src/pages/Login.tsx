@@ -15,14 +15,18 @@ export const AUTH_CARD_CLASSES =
   'flex w-full max-w-[380px] flex-col items-center gap-5 rounded-[20px] border border-border bg-card px-10 py-11 shadow-[0_24px_60px_rgba(16,41,143,0.10)]';
 
 export default function Login() {
-  const { signIn, user, isPlatformAdmin, isOrgAdmin, isLoading } = useAuth();
+  const { signIn, user, profile, isPlatformAdmin, isOrgAdmin, isLoading } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
 
   useEffect(() => {
+    // `isLoading` covers the user-context fetch (useAuth), so once it clears
+    // `profile` is resolved — guard on it too so a plain learner isn't routed
+    // to the dashboard before the assessment predicate can be evaluated.
     if (!isLoading && user) {
       // A guard stashed the originally requested URL before sending us here —
-      // restore it; otherwise fall back to the role home (#16).
+      // restore it; otherwise fall back to the role home (#16). A deep-linked
+      // login always keeps precedence and skips the assessment prompt.
       const redirect = consumePostLoginRedirect();
       if (redirect) {
         navigate(redirect, { replace: true });
@@ -30,11 +34,15 @@ export default function Login() {
         navigate(routes.platformAdmin.organizations);
       } else if (isOrgAdmin) {
         navigate(routes.orgAdmin.root);
+      } else if (profile && !profile.assessment_level && !profile.assessment_skipped_at) {
+        // Plain learner who has neither taken nor explicitly skipped the
+        // onboarding assessment: prompt them for it (#117).
+        navigate(routes.learner.assessment, { replace: true });
       } else {
         navigate(routes.learner.dashboard);
       }
     }
-  }, [user, isPlatformAdmin, isOrgAdmin, isLoading, navigate]);
+  }, [user, profile, isPlatformAdmin, isOrgAdmin, isLoading, navigate]);
 
   if (isLoading) {
     return (

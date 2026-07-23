@@ -20,6 +20,9 @@ export interface Profile {
   is_platform_admin: boolean;
   created_at: string;
   preferred_language: string | null;
+  assessment_level: CourseLevel | null;
+  assessment_skipped_at: string | null;
+  assessment_taken_at: string | null;
 }
 
 export interface Organization {

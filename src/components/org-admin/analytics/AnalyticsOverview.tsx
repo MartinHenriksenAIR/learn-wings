@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProgressRing } from '@/components/ui/progress-ring';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, TrendingUp, Loader2, FileText } from 'lucide-react';
+import { LEVEL_STYLES, type CourseLevel } from '@/components/ui/level-badge';
+import type { OrgAnalyticsMember } from '@/hooks/useOrgAnalyticsData';
 
 interface AnalyticsOverviewProps {
   stats: {
@@ -13,6 +16,8 @@ interface AnalyticsOverviewProps {
     avgQuizScore: number;
     completionRate: number;
   };
+  /** Raw member rows from the analytics endpoint — used for the level distribution card. */
+  members: OrgAnalyticsMember[];
   isGlobalView: boolean;
   selectedOrgId: string;
   showComplianceReport: boolean;
@@ -25,6 +30,11 @@ interface AnalyticsOverviewProps {
 const NAVY = '#10298f';
 const SUCCESS = '#1e9e6a';
 const TRACK = '#eceef3';
+
+// Gray used for the "not assessed" segment and legend swatch.
+const NOT_ASSESSED_COLOR = '#a1a1aa'; // zinc-400, readable on white
+
+const LEVELS: CourseLevel[] = ['basic', 'intermediate', 'advanced'];
 
 function MiniBar({ pct }: { pct: number }) {
   const clamped = Math.min(100, Math.max(0, pct));
@@ -42,6 +52,140 @@ function MiniBar({ pct }: { pct: number }) {
   );
 }
 
+// ─── Level distribution helpers ──────────────────────────────────────────────
+
+interface LevelCounts {
+  basic: number;
+  intermediate: number;
+  advanced: number;
+  notAssessed: number;
+  total: number;
+}
+
+function computeLevelCounts(members: OrgAnalyticsMember[]): LevelCounts {
+  // LOCKED: only learner-role rows count toward the distribution.
+  const learners = members.filter(m => m.role === 'learner');
+  const counts: LevelCounts = { basic: 0, intermediate: 0, advanced: 0, notAssessed: 0, total: learners.length };
+  for (const m of learners) {
+    if (m.assessment_level === 'basic') counts.basic++;
+    else if (m.assessment_level === 'intermediate') counts.intermediate++;
+    else if (m.assessment_level === 'advanced') counts.advanced++;
+    else counts.notAssessed++;
+  }
+  return counts;
+}
+
+interface DistSegment {
+  key: string;
+  color: string;
+  count: number;
+  pct: number;
+  label: string;
+}
+
+/**
+ * Horizontal segmented bar showing AI-level distribution across learners.
+ * Zero-count segments are omitted from the bar (no 0-width slivers) but
+ * always shown in the legend with a count of 0.
+ */
+function LevelDistributionCard({
+  members,
+  isGlobalView,
+  selectedOrgId,
+}: {
+  members: OrgAnalyticsMember[];
+  isGlobalView: boolean;
+  selectedOrgId: string;
+}) {
+  const { t } = useTranslation();
+  const counts = useMemo(() => computeLevelCounts(members), [members]);
+  const title = isGlobalView && selectedOrgId === 'all'
+    ? t('assessment.analytics.distributionTitleAll')
+    : t('assessment.analytics.distributionTitle');
+
+  // Build legend items (always 4, including not-assessed).
+  const legendItems: DistSegment[] = [
+    ...LEVELS.map(level => ({
+      key: level,
+      color: LEVEL_STYLES[level].fg,
+      count: counts[level],
+      pct: counts.total > 0 ? (counts[level] / counts.total) * 100 : 0,
+      label: t(`courses.levels.${level}`),
+    })),
+    {
+      key: 'notAssessed',
+      color: NOT_ASSESSED_COLOR,
+      count: counts.notAssessed,
+      pct: counts.total > 0 ? (counts.notAssessed / counts.total) * 100 : 0,
+      label: t('assessment.analytics.notAssessed'),
+    },
+  ];
+
+  // Bar segments: omit zero-count segments so we don't get 0-width artifacts.
+  const barSegments = legendItems.filter(s => s.count > 0);
+
+  return (
+    <Card>
+      <CardContent className="px-[22px] py-5">
+        <h3 className="mb-0.5 text-[14px] font-extrabold">{title}</h3>
+        <p className="mb-4 text-[12.5px] text-muted-foreground">
+          {t('assessment.analytics.distributionSubtitle')}
+        </p>
+
+        {/* Segmented bar */}
+        {counts.total === 0 ? (
+          <div
+            className="mb-4 h-3 w-full rounded-full"
+            style={{ background: TRACK }}
+            aria-label={t('assessment.analytics.noLearnerData')}
+          />
+        ) : (
+          <div
+            className="mb-4 flex h-3 w-full overflow-hidden rounded-full"
+            role="img"
+            aria-label={`${t('assessment.analytics.aiLevel')}: ${legendItems.map(s => `${s.label} ${s.count}`).join(', ')}`}
+          >
+            {barSegments.map((seg, i) => (
+              <span
+                key={seg.key}
+                style={{
+                  width: `${seg.pct}%`,
+                  background: seg.color,
+                  // Only round the outermost corners of the bar.
+                  borderRadius: i === 0 && barSegments.length === 1
+                    ? '9999px'
+                    : i === 0
+                      ? '9999px 0 0 9999px'
+                      : i === barSegments.length - 1
+                        ? '0 9999px 9999px 0'
+                        : '0',
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          {legendItems.map(seg => (
+            <span key={seg.key} className="flex items-center gap-1.5 text-[12.5px]">
+              <span
+                className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                style={{ background: seg.color }}
+                aria-hidden="true"
+              />
+              <span className="text-muted-foreground">{seg.label}</span>
+              <span className="font-bold">{seg.count}</span>
+            </span>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
+
 /**
  * Visual-first analytics overview: a row of stat cards (icon chips, ProgressRings
  * for completion / quiz score, mini bars under the engagement metrics), plus
@@ -50,6 +194,7 @@ function MiniBar({ pct }: { pct: number }) {
  */
 export function AnalyticsOverview({
   stats,
+  members,
   isGlobalView,
   selectedOrgId,
   showComplianceReport,
@@ -180,6 +325,13 @@ export function AnalyticsOverview({
           </CardContent>
         </Card>
       </div>
+
+      {/* AI level distribution */}
+      <LevelDistributionCard
+        members={members}
+        isGlobalView={isGlobalView}
+        selectedOrgId={selectedOrgId}
+      />
 
       {/* AI Act compliance report */}
       {showComplianceReport && (

@@ -25,18 +25,9 @@ import { routes } from '@/lib/routes';
 import { Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
-import { TeamPerformanceTab } from '@/components/org-admin/analytics/TeamPerformanceTab';
+import { TeamPerformanceTab, type UserStats } from '@/components/org-admin/analytics/TeamPerformanceTab';
 import { CourseProgressTab } from '@/components/org-admin/analytics/CourseProgressTab';
 import { OrgMembersTab } from '@/components/org-admin/OrgMembersTab';
-
-interface UserStats {
-  id: string;
-  name: string;
-  department: string | null;
-  enrollments: number;
-  completed: number;
-  avgQuizScore: number;
-}
 
 const ZERO_STATS = {
   totalUsers: 0,
@@ -146,6 +137,7 @@ export default function OrgAnalytics() {
         completed: enrollStats.completed,
         avgQuizScore: attemptStats.attempts > 0
           ? Math.round(attemptStats.totalScore / attemptStats.attempts) : 0,
+        assessment_level: m.assessment_level ?? null,
       };
     });
   }, [analyticsQuery.data]);
@@ -344,6 +336,7 @@ export default function OrgAnalytics() {
       {activeTab === 'overview' && (
         <AnalyticsOverview
           stats={stats}
+          members={analyticsQuery.data?.members ?? []}
           isGlobalView={isGlobalView}
           selectedOrgId={selectedOrgId}
           showComplianceReport={!isGlobalView && !!currentOrg}

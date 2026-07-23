@@ -28,10 +28,16 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         // department lives on profiles (not org_memberships), so it's per-user and
         // deterministic under DISTINCT ON (p.id) — cf. generate-compliance-report.
         query(
-          `SELECT DISTINCT ON (p.id) om.user_id, p.full_name, p.email, p.department
+          // om.role is included so callers can identify org_admin members and exclude them
+          // from learner-only computations (e.g. assessment level distribution). The
+          // deterministic ORDER BY p.id, om.role relies on enum sort order: 'org_admin'
+          // sorts before 'learner', so the org_admin row wins for users who hold both roles
+          // across organisations — ensuring the analytics consumer sees the admin role and
+          // correctly skips that user from the level-distribution count.
+          `SELECT DISTINCT ON (p.id) om.user_id, om.role, p.full_name, p.email, p.department, p.assessment_level
              FROM org_memberships om JOIN profiles p ON p.id = om.user_id
             WHERE om.status = 'active'
-            ORDER BY p.id`
+            ORDER BY p.id, om.role`
         ),
         query('SELECT * FROM enrollments'),
         query('SELECT * FROM quiz_attempts'),
@@ -57,7 +63,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     const [members, enrollments, quizAttempts, org] = await Promise.all([
       query(
-        'SELECT om.*, p.full_name, p.email FROM org_memberships om JOIN profiles p ON p.id = om.user_id WHERE om.org_id = $1 AND om.status = $2',
+        'SELECT om.*, p.full_name, p.email, p.assessment_level FROM org_memberships om JOIN profiles p ON p.id = om.user_id WHERE om.org_id = $1 AND om.status = $2',
         [orgId, 'active']
       ),
       query('SELECT * FROM enrollments WHERE org_id = $1', [orgId]),

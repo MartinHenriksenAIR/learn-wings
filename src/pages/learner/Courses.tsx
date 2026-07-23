@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerCourses() {
-  const { currentOrg } = useAuth();
+  const { currentOrg, profile } = useAuth();
   const orgGuard = useOrgGuard();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -118,6 +118,12 @@ export default function LearnerCourses() {
 
   const hasActiveFilters = search.trim() !== '' || levelFilter !== 'all' || statusFilter !== 'all';
 
+  // Level-matched recommendations (#117) — drives both the recommended grid and the
+  // "All courses" heading that separates it from the full catalog below.
+  const recommendedCourses = profile?.assessment_level != null
+    ? courses.filter(c => c.level === profile.assessment_level)
+    : [];
+
   const filteredCourses = courses.filter(course => {
     // Search filter
     const matchesSearch = search === '' ||
@@ -163,6 +169,118 @@ export default function LearnerCourses() {
 
   const selectClasses =
     'cursor-pointer rounded-xl border border-input bg-card py-[11px] pl-[13px] text-[13px] font-semibold text-[#2a2d3a] outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(16,41,143,0.10)]';
+
+  /** Renders a single course card. `showChip` adds the "Recommended" chip top-right. */
+  const renderCourseCard = (course: Course, showChip: boolean) => {
+    const enrollment = getEnrollmentStatus(course.id);
+    const isCompleted = enrollment?.status === 'completed';
+    const justEnrolled = flashed(`enr-${course.id}`);
+    const isEnrolling = enrollMutation.isPending && enrollMutation.variables?.courseId === course.id;
+
+    return (
+      <div
+        key={course.id}
+        className="hover-lift flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+      >
+        {/* Thumbnail with status badge */}
+        <div className="relative h-[118px] bg-gradient-to-br from-primary/80 to-primary">
+          {course.thumbnail_url && (
+            <img
+              src={course.thumbnail_url}
+              alt={course.title}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          )}
+          {showChip && (
+            <span
+              data-testid="recommended-chip"
+              className="absolute right-3 top-3 inline-flex items-center rounded-[7px] bg-primary px-[11px] py-[5px] text-[11px] font-bold text-primary-foreground"
+            >
+              {t('assessment.recommendations.chip')}
+            </span>
+          )}
+          {isCompleted ? (
+            <span
+              data-testid="status-badge-completed"
+              className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 inline-flex items-center gap-[5px] rounded-[7px] bg-success px-[11px] py-[5px] text-[11px] font-bold text-success-foreground`}
+            >
+              <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
+              {t('dashboard.completed')}
+            </span>
+          ) : enrollment ? (
+            <span
+              data-testid="status-badge-enrolled"
+              className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 inline-flex items-center rounded-[7px] bg-[rgba(13,21,60,0.45)] px-[11px] py-[5px] text-[11px] font-bold text-white`}
+            >
+              {t('common.enrolled')}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="flex flex-1 flex-col gap-[9px] px-[18px] pb-[18px] pt-4">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-[14.5px] font-bold leading-[1.35]">{course.title}</h3>
+            <LevelBadge level={course.level} className="shrink-0" />
+          </div>
+          <p className="line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
+            {course.description}
+          </p>
+
+          <div className="mt-auto flex items-center gap-2">
+            {justEnrolled ? (
+              // Transient post-enroll morph; reverts to Continue when the flash expires
+              <Button className="h-auto flex-1 rounded-[10px] border border-success bg-success px-3 py-[9px] text-[13px] font-bold text-success-foreground hover:bg-success">
+                <Check aria-hidden="true" />
+                {t('common.enrolled')}
+              </Button>
+            ) : enrollment ? (
+              <Button
+                asChild
+                className={cn(
+                  'h-auto flex-1 rounded-[10px] px-3 py-[9px] text-[13px] font-bold',
+                  isCompleted
+                    ? 'border border-[#cfd6ef] bg-card text-primary hover:bg-accent'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                )}
+              >
+                <Link to={routes.learner.coursePlayer(course.id)}>
+                  <Play aria-hidden="true" />
+                  {isCompleted ? t('courses.reviewCourse') : t('common.continue')}
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                onClick={() => handleEnroll(course.id)}
+                disabled={isEnrolling}
+                className="h-auto flex-1 rounded-[10px] border border-[#cfd6ef] bg-card px-3 py-[9px] text-[13px] font-bold text-primary hover:bg-accent"
+              >
+                {isEnrolling ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    {t('common.enrolling')}
+                  </>
+                ) : (
+                  t('common.enroll')
+                )}
+              </Button>
+            )}
+            {enrollment && (
+              <Button
+                variant="outline"
+                size="icon"
+                title={t('courses.unenrollFromCourse')}
+                aria-label={t('courses.unenrollFromCourse')}
+                onClick={() => setUnenrollDialog({ open: true, course, enrollment })}
+                className="h-9 w-9 shrink-0 rounded-[10px] text-[#9aa0af] hover:border-[#f0c7c7] hover:bg-card hover:text-destructive"
+              >
+                <LogOut aria-hidden="true" className="h-[15px] w-[15px]" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
@@ -216,6 +334,24 @@ export default function LearnerCourses() {
         )}
       </div>
 
+      {/* Recommended section — only shown when the learner has a known assessment level */}
+      {profile?.assessment_level != null && recommendedCourses.length > 0 && (
+        <div className="mb-8" data-testid="recommended-section">
+          <div className="mb-3.5 flex flex-wrap items-center gap-2">
+            <h2 className="font-display text-[17px] font-bold">{t('assessment.recommendations.forYou')}</h2>
+            <LevelBadge level={profile.assessment_level} />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {recommendedCourses.map((course) => renderCourseCard(course, true))}
+          </div>
+        </div>
+      )}
+
+      {/* All courses heading — shown when a recommended section is also visible */}
+      {recommendedCourses.length > 0 && (
+        <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('assessment.recommendations.allCourses')}</h2>
+      )}
+
       {filteredCourses.length === 0 ? (
         <EmptyState
           icon={<BookOpen className="h-6 w-6" />}
@@ -229,102 +365,7 @@ export default function LearnerCourses() {
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredCourses.map((course) => {
-            const enrollment = getEnrollmentStatus(course.id);
-            const isCompleted = enrollment?.status === 'completed';
-            const justEnrolled = flashed(`enr-${course.id}`);
-            const isEnrolling = enrollMutation.isPending && enrollMutation.variables?.courseId === course.id;
-
-            return (
-              <div
-                key={course.id}
-                className="hover-lift flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
-              >
-                {/* Thumbnail with status badge */}
-                <div className="relative h-[118px] bg-gradient-to-br from-primary/80 to-primary">
-                  {course.thumbnail_url && (
-                    <img
-                      src={course.thumbnail_url}
-                      alt={course.title}
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
-                  )}
-                  {isCompleted ? (
-                    <span className="absolute right-3 top-3 inline-flex items-center gap-[5px] rounded-[7px] bg-success px-[11px] py-[5px] text-[11px] font-bold text-success-foreground">
-                      <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
-                      {t('dashboard.completed')}
-                    </span>
-                  ) : enrollment ? (
-                    <span className="absolute right-3 top-3 inline-flex items-center rounded-[7px] bg-[rgba(13,21,60,0.45)] px-[11px] py-[5px] text-[11px] font-bold text-white">
-                      {t('common.enrolled')}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-1 flex-col gap-[9px] px-[18px] pb-[18px] pt-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-[14.5px] font-bold leading-[1.35]">{course.title}</h3>
-                    <LevelBadge level={course.level} className="shrink-0" />
-                  </div>
-                  <p className="line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
-                    {course.description}
-                  </p>
-
-                  <div className="mt-auto flex items-center gap-2">
-                    {justEnrolled ? (
-                      // Transient post-enroll morph; reverts to Continue when the flash expires
-                      <Button className="h-auto flex-1 rounded-[10px] border border-success bg-success px-3 py-[9px] text-[13px] font-bold text-success-foreground hover:bg-success">
-                        <Check aria-hidden="true" />
-                        {t('common.enrolled')}
-                      </Button>
-                    ) : enrollment ? (
-                      <Button
-                        asChild
-                        className={cn(
-                          'h-auto flex-1 rounded-[10px] px-3 py-[9px] text-[13px] font-bold',
-                          isCompleted
-                            ? 'border border-[#cfd6ef] bg-card text-primary hover:bg-accent'
-                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                        )}
-                      >
-                        <Link to={routes.learner.coursePlayer(course.id)}>
-                          <Play aria-hidden="true" />
-                          {isCompleted ? t('courses.reviewCourse') : t('common.continue')}
-                        </Link>
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => handleEnroll(course.id)}
-                        disabled={isEnrolling}
-                        className="h-auto flex-1 rounded-[10px] border border-[#cfd6ef] bg-card px-3 py-[9px] text-[13px] font-bold text-primary hover:bg-accent"
-                      >
-                        {isEnrolling ? (
-                          <>
-                            <Loader2 className="animate-spin" />
-                            {t('common.enrolling')}
-                          </>
-                        ) : (
-                          t('common.enroll')
-                        )}
-                      </Button>
-                    )}
-                    {enrollment && (
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        title={t('courses.unenrollFromCourse')}
-                        aria-label={t('courses.unenrollFromCourse')}
-                        onClick={() => setUnenrollDialog({ open: true, course, enrollment })}
-                        className="h-9 w-9 shrink-0 rounded-[10px] text-[#9aa0af] hover:border-[#f0c7c7] hover:bg-card hover:text-destructive"
-                      >
-                        <LogOut aria-hidden="true" className="h-[15px] w-[15px]" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {filteredCourses.map((course) => renderCourseCard(course, false))}
         </div>
       )}
 

@@ -229,3 +229,102 @@ describe('LearnerCourses — enroll in-button morph (no success toast)', () => {
     expect(screen.getByRole('button', { name: 'common.enroll' })).toBeInTheDocument();
   });
 });
+
+describe('LearnerCourses — recommended section', () => {
+  const currentOrg = { id: 'org-1', name: 'Org One' };
+
+  const basicCourse = {
+    id: 'c-basic', title: 'Basic AI Course', description: 'Intro level',
+    level: 'basic', is_published: true, thumbnail_url: null,
+    created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+  const advancedCourse = {
+    id: 'c-advanced', title: 'Advanced AI Course', description: 'Expert level',
+    level: 'advanced', is_published: true, thumbnail_url: null,
+    created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [basicCourse, advancedCourse],
+      enrollments: [],
+    });
+  });
+
+  it('renders the recommended section and chip when profile has an assessment level matching some courses', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: 'basic' },
+    });
+
+    renderCourses();
+
+    expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
+    expect(screen.getByText('assessment.recommendations.forYou')).toBeInTheDocument();
+    // Chip appears on the recommended card
+    expect(screen.getByTestId('recommended-chip')).toBeInTheDocument();
+    // The "All courses" heading also renders
+    expect(screen.getByText('assessment.recommendations.allCourses')).toBeInTheDocument();
+    // Both courses still appear in the full catalog below
+    expect(screen.getAllByText('Basic AI Course').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Advanced AI Course')).toBeInTheDocument();
+  });
+
+  it('does NOT render the recommended section when assessment_level is null', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+    });
+
+    renderCourses();
+
+    // Wait for courses to load
+    await screen.findByText('Basic AI Course');
+    expect(screen.queryByTestId('recommended-section')).toBeNull();
+    expect(screen.queryByText('assessment.recommendations.forYou')).toBeNull();
+  });
+
+  it('does NOT render the recommended section when no courses match the level', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: 'intermediate' },
+    });
+
+    renderCourses();
+
+    await screen.findByText('Basic AI Course');
+    expect(screen.queryByTestId('recommended-section')).toBeNull();
+  });
+
+  it('shows both the chip and the enrolled badge on a recommended card for an enrolled course', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [basicCourse, advancedCourse],
+      enrollments: [{ id: 'e-1', course_id: 'c-basic', status: 'enrolled' }],
+    });
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: 'basic' },
+    });
+
+    renderCourses();
+
+    // Wait for the recommended section to appear
+    expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
+
+    // The recommended-chip must be present
+    expect(screen.getByTestId('recommended-chip')).toBeInTheDocument();
+
+    // The enrolled status badge must appear on the recommended card (co-existing with the chip).
+    // The basic course also appears in the full catalog grid below, so there are two badges in total.
+    const enrolledBadges = screen.getAllByTestId('status-badge-enrolled');
+    expect(enrolledBadges.length).toBeGreaterThanOrEqual(1);
+
+    // The badge on the recommended card must sit at left-3 (pushed left to make room for the chip).
+    expect(enrolledBadges[0]).toHaveClass('left-3');
+  });
+});

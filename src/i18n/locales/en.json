@@ -1031,6 +1031,130 @@
     "failedToLoad": "Failed to load course",
     "retry": "Retry"
   },
+  "assessment": {
+    "skip": "Skip for now",
+    "back": "Back",
+    "next": "Next",
+    "seeResult": "See your result",
+    "questionOf": "Question {{current}} of {{total}}",
+    "timeEstimate": "~2 min",
+    "questions": {
+      "usage-frequency": {
+        "text": "How often do you use AI tools like ChatGPT in your work?",
+        "options": {
+          "never": "Never — I haven't really gotten started yet",
+          "tried-a-few-times": "I've tried it a few times",
+          "weekly": "Weekly",
+          "daily": "Daily or almost daily"
+        }
+      },
+      "task-breadth": {
+        "text": "What have you used AI for in your work tasks?",
+        "options": {
+          "nothing-yet": "Nothing yet",
+          "one-task-type": "One type of task — e.g. drafting an email or a summary",
+          "a-few-task-types": "A few different types of tasks",
+          "many-task-types": "Many different tasks — it's part of how I solve most things"
+        }
+      },
+      "tool-range": {
+        "text": "How many different AI tools have you tried?",
+        "options": {
+          "none": "None yet",
+          "one": "One — e.g. ChatGPT",
+          "two-to-three": "Two or three — e.g. also Copilot or Gemini",
+          "four-plus": "Four or more, including more specialized tools"
+        }
+      },
+      "iteration-behavior": {
+        "text": "What do you typically do when the AI's answer isn't quite what you needed?",
+        "options": {
+          "not-there-yet": "I haven't gotten that far yet",
+          "accept-or-do-myself": "I usually use the answer as it is — or just do the task myself",
+          "rephrase-and-retry": "I rephrase my question and try again",
+          "iterate-with-context": "I follow up with corrections, examples and more context until the result is right"
+        }
+      },
+      "workflow-integration": {
+        "text": "How big a part of your workday is AI?",
+        "options": {
+          "not-part-of-day": "It isn't part of my workday",
+          "now-and-then": "I use it now and then, when I happen to think of it",
+          "fixed-part-of-tasks": "It's a fixed part of certain tasks",
+          "woven-into-most": "It's woven into most of my work"
+        }
+      },
+      "self-sufficiency": {
+        "text": "How confident are you about using AI for a new type of task?",
+        "options": {
+          "no-idea-where-to-start": "I wouldn't know where to start",
+          "need-help-or-guide": "I'd need help or a step-by-step guide",
+          "figure-it-out-myself": "I can usually figure it out on my own",
+          "colleagues-ask-me": "Very confident — colleagues often come to me for advice"
+        }
+      },
+      "advanced-features": {
+        "text": "Have you tried any of the more advanced options — e.g. uploading documents, building your own GPTs or setting up automations?",
+        "options": {
+          "plain-chat-only": "No — I mostly use plain chat, or haven't used AI yet",
+          "tried-a-couple": "I've tried a couple — e.g. uploading a document for the AI to work with",
+          "use-some-regularly": "I use some of them regularly",
+          "build-my-own": "I build my own — custom GPTs, automations or AI connected to other tools"
+        }
+      }
+    },
+    "result": {
+      "eyebrow": "YOUR AI ASSESSMENT",
+      "scoreOf": "{{score}} of {{max}} points",
+      "startHere": "Start here — picked for your level",
+      "goToDashboard": "Go to your dashboard",
+      "startCourse": "Start course",
+      "personas": {
+        "basic": "Explorer",
+        "intermediate": "Everyday user",
+        "advanced": "Superuser"
+      },
+      "blurbs": {
+        "basic": "You're at the start of your AI journey — and that's a great place to be. We'll point you to courses that build a solid foundation from scratch, no prior experience needed.",
+        "intermediate": "You already use AI and have the basics down. We'll recommend courses that help you work smarter — sharper prompts, more use cases, and AI as a natural part of your workflow.",
+        "advanced": "AI is already a core part of how you work. We'll recommend advanced courses on automations, custom GPTs and getting the most out of the newest tools."
+      }
+    },
+    "banner": {
+      "title": "Where are you on your AI journey?",
+      "body": "Take the short assessment (2 min) and we'll recommend courses that match your level.",
+      "cta": "Take the assessment · 2 min"
+    },
+    "recommendations": {
+      "forYou": "Recommended for you",
+      "chip": "Recommended",
+      "allCourses": "All courses"
+    },
+    "settings": {
+      "title": "AI assessment",
+      "lastTaken": "Last taken {{date}}",
+      "notTaken": "Not taken yet",
+      "retake": "Retake assessment",
+      "take": "Take the assessment",
+      "privacyNote": "Your assessment is only used to recommend courses. Only your level is visible to administrators — never your answers."
+    },
+    "analytics": {
+      "distributionTitle": "AI level across the organization",
+      "distributionTitleAll": "AI level across organizations",
+      "distributionSubtitle": "Based on the onboarding assessment",
+      "notAssessed": "Not assessed",
+      "aiLevel": "AI level",
+      "noLearnerData": "No learner data yet"
+    },
+    "toasts": {
+      "saved": "Assessment saved — your level is updated",
+      "skipped": "Skipped — you can take the assessment from your dashboard"
+    },
+    "error": {
+      "title": "Something went wrong loading the assessment",
+      "retry": "Try again"
+    }
+  },
   "invitationAccept": {
     "invitedTitle": "You've been invited",
     "invitedBody": "Sign in with your Microsoft account to accept your invitation to <strong>AI Uddannelse</strong>.",
