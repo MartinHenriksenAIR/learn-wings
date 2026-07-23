@@ -784,6 +784,8 @@
       "community_enabled_hint": "Enable community feed, ideas and moderation features.",
       "course_reviews_enabled": "Course reviews",
       "course_reviews_enabled_hint": "Allow learners to leave reviews on courses.",
+      "exercises_enabled": "Exercises",
+      "exercises_enabled_hint": "Interactive practice lessons (Quick-check, drag-and-drop). Ungraded.",
       "save": "Save feature settings"
     },
     "seatPricing": {

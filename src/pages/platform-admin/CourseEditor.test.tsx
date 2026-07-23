@@ -32,7 +32,7 @@ vi.mock('@/components/ui/sonner', () => ({
 
 // --- mock usePlatformSettings ---
 vi.mock('@/hooks/usePlatformSettings', () => ({
-  usePlatformSettings: () => ({ features: { quizzes_enabled: false }, isLoading: false }),
+  usePlatformSettings: () => ({ features: { quizzes_enabled: false, exercises_enabled: false }, isLoading: false }),
 }));
 
 // --- stub heavy child components ---

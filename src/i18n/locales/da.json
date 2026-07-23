@@ -784,6 +784,8 @@
       "community_enabled_hint": "Aktivér fællesskabsfeed, idéer og moderationsfunktioner.",
       "course_reviews_enabled": "Kursusanmeldelser",
       "course_reviews_enabled_hint": "Tillad elever at skrive anmeldelser af kurser.",
+      "exercises_enabled": "Øvelser",
+      "exercises_enabled_hint": "Interaktive øvelseslektioner (Quick-check, træk-og-slip). Uden karakter.",
       "save": "Gem funktionsindstillinger"
     },
     "seatPricing": {

@@ -87,6 +87,7 @@ function setup(opts: {
       analytics_enabled: true,
       course_reviews_enabled: opts.reviewsEnabled,
       community_enabled: true,
+      exercises_enabled: false,
     },
   });
   mockCallApi.mockImplementation(async (url: string) => {
@@ -234,6 +235,7 @@ describe('CoursePlayer — completion semantics (#18)', () => {
         analytics_enabled: true,
         course_reviews_enabled: false,
         community_enabled: true,
+        exercises_enabled: false,
       },
     });
   });

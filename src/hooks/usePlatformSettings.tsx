@@ -8,6 +8,7 @@ interface FeatureSettings {
   analytics_enabled: boolean;
   course_reviews_enabled: boolean;
   community_enabled: boolean;
+  exercises_enabled: boolean;
 }
 
 interface BrandingSettings {
@@ -35,6 +36,7 @@ const defaultFeatures: FeatureSettings = {
   analytics_enabled: true,
   course_reviews_enabled: false,
   community_enabled: true,
+  exercises_enabled: false,
 };
 
 const defaultBranding: BrandingSettings = {
@@ -149,6 +151,7 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
     analytics_enabled: platformFeatures.analytics_enabled && (orgFeatures?.analytics_enabled ?? true),
     course_reviews_enabled: platformFeatures.course_reviews_enabled && (orgFeatures?.course_reviews_enabled ?? true),
     community_enabled: platformFeatures.community_enabled && (orgFeatures?.community_enabled ?? true),
+    exercises_enabled: platformFeatures.exercises_enabled && (orgFeatures?.exercises_enabled ?? true),
   };
 
   useEffect(() => {
