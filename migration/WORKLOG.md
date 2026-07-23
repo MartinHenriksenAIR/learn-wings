@@ -1407,3 +1407,18 @@ Plus a classification rule for future surfaces. Ratifies the courses model alrea
 **Out of scope:** no schema migration (column default stays `en`), no email templates (#225), no backfill, no `Signup.tsx` change.
 
 **Verify:** root `npm run lint` 0 errors · `npm test` 519 pass (92 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0; functions `npm run build` exit 0 · `npm test` 1970 pass (132 files, 3 skipped). Tests written first (red→green): user-context provisioning (da/en, default-en on missing/junk/bodyless, never-overwrite existing), i18n third-language→en (+ `en` kept as secondary key fallback), useAuth sends the language. Frontend user-visible behavior + one backend provisioning tweak; **no prod DB migration.** Merging auto-deploys (functions changed → backend + frontend workflows); deploy + smoke announced on PR #229.
+
+---
+
+## 2026-07-23 — AI Act compliance PDF rebrand + content redesign (#71)
+
+**Who:** claude (Opus) + martin. PR #230. Brainstorming → locked design (formal register + Article-4 content) → pdfkit implementation → code-review → merge.
+
+**What:** replaced the hand-rolled raw-PDF byte generator in `functions/generate-compliance-report` with a **pdfkit** renderer (new `render.ts`, pure-JS, serverless-safe). Reframed the document as evidence for **AI Act Article 4 (AI literacy), Regulation (EU) 2024/1689** — conclusion-first, one A4 page, scoped honestly as training evidence (not full conformity). Formal register: platform navy `#10298f` + logo, **Times** serif (built-in — æøå via WinAnsi, no TTF bundled), ruled tables, near-monochrome (oxblood only marks a deficiency). Sections: letterhead → title → metadata → declaration → §1 summary → §2 coverage by department → §3 course completion → §4 assessed literacy → certification/signature block.
+- **Metric:** headline = **participation** (share of active staff with ≥1 completed enrollment in an org-enabled course) — deliberately well-defined, **no "required course" concept and no schema change**. §4 assessed-literacy distribution (from #117 `profiles.assessment_level`) adds the competency dimension; refresher-due = latest completion >12 months.
+- **Localization (ADR-0016 category 3):** `strings.ts` da/en; report follows the requesting user's **live UI language** (`i18n.resolvedLanguage`), sent from `OrgAnalytics.tsx` (one-line change). Logo embedded as base64 (`logo.ts`, mount-safe). Binary body returned as a **Buffer** — pdfkit output is zlib-compressed, so the legacy `.toString('binary')` path would corrupt it (noted as a latent bug in the sibling `generate-certificate`).
+- **Empty-org edge (code-review fix):** zero active members is a neutral state — no self-contradictory "Action required / 0 departments" verdict.
+
+**Verify:** functions `npm run build` exit 0 · `npm test` 1971 pass (132 files, 3 skipped) — 9 new contract tests (200/400/401/403/404, da≠en bytes, `resolveLang` fallback, real-data render). Root `lint` 0 errors · `tsc` exit 0 · `test` 517 pass (92 files) · `build` exit 0. The **compiled** renderer was rendered with sample data (en+da) and visually matched the approved mockup; empty-org re-rendered after the fix. Code-reviewed (Opus): SQL scoping/authz/Buffer-response confirmed sound; one Important finding (empty-org verdict) fixed. Design spec: `docs/superpowers/specs/2026-07-23-ai-act-pdf-branding-design.md`.
+
+**Deploy:** functions + frontend changed → both workflows fire on merge. No prod DB change. **Authed PDF-download smoke (da+en) pending a real admin login on prod** — endpoint is POST-only + Entra-gated; unauth POST → 401 confirms registration.
