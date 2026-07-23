@@ -18,7 +18,7 @@ const LVL_NUM: Record<string, number> = { basic: 1, intermediate: 2, advanced: 3
 const LVL_BY_NUM: Record<number, LevelKey> = { 1: 'basic', 2: 'intermediate', 3: 'advanced' };
 
 function deptLevel(levels: (string | null)[]): LevelKey {
-  const nums = levels.filter((l): l is string => !!l).map((l) => LVL_NUM[l]);
+  const nums = levels.map((l) => (l ? LVL_NUM[l] : undefined)).filter((n): n is number => n != null);
   if (nums.length === 0) return 'na';
   const avg = Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
   return LVL_BY_NUM[avg] || 'na';
@@ -150,7 +150,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       target: TARGET,
       kf: { staff, trained, participation, notTrained: staff - trained, refresher },
       belowN: depts.filter((d) => d.status !== 'ok').length,
-      deficiency: participation < TARGET,
+      deficiency: staff > 0 && participation < TARGET,
       depts,
       courses,
       levels,

@@ -39,6 +39,7 @@ export interface ReportStrings {
   levelName: Record<LevelKey, string>;
   statusName: Record<DeptStatus, string>;
   status: (pctStr: string, target: number, belowN: number, deficiency: boolean) => StatusParts;
+  emptyStatus: string;
   cert: string;
   sig: [string, string, string];
   footL: (org: string) => string;
@@ -96,6 +97,7 @@ export const STRINGS: Record<Lang, ReportStrings> = {
             deficiency: false,
             tail: '. Department-level detail is set out in §2.',
           },
+    emptyStatus: 'No active members are in scope for this organisation as at the reporting date, so participation cannot be assessed.',
     cert: 'I certify that, to the best of my knowledge, the figures set out above reflect the organisation’s training and assessment records as at the reporting date.',
     sig: ['Prepared by — signature', 'Reviewed by — signature', 'Date'],
     footL: (org) => `Confidential — ${org}`,
@@ -149,6 +151,7 @@ export const STRINGS: Record<Lang, ReportStrings> = {
             deficiency: false,
             tail: '. Detaljer pr. afdeling fremgår af §2.',
           },
+    emptyStatus: 'Ingen aktive medarbejdere er omfattet for organisationen pr. rapporteringsdatoen, så deltagelse kan ikke vurderes.',
     cert: 'Jeg bekræfter, at ovenstående tal efter min bedste overbevisning afspejler organisationens uddannelses- og vurderingsdata pr. rapporteringsdatoen.',
     sig: ['Udarbejdet af — underskrift', 'Kontrolleret af — underskrift', 'Dato'],
     footL: (org) => `Fortroligt — ${org}`,

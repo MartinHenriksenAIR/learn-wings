@@ -131,12 +131,16 @@ export function generatePDF(data: ReportData, lang: Lang): Promise<Buffer> {
       doc.font('Times-Roman').fontSize(7.5).fillColor(MUT).text(uc(c[1]), x + 4, y + 28, { width: kw - 8, align: 'center', characterSpacing: 0.3 });
     });
     y += kh + 9;
-    const sp = s.status(data.kf.participation + '%', data.target, data.belowN, data.deficiency);
-    doc.font('Times-Roman').fontSize(10.5).fillColor(INK).text(sp.lead, M, y, { width: CW, continued: true });
-    doc.font('Times-Bold').text(sp.pct, { continued: true });
-    doc.font('Times-Roman').fillColor(INK).text(sp.mid, { continued: true });
-    doc.font('Times-Bold').fillColor(sp.deficiency ? OX : INK).text(sp.action, { continued: true });
-    doc.font('Times-Roman').fillColor(INK).text(sp.tail);
+    if (data.kf.staff === 0) {
+      doc.font('Times-Italic').fontSize(10.5).fillColor(MUT).text(s.emptyStatus, M, y, { width: CW });
+    } else {
+      const sp = s.status(data.kf.participation + '%', data.target, data.belowN, data.deficiency);
+      doc.font('Times-Roman').fontSize(10.5).fillColor(INK).text(sp.lead, M, y, { width: CW, continued: true });
+      doc.font('Times-Bold').text(sp.pct, { continued: true });
+      doc.font('Times-Roman').fillColor(INK).text(sp.mid, { continued: true });
+      doc.font('Times-Bold').fillColor(sp.deficiency ? OX : INK).text(sp.action, { continued: true });
+      doc.font('Times-Roman').fillColor(INK).text(sp.tail);
+    }
     y = doc.y + 10;
 
     // §2 coverage by department -----------------------------------------
