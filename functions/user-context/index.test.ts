@@ -30,6 +30,16 @@ const baseReq = {
   headers: { get: (k: string) => (k === 'origin' ? 'https://ai-uddannelse.dk' : 'Bearer tok') },
 };
 
+// A request carrying a JSON body (the client sends { language } on the
+// user-context call, #226). Mirrors the Azure HttpRequest.json() contract.
+const reqWith = (body: unknown) => ({
+  ...baseReq,
+  json: async () => body,
+});
+
+const insertParams = () =>
+  (mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT'))?.[1] ?? []) as unknown[];
+
 // pg QueryResult shape: the shared helper (client.query) reads `.rows`.
 const rows = (...r: unknown[]) => ({ rows: r });
 
@@ -105,6 +115,68 @@ describe('user-context', () => {
     expect(insertCall).toBeDefined();
     expect(insertCall![1]).toContain('entra-oid-123');
     expect(insertCall![1]).toContain('entra-tid-456');
+  });
+
+  // ---- #226: stamp preferred_language from the browser-derived language at provisioning ----
+
+  describe('#226 preferred_language provisioning', () => {
+    // Arrange a first-login provisioning flow: no existing profile, INSERT
+    // returns an id, re-select returns the full shape, no invites, no memberships.
+    const arrangeNewProfile = () => {
+      mockQueryOne.mockResolvedValueOnce(null); // no existing profile
+      mockQueryOne.mockResolvedValueOnce({ id: 'new-uuid' }); // INSERT RETURNING id
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'new-uuid', full_name: 'user', email: 'user@contoso.com',
+        is_platform_admin: false, avatar_url: null, preferred_language: 'da',
+        assessment_level: null, assessment_skipped_at: null, assessment_taken_at: null,
+      }); // re-select
+      mockQuery.mockResolvedValueOnce([]); // invite pre-check: none
+      mockQuery.mockResolvedValueOnce([]); // memberships
+    };
+
+    it('stamps the sent language (da) into the provisioning INSERT', async () => {
+      arrangeNewProfile();
+      await handler(reqWith({ language: 'da' }) as any, {} as any);
+      expect(insertParams()).toContain('da');
+    });
+
+    it('stamps the sent language (en) into the provisioning INSERT', async () => {
+      arrangeNewProfile();
+      await handler(reqWith({ language: 'en' }) as any, {} as any);
+      expect(insertParams()).toContain('en');
+    });
+
+    it('defaults to English when the request body omits a language', async () => {
+      arrangeNewProfile();
+      await handler(reqWith({}) as any, {} as any);
+      expect(insertParams()).toContain('en');
+    });
+
+    it('defaults to English (never persists) an unsupported language', async () => {
+      arrangeNewProfile();
+      await handler(reqWith({ language: 'fr' }) as any, {} as any);
+      const params = insertParams();
+      expect(params).toContain('en');
+      expect(params).not.toContain('fr');
+    });
+
+    it('defaults to English when there is no JSON body at all (e.g. a GET probe)', async () => {
+      arrangeNewProfile();
+      // baseReq has no json() method — the handler must tolerate that and default.
+      await handler(baseReq as any, {} as any);
+      expect(insertParams()).toContain('en');
+    });
+
+    it('does NOT overwrite an existing profile — later logins never touch preferred_language', async () => {
+      mockQueryOne.mockResolvedValueOnce(existingProfile); // profile already exists
+      await handler(reqWith({ language: 'da' }) as any, {} as any);
+      // No INSERT (already provisioned) and no UPDATE of the profile: existing
+      // users keep whatever language they have (Q1 — no backfill).
+      const insertCall = mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT'));
+      const updateCall = mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('UPDATE profiles'));
+      expect(insertCall).toBeUndefined();
+      expect(updateCall).toBeUndefined();
+    });
   });
 
   it('returns 500 on unexpected database error', async () => {

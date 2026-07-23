@@ -1388,3 +1388,22 @@ Plus a classification rule for future surfaces. Ratifies the courses model alrea
 **Follow-ups filed:** **#225** (invite email localization — hardcoded `da` today; must resolve the no-profile-yet invitee language) · **#226** (initialize `preferred_language` from the browser at first login + override #119's Danish fallback → English for non-da/en, so UI/courses/emails agree). Per-surface implementation stays in #71/#123/#125/#225/#226.
 
 **Verify:** docs-only (one new ADR file); CI green (frontend + functions gates). No deploy impact (no functions/frontend artifact change).
+
+---
+
+## 2026-07-23 — #226 Browser-derived platform language default (overrides #119)
+
+**Who:** martin. PR #229. Grilled the design (6 decisions) before coding; inline TDD in an isolated worktree.
+
+**What shipped:** a new user's platform language (UI, course catalog, and server-generated emails) is derived from their **detected browser language**, and #119's Danish catch-all is **reversed to English** for unrecognized browsers — Danish browser → `da`, English → `en`, **anything else → `en`** (was Danish).
+- `src/i18n/index.ts`: `fallbackLng: ['da','en'] → 'en'` — the one lever; `resolvedLanguage` now returns exactly `da`/`en`, so a non-da/en browser gets an English UI **and** English courses (the catalog keys off `resolvedLanguage`, #191). `en` stays the secondary key fallback for keys missing in `da`. Swept the four remaining `'da'` last-resort fallbacks to `'en'` (the `<html lang>` sync, `useLearnerCourses`, `EnrollUserDialog`, Settings selector) so "English is the last resort" holds everywhere, not just at the one lever.
+- `functions/user-context/index.ts`: stamps `preferred_language` from a validated, client-sent language at **first-login provisioning only** (default `en` on missing/unknown; existing profiles never overwritten). Fixes #193 seat-request emails for new users, which read `preferred_language` (previously the uninitialized `en`).
+- `src/hooks/useAuth.tsx`: sends `i18n.resolvedLanguage` on the user-context call — covers normal login and the invite-accept path (via `refreshUserContext`).
+
+**Grilled decisions:** (1) **no backfill** of existing users — their browser isn't server-visible and a guess could overwrite a deliberate Settings choice; (2) sweep all `'da'` fallbacks to `'en'` for consistency; (3) the Settings selector already read the stored value first — the issue's "hardcoded `da`" premise was wrong — so only the dead literal fallback flipped (no UI test: unobservable in practice); (4) the app sends the language and the server validates to `da`/`en` + defaults `en` (not derived from `Accept-Language`, which can diverge from the shown UI); (5) **no email-template changes** — initialization is the whole email fix, the invite email is #225; (6) TDD, three behavioral tests.
+
+**Issue-vs-code corrections:** `Signup.tsx` needed no change (it's the accept-invitation page and routes through `useAuth`); the Settings selector was not "hardcoded `da`".
+
+**Out of scope:** no schema migration (column default stays `en`), no email templates (#225), no backfill, no `Signup.tsx` change.
+
+**Verify:** root `npm run lint` 0 errors · `npm test` 519 pass (92 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0; functions `npm run build` exit 0 · `npm test` 1970 pass (132 files, 3 skipped). Tests written first (red→green): user-context provisioning (da/en, default-en on missing/junk/bodyless, never-overwrite existing), i18n third-language→en (+ `en` kept as secondary key fallback), useAuth sends the language. Frontend user-visible behavior + one backend provisioning tweak; **no prod DB migration.** Merging auto-deploys (functions changed → backend + frontend workflows); deploy + smoke announced on PR #229.

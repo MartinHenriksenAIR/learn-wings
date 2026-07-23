@@ -82,7 +82,7 @@ export function EnrollUserDialog({
           access: string;
           course: Course;
         }>;
-      }>('/api/org-course-access', { orgId, language: i18n.resolvedLanguage ?? 'da' });
+      }>('/api/org-course-access', { orgId, language: i18n.resolvedLanguage ?? 'en' });
 
       const availableCourseList = accessResult.access
         .filter((row) => row.access === 'enabled' && row.course.is_published === true)

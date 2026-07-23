@@ -3,6 +3,7 @@ import { useMsal, useAccount } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
 import { apiScopes } from '@/lib/msal-config';
 import { callApi } from '@/lib/api-client';
+import i18n from '@/i18n';
 import { clearPostLoginRedirect } from '@/lib/post-login-redirect';
 import type { Profile, OrgMembership, Organization } from '@/lib/types';
 
@@ -93,7 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserContext = async () => {
     if (!account) return;
     try {
-      const { profile: p, memberships: m } = await callApi<{ profile: Profile; memberships: OrgMembership[] }>('/api/user-context', {});
+      // Send the browser-derived UI language so first-login provisioning can
+      // stamp it on the new profile (#226); harmless on subsequent logins (the
+      // server only reads it when creating a profile, never to overwrite one).
+      const { profile: p, memberships: m } = await callApi<{ profile: Profile; memberships: OrgMembership[] }>('/api/user-context', { language: i18n.resolvedLanguage });
       setProfile(p);
       setMemberships(m);
       if (m.length > 0 && !currentOrg && !p?.is_platform_admin) {
