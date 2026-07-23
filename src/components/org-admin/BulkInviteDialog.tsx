@@ -27,6 +27,8 @@ import { Upload, Download, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Aler
 import { z } from 'zod';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { SeatUsageNote } from '@/components/SeatUsageNote';
+import { InviteLanguageSelect } from '@/components/InviteLanguageSelect';
+import { uiLangToInvite, type InviteLanguage } from '@/lib/inviteLanguage';
 import type { SeatUsage } from '@/lib/seats';
 
 interface BulkInviteDialogProps {
@@ -58,13 +60,15 @@ export function BulkInviteDialog({
   seatUsage,
   onSuccess,
 }: BulkInviteDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const atSeatLimit = !seatUsage.isUnlimited && seatUsage.atLimit;
   const [parsedData, setParsedData] = useState<ParsedInvite[]>([]);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [results, setResults] = useState<{ success: number; failed: number } | null>(null);
+  // One language applies to the whole batch; defaults to the admin's UI language.
+  const [inviteLanguage, setInviteLanguage] = useState<InviteLanguage>(() => uiLangToInvite(i18n.resolvedLanguage));
 
   const handleDownloadTemplate = () => {
     const csvContent = 'email,first_name,last_name,department,role\njohn.doe@example.com,John,Doe,Engineering,learner\njane.smith@example.com,Jane,Smith,Management,org_admin';
@@ -207,6 +211,7 @@ export function BulkInviteDialog({
               orgName,
               role: validInvites.find((v) => v.email === row.email)?.role ?? 'learner',
               linkId: row.invitation.link_id,
+              inviterLanguage: inviteLanguage,
             });
             if (emailResult.success) {
               emailsSent++;
@@ -262,6 +267,7 @@ export function BulkInviteDialog({
   const handleClose = () => {
     setParsedData([]);
     setResults(null);
+    setInviteLanguage(uiLangToInvite(i18n.resolvedLanguage));
     onOpenChange(false);
   };
 
@@ -280,6 +286,9 @@ export function BulkInviteDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 py-4">
+          {/* Email language — applies to the whole batch */}
+          <InviteLanguageSelect value={inviteLanguage} onChange={setInviteLanguage} />
+
           {/* Download Template */}
           <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
             <div className="flex items-center gap-3">
