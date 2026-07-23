@@ -91,8 +91,13 @@ describe('org-course-org-breakdown', () => {
     expect(sql).toContain('UNION');
     expect(sql).toContain("oca.access = 'enabled'");
     expect(sql).toContain('LEFT JOIN enrollments');
-    expect(sql).toContain('oca.course_id = $1');
-    // per-org enrollment counts (org-scoped; UNIQUE(org,user,course) => distinct within an org)
+    // group-expanded across editions via a grp CTE keyed on the passed course id
+    expect(sql).toContain('WITH grp AS');
+    expect(sql).toContain('COALESCE(gm.course_group_id, gm.id)');
+    expect(sql).toContain('IN (SELECT id FROM grp)');
+    // per-org DISTINCT-learner counts across the group's editions (the per-course UNIQUE
+    // no longer makes rows == distinct learners once editions are grouped)
+    expect(sql).toContain('COUNT(DISTINCT e.user_id)');
     expect(sql).toContain("FILTER (WHERE e.status = 'completed')");
     expect(sql).toContain('GROUP BY');
     // most-engaged first, gap rows sink to the bottom

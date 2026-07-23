@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { Switch } from '@/components/ui/switch';
 import { SaveButton } from '@/components/ui/save-button';
+import { LanguageBadge } from '@/components/ui/language-badge';
 import { useFlash } from '@/hooks/useFlash';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -34,6 +35,7 @@ import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCi
 import { toast } from '@/components/ui/sonner';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useToastMutation } from '@/hooks/useToastMutation';
+import { useCoursesAdmin } from '@/hooks/useCoursesAdmin';
 import { cn } from '@/lib/utils';
 import { coursesAdminQueryKey } from './CoursesManager';
 
@@ -384,6 +386,49 @@ export default function CourseEditor() {
     deleteCourseMutation.mutate();
   };
 
+  // ── Language editions (#213) ───────────────────────────────────────────────
+  // Candidate source is the shared admin course list — the same ['courses-admin']
+  // cache CoursesManager populates, read through the shared hook so both sites
+  // see one { courses, accessRecords } shape. Gated on `course` so we don't fetch
+  // before the editor has loaded (the section only renders once the course exists).
+  const { data: coursesData } = useCoursesAdmin({ enabled: !!course, staleTime: 60 * 1000 });
+  const allCourses = coursesData?.courses ?? [];
+  const thisCourse = allCourses.find((c) => c.id === courseId);
+  const siblings = thisCourse?.course_group_id
+    ? allCourses.filter((c) => c.id !== courseId && c.course_group_id === thisCourse.course_group_id)
+    : [];
+  // A candidate is eligible only if it's standalone (no group) and brings a
+  // language the group doesn't already have — one edition per language.
+  const groupLanguages = new Set(
+    [thisCourse, ...siblings].filter(Boolean).map((c) => (c as Course).language),
+  );
+  const candidates = allCourses.filter(
+    (c) =>
+      c.id !== courseId &&
+      !c.course_group_id &&
+      c.language != null &&
+      !groupLanguages.has(c.language),
+  );
+
+  const [linkTargetId, setLinkTargetId] = useState<string>('');
+
+  const linkEditionMutation = useToastMutation({
+    mutationFn: (otherCourseId: string) =>
+      callApi('/api/course-translation-link', { action: 'link', courseId, otherCourseId }),
+    errorTitle: 'Failed to link edition',
+    onSuccess: () => {
+      setLinkTargetId('');
+      queryClient.invalidateQueries({ queryKey: queryKeys.coursesAdmin.all });
+    },
+  });
+
+  const unlinkEditionMutation = useToastMutation({
+    mutationFn: (targetCourseId: string) =>
+      callApi('/api/course-translation-link', { action: 'unlink', courseId: targetCourseId }),
+    errorTitle: 'Failed to unlink edition',
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.coursesAdmin.all }),
+  });
+
   const lessonTypeIcon = (type: LessonType) => {
     switch (type) {
       case 'video': return <Video className="h-[13px] w-[13px]" aria-hidden="true" />;
@@ -511,6 +556,64 @@ export default function CourseEditor() {
                 </Select>
               </div>
             </div>
+          </div>
+
+          {/* Language editions (#213) — link/unlink translated editions so
+              analytics count a course and its siblings as one. */}
+          <div className="mb-[18px] space-y-2 border-t border-border pt-[18px]">
+            <Label>{t('courseEditor.editions.title')}</Label>
+            <p className="text-sm text-muted-foreground">{t('courseEditor.editions.description')}</p>
+
+            {siblings.length > 0 ? (
+              <div className="space-y-1.5">
+                <p className="text-[13px] font-semibold">{t('courseEditor.editions.linkedHeading')}</p>
+                <ul className="space-y-1">
+                  {siblings.map((s) => (
+                    <li key={s.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        {s.title}
+                        {s.language && <LanguageBadge language={s.language} />}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => unlinkEditionMutation.mutate(s.id)}
+                        disabled={unlinkEditionMutation.isPending}
+                      >
+                        {t('courseEditor.editions.unlinkButton')}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t('courseEditor.editions.none')}</p>
+            )}
+
+            {candidates.length > 0 ? (
+              <div className="flex items-center gap-2 pt-1">
+                <Select value={linkTargetId} onValueChange={setLinkTargetId}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder={t('courseEditor.editions.linkPlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {candidates.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.title} ({c.language})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={() => linkTargetId && linkEditionMutation.mutate(linkTargetId)}
+                  disabled={!linkTargetId || linkEditionMutation.isPending}
+                >
+                  {t('courseEditor.editions.linkButton')}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t('courseEditor.editions.noCandidates')}</p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

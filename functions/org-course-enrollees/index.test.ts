@@ -92,7 +92,8 @@ describe('org-course-enrollees', () => {
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('JOIN profiles');
-    expect(sql).toContain('WHERE e.org_id = $1 AND e.course_id = $2');
+    expect(sql).toContain('WHERE e.org_id = $1 AND e.course_id IN (');
+    expect(sql).toContain('COALESCE(gm.course_group_id, gm.id)');
     expect(sql).toContain('ORDER BY p.full_name');
     expect(sql).not.toContain('entra_oid');
     expect(sql).not.toContain('SELECT *');
@@ -164,8 +165,9 @@ describe('org-course-enrollees', () => {
       expect(sql).toContain('JOIN organizations');
       expect(sql).toContain('org_name');
       expect(sql).toContain('e.org_id');
-      // filtered by course only — no org bind param
-      expect(sql).toContain('e.course_id = $1');
+      // filtered by course only — no org bind param; group-expanded across editions
+      expect(sql).toContain('e.course_id IN (');
+      expect(sql).toContain('COALESCE(gm.course_group_id, gm.id)');
       expect(sql).toContain('ORDER BY p.full_name');
       expect(sql).not.toContain('SELECT *');
       expect(params).toEqual(['c-1']);

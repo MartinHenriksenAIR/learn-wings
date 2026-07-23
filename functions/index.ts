@@ -32,6 +32,7 @@ import './course-delete/index';
 import './course-player-data/index';
 import './course-review/index';
 import './course-structure-admin/index';
+import './course-translation-link/index';
 import './course-update/index';
 import './courses-admin/index';
 import './delete-user/index';

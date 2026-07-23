@@ -64,6 +64,7 @@ export interface Course {
   description: string | null;
   level: CourseLevel;
   language: 'en' | 'da' | null;
+  course_group_id: string | null;
   is_published: boolean;
   thumbnail_url: string | null;
   created_by_user_id: string | null;

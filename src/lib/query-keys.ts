@@ -251,10 +251,12 @@ export const queryKeys = {
 
   orgCourseProgress: {
     /**
-     * Full key: ['org-course-progress', orgId]
-     * Used by useOrgCourseProgress / CourseProgressTab.tsx.
+     * Full key: ['org-course-progress', orgId, adminLang]
+     * adminLang is in the key because the representative edition's title/level
+     * shown per group depends on the admin's app language (#213).
      */
-    detail: (orgId: string | undefined) => ['org-course-progress', orgId] as const,
+    detail: (orgId: string | undefined, adminLang: string | undefined) =>
+      ['org-course-progress', orgId, adminLang] as const,
   },
 
   orgCourseEnrollees: {

@@ -73,7 +73,7 @@ describe('org-course-progress', () => {
     const rows = [{ id: 'c1', title: 'A', level: 'basic', enrolled: 4, completed: 2 }];
     mockQuery.mockResolvedValueOnce(rows);
 
-    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    const res = await handler(baseReq({ orgId: 'org-1', adminLang: 'da' }), {} as any);
 
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
@@ -81,15 +81,34 @@ describe('org-course-progress', () => {
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('LEFT JOIN enrollments');
+    // Distinct-learner counts (not enrollment rows) so the combined line stays a true
+    // head-count even if a learner somehow holds two editions in the org.
+    expect(sql).toContain('COUNT(DISTINCT e.user_id)');
     expect(sql).toContain('FILTER (WHERE e.status = \'completed\')');
     expect(sql).toContain('GROUP BY');
+    // Group language editions by COALESCE(course_group_id, id)
+    expect(sql).toContain('COALESCE(');
+    expect(sql).toContain('course_group_id');
+    expect(sql).toContain("(language = $2) IS TRUE");     // NULL-safe representative-by-admin-language
     expect(sql).toContain('oca.access = \'enabled\'');
-    expect(sql).toContain('ORDER BY c.title');
     // Parity: no is_published filter
     expect(sql).not.toContain('is_published');
     // No SELECT *
     expect(sql).not.toContain('SELECT *');
-    expect(params).toEqual(['org-1']);
+    expect(params).toEqual(['org-1', 'da']);      // default adminLang
+  });
+
+  // 5b. Grouping + default adminLang when omitted
+  it('groups language editions and defaults adminLang to da when omitted', async () => {
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQuery.mockResolvedValueOnce([{ id: 'c-da', title: 'AI Grundkursus', level: 'basic', enrolled: 20, completed: 20 }]);
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any); // no adminLang
+
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('GROUP BY');
+    expect(params).toEqual(['org-1', 'da']);
   });
 
   // 6. Platform admin bypass — isOrgAdmin not called
@@ -131,7 +150,7 @@ describe('org-course-progress', () => {
       const rows = [{ id: 'c1', title: 'A', level: 'basic', enrolled: 7, completed: 3 }];
       mockQuery.mockResolvedValueOnce(rows);
 
-      const res = await handler(baseReq({ orgId: 'all' }), {} as any);
+      const res = await handler(baseReq({ orgId: 'all', adminLang: 'da' }), {} as any);
 
       expect(res.status).toBe(200);
       expect(JSON.parse(res.body as string).courses).toEqual(rows);
@@ -140,9 +159,11 @@ describe('org-course-progress', () => {
       const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
       // counts must be distinct users, not enrollment rows, once summed across orgs
       expect(sql).toContain('COUNT(DISTINCT e.user_id)');
-      // no org bind param — the aggregate spans every org
-      expect(sql).not.toContain('$1');
-      expect(params ?? []).toEqual([]);
+      // group language editions across orgs
+      expect(sql).toContain('COALESCE(');
+      // representative-by-admin-language ($1 is the only bind — the language)
+      expect(sql).toContain("(language = $1) IS TRUE");
+      expect(params).toEqual(['da']);
     });
   });
 });

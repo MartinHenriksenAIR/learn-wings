@@ -251,6 +251,77 @@ describe('CourseEditor — publish toggle', () => {
   });
 });
 
+describe('CourseEditor — Language editions (#213)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Candidates/siblings are derived from the shared `courses-admin` list. The
+  // Radix Select portals its options (and the jsdom setup has no pointer/scroll
+  // shims), so we assert the picker reaches its "has candidates" state — the
+  // link placeholder renders and the "no eligible courses" message does not —
+  // which proves the eligible candidate was derived. The sibling case below
+  // asserts the concrete title + unlink id, both visible without opening a Select.
+  it('shows the Language editions section with an eligible candidate', async () => {
+    const courseDa = {
+      id: 'c-da', title: 'Kursus DA', description: '', level: 'basic',
+      language: 'da', course_group_id: null, is_published: false,
+      thumbnail_url: null, created_at: '2024-01-01T00:00:00Z',
+    };
+    const candidateEn = { ...courseDa, id: 'c-en', title: 'English Course', language: 'en' };
+
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/course-structure-admin') return { course: courseDa, modules: [] };
+      if (path === '/api/courses-admin') return { courses: [courseDa, candidateEn] };
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage('c-da');
+
+    // The picker renders in its "candidates available" state (courses-admin loaded).
+    expect(await screen.findByText(/Choose a course to link/)).toBeInTheDocument();
+    expect(screen.getByText('Language editions')).toBeInTheDocument();
+    // No group yet → the "not linked" empty state, not a linked list.
+    expect(screen.getByText(/Not linked to any other language edition/)).toBeInTheDocument();
+    // An eligible candidate exists → the empty-candidates message must NOT show.
+    expect(screen.queryByText(/No eligible courses to link/)).toBeNull();
+  });
+
+  it('lists a linked sibling with an Unlink action and excludes same-language candidates', async () => {
+    const courseDa = {
+      id: 'c-da', title: 'Kursus DA', description: '', level: 'basic',
+      language: 'da', course_group_id: 'g1', is_published: false,
+      thumbnail_url: null, created_at: '2024-01-01T00:00:00Z',
+    };
+    const siblingEn = { ...courseDa, id: 'c-en-sib', title: 'English Edition', language: 'en', course_group_id: 'g1' };
+    // Standalone but 'da' — same language as the group → NOT an eligible candidate.
+    const standaloneDa = { ...courseDa, id: 'c-da2', title: 'Another DA', language: 'da', course_group_id: null };
+
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/course-structure-admin') return { course: courseDa, modules: [] };
+      if (path === '/api/courses-admin') return { courses: [courseDa, siblingEn, standaloneDa] };
+      if (path === '/api/course-translation-link') return { success: true };
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage('c-da');
+
+    // The sibling is listed by title (visible without opening any Select).
+    expect(await screen.findByText('English Edition')).toBeInTheDocument();
+    // The same-language standalone is filtered out → empty-candidates message shows.
+    expect(screen.getByText(/No eligible courses to link/)).toBeInTheDocument();
+
+    // Unlink targets the sibling's own id ({ action:'unlink', courseId: <sibling> }).
+    fireEvent.click(screen.getByRole('button', { name: /unlink/i }));
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith('/api/course-translation-link', {
+        action: 'unlink',
+        courseId: 'c-en-sib',
+      }),
+    );
+  });
+});
+
 describe('CourseEditor — language field (#191)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

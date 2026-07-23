@@ -957,6 +957,16 @@
     "descriptionLabel": "Beskrivelse",
     "levelLabel": "Niveau",
     "languageLabel": "Sprog",
+    "editions": {
+      "title": "Sprogudgaver",
+      "description": "Sammenkæd dette kursus med dets versioner på andre sprog, så analyser tæller dem som ét kursus.",
+      "linkedHeading": "Sammenkædede udgaver",
+      "none": "Ikke sammenkædet med en anden sprogudgave.",
+      "linkPlaceholder": "Vælg et kursus at sammenkæde…",
+      "linkButton": "Sammenkæd",
+      "unlinkButton": "Fjern kædning",
+      "noCandidates": "Ingen kurser kan sammenkædes (et kursus skal have et andet sprog og må ikke allerede være kædet)."
+    },
     "saveChanges": "Gem ændringer",
     "saved": "Gemt",
     "publishToggleLabel": "Udgivet",

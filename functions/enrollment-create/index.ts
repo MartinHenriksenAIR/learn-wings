@@ -1,6 +1,7 @@
 import { queryOne, isUniqueViolation } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { orgCourseAccessEnabled } from '../shared/course-visibility';
+import { siblingEnrollmentExists } from '../shared/course-groups';
 
 const ALLOWED_STATUSES = new Set(['enrolled', 'completed']);
 
@@ -53,6 +54,15 @@ export default endpoint('enrollment-create', async ({ req, profile, reply, requi
     if (!access?.ok) {
       return reply(403, { error: 'Organization does not have access to this course' });
     }
+  }
+
+  // #213: a learner may hold only one language edition of a course per org.
+  const sibling = await queryOne<{ blocked: boolean }>(
+    `SELECT ${siblingEnrollmentExists({ orgParam: 1, userParam: 2, courseParam: 3 })} AS blocked`,
+    [orgId, userId, courseId],
+  );
+  if (sibling?.blocked) {
+    return reply(409, { error: 'Already enrolled in this course in another language' });
   }
 
   const effectiveStatus = status ?? 'enrolled';

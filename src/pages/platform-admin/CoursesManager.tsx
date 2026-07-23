@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { routes } from '@/lib/routes';
 import { useTranslation } from 'react-i18next';
@@ -29,8 +29,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { FileUpload } from '@/components/ui/file-upload';
 import { callApi } from '@/lib/api-client';
 import { useOrganizations } from '@/hooks/useOrganizations';
+import { useCoursesAdmin, type CoursesAdminData } from '@/hooks/useCoursesAdmin';
 import { useToastMutation } from '@/hooks/useToastMutation';
-import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
+import { extractLmsAssetPath } from '@/lib/storage';
 import { Course, CourseLevel, OrgCourseAccess } from '@/lib/types';
 import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check, ChevronsUpDown, Pencil } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
@@ -41,12 +42,6 @@ import { cn } from '@/lib/utils';
  * Re-exported from the factory so CourseEditor can import it unchanged.
  */
 export const coursesAdminQueryKey = queryKeys.coursesAdmin.all;
-
-interface CoursesAdminData {
-  /** Courses with thumbnail_url already re-signed for display. */
-  courses: Course[];
-  accessRecords: OrgCourseAccess[];
-}
 
 /** RETURNING'd access rows replace any prior row for the same org+course pair. */
 function upsertAccessRecords(existing: OrgCourseAccess[], incoming: OrgCourseAccess[]): OrgCourseAccess[] {
@@ -104,19 +99,7 @@ export default function CoursesManager() {
     isLoading: coursesLoading,
     error: coursesError,
     refetch: refetchCourses,
-  } = useQuery({
-    queryKey: coursesAdminQueryKey,
-    queryFn: async (): Promise<CoursesAdminData> => {
-      const adminRes = await callApi<CoursesAdminData>('/api/courses-admin', {});
-      const coursesWithFreshThumbnails = await Promise.all(
-        adminRes.courses.map(async (course) => ({
-          ...course,
-          thumbnail_url: await getSignedLmsAssetUrl(course.thumbnail_url),
-        })),
-      );
-      return { courses: coursesWithFreshThumbnails, accessRecords: adminRes.accessRecords };
-    },
-  });
+  } = useCoursesAdmin();
   const courses = coursesData?.courses ?? [];
   const accessRecords = coursesData?.accessRecords ?? [];
 

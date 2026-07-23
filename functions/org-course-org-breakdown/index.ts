@@ -1,5 +1,6 @@
 import { query } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
+import { courseGroupMemberIds } from '../shared/course-groups';
 
 /**
  * Per-organization engagement breakdown for a single course, across every org.
@@ -18,10 +19,13 @@ import { adminEndpoint } from '../shared/endpoint';
  * after a learner enrolled). Without the union such an org would appear in the
  * enrollee list but be missing here, and the per-org total would fall short.
  *
- * Counts are org-scoped enrollments; UNIQUE(org_id, user_id, course_id) makes
- * "enrollments within an org" and "distinct learners within an org" equal.
- * Summed across orgs these can still exceed the dialog's distinct-learner
- * headline (#159) when one learner is enrolled through several orgs.
+ * Counts are DISTINCT learners per org (COUNT DISTINCT user_id across the group's
+ * editions). The per-course UNIQUE(org_id, user_id, course_id) does NOT make
+ * "enrollment rows" and "distinct learners" equal once editions are grouped — a
+ * learner could hold two sibling editions in one org (the enroll guard is app-level,
+ * not a DB constraint), so we de-dup by learner here. Summed across orgs these can
+ * still exceed the dialog's distinct-learner headline (#159) when one learner is
+ * enrolled through several orgs.
  */
 export default adminEndpoint('org-course-org-breakdown', async ({ req, reply }) => {
   const { courseId } = await req.json() as { courseId?: string };
@@ -31,17 +35,18 @@ export default adminEndpoint('org-course-org-breakdown', async ({ req, reply }) 
   }
 
   const orgs = await query(
-    `SELECT o.id AS org_id, o.name AS org_name,
-            COUNT(e.id)::int AS enrolled,
-            COUNT(e.id) FILTER (WHERE e.status = 'completed')::int AS completed
+    `WITH grp AS (${courseGroupMemberIds(1)})
+     SELECT o.id AS org_id, o.name AS org_name,
+            COUNT(DISTINCT e.user_id)::int AS enrolled,
+            COUNT(DISTINCT e.user_id) FILTER (WHERE e.status = 'completed')::int AS completed
        FROM organizations o
        JOIN (
          SELECT oca.org_id FROM org_course_access oca
-          WHERE oca.course_id = $1 AND oca.access = 'enabled'
+          WHERE oca.course_id IN (SELECT id FROM grp) AND oca.access = 'enabled'
          UNION
-         SELECT e.org_id FROM enrollments e WHERE e.course_id = $1
+         SELECT e.org_id FROM enrollments e WHERE e.course_id IN (SELECT id FROM grp)
        ) rel ON rel.org_id = o.id
-       LEFT JOIN enrollments e ON e.course_id = $1 AND e.org_id = o.id
+       LEFT JOIN enrollments e ON e.course_id IN (SELECT id FROM grp) AND e.org_id = o.id
       GROUP BY o.id, o.name
       ORDER BY enrolled DESC, o.name`,
     [courseId],
