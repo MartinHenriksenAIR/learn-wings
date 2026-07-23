@@ -1187,5 +1187,10 @@
     "goToSignIn": "Go to sign in",
     "signOut": "Sign out",
     "tryAgain": "Try again"
+  },
+  "exercise": {
+    "check": "Check",
+    "allCorrect": "Correct!",
+    "tryAgain": "Not quite — try again"
   }
 }

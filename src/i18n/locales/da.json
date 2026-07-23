@@ -1187,5 +1187,10 @@
     "goToSignIn": "Gå til login",
     "signOut": "Log ud",
     "tryAgain": "Prøv igen"
+  },
+  "exercise": {
+    "check": "Tjek",
+    "allCorrect": "Rigtigt!",
+    "tryAgain": "Ikke helt — prøv igen"
   }
 }
