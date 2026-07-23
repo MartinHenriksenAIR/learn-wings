@@ -1,4 +1,4 @@
--- migration/azure/05-assessment.sql
+-- migration/azure/06-assessment.sql
 -- Additive migration for #117 (AI self-assessment). IDEMPOTENT — safe to re-run.
 -- Apply to prod via psql from Azure Cloud Shell with a temporary single-IP
 -- firewall rule (see migration/azure/README.md "How to apply"). HUMAN-GATED.
