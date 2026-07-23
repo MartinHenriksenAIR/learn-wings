@@ -1371,3 +1371,20 @@ Idempotent (rewritten rows no longer match); the regex reproduces the JS `pathSe
 **Verify:** root `npm run lint` 0 errors · `npm test` 494 pass (88 files) · `npx tsc --noEmit -p tsconfig.app.json` exit 0 · `npm run build` exit 0; functions `npm run build` exit 0 · `npm test` 1938 pass (130 files, 3 skipped) — new: shared-module threshold boundaries (7/8, 14/15), submit validation 400s + boundary INSERT params, skip idempotency, user-context both-path field tests, analytics tenant-isolation 403, i18n drift guard. **Full signed-in reach-line smoke pre-undraft on a locally stood-up stack** (Docker Postgres 15 + `func start` + dev server, real Entra auth): wizard→result (13/21 Hverdagsbruger)→recommended→settings retake (21/advanced; 2 attempt rows, latest denormalized); skip→dashboard banner→no re-prompt on reload or /login round-trip (server-recorded); admin: settings card hidden, distribution Begynder 1/Øvet 1/Avanceret 1/Ikke vurderet 2 with BOTH org admins (each holding advanced) excluded, AI-niveau column, single-org + all-orgs title variants, da+en. Zero app console errors (one pre-existing boot-race 401 on `platform-settings` during the OAuth code exchange, unrelated to #117).
 
 **Deploy prerequisite (human-gated):** apply `migration/azure/06-assessment.sql` to prod before merging (same ritual as 03/04). **Applied to prod 2026-07-23** via the in-app SQL channel (Kudu `/api/vfs/data/` + the deployed `pg`, verify-full TLS); table/columns/index verified before-and-after.
+
+---
+
+## 2026-07-23 — ADR-0016 content localization strategy (#187)
+
+**Who:** martin. PR #224. Brainstorming → ADR. #187 is a **decision issue** — the deliverable is the recorded decision, no code (per-surface implementation lives in other issues).
+
+**Decision:** authored content localizes by one of three mechanisms, and **only courses segment the audience by language**:
+- **Structured teaching content (courses/lessons)** → per-language editions grouped by `course_group_id`; learners/org-admins see only the edition matching their **active UI language** (`i18n.resolvedLanguage`, per #191), analytics aggregate a group to one logical course (#213).
+- **Communal/announcement content (community feed, webinar/marketing #125)** → single shared artifact, no per-language editions, no language filter; authors write in either language.
+- **System-generated documents (transactional emails, AI Act PDF #71)** → one localized template rendered in the reader's language (server-sent email → stored `preferred_language`, as #193 does; on-demand PDF → requesting user's UI language). No duplicate copies.
+
+Plus a classification rule for future surfaces. Ratifies the courses model already shipped by #191/#213. **Two language signals** clarified: `resolvedLanguage` (UI + catalog content) vs. stored `preferred_language` (server-generated docs) — they currently diverge for new users.
+
+**Follow-ups filed:** **#225** (invite email localization — hardcoded `da` today; must resolve the no-profile-yet invitee language) · **#226** (initialize `preferred_language` from the browser at first login + override #119's Danish fallback → English for non-da/en, so UI/courses/emails agree). Per-surface implementation stays in #71/#123/#125/#225/#226.
+
+**Verify:** docs-only (one new ADR file); CI green (frontend + functions gates). No deploy impact (no functions/frontend artifact change).
