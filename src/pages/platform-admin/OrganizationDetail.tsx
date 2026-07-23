@@ -227,6 +227,7 @@ export default function OrganizationDetail() {
           orgName: org?.name || null,
           role: payload.role,
           linkId: invitation.link_id,
+          inviterLanguage: payload.language,
         });
 
         if (emailResult.success) {
