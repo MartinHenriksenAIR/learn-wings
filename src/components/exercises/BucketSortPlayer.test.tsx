@@ -4,9 +4,14 @@ import { render, screen, fireEvent } from '@testing-library/react';
 // i18n echo — REPO CONVENTION (see save-button.test.tsx / ReportedContentDialog.test.tsx):
 // t returns the key so the render resolves without a global i18n instance (test files
 // run isolated, so nothing initialises react-i18next otherwise). Key strings still
-// satisfy the /check/i etc. name matchers below.
+// satisfy the /check/i etc. name matchers below. The one exception is the
+// `placeInBucket` aria-label: it must interpolate {{label}} so the "place in <bucket>"
+// accessible-name matchers resolve, mirroring the real en.json value ("Place in {{label}}").
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({
+    t: (k: string, opts?: { label?: string }) =>
+      k === 'exercise.placeInBucket' && opts?.label ? `Place in ${opts.label}` : k,
+  }),
 }));
 
 import { BucketSortPlayer } from './BucketSortPlayer';
@@ -38,6 +43,23 @@ describe('BucketSortPlayer', () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
+  it('calls onComplete EXACTLY once even when Check is clicked repeatedly (completion latch)', () => {
+    const onComplete = vi.fn();
+    render(<BucketSortPlayer config={config} onComplete={onComplete} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Brainstorm/ }));
+    fireEvent.click(screen.getByRole('button', { name: /place in Draft/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Approve firing/ }));
+    fireEvent.click(screen.getByRole('button', { name: /place in Human/i }));
+
+    const check = screen.getByRole('button', { name: /check/i });
+    fireEvent.click(check);
+    fireEvent.click(check);
+    fireEvent.click(check);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
   it('does NOT call onComplete when an item is in the wrong bucket', () => {
     const onComplete = vi.fn();
     render(<BucketSortPlayer config={config} onComplete={onComplete} />);
@@ -51,7 +73,7 @@ describe('BucketSortPlayer', () => {
 // The three exercise.* keys the component renders must exist in BOTH locales
 // (frontend convention: every user-facing string has en + da).
 describe('exercise i18n keys', () => {
-  it.each(['check', 'allCorrect', 'tryAgain'])('defines exercise.%s in en and da', (key) => {
+  it.each(['check', 'allCorrect', 'tryAgain', 'placeHere', 'placeInBucket'])('defines exercise.%s in en and da', (key) => {
     const enVal = (en as unknown as Record<string, Record<string, string>>).exercise?.[key];
     const daVal = (da as unknown as Record<string, Record<string, string>>).exercise?.[key];
     expect(typeof enVal).toBe('string');

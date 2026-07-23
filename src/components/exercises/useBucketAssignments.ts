@@ -15,7 +15,7 @@ export function useBucketAssignments(config: BucketSortConfig) {
   const reset = () => setAssignments(Object.fromEntries(config.items.map((it) => [it.id, null])));
 
   const isAllCorrect = useMemo(
-    () => config.items.every((it) => assignments[it.id] === it.bucketId),
+    () => config.items.length > 0 && config.items.every((it) => assignments[it.id] === it.bucketId),
     [assignments, config.items],
   );
 

@@ -19,14 +19,23 @@ export function BucketSortPlayer({ config, onComplete }: Props) {
   const { assignments, assign, isAllCorrect } = useBucketAssignments(config);
   const [selected, setSelected] = useState<string | null>(null);   // click-to-place selection
   const [checked, setChecked] = useState(false);
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
+  const [completed, setCompleted] = useState(false);   // latch: onComplete fires exactly once
+  // distance:8 → a zero-movement click is NOT treated as a drag, so a plain click still
+  // reaches the item's onClick (click-to-place); a real drag starts after 8px of movement.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
 
   const place = (itemId: string, bucketId: string | null) => { assign(itemId, bucketId); setSelected(null); setChecked(false); };
   const onDragEnd = (e: DragEndEvent) => {
     const over = e.over?.id as string | undefined;
     if (over) place(e.active.id as string, over === TRAY ? null : over);
   };
-  const handleCheck = () => { setChecked(true); if (isAllCorrect) onComplete(); };
+  const handleCheck = () => {
+    setChecked(true);
+    if (isAllCorrect && !completed) { setCompleted(true); onComplete(); }
+  };
 
   const itemsIn = (bucketId: string | null) => config.items.filter((it) => (assignments[it.id] ?? null) === bucketId);
   const itemById = (id: string) => config.items.find((it) => it.id === id)!;
@@ -60,7 +69,7 @@ export function BucketSortPlayer({ config, onComplete }: Props) {
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <Button onClick={handleCheck}>{t('exercise.check')}</Button>
+        <Button onClick={handleCheck} disabled={completed}>{t('exercise.check')}</Button>
         {checked && (
           <span role="status" className={cn('text-sm', isAllCorrect ? 'text-green-600' : 'text-destructive')}>
             {isAllCorrect ? t('exercise.allCorrect') : t('exercise.tryAgain')}
@@ -91,6 +100,7 @@ function Item({ id, text, isSelected, feedback, onSelect }: {
 function Bucket({ id, label, canPlace, onPlaceClick, children }: {
   id: string; label: string; canPlace: boolean; onPlaceClick: () => void; children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div ref={setNodeRef} className={cn('rounded-lg border-2 border-dashed p-3', isOver && 'border-primary bg-accent')}>
@@ -98,7 +108,7 @@ function Bucket({ id, label, canPlace, onPlaceClick, children }: {
         <span className="font-medium">{label}</span>
         {canPlace && (
           <button type="button" onClick={onPlaceClick} className="text-xs underline"
-            aria-label={`place in ${label}`}>place here</button>
+            aria-label={t('exercise.placeInBucket', { label })}>{t('exercise.placeHere')}</button>
         )}
       </div>
       <div className="space-y-2 min-h-[3rem]">{children}</div>

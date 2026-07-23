@@ -1191,6 +1191,8 @@
   "exercise": {
     "check": "Check",
     "allCorrect": "Correct!",
-    "tryAgain": "Not quite — try again"
+    "tryAgain": "Not quite — try again",
+    "placeHere": "Place here",
+    "placeInBucket": "Place in {{label}}"
   }
 }

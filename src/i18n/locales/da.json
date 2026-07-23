@@ -1191,6 +1191,8 @@
   "exercise": {
     "check": "Tjek",
     "allCorrect": "Rigtigt!",
-    "tryAgain": "Ikke helt — prøv igen"
+    "tryAgain": "Ikke helt — prøv igen",
+    "placeHere": "Placér her",
+    "placeInBucket": "Placér i {{label}}"
   }
 }
