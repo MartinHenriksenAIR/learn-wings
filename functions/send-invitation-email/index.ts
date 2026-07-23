@@ -4,6 +4,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
+import { EMAIL_STRINGS, resolveEmailLanguage, type EmailLanguage } from './strings';
 import { Resend } from 'resend';
 
 // Lazy init — constructing Resend without an API key throws, which would
@@ -39,6 +40,7 @@ interface InvitationEmailRequest {
   orgName: string | null;
   role: string;
   inviteLink: string;
+  inviterLanguage?: 'da' | 'en';
 }
 
 function generateEmailHtml({
@@ -46,27 +48,26 @@ function generateEmailHtml({
   roleLabel,
   inviteLink,
   isPlatformAdmin,
+  lang,
+  s,
 }: {
-  email: string;
   orgName: string | null;
   roleLabel: string;
   inviteLink: string;
   isPlatformAdmin: boolean;
+  lang: EmailLanguage;
+  s: typeof EMAIL_STRINGS[EmailLanguage];
 }): string {
-  const welcomeMessage = isPlatformAdmin
-    ? 'Du er blevet inviteret til at blive Platform Administrator på AI Uddannelse.'
-    : `Du er blevet inviteret til at blive ${roleLabel} hos <strong>${orgName}</strong> på AI Uddannelse.`;
-
-  // Logo served from SWA static assets — not Supabase storage
+  const welcomeMessage = isPlatformAdmin ? s.welcomePlatformAdmin : s.welcomeOrg(roleLabel, orgName);
   const logoUrl = `${process.env.STATIC_ASSETS_BASE_URL ?? 'https://ai-uddannelse.dk'}/logo-light.png`;
 
   return `
 <!DOCTYPE html>
-<html lang="da">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invitation til AI Uddannelse</title>
+  <title>${s.documentTitle}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
   <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
@@ -76,42 +77,42 @@ function generateEmailHtml({
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; border-bottom: 1px solid #e4e4e7;">
               <img src="${logoUrl}" alt="AI Uddannelse" style="height: 50px; width: auto;" />
-              <p style="margin: 12px 0 0; font-size: 14px; color: #71717a;">AI Uddannelse til Virksomheder</p>
+              <p style="margin: 12px 0 0; font-size: 14px; color: #71717a;">${s.tagline}</p>
             </td>
           </tr>
           <tr>
             <td style="padding: 40px;">
-              <h2 style="margin: 0 0 16px; font-size: 20px; font-weight: 600; color: #18181b;">Du er inviteret!</h2>
+              <h2 style="margin: 0 0 16px; font-size: 20px; font-weight: 600; color: #18181b;">${s.heading}</h2>
               <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #3f3f46;">${welcomeMessage}</p>
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
                 <tr>
                   <td style="background-color: #f4f4f5; padding: 8px 16px; border-radius: 6px;">
-                    <span style="font-size: 14px; font-weight: 500; color: #3f3f46;">Din rolle: <strong style="color: #18181b;">${roleLabel}</strong></span>
+                    <span style="font-size: 14px; font-weight: 500; color: #3f3f46;">${s.yourRole} <strong style="color: #18181b;">${roleLabel}</strong></span>
                   </td>
                 </tr>
               </table>
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="text-align: center; padding: 8px 0;">
-                    <a href="${inviteLink}" style="display: inline-block; padding: 14px 32px; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px;">Accepter invitation</a>
+                    <a href="${inviteLink}" style="display: inline-block; padding: 14px 32px; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px;">${s.cta}</a>
                   </td>
                 </tr>
               </table>
-              <p style="margin: 24px 0 0; font-size: 14px; color: #71717a; text-align: center;">Eller kopier dette link til din browser:</p>
+              <p style="margin: 24px 0 0; font-size: 14px; color: #71717a; text-align: center;">${s.copyLinkHint}</p>
               <p style="margin: 8px 0 0; font-size: 12px; word-break: break-all; color: #a1a1aa; text-align: center;">${inviteLink}</p>
             </td>
           </tr>
           <tr>
             <td style="padding: 20px 40px 40px; border-top: 1px solid #e4e4e7;">
-              <p style="margin: 0 0 8px; font-size: 12px; color: #a1a1aa; text-align: center;">Denne invitation udløber om 7 dage.</p>
-              <p style="margin: 0; font-size: 12px; color: #a1a1aa; text-align: center;">Hvis du ikke forventede denne invitation, kan du ignorere denne email.</p>
+              <p style="margin: 0 0 8px; font-size: 12px; color: #a1a1aa; text-align: center;">${s.expiryNote}</p>
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa; text-align: center;">${s.ignoreNote}</p>
             </td>
           </tr>
         </table>
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 20px auto 0;">
           <tr>
             <td style="text-align: center;">
-              <p style="margin: 0; font-size: 12px; color: #a1a1aa;">© ${new Date().getFullYear()} AI Uddannelse. Alle rettigheder forbeholdes.</p>
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa;">© ${new Date().getFullYear()} AI Uddannelse. ${s.rightsReserved}</p>
             </td>
           </tr>
         </table>
@@ -141,7 +142,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return corsResponse(origin, 403, { error: 'Forbidden: Only admins can send invitations' });
     }
 
-    const { email, orgName, role, inviteLink } = await req.json() as InvitationEmailRequest;
+    const { email, orgName, role, inviteLink, inviterLanguage } = await req.json() as InvitationEmailRequest;
 
     if (!email || !inviteLink) {
       return corsResponse(origin, 400, { error: 'Missing required fields: email and inviteLink' });
@@ -158,12 +159,31 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     }
 
     const isPlatformAdminInvite = role === 'platform_admin';
-    const roleLabel = role === 'org_admin' ? 'Administrator' : role === 'platform_admin' ? 'Platform Administrator' : 'Learner';
-    const subject = isPlatformAdminInvite
-      ? 'Du er blevet inviteret som Platform Administrator på AI Uddannelse'
-      : `Du er blevet inviteret til ${orgName} på AI Uddannelse`;
 
-    const html = generateEmailHtml({ email, orgName, roleLabel, inviteLink, isPlatformAdmin: isPlatformAdminInvite });
+    // Resolve email language (ADR-0016 cat.3): existing recipient's stored
+    // preference wins; else the inviter's dialog pick; else default 'da'.
+    // Best-effort — a lookup failure must not block the send.
+    let profileLang: string | null = null;
+    try {
+      const invitee = await queryOne<{ preferred_language: string }>(
+        `SELECT preferred_language FROM profiles
+         WHERE lower(email) = lower($1) AND preferred_language IS NOT NULL
+         ORDER BY created_at ASC LIMIT 1`,
+        [email],
+      );
+      profileLang = invitee?.preferred_language ?? null;
+    } catch (lookupErr) {
+      context.warn?.('invitee language lookup failed; falling back', lookupErr);
+    }
+    const lang = resolveEmailLanguage(inviterLanguage, profileLang);
+    const s = EMAIL_STRINGS[lang];
+
+    const roleLabel =
+      role === 'org_admin' ? s.roleLabels.org_admin
+      : role === 'platform_admin' ? s.roleLabels.platform_admin
+      : s.roleLabels.learner;
+    const subject = isPlatformAdminInvite ? s.subjectPlatformAdmin : s.subjectOrg(orgName);
+    const html = generateEmailHtml({ orgName, roleLabel, inviteLink, isPlatformAdmin: isPlatformAdminInvite, lang, s });
 
     const emailResponse = await getResend().emails.send({
       from: 'AI Uddannelse <no-reply@ai-uddannelse.dk>',
