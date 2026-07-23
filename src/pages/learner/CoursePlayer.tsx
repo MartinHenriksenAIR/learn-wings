@@ -702,7 +702,7 @@ export default function CoursePlayer() {
 
             {currentLesson.lesson_type === 'exercise' && exerciseData?.exercise && (
               <div className="mt-4">
-                <ExercisePlayer exercise={exerciseData.exercise} onComplete={() => handleCompleteLesson()} />
+                <ExercisePlayer key={exerciseData.exercise.id} exercise={exerciseData.exercise} onComplete={() => handleCompleteLesson()} />
               </div>
             )}
 
