@@ -59,7 +59,7 @@ CREATE TYPE public.org_role            AS ENUM ('org_admin', 'learner');
 CREATE TYPE public.membership_status   AS ENUM ('active', 'invited', 'disabled');
 CREATE TYPE public.invitation_status   AS ENUM ('pending', 'accepted', 'expired');
 CREATE TYPE public.course_level        AS ENUM ('basic', 'intermediate', 'advanced');
-CREATE TYPE public.lesson_type         AS ENUM ('video', 'document', 'quiz');
+CREATE TYPE public.lesson_type         AS ENUM ('video', 'document', 'quiz', 'exercise');
 CREATE TYPE public.enrollment_status   AS ENUM ('enrolled', 'completed');
 CREATE TYPE public.progress_status     AS ENUM ('not_started', 'in_progress', 'completed');
 CREATE TYPE public.access_type         AS ENUM ('enabled', 'disabled');
@@ -235,6 +235,19 @@ CREATE TABLE public.quiz_options (
   option_text text NOT NULL,
   is_correct  boolean NOT NULL DEFAULT false,
   sort_order  integer NOT NULL DEFAULT 0   -- ADDED
+);
+
+-- ---- exercises ----
+-- Ungraded interactive lessons (ADR-0017). One row per exercise lesson.
+-- exercise_kind is TEXT (not an enum) so new kinds need no DDL; config is a
+-- kind-specific JSONB payload validated in code by functions/shared/exercises.
+-- Every config embeds an integer "version" for forward migration.
+CREATE TABLE public.exercises (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  lesson_id     uuid UNIQUE NOT NULL REFERENCES public.lessons(id) ON DELETE CASCADE,
+  exercise_kind text NOT NULL,
+  config        jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT exercises_config_is_object CHECK (jsonb_typeof(config) = 'object')
 );
 
 -- ---- org_course_access ----
