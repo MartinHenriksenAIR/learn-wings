@@ -49,11 +49,11 @@ describe('validateLessonFields — required fields', () => {
   // lessonType
   it('rejects missing lessonType', () => {
     const { lessonType: _l, ...body } = validBase;
-    expect(validateLessonFields(body)).toBe("lessonType must be 'video', 'document', or 'quiz'");
+    expect(validateLessonFields(body)).toBe("lessonType must be 'video', 'document', 'quiz', or 'exercise'");
   });
   it('rejects invalid lessonType', () => {
     expect(validateLessonFields({ ...validBase, lessonType: 'audio' })).toBe(
-      "lessonType must be 'video', 'document', or 'quiz'",
+      "lessonType must be 'video', 'document', 'quiz', or 'exercise'",
     );
   });
   it('accepts video', () => expect(validateLessonFields({ ...validBase, lessonType: 'video' })).toBeNull());
