@@ -1194,6 +1194,20 @@
     "allCorrect": "Correct!",
     "tryAgain": "Not quite — try again",
     "placeHere": "Place here",
-    "placeInBucket": "Place in {{label}}"
+    "placeInBucket": "Place in {{label}}",
+    "editor": {
+      "buckets": "Buckets",
+      "bucketLabel": "Bucket label",
+      "addBucket": "Add bucket",
+      "items": "Items",
+      "itemText": "Item text",
+      "correctBucket": "Correct bucket",
+      "addItem": "Add item",
+      "questionText": "Question text",
+      "optionText": "Option text",
+      "markCorrect": "Mark as correct",
+      "addOption": "Add option",
+      "addQuestion": "Add question"
+    }
   }
 }

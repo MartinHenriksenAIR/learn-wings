@@ -1194,6 +1194,20 @@
     "allCorrect": "Rigtigt!",
     "tryAgain": "Ikke helt — prøv igen",
     "placeHere": "Placér her",
-    "placeInBucket": "Placér i {{label}}"
+    "placeInBucket": "Placér i {{label}}",
+    "editor": {
+      "buckets": "Kategorier",
+      "bucketLabel": "Kategorinavn",
+      "addBucket": "Tilføj kategori",
+      "items": "Elementer",
+      "itemText": "Elementtekst",
+      "correctBucket": "Korrekt kategori",
+      "addItem": "Tilføj element",
+      "questionText": "Spørgsmålstekst",
+      "optionText": "Svarmulighed",
+      "markCorrect": "Markér som korrekt",
+      "addOption": "Tilføj svarmulighed",
+      "addQuestion": "Tilføj spørgsmål"
+    }
   }
 }
