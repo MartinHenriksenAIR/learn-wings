@@ -25,13 +25,14 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { AzureVideoUpload } from '@/components/ui/azure-video-upload';
 import { AzureDocumentUpload } from '@/components/ui/azure-document-upload';
 import { QuizEditorDialog } from '@/components/platform-admin/QuizEditorDialog';
+import { ExerciseEditorDialog } from '@/components/platform-admin/ExerciseEditorDialog';
 
 import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { routes } from '@/lib/routes';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
-import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, ListChecks, Pencil } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useToastMutation } from '@/hooks/useToastMutation';
@@ -103,6 +104,11 @@ export default function CourseEditor() {
   const [quizEditorOpen, setQuizEditorOpen] = useState(false);
   const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
   const [quizLessonTitle, setQuizLessonTitle] = useState('');
+
+  // Exercise editor state
+  const [exerciseEditorOpen, setExerciseEditorOpen] = useState(false);
+  const [exerciseLessonId, setExerciseLessonId] = useState<string | null>(null);
+  const [exerciseLessonTitle, setExerciseLessonTitle] = useState('');
 
   // Module/lesson mutations patch this cache from their RETURNING'd rows (issue
   // #48); only the course save path refetches it, because a changed thumbnail
@@ -434,6 +440,7 @@ export default function CourseEditor() {
       case 'video': return <Video className="h-[13px] w-[13px]" aria-hidden="true" />;
       case 'document': return <FileText className="h-[13px] w-[13px]" aria-hidden="true" />;
       case 'quiz': return <HelpCircle className="h-[13px] w-[13px]" aria-hidden="true" />;
+      case 'exercise': return <ListChecks className="h-[13px] w-[13px]" aria-hidden="true" />;
     }
   };
 
@@ -442,6 +449,7 @@ export default function CourseEditor() {
       case 'video': return t('courseEditor.lessonTypeVideo');
       case 'document': return t('courseEditor.lessonTypeDocument');
       case 'quiz': return t('courseEditor.lessonTypeQuiz');
+      case 'exercise': return t('courseEditor.lessonTypeExercise');
     }
   };
 
@@ -736,6 +744,19 @@ export default function CourseEditor() {
                           {t('courseEditor.editQuiz')}
                         </button>
                       )}
+                      {lesson.lesson_type === 'exercise' && features.exercises_enabled && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExerciseLessonId(lesson.id);
+                            setExerciseLessonTitle(lesson.title);
+                            setExerciseEditorOpen(true);
+                          }}
+                          className="rounded-[7px] px-2 py-[5px] text-xs font-bold text-primary transition-colors hover:bg-accent"
+                        >
+                          {t('courseEditor.editExercise')}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => openEditLesson(lesson)}
@@ -844,6 +865,7 @@ export default function CourseEditor() {
                     <SelectItem value="video">{t('courseEditor.lessonTypeVideo')}</SelectItem>
                     <SelectItem value="document">{t('courseEditor.lessonTypeDocument')}</SelectItem>
                     {features.quizzes_enabled && <SelectItem value="quiz">{t('courseEditor.lessonTypeQuiz')}</SelectItem>}
+                    {features.exercises_enabled && <SelectItem value="exercise">{t('courseEditor.lessonTypeExercise')}</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -925,6 +947,14 @@ export default function CourseEditor() {
                 </div>
               </>
             )}
+            {lessonType === 'exercise' && (
+              <div className="rounded-xl border border-dashed border-[#d6d8e0] p-4 text-center">
+                <ListChecks className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
+                <p className="text-sm text-muted-foreground">
+                  {t('courseEditor.exerciseSetupHint')}
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLessonDialogOpen(false)}>{t('common.cancel')}</Button>
@@ -945,6 +975,18 @@ export default function CourseEditor() {
           lessonTitle={quizLessonTitle}
           open={quizEditorOpen}
           onOpenChange={setQuizEditorOpen}
+        />
+      )}
+
+      {/* Exercise Editor Dialog — like the quiz editor, the structure response
+          carries no exercise data, so an exercise save changes nothing here. */}
+      {exerciseLessonId && (
+        <ExerciseEditorDialog
+          key={exerciseLessonId}
+          lessonId={exerciseLessonId}
+          lessonTitle={exerciseLessonTitle}
+          open={exerciseEditorOpen}
+          onOpenChange={setExerciseEditorOpen}
         />
       )}
 
