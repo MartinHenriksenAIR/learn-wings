@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-23
 **Issue:** #71 (AI Act Compliance PDF: update branding / layout / styling)
-**Status:** design LOCKED (2026-07-23) — ready for implementation planning
+**Status:** IMPLEMENTED (2026-07-23, PR #230) — pdfkit renderer in `render.ts`, endpoint + one client line; all gates green; compiled renderer visually matched the approved mockup; code-reviewed (empty-org verdict fixed). Pending: binary-download smoke on the deployed app.
 **Preview (locked look + content):** `scratchpad/pdf-mockup/report-formal.html`
 
 ## Problem
