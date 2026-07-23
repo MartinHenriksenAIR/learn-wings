@@ -45,6 +45,7 @@ import './enrollment-create/index';
 import './enrollments/index';
 import './exercise-admin/index';
 import './exercise-admin-save/index';
+import './exercise-by-lesson/index';
 import './generate-certificate/index';
 import './generate-compliance-report/index';
 import './grade-quiz/index';
