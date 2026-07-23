@@ -13,11 +13,13 @@ i18n
       en: { translation: en },
       da: { translation: da },
     },
-    // Danish is the default (issue #119): the first entry is the language used
-    // when the browser's language is neither en nor da. LanguageDetector still
-    // browser-matches en/da below; 'en' stays in the chain as a secondary
-    // fallback for any key ever missing in da.
-    fallbackLng: ['da', 'en'],
+    // English is the catch-all default (issue #226, overriding #119): when the
+    // browser's language is neither en nor da, i18next renders English — not
+    // Danish. LanguageDetector still browser-matches en/da below, so a Danish
+    // browser resolves to 'da' and an English browser to 'en'; only unrecognized
+    // languages hit this fallback. 'en' also stays the secondary key fallback
+    // for any key ever missing in da.
+    fallbackLng: 'en',
     supportedLngs: ['en', 'da'],
     interpolation: {
       escapeValue: false,
@@ -32,9 +34,9 @@ i18n
 // Keep the document's lang attribute in sync with the language actually shown
 // (#189): screen readers and browser "translate page" read it. Use
 // resolvedLanguage, not the raw detected code — an unsupported browser language
-// renders the Danish fallback, so the document should declare 'da'.
+// renders the English fallback (#226), so the document should declare 'en'.
 const syncDocumentLang = () => {
-  document.documentElement.lang = i18n.resolvedLanguage ?? 'da';
+  document.documentElement.lang = i18n.resolvedLanguage ?? 'en';
 };
 i18n.on('initialized', syncDocumentLang);
 i18n.on('languageChanged', syncDocumentLang);

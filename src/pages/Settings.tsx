@@ -310,7 +310,7 @@ export default function Settings() {
             </div>
             <div className="flex items-center gap-4">
               <Select
-                value={profile?.preferred_language || i18n.language || 'da'}
+                value={profile?.preferred_language || i18n.language || 'en'}
                 onValueChange={handleLanguageChange}
                 disabled={languageSaving}
               >

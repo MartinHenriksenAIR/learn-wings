@@ -26,6 +26,11 @@ vi.mock('@/lib/msal-config', () => ({
 const { mockCallApi } = vi.hoisted(() => ({ mockCallApi: vi.fn() }));
 vi.mock('@/lib/api-client', () => ({ callApi: mockCallApi }));
 
+// The provider reads the browser-derived language off the i18n singleton to
+// send it on the user-context call (#226). Pin it to 'da' so the assertion is
+// deterministic regardless of the jsdom navigator language.
+vi.mock('@/i18n', () => ({ default: { resolvedLanguage: 'da' } }));
+
 import { AuthProvider, useAuth } from './useAuth';
 
 const mockAccount = {
@@ -78,6 +83,27 @@ describe('useAuth', () => {
 
     expect(result.current.user?.id).toBe('entra-oid-123');
     expect(result.current.user?.email).toBe('user@contoso.com');
+  });
+
+  it('sends the browser-resolved language in the user-context request (#226)', async () => {
+    mockUseMsal.mockReturnValue({
+      instance: { loginRedirect: mockLoginRedirect, logoutRedirect: mockLogoutRedirect },
+      accounts: [mockAccount],
+      inProgress: 'none',
+    });
+    mockUseAccount.mockReturnValue(mockAccount);
+    mockCallApi.mockResolvedValue({ profile: { id: 'p-1', is_platform_admin: false }, memberships: [] });
+
+    renderHook(() => useAuth(), { wrapper });
+
+    // The provisioning call must carry the detected language so the server can
+    // stamp it on a first-login profile (mocked to 'da' above).
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith(
+        '/api/user-context',
+        expect.objectContaining({ language: 'da' }),
+      ),
+    );
   });
 
   it('signIn calls loginRedirect', () => {
