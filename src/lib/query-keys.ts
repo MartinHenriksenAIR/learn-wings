@@ -310,6 +310,22 @@ export const queryKeys = {
     detail: (lessonId: string) => ['quiz-admin', lessonId] as const,
   },
 
+  exerciseAdmin: {
+    /**
+     * Full key: ['exercise-admin', lessonId]
+     * Used by ExerciseEditorDialog.tsx (author read via /api/exercise-admin).
+     */
+    detail: (lessonId: string) => ['exercise-admin', lessonId] as const,
+  },
+
+  exerciseByLesson: {
+    /**
+     * Full key: ['exercise-by-lesson', lessonId]
+     * Used by useExerciseByLesson / CoursePlayer.tsx (learner read, full config).
+     */
+    detail: (lessonId: string | undefined) => ['exercise-by-lesson', lessonId] as const,
+  },
+
   // ── Learner courses (learner) ──────────────────────────────────────────────
   learnerCourses: {
     /**

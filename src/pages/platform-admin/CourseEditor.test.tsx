@@ -32,7 +32,7 @@ vi.mock('@/components/ui/sonner', () => ({
 
 // --- mock usePlatformSettings ---
 vi.mock('@/hooks/usePlatformSettings', () => ({
-  usePlatformSettings: () => ({ features: { quizzes_enabled: false }, isLoading: false }),
+  usePlatformSettings: () => ({ features: { quizzes_enabled: false, exercises_enabled: false }, isLoading: false }),
 }));
 
 // --- stub heavy child components ---
@@ -47,6 +47,9 @@ vi.mock('@/components/ui/azure-document-upload', () => ({
 }));
 vi.mock('@/components/platform-admin/QuizEditorDialog', () => ({
   QuizEditorDialog: () => <div data-testid="quiz-editor-dialog" />,
+}));
+vi.mock('@/components/platform-admin/ExerciseEditorDialog', () => ({
+  ExerciseEditorDialog: () => <div data-testid="exercise-editor-dialog" />,
 }));
 
 import CourseEditor from './CourseEditor';

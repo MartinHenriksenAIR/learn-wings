@@ -185,7 +185,8 @@
     "lessonTypes": {
       "video": "Video",
       "document": "Dokument",
-      "quiz": "Quiz"
+      "quiz": "Quiz",
+      "exercise": "Øvelse"
     },
     "rateThisCourse": "Bedøm dette kursus",
     "editYourReview": "Rediger din anmeldelse",
@@ -784,6 +785,8 @@
       "community_enabled_hint": "Aktivér fællesskabsfeed, idéer og moderationsfunktioner.",
       "course_reviews_enabled": "Kursusanmeldelser",
       "course_reviews_enabled_hint": "Tillad elever at skrive anmeldelser af kurser.",
+      "exercises_enabled": "Øvelser",
+      "exercises_enabled_hint": "Interaktive øvelseslektioner (Quick-check, træk-og-slip). Uden karakter.",
       "save": "Gem funktionsindstillinger"
     },
     "seatPricing": {
@@ -991,6 +994,7 @@
     "editLesson": "Redigér lektion",
     "deleteLesson": "Slet lektion",
     "editQuiz": "Redigér quiz",
+    "editExercise": "Redigér øvelse",
     "minutesShort": "{{count}} min",
     "moduleDialogAddTitle": "Tilføj modul",
     "moduleDialogEditTitle": "Redigér modul",
@@ -1013,6 +1017,7 @@
     "lessonTypeVideo": "Video",
     "lessonTypeDocument": "Dokument",
     "lessonTypeQuiz": "Quiz",
+    "lessonTypeExercise": "Øvelse",
     "lessonDurationLabel": "Varighed (minutter)",
     "lessonDurationPlaceholder": "f.eks. 15",
     "documentFileLabel": "Dokumentfil (valgfri)",
@@ -1023,6 +1028,7 @@
     "quizContentPlaceholder": "Quizinstruktioner eller yderligere kontekst...",
     "quizSetupHintEdit": "Gem lektionen først, og brug derefter \"Redigér quiz\" til at konfigurere spørgsmål.",
     "quizSetupHintCreate": "Opret lektionen først, og konfigurér derefter quizspørgsmålene.",
+    "exerciseSetupHint": "Gem lektionen først, og brug derefter \"Redigér øvelse\" til at opbygge aktiviteten.",
     "quizSetupSubhint": "Kursister skal bestå quizzen for at gennemføre denne lektion.",
     "lessonCreated": "Lektion oprettet!",
     "lessonUpdated": "Lektion opdateret!",
@@ -1185,5 +1191,33 @@
     "goToSignIn": "Gå til login",
     "signOut": "Log ud",
     "tryAgain": "Prøv igen"
+  },
+  "exercise": {
+    "check": "Tjek",
+    "allCorrect": "Rigtigt!",
+    "tryAgain": "Ikke helt — prøv igen",
+    "placeHere": "Placér her",
+    "placeInBucket": "Placér i {{label}}",
+    "kind": {
+      "quick_check": "Hurtig tjek",
+      "bucket_sort": "Sortér i kategorier"
+    },
+    "editor": {
+      "title": "Øvelse: {{title}}",
+      "saved": "Øvelse gemt",
+      "switchKindConfirm": "Hvis du skifter øvelsestype, ryddes det nuværende indhold. Fortsæt?",
+      "buckets": "Kategorier",
+      "bucketLabel": "Kategorinavn",
+      "addBucket": "Tilføj kategori",
+      "items": "Elementer",
+      "itemText": "Elementtekst",
+      "correctBucket": "Korrekt kategori",
+      "addItem": "Tilføj element",
+      "questionText": "Spørgsmålstekst",
+      "optionText": "Svarmulighed",
+      "markCorrect": "Markér som korrekt",
+      "addOption": "Tilføj svarmulighed",
+      "addQuestion": "Tilføj spørgsmål"
+    }
   }
 }

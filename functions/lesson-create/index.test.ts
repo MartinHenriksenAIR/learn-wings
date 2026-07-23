@@ -119,13 +119,13 @@ describe('lesson-create', () => {
     const { lessonType: _l, ...body } = validBody;
     const res = await handler(baseReq(body), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: "lessonType must be 'video', 'document', or 'quiz'" });
+    expect(JSON.parse(res.body as string)).toEqual({ error: "lessonType must be 'video', 'document', 'quiz', or 'exercise'" });
   });
 
   it('returns 400 when lessonType is invalid', async () => {
     const res = await handler(baseReq({ ...validBody, lessonType: 'audio' }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: "lessonType must be 'video', 'document', or 'quiz'" });
+    expect(JSON.parse(res.body as string)).toEqual({ error: "lessonType must be 'video', 'document', 'quiz', or 'exercise'" });
   });
 
   it('returns 400 when contentText is not a string (type violation)', async () => {

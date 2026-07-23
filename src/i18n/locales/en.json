@@ -185,7 +185,8 @@
     "lessonTypes": {
       "video": "Video",
       "document": "Document",
-      "quiz": "Quiz"
+      "quiz": "Quiz",
+      "exercise": "Exercise"
     },
     "rateThisCourse": "Rate this course",
     "editYourReview": "Edit your review",
@@ -784,6 +785,8 @@
       "community_enabled_hint": "Enable community feed, ideas and moderation features.",
       "course_reviews_enabled": "Course reviews",
       "course_reviews_enabled_hint": "Allow learners to leave reviews on courses.",
+      "exercises_enabled": "Exercises",
+      "exercises_enabled_hint": "Interactive practice lessons (Quick-check, drag-and-drop). Ungraded.",
       "save": "Save feature settings"
     },
     "seatPricing": {
@@ -991,6 +994,7 @@
     "editLesson": "Edit lesson",
     "deleteLesson": "Delete lesson",
     "editQuiz": "Edit quiz",
+    "editExercise": "Edit exercise",
     "minutesShort": "{{count}} min",
     "moduleDialogAddTitle": "Add Module",
     "moduleDialogEditTitle": "Edit Module",
@@ -1013,6 +1017,7 @@
     "lessonTypeVideo": "Video",
     "lessonTypeDocument": "Document",
     "lessonTypeQuiz": "Quiz",
+    "lessonTypeExercise": "Exercise",
     "lessonDurationLabel": "Duration (minutes)",
     "lessonDurationPlaceholder": "e.g., 15",
     "documentFileLabel": "Document File (optional)",
@@ -1023,6 +1028,7 @@
     "quizContentPlaceholder": "Quiz instructions or additional context...",
     "quizSetupHintEdit": "Save the lesson first, then use \"Edit Quiz\" to configure questions.",
     "quizSetupHintCreate": "Create the lesson first, then configure the quiz questions.",
+    "exerciseSetupHint": "Save the lesson first, then use \"Edit exercise\" to build the activity.",
     "quizSetupSubhint": "Learners will need to pass the quiz to complete this lesson.",
     "lessonCreated": "Lesson created!",
     "lessonUpdated": "Lesson updated!",
@@ -1185,5 +1191,33 @@
     "goToSignIn": "Go to sign in",
     "signOut": "Sign out",
     "tryAgain": "Try again"
+  },
+  "exercise": {
+    "check": "Check",
+    "allCorrect": "Correct!",
+    "tryAgain": "Not quite — try again",
+    "placeHere": "Place here",
+    "placeInBucket": "Place in {{label}}",
+    "kind": {
+      "quick_check": "Quick check",
+      "bucket_sort": "Sort into buckets"
+    },
+    "editor": {
+      "title": "Exercise: {{title}}",
+      "saved": "Exercise saved",
+      "switchKindConfirm": "Switching the exercise type will clear the current content. Continue?",
+      "buckets": "Buckets",
+      "bucketLabel": "Bucket label",
+      "addBucket": "Add bucket",
+      "items": "Items",
+      "itemText": "Item text",
+      "correctBucket": "Correct bucket",
+      "addItem": "Add item",
+      "questionText": "Question text",
+      "optionText": "Option text",
+      "markCorrect": "Mark as correct",
+      "addOption": "Add option",
+      "addQuestion": "Add question"
+    }
   }
 }

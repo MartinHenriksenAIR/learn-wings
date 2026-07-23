@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import React from 'react';
+import type { Exercise } from '@/lib/types';
 
 // react-i18next → key-returning t (the player uses t() for the completion-failure toast)
 vi.mock('react-i18next', () => ({
@@ -37,6 +38,23 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
 const mockUsePlatformSettings = vi.fn();
 vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => mockUsePlatformSettings(),
+}));
+
+// useExerciseByLesson → configurable per-lessonId mock. Default returns a static
+// bucket_sort exercise (only rendered when the current lesson is of type
+// 'exercise', so it's inert for the non-exercise tests). The state-isolation test
+// overrides the implementation to return a DIFFERENT exercise per lessonId.
+// (Named `mock`-prefixed for vi.mock hoisting; vi.clearAllMocks clears call
+// history but keeps this default implementation.)
+const mockUseExerciseByLesson = vi.fn<(lessonId?: string) => { data: { exercise: Exercise } }>(() => ({
+  data: { exercise: {
+    id: 'ex1', lesson_id: 'l-ex', exercise_kind: 'bucket_sort',
+    config: { version: 1, buckets: [{ id: 'b1', label: 'Draft' }, { id: 'b2', label: 'Human' }],
+      items: [{ id: 'i1', text: 'Brainstorm', bucketId: 'b1' }] },
+  } },
+}));
+vi.mock('@/hooks/useExerciseByLesson', () => ({
+  useExerciseByLesson: (lessonId?: string) => mockUseExerciseByLesson(lessonId),
 }));
 
 import CoursePlayer from './CoursePlayer';
@@ -87,6 +105,7 @@ function setup(opts: {
       analytics_enabled: true,
       course_reviews_enabled: opts.reviewsEnabled,
       community_enabled: true,
+      exercises_enabled: false,
     },
   });
   mockCallApi.mockImplementation(async (url: string) => {
@@ -234,6 +253,7 @@ describe('CoursePlayer — completion semantics (#18)', () => {
         analytics_enabled: true,
         course_reviews_enabled: false,
         community_enabled: true,
+        exercises_enabled: false,
       },
     });
   });
@@ -326,5 +346,116 @@ describe('CoursePlayer — completion semantics (#18)', () => {
       }));
     });
     expect(screen.queryByText(/congratulations/i)).toBeNull();
+  });
+});
+
+describe('CoursePlayer — exercise rendering (#227)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(baseAuth);
+    mockUsePlatformSettings.mockReturnValue({
+      features: {
+        certificates_enabled: false,
+        quizzes_enabled: true,
+        analytics_enabled: true,
+        course_reviews_enabled: false,
+        community_enabled: true,
+        exercises_enabled: true,
+      },
+    });
+  });
+
+  it('renders the ExercisePlayer for an exercise lesson and gives it no manual complete button', async () => {
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') {
+        return {
+          course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+          modules: [{
+            id: 'm-1', title: 'Module 1', sort_order: 0,
+            lessons: [{
+              id: 'l-ex', title: 'Sort the tasks', lesson_type: 'exercise',
+              module_id: 'm-1', sort_order: 0,
+            }],
+          }],
+          progressMap: {},
+          review: null,
+        };
+      }
+      if (url === '/api/quiz-by-lesson') return { quiz: null, questions: [] };
+      return {};
+    });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    // The bucket_sort exercise surfaces its bucket labels — proof the player rendered.
+    expect(await screen.findByText('Draft')).toBeInTheDocument();
+    expect(screen.getByText('Human')).toBeInTheDocument();
+    // Correctness-gated (ADR-0017): no manual "Mark complete" footer override for exercises.
+    expect(screen.queryByRole('button', { name: /markAsComplete/i })).toBeNull();
+  });
+
+  it('does not leak player state between two consecutive exercise lessons (key remount)', async () => {
+    // Two exercise lessons back-to-back. Completing A auto-advances to B; B must
+    // mount fresh — its Check button ENABLED, not latched-disabled from A's
+    // `completed` state. Without a per-exercise React key the player instance is
+    // reused and B can never be completed. Regression guard for #227 final review.
+    const exA: Exercise = {
+      id: 'ex-a', lesson_id: 'l-1', exercise_kind: 'quick_check',
+      config: { version: 1, questions: [{
+        id: 'qa', text: 'Question A',
+        options: [{ id: 'a1', text: 'Right A', correct: true }, { id: 'a2', text: 'Wrong A', correct: false }],
+      }] },
+    };
+    const exB: Exercise = {
+      id: 'ex-b', lesson_id: 'l-2', exercise_kind: 'quick_check',
+      config: { version: 1, questions: [{
+        id: 'qb', text: 'Question B',
+        options: [{ id: 'b1', text: 'Right B', correct: true }, { id: 'b2', text: 'Wrong B', correct: false }],
+      }] },
+    };
+    mockUseExerciseByLesson.mockImplementation((lessonId?: string) => ({
+      data: { exercise: lessonId === 'l-2' ? exB : exA },
+    }));
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') {
+        return {
+          course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+          modules: [{
+            id: 'm-1', title: 'Module 1', sort_order: 0,
+            lessons: [
+              { id: 'l-1', title: 'Exercise A', lesson_type: 'exercise', module_id: 'm-1', sort_order: 0 },
+              { id: 'l-2', title: 'Exercise B', lesson_type: 'exercise', module_id: 'm-1', sort_order: 1 },
+            ],
+          }],
+          progressMap: {},
+          review: null,
+        };
+      }
+      if (url === '/api/quiz-by-lesson') return { quiz: null, questions: [] };
+      return {};
+    });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    // Exercise A is shown and completable.
+    await screen.findByText('Question A');
+    expect(screen.getByRole('button', { name: /exercise\.check/i })).toBeEnabled();
+
+    // Complete A → onComplete fires → auto-advance to lesson B.
+    fireEvent.click(screen.getByRole('radio', { name: /Right A/ }));
+    fireEvent.click(screen.getByRole('button', { name: /exercise\.check/i }));
+
+    // Lesson progress recorded for A, then advance renders B's content.
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/lesson-progress', {
+        orgId: 'org-1', lessonId: 'l-1', status: 'completed',
+      });
+    });
+    await screen.findByText('Question B');
+    // A's content is gone (single exercise renders at a time).
+    expect(screen.queryByText('Question A')).toBeNull();
+    // The decisive assertion: B's Check button is ENABLED (fresh state), not
+    // disabled by A's latched `completed`. Fails without the per-exercise key.
+    expect(screen.getByRole('button', { name: /exercise\.check/i })).toBeEnabled();
   });
 });
