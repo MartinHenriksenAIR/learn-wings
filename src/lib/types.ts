@@ -4,7 +4,7 @@ export type OrgRole = 'org_admin' | 'learner';
 type MembershipStatus = 'active' | 'invited' | 'disabled';
 type InvitationStatus = 'pending' | 'accepted' | 'expired';
 export type CourseLevel = 'basic' | 'intermediate' | 'advanced';
-export type LessonType = 'video' | 'document' | 'quiz';
+export type LessonType = 'video' | 'document' | 'quiz' | 'exercise';
 type EnrollmentStatus = 'enrolled' | 'completed';
 type ProgressStatus = 'not_started' | 'in_progress' | 'completed';
 type AccessType = 'enabled' | 'disabled';
@@ -117,6 +117,26 @@ export interface QuizOption {
   question_id: string;
   option_text: string;
   is_correct: boolean;
+}
+
+// ── Exercises (ADR-0017) — ungraded interactive lessons ──────────────────────
+export type ExerciseKind = 'quick_check' | 'bucket_sort';
+
+export interface QuickCheckOption { id: string; text: string; correct: boolean; }
+export interface QuickCheckQuestion { id: string; text: string; options: QuickCheckOption[]; }
+export interface QuickCheckConfig { version: 1; questions: QuickCheckQuestion[]; }
+
+export interface BucketSortBucket { id: string; label: string; }
+export interface BucketSortItem { id: string; text: string; bucketId: string; }
+export interface BucketSortConfig { version: 1; buckets: BucketSortBucket[]; items: BucketSortItem[]; }
+
+export type ExerciseConfig = QuickCheckConfig | BucketSortConfig;
+
+export interface Exercise {
+  id: string;
+  lesson_id: string;
+  exercise_kind: ExerciseKind;
+  config: ExerciseConfig;
 }
 
 export interface OrgCourseAccess {
