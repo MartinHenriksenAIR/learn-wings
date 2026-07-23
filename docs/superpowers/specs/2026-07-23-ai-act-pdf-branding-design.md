@@ -1,78 +1,95 @@
-# AI Act Compliance PDF — Branding + Localization (#71)
+# AI Act Compliance PDF — Rebrand + Content Redesign (#71)
 
 **Date:** 2026-07-23
 **Issue:** #71 (AI Act Compliance PDF: update branding / layout / styling)
-**Status:** design approved, pending spec review
+**Status:** design LOCKED (2026-07-23) — one open implementation decision noted in §Data
+**Preview (locked look + content):** `scratchpad/pdf-mockup/report-formal.html`
 
 ## Problem
 
-The org-admin "Download Report" button (`OrgAnalytics.tsx` → `/api/generate-compliance-report`) produces a working but unbranded PDF. The current generator (`functions/generate-compliance-report/index.ts`) hand-writes raw PDF-1.4 byte syntax as a template string:
+The org-admin "Download Report" button (`OrgAnalytics.tsx` → `/api/generate-compliance-report`) produces a working but weak PDF. Two problems, addressed together:
 
-- Off-brand header colour (`0.1 0.3 0.5` ≈ a muted teal, not the brand navy).
-- No logo, Helvetica only.
-- **Fragile:** hardcoded `/Length` and xref byte offsets that already drift from the real content; fixed absolute coordinates that overflow/overlap past ~5 departments (courses are hard-capped at 5).
-- All fixed strings are English (`en-US`), regardless of the reader.
+1. **Presentation** — `functions/generate-compliance-report/index.ts` hand-writes raw PDF-1.4 byte syntax: off-brand header colour, no logo, fragile hardcoded xref offsets, fixed coordinates that overflow past ~5 rows, English-only.
+2. **Content** — it's a formatted dump of training stats you can't *conclude* from. It should be evidence for **AI Act Article 4 (AI literacy), Regulation (EU) 2024/1689**: does the org ensure a sufficient level of staff AI literacy, to what degree, and where are the gaps.
 
-## Decisions (from brainstorming, 2026-07-23)
+## Decisions (brainstorming + review, 2026-07-23)
 
-1. **Brand source → Platform (AI Uddannelse).** Navy `#10298f` (the `--primary` token) + the in-app logo (`src/assets/logo-light.png`). One consistent look for every org. (Not the org's own logo, not the AI Rådgivning consultancy brand.)
-2. **Technology → `pdfkit`.** Pure-JS (no native binaries → clean Azure Functions zipdeploy, survives runtime bumps), real flow layout + pagination, embeds a PNG logo and fonts. Chosen over HTML→PDF/Puppeteer (Chromium is an operational trap in a serverless Function) and `@react-pdf/renderer` (drags React into an otherwise React-free `functions/` tree). Replaces the fragile hand-rolled byte code entirely.
-3. **Localization → category-3 per ADR-0016.** The PDF is a *system-generated document*: one localized template whose fixed strings render in the reader's language, variable data (org, names, numbers, dates) language-neutral. Per ADR-0016, the compliance PDF specifically follows **the requesting user's UI language at request time** (`i18n.resolvedLanguage`, sent by the client) — **not** the stored `preferred_language` (that rule is for server-sent emails where no user is present). Supported languages `da` / `en`; server validates and falls back to `en`.
+1. **Brand source → Platform (AI Uddannelse).** Navy `#10298f` + in-app logo (`src/assets/logo-light.png`).
+2. **Technology → `pdfkit`.** Pure-JS (serverless-safe on Azure Functions), real flow layout + pagination, embeds the logo and covers `æøå` via built-in fonts. Replaces the raw-PDF byte code entirely.
+3. **Localization → ADR-0016 category-3.** One localized template; fixed strings in the reader's language, variable data language-neutral. The PDF follows **the requesting user's UI language at request time** (`i18n.resolvedLanguage`, sent by the client), not the stored `preferred_language`. `da` / `en`; server validates, falls back to `en`.
+4. **Visual register → formal / authoritative** (not a product dashboard). **Serif throughout** (built-in **Times** in pdfkit; Georgia in the HTML preview). **Near-monochrome**: ink + navy only, with a restrained **oxblood `#8a2a2a`** used *solely* to mark a deficiency. **Ruled**, not carded — hairline-ruled tables, no zebra fills, no rounded pills/cards, sharp corners, small-caps serif labels. A letterhead double-rule, a centred title block, numbered clauses, a declaration and a signature block.
+5. **Content → concise, conclusion-first, Article-4 framing.** Ruthlessly lean — the verdict is legible in the first third of one page; no vanity metrics. Scoped honestly as *training* evidence, **not** a full AI-Act conformity assessment.
+6. **Page size → A4** (Danish/EU orgs; current code uses US Letter).
+
+## Report structure (locked)
+
+Single formal document, paginated. In order:
+
+1. **Letterhead** — logo (left) + right block: "Compliance Report" · reference no. · "Confidential"; double navy rule.
+2. **Title block** (centred) — "AI Literacy & Training Report" + regulation citation subtitle.
+3. **Metadata row** (ruled) — Organisation · Reporting period · Prepared by (name + role) · Date of issue.
+4. **Declaration** — one justified paragraph stating what the report documents and the Article-4 frame.
+5. **§1 Summary** — key-figures strip (Staff in scope · Baseline-trained · **Coverage %** · Outstanding · Refresher due) + a one-line status sentence with the status word (e.g. "Action required") in oxblood small-caps.
+6. **§2 Coverage by department** — ruled table: Department · Staff · Trained · Coverage · Assessed level · Status (On track / Below target / Priority; deficiencies in oxblood). Stated ≥80% target note.
+7. **§3 Required curriculum** — compact ruled table: each required course · completion %.
+8. **§4 Assessed literacy** — compact ruled table: level (Advanced / Intermediate / Basic / Not assessed) · staff · share. Source: onboarding assessment (#117).
+9. **Certification + signature block** — certification sentence + Prepared-by / Reviewed-by / Date signature lines.
+10. **Footer** (ruled) — Confidential · reference · page X of Y.
+
+**Removed by owner decision (2026-07-23):** the "Recommended actions & basis of preparation" section. The report states findings and evidence; it does not prescribe actions. (Consequence: the scope/basis disclaimer that lived there is gone — if a scope caveat is later wanted, add a one-line footer, not a section.)
 
 ## Architecture
 
-Single endpoint rewrite plus one client line. No new shared contract, no schema change.
+Endpoint rewrite + one client line. No new shared contract.
 
 ### Backend — `functions/generate-compliance-report/index.ts`
 - Read `language` from the POST body alongside `orgId`; validate `∈ {'da','en'}`, default `'en'`.
-- Keep the existing auth + access-check (platform admin OR active org_admin via `entra_oid`) and the department/course aggregation SQL **unchanged**.
-- Replace `generatePDF()` with a pdfkit implementation.
-- **Strings stay local** to the endpoint: a small `const LABELS = { da: {...}, en: {...} }` module in the function folder (`strings.ts`). This is deliberately *not* a `functions/shared/*` i18n contract — #71 is the first category-3 document; when #225 (invitation email) builds the reusable server-doc i18n mechanism, that helper is extracted and #71 adopts it. Avoids premature abstraction and avoids editing shared files in flight.
-- **Logo** embedded as a base64 constant (`logo.ts`, ~5KB) rather than a runtime file read — no path resolution, no `WEBSITE_RUN_FROM_PACKAGE` read-only-mount concern, guaranteed to ship in the bundle. `doc.image(Buffer.from(base64,'base64'), …)`.
-- **Fonts:** pdfkit's built-in Helvetica / Helvetica-Bold, which render `æøå` via WinAnsi encoding (verified during build). A brand TTF is a possible later polish, out of scope here.
-- **Dates** localized with `toLocaleDateString(language === 'da' ? 'da-DK' : 'en-US', …)`.
-- Response stays a binary `application/pdf` attachment (same `Content-Disposition` pattern), body from the pdfkit Buffer.
+- Keep the existing auth + access-check (platform admin OR active org_admin via `entra_oid`); additionally resolve the **caller's name + role** for the "Prepared by" line.
+- Replace `generatePDF()` with a pdfkit implementation rendering the structure above.
+- **Strings local** to the endpoint (`strings.ts`, `{da,en}`) — not a shared contract; #225 later extracts the reusable server-doc i18n helper and this adopts it.
+- **Logo** embedded as a base64 constant (`logo.ts`) — no runtime file read, mount-safe.
+- **Fonts:** pdfkit built-in Times-Roman / Times-Bold / Times-Italic (WinAnsi covers `æøå`; verified in the prototype). No TTF bundled.
+- **Dates** localized (`da-DK` / `en-US`).
+- Binary `application/pdf` response unchanged.
 
-### Frontend — `src/pages/org-admin/OrgAnalytics.tsx` (line ~155)
-- One-line change: add `language: i18n.resolvedLanguage` to the existing `callApiRaw('/api/generate-compliance-report', { orgId })` body. `useTranslation` is already imported in this component.
+### Frontend — `src/pages/org-admin/OrgAnalytics.tsx` (~line 155)
+- Add `language: i18n.resolvedLanguage` to the existing `callApiRaw('/api/generate-compliance-report', { orgId })` body. `useTranslation` already imported.
 
-## Layout (branded)
+## Data
 
-- **Header band:** navy `#10298f` full-width bar; logo (left) + report title (white) — title localized.
-- **Meta block:** organization name, generated date (localized), total staff.
-- **Overall compliance card:** light-navy `#eef1fb` background, navy heading, the org-wide compliance rate.
-- **Department table:** real header row + column layout (Department · Staff · Courses completed · Compliance rate), row dividers, and **pagination** via pdfkit flow / `addPage()` so any number of departments renders without overlap.
-- **Course completion table:** header row (Course · Completion), no longer hard-capped at 5.
-- **Footer:** page number ("Page X of Y" / "Side X af Y") + a branding line and generated timestamp.
-- Compliance rates may use success-green `#1e9e6a` as a tasteful accent. Palette sourced from `src/index.css` tokens.
+The richer content needs more than today's dept/course aggregation. All of the following exist in the DB and are additive queries:
+- **Coverage / trained / outstanding** — `enrollments.status = 'completed'` per user against the baseline curriculum; joined to `profiles.department` for the per-dept table.
+- **Assessed literacy** — `profiles.assessment_level` + `assessment_skipped_at` (#117): counts per level incl. "Not assessed".
+- **Refresher due** — completion timestamps on `enrollments` older than 12 months.
+- **Prepared by** — the requesting user's `profiles.full_name` + org role.
 
-## Data flow
+**⚠ One open implementation decision — the "baseline curriculum" (required courses) source.** There is no "required course" concept today. Options:
+- **(a) Proxy = all org-enabled courses** (`org_course_access.access='enabled'`). No schema change, but "baseline-trained = completed *every* enabled course" is a stringent/odd bar.
+- **(b) Add a lightweight `is_baseline`/`required` flag** on `org_course_access` (org admin marks which enabled courses count toward baseline literacy) + a small toggle in the org course-access UI; fall back to (a) when none flagged. **Recommended** — makes the headline metric meaningful. This expands #71's footprint to a schema migration + a small admin-UI toggle.
 
-`OrgAnalytics` POST `{ orgId, language }` → authenticate → access-check → aggregate departments/courses (unchanged SQL) → build `ReportData` → `generatePDF(data, language)` → Buffer → 200 `application/pdf`. Auth failures 401 (`AuthError`), non-admin 403, unexpected 500 via `internalError` (generic body, ADR-0014) — all unchanged.
+Resolve in the implementation plan. If (b), announce the shared-schema touch per the collaboration model.
 
 ## Testing
 
-Mock-contract test (`functions/generate-compliance-report/index.test.ts`), per functions convention (mock `shared/auth`, `shared/db`; never a real DB):
-- Happy path → 200, `Content-Type: application/pdf`, body begins `%PDF`, non-trivial length.
+Mock-contract test (`functions/generate-compliance-report/index.test.ts`; mock `shared/auth`, `shared/db` — never a real DB):
+- 200 + `application/pdf` + body begins `%PDF`, non-trivial length.
 - 401 unauthenticated; 403 authenticated non-admin.
-- Localization: `language: 'da'` vs `'en'` produce different bytes (labels differ); an unsupported/absent language falls back to `en`.
-- Manual: generate a real PDF locally for both languages and eyeball branding/layout before undrafting.
+- Localization: `da` vs `en` produce different bytes; unsupported/absent language → `en`.
+- Manual: generate real PDFs (both languages, incl. a long department list to prove pagination) and eyeball before undrafting.
 
 ## Verification gates
 
-- `functions/`: `npm run build`, `npm test`.
-- Root gates (`lint`, `tsc`, `test`, `build`) — the frontend change is one line in `OrgAnalytics.tsx`; run the root gates to keep them green.
+`functions/`: `npm run build`, `npm test`. Root gates (`lint`, `tsc`, `test`, `build`) for the one-line `OrgAnalytics.tsx` change. (New worktree needs BOTH root + `functions/` `npm install` before gates run.)
 
-## Interference / coordination (checked against in-flight work)
+## Interference / coordination
 
-- **Files touched:** `functions/generate-compliance-report/*` (+ new `strings.ts`, `logo.ts`, test) and **one line** in `src/pages/org-admin/OrgAnalytics.tsx`. Neither is in #226's file set (`src/i18n/index.ts`, `functions/user-context`, `useAuth`, `Signup`, `Settings`) nor #227's (`CourseEditor`, `CoursePlayer`, `types.ts`, locale JSON, schema, `validate.ts`, lesson endpoints). No merge conflict, no shared-contract edit.
-- **Independent of #226:** #71 keys off the live `i18n.resolvedLanguage`, which is already correct today; it does not read the `preferred_language` #226 initializes. #226 only changes what `resolvedLanguage` resolves to for a non-da/en browser (`da` → `en`), which #71 simply honors. No ordering requirement.
-- **Independent of #225:** both are category-3 documents, but #71 keeps its strings local; the shared server-doc i18n helper is #225's to build and #71 will adopt it later. #71 is a concrete first example to generalize from.
-- **`OrgAnalytics.tsx`** is on #121's future radar (analytics/org-overview split), but #121 is blocked on RBAC #122 and not in flight — no current conflict.
+- **Files touched:** `functions/generate-compliance-report/*` (+ `strings.ts`, `logo.ts`, test) and one line in `src/pages/org-admin/OrgAnalytics.tsx` — **plus**, if Data option (b) is chosen, `migration/azure/01-schema.sql` + the org course-access admin UI. None overlap #226 (`i18n/index.ts`, `user-context`, `useAuth`, `Signup`, `Settings`) or #227 (`CourseEditor`, `CoursePlayer`, `types.ts`, locale JSON, schema `lesson_type`, `validate.ts`, lesson endpoints). A schema touch under (b) would be a new (non-conflicting) migration file — coordinate the shared-schema heads-up.
+- **Independent of #226:** keys off the live `resolvedLanguage`, correct today; #226 only changes what non-da/en browsers resolve to. No ordering requirement.
+- **Independent of #225:** both category-3, but strings stay local; #225 owns the shared helper.
 
 ## Out of scope / future
 
-- Brand TTF typography (built-in Helvetica is sufficient for `æøå`).
-- Extracting the local strings into a `functions/shared/*` server-doc i18n helper (deferred to #225 / ADR-0016 follow-up).
-- Charts/graphs in the report.
-- Per-org white-label logo.
+- Recommended-actions / basis-of-preparation section (removed by decision).
+- Brand TTF typography (built-in Times suffices for `æøå`).
+- Extracting local strings into a `functions/shared/*` server-doc i18n helper (→ #225).
+- Charts/graphics, per-org white-label logo.
