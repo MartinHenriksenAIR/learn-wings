@@ -43,6 +43,7 @@ import './enroll/index';
 import './enrollment-complete/index';
 import './enrollment-create/index';
 import './enrollments/index';
+import './exercise-admin/index';
 import './exercise-admin-save/index';
 import './generate-certificate/index';
 import './generate-compliance-report/index';
