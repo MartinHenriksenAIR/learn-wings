@@ -38,7 +38,7 @@ const ZERO_STATS = {
 };
 
 export default function OrgAnalytics() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isGlobalView = location.pathname === routes.platformAdmin.analytics;
@@ -152,7 +152,8 @@ export default function OrgAnalytics() {
 
     setGeneratingReport(true);
     try {
-      const response = await callApiRaw('/api/generate-compliance-report', { orgId: effectiveOrgId });
+      // #71: report follows the reader's live UI language (ADR-0016 category 3)
+      const response = await callApiRaw('/api/generate-compliance-report', { orgId: effectiveOrgId, language: i18n.resolvedLanguage });
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
