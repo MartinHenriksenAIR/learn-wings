@@ -1,9 +1,9 @@
 /**
  * Shared dynamic-UPDATE builder for PATCH-style endpoints.
  *
- * `buildUpdateSet(updates, allowedFields, options)` performs the three checks
- * that resource-update, idea-update, and organization-update all repeated
- * verbatim, plus builds the parameterized SET clause list:
+ * `buildUpdateSet(updates, allowedFields, options)` performs the checks that
+ * resource-update, idea-update, and organization-update all repeated verbatim,
+ * plus builds the parameterized SET clause list:
  *
  *   1. shape check — `updates` must be a non-null, non-array object,
  *   2. whitelist enforcement — ONE policy: any key NOT in `allowedFields` is an
@@ -51,6 +51,8 @@ export interface BuildUpdateSetOptions {
    * before it becomes a param (e.g. organization-update trims `name` via
    * normalizeOrgName). Return the value unchanged for keys you don't transform.
    * The transform never affects the interpolated key name — only the param value.
+   * NOTE: it runs BEFORE the endpoint's per-field domain validation, so it sees
+   * raw, un-validated values — guard any type assumption inside the transform.
    */
   transform?: (key: string, value: unknown) => unknown;
   /** 400 message when `updates` fails the object-shape check. */
