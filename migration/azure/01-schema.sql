@@ -109,7 +109,7 @@ CREATE TABLE public.profiles (
   preferred_language text DEFAULT 'en' CHECK (preferred_language IN ('en', 'da')),
   entra_oid          text,                         -- ADDED (Entra object id)
   entra_tid          text,                         -- ADDED (Entra tenant id)
-  assessment_level      public.course_level,       -- #117: self-assessed AI level (see 06-assessment.sql)
+  assessment_level      public.course_level,       -- #117: self-assessed AI level
   assessment_skipped_at timestamptz,               -- #117: set when the learner skips the assessment
   created_at         timestamptz NOT NULL DEFAULT now()
 );
