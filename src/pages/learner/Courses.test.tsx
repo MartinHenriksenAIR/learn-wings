@@ -230,6 +230,26 @@ describe('LearnerCourses — enroll in-button morph (no success toast)', () => {
   });
 });
 
+describe('LearnerCourses — failed fetch shows error fork, not empty state', () => {
+  const currentOrg = { id: 'org-1', name: 'Org One' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg });
+  });
+
+  it('renders the retryable error state (not "no courses available") when the catalogue fetch fails', async () => {
+    vi.mocked(callApi).mockRejectedValue(new Error('boom'));
+
+    renderCourses();
+
+    expect(await screen.findByText('common.loadErrorTitle')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
+    // The success-empty state must NOT be shown on a failure.
+    expect(screen.queryByText('courses.noCoursesAvailable')).toBeNull();
+  });
+});
+
 describe('LearnerCourses — recommended section', () => {
   const currentOrg = { id: 'org-1', name: 'Org One' };
 

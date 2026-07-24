@@ -3,6 +3,7 @@ import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageSpinner } from '@/components/ui/page-spinner';
+import { QueryErrorState } from '@/components/ui/query-error-state';
 import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -222,6 +223,18 @@ export default function OrgAnalytics() {
           <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground">No organization selected.</p>
           <p className="text-sm text-muted-foreground">Join an organization to view analytics.</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // A failed analytics fetch must not render all-zero stats — an org admin would
+  // read the zeros as truth. Show a distinct, retryable error fork instead.
+  if (analyticsQuery.isError) {
+    return (
+      <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
+        <div className="flex h-64 items-center justify-center">
+          <QueryErrorState onRetry={() => analyticsQuery.refetch()} />
         </div>
       </AppLayout>
     );

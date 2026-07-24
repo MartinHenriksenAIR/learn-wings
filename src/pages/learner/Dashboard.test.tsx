@@ -242,6 +242,31 @@ describe('LearnerDashboard — assessment banner', () => {
   });
 });
 
+describe('LearnerDashboard — failed fetch shows error fork, not first-time hero', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the retryable error state (not the first-time hero) when the dashboard fetch fails', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockRejectedValue(new Error('boom'));
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
+      currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
+    });
+
+    renderDashboard();
+
+    // Error fork copy + retry button appear...
+    expect(await screen.findByText('common.loadErrorTitle')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
+    // ...and the first-time hero (success-empty state) does NOT.
+    expect(screen.queryByTestId('dashboard-hero')).toBeNull();
+    expect(screen.queryByText('dashboard.heroFirstTimeTitle')).toBeNull();
+  });
+});
+
 describe('LearnerDashboard — hero variants', () => {
   beforeEach(() => {
     vi.clearAllMocks();

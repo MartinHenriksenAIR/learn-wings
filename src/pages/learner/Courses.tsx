@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { routes } from '@/lib/routes';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueryErrorState } from '@/components/ui/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LevelBadge } from '@/components/ui/level-badge';
@@ -162,6 +163,18 @@ export default function LearnerCourses() {
           <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/50" />
           <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
           <p className="text-sm text-muted-foreground">{t('courses.joinOrgToAccessCourses')}</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // A failed catalogue fetch must not render the "no courses available" empty
+  // state — show a distinct, retryable error fork instead.
+  if (query.isError) {
+    return (
+      <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
+        <div className="flex h-64 items-center justify-center">
+          <QueryErrorState onRetry={() => query.refetch()} />
         </div>
       </AppLayout>
     );

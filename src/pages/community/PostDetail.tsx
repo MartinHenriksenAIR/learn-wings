@@ -110,6 +110,9 @@ export default function PostDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
     },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.commentUpdateFailed'), description: error.message, variant: 'destructive' });
+    },
   });
 
   const deleteCommentMutation = useMutation({
@@ -117,6 +120,9 @@ export default function PostDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
       toast({ title: t('community.toasts.commentDeleted') });
+    },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.commentDeleteFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -136,12 +142,18 @@ export default function PostDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPost.detail(postId) });
     },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.postHideFailed'), description: error.message, variant: 'destructive' });
+    },
   });
 
   const toggleLockMutation = useMutation({
     mutationFn: (locked: boolean) => togglePostLocked(postId!, locked),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPost.detail(postId) });
+    },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.postLockFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -150,6 +162,9 @@ export default function PostDetail() {
       toggleCommentHidden(commentId, hidden),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
+    },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.commentHideFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -448,14 +463,17 @@ export default function PostDetail() {
             await createCommentMutation.mutateAsync({ content, parentId });
           }}
           onEditComment={async (commentId, content) => {
-            await updateCommentMutation.mutateAsync({ commentId, content });
+            // onError toasts the failure; swallow the rejection so it doesn't
+            // surface as an unhandled promise rejection (no post-await success
+            // dependency at the call site — CommentItem closes edit mode eagerly).
+            await updateCommentMutation.mutateAsync({ commentId, content }).catch(() => {});
           }}
           onDeleteComment={async (commentId) => {
-            await deleteCommentMutation.mutateAsync(commentId);
+            await deleteCommentMutation.mutateAsync(commentId).catch(() => {});
           }}
           onReportComment={handleReportComment}
           onToggleHideComment={isAdmin ? async (commentId, hidden) => {
-            await toggleCommentHideMutation.mutateAsync({ commentId, hidden });
+            await toggleCommentHideMutation.mutateAsync({ commentId, hidden }).catch(() => {});
           } : undefined}
         />
 

@@ -108,3 +108,22 @@ describe('IdeaLibrary drafts tab — caller identity is the profile id, not the 
     await waitFor(() => expect(screen.getByTestId('idea-card')).toBeInTheDocument());
   });
 });
+
+describe('IdeaLibrary — failed fetch shows error fork, not empty state', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(authState);
+    mockFetchOrgTags.mockResolvedValue([]);
+  });
+
+  it('renders the retryable error state (not CommunityEmptyState) when the ideas fetch fails', async () => {
+    mockFetchIdeas.mockRejectedValue(new Error('boom'));
+
+    renderDraftsTab();
+
+    expect(await screen.findByText('common.loadErrorTitle')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
+    // The stubbed empty state must NOT render on a failure.
+    expect(screen.queryByTestId('empty-state')).toBeNull();
+  });
+});

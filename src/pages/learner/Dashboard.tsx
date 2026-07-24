@@ -7,6 +7,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { ProgressRing } from '@/components/ui/progress-ring';
 import { LevelBadge } from '@/components/ui/level-badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueryErrorState } from '@/components/ui/query-error-state';
 import { Button } from '@/components/ui/button';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
@@ -91,6 +92,18 @@ export default function LearnerDashboard() {
             title={isNoMembership ? t('dashboard.noMembershipTitle') : t('common.noOrgSelected')}
             description={isNoMembership ? t('dashboard.noMembershipDescription') : t('common.joinOrgToContinue')}
           />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // A failed dashboard fetch must not masquerade as the first-time-user hero
+  // (all-empty derived state); show a distinct error fork with retry instead.
+  if (query.isError) {
+    return (
+      <AppLayout title={t('dashboard.title')}>
+        <div className="flex h-64 items-center justify-center">
+          <QueryErrorState onRetry={() => query.refetch()} />
         </div>
       </AppLayout>
     );
