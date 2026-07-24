@@ -1,5 +1,5 @@
 import jwksClient from 'jwks-rsa';
-import { verify } from 'jsonwebtoken';
+import { verify, JsonWebTokenError } from 'jsonwebtoken';
 import type { HttpRequest } from '@azure/functions';
 
 export class AuthError extends Error {
@@ -40,7 +40,13 @@ function verifyToken(token: string): Promise<AuthUser> {
         // issuer intentionally omitted — multi-tenant tokens have per-tenant issuers
       },
       (err, decoded) => {
-        if (err) return reject(new AuthError(err.message));
+        // Only genuine token-verification failures become AuthError → 401.
+        // JsonWebTokenError covers TokenExpiredError and NotBeforeError (both subclasses),
+        // i.e. every jsonwebtoken validation error. Any OTHER error here is a signing-key
+        // transport failure surfaced via getKey/jwks-rsa (DNS/network/rate-limit fetching
+        // login.microsoftonline.com keys) — reject it AS-IS so the endpoint factory's catch
+        // routes it through internalError (logs + generic 500, ADR-0014) instead of a silent 401.
+        if (err) return reject(err instanceof JsonWebTokenError ? new AuthError(err.message) : err);
         const d = decoded as Record<string, string>;
         if (!ISSUER_RE.test(d.iss)) return reject(new AuthError('Invalid token issuer'));
         if (!d.oid || !d.tid) return reject(new AuthError('Missing oid or tid claims'));

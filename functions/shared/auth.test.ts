@@ -10,16 +10,37 @@ vi.mock('jwks-rsa', () => ({
 
 const VALID_ISSUER = 'https://login.microsoftonline.com/11111111-1111-1111-1111-111111111111/v2.0';
 
+// Mirror jsonwebtoken's real class hierarchy: TokenExpiredError/NotBeforeError extend
+// JsonWebTokenError, so the production `instanceof JsonWebTokenError` classification covers all three.
+// Declared via vi.hoisted so they exist when the (hoisted) vi.mock factory below runs.
+const { MockJsonWebTokenError, MockTokenExpiredError } = vi.hoisted(() => {
+  class MockJsonWebTokenError extends Error {
+    constructor(message: string) { super(message); this.name = 'JsonWebTokenError'; }
+  }
+  class MockTokenExpiredError extends MockJsonWebTokenError {
+    constructor(message: string) { super(message); this.name = 'TokenExpiredError'; }
+  }
+  return { MockJsonWebTokenError, MockTokenExpiredError };
+});
+
 vi.mock('jsonwebtoken', () => ({
+  JsonWebTokenError: MockJsonWebTokenError,
+  TokenExpiredError: MockTokenExpiredError,
   verify: (_token: string, _getKey: unknown, _opts: unknown, cb: (err: Error | null, payload?: unknown) => void) => {
     const parts = _token.split('.');
-    if (parts.length !== 3) return cb(new Error('invalid token'));
+    if (parts.length !== 3) return cb(new MockJsonWebTokenError('invalid token'));
     try {
       const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-      if (payload._forceError) return cb(new Error('invalid signature'));
+      // A genuine jsonwebtoken validation failure (bad signature) → JsonWebTokenError → AuthError → 401.
+      if (payload._forceError) return cb(new MockJsonWebTokenError('invalid signature'));
+      // Expired token → TokenExpiredError (subclass) → still classified as AuthError → 401.
+      if (payload._forceExpired) return cb(new MockTokenExpiredError('jwt expired'));
+      // A signing-key TRANSPORT failure surfaced via getKey/jwks-rsa is a plain Error,
+      // NOT a JsonWebTokenError → must NOT be wrapped as AuthError (so it 500s + logs, not a silent 401).
+      if (payload._forceTransportError) return cb(new Error('getaddrinfo ENOTFOUND login.microsoftonline.com'));
       cb(null, payload);
     } catch {
-      cb(new Error('decode error'));
+      cb(new MockJsonWebTokenError('decode error'));
     }
   },
 }));
@@ -55,10 +76,26 @@ describe('authenticate', () => {
     await expect(authenticate(req as any)).rejects.toBeInstanceOf(AuthError);
   });
 
-  it('throws AuthError on invalid signature', async () => {
+  it('throws AuthError on invalid signature (JsonWebTokenError → 401)', async () => {
     const token = makeToken({ _forceError: true });
     const req = { headers: { get: () => `Bearer ${token}` } };
     await expect(authenticate(req as any)).rejects.toBeInstanceOf(AuthError);
+  });
+
+  it('throws AuthError on expired token (TokenExpiredError subclass → 401)', async () => {
+    const token = makeToken({ _forceExpired: true });
+    const req = { headers: { get: () => `Bearer ${token}` } };
+    await expect(authenticate(req as any)).rejects.toBeInstanceOf(AuthError);
+  });
+
+  it('a JWKS transport failure is NOT wrapped as AuthError — rejects as-is so the factory 500s + logs it', async () => {
+    // Simulates a signing-key fetch failure (getKey/jwks-rsa DNS/network/rate-limit against
+    // login.microsoftonline.com). During an Entra outage this must NOT be a silent 401.
+    const token = makeToken({ _forceTransportError: true });
+    const req = { headers: { get: () => `Bearer ${token}` } };
+    await expect(authenticate(req as any)).rejects.not.toBeInstanceOf(AuthError);
+    // And the raw transport message is preserved (for App Insights logging), not swallowed.
+    await expect(authenticate(req as any)).rejects.toThrow('getaddrinfo ENOTFOUND login.microsoftonline.com');
   });
 
   it('throws AuthError on missing oid or tid', async () => {
