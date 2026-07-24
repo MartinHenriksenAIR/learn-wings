@@ -3,6 +3,7 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
+import { validatePublicHost } from '../shared/net-guard';
 import { createConnection } from 'node:net';
 import { connect as tlsConnect } from 'node:tls';
 
@@ -29,9 +30,22 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     );
     if (!isAdmin?.is_platform_admin) return corsResponse(origin, 403, { error: 'Platform admin required' });
 
-    const { host, port, encryption } = await req.json() as { host: string; port: number; encryption: 'none' | 'ssl_tls' | 'starttls' };
+    const { host, port, encryption } = await req.json() as { host?: unknown; port?: unknown; encryption?: unknown };
+
+    // SSRF guard (#267) — a raw socket to a body-supplied host:port is an internal
+    // port-probe primitive even behind the admin gate. Failures reuse the bespoke
+    // 200 {success:false} contract because Platform Settings renders it inline.
+    if (typeof host !== 'string' || host.trim() === '') {
+      return corsResponse(origin, 200, { success: false, error: 'host is required' });
+    }
+    if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
+      return corsResponse(origin, 200, { success: false, error: 'port must be an integer between 1 and 65535' });
+    }
+    const hostError = await validatePublicHost(host);
+    if (hostError) return corsResponse(origin, 200, { success: false, error: hostError });
+
     const useTls = encryption === 'ssl_tls';
-    const message = await testConnection(host, port, useTls);
+    const message = await testConnection(host.trim(), port, useTls);
     return corsResponse(origin, 200, { success: true, message });
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });

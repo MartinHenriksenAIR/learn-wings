@@ -10,7 +10,7 @@ vi.mock('./sas', () => ({
   buildBlobUrl: mockBuildBlobUrl,
 }));
 
-import { deleteBlob, resolveAssetContainer, isBrandingAssetType, isBrandingAssetPath } from './blob';
+import { deleteBlob, cleanupBlobs, resolveAssetContainer, isBrandingAssetType, isBrandingAssetPath } from './blob';
 
 const BLOB_PATH = 'videos/lesson-1.mp4';
 const BLOB_URL = 'https://testaccount.blob.core.windows.net/lms-videos/blob?sp=d&sig=abc';

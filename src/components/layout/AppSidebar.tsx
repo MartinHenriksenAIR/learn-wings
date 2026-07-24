@@ -42,6 +42,7 @@ import {
   Lightbulb,
   Flag,
   MessageSquare,
+  type LucideIcon,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
 import { getInitials } from '@/lib/utils';
@@ -62,6 +63,56 @@ const GROUP_LABEL_CLASSES =
   'h-auto px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.09em] text-[#9aa0af]';
 
 const MENU_ITEM_CLASSES = 'rounded-[9px] text-[13px] font-medium';
+
+/** One entry in a sidebar nav group. All three groups share this shape. */
+type NavItem = {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+};
+
+/**
+ * One labelled nav group (label + pill menu). The three groups in AppSidebar were
+ * byte-identical apart from label and items (#271).
+ *
+ * Deliberately at module scope, not nested inside AppSidebar: a component declared
+ * inside a render body gets a fresh identity every render, so React would unmount and
+ * remount the whole menu subtree (losing tooltip/focus state) on every sidebar render.
+ * `collapsed` and `pathname` are read from context here rather than threaded as props,
+ * exactly as the underlying sidebar primitives do.
+ */
+function NavSection({ label, items }: { label: string; items: NavItem[] }) {
+  const { state } = useSidebar();
+  const collapsed = state === 'collapsed';
+  const location = useLocation();
+
+  return (
+    <SidebarGroup className="p-0">
+      <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
+        {label}
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu className="gap-[3px]">
+          {items.map((item) => (
+            <SidebarMenuItem key={item.url}>
+              <SidebarMenuButton
+                asChild
+                isActive={location.pathname === item.url}
+                tooltip={collapsed ? item.title : undefined}
+                className={NAV_BUTTON_CLASSES}
+              >
+                <NavLink to={item.url} end className="flex items-center">
+                  <item.icon />
+                  {!collapsed && <span>{item.title}</span>}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
 
 export function AppSidebar() {
   const { state } = useSidebar();

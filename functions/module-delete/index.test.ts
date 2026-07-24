@@ -20,7 +20,17 @@ vi.mock('../shared/profile', () => ({
   isOrgAdmin: vi.fn(),
   isOrgAdminOfAny: vi.fn(),
 }));
-vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
+// cleanupBlobs is faked in terms of mockDeleteBlob so the per-path assertions below
+// (call counts, mixed true/false results) keep exercising the endpoint's real behaviour.
+// The helper's own counting/warning contract is covered in shared/blob.test.ts.
+vi.mock('../shared/blob', () => ({
+  deleteBlob: mockDeleteBlob,
+  cleanupBlobs: async (paths: string[]) => {
+    const results = await Promise.all(paths.map((p) => mockDeleteBlob(p)));
+    const blobsDeleted = results.filter(Boolean).length;
+    return { blobsDeleted, blobsFailed: results.length - blobsDeleted };
+  },
+}));
 
 import handler from './index';
 

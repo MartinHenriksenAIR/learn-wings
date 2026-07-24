@@ -72,3 +72,25 @@ export async function deleteBlob(blobPath: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Best-effort bulk blob cleanup for cascade-delete endpoints.
+ *
+ * `deleteBlob` never throws, so this never rejects either: every path is attempted,
+ * failures are counted rather than propagated. A single warning tagged with `logTag`
+ * and `id` is emitted server-side when any path failed — server logs are the only
+ * signal for failed cleanup — and the counts are returned for the client response.
+ */
+export async function cleanupBlobs(
+  paths: string[],
+  logTag: string,
+  id: string,
+): Promise<{ blobsDeleted: number; blobsFailed: number }> {
+  const results = await Promise.all(paths.map((p) => deleteBlob(p)));
+  const blobsDeleted = results.filter(Boolean).length;
+  const blobsFailed = results.length - blobsDeleted;
+  if (blobsFailed > 0) {
+    console.warn(`[${logTag}] ${blobsFailed} blob(s) failed to delete for`, id);
+  }
+  return { blobsDeleted, blobsFailed };
+}
