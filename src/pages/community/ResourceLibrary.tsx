@@ -31,7 +31,7 @@ import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { toast } from '@/components/ui/sonner';
 import {
   fetchResources,
@@ -54,7 +54,7 @@ export default function ResourceLibrary() {
   const { t } = useTranslation();
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
   const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);
@@ -138,9 +138,7 @@ export default function ResourceLibrary() {
     },
   });
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
   // while the signed-in user's context is still resolving.

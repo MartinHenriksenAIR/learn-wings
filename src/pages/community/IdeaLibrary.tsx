@@ -22,7 +22,7 @@ import { QueryErrorState } from '@/components/ui/query-error-state';
 import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQueryErrorToast';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { fetchIdeas, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { IdeaStatusExtended, BusinessArea } from '@/lib/community-types';
@@ -45,7 +45,7 @@ export default function IdeaLibrary() {
   // and never matches ideas.user_id post-migration.
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
 
   const initialTab = searchParams.get('tab') || 'all';
   const [activeTab, setActiveTab] = useState<string>(initialTab);
@@ -138,9 +138,7 @@ export default function IdeaLibrary() {
 
   const hasActiveFilters = Boolean(searchQuery || selectedBusinessArea || selectedTags.length > 0);
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
   // while the signed-in user's context is still resolving.

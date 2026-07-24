@@ -43,7 +43,7 @@ import {
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { createIdea, submitIdea, updateIdea, fetchIdea, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { BusinessArea } from '@/lib/community-types';
@@ -86,7 +86,7 @@ export default function IdeaSubmit() {
   // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
   const { currentOrg, profile } = useAuth();
   const orgGuard = useOrgGuard();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
   const queryClient = useQueryClient();
 
   const [draftId, setDraftId] = useState<string | null>(ideaId || null);
@@ -255,9 +255,7 @@ export default function IdeaSubmit() {
     { title: t('community.ideaForm.stepDetails') },
   ];
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
   // while the signed-in user's context is still resolving.
