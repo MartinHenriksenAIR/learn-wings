@@ -38,7 +38,6 @@ import './course-structure-admin/index';
 import './course-translation-link/index';
 import './course-update/index';
 import './courses-admin/index';
-import './delete-user/index';
 import './enroll/index';
 import './enrollment-complete/index';
 import './enrollment-create/index';
