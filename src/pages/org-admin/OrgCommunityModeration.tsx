@@ -1,49 +1,25 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { SlidingTabs } from '@/components/ui/sliding-tabs';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { fetchReports, updateReport, togglePostHidden, toggleCommentHidden, togglePostLocked } from '@/lib/community-api';
+import { fetchReports } from '@/lib/community-api';
 import { ReportedContentDialog } from '@/components/community/ReportedContentDialog';
-import { ReportActions } from '@/components/community/ReportActions';
-import type { CommunityReport, ReportStatus } from '@/lib/community-types';
-import { cn } from '@/lib/utils';
-import { formatDistanceToNowLocalized } from '@/lib/date-locale';
-import { toast } from 'sonner';
-import {
-  Loader2,
-  CheckCircle,
-  XCircle,
-  Flag,
-  MessageSquare,
-  FileText,
-} from 'lucide-react';
-
-interface ReportWithDetails extends Omit<CommunityReport, 'reporter'> {
-  reporter?: { id: string; full_name: string };
-}
+import { ReportCard } from '@/components/community/ReportCard';
+import { ReviewReportDialog } from '@/components/community/ReviewReportDialog';
+import { useReportModeration, type ReportWithDetails } from '@/hooks/useReportModeration';
+import type { ReportStatus } from '@/lib/community-types';
+import { Loader2, Flag } from 'lucide-react';
 
 export default function OrgCommunityModeration() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { currentOrg } = useAuth();
   const orgGuard = useOrgGuard();
-  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<ReportStatus>('pending');
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
@@ -62,69 +38,13 @@ export default function OrgCommunityModeration() {
     enabled: !!currentOrg,
   });
 
-  // Update report status — moderation decisions keep their toasts (toast policy).
-  const updateReportMutation = useMutation({
-    mutationFn: async ({
-      reportId,
-      status,
-      notes,
-    }: {
-      reportId: string;
-      status: 'reviewed' | 'dismissed';
-      notes?: string;
-    }) => {
-      await updateReport(reportId, { status, admin_notes: notes || null });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orgReports.all });
+  const { updateReportMutation, toggleContentVisibility, togglePostLock } = useReportModeration(
+    queryKeys.orgReports.all,
+    () => {
       setReviewDialogOpen(false);
       setSelectedReport(null);
-      toast.success(t('moderation.reportUpdated'));
     },
-    onError: () => {
-      toast.error(t('moderation.reportUpdateFailed'));
-    },
-  });
-
-  // Hide/show content — moderation decisions keep their toasts (toast policy).
-  const toggleContentVisibility = useMutation({
-    mutationFn: async ({
-      type,
-      id,
-      hide,
-    }: {
-      type: 'post' | 'comment';
-      id: string;
-      hide: boolean;
-    }) => {
-      if (type === 'post') {
-        await togglePostHidden(id, hide);
-      } else {
-        await toggleCommentHidden(id, hide);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orgReports.all });
-      toast.success(t('moderation.visibilityUpdated'));
-    },
-    onError: () => {
-      toast.error(t('moderation.contentUpdateFailed'));
-    },
-  });
-
-  // Lock/unlock post comments — moderation decisions keep their toasts (toast policy).
-  const togglePostLock = useMutation({
-    mutationFn: async ({ postId, lock }: { postId: string; lock: boolean }) => {
-      await togglePostLocked(postId, lock);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orgReports.all });
-      toast.success(t('moderation.lockUpdated'));
-    },
-    onError: () => {
-      toast.error(t('moderation.postUpdateFailed'));
-    },
-  });
+  );
 
   const openReviewDialog = (report: ReportWithDetails) => {
     setSelectedReport(report);
@@ -212,67 +132,22 @@ export default function OrgCommunityModeration() {
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {reports.map((report) => {
-            const isPost = report.target_type === 'post';
-            return (
-              <Card key={report.id}>
-                <CardContent className="px-[22px] py-[18px]">
-                  {/* Meta row */}
-                  <div className="mb-2.5 flex flex-wrap items-center gap-2">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[#fdecec] text-[#c43d3d]">
-                      {isPost ? <FileText className="h-[15px] w-[15px]" /> : <MessageSquare className="h-[15px] w-[15px]" />}
-                    </span>
-                    <span className="rounded-[7px] bg-[#f3f4f8] px-[11px] py-1 text-[11px] font-bold text-muted-foreground">
-                      {isPost ? t('moderation.typePost') : t('moderation.typeComment')}
-                    </span>
-                    <span
-                      className={cn(
-                        'rounded-[7px] px-[11px] py-1 text-[11px] font-bold capitalize',
-                        report.status === 'pending'
-                          ? 'bg-[#fdecec] text-[#c43d3d]'
-                          : 'bg-[#f3f4f8] text-muted-foreground'
-                      )}
-                    >
-                      {report.status}
-                    </span>
-                    <div className="flex-1" />
-                    <span className="text-[11.5px] font-semibold text-muted-foreground">
-                      {t('moderation.reportedBy', {
-                        name: report.reporter?.full_name || t('moderation.unknownReporter'),
-                        time: formatDistanceToNowLocalized(new Date(report.created_at), i18n.language),
-                      })}
-                    </span>
-                  </div>
-
-                  {/* Reason */}
-                  <p className="mb-1 text-[13.5px] font-bold">{t('moderation.reasonLabel')}</p>
-                  <p className="mb-3.5 text-[13px] italic leading-[1.5] text-muted-foreground">
-                    {report.reason}
-                  </p>
-
-                  {report.admin_notes && (
-                    <p className="mb-3.5 rounded-[10px] bg-[#fbf2dd] px-3.5 py-2.5 text-[12.5px] text-[#8a5e10]">
-                      <strong>{t('moderation.adminNotesInline')}</strong> {report.admin_notes}
-                    </p>
-                  )}
-
-                  <ReportActions
-                    report={report}
-                    onViewContent={() => setViewReport(report)}
-                    onSetHidden={(hide) =>
-                      toggleContentVisibility.mutate({ type: report.target_type, id: report.target_id, hide })
-                    }
-                    onSetLocked={(lock) => togglePostLock.mutate({ postId: report.target_id, lock })}
-                    onDismiss={() => updateReportMutation.mutate({ reportId: report.id, status: 'dismissed' })}
-                    onReview={() => openReviewDialog(report)}
-                    visibilityPending={toggleContentVisibility.isPending}
-                    lockPending={togglePostLock.isPending}
-                    updatePending={updateReportMutation.isPending}
-                  />
-                </CardContent>
-              </Card>
-            );
-          })}
+          {reports.map((report) => (
+            <ReportCard
+              key={report.id}
+              report={report}
+              onViewContent={() => setViewReport(report)}
+              onSetHidden={(hide) =>
+                toggleContentVisibility.mutate({ type: report.target_type, id: report.target_id, hide })
+              }
+              onSetLocked={(lock) => togglePostLock.mutate({ postId: report.target_id, lock })}
+              onDismiss={() => updateReportMutation.mutate({ reportId: report.id, status: 'dismissed' })}
+              onReview={() => openReviewDialog(report)}
+              visibilityPending={toggleContentVisibility.isPending}
+              lockPending={togglePostLock.isPending}
+              updatePending={updateReportMutation.isPending}
+            />
+          ))}
         </div>
       )}
 
@@ -284,45 +159,15 @@ export default function OrgCommunityModeration() {
       />
 
       {/* Review dialog */}
-      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('moderation.dialog.title')}</DialogTitle>
-            <DialogDescription>{t('moderation.dialog.description')}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('moderation.dialog.adminNotesLabel')}</label>
-              <Textarea
-                placeholder={t('moderation.dialog.adminNotesPlaceholder')}
-                value={adminNotes}
-                onChange={(e) => setAdminNotes(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleDismiss}
-              disabled={updateReportMutation.isPending}
-            >
-              <XCircle className="mr-2 h-4 w-4" />
-              {t('moderation.dismiss')}
-            </Button>
-            <Button onClick={handleMarkReviewed} disabled={updateReportMutation.isPending}>
-              {updateReportMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle className="mr-2 h-4 w-4" />
-              )}
-              {t('moderation.markReviewed')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReviewReportDialog
+        open={reviewDialogOpen}
+        onOpenChange={setReviewDialogOpen}
+        adminNotes={adminNotes}
+        onAdminNotesChange={setAdminNotes}
+        onDismiss={handleDismiss}
+        onReview={handleMarkReviewed}
+        pending={updateReportMutation.isPending}
+      />
     </AppLayout>
   );
 }
