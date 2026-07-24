@@ -95,9 +95,10 @@ already perform the equivalent checks inline:
 - `get_invitation_by_token(lookup_token)`, `accept_invitation(link_id, user_id)`
 - `get_org_invitations_safe(p_org_id)`, `get_platform_invitations_safe(p_org_id)`
 - `get_quiz_options_for_learner(p_question_id)`, `get_quiz_options_with_answers(p_question_id)`
-- `hash_invitation_token()` — **kept** (no `auth.uid()`; plain trigger)
 - `handle_new_user()` / `on_auth_user_created` — dropped (was on `auth.users`; replaced by `user-context` first-login provisioning)
 - `quiz_options_public` view — dropped (was a learner-safe view; `quiz-by-lesson` excludes `is_correct` in app code)
+
+Kept (not omitted): `hash_invitation_token()` — no `auth.uid()` dependency; plain trigger.
 
 ---
 
@@ -183,8 +184,9 @@ node -e '
 ```
 
 Each file is a single transaction, so a failure rolls the whole file
-back. Re-running on a populated DB will fail on duplicate keys — drop and
-recreate the schema (or a fresh database) for a clean re-apply.
+back. Re-running `01`/`02` on a populated DB will fail on duplicate keys —
+drop and recreate the schema (or a fresh database) for a clean re-apply.
+(The additive `0N-*.sql` migrations are idempotent and safe to re-run.)
 
 ---
 
