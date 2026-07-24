@@ -74,10 +74,12 @@ describe('idea-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'updates must be an object' });
   });
 
-  it('returns 400 when updates has no whitelisted fields (only unknown keys)', async () => {
+  it('returns 400 on the first unknown key (only unknown keys — #252)', async () => {
+    // Was "No valid update fields provided" (silent filter to empty); now the
+    // strict whitelist rejects the first unknown key directly.
     const res = await handler(baseReq({ ideaId: 'idea-1', updates: { status: 'approved', admin_notes: 'x' } }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'No valid update fields provided' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid update field: status' });
   });
 
   it('returns 400 when updates is empty', async () => {
@@ -154,17 +156,16 @@ describe('idea-update', () => {
     expect(params).toEqual(['Updated', 'slow', 'idea-1']); // exact placeholder order
   });
 
-  it('ignores unknown keys but applies recognized ones', async () => {
-    mockQueryOne.mockResolvedValueOnce(myDraft); // load idea
-    mockQueryOne.mockResolvedValueOnce({ ...myDraft, title: 'New' }); // UPDATE RETURNING
+  it('rejects unknown keys with 400 (was: silently ignored — #252)', async () => {
+    // Behavior change (#252): unknown keys now 400 instead of being dropped.
+    // The frontend only ever sends whitelisted keys (verified in #252), so no
+    // legitimate caller regresses; smuggled columns (status/user_id) are rejected
+    // before any DB access.
     const res = await handler(baseReq({ ideaId: 'idea-1', updates: { title: 'New', status: 'approved', user_id: 'evil' } }), {} as any);
-    expect(res.status).toBe(200);
-    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
-    expect(sql).toContain('title');
-    expect(sql).not.toContain('status');
-    expect(sql).not.toContain('user_id');
-    expect(params).not.toContain('approved');
-    expect(params).not.toContain('evil');
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid update field: status' });
+    // Rejected before any DB access.
+    expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
   it('returns 500 on db error', async () => {

@@ -1,14 +1,8 @@
-import { query, queryOne } from '../shared/db';
+import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isActiveMember } from '../shared/profile';
 import { profileJson } from '../shared/profile-json';
-
-interface IdeaRow {
-  id: string;
-  org_id: string;
-  user_id: string;
-  status: string;
-}
+import { loadIdea, isIdeaVisibleTo } from '../shared/ideas';
 
 export default endpoint('idea-comments', async ({ req, profile, reply }) => {
   const body = await req.json() as { ideaId?: unknown };
@@ -18,17 +12,13 @@ export default endpoint('idea-comments', async ({ req, profile, reply }) => {
     return reply(400, { error: 'ideaId is required' });
   }
 
-  // Load idea
-  const idea = await queryOne<IdeaRow>(
-    `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
-    [ideaId],
-  );
+  const idea = await loadIdea(ideaId);
 
   // Missing idea → RLS parity: return empty (not 404)
   if (!idea) return reply(200, { comments: [] });
 
-  // Draft privacy: other-author's draft is invisible (no admin bypass)
-  if (idea.status === 'draft' && idea.user_id !== profile.id) {
+  // Draft privacy (shared/ideas): other-author's draft is invisible (no admin bypass)
+  if (!isIdeaVisibleTo(idea, profile)) {
     return reply(200, { comments: [] });
   }
 

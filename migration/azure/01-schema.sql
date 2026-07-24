@@ -109,6 +109,8 @@ CREATE TABLE public.profiles (
   preferred_language text DEFAULT 'en' CHECK (preferred_language IN ('en', 'da')),
   entra_oid          text,                         -- ADDED (Entra object id)
   entra_tid          text,                         -- ADDED (Entra tenant id)
+  assessment_level      public.course_level,       -- #117: self-assessed AI level
+  assessment_skipped_at timestamptz,               -- #117: set when the learner skips the assessment
   created_at         timestamptz NOT NULL DEFAULT now()
 );
 
@@ -283,6 +285,20 @@ CREATE TABLE public.quiz_attempts (
   started_at  timestamptz NOT NULL DEFAULT now(),
   finished_at timestamptz
 );
+
+-- ---- assessment_attempts (issue #117) ----
+-- #117: AI self-assessment. One row per completed questionnaire attempt.
+-- functions/user-context reads the latest attempt (assessment_taken_at) on every login.
+CREATE TABLE public.assessment_attempts (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id               uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  score                 integer NOT NULL,
+  level                 public.course_level NOT NULL,
+  answers               jsonb NOT NULL,
+  questionnaire_version text NOT NULL,
+  created_at            timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_assessment_attempts_user ON public.assessment_attempts (user_id, created_at DESC);
 
 -- ---- course_reviews ----
 CREATE TABLE public.course_reviews (

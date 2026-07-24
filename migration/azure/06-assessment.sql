@@ -1,7 +1,10 @@
--- migration/azure/06-assessment.sql
--- Additive migration for #117 (AI self-assessment). IDEMPOTENT — safe to re-run.
--- Apply to prod via psql from Azure Cloud Shell with a temporary single-IP
--- firewall rule (see migration/azure/README.md "How to apply"). HUMAN-GATED.
+-- 06-assessment.sql
+-- #117 AI self-assessment: assessment_attempts table + profiles.assessment_level
+-- / assessment_skipped_at. Idempotent; safe to re-run.
+-- MUST run on prod BEFORE the #117 deploy: functions/user-context reads
+-- assessment_level, assessment_skipped_at, and assessment_attempts on EVERY
+-- login, so the objects must exist the moment the new function code goes live.
+-- Folded into 01-schema.sql after apply (see migration/azure/README.md).
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.assessment_attempts (
