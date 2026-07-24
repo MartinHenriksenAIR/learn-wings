@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { callApi } from '@/lib/api-client';
+import { downscaleImageFile, maxEdgeForUpload } from '@/lib/image-downscale';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -88,6 +89,16 @@ export function FileUpload({
     setFileName(file.name);
 
     try {
+      // Shrink oversized images before the PUT (#278). This runs first, while
+      // the spinner is already showing and before the short-lived SAS URL is
+      // minted, so a slow decode can't eat into that URL's validity window.
+      // downscaleImageFile never throws and returns the original file whenever
+      // downscaling is impossible or unprofitable, so `upload` is always safe —
+      // and its name/MIME type always match the original, keeping the
+      // contentType handshake below unchanged.
+      const maxEdge = maxEdgeForUpload(accept, assetType);
+      const upload = maxEdge === null ? file : await downscaleImageFile(file, maxEdge);
+
       // Get a signed Azure upload URL
       const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>(
         '/api/azure-upload-url',
@@ -107,12 +118,14 @@ export function FileUpload({
         xhr.open('PUT', uploadData.uploadUrl);
         xhr.setRequestHeader('Content-Type', uploadData.contentType);
         xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
-        xhr.send(file);
+        xhr.send(upload);
       });
 
       setProgress(100);
       if (accept === 'image') {
-        setPreview({ url: URL.createObjectURL(file), forValue: uploadData.blobPath });
+        // Preview the bytes we actually stored, so what the user sees is what
+        // the blob holds (identical to `file` when no downscale happened).
+        setPreview({ url: URL.createObjectURL(upload), forValue: uploadData.blobPath });
       }
       // Store the blob path; use it as both the display value and storage path
       onChange(uploadData.blobPath, uploadData.blobPath);

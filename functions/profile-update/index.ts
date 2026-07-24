@@ -1,5 +1,6 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
+import { deleteBlob } from '../shared/blob';
 
 interface ProfileUpdateBody {
   first_name?: unknown;
@@ -90,16 +91,44 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
     setClauses.push(`preferred_language = $${params.length}`);
   }
 
-  if (avatarUrl !== undefined) {
-    // Empty string clears the photo (stored as NULL); otherwise store the raw
-    // container-relative blob path verbatim (display composes the URL).
-    const avatarStored = avatarUrl.length > 0 ? avatarUrl : null;
-    params.push(avatarStored);
+  // The blob path this update will write to avatar_url. Empty string clears the
+  // photo (stored as NULL); otherwise store the raw container-relative blob path
+  // verbatim (display composes the URL). `undefined` = the caller never supplied
+  // avatar_url, which is NOT a clear: an absent key leaves the column (and its
+  // blob) alone.
+  const nextAvatarUrl = avatarUrl === undefined
+    ? undefined
+    : (avatarUrl.length > 0 ? avatarUrl : null);
+
+  if (nextAvatarUrl !== undefined) {
+    params.push(nextAvatarUrl);
     setClauses.push(`avatar_url = $${params.length}`);
   }
 
   if (setClauses.length === 0) {
     return reply(400, { error: 'No updatable fields provided' });
+  }
+
+  // Previous avatar blob path, read before the write so the superseded blob can be
+  // deleted afterwards — a replace (or a clear-to-null) used to strand the file.
+  // Issued ONLY when the update actually writes the column, so a name/language
+  // change costs no extra round trip and can never delete a live avatar. The path
+  // has to be queried explicitly: CallerProfile is deliberately minimal (id +
+  // is_platform_admin) and does not carry avatar_url.
+  //
+  // A plain SELECT rather than pulling the old value out of the UPDATE itself: the
+  // RETURNING row is handed straight back to the client, so the self-join form
+  // would leak a prev_* column into the response body.
+  //
+  // Deliberately NOT transactional: blob deletes are irreversible and cannot join a
+  // DB transaction, and a stranded blob is strictly less bad than a failed update.
+  let previousAvatarUrl: string | null = null;
+  if (nextAvatarUrl !== undefined) {
+    const prev = await queryOne<{ avatar_url: string | null }>(
+      `SELECT avatar_url FROM profiles WHERE id = $1`,
+      [profile.id],
+    );
+    previousAvatarUrl = prev?.avatar_url ?? null;
   }
 
   // Caller can ONLY update their own row — id comes from the authenticated profile, never from the body
@@ -113,6 +142,14 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
   // The row can vanish between getProfile and the UPDATE (account deletion race) —
   // without this guard the endpoint would answer 200 { profile: null }.
   if (!updated) return reply(404, { error: 'Profile not found' });
+
+  // Best-effort cleanup of the superseded avatar, only after the row write
+  // succeeded. An unchanged path is left alone; a null old path has nothing to
+  // delete. deleteBlob never throws and its result is deliberately NOT surfaced in
+  // the response — server logs are the only failure signal.
+  if (previousAvatarUrl && previousAvatarUrl !== nextAvatarUrl) {
+    await deleteBlob(previousAvatarUrl);
+  }
 
   return reply(200, { profile: updated });
 });

@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
+    mockDeleteBlob: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -16,6 +19,7 @@ vi.mock('../shared/profile', () => ({
   isOrgAdmin: vi.fn(),
   isOrgAdminOfAny: vi.fn(),
 }));
+vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
 
 import handler from './index';
 
@@ -43,11 +47,26 @@ const fakeLesson = {
   video_url: null,
 };
 
+/** The row the endpoint's pre-update SELECT returns (all three blob columns). */
+const prevPaths = (over: Partial<Record<'video_storage_path' | 'azure_blob_path' | 'document_storage_path', string | null>> = {}) => ({
+  video_storage_path: null,
+  azure_blob_path: null,
+  document_storage_path: null,
+  ...over,
+});
+
+/** The endpoint issues exactly two queryOne calls: [0] the previous-paths SELECT, [1] the UPDATE. */
+const mockDb = (previous: unknown, updated: unknown) => {
+  mockQueryOne.mockResolvedValueOnce(previous).mockResolvedValueOnce(updated);
+};
+const updateCall = () => mockQueryOne.mock.calls[1] as [string, unknown[]];
+
 describe('lesson-update', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
+    mockDeleteBlob.mockResolvedValue(true);
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -195,20 +214,34 @@ describe('lesson-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'documentStoragePath must be a non-empty string or null' });
   });
 
-  it('returns 404 when lesson not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null);
+  it('returns 404 when lesson not found — and no blob is deleted', async () => {
+    mockDb(null, null); // no previous row, UPDATE matches nothing
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Lesson not found' });
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('reads the previous blob paths with a SELECT before the UPDATE', async () => {
+    mockDb(prevPaths(), fakeLesson);
+    await handler(baseReq(validBody), {} as any);
+
+    expect(mockQueryOne).toHaveBeenCalledTimes(2);
+    const [selectSql, selectParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(selectSql).toMatch(/SELECT[\s\S]*FROM lessons/i);
+    expect(selectSql).toContain('video_storage_path');
+    expect(selectSql).toContain('azure_blob_path');
+    expect(selectSql).toContain('document_storage_path');
+    expect(selectParams).toEqual(['lesson-1']);
   });
 
   it('happy path: updates lesson and returns it', async () => {
-    mockQueryOne.mockResolvedValueOnce(fakeLesson);
+    mockDb(prevPaths(), fakeLesson);
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ lesson: fakeLesson });
 
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = updateCall();
     expect(sql).toContain('UPDATE lessons');
     expect(sql).toContain('RETURNING *');
     // video_url must be set to NULL in the SQL (not as a param), sort_order NOT in SET
@@ -236,11 +269,11 @@ describe('lesson-update', () => {
       azureBlobPath: 'blob/path',
       documentStoragePath: 'doc/path',
     };
-    mockQueryOne.mockResolvedValueOnce({ ...fakeLesson, ...body });
+    mockDb(prevPaths(), { ...fakeLesson, ...body });
     const res = await handler(baseReq(body), {} as any);
     expect(res.status).toBe(200);
 
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = updateCall();
     expect(sql).toContain('video_url=NULL');
     expect(params[3]).toBe('Text content');  // content_text
     expect(params[4]).toBe(45);              // duration_minutes
@@ -249,10 +282,107 @@ describe('lesson-update', () => {
     expect(params[7]).toBe('doc/path');      // document_storage_path
   });
 
-  it('returns 500 on db error propagating err.message', async () => {
-    mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
+  it('returns 500 on db error propagating err.message — and deletes no blob', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(prevPaths({ azure_blob_path: 'videos/old.mp4' }))
+      .mockRejectedValueOnce(new Error('connection refused'));
     const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+    // Row-first ordering: a failed UPDATE must never strand-delete a live video.
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  // --- Superseded-blob cleanup (#275) ---
+
+  it('video replaced: deletes the OLD blob exactly once', async () => {
+    mockDb(prevPaths({ azure_blob_path: 'videos/old.mp4' }), fakeLesson);
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('videos/old.mp4');
+  });
+
+  it('video cleared to null: deletes the OLD blob', async () => {
+    mockDb(prevPaths({ azure_blob_path: 'videos/old.mp4' }), fakeLesson);
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: null }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('videos/old.mp4');
+  });
+
+  it('video unchanged: deletes nothing (re-saving another field must not kill a live video)', async () => {
+    mockDb(prevPaths({ azure_blob_path: 'videos/keep.mp4' }), fakeLesson);
+    const res = await handler(baseReq({ ...validBody, title: 'Renamed', azureBlobPath: 'videos/keep.mp4' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('old path was null: deletes nothing', async () => {
+    mockDb(prevPaths(), fakeLesson);
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('three columns: video replaced, document unchanged → exactly one delete, the right path', async () => {
+    mockDb(
+      prevPaths({ azure_blob_path: 'videos/old.mp4', document_storage_path: 'docs/keep.pdf' }),
+      fakeLesson,
+    );
+    const res = await handler(baseReq({
+      ...validBody,
+      lessonType: 'document',
+      azureBlobPath: 'videos/new.mp4',
+      documentStoragePath: 'docs/keep.pdf',
+    }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('videos/old.mp4');
+  });
+
+  it('three columns: every path replaced → one delete per old path', async () => {
+    mockDb(
+      prevPaths({
+        video_storage_path: 'legacy/old.mp4',
+        azure_blob_path: 'videos/old.mp4',
+        document_storage_path: 'docs/old.pdf',
+      }),
+      fakeLesson,
+    );
+    const res = await handler(baseReq({
+      ...validBody,
+      videoStoragePath: 'legacy/new.mp4',
+      azureBlobPath: 'videos/new.mp4',
+      documentStoragePath: 'docs/new.pdf',
+    }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(3);
+    expect(mockDeleteBlob.mock.calls.map((c) => c[0]).sort())
+      .toEqual(['docs/old.pdf', 'legacy/old.mp4', 'videos/old.mp4']);
+  });
+
+  it('a path that merely moves between columns is still referenced → not deleted', async () => {
+    mockDb(prevPaths({ video_storage_path: 'videos/same.mp4' }), fakeLesson);
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/same.mp4' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('deleteBlob returns false (storage 500): request still succeeds with its normal body', async () => {
+    mockDb(prevPaths({ azure_blob_path: 'videos/old.mp4' }), fakeLesson);
+    mockDeleteBlob.mockResolvedValue(false);
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+    expect(res.status).toBe(200);
+    // Cleanup outcome is deliberately NOT surfaced — server logs are the only signal.
+    expect(JSON.parse(res.body as string)).toEqual({ lesson: fakeLesson });
+  });
+
+  it('storage fetch rejects (helper swallows it → false): request still succeeds', async () => {
+    mockDb(prevPaths({ azure_blob_path: 'videos/old.mp4' }), fakeLesson);
+    mockDeleteBlob.mockResolvedValue(false); // deleteBlob never throws — a rejected fetch surfaces as false
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ lesson: fakeLesson });
   });
 });

@@ -1,5 +1,6 @@
 import { queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
+import { deleteBlob } from '../shared/blob';
 
 const VALID_LEVELS = ['basic', 'intermediate', 'advanced'] as const;
 type CourseLevel = typeof VALID_LEVELS[number];
@@ -81,11 +82,46 @@ export default adminEndpoint('course-update', async ({ req, reply }) => {
     return reply(400, { error: 'No valid fields to update' });
   }
 
+  // The blob path this update will write to thumbnail_url — `undefined` when the
+  // caller never supplied thumbnailUrl, which is NOT a clear: an absent key leaves
+  // the column (and its blob) alone. Validated above as string | null.
+  const nextThumbnail = 'thumbnailUrl' in updatesObj
+    ? (updatesObj.thumbnailUrl as string | null)
+    : undefined;
+
+  // Previous thumbnail blob path, read before the write so the superseded blob can
+  // be deleted afterwards — a replace (or a clear-to-null) used to strand the file.
+  // Issued ONLY when the update actually writes the column, so an unrelated field
+  // change costs no extra round trip and can never delete a live thumbnail.
+  //
+  // A plain SELECT rather than pulling the old value out of the UPDATE itself: the
+  // `RETURNING *` row is handed straight back to the client, so the self-join form
+  // would leak a prev_* column into the response body.
+  //
+  // Deliberately NOT transactional: blob deletes are irreversible and cannot join a
+  // DB transaction, and a stranded blob is strictly less bad than a failed update.
+  let previousThumbnail: string | null = null;
+  if (nextThumbnail !== undefined) {
+    const prev = await queryOne<{ thumbnail_url: string | null }>(
+      `SELECT thumbnail_url FROM courses WHERE id = $1`,
+      [courseId],
+    );
+    previousThumbnail = prev?.thumbnail_url ?? null;
+  }
+
   params.push(courseId);
   const sql = `UPDATE courses SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`;
 
   const course = await queryOne(sql, params);
   if (!course) return reply(404, { error: 'Course not found' });
+
+  // Best-effort cleanup of the superseded thumbnail, only after the row write
+  // succeeded. An unchanged path is left alone; a null old path has nothing to
+  // delete. deleteBlob never throws and its result is deliberately NOT surfaced in
+  // the response — server logs are the only failure signal.
+  if (previousThumbnail && previousThumbnail !== nextThumbnail) {
+    await deleteBlob(previousThumbnail);
+  }
 
   return reply(200, { course });
 });

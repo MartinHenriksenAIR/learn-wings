@@ -10,6 +10,10 @@ vi.mock('@/lib/api-client', () => ({
 
 import { FileUpload } from './file-upload';
 
+// Records the body handed to the PUT, so tests can assert exactly which bytes
+// were uploaded (the original File vs. a downscaled re-encode).
+let lastSentBody: unknown = null;
+
 // Fake XHR that reports an immediately-successful PUT to Azure.
 class FakeXHR {
   upload: { onprogress: ((e: ProgressEvent) => void) | null } = { onprogress: null };
@@ -18,7 +22,8 @@ class FakeXHR {
   status = 200;
   open() {}
   setRequestHeader() {}
-  send() {
+  send(body?: unknown) {
+    lastSentBody = body;
     queueMicrotask(() => this.onload?.());
   }
 }
@@ -180,5 +185,119 @@ describe('FileUpload — image preview after upload (#158)', () => {
 
     await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-url'));
     expect(screen.getByRole('img')).toHaveAttribute('src', signedUrl);
+  });
+});
+
+// jsdom implements no part of the Canvas API and has no `createImageBitmap`, so
+// the re-encode itself cannot run here — that path is covered by the pure unit
+// tests in src/lib/image-downscale.test.ts and is visually verified in a real
+// browser. What IS reachable, and what matters most, is that every way the
+// downscale can decline or fail still uploads the ORIGINAL bytes.
+describe('FileUpload — image downscale before upload (#278)', () => {
+  const realCreateImageBitmap = globalThis.createImageBitmap;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    lastSentBody = null;
+    vi.stubGlobal('XMLHttpRequest', FakeXHR as unknown as typeof XMLHttpRequest);
+    URL.createObjectURL = vi.fn(() => 'blob:preview-url');
+    URL.revokeObjectURL = vi.fn();
+    mockCallApi.mockResolvedValue({
+      uploadUrl: 'https://acct.blob.core.windows.net/lms-assets/thumbnails/pic.png?sig=abc',
+      blobPath: 'thumbnails/pic.png',
+      contentType: 'image/png',
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    URL.createObjectURL = realCreateObjectURL;
+    URL.revokeObjectURL = realRevokeObjectURL;
+    globalThis.createImageBitmap = realCreateImageBitmap;
+  });
+
+  /** Selects `file` on the component's hidden input and waits for the PUT. */
+  async function uploadAndCaptureBody(container: HTMLElement, file: File) {
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(lastSentBody).not.toBeNull());
+    return lastSentBody;
+  }
+
+  it('uploads a non-image file untouched (never processed)', async () => {
+    mockCallApi.mockResolvedValue({
+      uploadUrl: 'https://acct.blob.core.windows.net/lms-assets/docs/spec.pdf?sig=abc',
+      blobPath: 'docs/spec.pdf',
+      contentType: 'application/pdf',
+    });
+
+    const { container } = render(
+      <FileUpload folder="docs" accept="document" value={null} onChange={vi.fn()} />
+    );
+    const pdf = new File(['pdf-bytes'], 'spec.pdf', { type: 'application/pdf' });
+
+    expect(await uploadAndCaptureBody(container, pdf)).toBe(pdf);
+  });
+
+  it('fails open and uploads the original when the browser cannot decode images', async () => {
+    // jsdom's default: no createImageBitmap at all.
+    expect(typeof globalThis.createImageBitmap).not.toBe('function');
+
+    const { container } = render(<Harness onChangeSpy={vi.fn()} />);
+    const png = new File(['png-bytes'], 'pic.png', { type: 'image/png' });
+
+    expect(await uploadAndCaptureBody(container, png)).toBe(png);
+  });
+
+  it('fails open and uploads the original when the image fails to decode', async () => {
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(() => Promise.reject(new Error('corrupt image')))
+    );
+
+    const { container } = render(<Harness onChangeSpy={vi.fn()} />);
+    const png = new File(['png-bytes'], 'pic.png', { type: 'image/png' });
+
+    expect(await uploadAndCaptureBody(container, png)).toBe(png);
+  });
+
+  it('uploads the original untouched when the image is already under the cap', async () => {
+    const close = vi.fn();
+    const createImageBitmap = vi.fn((_source: ImageBitmapSource, _options?: ImageBitmapOptions) =>
+      Promise.resolve({ width: 800, height: 600, close } as unknown as ImageBitmap)
+    );
+    vi.stubGlobal('createImageBitmap', createImageBitmap);
+    // If this ever reached the canvas it would throw in jsdom, not silently pass.
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
+
+    const { container } = render(<Harness onChangeSpy={vi.fn()} />);
+    const png = new File(['png-bytes'], 'pic.png', { type: 'image/png' });
+
+    expect(await uploadAndCaptureBody(container, png)).toBe(png);
+    expect(createImageBitmap).toHaveBeenCalledTimes(1);
+    // Decoded with EXIF orientation applied, so a rotated photo is not made worse.
+    expect(createImageBitmap.mock.calls[0][1]).toEqual({ imageOrientation: 'from-image' });
+    expect(getContext).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalled();
+  });
+
+  it('fails open and uploads the original when the canvas 2D context is unavailable', async () => {
+    const close = vi.fn();
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(() => Promise.resolve({ width: 4000, height: 3000, close } as unknown as ImageBitmap))
+    );
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => null);
+
+    const { container } = render(<Harness onChangeSpy={vi.fn()} />);
+    const png = new File(['png-bytes'], 'pic.png', { type: 'image/png' });
+
+    expect(await uploadAndCaptureBody(container, png)).toBe(png);
+    expect(getContext).toHaveBeenCalled();
+    expect(close).toHaveBeenCalled();
   });
 });

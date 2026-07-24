@@ -1,17 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
     MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
+    mockDeleteBlob: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile }));
+vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
 
 import handler from './index';
 
@@ -34,11 +36,20 @@ const profileRow = {
   created_at: '2024-01-01T00:00:00Z',
 };
 
+/**
+ * When (and only when) `avatar_url` is in the body, the endpoint issues a
+ * previous-avatar SELECT before the UPDATE — so queryOne is called twice.
+ */
+const mockAvatarDb = (previousAvatarUrl: string | null, updated: unknown = profileRow) => {
+  mockQueryOne.mockResolvedValueOnce({ avatar_url: previousAvatarUrl }).mockResolvedValueOnce(updated);
+};
+
 describe('profile-update', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'alice@example.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
+    mockDeleteBlob.mockResolvedValue(true);
   });
 
   // 1. 401 invalid bearer token
@@ -154,7 +165,7 @@ describe('profile-update', () => {
 
   // 9b. avatar_url round-trips through the update as the raw container-relative path
   it('updates avatar_url with the raw container-relative path', async () => {
-    mockQueryOne.mockResolvedValueOnce({ ...profileRow, avatar_url: 'avatars/abc.png' });
+    mockAvatarDb(null, { ...profileRow, avatar_url: 'avatars/abc.png' });
 
     const res = await handler(baseReq({ avatar_url: 'avatars/abc.png' }), {} as any);
 
@@ -162,7 +173,8 @@ describe('profile-update', () => {
     const body = JSON.parse(res.body as string);
     expect(body.profile.avatar_url).toBe('avatars/abc.png');
 
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    // calls[0] is the previous-avatar SELECT; calls[1] is the UPDATE.
+    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     // SET touches avatar_url but NOT full_name (avatar-only update)
     const setClause = sql.split('RETURNING')[0];
     expect(setClause).toContain('avatar_url =');
@@ -173,12 +185,12 @@ describe('profile-update', () => {
 
   // 9c. empty-string avatar_url clears the photo (stored as NULL)
   it('stores empty-string avatar_url as NULL (clears the photo)', async () => {
-    mockQueryOne.mockResolvedValueOnce({ ...profileRow, avatar_url: null });
+    mockAvatarDb(null, { ...profileRow, avatar_url: null });
 
     const res = await handler(baseReq({ avatar_url: '' }), {} as any);
 
     expect(res.status).toBe(200);
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql.split('RETURNING')[0]).toContain('avatar_url =');
     expect(params).toContain(null);
   });
@@ -201,5 +213,99 @@ describe('profile-update', () => {
 
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+  });
+
+  // --- Superseded-avatar cleanup (#275) ---
+
+  it('avatar replaced: deletes the OLD blob exactly once', async () => {
+    mockAvatarDb('avatars/old.png', { ...profileRow, avatar_url: 'avatars/new.png' });
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('avatars/old.png');
+  });
+
+  it('avatar cleared with an empty string: deletes the OLD blob', async () => {
+    mockAvatarDb('avatars/old.png', { ...profileRow, avatar_url: null });
+
+    const res = await handler(baseReq({ avatar_url: '' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('avatars/old.png');
+  });
+
+  it('avatar unchanged: deletes nothing', async () => {
+    mockAvatarDb('avatars/keep.png', { ...profileRow, avatar_url: 'avatars/keep.png' });
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/keep.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('old avatar was null: deletes nothing', async () => {
+    mockAvatarDb(null, { ...profileRow, avatar_url: 'avatars/new.png' });
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('avatar_url absent from the body is NOT a clear: no SELECT, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce(profileRow); // single call — the UPDATE
+
+    const res = await handler(baseReq({ first_name: 'Bob' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('reads the previous avatar with a SELECT scoped to the caller own id', async () => {
+    mockAvatarDb('avatars/old.png');
+
+    await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(mockQueryOne).toHaveBeenCalledTimes(2);
+    const [selectSql, selectParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(selectSql).toMatch(/SELECT avatar_url FROM profiles/i);
+    // id comes from the authenticated profile, never from the body
+    expect(selectParams).toEqual(['p1']);
+  });
+
+  it('404 (profile vanished mid-request): deletes nothing', async () => {
+    mockAvatarDb('avatars/old.png', null);
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(404);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('deleteBlob returns false: request still succeeds with its normal body', async () => {
+    const updated = { ...profileRow, avatar_url: 'avatars/new.png' };
+    mockAvatarDb('avatars/old.png', updated);
+    mockDeleteBlob.mockResolvedValue(false);
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    // Cleanup outcome is deliberately NOT surfaced in the response.
+    expect(JSON.parse(res.body as string)).toEqual({ profile: updated });
+  });
+
+  it('storage fetch rejects (helper swallows it → false): request still succeeds', async () => {
+    const updated = { ...profileRow, avatar_url: 'avatars/new.png' };
+    mockAvatarDb('avatars/old.png', updated);
+    mockDeleteBlob.mockResolvedValue(false); // deleteBlob never throws — a rejected fetch surfaces as false
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ profile: updated });
   });
 });
