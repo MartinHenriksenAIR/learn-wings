@@ -19,6 +19,19 @@ describe('pdfResponse', () => {
     expect(headersOf(res)['Content-Disposition']).toBe('attachment; filename="certificate-AI-Basics.pdf"');
   });
 
+  it('leaves an already-safe filename byte-identical (no double-sanitizing)', () => {
+    // what generate-compliance-report produces: `ai-act-compliance-report-${Date.now()}.pdf`
+    const res = pdfResponse(null, 'ai-act-compliance-report-1753300000000.pdf', BYTES);
+    expect(headersOf(res)['Content-Disposition']).toBe('attachment; filename="ai-act-compliance-report-1753300000000.pdf"');
+  });
+
+  it('sanitizes a filename that would break or inject into Content-Disposition', () => {
+    // a raw course title is the trap: quotes escape the quoted value, CRLF forges a header
+    const res = pdfResponse(null, 'AI "Grundkursus" æøå\r\nX-Injected: 1.pdf', BYTES);
+    // anchored: proves no CR/LF, no embedded quote and no non-ASCII byte survived
+    expect(headersOf(res)['Content-Disposition']).toMatch(/^attachment; filename="[A-Za-z0-9._-]*"$/);
+  });
+
   it('merges the CORS headers for the request origin', () => {
     const res = pdfResponse('https://ai-uddannelse.dk', 'report.pdf', BYTES);
     expect(headersOf(res)['Access-Control-Allow-Origin']).toBe('https://ai-uddannelse.dk');

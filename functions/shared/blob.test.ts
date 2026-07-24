@@ -96,6 +96,103 @@ describe('deleteBlob', () => {
   });
 });
 
+describe('cleanupBlobs', () => {
+  const PATH_A = 'videos/a.mp4';
+  const PATH_B = 'videos/b.mp4';
+  const PATH_C = 'videos/c.mp4';
+
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  /**
+   * Drives the REAL `deleteBlob` through the same seam the suite above uses — `./sas`
+   * is module-mocked and `fetch` is stubbed, so nothing leaves the process. (`cleanupBlobs`
+   * calls `deleteBlob` through the module-local binding, so it cannot be mocked away.)
+   * `outcomes[path] === true` → storage 200 → `deleteBlob` true; false → 500 → false.
+   */
+  const stubStorage = (outcomes: Record<string, boolean>) => {
+    mockBuildBlobUrl.mockImplementation(
+      (_account: string, _container: string, blobPath: string) =>
+        `https://testaccount.blob.core.windows.net/lms-videos/${blobPath}?sp=d&sig=abc`,
+    );
+    const fetchMock = vi.fn(async (url: string) => {
+      const hit = Object.entries(outcomes).find(([path]) => url.includes(path));
+      return hit?.[1] ? { ok: true, status: 200 } : { ok: false, status: 500 };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGenerateSasToken.mockReturnValue('sp=d&sig=abc');
+    process.env.AZURE_STORAGE_ACCOUNT_NAME = 'testaccount';
+    process.env.AZURE_STORAGE_ACCOUNT_KEY = Buffer.alloc(32).toString('base64');
+    process.env.AZURE_STORAGE_CONTAINER_NAME = 'lms-videos';
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    vi.unstubAllGlobals();
+    mockBuildBlobUrl.mockReset();
+    delete process.env.AZURE_STORAGE_ACCOUNT_NAME;
+    delete process.env.AZURE_STORAGE_ACCOUNT_KEY;
+    delete process.env.AZURE_STORAGE_CONTAINER_NAME;
+  });
+
+  it('counts every path as deleted, and never warns, when all deletes succeed', async () => {
+    const fetchMock = stubStorage({ [PATH_A]: true, [PATH_B]: true, [PATH_C]: true });
+    const result = await cleanupBlobs([PATH_A, PATH_B, PATH_C], 'course-delete', 'course-1');
+    expect(result).toEqual({ blobsDeleted: 3, blobsFailed: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('splits the counts on mixed results and still attempts every path', async () => {
+    const fetchMock = stubStorage({ [PATH_A]: true, [PATH_B]: false, [PATH_C]: true });
+    const result = await cleanupBlobs([PATH_A, PATH_B, PATH_C], 'module-delete', 'mod-7');
+    expect(result).toEqual({ blobsDeleted: 2, blobsFailed: 1 });
+    // A failure mid-list must not short-circuit the remaining deletes.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('counts every path as failed when all deletes fail', async () => {
+    stubStorage({ [PATH_A]: false, [PATH_B]: false });
+    await expect(cleanupBlobs([PATH_A, PATH_B], 'course-delete', 'course-2')).resolves.toEqual({
+      blobsDeleted: 0,
+      blobsFailed: 2,
+    });
+  });
+
+  it('returns zeroed counts and does NOT warn for an empty path list', async () => {
+    const fetchMock = stubStorage({});
+    const result = await cleanupBlobs([], 'course-delete', 'course-3');
+    expect(result).toEqual({ blobsDeleted: 0, blobsFailed: 0 });
+    expect(fetchMock).not.toHaveBeenCalled();
+    // blobsFailed is 0, not "not > 0" by accident — an empty cleanup is silent.
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('resolves rather than rejecting when the underlying delete blows up', async () => {
+    mockBuildBlobUrl.mockReturnValue(BLOB_URL);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+    await expect(cleanupBlobs([PATH_A, PATH_B], 'course-delete', 'course-4')).resolves.toEqual({
+      blobsDeleted: 0,
+      blobsFailed: 2,
+    });
+  });
+
+  it('warns exactly once, tagged with logTag and id, when at least one path fails', async () => {
+    stubStorage({ [PATH_A]: true, [PATH_B]: false });
+    await cleanupBlobs([PATH_A, PATH_B], 'module-delete', 'mod-42');
+    expect(warnSpy).toHaveBeenCalledWith('[module-delete] 1 blob(s) failed to delete for', 'mod-42');
+    const cleanupWarnings = warnSpy.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.startsWith('[module-delete]'),
+    );
+    expect(cleanupWarnings).toHaveLength(1);
+  });
+});
+
 describe('resolveAssetContainer', () => {
   beforeEach(() => {
     process.env.AZURE_STORAGE_CONTAINER_NAME = 'lms-videos';

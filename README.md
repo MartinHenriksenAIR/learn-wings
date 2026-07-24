@@ -42,7 +42,7 @@ callApi()  ───────────────────────
 Azure Function  ─────────────────────────►  functions/<name>/index.ts  (×~100)
    │   the envelope is owned by endpoint()/adminEndpoint() in functions/shared/endpoint.ts
    │   (ADR-0015; a handful of hand-rolled exceptions), leaning on the core
-   │   request-path helpers among the ~20 modules in functions/shared/:
+   │   request-path helpers among the ~25 modules in functions/shared/:
    │     authenticate()  verify the Entra JWT            functions/shared/auth.ts
    │     getProfile()    Entra identity → DB profile     functions/shared/profile.ts
    │                     + isActiveMember / isOrgAdmin    (authorization lives HERE)
@@ -59,7 +59,7 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | Path | What's there |
 |------|--------------|
 | `src/` | Frontend SPA — `pages/` (by role), `components/`, `hooks/useAuth.tsx`, `lib/` (api-client, types, msal-config) |
-| `functions/` | ~100 Azure Functions (one folder each) + `shared/` (~20 modules: `endpoint`, `auth`, `db`, `profile`, `cors`, `errors`, …) + `index.ts` barrel |
+| `functions/` | ~100 Azure Functions (one folder each) + `shared/` (~25 modules: `endpoint`, `auth`, `db`, `profile`, `cors`, `errors`, …) + `index.ts` barrel |
 | `migration/azure/` | The canonical Postgres schema (`01-schema.sql`), seed data (`02-seed.sql`), and apply guide |
 | `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history) |
 | `docs/adr/` | The 15 architecture decision records |

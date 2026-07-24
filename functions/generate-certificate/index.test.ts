@@ -40,7 +40,7 @@ describe('generate-certificate', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns a PDF with correct headers when enrollment is completed', async () => {
+  it('returns a %PDF- Buffer with correct headers when enrollment is completed', async () => {
     mockQueryOne.mockResolvedValueOnce({ user_id: 'profile-uuid', status: 'completed', course_id: 'c-1', completed_at: '2026-05-01T00:00:00Z' });
     // Promise.all: profile, course, org
     mockQueryOne.mockResolvedValueOnce({ full_name: 'Alice Smith' });
@@ -52,5 +52,8 @@ describe('generate-certificate', () => {
     expect(res.status).toBe(200);
     expect((res.headers as Record<string, string>)['Content-Type']).toBe('application/pdf');
     expect((res.headers as Record<string, string>)['Content-Disposition']).toMatch(/certificate/);
+    // the body itself, not just the envelope: a raw Buffer (never a latin1 string) of real PDF bytes
+    expect(Buffer.isBuffer(res.body)).toBe(true);
+    expect((res.body as Buffer).subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
 });

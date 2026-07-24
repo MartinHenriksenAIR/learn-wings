@@ -12,6 +12,7 @@ describe('isBlockedAddress — IPv4', () => {
     ['127.0.0.1', '127.0.0.0/8'],
     ['169.254.169.254', 'cloud metadata'],
     ['169.254.0.1', '169.254.0.0/16'],
+    ['168.63.129.16', 'Azure WireServer host endpoint'],
     ['172.16.0.1', '172.16.0.0/12'],
     ['172.31.255.255', '172.16.0.0/12'],
     ['192.168.1.1', '192.168.0.0/16'],
@@ -30,6 +31,11 @@ describe('isBlockedAddress — IPv4', () => {
     '100.128.0.1',  // just above 100.64.0.0/10
     '192.169.0.1',
     '169.253.0.1',
+    // The WireServer block is a /32 — its neighbours are ordinary public unicast.
+    '168.63.129.15',
+    '168.63.129.17',
+    '168.63.130.16',
+    '168.62.129.16',
   ])('allows public %s', (ip) => {
     expect(isBlockedAddress(ip)).toBe(false);
   });
@@ -47,6 +53,7 @@ describe('isBlockedAddress — IPv6', () => {
     ['febf::1', 'fe80::/10 upper bound'],
     ['::ffff:192.168.1.1', 'IPv4-mapped private'],
     ['::ffff:169.254.169.254', 'IPv4-mapped metadata'],
+    ['::ffff:168.63.129.16', 'IPv4-mapped Azure WireServer'],
     ['::FFFF:10.0.0.1', 'IPv4-mapped, uppercase'],
   ])('blocks %s (%s)', (ip) => {
     expect(isBlockedAddress(ip)).toBe(true);
@@ -76,9 +83,24 @@ describe('validatePublicHost', () => {
     vi.clearAllMocks();
   });
 
-  it('returns null when every resolved address is public', async () => {
+  it('returns the resolved address when every resolved address is public', async () => {
     mockLookup.mockResolvedValueOnce([{ address: '8.8.8.8', family: 4 }]);
-    expect(await validatePublicHost('smtp.example.com')).toBeNull();
+    expect(await validatePublicHost('smtp.example.com')).toEqual({ address: '8.8.8.8' });
+  });
+
+  // The address travels back so the caller dials it instead of the hostname —
+  // without that, the socket resolves again and a rebind wins the race.
+  it('pins one vetted address out of a multi-record public answer', async () => {
+    mockLookup.mockResolvedValueOnce([
+      { address: '93.184.216.34', family: 4 },
+      { address: '93.184.216.35', family: 4 },
+    ]);
+    expect(await validatePublicHost('smtp.example.com')).toEqual({ address: '93.184.216.34' });
+  });
+
+  it('returns an IP literal host verbatim as the pinned address', async () => {
+    mockLookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    expect(await validatePublicHost('93.184.216.34')).toEqual({ address: '93.184.216.34' });
   });
 
   it('rejects when ANY resolved address is private (multi-record answer)', async () => {
@@ -86,26 +108,31 @@ describe('validatePublicHost', () => {
       { address: '93.184.216.34', family: 4 },
       { address: '10.0.0.5', family: 4 },
     ]);
-    expect(await validatePublicHost('rebind.example.com')).toBe(BLOCKED_HOST_MESSAGE);
+    expect(await validatePublicHost('rebind.example.com')).toEqual({ error: BLOCKED_HOST_MESSAGE });
   });
 
   it('rejects a literal private IP (lookup returns literals verbatim)', async () => {
     mockLookup.mockResolvedValueOnce([{ address: '192.168.1.1', family: 4 }]);
-    expect(await validatePublicHost('192.168.1.1')).toBe(BLOCKED_HOST_MESSAGE);
+    expect(await validatePublicHost('192.168.1.1')).toEqual({ error: BLOCKED_HOST_MESSAGE });
+  });
+
+  it('rejects a host resolving to the Azure WireServer endpoint', async () => {
+    mockLookup.mockResolvedValueOnce([{ address: '168.63.129.16', family: 4 }]);
+    expect(await validatePublicHost('wireserver.example.com')).toEqual({ error: BLOCKED_HOST_MESSAGE });
   });
 
   it('rejects an empty host without resolving', async () => {
-    expect(await validatePublicHost('   ')).toBe('host is required');
+    expect(await validatePublicHost('   ')).toEqual({ error: 'host is required' });
     expect(mockLookup).not.toHaveBeenCalled();
   });
 
   it('reports unresolvable hosts', async () => {
     mockLookup.mockRejectedValueOnce(new Error('getaddrinfo ENOTFOUND nope.invalid'));
-    expect(await validatePublicHost('nope.invalid')).toBe('Could not resolve host nope.invalid');
+    expect(await validatePublicHost('nope.invalid')).toEqual({ error: 'Could not resolve host nope.invalid' });
   });
 
   it('reports an empty resolution result', async () => {
     mockLookup.mockResolvedValueOnce([]);
-    expect(await validatePublicHost('empty.invalid')).toBe('Could not resolve host empty.invalid');
+    expect(await validatePublicHost('empty.invalid')).toEqual({ error: 'Could not resolve host empty.invalid' });
   });
 });

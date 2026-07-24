@@ -4,17 +4,39 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { validatePublicHost } from '../shared/net-guard';
-import { createConnection } from 'node:net';
-import { connect as tlsConnect } from 'node:tls';
+import { createConnection, isIP } from 'node:net';
+import { connect as tlsConnect, type ConnectionOptions as TlsConnectionOptions } from 'node:tls';
 
-async function testConnection(host: string, port: number, useTls: boolean): Promise<string> {
+/**
+ * TLS options for the pinned-IP dial.
+ *
+ * `servername` is NOT removable: we connect to `address`, and a dial to a bare IP
+ * sends no SNI, so shared-IP / load-balanced SMTP providers (SendGrid, Mailgun,
+ * Office 365) would fail the handshake and a working Test Connection would start
+ * reporting a false failure. It is omitted when the admin typed an IP literal —
+ * RFC 6066 forbids IP literals in SNI and Node rejects them.
+ */
+function tlsOptions(host: string, address: string, port: number): TlsConnectionOptions {
+  const options: TlsConnectionOptions = { host: address, port, rejectUnauthorized: false };
+  if (isIP(host) === 0) options.servername = host;
+  return options;
+}
+
+/**
+ * Dials `address` — the IP `validatePublicHost` already vetted — rather than
+ * `host`, so the socket's own resolution can't run a second lookup that a
+ * low-TTL rebinding record answers with a private address. `host` stays the
+ * user-facing name: it is what the success message reports and what rides along
+ * as the TLS SNI servername.
+ */
+async function testConnection(host: string, address: string, port: number, useTls: boolean): Promise<string> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Connection timeout after 8 seconds')), 8000);
     const onConnect = () => { clearTimeout(timeout); sock.destroy(); resolve(`Connected to ${host}:${port}`); };
     const onError = (e: Error) => { clearTimeout(timeout); reject(e); };
     const sock = useTls
-      ? tlsConnect({ host, port, rejectUnauthorized: false }, onConnect)
-      : createConnection({ host, port }, onConnect);
+      ? tlsConnect(tlsOptions(host, address, port), onConnect)
+      : createConnection({ host: address, port }, onConnect);
     sock.on('error', onError);
   });
 }
@@ -41,11 +63,11 @@ async function handler(req: HttpRequest, _ctx: InvocationContext): Promise<HttpR
     if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
       return corsResponse(origin, 200, { success: false, error: 'port must be an integer between 1 and 65535' });
     }
-    const hostError = await validatePublicHost(host);
-    if (hostError) return corsResponse(origin, 200, { success: false, error: hostError });
+    const verdict = await validatePublicHost(host);
+    if ('error' in verdict) return corsResponse(origin, 200, { success: false, error: verdict.error });
 
     const useTls = encryption === 'ssl_tls';
-    const message = await testConnection(host.trim(), port, useTls);
+    const message = await testConnection(host.trim(), verdict.address, port, useTls);
     return corsResponse(origin, 200, { success: true, message });
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });

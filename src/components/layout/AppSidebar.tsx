@@ -123,7 +123,6 @@ export function AppSidebar() {
     isPlatformAdmin,
     effectiveIsPlatformAdmin,
     effectiveIsOrgAdmin,
-    currentOrg,
     signOut,
     viewMode,
     setViewMode,

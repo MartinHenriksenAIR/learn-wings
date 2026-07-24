@@ -1,15 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
-  mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockDeleteBlob,
+  mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockDeleteBlob, mockCleanupBlobs,
 } = vi.hoisted(() => {
   class MockAuthError extends Error {}
+  const mockDeleteBlob = vi.fn();
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQuery: vi.fn(),
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
-    mockDeleteBlob: vi.fn(),
+    mockDeleteBlob,
+    mockCleanupBlobs: vi.fn(async (paths: string[], _logTag: string, _id: string) => {
+      const results = await Promise.all(paths.map((p) => mockDeleteBlob(p)));
+      const blobsDeleted = results.filter(Boolean).length;
+      return { blobsDeleted, blobsFailed: results.length - blobsDeleted };
+    }),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -20,16 +26,14 @@ vi.mock('../shared/profile', () => ({
   isOrgAdmin: vi.fn(),
   isOrgAdminOfAny: vi.fn(),
 }));
-// cleanupBlobs is faked in terms of mockDeleteBlob so the per-path assertions below
-// (call counts, mixed true/false results) keep exercising the endpoint's real behaviour.
-// The helper's own counting/warning contract is covered in shared/blob.test.ts.
+// cleanupBlobs is faked in terms of mockDeleteBlob so the assertions below still pin what
+// belongs to THIS endpoint: which paths it collects, that it attempts one delete per path,
+// and that it echoes the returned counts into the response body. The arithmetic those
+// assertions compare against comes from the fake, not from the real helper — cleanupBlobs'
+// own counting/warning contract is covered by describe('cleanupBlobs') in shared/blob.test.ts.
 vi.mock('../shared/blob', () => ({
   deleteBlob: mockDeleteBlob,
-  cleanupBlobs: async (paths: string[]) => {
-    const results = await Promise.all(paths.map((p) => mockDeleteBlob(p)));
-    const blobsDeleted = results.filter(Boolean).length;
-    return { blobsDeleted, blobsFailed: results.length - blobsDeleted };
-  },
+  cleanupBlobs: mockCleanupBlobs,
 }));
 
 import handler from './index';
@@ -141,6 +145,16 @@ describe('module-delete', () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ success: true, blobsDeleted: 2, blobsFailed: 0 });
     expect(mockDeleteBlob).toHaveBeenCalledTimes(2);
+  });
+
+  it('passes the collected paths to cleanupBlobs tagged with the endpoint name and moduleId', async () => {
+    mockQuery.mockResolvedValueOnce([
+      { azure_blob_path: 'videos/a.mp4' },
+      { azure_blob_path: 'videos/b.mp4' },
+    ]);
+    mockQueryOne.mockResolvedValueOnce({ id: 'mod-1' });
+    await handler(baseReq(validBody), {} as any);
+    expect(mockCleanupBlobs).toHaveBeenCalledWith(['videos/a.mp4', 'videos/b.mp4'], 'module-delete', 'mod-1');
   });
 
   it('mixed results (one true, one false): blobsDeleted:1, blobsFailed:1, still 200', async () => {

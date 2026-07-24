@@ -212,9 +212,23 @@ describe('AppSidebar nav groups (#271)', () => {
       renderSidebar(routes.orgAdmin.settings);
 
       expect(navLink(routes.orgAdmin.settings)).toHaveAttribute('data-active', 'true');
-      // The org root is a prefix of the settings path — `end` keeps it inactive.
+      // `data-active` is NavSection's own `location.pathname === item.url` — exact string
+      // equality — so the org root is inactive here purely because the pathnames differ.
+      // (The NavLink `end` prop is what keeps React Router's own match strict; see below.)
       expect(navLink(routes.orgAdmin.root)).toHaveAttribute('data-active', 'false');
       expect(navLink(routes.learner.dashboard)).toHaveAttribute('data-active', 'false');
+    });
+
+    it('keeps React Router from matching the org root on a nested path (the `end` prop)', () => {
+      mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
+      renderSidebar(routes.orgAdmin.settings);
+
+      // '/app/admin/org' is a strict prefix of '/app/admin/org/settings', so without `end`
+      // React Router would consider the org-root NavLink matched and stamp it with
+      // aria-current="page" (plus its own appended "active" class). data-active would not
+      // catch that regression — it is computed by NavSection, not by NavLink.
+      expect(navLink(routes.orgAdmin.settings)).toHaveAttribute('aria-current', 'page');
+      expect(navLink(routes.orgAdmin.root)).not.toHaveAttribute('aria-current');
     });
 
     it('marks the active item inside the platform-admin group', () => {

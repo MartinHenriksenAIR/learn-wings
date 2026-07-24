@@ -5,8 +5,10 @@
  * to 10.x / 169.254.169.254 / 127.0.0.1 is an internal-service reachability and
  * port-probe primitive. Callers get a public-internet-only view instead.
  *
- * House style follows `shared/validate.ts`: `null` on success, an error message
- * string on failure — the caller owns the response shape.
+ * Like `shared/validate.ts`, the caller owns the response shape — the guard only
+ * hands back an error message string. It diverges from that module's plain
+ * `null`-on-success because the success case carries a value: the vetted address
+ * the caller must dial (see `validatePublicHost`).
  */
 import { lookup } from 'node:dns/promises';
 
@@ -27,7 +29,7 @@ function parseIPv4(ip: string): number[] | null {
   return octets;
 }
 
-function isBlockedIPv4([a, b]: number[]): boolean {
+function isBlockedIPv4([a, b, c, d]: number[]): boolean {
   if (a === 0) return true;                            // 0.0.0.0/8 — "this network"
   if (a === 10) return true;                           // 10.0.0.0/8 — private
   if (a === 127) return true;                          // 127.0.0.0/8 — loopback
@@ -35,6 +37,12 @@ function isBlockedIPv4([a, b]: number[]): boolean {
   if (a === 172 && b >= 16 && b <= 31) return true;    // 172.16.0.0/12 — private
   if (a === 192 && b === 168) return true;             // 192.168.0.0/16 — private
   if (a === 100 && b >= 64 && b <= 127) return true;   // 100.64.0.0/10 — CGNAT
+  // 168.63.129.16/32 — Azure WireServer, the host-communication endpoint every
+  // Azure VM/App Service can reach (DNS, DHCP, guest-agent plugin endpoints).
+  // Publicly-routable-looking unicast, so no range rule above catches it, and it
+  // is the standard second SSRF target after 169.254.169.254 on Azure — which is
+  // exactly where this app runs.
+  if (a === 168 && b === 63 && c === 129 && d === 16) return true;
   return false;
 }
 
@@ -93,26 +101,35 @@ export function isBlockedAddress(ip: string): boolean {
 }
 
 /**
- * Resolves `host` and returns an error message when ANY resolved address is
- * blocked — one bad A/AAAA record is enough, so a multi-record or rebinding
- * answer can't slip a private address past. A literal IP takes the same path
- * because `dns.lookup` returns literals verbatim.
- *
- * Callers still connect by hostname, so a rebind between this lookup and the
- * connect remains theoretically possible; closing that needs a pinned-IP dial,
- * which is out of scope for a reachability probe.
+ * Verdict of `validatePublicHost` — one of the two branches, never both:
+ * `{ error }` is a caller-facing message, `{ address }` is the vetted IP to dial.
  */
-export async function validatePublicHost(host: string): Promise<string | null> {
+export type PublicHostVerdict = { error: string } | { address: string };
+
+/**
+ * Resolves `host` and returns `{ error }` when ANY resolved address is blocked —
+ * one bad A/AAAA record is enough, so a multi-record or rebinding answer can't
+ * slip a private address past. A literal IP takes the same path because
+ * `dns.lookup` returns literals verbatim.
+ *
+ * On success the verdict carries the address that was actually checked, and the
+ * caller MUST dial that instead of the hostname. Dialling by name would let the
+ * socket's own resolution run a second lookup, and a low-TTL record answering
+ * public here and private there walks straight through this guard (DNS
+ * rebinding). Passing a literal skips DNS in `net`/`tls` entirely, so the
+ * address that was vetted is the address that gets connected.
+ */
+export async function validatePublicHost(host: string): Promise<PublicHostVerdict> {
   const trimmed = host.trim();
-  if (!trimmed) return 'host is required';
+  if (!trimmed) return { error: 'host is required' };
 
   let addresses: { address: string }[];
   try {
     addresses = await lookup(trimmed, { all: true });
   } catch {
-    return `Could not resolve host ${trimmed}`;
+    return { error: `Could not resolve host ${trimmed}` };
   }
-  if (addresses.length === 0) return `Could not resolve host ${trimmed}`;
-  if (addresses.some((a) => isBlockedAddress(a.address))) return BLOCKED_HOST_MESSAGE;
-  return null;
+  if (addresses.length === 0) return { error: `Could not resolve host ${trimmed}` };
+  if (addresses.some((a) => isBlockedAddress(a.address))) return { error: BLOCKED_HOST_MESSAGE };
+  return { address: addresses[0].address };
 }
