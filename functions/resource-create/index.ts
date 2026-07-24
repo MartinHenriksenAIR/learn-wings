@@ -1,12 +1,7 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-import { RESOURCE_PROFILE_PROJECTION } from '../shared/resources';
+import { RESOURCE_PROFILE_PROJECTION, RESOURCE_TYPES } from '../shared/resources';
 import { validateHttpUrl } from '../shared/validate';
-
-// Mirrors RESOURCE_TYPES in src/lib/resources-api.ts. No DB CHECK constraint exists
-// (the column is plain TEXT DEFAULT 'link'); validating here keeps types consistent
-// with the form's <Select> options.
-const RESOURCE_TYPES = ['link', 'document', 'template', 'guide'];
 
 export default endpoint('resource-create', async ({ req, profile, reply, requireActiveMember }) => {
   const body = await req.json() as Record<string, unknown>;
