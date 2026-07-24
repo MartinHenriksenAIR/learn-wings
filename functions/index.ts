@@ -86,6 +86,7 @@ import './organization-create/index';
 import './organization-delete/index';
 import './organization-update/index';
 import './organizations/index';
+import './orphan-sweep/index';
 import './platform-admin-update/index';
 import './platform-settings/index';
 import './platform-settings-update/index';
