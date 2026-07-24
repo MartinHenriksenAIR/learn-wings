@@ -1,5 +1,6 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
+import { loadIdea } from '../shared/ideas';
 
 // idea_status enum values (provenance: supabase enum idea_status).
 const VALID_STATUSES = [
@@ -15,13 +16,6 @@ const VALID_STATUSES = [
   'done',
   'archived',
 ];
-
-interface IdeaRow {
-  id: string;
-  org_id: string;
-  user_id: string;
-  status: string;
-}
 
 export default endpoint('idea-status-update', async ({ req, reply, requireOrgAdmin }) => {
   const body = await req.json() as {
@@ -47,11 +41,7 @@ export default endpoint('idea-status-update', async ({ req, reply, requireOrgAdm
     return reply(400, { error: 'rejectionReason must be a string or null' });
   }
 
-  // Load idea
-  const idea = await queryOne<IdeaRow>(
-    `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
-    [ideaId],
-  );
+  const idea = await loadIdea(ideaId);
   if (!idea) return reply(404, { error: 'Idea not found' });
 
   // Authorization: platform admin OR org admin of the IDEA's org (never client-supplied).

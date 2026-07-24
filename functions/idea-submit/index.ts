@@ -1,12 +1,6 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-
-interface IdeaRow {
-  id: string;
-  org_id: string;
-  user_id: string;
-  status: string;
-}
+import { loadIdea, assertAuthorDraft } from '../shared/ideas';
 
 export default endpoint('idea-submit', async ({ req, profile, reply }) => {
   const body = await req.json() as { ideaId?: unknown };
@@ -16,22 +10,12 @@ export default endpoint('idea-submit', async ({ req, profile, reply }) => {
     return reply(400, { error: 'ideaId is required' });
   }
 
-  // Load idea
-  const idea = await queryOne<IdeaRow>(
-    `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
-    [ideaId],
-  );
+  const idea = await loadIdea(ideaId);
   if (!idea) return reply(404, { error: 'Idea not found' });
 
-  // Author-only: no admin bypass — submitting someone else's idea is meaningless.
-  if (idea.user_id !== profile.id) {
-    return reply(403, { error: 'Forbidden' });
-  }
-
-  // Draft-only.
-  if (idea.status !== 'draft') {
-    return reply(409, { error: 'Only draft ideas can be submitted' });
-  }
+  // Author-only-403 + draft-only-409 (shared/ideas; no admin bypass).
+  const gate = assertAuthorDraft(idea, profile, { notDraftError: 'Only draft ideas can be submitted' });
+  if (!gate.ok) return reply(gate.status, gate.body);
 
   const submitted = await queryOne(
     `UPDATE ideas SET status = 'submitted', submitted_at = now() WHERE id = $1 RETURNING *`,

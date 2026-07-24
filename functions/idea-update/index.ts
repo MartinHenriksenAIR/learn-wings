@@ -1,6 +1,7 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { buildUpdateSet } from '../shared/update-builder';
+import { loadIdea, assertAuthorDraft } from '../shared/ideas';
 
 // Author-writable fields. status, user_id, org_id, submitted_at, admin_notes,
 // rejection_reason, category_id, course/lesson context are NOT editable here —
@@ -26,13 +27,6 @@ const STRING_FIELDS = new Set([
 const ALLOWED_UPDATE_FIELDS = new Set([...STRING_FIELDS, 'tags', 'business_area']);
 
 const BUSINESS_AREAS = ['hr', 'finance', 'sales', 'support', 'ops', 'it', 'legal', 'other'];
-
-interface IdeaRow {
-  id: string;
-  org_id: string;
-  user_id: string;
-  status: string;
-}
 
 export default endpoint('idea-update', async ({ req, profile, reply }) => {
   const body = await req.json() as { ideaId?: unknown; updates?: unknown };
@@ -76,22 +70,13 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
     }
   }
 
-  // Load idea
-  const idea = await queryOne<IdeaRow>(
-    `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
-    [ideaId],
-  );
+  const idea = await loadIdea(ideaId);
   if (!idea) return reply(404, { error: 'Idea not found' });
 
-  // Author-only: no admin bypass (org-admin writes go through idea-status-update).
-  if (idea.user_id !== profile.id) {
-    return reply(403, { error: 'Forbidden' });
-  }
-
-  // Draft-only.
-  if (idea.status !== 'draft') {
-    return reply(409, { error: 'Only draft ideas can be edited' });
-  }
+  // Author-only-403 + draft-only-409 (shared/ideas; no admin bypass — org-admin
+  // writes go through idea-status-update).
+  const gate = assertAuthorDraft(idea, profile, { notDraftError: 'Only draft ideas can be edited' });
+  if (!gate.ok) return reply(gate.status, gate.body);
 
   // Build dynamic UPDATE over the provided whitelisted keys only.
   const { setClauses, params } = built;
