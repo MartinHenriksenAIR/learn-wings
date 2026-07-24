@@ -107,6 +107,10 @@ export default tseslint.config(
               // Custom props that carry a className/id reference, not prose.
               "fallbackClassName",
               "list",
+              // OrgGate props carry i18n keys (translated inside the component),
+              // not prose (#256).
+              "titleKey",
+              "descriptionKey",
             ],
           },
           callees: {
