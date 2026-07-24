@@ -49,7 +49,10 @@
     "completedOn": "Completed on",
     "noOrgSelected": "No organization selected.",
     "joinOrgToContinue": "Join an organization to continue.",
-    "clear": "Clear"
+    "clear": "Clear",
+    "loadErrorTitle": "Couldn't load this page",
+    "loadErrorDescription": "Something went wrong while loading. Please try again.",
+    "retry": "Try again"
   },
   "nav": {
     "home": "Home",

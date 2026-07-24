@@ -14,6 +14,8 @@ import { UpcomingEvents } from '@/components/community/UpcomingEvents';
 import { EventsTab } from '@/pages/community/EventsTab';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { AIChampionsList } from '@/components/community/AIChampionsList';
+import { QueryErrorState } from '@/components/ui/query-error-state';
+import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQueryErrorToast';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { toast } from '@/components/ui/sonner';
@@ -67,14 +69,24 @@ export default function CommunityFeed() {
     }
   }, [view, currentOrg, setSearchParams]);
 
-  // Fetch categories
-  const { data: categories = [] } = useQuery({
+  // Fetch categories (secondary data — the chip row degrades gracefully; a
+  // failure just toasts + logs rather than blocking the feed).
+  const {
+    data: categories = [],
+    isError: categoriesError,
+    error: categoriesErrorObj,
+  } = useQuery({
     queryKey: queryKeys.communityCategories.all,
     queryFn: fetchCategories,
   });
+  useQueryErrorToast({
+    isError: categoriesError,
+    error: categoriesErrorObj,
+    logLabel: 'CommunityFeed: failed to load categories',
+  });
 
-  // Fetch posts
-  const { data: posts = [], isLoading } = useQuery({
+  // Fetch posts (primary data)
+  const { data: posts = [], isLoading, isError: postsError, refetch: refetchPosts } = useQuery({
     queryKey: queryKeys.communityPosts.list(scope, currentOrg?.id, selectedCategory, searchQuery, selectedTags),
     queryFn: () => fetchPosts({
       scope,
@@ -300,6 +312,9 @@ export default function CommunityFeed() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
+          ) : postsError ? (
+            // A failed fetch must not render the "no posts yet" empty state.
+            <QueryErrorState onRetry={() => refetchPosts()} />
           ) : posts.length === 0 ? (
             <CommunityEmptyState
               variant="posts"

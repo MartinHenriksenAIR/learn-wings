@@ -18,6 +18,8 @@ import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import { IdeaCard } from '@/components/community/IdeaCard';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { PageSpinner } from '@/components/ui/page-spinner';
+import { QueryErrorState } from '@/components/ui/query-error-state';
+import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQueryErrorToast';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
@@ -87,8 +89,8 @@ export default function IdeaLibrary() {
     rejected: ['rejected'],
   };
 
-  // Fetch ideas - for drafts tab, filter by current user
-  const { data: ideas = [], isLoading } = useQuery({
+  // Fetch ideas - for drafts tab, filter by current user (primary data)
+  const { data: ideas = [], isLoading, isError: ideasError, refetch: refetchIdeas } = useQuery({
     queryKey: queryKeys.ideas.list(currentOrg?.id, safeTab, searchQuery, selectedBusinessArea, selectedTags, profile?.id),
     queryFn: () => fetchIdeas(currentOrg!.id, {
       status: tabStatusFilters[safeTab].length > 0 ? tabStatusFilters[safeTab] : undefined,
@@ -100,10 +102,17 @@ export default function IdeaLibrary() {
     enabled: !!currentOrg,
   });
 
-  const { data: orgTags = [] } = useQuery({
+  // Org tags are secondary (the tag filter dropdown) — a failure degrades the
+  // filter but should not blank the page, so it toasts + logs instead.
+  const { data: orgTags = [], isError: orgTagsError, error: orgTagsErrorObj } = useQuery({
     queryKey: queryKeys.ideaTags.list(currentOrg?.id),
     queryFn: () => fetchOrgTags(currentOrg!.id),
     enabled: !!currentOrg,
+  });
+  useQueryErrorToast({
+    isError: orgTagsError,
+    error: orgTagsErrorObj,
+    logLabel: 'IdeaLibrary: failed to load org tags',
   });
 
   // Delete idea mutation
@@ -261,6 +270,9 @@ export default function IdeaLibrary() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : ideasError ? (
+        // A failed fetch must not render the "no ideas yet" empty state.
+        <QueryErrorState onRetry={() => refetchIdeas()} />
       ) : filteredIdeas.length === 0 ? (
         <CommunityEmptyState
           variant={safeTab === 'drafts' ? 'drafts' : 'ideas'}

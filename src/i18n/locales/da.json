@@ -49,7 +49,10 @@
     "completedOn": "Afsluttet den",
     "noOrgSelected": "Ingen organisation valgt.",
     "joinOrgToContinue": "Tilmeld dig en organisation for at fortsætte.",
-    "clear": "Ryd"
+    "clear": "Ryd",
+    "loadErrorTitle": "Kunne ikke indlæse denne side",
+    "loadErrorDescription": "Noget gik galt under indlæsningen. Prøv igen.",
+    "retry": "Prøv igen"
   },
   "nav": {
     "home": "Hjem",

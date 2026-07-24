@@ -104,3 +104,28 @@ describe('OrgAnalytics — view is selected by route (#120)', () => {
     expect(screen.getByText('analytics.tabs.members')).toBeInTheDocument();
   });
 });
+
+describe('OrgAnalytics — failed fetch shows error fork, not all-zero stats', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the retryable error state (not the stats tabs) when the analytics fetch fails', () => {
+    primeHooks({ isPlatformAdmin: false, currentOrg: org });
+    // Override the analytics query to a failed state.
+    const refetch = vi.fn();
+    vi.mocked(useOrgAnalyticsData).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    } as unknown as ReturnType<typeof useOrgAnalyticsData>);
+
+    renderAt(routes.orgAdmin.root);
+
+    expect(screen.getByText('common.loadErrorTitle')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
+    // The stats-bearing tabs must NOT render on a failure (would show zeros).
+    expect(screen.queryByText('analytics.tabs.overview')).not.toBeInTheDocument();
+  });
+});
