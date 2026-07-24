@@ -130,7 +130,6 @@ export function AppSidebar() {
   } = useAuth();
   const { features } = usePlatformSettings();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleSignOut = async () => {
     await signOut();
@@ -198,86 +197,17 @@ export function AppSidebar() {
       <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2">
         {/* Learner section - hidden when viewing as platform admin */}
         {!effectiveIsPlatformAdmin && (
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
-              {t('nav.learning')}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-[3px]">
-                {learnerItems.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === item.url}
-                      tooltip={collapsed ? item.title : undefined}
-                      className={NAV_BUTTON_CLASSES}
-                    >
-                      <NavLink to={item.url} end className="flex items-center">
-                        <item.icon />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <NavSection label={t('nav.learning')} items={learnerItems} />
         )}
 
         {/* Org Admin section - hidden when viewing as platform admin */}
         {effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && (
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
-              {t('nav.organization')}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-[3px]">
-                {orgAdminItems.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === item.url}
-                      tooltip={collapsed ? item.title : undefined}
-                      className={NAV_BUTTON_CLASSES}
-                    >
-                      <NavLink to={item.url} end className="flex items-center">
-                        <item.icon />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <NavSection label={t('nav.organization')} items={orgAdminItems} />
         )}
 
         {/* Platform Admin section */}
         {effectiveIsPlatformAdmin && (
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
-              {t('nav.platformAdmin')}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-[3px]">
-                {platformAdminItems.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === item.url}
-                      tooltip={collapsed ? item.title : undefined}
-                      className={NAV_BUTTON_CLASSES}
-                    >
-                      <NavLink to={item.url} end className="flex items-center">
-                        <item.icon />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <NavSection label={t('nav.platformAdmin')} items={platformAdminItems} />
         )}
       </SidebarContent>
 
