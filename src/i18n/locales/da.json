@@ -462,8 +462,13 @@
       "postDeleted": "Opslaget blev slettet",
       "postDeleteFailed": "Kunne ikke slette opslaget",
       "commentAddFailed": "Kunne ikke tilføje kommentaren",
+      "commentUpdateFailed": "Kunne ikke opdatere kommentaren",
       "commentDeleted": "Kommentaren blev slettet",
+      "commentDeleteFailed": "Kunne ikke slette kommentaren",
+      "commentHideFailed": "Kunne ikke opdatere kommentarens synlighed",
       "commentLinkCopied": "Link til kommentaren blev kopieret",
+      "postHideFailed": "Kunne ikke opdatere opslagets synlighed",
+      "postLockFailed": "Kunne ikke opdatere opslagets lås",
       "voteFailed": "Kunne ikke stemme",
       "unvoteFailed": "Kunne ikke fjerne stemmen",
       "statusUpdateFailed": "Kunne ikke opdatere status",
@@ -482,7 +487,8 @@
       "resourceUpdated": "Ressourcen blev opdateret!",
       "resourceUpdateFailed": "Kunne ikke opdatere ressourcen",
       "resourceDeleted": "Ressourcen blev slettet",
-      "resourceDeleteFailed": "Kunne ikke slette ressourcen"
+      "resourceDeleteFailed": "Kunne ikke slette ressourcen",
+      "resourcePinFailed": "Kunne ikke opdatere fastgørelsen"
     }
   },
   "ideas": {

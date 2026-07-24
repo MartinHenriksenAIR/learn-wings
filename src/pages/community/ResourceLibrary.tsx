@@ -133,6 +133,9 @@ export default function ResourceLibrary() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityResources.all });
     },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.resourcePinFailed'), description: error.message, variant: 'destructive' });
+    },
   });
 
   if (!settingsLoading && !features.community_enabled) {

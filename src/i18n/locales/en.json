@@ -462,8 +462,13 @@
       "postDeleted": "Post deleted",
       "postDeleteFailed": "Failed to delete post",
       "commentAddFailed": "Failed to add comment",
+      "commentUpdateFailed": "Failed to update comment",
       "commentDeleted": "Comment deleted",
+      "commentDeleteFailed": "Failed to delete comment",
+      "commentHideFailed": "Failed to update comment visibility",
       "commentLinkCopied": "Comment link copied",
+      "postHideFailed": "Failed to update post visibility",
+      "postLockFailed": "Failed to update post lock",
       "voteFailed": "Failed to vote",
       "unvoteFailed": "Failed to remove vote",
       "statusUpdateFailed": "Failed to update status",
@@ -482,7 +487,8 @@
       "resourceUpdated": "Resource updated!",
       "resourceUpdateFailed": "Failed to update resource",
       "resourceDeleted": "Resource deleted",
-      "resourceDeleteFailed": "Failed to delete resource"
+      "resourceDeleteFailed": "Failed to delete resource",
+      "resourcePinFailed": "Failed to update pin"
     }
   },
   "ideas": {

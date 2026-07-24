@@ -118,6 +118,9 @@ export default function CommunityFeed() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPosts.all });
     },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.postHideFailed'), description: error.message, variant: 'destructive' });
+    },
   });
 
   const toggleLockMutation = useMutation({
@@ -125,6 +128,9 @@ export default function CommunityFeed() {
       togglePostLocked(postId, locked),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPosts.all });
+    },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.postLockFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
