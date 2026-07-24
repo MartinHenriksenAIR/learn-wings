@@ -15,11 +15,18 @@ type OrgGuardState = 'loading' | 'no-org' | 'ready';
  * Note: `'ready'` guarantees `currentOrg` is non-null at runtime, but TypeScript
  * can't narrow across the hook boundary — keep a `!currentOrg` check where the
  * org's fields are used, or read `currentOrg` after an explicit null check.
+ *
+ * Defensive against a failed user-context load (#232): when `contextError` is
+ * set, the load has SETTLED (in failure), so we must not report `'loading'` —
+ * that would strand an eternal spinner. In practice `ProtectedRoute` short-
+ * circuits on `contextError` before any org-scoped page mounts, so this branch
+ * is a belt-and-suspenders fallback; it resolves to `'no-org'` (a terminal
+ * empty state every consumer already renders) rather than spinning forever.
  */
 export function useOrgGuard(): OrgGuardState {
-  const { user, profile, currentOrg } = useAuth();
+  const { user, profile, currentOrg, contextError } = useAuth();
 
-  if (user && !profile) return 'loading';
+  if (user && !profile && !contextError) return 'loading';
   if (!currentOrg) return 'no-org';
   return 'ready';
 }

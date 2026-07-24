@@ -83,6 +83,13 @@
     "passwordResetInfo": "Password reset is managed by your organization's IT administrator via Microsoft Entra ID.",
     "backToSignIn": "Back to sign in"
   },
+  "contextError": {
+    "title": "We couldn't load your account",
+    "networkDescription": "Something went wrong while loading your profile. This is usually temporary — please try again.",
+    "authDescription": "Your session may have expired. Please sign in again to continue.",
+    "retry": "Try again",
+    "signInAgain": "Sign in again"
+  },
   "notFound": {
     "title": "Page not found",
     "description": "The page you're looking for doesn't exist or has moved.",

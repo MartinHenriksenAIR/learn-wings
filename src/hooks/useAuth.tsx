@@ -2,13 +2,19 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useMsal, useAccount } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
 import { apiScopes } from '@/lib/msal-config';
-import { callApi } from '@/lib/api-client';
+import { callApi, ApiError } from '@/lib/api-client';
 import i18n from '@/i18n';
 import { clearPostLoginRedirect } from '@/lib/post-login-redirect';
 import type { Profile, OrgMembership, Organization } from '@/lib/types';
 
 interface AppUser { id: string; tid: string; email: string; name: string; }
 export type ViewMode = 'learner' | 'org_admin' | 'platform_admin';
+
+// Distinguishes a failed /api/user-context load from the (impossible) legitimate
+// "no profile" state — the backend auto-provisions a profile on first login, so a
+// settled-but-null profile is ALWAYS a failure. `'auth'` = a 401 (token rejected,
+// re-auth may help); `'network'` = anything else (transient blip / 500 / offline).
+export type ContextError = 'auth' | 'network' | null;
 
 interface AuthContextType {
   user: AppUser | null;
@@ -18,6 +24,7 @@ interface AuthContextType {
   isPlatformAdmin: boolean;
   isOrgAdmin: boolean;
   isLoading: boolean;
+  contextError: ContextError;
   signIn: () => void;
   signOut: () => void;
   refreshUserContext: () => Promise<void>;
@@ -71,6 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [contextSettledFor, setContextSettledFor] = useState<string | null>(null);
   const contextLoading = account !== null && contextSettledFor !== account.localAccountId;
 
+  // Distinct error state for a failed user-context load (see ContextError above).
+  // Kept separate from `profile === null` so guards/ProtectedRoute can tell a
+  // real failure apart from the still-loading window and surface a retry (#232).
+  const [contextError, setContextError] = useState<ContextError>(null);
+
   // isLoading is true while MSAL is processing a redirect or popup interaction,
   // OR while the user context (profile/memberships) is still resolving.
   const isLoading = inProgress !== InteractionStatus.None || contextLoading;
@@ -93,6 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserContext = async () => {
     if (!account) return;
+    // Clear any prior error at the start of a load so a retry that succeeds
+    // (or is in flight) doesn't keep showing the stale error state.
+    setContextError(null);
     try {
       // Send the browser-derived UI language so first-login provisioning can
       // stamp it on the new profile (#226); harmless on subsequent logins (the
@@ -103,9 +118,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (m.length > 0 && !currentOrg && !p?.is_platform_admin) {
         setCurrentOrg((m[0] as any).organization ?? null);
       }
-    } catch {
+    } catch (err) {
+      // The backend auto-provisions a profile on first login, so this is always
+      // a genuine failure (transient blip / MSAL hiccup / 500), never a "new
+      // user" state. Log it — it used to be swallowed silently (#232) — and
+      // record a distinct error state so guards can offer a retry instead of
+      // spinning forever or silently redirecting an admin.
+      console.error('Failed to load user context', err);
       setProfile(null);
       setMemberships([]);
+      // A 401 means the token itself was rejected (re-auth may help); anything
+      // else is treated as a transient/network failure that a plain retry fixes.
+      setContextError(err instanceof ApiError && err.status === 401 ? 'auth' : 'network');
     } finally {
       setContextSettledFor(account.localAccountId);
     }
@@ -120,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       setMemberships([]);
       setCurrentOrg(null);
+      setContextError(null);
       // Signed out: forget the settled marker so a future sign-in of the same
       // account starts in the loading state again.
       setContextSettledFor(null);
@@ -135,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setMemberships([]);
     setCurrentOrg(null);
+    setContextError(null);
     // Per-tab persistence must not leak into the next login on this tab.
     try {
       sessionStorage.removeItem(VIEW_MODE_KEY);
@@ -148,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, profile, memberships, currentOrg,
-      isPlatformAdmin, isOrgAdmin, isLoading,
+      isPlatformAdmin, isOrgAdmin, isLoading, contextError,
       signIn, signOut, refreshUserContext: fetchUserContext,
       setCurrentOrg, viewMode, setViewMode,
       effectiveIsPlatformAdmin, effectiveIsOrgAdmin,
