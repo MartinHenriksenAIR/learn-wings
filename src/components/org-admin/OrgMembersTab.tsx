@@ -51,6 +51,7 @@ import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQu
 import { queryKeys } from '@/lib/query-keys';
 import { callApi, ApiError } from '@/lib/api-client';
 import { getSeatUsage } from '@/lib/seats';
+import { formatDate } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
 import { SeatUsageNote } from '@/components/SeatUsageNote';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
@@ -85,7 +86,7 @@ const inviteSchema = z.object({
 });
 
 export function OrgMembersTab() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, profile, currentOrg } = useAuth();
   const queryClient = useQueryClient();
 
@@ -577,7 +578,7 @@ export function OrgMembersTab() {
               <span className="text-xs font-medium text-muted-foreground">
                 {t('seatRequests.pending', {
                   seats: pendingSeatRequest.additional_seats,
-                  date: new Date(pendingSeatRequest.created_at).toLocaleDateString(),
+                  date: formatDate(new Date(pendingSeatRequest.created_at), 'P', i18n.language),
                 })}
               </span>
               <Button
@@ -716,7 +717,7 @@ export function OrgMembersTab() {
                 </span>
                 {/* Joined */}
                 <span className="text-[12.5px] text-muted-foreground">
-                  {new Date(member.created_at).toLocaleDateString()}
+                  {formatDate(new Date(member.created_at), 'P', i18n.language)}
                 </span>
                 {/* Actions */}
                 <span className="text-right">
@@ -795,7 +796,7 @@ export function OrgMembersTab() {
                     <span className="truncate text-[13px] font-bold">{invitation.email}</span>
                     <span className="text-[11.5px] text-[#9aa0af]">
                       {t('analytics.members.invitedOn', {
-                        date: new Date(invitation.created_at).toLocaleDateString(),
+                        date: formatDate(new Date(invitation.created_at), 'P', i18n.language),
                         role:
                           invitation.role === 'org_admin'
                             ? t('analytics.members.admin')

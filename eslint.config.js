@@ -27,6 +27,24 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "warn",
     },
   },
+  // ── Date-locale guard (#238) ─────────────────────────────────────────────
+  // All user-facing dates in src/ must go through src/lib/date-locale.ts so
+  // they honour the UI language (en/da via i18next) rather than the browser
+  // locale. `toLocaleDateString()` (no locale arg) bypasses that helper and
+  // re-introduces browser-locale drift — block it at the lint level.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "MemberExpression[property.name='toLocaleDateString']",
+          message:
+            "Use formatDate(date, 'P', i18n.language) from src/lib/date-locale.ts instead of toLocaleDateString() — ensures dates follow the UI language (en/da), not the browser locale.",
+        },
+      ],
+    },
+  },
   // ── Community i18n gate (#207) ───────────────────────────────────────────
   // Every user-facing string under the community feature must be translated.
   // `i18next/no-literal-string` in `jsx-only` mode flags hard-coded strings that

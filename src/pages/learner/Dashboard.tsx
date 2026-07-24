@@ -18,13 +18,14 @@ import { callApiRaw } from '@/lib/api-client';
 import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Clock, Award, Play, ArrowRight, TrendingUp, Sparkles } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
+import { formatDate } from '@/lib/date-locale';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerDashboard() {
   const { currentOrg, profile, memberships, isPlatformAdmin, isOrgAdmin } = useAuth();
   const orgGuard = useOrgGuard();
   const { features } = usePlatformSettings();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { flashed, flash } = useFlash();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -337,7 +338,7 @@ export default function LearnerDashboard() {
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-[13.5px] font-bold">{enrollment.course?.title}</span>
                   <span className="text-xs text-[#9aa0af]">
-                    {t('common.completedOn')} {new Date(enrollment.completed_at!).toLocaleDateString()}
+                    {t('common.completedOn')} {formatDate(new Date(enrollment.completed_at!), 'P', i18n.language)}
                   </span>
                 </span>
               </div>

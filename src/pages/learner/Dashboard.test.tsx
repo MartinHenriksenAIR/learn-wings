@@ -6,7 +6,7 @@ import React from 'react';
 
 // --- mock react-i18next (no i18n provider needed) ---
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
 // --- mock AppLayout as a simple passthrough ---

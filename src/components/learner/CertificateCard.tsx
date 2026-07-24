@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Award, Check, Download, Loader2 } from 'lucide-react';
 import { Enrollment, Course, Profile } from '@/lib/types';
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '@/lib/date-locale';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { cn } from '@/lib/utils';
 
@@ -15,9 +16,9 @@ interface CertificateCardProps {
 }
 
 export function CertificateCard({ enrollment, profile, downloading, saved, onDownload }: CertificateCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { branding } = usePlatformSettings();
-  const completedOn = new Date(enrollment.completed_at!).toLocaleDateString();
+  const completedOn = formatDate(new Date(enrollment.completed_at!), 'P', i18n.language);
 
   return (
     <div className="hover-lift group relative flex items-center gap-4 rounded-2xl border border-border bg-card p-5">

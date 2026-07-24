@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '@/lib/date-locale';
 import {
   MoreHorizontal,
   Loader2,
@@ -37,7 +38,7 @@ export function MembersTable({
   onDisable,
   onReactivate,
 }: MembersTableProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   return (
     <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
@@ -98,7 +99,7 @@ export function MembersTable({
             </span>
             {/* Added */}
             <span className="text-[12.5px] text-muted-foreground">
-              {new Date(member.created_at).toLocaleDateString()}
+              {formatDate(new Date(member.created_at), 'P', i18n.language)}
             </span>
             {/* Actions */}
             <span className="text-right">
