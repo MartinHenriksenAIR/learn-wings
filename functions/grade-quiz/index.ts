@@ -61,7 +61,7 @@ export default endpoint('grade-quiz', async ({ req, profile, reply }) => {
      RETURNING org_id`,
     [profile.id, quiz_id, score, passed]
   );
-  const recorded = inserted.length === 1;
+  const recorded = inserted.length > 0;
 
   return reply(200, { score, passed, passing_score, correct_count, total_questions, recorded });
 });

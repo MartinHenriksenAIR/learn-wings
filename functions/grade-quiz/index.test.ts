@@ -184,6 +184,7 @@ describe('grade-quiz', () => {
 
     expect(body.score).toBe(100);
     expect(body.passed).toBe(true);
+    expect(body.recorded).toBe(false);
     expect(JSON.stringify(body)).not.toContain('is_correct');
   });
 
