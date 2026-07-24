@@ -53,7 +53,7 @@ export function isIdeaVisibleTo(
 }
 
 /**
- * Failure of {@link assertAuthorDraft}: a status + body the caller returns
+ * Failure of {@link checkAuthorDraft}: a status + body the caller returns
  * verbatim as `reply(status, body)` — keeping each endpoint's own 409 wording.
  */
 export interface AuthorDraftError {
@@ -75,7 +75,7 @@ export type AuthorDraftResult = { ok: true } | AuthorDraftError;
  *   2. draft-only — non-draft ideas are frozen to the author → 409 with the
  *      caller-supplied `notDraftError`.
  */
-export function assertAuthorDraft(
+export function checkAuthorDraft(
   idea: Pick<IdeaRow, 'status' | 'user_id'>,
   profile: { id: string },
   opts: { notDraftError: string },

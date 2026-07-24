@@ -1,6 +1,6 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-import { loadIdea, assertAuthorDraft } from '../shared/ideas';
+import { loadIdea, checkAuthorDraft } from '../shared/ideas';
 
 export default endpoint('idea-submit', async ({ req, profile, reply }) => {
   const body = await req.json() as { ideaId?: unknown };
@@ -14,7 +14,7 @@ export default endpoint('idea-submit', async ({ req, profile, reply }) => {
   if (!idea) return reply(404, { error: 'Idea not found' });
 
   // Author-only-403 + draft-only-409 (shared/ideas; no admin bypass).
-  const gate = assertAuthorDraft(idea, profile, { notDraftError: 'Only draft ideas can be submitted' });
+  const gate = checkAuthorDraft(idea, profile, { notDraftError: 'Only draft ideas can be submitted' });
   if (!gate.ok) return reply(gate.status, gate.body);
 
   const submitted = await queryOne(

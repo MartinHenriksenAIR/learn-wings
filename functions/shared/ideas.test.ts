@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockQueryOne } = vi.hoisted(() => ({ mockQueryOne: vi.fn() }));
 vi.mock('./db', () => ({ queryOne: mockQueryOne }));
 
-import { loadIdea, isIdeaVisibleTo, assertAuthorDraft, type IdeaRow } from './ideas';
+import { loadIdea, isIdeaVisibleTo, checkAuthorDraft, type IdeaRow } from './ideas';
 
 const draft = { id: 'idea-1', org_id: 'org-1', user_id: 'author', status: 'draft' };
 const submitted = { id: 'idea-1', org_id: 'org-1', user_id: 'author', status: 'submitted' };
@@ -57,15 +57,15 @@ describe('isIdeaVisibleTo (draft-privacy truth table)', () => {
   });
 });
 
-describe('assertAuthorDraft', () => {
+describe('checkAuthorDraft', () => {
   const opts = { notDraftError: 'Only draft ideas can be submitted' };
 
   it('author + draft → ok', () => {
-    expect(assertAuthorDraft(draft, author, opts)).toEqual({ ok: true });
+    expect(checkAuthorDraft(draft, author, opts)).toEqual({ ok: true });
   });
 
   it('non-author → 403 Forbidden (no admin bypass)', () => {
-    expect(assertAuthorDraft(draft, nonAuthor, opts)).toEqual({
+    expect(checkAuthorDraft(draft, nonAuthor, opts)).toEqual({
       ok: false,
       status: 403,
       body: { error: 'Forbidden' },
@@ -73,7 +73,7 @@ describe('assertAuthorDraft', () => {
   });
 
   it('author + non-draft → 409 with the caller-supplied notDraftError', () => {
-    expect(assertAuthorDraft(submitted, author, opts)).toEqual({
+    expect(checkAuthorDraft(submitted, author, opts)).toEqual({
       ok: false,
       status: 409,
       body: { error: 'Only draft ideas can be submitted' },
@@ -81,7 +81,7 @@ describe('assertAuthorDraft', () => {
   });
 
   it('author + non-draft → 409 carries the endpoint-specific wording', () => {
-    expect(assertAuthorDraft(submitted, author, { notDraftError: 'Only draft ideas can be edited' })).toEqual({
+    expect(checkAuthorDraft(submitted, author, { notDraftError: 'Only draft ideas can be edited' })).toEqual({
       ok: false,
       status: 409,
       body: { error: 'Only draft ideas can be edited' },
@@ -89,7 +89,7 @@ describe('assertAuthorDraft', () => {
   });
 
   it('author-check runs before the draft-check (non-author on a non-draft → 403)', () => {
-    expect(assertAuthorDraft(submitted, nonAuthor, opts)).toEqual({
+    expect(checkAuthorDraft(submitted, nonAuthor, opts)).toEqual({
       ok: false,
       status: 403,
       body: { error: 'Forbidden' },
