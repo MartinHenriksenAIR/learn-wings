@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '@/lib/date-locale';
 import { Mail, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Invitation } from '@/lib/types';
@@ -21,7 +22,7 @@ export function PendingInvitationsList({
   onCopy,
   onCancel,
 }: PendingInvitationsListProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   return (
     <>
@@ -40,7 +41,7 @@ export function PendingInvitationsList({
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[13px] font-bold">{invitation.email}</span>
                 <span className="text-[11.5px] text-[#9aa0af]">
-                  {t('orgDetail.expiresOn', { date: new Date(invitation.expires_at).toLocaleDateString() })}
+                  {t('orgDetail.expiresOn', { date: formatDate(new Date(invitation.expires_at), 'P', i18n.language) })}
                 </span>
               </span>
               <span

@@ -11,7 +11,7 @@ import React from 'react';
 vi.mock('react-i18next', async () => {
   const ReactActual = await import('react');
   return {
-    useTranslation: () => ({ t: (k: string) => k }),
+    useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
     Trans: ({ i18nKey }: { i18nKey: string }) =>
       ReactActual.createElement(ReactActual.Fragment, null, i18nKey),
   };
@@ -85,6 +85,7 @@ const organization = {
   slug: 'acme-corp',
   logo_url: null,
   seat_limit: null,
+  created_at: '2026-01-01T00:00:00Z',
 };
 
 const membershipRow = {

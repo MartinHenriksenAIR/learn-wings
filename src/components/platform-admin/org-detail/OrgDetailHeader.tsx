@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '@/lib/date-locale';
 import { Building2, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
@@ -15,7 +16,7 @@ interface OrgDetailHeaderProps {
  * Edit / Delete trigger buttons.
  */
 export function OrgDetailHeader({ org, onEdit, onDelete }: OrgDetailHeaderProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: logoSrc } = useSignedBrandingUrl(org.logo_url);
 
   return (
@@ -30,7 +31,7 @@ export function OrgDetailHeader({ org, onEdit, onDelete }: OrgDetailHeaderProps)
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-2xl font-extrabold tracking-[-0.02em]">{org.name}</h1>
         <p className="truncate font-mono text-[13px] text-muted-foreground">
-          {org.slug} · {new Date(org.created_at).toLocaleDateString()}
+          {org.slug} · {formatDate(new Date(org.created_at), 'P', i18n.language)}
         </p>
       </div>
       <div className="flex shrink-0 gap-2">

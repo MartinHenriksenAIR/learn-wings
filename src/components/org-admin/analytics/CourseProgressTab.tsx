@@ -36,6 +36,7 @@ import { useOrgCourseEnrollees } from '@/hooks/useOrgCourseEnrollees';
 import { useOrgCourseOrgBreakdown } from '@/hooks/useOrgCourseOrgBreakdown';
 import { LevelBadge } from '@/components/ui/level-badge';
 import { CourseLevel } from '@/lib/types';
+import { formatDate } from '@/lib/date-locale';
 
 interface CourseStats {
   id: string;
@@ -385,11 +386,11 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
                         </span>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {new Date(enrollee.enrolledAt).toLocaleDateString()}
+                        {formatDate(new Date(enrollee.enrolledAt), 'P', i18n.language)}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {enrollee.completedAt
-                          ? new Date(enrollee.completedAt).toLocaleDateString()
+                          ? formatDate(new Date(enrollee.completedAt), 'P', i18n.language)
                           : '-'}
                       </TableCell>
                     </TableRow>

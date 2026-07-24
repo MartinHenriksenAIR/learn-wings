@@ -103,8 +103,6 @@ against `01-schema.sql`.
 | Function | Tables / columns consumed | OK? |
 |----------|---------------------------|-----|
 | `user-context` | `profiles(id, full_name, email, is_platform_admin, avatar_url, entra_oid, entra_tid)`; `org_memberships(*, user_id, org_id, status)`; `organizations(*)` | ✅ |
-| `admin-user-actions` | `profiles(is_platform_admin, id, entra_oid)`; `org_memberships(role, id, org_id, user_id, status)` | ✅ |
-| `delete-user` | `profiles(id, is_platform_admin, entra_oid)` | ✅ |
 | `course-player-data` | `courses(*)`; `course_modules(course_id, sort_order)`; `lessons(module_id, sort_order)`; `lesson_progress(lesson_id, status, completed_at, user_id, org_id)`; `course_reviews(id, rating, comment, user_id, org_id, course_id)` | ✅ |
 | `enrollment-complete` | `enrollments(status, completed_at, user_id, org_id, course_id)` | ✅ |
 | `lesson-progress` | `lesson_progress(org_id, user_id, lesson_id, status, completed_at)` + `ON CONFLICT (org_id,user_id,lesson_id)` | ✅ (unique constraint present) |

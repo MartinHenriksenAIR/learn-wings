@@ -84,6 +84,35 @@ describe('azure-view-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'blobPath is required' });
   });
 
+  // Validation hardening (#239): azure-view-url adopts the same strict
+  // typeof check as asset-signed-url — empty string and non-string values
+  // must 400, not slip through to the access check.
+  it('returns 400 when blobPath is an empty string', async () => {
+    const req = {
+      method: 'POST',
+      headers: { get: (k: string) => (k === 'origin' ? 'https://ai-uddannelse.dk' : 'Bearer tok') },
+      json: async () => ({ blobPath: '' }),
+    };
+
+    const res = await handler(req as any, {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'blobPath is required' });
+  });
+
+  it('returns 400 when blobPath is a non-string value', async () => {
+    const req = {
+      method: 'POST',
+      headers: { get: (k: string) => (k === 'origin' ? 'https://ai-uddannelse.dk' : 'Bearer tok') },
+      json: async () => ({ blobPath: 42 }),
+    };
+
+    const res = await handler(req as any, {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'blobPath is required' });
+  });
+
   it('returns 403 when canAccessAsset returns false; uses profile.id not oid', async () => {
     mockQueryOne.mockResolvedValueOnce({ can_access: false });
 

@@ -33,6 +33,7 @@ import { Organization, OrgRole } from '@/lib/types';
 import { Building2, Plus, Loader2, ChevronRight, UserPlus, Mail, Search } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
+import { formatDate } from '@/lib/date-locale';
 import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
 import { orgSchema } from '@/lib/org-validation';
 import { SeatUsageBar } from '@/components/platform-admin/SeatUsageBar';
@@ -56,7 +57,7 @@ function OrgRowLogo({ logoPath }: { logoPath: string | null }) {
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     data: orgsData,
     isLoading: loading,
@@ -465,7 +466,7 @@ export default function OrganizationsManager() {
                 </span>
                 {/* Created */}
                 <span className="text-[12.5px] text-muted-foreground">
-                  {new Date(org.created_at).toLocaleDateString()}
+                  {formatDate(new Date(org.created_at), 'P', i18n.language)}
                 </span>
                 {/* Chevron */}
                 <span className="flex justify-end text-[#c3c7d3]">
