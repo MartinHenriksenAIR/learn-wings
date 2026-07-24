@@ -12,7 +12,12 @@ consumers).
 | `01-schema.sql` | Types, tables, indexes, ported functions, triggers. Single `BEGIN/COMMIT`. |
 | `02-seed.sql`   | Synthetic, FK-valid, end-to-end-usable seed data. Single `BEGIN/COMMIT`. |
 | `03-seat-requests.sql` | Additive, idempotent migration for #127 (seat-request flow) — apply to prod directly. |
+| `04-idea-priority-scores.sql` | Additive, idempotent migration for #118 (idea Value × Effort scores). |
+| `05-course-group-id.sql` | Additive, idempotent migration for #213 (multilingual course grouping). |
+| `06-assessment.sql` | Additive, idempotent migration for #117 (AI self-assessment). |
 | `README.md`     | This file. |
+
+> **Standing rule:** additive prod migrations (the numbered `0N-*.sql` files) are folded into `01-schema.sql` after they are applied to prod, so a fresh DB stood up from `01`+`02` is always complete. The numbered files stay in this folder as the applied-migration record.
 
 Plain SQL only — no `psql` meta-commands (`\i`, `\dt`, …). PG15-compatible.
 No Supabase schemas (`auth` / `storage` / `realtime`).
