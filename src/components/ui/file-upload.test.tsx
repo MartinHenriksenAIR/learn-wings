@@ -301,3 +301,113 @@ describe('FileUpload — image downscale before upload (#278)', () => {
     expect(close).toHaveBeenCalled();
   });
 });
+
+// The cap used to be applied to the file the user PICKED, before downscaling —
+// so a 20 MB photo with a 10 MB cap was refused outright rather than shrunk to a
+// few hundred KB and accepted, undercutting the whole point of #278. It is now
+// applied to the bytes that will actually be PUT, with a separate, larger
+// ceiling guarding the decoder itself.
+describe('FileUpload — size cap vs. downscale ordering (#276)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    lastSentBody = null;
+    vi.stubGlobal('XMLHttpRequest', FakeXHR as unknown as typeof XMLHttpRequest);
+    URL.createObjectURL = vi.fn(() => 'blob:preview-url');
+    URL.revokeObjectURL = vi.fn();
+    mockCallApi.mockResolvedValue({
+      uploadUrl: 'https://acct.blob.core.windows.net/lms-assets/thumbnails/pic.png?sig=abc',
+      blobPath: 'thumbnails/pic.png',
+      contentType: 'image/png',
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    URL.createObjectURL = realCreateObjectURL;
+    URL.revokeObjectURL = realRevokeObjectURL;
+  });
+
+  /** A File that reports `sizeMB` without allocating it. */
+  function sizedFile(name: string, type: string, sizeMB: number) {
+    const file = new File(['x'], name, { type });
+    Object.defineProperty(file, 'size', { value: sizeMB * 1024 * 1024 });
+    return file;
+  }
+
+  function selectFile(container: HTMLElement, file: File) {
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+  }
+
+  it('sends an oversized image to the decoder instead of rejecting it up front', async () => {
+    // jsdom has no createImageBitmap, so the downscale fails open and the
+    // ORIGINAL bytes reach the payload check — which then applies the cap. What
+    // this pins is the ordering: the file was not refused on selection, and the
+    // message the user gets is the payload-cap one, not the decode-ceiling one.
+    const { container } = render(
+      <FileUpload accept="image" maxSizeMB={10} value={null} onChange={vi.fn()} />
+    );
+    selectFile(container, sizedFile('big.png', 'image/png', 20));
+
+    expect(await screen.findByText('File size must be less than 10 MB')).toBeInTheDocument();
+    // No SAS URL minted and no bytes sent — the bail costs the user nothing.
+    expect(mockCallApi).not.toHaveBeenCalled();
+    expect(lastSentBody).toBeNull();
+  });
+
+  it('rejects an image too large to decode without ever calling the upload API', async () => {
+    const { container } = render(
+      <FileUpload accept="image" maxSizeMB={10} value={null} onChange={vi.fn()} />
+    );
+    selectFile(container, sizedFile('enormous.png', 'image/png', 500));
+
+    expect(
+      await screen.findByText('Image is too large to process. Choose a file under 50 MB.')
+    ).toBeInTheDocument();
+    expect(mockCallApi).not.toHaveBeenCalled();
+  });
+
+  it('uploads an image that is within the cap', async () => {
+    const { container } = render(
+      <FileUpload accept="image" maxSizeMB={10} value={null} onChange={vi.fn()} />
+    );
+    const png = sizedFile('small.png', 'image/png', 4);
+    selectFile(container, png);
+
+    await waitFor(() => expect(lastSentBody).toBe(png));
+  });
+
+  it('applies the cap directly to a document — nothing is ever downscaled there', async () => {
+    mockCallApi.mockResolvedValue({
+      uploadUrl: 'https://acct.blob.core.windows.net/lms-assets/docs/spec.pdf?sig=abc',
+      blobPath: 'docs/spec.pdf',
+      contentType: 'application/pdf',
+    });
+
+    const { container } = render(
+      <FileUpload accept="document" value={null} onChange={vi.fn()} />
+    );
+    selectFile(container, sizedFile('huge.pdf', 'application/pdf', 150));
+
+    expect(await screen.findByText('File size must be less than 100 MB')).toBeInTheDocument();
+    expect(mockCallApi).not.toHaveBeenCalled();
+  });
+
+  it('clamps a call site that asks for more than the server cap', async () => {
+    // 50 MB was the old default; the server would 413 anything over 10 MB.
+    const { container } = render(
+      <FileUpload accept="image" maxSizeMB={50} value={null} onChange={vi.fn()} />
+    );
+    selectFile(container, sizedFile('big.png', 'image/png', 20));
+
+    expect(await screen.findByText('File size must be less than 10 MB')).toBeInTheDocument();
+  });
+
+  it('advertises the effective cap, not the raw prop', () => {
+    render(<FileUpload accept="image" maxSizeMB={50} value={null} onChange={vi.fn()} />);
+    expect(
+      screen.getByText(/Max size: 10 MB • larger images are resized automatically/)
+    ).toBeInTheDocument();
+  });
+});

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useRef } from 'react';
 import { callApi } from '@/lib/api-client';
+import { checkUploadPayloadSize, effectiveMaxSizeMB, formatSizeMB } from '@/lib/upload-limits';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -11,6 +12,11 @@ interface AzureDocumentUploadProps {
   onChange: (blobPath: string | null) => void;
   className?: string;
   disabled?: boolean;
+  /**
+   * Tightens the limit below the server cap for this call site. Never widens it:
+   * `effectiveMaxSizeMB` clamps to the cap the backend enforces, so the UI can't
+   * promise something the save would 413 on. Defaults to the server cap.
+   */
   maxSizeMB?: number;
 }
 
@@ -31,8 +37,9 @@ export function AzureDocumentUpload({
   onChange,
   className,
   disabled = false,
-  maxSizeMB = 100,
+  maxSizeMB,
 }: AzureDocumentUploadProps) {
+  const capMB = effectiveMaxSizeMB('document', maxSizeMB);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -49,9 +56,11 @@ export function AzureDocumentUpload({
       return;
     }
 
-    // Validate file size
-    if (file.size > maxSizeMB * 1024 * 1024) {
-      setError(`File size must be less than ${maxSizeMB}MB`);
+    // Validate file size against the (server-clamped) cap — documents are never
+    // downscaled, so what was picked is what will be uploaded.
+    const sizeError = checkUploadPayloadSize(file.size, capMB);
+    if (sizeError) {
+      setError(sizeError);
       return;
     }
 
@@ -187,7 +196,7 @@ export function AzureDocumentUpload({
               <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm font-medium">Click to upload document</p>
               <p className="text-xs text-muted-foreground mt-1">
-                PDF, Word, Excel, PowerPoint • Max {maxSizeMB}MB
+                PDF, Word, Excel, PowerPoint • Max {formatSizeMB(capMB)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Uploads directly to Azure Cloud Storage

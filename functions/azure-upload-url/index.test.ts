@@ -88,7 +88,7 @@ describe('azure-upload-url', () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     const req = {
       ...baseReq,
-      json: async () => ({ fileName: 'weird.bin', contentType: 'application/octet-stream', assetType: 'not-a-real-type' }),
+      json: async () => ({ fileName: 'clip.mp4', contentType: 'video/mp4', assetType: 'not-a-real-type' }),
     };
 
     const res = await handler(req as any, {} as any);
@@ -223,14 +223,16 @@ describe('azure-upload-url', () => {
   it('falls through to the private default when assetType is not a recognized value', async () => {
     const req = {
       ...baseReq,
-      json: async () => ({ fileName: 'weird.bin', contentType: 'application/octet-stream', assetType: 'not-a-real-type' }),
+      // An allow-listed file (#276) with an unrecognized assetType: the point of
+      // this test is the CONTAINER/prefix fall-through, not the file type.
+      json: async () => ({ fileName: 'clip.mp4', contentType: 'video/mp4', assetType: 'not-a-real-type' }),
     };
 
     const res = await handler(req as any, {} as any);
     const body = JSON.parse(res.body as string);
 
     expect(res.status).toBe(200);
-    expect(body.blobPath).toMatch(/^[^/]+\.bin$/);
+    expect(body.blobPath).toMatch(/^[^/]+\.mp4$/);
     expect(mockGenerateSasToken).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
@@ -239,5 +241,63 @@ describe('azure-upload-url', () => {
       'cw',
       30,
     );
+  });
+
+  // --- Type allow-list at mint time (#276) ---
+  //
+  // Defence in depth: the client PUTs whatever bytes it likes to the URL we hand
+  // back, so the binding check is the post-upload HEAD at persist time. What
+  // these pin is that no URL is minted for a file we would never accept, and
+  // that the minted path always carries a known-good extension.
+
+  const mint = (body: Record<string, unknown>) => handler(
+    { ...baseReq, json: async () => body } as any,
+    {} as any,
+  );
+
+  it('returns 400 for an off-allowlist extension, minting no SAS', async () => {
+    const res = await mint({ fileName: 'payload.exe', contentType: 'application/octet-stream' });
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'File type not allowed' });
+    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a filename with no extension at all', async () => {
+    // fileName.split('.').pop() would have used the WHOLE name as the suffix.
+    const res = await mint({ fileName: 'noextension', contentType: 'video/mp4' });
+    expect(res.status).toBe(400);
+    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the declared contentType contradicts the extension', async () => {
+    const res = await mint({ fileName: 'logo.png', contentType: 'video/mp4' });
+    expect(res.status).toBe(400);
+    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+  });
+
+  it('still mints when the browser reports no contentType (extension decides)', async () => {
+    const res = await mint({ fileName: 'clip.mov' });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string).blobPath).toMatch(/^[^/]+\.mov$/);
+  });
+
+  it('normalizes the extension into the blob path rather than echoing the caller', async () => {
+    const res = await mint({ fileName: 'Holiday.Clip.MP4', contentType: 'video/mp4' });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string).blobPath).toMatch(/^[^/]+\.mp4$/);
+  });
+
+  it('refuses a non-image branding asset — the branding path skips the admin gate', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const res = await mint({ fileName: 'clip.mp4', contentType: 'video/mp4', assetType: 'avatar' });
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'File type not allowed' });
+    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+  });
+
+  it('authz still comes first: a non-admin gets 403, not 400, for a disallowed course-content file', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const res = await mint({ fileName: 'payload.exe', contentType: 'application/octet-stream' });
+    expect(res.status).toBe(403);
   });
 });

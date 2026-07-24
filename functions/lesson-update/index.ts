@@ -2,6 +2,7 @@ import { queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
 import { validateLessonFields } from '../shared/validate';
 import { deleteBlob } from '../shared/blob';
+import { enforceUploadLimits } from '../shared/upload-limits';
 
 export default adminEndpoint('lesson-update', async ({ req, reply }) => {
   const body = await req.json() as {
@@ -58,6 +59,24 @@ export default adminEndpoint('lesson-update', async ({ req, reply }) => {
       WHERE id = $1`,
     [lessonId],
   );
+
+  // Size/type gate on the blobs this update newly references (#276). The client's
+  // caps are advisory (the browser PUTs straight to storage), so this is where an
+  // over-cap upload is actually stopped — before the row is written, so a refused
+  // blob is never persisted. `previous` is passed in whole: a path already stored
+  // in ANY of the three columns is not new, so an unchanged video costs no HEAD
+  // and a blob deleted from storage by hand can never block a later save.
+  const limitError = await enforceUploadLimits(
+    [
+      { path: nextVideoStoragePath, kind: 'video' },
+      { path: nextAzureBlobPath, kind: 'video' },
+      { path: nextDocumentStoragePath, kind: 'document' },
+    ],
+    [previous?.video_storage_path, previous?.azure_blob_path, previous?.document_storage_path],
+  );
+  if (limitError) {
+    return reply(413, { error: limitError });
+  }
 
   // Full-row UPDATE (old client always sent full payload — not a sparse patch).
   // video_url is literal NULL (deprecated column, old payload parity).

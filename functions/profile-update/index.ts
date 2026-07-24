@@ -1,6 +1,7 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { deleteBlob } from '../shared/blob';
+import { enforceUploadLimits } from '../shared/upload-limits';
 
 interface ProfileUpdateBody {
   first_name?: unknown;
@@ -129,6 +130,19 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
       [profile.id],
     );
     previousAvatarUrl = prev?.avatar_url ?? null;
+  }
+
+  // Size/type gate on a newly-referenced avatar (#276). This endpoint is open to
+  // every authenticated user, and `azure-upload-url` mints avatar URLs without a
+  // platform-admin gate, so it is the only place an avatar's real size is ever
+  // checked. Reuses the same change detection as the cleanup below: an unchanged
+  // path is not new, so a name/language change costs no HEAD.
+  const limitError = await enforceUploadLimits(
+    [{ path: nextAvatarUrl, kind: 'image' }],
+    [previousAvatarUrl],
+  );
+  if (limitError) {
+    return reply(413, { error: limitError });
   }
 
   // Caller can ONLY update their own row — id comes from the authenticated profile, never from the body

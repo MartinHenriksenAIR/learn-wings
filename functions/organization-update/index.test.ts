@@ -1,18 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrgAdmin, mockDeleteBlob } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrgAdmin, mockDeleteBlob, mockEnforceUploadLimits } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
     mockDeleteBlob: vi.fn(),
+    mockEnforceUploadLimits: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: mockIsOrgAdmin, isOrgAdminOfAny: vi.fn() }));
 vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
+vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
 
 import handler from './index';
 
@@ -39,6 +41,7 @@ describe('organization-update', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
     mockIsOrgAdmin.mockResolvedValue(false);
     mockDeleteBlob.mockResolvedValue(true);
+    mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -345,6 +348,49 @@ describe('organization-update', () => {
     );
     expect(res.status).toBe(409);
     expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  // --- Upload size/type enforcement (#276) ---
+
+  it('413 when the new logo is over cap: no UPDATE is issued', async () => {
+    mockQueryOne.mockResolvedValueOnce({ logo_url: null }); // only the previous-logo SELECT
+    mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
+
+    const res = await handler(baseReq(logoUpdate('org-logos/huge.png')), {} as any);
+
+    expect(res.status).toBe(413);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Image exceeds the maximum upload size of 10 MB',
+    });
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE organizations');
+    // The refused blob's cleanup is the helper's job, not the endpoint's.
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('hands the logo to the gate with the previous path, after the SELECT and before the UPDATE', async () => {
+    const order: string[] = [];
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('gate'); return null; });
+    mockQueryOne
+      .mockImplementationOnce(async () => { order.push('select'); return { logo_url: 'org-logos/old.png' }; })
+      .mockImplementationOnce(async () => { order.push('update'); return { id: 'org-1' }; });
+
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      [{ path: 'org-logos/new.png', kind: 'image' }],
+      ['org-logos/old.png'], // unchanged path ⇒ not new ⇒ never probed
+    );
+    expect(order).toEqual(['select', 'gate', 'update']);
+  });
+
+  it('a non-admin member never reaches the gate (authz first, storage never touched)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(false);
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+    expect(res.status).toBe(403);
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
   });
 
   it('deleteBlob returns false: request still succeeds with its normal body', async () => {

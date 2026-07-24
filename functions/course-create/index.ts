@@ -1,5 +1,6 @@
 import { queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
+import { enforceUploadLimits } from '../shared/upload-limits';
 
 const VALID_LEVELS = ['basic', 'intermediate', 'advanced'] as const;
 type CourseLevel = typeof VALID_LEVELS[number];
@@ -42,6 +43,15 @@ export default adminEndpoint('course-create', async ({ req, profile, reply }) =>
   // Validate thumbnailUrl: if present, must be string or null
   if (thumbnailUrl !== undefined && thumbnailUrl !== null && typeof thumbnailUrl !== 'string') {
     return reply(400, { error: 'thumbnailUrl must be a string or null' });
+  }
+
+  // Size/type gate on the thumbnail (#276). No previous row, so a supplied path
+  // is always new; over-cap or off-allowlist means no row is inserted at all.
+  const limitError = await enforceUploadLimits([
+    { path: thumbnailUrl as string | null | undefined, kind: 'image' },
+  ]);
+  if (limitError) {
+    return reply(413, { error: limitError });
   }
 
   const course = await queryOne(

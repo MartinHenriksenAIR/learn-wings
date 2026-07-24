@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockEnforceUploadLimits } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
+    mockEnforceUploadLimits: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -16,6 +17,7 @@ vi.mock('../shared/profile', () => ({
   isOrgAdmin: vi.fn(),
   isOrgAdminOfAny: vi.fn(),
 }));
+vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
 
 import handler from './index';
 
@@ -50,6 +52,7 @@ describe('course-create', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
+    mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -191,6 +194,32 @@ describe('course-create', () => {
     expect(params[3]).toBe('en');             // language
     expect(params[4]).toBe('https://example.com/thumb.jpg'); // thumbnail_url
     expect(params[5]).toBe('admin-1');        // created_by_user_id (server-set from profile)
+  });
+
+  // --- Upload size/type enforcement (#276) ---
+
+  it('413 when the thumbnail is over cap: nothing is inserted', async () => {
+    mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
+
+    const res = await handler(baseReq({ ...validBody, thumbnailUrl: 'thumbs/huge.png' }), {} as any);
+
+    expect(res.status).toBe(413);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Image exceeds the maximum upload size of 10 MB',
+    });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('hands the thumbnail to the gate under the image cap, before the INSERT', async () => {
+    const order: string[] = [];
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('gate'); return null; });
+    mockQueryOne.mockImplementationOnce(async () => { order.push('insert'); return fakeCourse; });
+
+    const res = await handler(baseReq({ ...validBody, thumbnailUrl: 'thumbs/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith([{ path: 'thumbs/new.png', kind: 'image' }]);
+    expect(order).toEqual(['gate', 'insert']);
   });
 
   it('returns 500 on db error propagating err.message', async () => {

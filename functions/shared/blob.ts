@@ -74,6 +74,90 @@ export async function deleteBlob(blobPath: string): Promise<boolean> {
 }
 
 /**
+ * What a HEAD against a blob told us.
+ *
+ * `ok` is the conclusiveness flag and MUST be checked first: it is true only
+ * when storage actually answered about this blob (2xx or 404). Every failure —
+ * missing env vars, a network error, an unexpected status — comes back as
+ * `ok: false`, which callers are expected to treat as "we do not know" rather
+ * than as "the blob is fine" or "the blob is absent".
+ */
+export interface BlobHead {
+  /** True only when storage answered conclusively (2xx or 404). */
+  ok: boolean;
+  /** True only when the blob exists (a 2xx HEAD). False for 404 AND for every inconclusive answer. */
+  exists: boolean;
+  /** Parsed Content-Length in bytes, or null when absent/unparseable/inconclusive. */
+  contentLength: number | null;
+  /** Content-Type as stored on the blob, or null when absent/inconclusive. */
+  contentType: string | null;
+}
+
+/** The single "we could not find out" value — never conflated with "blob absent". */
+const INCONCLUSIVE_HEAD: BlobHead = { ok: false, exists: false, contentLength: null, contentType: null };
+
+/**
+ * Reads a response header without assuming a spec-complete `Headers` object —
+ * mocked fetch responses in tests routinely omit it entirely.
+ */
+function readHeader(res: Response, name: string): string | null {
+  try {
+    return res.headers?.get(name) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Probes a blob's size and content type with a short-lived read SAS + HTTP HEAD.
+ *
+ * Structural twin of `deleteBlob`: env is read lazily (never at module load),
+ * the SAS is minted per call, and it NEVER throws — every failure path returns
+ * `INCONCLUSIVE_HEAD` so a caller can decide what an unknown answer means.
+ *
+ * A HEAD is the only way to learn an uploaded blob's size: a Blob SAS cannot
+ * cap it (Azure has no size field in the SAS contract, and `sas.ts` signs the
+ * rscc/rscd/rsce/rscl/rsct fields empty), so size enforcement can only happen
+ * after the bytes have landed.
+ */
+export async function headBlob(blobPath: string): Promise<BlobHead> {
+  const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+  const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME ?? 'lms-videos';
+
+  if (!accountName || !accountKey) {
+    console.warn('[headBlob] Missing storage env vars — skipping blob probe for', blobPath);
+    return INCONCLUSIVE_HEAD;
+  }
+
+  try {
+    const sasToken = generateSasToken(accountName, accountKey, containerName, blobPath, 'r', 10);
+    const headUrl = buildBlobUrl(accountName, containerName, blobPath, sasToken);
+    const res = await fetch(headUrl, { method: 'HEAD' });
+
+    // 404 is a conclusive answer: storage is reachable and the blob is not there.
+    if (res.status === 404) return { ok: true, exists: false, contentLength: null, contentType: null };
+
+    if (!res.ok) {
+      console.warn(`[headBlob] Storage returned ${res.status} for`, blobPath);
+      return INCONCLUSIVE_HEAD;
+    }
+
+    const rawLength = readHeader(res, 'content-length');
+    const parsedLength = rawLength === null || rawLength.trim() === '' ? Number.NaN : Number(rawLength);
+    return {
+      ok: true,
+      exists: true,
+      contentLength: Number.isFinite(parsedLength) && parsedLength >= 0 ? parsedLength : null,
+      contentType: readHeader(res, 'content-type'),
+    };
+  } catch (err: unknown) {
+    console.warn('[headBlob] fetch failed:', err instanceof Error ? err.message : err);
+    return INCONCLUSIVE_HEAD;
+  }
+}
+
+/**
  * Best-effort bulk blob cleanup for cascade-delete endpoints.
  *
  * `deleteBlob` never throws, so this never rejects either: every path is attempted,

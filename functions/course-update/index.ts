@@ -1,6 +1,7 @@
 import { queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
 import { deleteBlob } from '../shared/blob';
+import { enforceUploadLimits } from '../shared/upload-limits';
 
 const VALID_LEVELS = ['basic', 'intermediate', 'advanced'] as const;
 type CourseLevel = typeof VALID_LEVELS[number];
@@ -107,6 +108,19 @@ export default adminEndpoint('course-update', async ({ req, reply }) => {
       [courseId],
     );
     previousThumbnail = prev?.thumbnail_url ?? null;
+  }
+
+  // Size/type gate on a newly-referenced thumbnail (#276) — the client's cap is
+  // advisory (the browser PUTs straight to storage), so this is where an
+  // over-cap image is actually stopped, before the row is written. Reuses the
+  // same change detection as the cleanup below: an unchanged path is not new, so
+  // re-saving a course costs no HEAD.
+  const limitError = await enforceUploadLimits(
+    [{ path: nextThumbnail, kind: 'image' }],
+    [previousThumbnail],
+  );
+  if (limitError) {
+    return reply(413, { error: limitError });
   }
 
   params.push(courseId);

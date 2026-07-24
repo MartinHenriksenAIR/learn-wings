@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
-  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob,
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob, mockEnforceUploadLimits,
 } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
@@ -9,6 +9,7 @@ const {
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
     mockDeleteBlob: vi.fn(),
+    mockEnforceUploadLimits: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -20,6 +21,7 @@ vi.mock('../shared/profile', () => ({
   isOrgAdminOfAny: vi.fn(),
 }));
 vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
+vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
 
 import handler from './index';
 
@@ -67,6 +69,7 @@ describe('lesson-update', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
     mockDeleteBlob.mockResolvedValue(true);
+    mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -367,6 +370,61 @@ describe('lesson-update', () => {
     const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/same.mp4' }), {} as any);
     expect(res.status).toBe(200);
     expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  // --- Upload size/type enforcement (#276) ---
+
+  it('413 when a newly-referenced blob is over cap: no UPDATE is issued', async () => {
+    mockQueryOne.mockResolvedValueOnce(prevPaths()); // only the previous-paths SELECT
+    mockEnforceUploadLimits.mockResolvedValueOnce('Video exceeds the maximum upload size of 2 GB');
+
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/huge.mp4' }), {} as any);
+
+    expect(res.status).toBe(413);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Video exceeds the maximum upload size of 2 GB',
+    });
+    // The SELECT ran; the UPDATE must not have.
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE lessons');
+    // The refused blob's cleanup is the helper's job, not the endpoint's.
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('hands every blob column to the gate, tagged with the cap its column implies', async () => {
+    mockDb(prevPaths({ azure_blob_path: 'videos/old.mp4' }), fakeLesson);
+
+    await handler(baseReq({
+      ...validBody,
+      videoStoragePath: 'legacy/new.mp4',
+      azureBlobPath: 'videos/new.mp4',
+      documentStoragePath: 'docs/new.pdf',
+    }), {} as any);
+
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      [
+        { path: 'legacy/new.mp4', kind: 'video' },
+        { path: 'videos/new.mp4', kind: 'video' },
+        { path: 'docs/new.pdf', kind: 'document' },
+      ],
+      // Row-wide previous paths in column order (video, azure, document) — the
+      // same set the cleanup below diffs against, so an unchanged (or merely
+      // relocated) path is never probed.
+      [null, 'videos/old.mp4', null],
+    );
+  });
+
+  it('runs the gate BEFORE the UPDATE so a refused blob is never persisted', async () => {
+    const order: string[] = [];
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('gate'); return null; });
+    mockQueryOne
+      .mockImplementationOnce(async () => { order.push('select'); return prevPaths(); })
+      .mockImplementationOnce(async () => { order.push('update'); return fakeLesson; });
+
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(order).toEqual(['select', 'gate', 'update']);
   });
 
   it('deleteBlob returns false (storage 500): request still succeeds with its normal body', async () => {

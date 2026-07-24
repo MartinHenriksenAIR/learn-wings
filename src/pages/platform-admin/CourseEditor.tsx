@@ -526,12 +526,13 @@ export default function CourseEditor() {
             <div className="w-full shrink-0 space-y-3.5 md:w-[220px]">
               <div className="space-y-1.5">
                 <Label>{t('courseEditor.thumbnail')}</Label>
+                {/* No maxSizeMB: the image cap is the server's, and FileUpload
+                    defaults to it (src/lib/upload-limits.ts). */}
                 <FileUpload
                   folder="thumbnails"
                   accept="image"
                   value={editThumbnailUrl}
                   onChange={(url) => setEditThumbnailUrl(url)}
-                  maxSizeMB={10}
                 />
               </div>
               <div className="space-y-1.5">
@@ -861,10 +862,11 @@ export default function CourseEditor() {
               <>
                 <div className="space-y-2">
                   <Label>{t('courseEditor.documentFileLabel')}</Label>
+                  {/* No maxSizeMB: the document cap is the server's, and
+                      AzureDocumentUpload defaults to it (src/lib/upload-limits.ts). */}
                   <AzureDocumentUpload
                     value={lessonDocPath}
                     onChange={setLessonDocPath}
-                    maxSizeMB={100}
                   />
                 </div>
                 <div className="space-y-2">

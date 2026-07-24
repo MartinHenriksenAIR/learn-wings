@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob, mockEnforceUploadLimits } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
@@ -8,12 +8,14 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDelet
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
     mockDeleteBlob: vi.fn(),
+    mockEnforceUploadLimits: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile }));
 vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
+vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
 
 import handler from './index';
 
@@ -50,6 +52,7 @@ describe('profile-update', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'alice@example.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockDeleteBlob.mockResolvedValue(true);
+    mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
   });
 
   // 1. 401 invalid bearer token
@@ -284,6 +287,51 @@ describe('profile-update', () => {
 
     expect(res.status).toBe(404);
     expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  // --- Upload size/type enforcement (#276) ---
+
+  it('413 when the new avatar is over cap: no UPDATE is issued', async () => {
+    mockQueryOne.mockResolvedValueOnce({ avatar_url: null }); // only the previous-avatar SELECT
+    mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/huge.png' }), {} as any);
+
+    expect(res.status).toBe(413);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Image exceeds the maximum upload size of 10 MB',
+    });
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE profiles');
+    // The refused blob's cleanup is the helper's job, not the endpoint's.
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('hands the avatar to the gate with the previous path, after the SELECT and before the UPDATE', async () => {
+    const order: string[] = [];
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('gate'); return null; });
+    mockQueryOne
+      .mockImplementationOnce(async () => { order.push('select'); return { avatar_url: 'avatars/old.png' }; })
+      .mockImplementationOnce(async () => { order.push('update'); return profileRow; });
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      [{ path: 'avatars/new.png', kind: 'image' }],
+      ['avatars/old.png'], // unchanged path ⇒ not new ⇒ never probed
+    );
+    expect(order).toEqual(['select', 'gate', 'update']);
+  });
+
+  it('clearing the avatar passes a null path, so nothing is probed', async () => {
+    mockAvatarDb('avatars/old.png', { ...profileRow, avatar_url: null });
+    const res = await handler(baseReq({ avatar_url: '' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      [{ path: null, kind: 'image' }],
+      ['avatars/old.png'],
+    );
   });
 
   it('deleteBlob returns false: request still succeeds with its normal body', async () => {

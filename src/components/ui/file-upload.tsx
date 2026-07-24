@@ -2,6 +2,13 @@ import * as React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { callApi } from '@/lib/api-client';
 import { downscaleImageFile, maxEdgeForUpload } from '@/lib/image-downscale';
+import {
+  checkSelectedFileSize,
+  checkUploadPayloadSize,
+  effectiveMaxSizeMB,
+  formatSizeMB,
+  willDownscale,
+} from '@/lib/upload-limits';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -20,6 +27,12 @@ interface FileUploadProps {
   accept?: FileUploadType;
   value?: string | null;
   onChange: (url: string | null, storagePath: string | null) => void;
+  /**
+   * Tightens the limit below the server cap for this call site (avatars ask for
+   * 2 MB). Never widens it: `effectiveMaxSizeMB` clamps to the cap the backend
+   * enforces, so the UI can't promise something the save would 413 on. Defaults
+   * to the server cap for `accept`.
+   */
   maxSizeMB?: number;
   className?: string;
   disabled?: boolean;
@@ -43,10 +56,11 @@ export function FileUpload({
   accept = 'image',
   value,
   onChange,
-  maxSizeMB = 50,
+  maxSizeMB,
   className,
   disabled = false,
 }: FileUploadProps) {
+  const capMB = effectiveMaxSizeMB(accept, maxSizeMB);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -77,9 +91,16 @@ export function FileUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size
-    if (file.size > maxSizeMB * 1024 * 1024) {
-      setError(`File size must be less than ${maxSizeMB}MB`);
+    // Size is validated in TWO places, and the split is the point (#276/#278).
+    // Here we only reject what could never work: for a file that is about to be
+    // downscaled the bar is the decode ceiling, not the upload cap, because a
+    // 20 MB photo destined to become a 200 KB thumbnail must be shrunk rather
+    // than refused. The cap itself is applied further down, to the bytes that
+    // will actually be PUT.
+    const downscalable = willDownscale(accept, file.type);
+    const selectionError = checkSelectedFileSize(file.size, capMB, downscalable);
+    if (selectionError) {
+      setError(selectionError);
       return;
     }
 
@@ -98,6 +119,23 @@ export function FileUpload({
       // contentType handshake below unchanged.
       const maxEdge = maxEdgeForUpload(accept, assetType);
       const upload = maxEdge === null ? file : await downscaleImageFile(file, maxEdge);
+
+      // The cap, applied to what will ACTUALLY be uploaded — this is the check
+      // that mirrors the server's post-upload HEAD, so clearing it is what makes
+      // the eventual save succeed. It can still fire after a downscale: a format
+      // we don't re-encode (animated GIF, SVG), a browser without a canvas
+      // encoder, or a re-encode that came out no smaller all leave `upload ===
+      // file`. Bailing here costs the user nothing — no SAS URL has been minted
+      // and no bytes have been sent.
+      const payloadError = checkUploadPayloadSize(upload.size, capMB);
+      if (payloadError) {
+        setError(payloadError);
+        // Nothing was stored, so drop the name we optimistically adopted — with a
+        // value already present the tile would otherwise label the OLD blob with
+        // the REJECTED file's name.
+        setFileName(null);
+        return;
+      }
 
       // Get a signed Azure upload URL
       const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>(
@@ -226,7 +264,8 @@ export function FileUpload({
                 Click to upload {accept === 'image' ? 'an image' : accept === 'video' ? 'a video' : 'a document'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Max size: {maxSizeMB}MB
+                Max size: {formatSizeMB(capMB)}
+                {accept === 'image' && ' • larger images are resized automatically'}
               </p>
             </>
           )}

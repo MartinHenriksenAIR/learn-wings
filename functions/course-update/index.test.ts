@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
-  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob,
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob, mockEnforceUploadLimits,
 } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
@@ -9,6 +9,7 @@ const {
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
     mockDeleteBlob: vi.fn(),
+    mockEnforceUploadLimits: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -20,6 +21,7 @@ vi.mock('../shared/profile', () => ({
   isOrgAdminOfAny: vi.fn(),
 }));
 vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
+vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
 
 import handler from './index';
 
@@ -58,6 +60,7 @@ describe('course-update', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
     mockDeleteBlob.mockResolvedValue(true);
+    mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -330,6 +333,51 @@ describe('course-update', () => {
     const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
     expect(res.status).toBe(404);
     expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  // --- Upload size/type enforcement (#276) ---
+
+  it('413 when the new thumbnail is over cap: no UPDATE is issued', async () => {
+    mockQueryOne.mockResolvedValueOnce({ thumbnail_url: null }); // only the previous-thumbnail SELECT
+    mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
+
+    const res = await handler(baseReq(thumbUpdate('thumbs/huge.png')), {} as any);
+
+    expect(res.status).toBe(413);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Image exceeds the maximum upload size of 10 MB',
+    });
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE courses');
+    // The refused blob's cleanup is the helper's job, not the endpoint's.
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('hands the thumbnail to the gate with the previous path, after the SELECT and before the UPDATE', async () => {
+    const order: string[] = [];
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('gate'); return null; });
+    mockQueryOne
+      .mockImplementationOnce(async () => { order.push('select'); return { thumbnail_url: 'thumbs/old.png' }; })
+      .mockImplementationOnce(async () => { order.push('update'); return fakeCourse; });
+
+    const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      [{ path: 'thumbs/new.png', kind: 'image' }],
+      ['thumbs/old.png'], // unchanged path ⇒ not new ⇒ never probed
+    );
+    expect(order).toEqual(['select', 'gate', 'update']);
+  });
+
+  it('thumbnailUrl absent from updates: the gate sees an undefined path, so nothing is probed', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeCourse);
+    const res = await handler(baseReq({ courseId: 'c1', updates: { title: 'Renamed' } }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      [{ path: undefined, kind: 'image' }],
+      [null],
+    );
   });
 
   it('deleteBlob returns false: request still succeeds with its normal body', async () => {

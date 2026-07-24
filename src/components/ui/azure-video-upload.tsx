@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useRef } from 'react';
 import { callApi } from '@/lib/api-client';
+import { checkUploadPayloadSize, formatSizeMB, UPLOAD_MAX_MB } from '@/lib/upload-limits';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,16 @@ export function AzureVideoUpload({
     // Validate file type
     if (!file.type.startsWith('video/')) {
       setError('Please select a video file');
+      return;
+    }
+
+    // Validate file size against the server cap (#276). This component used to
+    // have no size check at all and advertised "Unlimited file size"; without it
+    // an oversized video uploads for minutes and only then fails the save with a
+    // 413, having already cost the user (and the storage account) the transfer.
+    const sizeError = checkUploadPayloadSize(file.size, UPLOAD_MAX_MB.video);
+    if (sizeError) {
+      setError(sizeError);
       return;
     }
 
@@ -200,7 +211,7 @@ export function AzureVideoUpload({
               <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
               <p className="text-sm font-medium">Click to upload video</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Unlimited file size • MP4, WebM, MOV
+                Max {formatSizeMB(UPLOAD_MAX_MB.video)} • MP4, WebM, MOV
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Uploads directly to Azure Cloud Storage

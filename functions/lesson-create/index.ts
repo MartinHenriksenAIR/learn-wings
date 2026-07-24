@@ -1,6 +1,7 @@
 import { queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
 import { validateLessonFields } from '../shared/validate';
+import { enforceUploadLimits } from '../shared/upload-limits';
 
 export default adminEndpoint('lesson-create', async ({ req, reply }) => {
   const body = await req.json() as {
@@ -20,6 +21,18 @@ export default adminEndpoint('lesson-create', async ({ req, reply }) => {
   const sharedError = validateLessonFields(body);
   if (sharedError) {
     return reply(400, { error: sharedError });
+  }
+
+  // Size/type gate on the blobs this insert references (#276). There is no
+  // previous row, so every supplied path is new and gets probed; over-cap or
+  // off-allowlist means no row is inserted at all.
+  const limitError = await enforceUploadLimits([
+    { path: videoStoragePath as string | null | undefined, kind: 'video' },
+    { path: azureBlobPath as string | null | undefined, kind: 'video' },
+    { path: documentStoragePath as string | null | undefined, kind: 'document' },
+  ]);
+  if (limitError) {
+    return reply(413, { error: limitError });
   }
 
   // sort_order is server-owned (issue #46): computed as MAX+1 within the module

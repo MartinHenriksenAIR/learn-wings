@@ -4,6 +4,7 @@ import { isOrgAdmin } from '../shared/profile';
 import { validateOrgName, validateOrgSlug, normalizeOrgName } from '../shared/org-validation';
 import { buildUpdateSet } from '../shared/update-builder';
 import { deleteBlob } from '../shared/blob';
+import { enforceUploadLimits } from '../shared/upload-limits';
 
 const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit']);
 
@@ -94,6 +95,20 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
       [orgId],
     );
     previousLogoUrl = prev?.logo_url ?? null;
+  }
+
+  // Size/type gate on a newly-referenced logo (#276). Placed AFTER the authz gate
+  // for the same reason as the SELECT above — an unauthorized caller must never
+  // reach storage either. Any org admin can write logo_url and `azure-upload-url`
+  // mints org-logo URLs without a platform-admin gate, so this is the only place
+  // a logo's real size is ever checked. Reuses the same change detection as the
+  // cleanup below: an unchanged path is not new, so it costs no HEAD.
+  const limitError = await enforceUploadLimits(
+    [{ path: nextLogoUrl, kind: 'image' }],
+    [previousLogoUrl],
+  );
+  if (limitError) {
+    return reply(413, { error: limitError });
   }
 
   // Dynamic UPDATE over the whitelisted keys (SET clauses built above).

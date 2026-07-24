@@ -1040,7 +1040,7 @@
     "contentTextLabel": "Content Text (optional)",
     "contentTextPlaceholder": "Additional lesson content or description...",
     "videoFileLabel": "Video File (Azure Cloud)",
-    "videoFileHint": "Ingen filstørrelses-begrænsning. Videoer uploades direkte til Azure Cloud Storage.",
+    "videoFileHint": "Maximum file size 2 GB. Videos are uploaded directly to Azure Cloud Storage.",
     "quizContentPlaceholder": "Quiz instructions or additional context...",
     "quizSetupHintEdit": "Save the lesson first, then use \"Edit Quiz\" to configure questions.",
     "quizSetupHintCreate": "Create the lesson first, then configure the quiz questions.",

@@ -10,7 +10,7 @@ vi.mock('./sas', () => ({
   buildBlobUrl: mockBuildBlobUrl,
 }));
 
-import { deleteBlob, cleanupBlobs, resolveAssetContainer, isBrandingAssetType, isBrandingAssetPath } from './blob';
+import { deleteBlob, headBlob, cleanupBlobs, resolveAssetContainer, isBrandingAssetType, isBrandingAssetPath } from './blob';
 
 const BLOB_PATH = 'videos/lesson-1.mp4';
 const BLOB_URL = 'https://testaccount.blob.core.windows.net/lms-videos/blob?sp=d&sig=abc';
@@ -91,6 +91,141 @@ describe('deleteBlob', () => {
       'lms-videos',
       BLOB_PATH,
       'd',
+      10,
+    );
+  });
+});
+
+describe('headBlob', () => {
+  /** A fetch Response stub carrying just the headers headBlob reads. */
+  const okResponse = (headers: Record<string, string>) => ({
+    ok: true,
+    status: 200,
+    headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGenerateSasToken.mockReturnValue('sp=r&sig=abc');
+    mockBuildBlobUrl.mockReturnValue(BLOB_URL);
+    process.env.AZURE_STORAGE_ACCOUNT_NAME = 'testaccount';
+    process.env.AZURE_STORAGE_ACCOUNT_KEY = Buffer.alloc(32).toString('base64');
+    process.env.AZURE_STORAGE_CONTAINER_NAME = 'lms-videos';
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.AZURE_STORAGE_ACCOUNT_NAME;
+    delete process.env.AZURE_STORAGE_ACCOUNT_KEY;
+    delete process.env.AZURE_STORAGE_CONTAINER_NAME;
+  });
+
+  it('returns size and content type from a 2xx, minting a read-only SAS', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      okResponse({ 'content-length': '1234', 'content-type': 'video/mp4' }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(headBlob(BLOB_PATH)).resolves.toEqual({
+      ok: true,
+      exists: true,
+      contentLength: 1234,
+      contentType: 'video/mp4',
+    });
+    // 'r', not 'd' — a size probe must never be able to delete.
+    expect(mockGenerateSasToken).toHaveBeenCalledWith(
+      'testaccount',
+      expect.any(String),
+      'lms-videos',
+      BLOB_PATH,
+      'r',
+      10,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(BLOB_URL, { method: 'HEAD' });
+  });
+
+  it('reports a conclusive absence for 404 (ok, but exists false)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+    await expect(headBlob(BLOB_PATH)).resolves.toEqual({
+      ok: true,
+      exists: false,
+      contentLength: null,
+      contentType: null,
+    });
+  });
+
+  it('reports inconclusive (ok false) when storage responds 500', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await headBlob(BLOB_PATH);
+    expect(result.ok).toBe(false);
+    expect(result.exists).toBe(false);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('reports inconclusive and never throws when fetch rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(headBlob(BLOB_PATH)).resolves.toEqual({
+      ok: false,
+      exists: false,
+      contentLength: null,
+      contentType: null,
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('reports inconclusive and warns when env vars are missing, without minting a SAS', async () => {
+    delete process.env.AZURE_STORAGE_ACCOUNT_NAME;
+    delete process.env.AZURE_STORAGE_ACCOUNT_KEY;
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await headBlob(BLOB_PATH);
+    expect(result.ok).toBe(false);
+    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('still reports the blob as existing when Content-Length is absent or unparseable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ 'content-type': 'image/png' })));
+    await expect(headBlob(BLOB_PATH)).resolves.toEqual({
+      ok: true,
+      exists: true,
+      contentLength: null,
+      contentType: 'image/png',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ 'content-length': 'not-a-number' })));
+    await expect(headBlob(BLOB_PATH)).resolves.toEqual({
+      ok: true,
+      exists: true,
+      contentLength: null,
+      contentType: null,
+    });
+  });
+
+  it('tolerates a response with no headers object at all', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+    await expect(headBlob(BLOB_PATH)).resolves.toEqual({
+      ok: true,
+      exists: true,
+      contentLength: null,
+      contentType: null,
+    });
+  });
+
+  it('uses the container fallback lms-videos when env var is absent', async () => {
+    delete process.env.AZURE_STORAGE_CONTAINER_NAME;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ 'content-length': '10' })));
+    await headBlob(BLOB_PATH);
+    expect(mockGenerateSasToken).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'lms-videos',
+      BLOB_PATH,
+      'r',
       10,
     );
   });
