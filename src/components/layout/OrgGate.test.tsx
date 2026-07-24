@@ -78,6 +78,27 @@ describe('OrgGate (#256)', () => {
     expect(screen.queryByTestId('page-content')).not.toBeInTheDocument();
   });
 
+  it('forwards breadcrumbs to AppLayout in the gate states', () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuth,
+      user: { id: 'entra-oid' },
+      profile: { id: 'profile-uuid' },
+      currentOrg: null,
+    });
+    render(
+      <I18nextProvider i18n={i18n}>
+        <MemoryRouter>
+          <OrgGate
+            breadcrumbs={[{ label: 'Idea Management' }]}
+            titleKey="community.noOrganizationTitle"
+            descriptionKey="community.noOrgIdeas"
+          />
+        </MemoryRouter>
+      </I18nextProvider>,
+    );
+    expect(screen.getByText('Idea Management')).toBeInTheDocument();
+  });
+
   it('renders children when an org is selected', () => {
     mockUseAuth.mockReturnValue({
       ...baseAuth,
