@@ -24,12 +24,14 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const mockFetchIdea = vi.fn();
 const mockFetchIdeaComments = vi.fn();
 const mockUpdateIdeaStatus = vi.fn();
+const mockCreateIdeaComment = vi.fn();
+const mockVoteForIdea = vi.fn();
 vi.mock('@/lib/ideas-api', () => ({
   fetchIdea: (...args: unknown[]) => mockFetchIdea(...args),
   fetchIdeaComments: (...args: unknown[]) => mockFetchIdeaComments(...args),
   updateIdeaStatus: (...args: unknown[]) => mockUpdateIdeaStatus(...args),
-  createIdeaComment: vi.fn(),
-  voteForIdea: vi.fn(),
+  createIdeaComment: (...args: unknown[]) => mockCreateIdeaComment(...args),
+  voteForIdea: (...args: unknown[]) => mockVoteForIdea(...args),
   removeVoteFromIdea: vi.fn(),
 }));
 
@@ -101,6 +103,8 @@ describe('IdeaDetail admin status panel', () => {
     mockFetchIdea.mockResolvedValue(baseIdea);
     mockFetchIdeaComments.mockResolvedValue([]);
     mockUpdateIdeaStatus.mockResolvedValue({});
+    mockCreateIdeaComment.mockResolvedValue({});
+    mockVoteForIdea.mockResolvedValue(undefined);
   });
 
   it('hides the Update status panel from non-admins', async () => {
@@ -152,5 +156,43 @@ describe('IdeaDetail admin status panel', () => {
       target: { value: 'Out of scope' },
     });
     expect(screen.getByRole('button', { name: 'common.save' })).toBeEnabled();
+  });
+});
+
+// #268 — voting and commenting take only the idea id: both endpoints derive the
+// org from the idea row, so the page never threads currentOrg through. Pinned
+// with currentOrg null, which the old `currentOrg!.id` call sites would have
+// thrown on.
+describe('IdeaDetail vote/comment arguments', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetchIdea.mockResolvedValue(baseIdea);
+    mockFetchIdeaComments.mockResolvedValue([]);
+    mockCreateIdeaComment.mockResolvedValue({});
+    mockVoteForIdea.mockResolvedValue(undefined);
+    mockUseAuth.mockReturnValue({ ...makeAuth(false), currentOrg: null });
+  });
+
+  it('votes with the idea id alone', async () => {
+    renderIdeaDetail();
+
+    await screen.findByText('Automate invoice processing');
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+
+    await waitFor(() => expect(mockVoteForIdea).toHaveBeenCalledTimes(1));
+    expect(mockVoteForIdea).toHaveBeenCalledWith('idea-1');
+  });
+
+  it('comments with the idea id and the trimmed content alone', async () => {
+    renderIdeaDetail();
+
+    await screen.findByText('Automate invoice processing');
+    fireEvent.change(screen.getByPlaceholderText('community.addCommentPlaceholder'), {
+      target: { value: '  Great idea  ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'community.comment' }));
+
+    await waitFor(() => expect(mockCreateIdeaComment).toHaveBeenCalledTimes(1));
+    expect(mockCreateIdeaComment).toHaveBeenCalledWith('idea-1', 'Great idea');
   });
 });

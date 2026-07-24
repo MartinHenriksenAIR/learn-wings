@@ -7,6 +7,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
 import { corsPreflightResponse, getCorsHeaders } from '../shared/cors';
 import { internalError } from '../shared/errors';
+import { pdfResponse } from '../shared/http';
 import { STRINGS, resolveLang, type LevelKey } from './strings';
 import { generatePDF, type DeptRow, type CourseRow, type LevelRow, type ReportData } from './render';
 
@@ -158,15 +159,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     const pdf = await generatePDF(data, lang);
 
-    return {
-      status: 200,
-      headers: {
-        ...getCorsHeaders(origin),
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="ai-act-compliance-report-${Date.now()}.pdf"`,
-      },
-      body: pdf,
-    };
+    return pdfResponse(origin, `ai-act-compliance-report-${Date.now()}.pdf`, pdf);
   } catch (err: unknown) {
     if (err instanceof AuthError) return { status: 401, headers: getCorsHeaders(origin), body: JSON.stringify({ error: (err as Error).message }) };
     return internalError(context, origin, err);
