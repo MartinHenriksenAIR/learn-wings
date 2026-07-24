@@ -43,8 +43,8 @@ describe('grade-quiz', () => {
     mockQuery.mockResolvedValueOnce([{ id: 'opt-a', is_correct: true }]);
     // correct options for q2 → user selected opt-c (wrong, correct is opt-b)
     mockQuery.mockResolvedValueOnce([{ id: 'opt-b', is_correct: true }]);
-    // quiz_attempts insert
-    mockQuery.mockResolvedValueOnce([]);
+    // quiz_attempts insert → rowCount 1 (membership found)
+    mockQuery.mockResolvedValueOnce([{ org_id: 'org-1' }]);
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body as string);
@@ -53,6 +53,7 @@ describe('grade-quiz', () => {
     expect(body.passed).toBe(false);
     expect(body.correct_count).toBe(1);
     expect(body.total_questions).toBe(2);
+    expect(body.recorded).toBe(true);
 
     // SECURITY: is_correct must never appear in the response
     expect(JSON.stringify(body)).not.toContain('is_correct');
@@ -92,7 +93,7 @@ describe('grade-quiz', () => {
     mockQuery.mockResolvedValueOnce([{ id: 'q1-uuid' }]);
     // correct options for q1 → user selected opt-a (correct)
     mockQuery.mockResolvedValueOnce([{ id: 'opt-a', is_correct: true }]);
-    // quiz_attempts insert
+    // quiz_attempts insert → zero rows (platform admin has no org_membership row by design)
     mockQuery.mockResolvedValueOnce([]);
 
     const req = {
@@ -107,6 +108,7 @@ describe('grade-quiz', () => {
     expect(res.status).toBe(200);
     expect(body.score).toBe(100);
     expect(body.passed).toBe(true);
+    expect(body.recorded).toBe(false);
 
     // SECURITY: no access-check SQL executed at all (queryOne only called for quiz metadata)
     const allQueryOneCalls = mockQueryOne.mock.calls.map(c => c[0] as string);
@@ -114,6 +116,33 @@ describe('grade-quiz', () => {
     // The only queryOne call should be the quiz metadata fetch
     expect(allQueryOneCalls).toHaveLength(1);
     expect(allQueryOneCalls[0]).toContain('quizzes');
+  });
+
+  it('still returns 200 with correct grade when INSERT writes zero rows (recorded: false)', async () => {
+    // Simulates a learner whose membership was disabled mid-session (passed access
+    // check earlier but has no active row at INSERT time). Grade is valid feedback;
+    // the attempt is simply not persisted — surface it via recorded: false (#18).
+    mockQueryOne.mockResolvedValueOnce({ has_access: true });
+    mockQueryOne.mockResolvedValueOnce({ id: 'quiz-uuid', passing_score: 50 });
+    // one question, answered correctly
+    mockQuery.mockResolvedValueOnce([{ id: 'q1-uuid' }]);
+    mockQuery.mockResolvedValueOnce([{ id: 'opt-a', is_correct: true }]);
+    // INSERT returns no rows — no active membership found
+    mockQuery.mockResolvedValueOnce([]);
+
+    const req = {
+      method: 'POST',
+      headers: { get: (k: string) => k === 'origin' ? 'https://ai-uddannelse.dk' : 'Bearer tok' },
+      json: async () => ({ quiz_id: 'quiz-uuid', answers: { 'q1-uuid': 'opt-a' } }),
+    };
+
+    const res = await handler(req as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    expect(body.score).toBe(100);
+    expect(body.passed).toBe(true);
+    expect(body.recorded).toBe(false);
   });
 
   it('returns 401 when getProfile returns null', async () => {

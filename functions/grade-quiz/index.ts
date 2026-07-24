@@ -47,13 +47,21 @@ export default endpoint('grade-quiz', async ({ req, profile, reply }) => {
   const passed = score >= quiz.passing_score;
   const passing_score = quiz.passing_score;
 
-  // Insert quiz_attempts server-side — never trust the client to record scores
-  await query(
+  // Insert quiz_attempts server-side — never trust the client to record scores.
+  // The SELECT-based INSERT writes zero rows when the user has no active membership
+  // row (platform admins bypass the access check above and have no membership by
+  // design; a learner's membership may also have been disabled mid-session). That
+  // used to return 200 with the attempt silently unrecorded — the same #18 silent
+  // no-op class as enrollment-complete. Surface it via `recorded` so the caller
+  // knows whether the attempt landed; the grade is still valid feedback either way.
+  const inserted = await query<{ org_id: string }>(
     `INSERT INTO quiz_attempts (org_id, user_id, quiz_id, score, passed, finished_at)
      SELECT om.org_id, $1, $2, $3, $4, NOW()
-     FROM org_memberships om WHERE om.user_id = $1 AND om.status = 'active' LIMIT 1`,
+     FROM org_memberships om WHERE om.user_id = $1 AND om.status = 'active' LIMIT 1
+     RETURNING org_id`,
     [profile.id, quiz_id, score, passed]
   );
+  const recorded = inserted.length === 1;
 
-  return reply(200, { score, passed, passing_score, correct_count, total_questions });
+  return reply(200, { score, passed, passing_score, correct_count, total_questions, recorded });
 });
