@@ -105,6 +105,19 @@ describe('resource-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'tags must be an array of strings' });
   });
 
+  it('returns 400 when url has a javascript: scheme (stored-XSS guard, #232)', async () => {
+    const res = await handler(baseReq({ ...validBody, url: 'javascript:alert(document.cookie)' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'url must be a valid http(s) URL' });
+    expect(mockQueryOne).not.toHaveBeenCalled(); // never reaches the INSERT
+  });
+
+  it('accepts a valid https url', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'r1' });
+    const res = await handler(baseReq({ ...validBody, url: 'https://example.com/doc' }), {} as any);
+    expect(res.status).toBe(200);
+  });
+
   it('returns 403 when caller is not an active member', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
     const res = await handler(baseReq(validBody), {} as any);

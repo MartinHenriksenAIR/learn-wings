@@ -6,6 +6,7 @@ import { CategoryBadge } from './CategoryBadge';
 import { TagList } from './TagList';
 import { MessageSquare, Pin, Lock, Calendar, MapPin, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { formatDate, formatDistanceToNowLocalized } from '@/lib/date-locale';
+import { safeHref } from '@/lib/safe-href';
 import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
@@ -98,7 +99,7 @@ export function PostCard({
           )}
           {post.event_registration_url && (
             <a
-              href={post.event_registration_url}
+              href={safeHref(post.event_registration_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg px-2 py-[7px] text-xs font-bold text-primary hover:underline"

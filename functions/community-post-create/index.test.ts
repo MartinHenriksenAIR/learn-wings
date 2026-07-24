@@ -115,6 +115,26 @@ describe('community-post-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'tags must be an array of strings' });
   });
 
+  it('returns 400 when eventRegistrationUrl has a javascript: scheme (stored-XSS guard, #232)', async () => {
+    const res = await handler(
+      baseReq({ ...validGlobalBody, eventRegistrationUrl: 'javascript:fetch("//evil")' }),
+      {} as any,
+    );
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'eventRegistrationUrl must be a valid http(s) URL' });
+    expect(mockQueryOne).not.toHaveBeenCalled(); // never reaches the category lookup / INSERT
+  });
+
+  it('accepts a valid https eventRegistrationUrl', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_restricted: false }); // category check
+    mockQueryOne.mockResolvedValueOnce({ id: 'post-new' }); // INSERT RETURNING
+    const res = await handler(
+      baseReq({ ...validGlobalBody, eventRegistrationUrl: 'https://example.com/register' }),
+      {} as any,
+    );
+    expect(res.status).toBe(200);
+  });
+
   it('returns 403 when scope=org and caller is not a member', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
     // category check won't be reached

@@ -4,7 +4,7 @@
 // ProtectedRoute.test.tsx, which mocks useAuth wholesale) so the race between
 // the MSAL account appearing and /api/user-context resolving is covered.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
@@ -29,9 +29,26 @@ vi.mock('@/lib/msal-config', () => ({
 }));
 
 const { mockCallApi } = vi.hoisted(() => ({ mockCallApi: vi.fn() }));
-vi.mock('@/lib/api-client', () => ({ callApi: mockCallApi }));
+// Preserve the real ApiError export so useAuth's 401-vs-network classification runs.
+vi.mock('@/lib/api-client', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return { ...actual, callApi: mockCallApi };
+});
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: 'en', changeLanguage: vi.fn() },
+  }),
+}));
+
+// The real AuthProvider reads i18n.resolvedLanguage to pass the UI language to
+// /api/user-context (#226/#229). Mock the singleton so the real @/i18n module
+// (which .use()s initReactI18next) isn't initialized in this unit test.
+vi.mock('@/i18n', () => ({ default: { resolvedLanguage: 'en' } }));
 
 import { AuthProvider } from '@/hooks/useAuth';
+import { ApiError } from '@/lib/api-client';
 import { ProtectedRoute } from './ProtectedRoute';
 
 const mockAccount = {
@@ -130,6 +147,57 @@ describe('admin deep-link cold load (#79)', () => {
 
     await waitFor(() => expect(screen.getByText('DASHBOARD')).toBeInTheDocument());
     expect(screen.queryByText('ORG DETAIL')).toBeNull();
+  });
+
+  it('shows the retry state (not a dashboard bounce) when an admin deep link fails to load context (#232)', async () => {
+    // End-to-end through the real AuthProvider: the account is cached, but
+    // /api/user-context rejects. Pre-fix this settled as profile=null →
+    // !isPlatformAdmin → silent redirect to the learner dashboard. The admin
+    // must now see the retry state instead.
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setMsal({ account: mockAccount, inProgress: 'none' });
+    mockCallApi.mockRejectedValue(new Error('bootstrap 500'));
+
+    render(<AdminApp guard={{ requirePlatformAdmin: true }} />);
+
+    await waitFor(() => expect(screen.getByText('contextError.title')).toBeInTheDocument());
+    expect(screen.getByText('contextError.retry')).toBeInTheDocument();
+    expect(screen.queryByText('DASHBOARD')).toBeNull();
+    consoleSpy.mockRestore();
+  });
+
+  it("shows the 'sign in again' affordance when an admin deep link fails with a 401 (#232)", async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setMsal({ account: mockAccount, inProgress: 'none' });
+    mockCallApi.mockRejectedValue(new ApiError('Unauthorized', 401));
+
+    render(<AdminApp guard={{ requirePlatformAdmin: true }} />);
+
+    await waitFor(() => expect(screen.getByText('contextError.signInAgain')).toBeInTheDocument());
+    expect(screen.queryByText('DASHBOARD')).toBeNull();
+    consoleSpy.mockRestore();
+  });
+
+  it('a successful retry after a failed admin deep-link load renders the page (#232)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setMsal({ account: mockAccount, inProgress: 'none' });
+    mockCallApi.mockRejectedValueOnce(new Error('transient'));
+
+    render(<AdminApp guard={{ requirePlatformAdmin: true }} />);
+
+    await waitFor(() => expect(screen.getByText('contextError.retry')).toBeInTheDocument());
+
+    // Retry succeeds with admin=true → the deep-linked page renders.
+    mockCallApi.mockResolvedValueOnce({
+      profile: { id: 'p-1', is_platform_admin: true },
+      memberships: [],
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('contextError.retry'));
+    });
+
+    await waitFor(() => expect(screen.getByText('ORG DETAIL')).toBeInTheDocument());
+    consoleSpy.mockRestore();
   });
 
   it('requireOrgAdmin waits for the context the same way instead of redirecting', async () => {

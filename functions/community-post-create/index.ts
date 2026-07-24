@@ -1,6 +1,7 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isActiveMember } from '../shared/profile';
+import { validateHttpUrl } from '../shared/validate';
 
 export default endpoint('community-post-create', async ({ req, profile, reply, requireOrgAdmin, requirePlatformAdmin }) => {
   const body = await req.json() as {
@@ -46,6 +47,12 @@ export default endpoint('community-post-create', async ({ req, profile, reply, r
   // Validate optional fields
   if (tags !== undefined && (!Array.isArray(tags) || !tags.every((t) => typeof t === 'string'))) {
     return reply(400, { error: 'tags must be an array of strings' });
+  }
+  // Defence in depth against stored-XSS (sec-1, #232): the registration URL is
+  // rendered into an anchor href, so reject non-http(s) schemes on write.
+  const eventRegistrationUrlError = validateHttpUrl(eventRegistrationUrl, 'eventRegistrationUrl');
+  if (eventRegistrationUrlError) {
+    return reply(400, { error: eventRegistrationUrlError });
   }
 
   const vScope = scope as 'org' | 'global';

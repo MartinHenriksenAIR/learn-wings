@@ -88,6 +88,28 @@ describe('community-post-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'No valid update fields provided' });
   });
 
+  it('returns 400 when event_registration_url has a javascript: scheme (stored-XSS guard, #232)', async () => {
+    const res = await handler(
+      baseReq({ postId: 'post-1', updates: { event_registration_url: 'javascript:alert(1)' } }),
+      {} as any,
+    );
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'event_registration_url must be a valid http(s) URL' });
+    // Rejected before the post SELECT.
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('accepts a valid https event_registration_url', async () => {
+    mockQueryOne.mockResolvedValueOnce(myOrgPost); // post
+    mockQueryOne.mockResolvedValueOnce({ is_restricted: false }); // current category
+    mockQueryOne.mockResolvedValueOnce({ ...myOrgPost, event_registration_url: 'https://example.com/register' }); // UPDATE
+    const res = await handler(
+      baseReq({ postId: 'post-1', updates: { event_registration_url: 'https://example.com/register' } }),
+      {} as any,
+    );
+    expect(res.status).toBe(200);
+  });
+
   it('returns 404 when post not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null); // post not found
     const res = await handler(baseReq({ postId: 'post-999', updates: { title: 'x' } }), {} as any);

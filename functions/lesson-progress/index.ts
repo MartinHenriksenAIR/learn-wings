@@ -1,8 +1,12 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 
-export default endpoint('lesson-progress', async ({ req, profile, reply }) => {
+export default endpoint('lesson-progress', async ({ req, profile, reply, requireActiveMember }) => {
   const { orgId, lessonId, status } = await req.json() as { orgId: string; lessonId: string; status: string };
+
+  // Authorization — membership (platform admins bypass)
+  await requireActiveMember(orgId);
+
   await query(
     `INSERT INTO lesson_progress (org_id, user_id, lesson_id, status, completed_at)
      VALUES ($1, $2, $3, $4, NOW())

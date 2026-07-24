@@ -1,10 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: 'en', changeLanguage: vi.fn() },
+  }),
 }));
 
 import { ProtectedRoute } from './ProtectedRoute';
@@ -17,6 +24,7 @@ const baseAuth = {
   isPlatformAdmin: false,
   isOrgAdmin: false,
   isLoading: false,
+  contextError: null as 'auth' | 'network' | null,
   signIn: vi.fn(),
   signOut: vi.fn(),
   refreshUserContext: vi.fn(),
@@ -85,5 +93,57 @@ describe('ProtectedRoute', () => {
 
     expect(screen.getByText('DASHBOARD')).toBeDefined();
     expect(sessionStorage.getItem('postLoginRedirect')).toBeNull();
+  });
+
+  describe('contextError shows a retry state instead of swallowing the failure (#232)', () => {
+    it("renders the error + a retry button on a 'network' contextError (no redirect, no children)", () => {
+      mockUseAuth.mockReturnValue({ ...baseAuth, profile: null, contextError: 'network' });
+
+      renderAt(DEEP_URL);
+
+      expect(screen.getByText('contextError.title')).toBeDefined();
+      expect(screen.getByText('contextError.retry')).toBeDefined();
+      expect(screen.queryByText('POST')).toBeNull();
+      expect(screen.queryByText('DASHBOARD')).toBeNull();
+      expect(screen.queryByText('LOGIN')).toBeNull();
+    });
+
+    it('retry click calls refreshUserContext', () => {
+      const refreshUserContext = vi.fn();
+      mockUseAuth.mockReturnValue({ ...baseAuth, profile: null, contextError: 'network', refreshUserContext });
+
+      renderAt(DEEP_URL);
+      fireEvent.click(screen.getByText('contextError.retry'));
+
+      expect(refreshUserContext).toHaveBeenCalledOnce();
+    });
+
+    it("offers a 'sign in again' affordance on an 'auth' contextError", () => {
+      const signIn = vi.fn();
+      mockUseAuth.mockReturnValue({ ...baseAuth, profile: null, contextError: 'auth', signIn });
+
+      renderAt(DEEP_URL);
+      expect(screen.getByText('contextError.signInAgain')).toBeDefined();
+      fireEvent.click(screen.getByText('contextError.signInAgain'));
+      expect(signIn).toHaveBeenCalledOnce();
+    });
+
+    it('does NOT silently demote/redirect a platform admin whose context failed — shows retry instead', () => {
+      // A platform admin (requirePlatformAdmin route) whose context blipped:
+      // isPlatformAdmin is false only because the load failed. The old code read
+      // `!isPlatformAdmin` and bounced to the learner dashboard; now it must not.
+      mockUseAuth.mockReturnValue({
+        ...baseAuth,
+        profile: null,
+        isPlatformAdmin: false,
+        contextError: 'network',
+      });
+
+      renderAt(DEEP_URL, { requirePlatformAdmin: true });
+
+      expect(screen.getByText('contextError.title')).toBeDefined();
+      expect(screen.getByText('contextError.retry')).toBeDefined();
+      expect(screen.queryByText('DASHBOARD')).toBeNull();
+    });
   });
 });

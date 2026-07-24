@@ -21,6 +21,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { formatDistanceToNowLocalized } from '@/lib/date-locale';
+import { safeHref } from '@/lib/safe-href';
 import { cn, getAvatarColor, getInitials } from '@/lib/utils';
 import { RESOURCE_TYPES, type CommunityResource } from '@/lib/resources-api';
 
@@ -137,7 +138,7 @@ export function ResourceCard({
       <div className="flex items-center gap-2">
         {resource.url && (
           <a
-            href={resource.url}
+            href={safeHref(resource.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-[7px] rounded-[9px] bg-accent px-[13px] py-2 text-[12.5px] font-bold text-accent-foreground transition-colors hover:bg-[#dfe5f8]"

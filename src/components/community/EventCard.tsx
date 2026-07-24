@@ -5,6 +5,7 @@ import { Clock, MapPin, ExternalLink } from 'lucide-react';
 import { isToday } from 'date-fns';
 import { formatDate } from '@/lib/date-locale';
 import { routes } from '@/lib/routes';
+import { safeHref } from '@/lib/safe-href';
 import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
@@ -98,7 +99,7 @@ export function EventCard({ event }: EventCardProps) {
       {/* Join — opens the external registration page; must not open the detail */}
       {event.event_registration_url && (
         <a
-          href={event.event_registration_url}
+          href={safeHref(event.event_registration_url)}
           target="_blank"
           rel="noopener noreferrer"
           className="shrink-0"

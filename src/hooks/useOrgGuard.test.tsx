@@ -48,4 +48,14 @@ describe('useOrgGuard', () => {
 
     expect(result.current).toBe('ready');
   });
+
+  it("does NOT spin forever when the context load failed — a contextError resolves to 'no-org', not 'loading' (#232)", () => {
+    // profile is null ONLY because /api/user-context failed. Without the
+    // defensive guard this returned 'loading' forever (eternal spinner).
+    mockUseAuth.mockReturnValue({ user, profile: null, currentOrg: null, contextError: 'network' });
+
+    const { result } = renderHook(() => useOrgGuard());
+
+    expect(result.current).toBe('no-org');
+  });
 });

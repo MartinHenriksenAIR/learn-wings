@@ -83,6 +83,13 @@
     "passwordResetInfo": "Nulstilling af adgangskode håndteres af din organisations IT-administrator via Microsoft Entra ID.",
     "backToSignIn": "Tilbage til login"
   },
+  "contextError": {
+    "title": "Vi kunne ikke indlæse din konto",
+    "networkDescription": "Noget gik galt under indlæsningen af din profil. Det er som regel midlertidigt — prøv venligst igen.",
+    "authDescription": "Din session er muligvis udløbet. Log venligst ind igen for at fortsætte.",
+    "retry": "Prøv igen",
+    "signInAgain": "Log ind igen"
+  },
   "notFound": {
     "title": "Siden blev ikke fundet",
     "description": "Den side, du leder efter, findes ikke eller er blevet flyttet.",

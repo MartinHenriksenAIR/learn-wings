@@ -24,7 +24,12 @@ vi.mock('@/lib/msal-config', () => ({
 }));
 
 const { mockCallApi } = vi.hoisted(() => ({ mockCallApi: vi.fn() }));
-vi.mock('@/lib/api-client', () => ({ callApi: mockCallApi }));
+// Keep the real ApiError so the hook's `err instanceof ApiError` classification
+// (401 → 'auth', else → 'network') is exercised against the actual class.
+vi.mock('@/lib/api-client', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+  return { ...actual, callApi: mockCallApi };
+});
 
 // The provider reads the browser-derived language off the i18n singleton to
 // send it on the user-context call (#226). Pin it to 'da' so the assertion is
@@ -32,6 +37,7 @@ vi.mock('@/lib/api-client', () => ({ callApi: mockCallApi }));
 vi.mock('@/i18n', () => ({ default: { resolvedLanguage: 'da' } }));
 
 import { AuthProvider, useAuth } from './useAuth';
+import { ApiError } from '@/lib/api-client';
 
 const mockAccount = {
   localAccountId: 'local-123',
@@ -178,6 +184,89 @@ describe('useAuth', () => {
 
       expect(result.current.isLoading).toBe(false);
       expect(mockCallApi).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('contextError surfaces a failed user-context load (#232)', () => {
+    const msalWithAccount = () => {
+      mockUseMsal.mockReturnValue({
+        instance: { loginRedirect: mockLoginRedirect, logoutRedirect: mockLogoutRedirect },
+        accounts: [mockAccount],
+        inProgress: 'none',
+      });
+      mockUseAccount.mockReturnValue(mockAccount);
+    };
+
+    it('no contextError while the fetch is in flight or on success', async () => {
+      msalWithAccount();
+      let resolveCtx!: (v: unknown) => void;
+      mockCallApi.mockReturnValue(new Promise((r) => { resolveCtx = r; }));
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      expect(result.current.contextError).toBeNull();
+
+      await act(async () => {
+        resolveCtx({ profile: { id: 'p-1', is_platform_admin: false }, memberships: [] });
+      });
+      expect(result.current.contextError).toBeNull();
+    });
+
+    it("logs and sets contextError='network' when the fetch fails with a non-401 error", async () => {
+      msalWithAccount();
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const err = new Error('api down');
+      mockCallApi.mockRejectedValue(err);
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.contextError).toBe('network'));
+      expect(result.current.profile).toBeNull();
+      // The failure must be logged, not swallowed.
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load user context', err);
+      consoleSpy.mockRestore();
+    });
+
+    it("classifies an ApiError with status 401 as contextError='auth'", async () => {
+      msalWithAccount();
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockCallApi.mockRejectedValue(new ApiError('Unauthorized', 401));
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.contextError).toBe('auth'));
+      consoleSpy.mockRestore();
+    });
+
+    it('classifies a non-401 ApiError (e.g. 500) as network', async () => {
+      msalWithAccount();
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockCallApi.mockRejectedValue(new ApiError('Server error', 500));
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.contextError).toBe('network'));
+      consoleSpy.mockRestore();
+    });
+
+    it('clears contextError when a retry (refreshUserContext) succeeds', async () => {
+      msalWithAccount();
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockCallApi.mockRejectedValueOnce(new Error('transient blip'));
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.contextError).toBe('network'));
+
+      // Retry: next call succeeds → error cleared, profile populated.
+      mockCallApi.mockResolvedValueOnce({
+        profile: { id: 'p-1', is_platform_admin: true },
+        memberships: [],
+      });
+      await act(async () => { await result.current.refreshUserContext(); });
+
+      expect(result.current.contextError).toBeNull();
+      expect(result.current.profile?.id).toBe('p-1');
+      consoleSpy.mockRestore();
     });
   });
 
