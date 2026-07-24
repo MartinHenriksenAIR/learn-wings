@@ -12,6 +12,47 @@
  * NOT included: sortOrder (create-only), lessonId (update-only).
  */
 
+/**
+ * True when `value` is a string whose scheme is http: or https: (defence in
+ * depth against stored-XSS — sec-1, #232). Community URL fields (event
+ * registration/recording URLs, resource URLs) are rendered into anchor hrefs,
+ * where React 18 does NOT block `javascript:` and friends; rejecting non-http(s)
+ * schemes on write keeps such payloads out of the database entirely.
+ *
+ * Parses with the URL constructor (no base) so casing, whitespace, and exotic
+ * encodings can't smuggle a bad scheme past, and relative/unparseable input is
+ * rejected — these fields are meant to be absolute external URLs.
+ */
+export function isHttpUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  try {
+    const { protocol } = new URL(trimmed);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates an OPTIONAL URL field that must be an http(s) URL when present.
+ * Returns null when the value is acceptable (absent, null, empty string, or a
+ * valid http/https URL); returns an error message string otherwise. `fieldName`
+ * is interpolated into the message so callers get a field-specific 400.
+ *
+ * Empty/absent is allowed because these fields are optional in the schema and
+ * elsewhere (the create/update handlers) coalesce '' → null.
+ */
+export function validateHttpUrl(value: unknown, fieldName: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  if (!isHttpUrl(value)) {
+    return `${fieldName} must be a valid http(s) URL`;
+  }
+  return null;
+}
+
 function isStringOrNull(v: unknown): boolean {
   return v === null || typeof v === 'string';
 }

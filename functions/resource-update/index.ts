@@ -2,6 +2,7 @@ import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isOrgAdmin } from '../shared/profile';
 import { RESOURCE_PROFILE_PROJECTION } from '../shared/resources';
+import { validateHttpUrl } from '../shared/validate';
 
 const RESOURCE_TYPES = ['link', 'document', 'template', 'guide'];
 const ALLOWED_UPDATE_FIELDS = new Set([
@@ -57,8 +58,19 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
       if (!v || typeof v !== 'string') {
         return reply(400, { error: 'title must be a non-empty string' });
       }
+    } else if (key === 'url') {
+      // url — string or null (nullable in schema)
+      if (v !== null && typeof v !== 'string') {
+        return reply(400, { error: 'url must be a string or null' });
+      }
+      // Defence in depth against stored-XSS (sec-1, #232): reject non-http(s)
+      // schemes so a `javascript:` payload never persists.
+      const urlError = validateHttpUrl(v, 'url');
+      if (urlError) {
+        return reply(400, { error: urlError });
+      }
     } else {
-      // description, url — string or null (nullable in schema)
+      // description — string or null (nullable in schema)
       if (v !== null && typeof v !== 'string') {
         return reply(400, { error: `${key} must be a string or null` });
       }

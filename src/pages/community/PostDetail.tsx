@@ -55,6 +55,7 @@ import {
   Pin,
 } from 'lucide-react';
 import { formatDate } from '@/lib/date-locale';
+import { safeHref } from '@/lib/safe-href';
 import type { CommunityScope } from '@/lib/community-types';
 
 export default function PostDetail() {
@@ -316,7 +317,7 @@ export default function PostDetail() {
               )}
               {post.event_registration_url && (
                 <a
-                  href={post.event_registration_url}
+                  href={safeHref(post.event_registration_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-lg px-2 py-[9px] text-[12.5px] font-bold text-primary hover:underline"
@@ -327,7 +328,7 @@ export default function PostDetail() {
               )}
               {post.event_recording_url && (
                 <a
-                  href={post.event_recording_url}
+                  href={safeHref(post.event_recording_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-lg px-2 py-[9px] text-[12.5px] font-bold text-primary hover:underline"

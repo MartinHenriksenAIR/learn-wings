@@ -115,6 +115,21 @@ describe('resource-update', () => {
     expect(params).toEqual([null, 'r1']);
   });
 
+  it('returns 400 when url has a javascript: scheme (stored-XSS guard, #232)', async () => {
+    const res = await handler(baseReq({ resourceId: 'r1', updates: { url: 'javascript:alert(1)' } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'url must be a valid http(s) URL' });
+    // Rejected before any DB access (validation precedes the SELECT).
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('accepts a valid https url update', async () => {
+    mockQueryOne.mockResolvedValueOnce(myResource); // SELECT
+    mockQueryOne.mockResolvedValueOnce({ id: 'r1', url: 'https://example.com', profile: null }); // UPDATE
+    const res = await handler(baseReq({ resourceId: 'r1', updates: { url: 'https://example.com' } }), {} as any);
+    expect(res.status).toBe(200);
+  });
+
   it('returns 400 when is_pinned is not boolean', async () => {
     const res = await handler(baseReq({ resourceId: 'r1', updates: { is_pinned: 'yes' } }), {} as any);
     expect(res.status).toBe(400);
