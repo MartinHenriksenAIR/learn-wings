@@ -1422,3 +1422,21 @@ Plus a classification rule for future surfaces. Ratifies the courses model alrea
 **Verify:** functions `npm run build` exit 0 · `npm test` 1971 pass (132 files, 3 skipped) — 9 new contract tests (200/400/401/403/404, da≠en bytes, `resolveLang` fallback, real-data render). Root `lint` 0 errors · `tsc` exit 0 · `test` 517 pass (92 files) · `build` exit 0. The **compiled** renderer was rendered with sample data (en+da) and visually matched the approved mockup; empty-org re-rendered after the fix. Code-reviewed (Opus): SQL scoping/authz/Buffer-response confirmed sound; one Important finding (empty-org verdict) fixed. Design spec: `docs/superpowers/specs/2026-07-23-ai-act-pdf-branding-design.md`.
 
 **Deploy:** functions + frontend changed → both workflows fire on merge. No prod DB change. **Authed PDF-download smoke (da+en) pending a real admin login on prod** — endpoint is POST-only + Entra-gated; unauth POST → 401 confirms registration.
+
+## 2026-07-24 — Security & silent-failure hardening from /review-suite (#232, PR #233)
+
+**Who:** claude (Fable) + emil. Whole-codebase `/review-suite` (7 passes) → 4 fixes selected for inline fixing → subagent-driven implementation (one implementer per fix) → independent adversarial review → merge → deploy → prod smoke.
+
+**What:** Four fixes, one per commit:
+- **sec-1 (stored XSS, high):** community event/resource URLs were rendered into `href` with no scheme validation, and React 18 does not block `javascript:` URLs. New shared `src/lib/safe-href.ts` `safeHref()` (allowlist http/https/mailto, else `undefined`) applied at 6 render sinks (EventCard, PostCard, UpcomingEvents, PostDetail ×2, ResourceCard) + server-side scheme validation on write via `functions/shared/validate.ts` (`validateHttpUrl`) in community-post-create/-update and resource-create/-update.
+- **sec-3 (PDF injection, medium):** extracted `pdfString()` (escapes `\`, `(`, `)`) to `functions/shared/pdf.ts` and applied it in the hand-rolled `generate-certificate`. The sibling `generate-compliance-report` was already migrated to pdfkit by #230 (which neutralizes the content-stream injection class), so the now-obsolete raw wraps there were dropped during rebase.
+- **authz-1 (RLS parity, medium):** added the missing `requireActiveMember(orgId)` gate to `functions/lesson-progress` (+403 non-member test) — a non-member could previously upsert progress rows against any org.
+- **err-1 (silent failure, high):** `useAuth` now `console.error`s a failed user-context load and records a distinct `contextError` state (401→'auth' vs network) instead of swallowing it; `ProtectedRoute` renders a retry (before the authz redirect, so an admin is not silently demoted) and `useOrgGuard` no longer presents the failure as eternal 'loading'.
+
+**Rebase note:** main moved twice mid-flight; rebased onto #230 (pdfkit compliance report) + #229 (browser-language default) — both merges preserved (sec-3 compliance wraps dropped as obsolete; err-1 merged with #229's `i18n.resolvedLanguage` on the user-context call). One self-inflicted divergence (autosquash onto a stale local `main`) was corrected by re-parenting onto `origin/main`.
+
+**Verify:** root `lint` 0 · `tsc` 0 · `test` 93 files pass · `build` 0; functions `build` 0 · `test` 133 files pass. Independent adversarial review over the whole diff (spec + security + quality): all four APPROVED, no must-fix. CI green on the PR.
+
+**Deploy:** merged @`a3e635a` (squash), SWA + functions workflows green. **Prod /ui-report smoke (signed-in, all 4 features): PASS**, zero app console errors — err-1 (silent SSO, correct admin routing, resilient MSAL re-init), sec-1 (valid https event links render unchanged across feed/widget/detail), authz-1 (lesson-progress saves 0/4→1/4 for an active member), sec-3 (AI Act compliance PDF generates a real `%PDF-`, ~10 KB — this also completes #230/#71's long-pending authed PDF-download smoke). Server create-path validation + certificate generation left to the passing test suite (no prod mutation).
+
+**Deferred:** the rest of the review (mechanical batch → Helm tasks; decision/refactor set → GitHub issues) is held until PRs #228/#231 merge (they overlap ~10 of the batch files). Report: `Desktop/claude-html/2026-07-24-review-main-codebase.html`.
