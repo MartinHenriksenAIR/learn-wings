@@ -4,12 +4,9 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, getCorsHeaders } from '../shared/cors';
 import { internalError } from '../shared/errors';
+import { pdfString } from '../shared/pdf';
 
 // Pure TypeScript PDF generation — no Deno APIs, works unchanged in Node.js
-function pdfString(str: string): string {
-  return str.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
-
 function generateCertificatePDF(
   recipientName: string,
   courseName: string,

@@ -106,4 +106,20 @@ describe('generate-compliance-report', () => {
     // localization sanity: the two templates really differ
     expect(STRINGS.da.title).not.toBe(STRINGS.en.title);
   });
+
+  // #232 (sec-3) — a department string comes from profiles.department, which any
+  // authenticated user sets arbitrarily. #230 renders the report with pdfkit, which
+  // encodes text through its .text() API instead of interpolating into a raw PDF
+  // content stream, so a crafted department can no longer inject PDF operators.
+  // Guard that a malicious value still renders a valid PDF and doesn't break the
+  // renderer (regression guard against re-introducing raw-string interpolation).
+  it('renders a malicious department name safely (pdfkit encodes it — no injection)', async () => {
+    mockQuery.mockImplementation(async (sql: string) =>
+      sql.includes('GROUP BY c.id')
+        ? []
+        : [{ department: 'Sales) Tj 0 0 1 rg (', assessment_level: 'basic', trained: true, last_completed: null }]);
+    const res = await handler(req({ orgId: 'org-1' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(isPdf(res.body)).toBe(true);
+  });
 });
