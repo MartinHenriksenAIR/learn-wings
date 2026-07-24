@@ -2,6 +2,7 @@ import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isOrgAdmin } from '../shared/profile';
 import { RESOURCE_PROFILE_PROJECTION } from '../shared/resources';
+import { buildUpdateSet } from '../shared/update-builder';
 import { validateHttpUrl } from '../shared/validate';
 
 const RESOURCE_TYPES = ['link', 'document', 'template', 'guide'];
@@ -22,21 +23,16 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
   if (!resourceId || typeof resourceId !== 'string') {
     return reply(400, { error: 'resourceId is required' });
   }
-  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-    return reply(400, { error: 'updates must be an object' });
+
+  // Shape check + whitelist walk + SET-clause build (shared #252). Per-field
+  // domain validation below stays local to this endpoint.
+  const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS);
+  if (!built.ok) {
+    return reply(400, { error: built.error });
   }
 
   const updatesObj = updates as Record<string, unknown>;
   const updateKeys = Object.keys(updatesObj);
-  for (const key of updateKeys) {
-    if (!ALLOWED_UPDATE_FIELDS.has(key)) {
-      return reply(400, { error: `Invalid update field: ${key}` });
-    }
-  }
-  if (updateKeys.length === 0) {
-    return reply(400, { error: 'No update fields provided' });
-  }
-
   for (const key of updateKeys) {
     const v = updatesObj[key];
     if (key === 'tags') {
@@ -101,11 +97,7 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
   if (!authorized) return reply(404, { error: 'Resource not found' });
 
   // Dynamic UPDATE over the whitelisted keys + return shape with embedded profile (CTE).
-  const params: unknown[] = [];
-  const setClauses = updateKeys.map((key) => {
-    params.push(updatesObj[key]);
-    return `${key} = $${params.length}`;
-  });
+  const { setClauses, params } = built;
   params.push(resourceId);
   const idIndex = params.length;
 

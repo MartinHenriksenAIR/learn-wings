@@ -1,5 +1,6 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
+import { buildUpdateSet } from '../shared/update-builder';
 
 // Author-writable fields. status, user_id, org_id, submitted_at, admin_notes,
 // rejection_reason, category_id, course/lesson context are NOT editable here —
@@ -40,17 +41,19 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
   if (!ideaId || typeof ideaId !== 'string') {
     return reply(400, { error: 'ideaId is required' });
   }
-  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-    return reply(400, { error: 'updates must be an object' });
+
+  // Shape check + whitelist walk + SET-clause build (shared #252). NOTE: unknown
+  // keys now 400 ("Invalid update field: X") — this endpoint used to silently
+  // drop them; the frontend only ever sends whitelisted keys (verified #252).
+  const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS, {
+    emptyError: 'No valid update fields provided',
+  });
+  if (!built.ok) {
+    return reply(400, { error: built.error });
   }
 
   const updatesObj = updates as Record<string, unknown>;
-
-  // Filter to recognized whitelisted keys only (unknown keys are silently ignored).
-  const updateKeys = Object.keys(updatesObj).filter((k) => ALLOWED_UPDATE_FIELDS.has(k));
-  if (updateKeys.length === 0) {
-    return reply(400, { error: 'No valid update fields provided' });
-  }
+  const updateKeys = Object.keys(updatesObj);
 
   // Per-field validation on present whitelisted keys.
   for (const key of updateKeys) {
@@ -91,11 +94,7 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
   }
 
   // Build dynamic UPDATE over the provided whitelisted keys only.
-  const params: unknown[] = [];
-  const setClauses = updateKeys.map((key) => {
-    params.push(updatesObj[key]);
-    return `${key} = $${params.length}`;
-  });
+  const { setClauses, params } = built;
   params.push(ideaId);
   const idIndex = params.length;
 

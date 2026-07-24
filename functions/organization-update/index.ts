@@ -2,6 +2,7 @@ import { queryOne, isUniqueViolation } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isOrgAdmin } from '../shared/profile';
 import { validateOrgName, validateOrgSlug, normalizeOrgName } from '../shared/org-validation';
+import { buildUpdateSet } from '../shared/update-builder';
 
 const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit']);
 
@@ -13,20 +14,19 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
   if (!orgId || typeof orgId !== 'string') {
     return reply(400, { error: 'orgId is required' });
   }
-  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-    return reply(400, { error: 'updates must be an object' });
+
+  // Shape check + whitelist walk + SET-clause build (shared #252). The transform
+  // persists the trimmed name (parity with organization-create); other fields
+  // pass through as validated.
+  const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS, {
+    transform: (key, value) => (key === 'name' ? normalizeOrgName(value as string) : value),
+  });
+  if (!built.ok) {
+    return reply(400, { error: built.error });
   }
 
   const updatesObj = updates as Record<string, unknown>;
   const updateKeys = Object.keys(updatesObj);
-  for (const key of updateKeys) {
-    if (!ALLOWED_UPDATE_FIELDS.has(key)) {
-      return reply(400, { error: `Invalid update field: ${key}` });
-    }
-  }
-  if (updateKeys.length === 0) {
-    return reply(400, { error: 'No update fields provided' });
-  }
 
   // Per-field validation — messages aligned with organization-create.
   for (const key of updateKeys) {
@@ -66,16 +66,10 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
     }
   }
 
-  // Dynamic UPDATE over the whitelisted keys (pattern: resource-update:104-125).
+  // Dynamic UPDATE over the whitelisted keys (SET clauses built above).
   // UPDATE ... RETURNING returns no row when WHERE matches nothing, giving us
   // the 404 distinction without a separate existence SELECT.
-  const params: unknown[] = [];
-  const setClauses = updateKeys.map((key) => {
-    // Persist the trimmed name (parity with organization-create); other fields
-    // pass through as validated.
-    params.push(key === 'name' ? normalizeOrgName(updatesObj[key] as string) : updatesObj[key]);
-    return `${key} = $${params.length}`;
-  });
+  const { setClauses, params } = built;
   params.push(orgId);
   const idIndex = params.length;
 
