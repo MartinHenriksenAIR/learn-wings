@@ -1502,3 +1502,18 @@ Plus a classification rule for future surfaces. Ratifies the courses model alrea
 **Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 99 files / 598 pass · `build` exit 0 (functions untouched; CI runs its gates anyway). Every fix: spec + quality review by independent subagents; review findings fixed in-batch (OrgGate breadcrumbs test, msal-config `||` fallback). Whole-branch final review before undrafting.
 
 **Deploy:** merging auto-fires both workflows. Deploy + signed-in /ui-report smoke over the touched surfaces (community pages, org-admin idea/moderation gates) announced on PR #260. Board HTML on Desktop updated to 32 open cards after the deploy smoke.
+
+## 2026-07-24 — Review-suite round-5 top-5 (#261–#265, PR #266)
+
+**Who:** claude (Fable) + emil. Fifth top-5 pick from the 2026-07-24 review board — the most important open cards with zero file overlap with in-flight #228/#231 (#228 still holds CoursePlayer/CourseEditor/types.ts/package.json/locales, deferring err-5/err-10/dup-11/dead-5/dead-9/dead-6; #231 still holds send-invitation-email/OrgMembersTab/OrganizationDetail, deferring sec-2/err-2/authz-2/dup-2/dup-15/err-12; the high cards err-2/dup-2/dup-4 stay deferred) → issues filed → one implementer subagent per fix (parallel — disjoint file sets), controller diff review + full gates → merge.
+
+**What:** five fixes, one commit:
+- **dup-10/#261:** shared `loadResourceForWrite(resourceId, profile)` + `RESOURCE_TYPES` in `functions/shared/resources.ts` — resource-update/resource-delete share the load+authorize gate (null collapses missing/unauthorized into the single anti-enumeration 404, RLS provenance 20260202125517 preserved, "do not split the cases" warning in the JSDoc); resource-create/update import the shared type list. Pure extraction — all 55 endpoint tests pass unmodified.
+- **docs-4/#262:** the four consumed 2026-07-20/22 plan/spec docs under `docs/superpowers/` deleted per the ephemeral-docs policy (PR #129 precedent); the tree itself stays — in-flight #228/#231 docs live there. Only reference found: WORKLOG (append-only history, allowed).
+- **err-13/#263:** `course-translation-link`'s unlink branch (clear `course_group_id` + group-of-one collapse + the COUNT probe between them) now runs inside one `withTransaction` — no more committed unlink followed by a 500 leaving a stale one-member group. Tests assert all three statements go through the transaction client and a collapse failure yields the factory 500 with rollback.
+- **err-14/#264:** `PdfViewer.handleDownload` gained the same `if (!response.ok) throw` guard the viewer path already had — an expired SAS/404 now fires the existing "Failed to download document" toast instead of silently saving the Azure XML error body as `document.pdf`.
+- **dead-10/#265:** `index.html`'s icon link repointed from the Lovable-era gpt-engineer CDN URL to a local `/favicon.png` (the brand mark vendored into `public/`); the stale template `public/favicon.ico` deleted. No third-party CDN dependency left in the app shell; `usePlatformSettings`' org-branding rewrite untouched.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 99 files / 598 pass · `build` exit 0; functions `build` exit 0 · `test` 133 files / 2045 pass (3 skipped). Controller-reviewed combined diff; wire contracts byte-identical on the extraction fixes.
+
+**Deploy:** merging auto-fires both workflows. Deploy + signed-in /ui-report smoke over the touched surfaces (resource edit/delete, course-translation unlink, PDF download, favicon) announced on PR #266. Board HTML on Desktop updated after the deploy smoke.

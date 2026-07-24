@@ -109,6 +109,9 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
   const handleDownload = async () => {
     try {
       const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status}`);
+      }
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

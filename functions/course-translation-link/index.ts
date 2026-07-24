@@ -1,4 +1,4 @@
-import { query, queryOne, isUniqueViolation } from '../shared/db';
+import { query, queryOne, isUniqueViolation, withTransaction } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
 
 interface CourseRow {
@@ -30,16 +30,21 @@ export default adminEndpoint('course-translation-link', async ({ req, reply }) =
     if (!course.course_group_id) return reply(200, { ok: true }); // already standalone
 
     const groupId = course.course_group_id;
-    await query(`UPDATE courses SET course_group_id = NULL WHERE id = $1`, [courseId]);
+    // Unlink + group-of-one collapse are one atomic step: if the collapse
+    // failed after a committed unlink, the lone remaining edition would keep
+    // a stale one-member group.
+    await withTransaction(async (client) => {
+      await client.query(`UPDATE courses SET course_group_id = NULL WHERE id = $1`, [courseId]);
 
-    // A group of one is meaningless — collapse the lone remaining edition to standalone.
-    const rest = await queryOne<{ remaining: number }>(
-      `SELECT COUNT(*)::int AS remaining FROM courses WHERE course_group_id = $1`,
-      [groupId],
-    );
-    if ((rest?.remaining ?? 0) === 1) {
-      await query(`UPDATE courses SET course_group_id = NULL WHERE course_group_id = $1`, [groupId]);
-    }
+      // A group of one is meaningless — collapse the lone remaining edition to standalone.
+      const rest = await client.query<{ remaining: number }>(
+        `SELECT COUNT(*)::int AS remaining FROM courses WHERE course_group_id = $1`,
+        [groupId],
+      );
+      if ((rest.rows[0]?.remaining ?? 0) === 1) {
+        await client.query(`UPDATE courses SET course_group_id = NULL WHERE course_group_id = $1`, [groupId]);
+      }
+    });
     return reply(200, { ok: true });
   }
 
