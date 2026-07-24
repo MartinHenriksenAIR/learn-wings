@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -7,11 +7,12 @@ import React from 'react';
 // --- mock react-i18next (no i18n provider needed) ---
 // `t` echoes the key (so assertions pin i18n keys); `Trans` renders its key
 // text — enough for the controlled-dialog test, which never inspects the
-// interpolated member name inside descriptions.
+// interpolated member name inside descriptions. `i18n.resolvedLanguage` is 'en'
+// so the invite dialog's language selector defaults to 'en' (uiLangToInvite).
 vi.mock('react-i18next', async () => {
   const ReactActual = await import('react');
   return {
-    useTranslation: () => ({ t: (k: string) => k }),
+    useTranslation: () => ({ t: (k: string) => k, i18n: { resolvedLanguage: 'en' } }),
     Trans: ({ i18nKey }: { i18nKey: string }) =>
       ReactActual.createElement(ReactActual.Fragment, null, i18nKey),
   };
@@ -75,9 +76,11 @@ vi.mock('@/components/ui/dropdown-menu', async () => {
 });
 
 import { callApi } from '@/lib/api-client';
+import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import OrganizationDetail from './OrganizationDetail';
 
 const mockCallApi = vi.mocked(callApi);
+const sendInvitationEmailMock = vi.mocked(sendInvitationEmail);
 
 const organization = {
   id: 'org-1',
@@ -221,5 +224,42 @@ describe('OrganizationDetail — load-failure retry (#53)', () => {
     // Not-found description shows; no Try again button (404 is honest, not retryable).
     expect(await screen.findByText('orgDetail.notFoundDescription')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /orgDetail\.tryAgain/i })).toBeNull();
+  });
+});
+
+describe('OrganizationDetail — invite forwards the language pick (#225)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/organizations') return { organization };
+      if (path === '/api/org-memberships') return { memberships: [membershipRow] };
+      if (path === '/api/invitations') return { invitations: [] };
+      if (path === '/api/profiles') return { profiles: [] };
+      if (path === '/api/invitation-create')
+        return { invitation: { id: 'inv-1', link_id: 'link-1' } };
+      throw new Error(`Unexpected callApi path: ${path}`);
+    });
+    sendInvitationEmailMock.mockResolvedValue({ success: true });
+  });
+
+  it('passes the selected inviterLanguage through to sendInvitationEmail', async () => {
+    renderPage();
+
+    // Open the invite dialog from the members section.
+    fireEvent.click(await screen.findByRole('button', { name: 'orgDetail.inviteUser' }));
+
+    // A valid email is required for the invite (inviteSchema); language defaults
+    // to the UI language ('en' via the i18n mock).
+    fireEvent.change(await screen.findByPlaceholderText('colleague@company.com'), {
+      target: { value: 'new@example.com' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'orgDetail.createInvitation' }));
+
+    await waitFor(() =>
+      expect(sendInvitationEmailMock).toHaveBeenCalledWith(
+        expect.objectContaining({ inviterLanguage: 'en' }),
+      ),
+    );
   });
 });

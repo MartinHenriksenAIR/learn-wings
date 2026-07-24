@@ -1,11 +1,13 @@
 import { callApi } from '@/lib/api-client';
 import { getInviteLink } from '@/lib/config';
+import type { InviteLanguage } from '@/lib/inviteLanguage';
 
 interface SendInvitationEmailParams {
   email: string;
   orgName: string | null;
   role: 'learner' | 'org_admin' | 'platform_admin';
   linkId: string;
+  inviterLanguage?: InviteLanguage;
 }
 
 /**
@@ -17,15 +19,17 @@ export async function sendInvitationEmail({
   orgName,
   role,
   linkId,
+  inviterLanguage,
 }: SendInvitationEmailParams): Promise<{ success: boolean; error?: string }> {
   try {
     const inviteLink = getInviteLink(linkId);
-    
+
     const data = await callApi<{ success: boolean; error?: string }>('/api/send-invitation-email', {
       email,
       orgName,
       role,
       inviteLink,
+      inviterLanguage,
     });
 
     if (data && !data.success) {

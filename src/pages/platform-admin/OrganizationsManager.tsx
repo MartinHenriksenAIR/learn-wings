@@ -36,6 +36,8 @@ import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
 import { orgSchema } from '@/lib/org-validation';
 import { SeatUsageBar } from '@/components/platform-admin/SeatUsageBar';
+import { InviteLanguageSelect } from '@/components/InviteLanguageSelect';
+import { uiLangToInvite, type InviteLanguage } from '@/lib/inviteLanguage';
 
 /** Org-list row logo: signs the stored branding path for display; placeholder otherwise. */
 function OrgRowLogo({ logoPath }: { logoPath: string | null }) {
@@ -56,7 +58,7 @@ function OrgRowLogo({ logoPath }: { logoPath: string | null }) {
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     data: orgsData,
     isLoading: loading,
@@ -91,6 +93,9 @@ export default function OrganizationsManager() {
   const [adminTab, setAdminTab] = useState<'existing' | 'invite'>('existing');
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteLanguage, setInviteLanguage] = useState<InviteLanguage>(() =>
+    uiLangToInvite(i18n.resolvedLanguage)
+  );
 
   // Org list failures surface the same way the old inline fetch did.
   useEffect(() => {
@@ -187,6 +192,7 @@ export default function OrganizationsManager() {
               orgName: name,
               role: 'org_admin',
               linkId: invitation.link_id,
+              inviterLanguage: inviteLanguage,
             });
             if (!emailResult.success) {
               postCreateError = `invitation email failed: ${emailResult.error ?? 'unknown'}`;
@@ -225,6 +231,7 @@ export default function OrganizationsManager() {
     setAdminTab('existing');
     setSelectedUserId('');
     setInviteEmail('');
+    setInviteLanguage(uiLangToInvite(i18n.resolvedLanguage));
     setErrors({});
   };
 
@@ -360,6 +367,9 @@ export default function OrganizationsManager() {
                 <p className="text-xs text-muted-foreground mt-1">
                   {t('organizations.inviteEmailHint')}
                 </p>
+                <div className="mt-3">
+                  <InviteLanguageSelect value={inviteLanguage} onChange={setInviteLanguage} />
+                </div>
               </TabsContent>
             </Tabs>
           </div>

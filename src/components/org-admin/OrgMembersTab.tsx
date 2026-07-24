@@ -74,6 +74,8 @@ import { toast } from '@/components/ui/sonner';
 import { z } from 'zod';
 import { getInviteLink } from '@/lib/config';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
+import { InviteLanguageSelect } from '@/components/InviteLanguageSelect';
+import { uiLangToInvite, type InviteLanguage } from '@/lib/inviteLanguage';
 import { BulkInviteDialog } from '@/components/org-admin/BulkInviteDialog';
 import { EnrollUserDialog } from '@/components/org-admin/EnrollUserDialog';
 import { RequestSeatsDialog } from '@/components/org-admin/RequestSeatsDialog';
@@ -85,7 +87,7 @@ const inviteSchema = z.object({
 });
 
 export function OrgMembersTab() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, profile, currentOrg } = useAuth();
   const queryClient = useQueryClient();
 
@@ -168,6 +170,9 @@ export function OrgMembersTab() {
   const [inviteLastName, setInviteLastName] = useState('');
   const [inviteDepartment, setInviteDepartment] = useState('');
   const [inviteRole, setInviteRole] = useState<OrgRole>('learner');
+  const [inviteLanguage, setInviteLanguage] = useState<InviteLanguage>(() =>
+    uiLangToInvite(i18n.resolvedLanguage),
+  );
   // In-button morph feedback for copy-link ("Copied!") and revoke ("Revoked"),
   // keyed by invitation link/id — replaces the routine success toasts.
   const { flashed: copyFlashed, flash: flashCopy } = useFlash();
@@ -234,6 +239,7 @@ export function OrgMembersTab() {
           orgName: currentOrg?.name ?? null,
           role: inviteRole,
           linkId: invitation.link_id,
+          inviterLanguage: inviteLanguage,
         });
         emailSent = emailResult.success;
       }
@@ -254,6 +260,7 @@ export function OrgMembersTab() {
       setInviteLastName('');
       setInviteDepartment('');
       setInviteRole('learner');
+      setInviteLanguage(uiLangToInvite(i18n.resolvedLanguage));
       invalidateInvitations();
       invalidateOrgDetail();
     },
@@ -539,6 +546,7 @@ export function OrgMembersTab() {
                   </SelectContent>
                 </Select>
               </div>
+              <InviteLanguageSelect value={inviteLanguage} onChange={setInviteLanguage} />
             </div>
             {(atSeatLimit || inviteErrorMessage) && (
               <>
