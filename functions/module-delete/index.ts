@@ -1,6 +1,6 @@
 import { query, queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
-import { deleteBlob } from '../shared/blob';
+import { cleanupBlobs } from '../shared/blob';
 
 export default adminEndpoint('module-delete', async ({ req, reply }) => {
   const body = await req.json() as { moduleId?: unknown };
@@ -31,15 +31,11 @@ export default adminEndpoint('module-delete', async ({ req, reply }) => {
     return reply(404, { error: 'Module not found' });
   }
 
-  // Best-effort blob cleanup — deleteBlob never throws; it warns server-side per failed path,
-  // and counts are returned to the client.
-  const blobPaths = blobRows.map((r) => r.azure_blob_path);
-  const results = await Promise.all(blobPaths.map((p) => deleteBlob(p)));
-  const blobsDeleted = results.filter(Boolean).length;
-  const blobsFailed = results.length - blobsDeleted;
-  if (blobsFailed > 0) {
-    console.warn(`[module-delete] ${blobsFailed} blob(s) failed to delete for module`, moduleId);
-  }
+  const { blobsDeleted, blobsFailed } = await cleanupBlobs(
+    blobRows.map((r) => r.azure_blob_path),
+    'module-delete',
+    moduleId,
+  );
 
   return reply(200, { success: true, blobsDeleted, blobsFailed });
 });

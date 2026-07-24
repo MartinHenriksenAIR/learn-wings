@@ -47,7 +47,7 @@ export default function IdeaDetail() {
   const { ideaId } = useParams<{ ideaId: string }>();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
-  const { profile, currentOrg, effectiveIsOrgAdmin } = useAuth();
+  const { profile, effectiveIsOrgAdmin } = useAuth();
   const communityGate = useCommunityGate();
   const queryClient = useQueryClient();
   const { flashed, flash } = useFlash();
@@ -84,8 +84,7 @@ export default function IdeaDetail() {
 
   // Comment mutation
   const commentMutation = useMutation({
-    mutationFn: (content: string) =>
-      createIdeaComment(ideaId!, currentOrg!.id, content),
+    mutationFn: (content: string) => createIdeaComment(ideaId!, content),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ideaComments.list(ideaId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
@@ -101,7 +100,7 @@ export default function IdeaDetail() {
   // Vote mutation — routine toggle: the button's pressed state + vote count are
   // the feedback (toast policy: like/vote toggles get no success toast). Errors keep toasts.
   const voteMutation = useMutation({
-    mutationFn: () => voteForIdea(ideaId!, currentOrg!.id),
+    mutationFn: () => voteForIdea(ideaId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
     },

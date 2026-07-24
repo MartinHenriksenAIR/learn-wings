@@ -109,9 +109,9 @@ export async function deleteIdea(ideaId: string): Promise<void> {
   await callApi('/api/idea-delete', { ideaId });
 }
 
-// Vote for idea — orgId kept for signature compatibility; server derives org from the idea row
-export async function voteForIdea(ideaId: string, orgId: string): Promise<void> {
-  await callApi('/api/idea-vote', { ideaId, orgId });
+// Vote for idea — server derives org from the idea row
+export async function voteForIdea(ideaId: string): Promise<void> {
+  await callApi('/api/idea-vote', { ideaId });
 }
 
 // Remove vote from idea
@@ -125,10 +125,9 @@ export async function fetchIdeaComments(ideaId: string): Promise<IdeaComment[]> 
   return res.comments ?? [];
 }
 
-// Create idea comment — orgId kept for signature compatibility; server derives org from the idea row
+// Create idea comment — server derives org from the idea row
 export async function createIdeaComment(
   ideaId: string,
-  orgId: string,
   content: string,
   parentId?: string
 ): Promise<IdeaComment> {
@@ -136,7 +135,6 @@ export async function createIdeaComment(
     ideaId,
     content,
     parentCommentId: parentId,
-    orgId,
   });
   return res.comment;
 }

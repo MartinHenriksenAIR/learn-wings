@@ -4,6 +4,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, getCorsHeaders } from '../shared/cors';
 import { internalError } from '../shared/errors';
+import { pdfResponse } from '../shared/http';
 import { pdfString } from '../shared/pdf';
 
 // Pure TypeScript PDF generation — no Deno APIs, works unchanged in Node.js
@@ -142,15 +143,11 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       certificateId
     );
 
-    return {
-      status: 200,
-      headers: {
-        ...getCorsHeaders(origin),
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="certificate-${(course?.title ?? 'course').replace(/[^a-zA-Z0-9]/g, '-')}.pdf"`,
-      },
-      body: Buffer.from(pdfBytes).toString('binary'),
-    };
+    return pdfResponse(
+      origin,
+      `certificate-${(course?.title ?? 'course').replace(/[^a-zA-Z0-9]/g, '-')}.pdf`,
+      pdfBytes
+    );
   } catch (err: unknown) {
     if (err instanceof AuthError) return { status: 401, headers: getCorsHeaders(origin), body: JSON.stringify({ error: (err as Error).message }) };
     return internalError(context, origin, err);
