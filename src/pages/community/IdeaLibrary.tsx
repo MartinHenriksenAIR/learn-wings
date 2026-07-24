@@ -112,6 +112,7 @@ export default function IdeaLibrary() {
   useQueryErrorToast({
     isError: orgTagsError,
     error: orgTagsErrorObj,
+    toastTitle: t('common.loadErrorTitle'),
     logLabel: 'IdeaLibrary: failed to load org tags',
   });
 

@@ -82,6 +82,7 @@ export default function CommunityFeed() {
   useQueryErrorToast({
     isError: categoriesError,
     error: categoriesErrorObj,
+    toastTitle: t('common.loadErrorTitle'),
     logLabel: 'CommunityFeed: failed to load categories',
   });
 

@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { routes } from '@/lib/routes';
+import en from '@/i18n/locales/en.json';
 
 // OrgAnalytics is one component serving two routes; it decides which by
 // matching location.pathname against routes.platformAdmin.analytics. This test
@@ -124,8 +125,18 @@ describe('OrgAnalytics — failed fetch shows error fork, not all-zero stats', (
     renderAt(routes.orgAdmin.root);
 
     expect(screen.getByText('common.loadErrorTitle')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
+    // The retry button carries common.retry; asserting its presence via the key
+    // pins the wiring (the mocked `t` echoes keys, so the accessible name is the
+    // key, not en.common.retry's "Try again" copy — kept referenced below).
+    expect(en.common.retry.length).toBeGreaterThan(0);
+    const retryButton = screen.getByRole('button', { name: 'common.retry' });
+    expect(retryButton).toBeInTheDocument();
     // The stats-bearing tabs must NOT render on a failure (would show zeros).
     expect(screen.queryByText('analytics.tabs.overview')).not.toBeInTheDocument();
+
+    // Clicking retry must trigger the query's refetch — the error state is
+    // recoverable, not a dead end.
+    fireEvent.click(retryButton);
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
