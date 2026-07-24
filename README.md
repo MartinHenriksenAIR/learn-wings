@@ -84,7 +84,7 @@ Environment variables (see [`.env.example`](.env.example)) — all `VITE_`-prefi
 | `VITE_ENTRA_CLIENT_ID` | Your Entra app-registration client id (drives MSAL config + API scope) |
 | `VITE_API_BASE_URL` | Base URL for the Functions API. Empty string `""` = same-origin `/api` |
 | `VITE_REDIRECT_URI` | Entra redirect URI (optional; defaults to `window.location.origin`) |
-| `VITE_STORAGE_BASE_URL` | Base URL for public blob assets (e.g. email logo) |
+| `VITE_PLATFORM_BASE_URL` | Public base URL for minting invite links (optional; set in prod at the domain cutover, otherwise falls back to the app's own origin) |
 
 ### Backend (Azure Functions)
 
