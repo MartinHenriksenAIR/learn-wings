@@ -24,7 +24,7 @@ import { TagList } from '@/components/community/TagList';
 import { CommentThread } from '@/components/community/CommentThread';
 import { ReportDialog } from '@/components/community/ReportDialog';
 import { useAuth } from '@/hooks/useAuth';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { toast } from '@/components/ui/sonner';
 import { ApiError } from '@/lib/api-client';
 import {
@@ -63,7 +63,11 @@ export default function PostDetail() {
   const navigate = useNavigate();
   const scope = (routeScope || 'org') as CommunityScope;
   const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  // allowPlatformAdmin: the gate is keyed on the VIEWER's effective flags (platform +
+  // their currentOrg override), not the reported post's org. Platform admins moderating
+  // an org-scoped report must not be bounced just because their own org has community
+  // disabled (or they have no org selected). Backend authz already permits them.
+  const communityGate = useCommunityGate({ allowPlatformAdmin: true });
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -214,13 +218,7 @@ export default function PostDetail() {
     return () => window.clearTimeout(timer);
   }, [comments]);
 
-  // The community gate is keyed on the VIEWER's effective flags (platform + their
-  // currentOrg override), not the reported post's org. Platform admins moderating an
-  // org-scoped report must not be bounced just because their own org has community
-  // disabled (or they have no org selected). Backend authz already permits them.
-  if (!settingsLoading && !features.community_enabled && !effectiveIsPlatformAdmin) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   if (postLoading) {
     return (

@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { OrgGate } from '@/components/layout/OrgGate';
 import { routes } from '@/lib/routes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,10 +41,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { createIdea, submitIdea, updateIdea, fetchIdea, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { BusinessArea } from '@/lib/community-types';
@@ -86,7 +86,7 @@ export default function IdeaSubmit() {
   // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
   const { currentOrg, profile } = useAuth();
   const orgGuard = useOrgGuard();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
   const queryClient = useQueryClient();
 
   const [draftId, setDraftId] = useState<string | null>(ideaId || null);
@@ -255,31 +255,10 @@ export default function IdeaSubmit() {
     { title: t('community.ideaForm.stepDetails') },
   ];
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
-  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
-  // while the signed-in user's context is still resolving.
-  if (orgGuard === 'loading') {
-    return (
-      <AppLayout>
-        <PageSpinner />
-      </AppLayout>
-    );
-  }
-
-  if (!currentOrg) {
-    return (
-      <AppLayout>
-        <div className="py-12 text-center">
-          <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
-            {t('community.noOrganizationTitle')}
-          </h1>
-          <p className="text-sm text-muted-foreground">{t('community.noOrgSubmitIdea')}</p>
-        </div>
-      </AppLayout>
-    );
+  if (orgGuard === 'loading' || !currentOrg) {
+    return <OrgGate titleKey="community.noOrganizationTitle" descriptionKey="community.noOrgSubmitIdea" />;
   }
 
   if (isEditMode && isLoadingIdea) {

@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { OrgGate } from '@/components/layout/OrgGate';
 import { SlidingTabs } from '@/components/ui/sliding-tabs';
-import { PageSpinner } from '@/components/ui/page-spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
@@ -78,24 +78,13 @@ export default function OrgCommunityModeration() {
     { key: 'dismissed', label: t('moderation.tabs.dismissed') },
   ];
 
-  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
-  // while the signed-in user's context is still resolving.
-  if (orgGuard === 'loading') {
+  if (orgGuard === 'loading' || !currentOrg) {
     return (
-      <AppLayout breadcrumbs={breadcrumbs}>
-        <PageSpinner />
-      </AppLayout>
-    );
-  }
-
-  if (!currentOrg) {
-    return (
-      <AppLayout breadcrumbs={breadcrumbs}>
-        <div className="py-12 text-center">
-          <h1 className="mb-2 text-2xl font-bold">{t('common.noOrgSelected')}</h1>
-          <p className="text-muted-foreground">{t('moderation.noOrgDescription')}</p>
-        </div>
-      </AppLayout>
+      <OrgGate
+        breadcrumbs={breadcrumbs}
+        titleKey="common.noOrgSelected"
+        descriptionKey="moderation.noOrgDescription"
+      />
     );
   }
 

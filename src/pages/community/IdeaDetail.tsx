@@ -20,7 +20,7 @@ import { IdeaStatusBadge } from '@/components/community/IdeaStatusBadge';
 import { SaveButton } from '@/components/ui/save-button';
 import { useFlash } from '@/hooks/useFlash';
 import { useAuth } from '@/hooks/useAuth';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import {
   fetchIdea,
   fetchIdeaComments,
@@ -48,7 +48,7 @@ export default function IdeaDetail() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { profile, currentOrg, effectiveIsOrgAdmin } = useAuth();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
   const queryClient = useQueryClient();
   const { flashed, flash } = useFlash();
 
@@ -157,9 +157,7 @@ export default function IdeaDetail() {
     return BUSINESS_AREAS.find((a) => a.value === value)?.label || value;
   };
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   if (ideaLoading) {
     return (

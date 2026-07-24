@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { OrgGate } from '@/components/layout/OrgGate';
 import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,11 +28,10 @@ import {
 import { ResourceCard } from '@/components/community/ResourceCard';
 import { ResourceForm } from '@/components/community/ResourceForm';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
-import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { toast } from '@/components/ui/sonner';
 import {
   fetchResources,
@@ -54,7 +54,7 @@ export default function ResourceLibrary() {
   const { t } = useTranslation();
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
   const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);
@@ -138,31 +138,10 @@ export default function ResourceLibrary() {
     },
   });
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
-  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
-  // while the signed-in user's context is still resolving.
-  if (orgGuard === 'loading') {
-    return (
-      <AppLayout>
-        <PageSpinner />
-      </AppLayout>
-    );
-  }
-
-  if (!currentOrg) {
-    return (
-      <AppLayout>
-        <div className="py-12 text-center">
-          <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
-            {t('community.noOrganizationTitle')}
-          </h1>
-          <p className="text-sm text-muted-foreground">{t('community.noOrgResources')}</p>
-        </div>
-      </AppLayout>
-    );
+  if (orgGuard === 'loading' || !currentOrg) {
+    return <OrgGate titleKey="community.noOrganizationTitle" descriptionKey="community.noOrgResources" />;
   }
 
   return (

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { OrgGate } from '@/components/layout/OrgGate';
 import { routes } from '@/lib/routes';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,7 +30,6 @@ import { IdeaStatusBadge } from '@/components/community/IdeaStatusBadge';
 import { PrioritizationMatrix } from '@/components/community/PrioritizationMatrix';
 import { PriorityOverview } from '@/components/community/PriorityOverview';
 import { PriorityBadge } from '@/components/community/PriorityBadge';
-import { PageSpinner } from '@/components/ui/page-spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
@@ -184,24 +184,13 @@ export default function OrgIdeasManagement() {
 
   const breadcrumbs = [{ label: t('ideaManagement.title') }];
 
-  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
-  // while the signed-in user's context is still resolving.
-  if (orgGuard === 'loading') {
+  if (orgGuard === 'loading' || !currentOrg) {
     return (
-      <AppLayout breadcrumbs={breadcrumbs}>
-        <PageSpinner />
-      </AppLayout>
-    );
-  }
-
-  if (!currentOrg) {
-    return (
-      <AppLayout breadcrumbs={breadcrumbs}>
-        <div className="py-12 text-center">
-          <h1 className="mb-2 text-2xl font-bold">{t('common.noOrgSelected')}</h1>
-          <p className="text-muted-foreground">{t('ideaManagement.noOrgDescription')}</p>
-        </div>
-      </AppLayout>
+      <OrgGate
+        breadcrumbs={breadcrumbs}
+        titleKey="common.noOrgSelected"
+        descriptionKey="ideaManagement.noOrgDescription"
+      />
     );
   }
 

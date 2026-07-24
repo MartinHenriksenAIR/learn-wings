@@ -17,7 +17,7 @@ import { AIChampionsList } from '@/components/community/AIChampionsList';
 import { QueryErrorState } from '@/components/ui/query-error-state';
 import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQueryErrorToast';
 import { useAuth } from '@/hooks/useAuth';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -46,7 +46,7 @@ export default function CommunityFeed() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -161,9 +161,7 @@ export default function CommunityFeed() {
   const allTags = [...new Set(posts.flatMap((p) => p.tags || []))];
   const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedTags.length > 0);
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   const scopeTabs = [
     ...(currentOrg
