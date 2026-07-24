@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { PlatformSettingsProvider } from "@/hooks/usePlatformSettings";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { routes } from "@/lib/routes";
 
 // Pages
@@ -98,7 +99,9 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <PlatformSettingsProvider>
-            <AppRoutes />
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
           </PlatformSettingsProvider>
         </AuthProvider>
       </BrowserRouter>

@@ -95,6 +95,11 @@
     "description": "Den side, du leder efter, findes ikke eller er blevet flyttet.",
     "returnHome": "Tilbage til forsiden"
   },
+  "errorBoundary": {
+    "title": "Noget gik galt",
+    "description": "En uventet fejl afbrød siden. En genindlæsning løser det som regel.",
+    "reload": "Genindlæs siden"
+  },
   "settings": {
     "title": "Indstillinger",
     "profile": "Profil",
