@@ -12,11 +12,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Folder name → registered route name, for deliberate deviations ONLY.
-const KNOWN_DEVIATIONS: Record<string, string> = {
-  // Route names may not start with the reserved prefixes admin/runtime/host
-  // (.claude/rules/functions.md), so this folder registers suffix-style.
-  'admin-user-actions': 'user-actions-admin',
-};
+// Empty now that admin-user-actions was deleted (callers died in bf1df3b).
+const KNOWN_DEVIATIONS: Record<string, string> = {};
 
 const RESERVED_PREFIXES = ['admin', 'runtime', 'host'] as const;
 const NON_ENDPOINT_DIRS = new Set(['shared', 'node_modules', 'dist']);
