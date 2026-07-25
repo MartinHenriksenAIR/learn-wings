@@ -15,6 +15,8 @@ consumers).
 | `04-idea-priority-scores.sql` | Additive, idempotent migration for #118 (idea Value × Effort scores). |
 | `05-course-group-id.sql` | Additive, idempotent migration for #213 (multilingual course grouping). |
 | `06-assessment.sql` | Additive, idempotent migration for #117 (AI self-assessment). |
+| _(`07-*.sql` — not in this folder)_ | Slot claimed by `07-exercises.sql` on the unmerged `feat/exercises-lesson-family-227` branch (#227). The gap is deliberate; do not reuse `07`. |
+| `08-orphan-sweep-runs.sql` | Additive, idempotent migration for #286 (orphan-sweep run records + the `ops_alerts` recipients row). |
 | `README.md`     | This file. |
 
 > **Standing rule:** additive prod migrations (the numbered `0N-*.sql` files) are folded into `01-schema.sql` after they are applied to prod, so a fresh DB stood up from `01`+`02` is always complete. The numbered files stay in this folder as the applied-migration record.

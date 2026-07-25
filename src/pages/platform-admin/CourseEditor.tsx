@@ -15,9 +15,7 @@ import { useFlash } from '@/hooks/useFlash';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteCourseDialog } from '@/components/platform-admin/DeleteCourseDialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -802,33 +800,13 @@ export default function CourseEditor() {
         )}
       </div>
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('courseEditor.deleteCourseTitle')}</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <span className="block">{t('courseEditor.deleteIntro', { title: course.title })}</span>
-              <ul className="list-inside list-disc text-sm">
-                <li>{t('courseEditor.deleteItemModules')}</li>
-                <li>{t('courseEditor.deleteItemEnrollments')}</li>
-                <li>{t('courseEditor.deleteItemQuizzes')}</li>
-              </ul>
-              <span className="block font-medium">{t('courseEditor.deleteIrreversible')}</span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteCourse}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-              {t('courseEditor.deleteCourse')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteCourseDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        courseTitle={course.title}
+        onConfirm={handleDeleteCourse}
+        pending={deleting}
+      />
 
       <Dialog open={moduleDialogOpen} onOpenChange={setModuleDialogOpen}>
         <DialogContent>

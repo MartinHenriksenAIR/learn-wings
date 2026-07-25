@@ -248,7 +248,9 @@
     "noVideo": "Ingen video uploadet",
     "loadingDocument": "Indlæser dokument...",
     "documentLoadFailed": "Dokumentet kunne ikke indlæses. Prøv igen.",
-    "noDocument": "Intet dokument uploadet"
+    "noDocument": "Intet dokument uploadet",
+    "loadingQuiz": "Indlæser quiz...",
+    "quizLoadFailed": "Quizzen kunne ikke indlæses"
   },
   "community": {
     "title": "Fællesskab",
@@ -969,12 +971,6 @@
     "create": "Opret",
     "courseCreated": "Kursus oprettet!",
     "courseDeleted": "Kursus slettet",
-    "deleteCourseTitle": "Slet kursus?",
-    "deleteIntro": "Dette sletter permanent \"{{title}}\" og alle tilknyttede data, herunder:",
-    "deleteItemModules": "Alle moduler og lektioner",
-    "deleteItemEnrollments": "Alle tilmeldinger og fremskridt for kursister",
-    "deleteItemQuizzes": "Alle quizforsøg og anmeldelser",
-    "deleteIrreversible": "Denne handling kan ikke fortrydes.",
     "selectOrganization": "Vælg organisation",
     "allOrganizations": "Alle organisationer",
     "searchOrganizationPrompt": "Søg organisation...",
@@ -1020,12 +1016,6 @@
     "publishAria": "Udgiv kursus",
     "unpublishAria": "Træk kursus tilbage",
     "deleteCourse": "Slet kursus",
-    "deleteCourseTitle": "Slet kursus?",
-    "deleteIntro": "Dette sletter permanent \"{{title}}\" og alle tilknyttede data, herunder:",
-    "deleteItemModules": "Alle moduler og lektioner",
-    "deleteItemEnrollments": "Alle tilmeldinger og fremskridt for kursister",
-    "deleteItemQuizzes": "Alle quizforsøg og anmeldelser",
-    "deleteIrreversible": "Denne handling kan ikke fortrydes.",
     "courseDeleted": "Kursus slettet",
     "modulesAndLessons": "Moduler og lektioner",
     "addModule": "Tilføj modul",
@@ -1077,6 +1067,15 @@
     "courseNotFound": "Kursus ikke fundet",
     "failedToLoad": "Kunne ikke indlæse kursus",
     "retry": "Prøv igen"
+  },
+  "courseDelete": {
+    "title": "Slet kursus?",
+    "intro": "Dette sletter permanent \"{{title}}\" og alle tilknyttede data, herunder:",
+    "itemModules": "Alle moduler og lektioner",
+    "itemEnrollments": "Alle tilmeldinger og fremskridt for kursister",
+    "itemQuizzes": "Alle quizforsøg og anmeldelser",
+    "irreversible": "Denne handling kan ikke fortrydes.",
+    "confirm": "Slet kursus"
   },
   "assessment": {
     "skip": "Spring over indtil videre",

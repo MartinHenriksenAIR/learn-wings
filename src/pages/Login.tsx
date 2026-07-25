@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { consumePostLoginRedirect } from '@/lib/post-login-redirect';
 import { routes } from '@/lib/routes';
-import { Button } from '@/components/ui/button';
+import { MicrosoftSignInButton } from '@/components/auth/MicrosoftSignInButton';
 import { Loader2 } from 'lucide-react';
 import logoLight from '@/assets/logo-light.png';
 
@@ -63,18 +63,11 @@ export default function Login() {
         <p className="text-balance text-center text-sm leading-[1.55] text-muted-foreground">
           {t('auth.platformDescription')}
         </p>
-        <Button
+        <MicrosoftSignInButton
           className="h-auto w-full gap-2.5 rounded-xl px-4 py-[13px] text-[14.5px] font-semibold"
           onClick={signIn}
-        >
-          <svg width="16" height="16" viewBox="0 0 23 23" aria-hidden="true">
-            <rect x="1" y="1" width="10" height="10" fill="#ffffff" />
-            <rect x="12" y="1" width="10" height="10" fill="#dfe4f7" />
-            <rect x="1" y="12" width="10" height="10" fill="#dfe4f7" />
-            <rect x="12" y="12" width="10" height="10" fill="#ffffff" />
-          </svg>
-          {t('auth.signInWithMicrosoft', 'Sign in with Microsoft')}
-        </Button>
+          label={t('auth.signInWithMicrosoft', 'Sign in with Microsoft')}
+        />
         <span className="text-xs text-[#9aa0af]">{t('auth.accessProvidedByOrg')}</span>
       </div>
     </div>

@@ -15,6 +15,13 @@ vi.mock('../shared/db', () => ({
   getDb: vi.fn(),
 }));
 
+// The run record and the alerting (#286) are mocked here so these cases stay
+// about the SWEEP; the policy they implement is pinned in ./notify.test.ts.
+// Mocking also keeps the "refuses before reading anything at all" assertions
+// meaningful — an unmocked notifier would put its own reads on `mockQuery`.
+const { mockRecordAndNotify } = vi.hoisted(() => ({ mockRecordAndNotify: vi.fn() }));
+vi.mock('./notify', () => ({ recordAndNotify: mockRecordAndNotify }));
+
 import {
   runOrphanSweep,
   runScheduledSweep,
@@ -1015,6 +1022,73 @@ describe('orphan-sweep — deletion', () => {
     expect(summary).toMatchObject({ skippedUnsafeName: 1, scanned: 10, eligible: 9 });
     expect(log.warn).toHaveBeenCalledWith(expect.stringContaining('will not delete'), 'weird name?x=1.mp4');
   });
+
+  /**
+   * The bytes and the names the #286 digest turns into a receipt. `blob.contentLength`
+   * used to be interpolated into a log line and dropped, so a digest could say
+   * "12 blobs" but not "and 340 MB" — which is most of what makes a receipt readable.
+   */
+  it('carries the reclaimed bytes and the deleted names out of the run', async () => {
+    stubFetch({
+      pages: [
+        listPage([
+          ...referencedBlobs(),
+          { name: 'stranded-1.mp4', bytes: 4096 },
+          { name: 'stranded-2.mp4', bytes: 2048 },
+        ]),
+      ],
+    });
+
+    const summary = await runOrphanSweep(makeLog(), NOW);
+
+    expect(summary).toMatchObject({ deleted: 2, bytesReclaimed: 6144 });
+    expect(summary.deletedSample).toEqual(['stranded-1.mp4', 'stranded-2.mp4']);
+  });
+
+  it('counts a blob Azure listed without a size as 0 bytes rather than guessing', async () => {
+    stubFetch({
+      pages: [listPage([...referencedBlobs(), { name: 'sizeless.mp4', bytes: Number.NaN as unknown as number }])],
+    });
+
+    const summary = await runOrphanSweep(makeLog(), NOW);
+
+    expect(summary).toMatchObject({ deleted: 1, bytesReclaimed: 0 });
+  });
+
+  it('counts a failed delete in neither the bytes nor the sample', async () => {
+    stubFetch({
+      pages: [listPage([...referencedBlobs(), { name: 'ok.mp4', bytes: 100 }, { name: 'broken.mp4', bytes: 900 }])],
+      deleteStatus: { 'broken.mp4': 500 },
+    });
+
+    const summary = await runOrphanSweep(makeLog(), NOW);
+
+    expect(summary).toMatchObject({ deleted: 1, failed: 1, bytesReclaimed: 100 });
+    expect(summary.deletedSample).toEqual(['ok.mp4']);
+  });
+
+  it('caps the sample at 20 names while still counting every deletion', async () => {
+    // A 500-name wall of text is not a readable email; the count and the bytes
+    // stay complete regardless.
+    const referenced = Array.from({ length: 30 }, (_, i) => `keep-${i}.mp4`);
+    const orphans = Array.from({ length: 25 }, (_, i) => `gone-${i}.mp4`);
+    mockQuery.mockResolvedValue([...REFERENCED_ROWS, ...referenced.map((path) => ({ path }))]);
+    stubFetch({
+      pages: [
+        listPage([
+          ...referencedBlobs(),
+          ...referenced.map((name) => ({ name, bytes: 10 })),
+          ...orphans.map((name) => ({ name, bytes: 10 })),
+        ]),
+      ],
+    });
+
+    const summary = await runOrphanSweep(makeLog(), NOW);
+
+    expect(summary).toMatchObject({ aborted: false, deleted: 25, bytesReclaimed: 250 });
+    expect(summary.deletedSample).toHaveLength(20);
+    expect(summary.deletedSample[0]).toBe('gone-0.mp4');
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1110,6 +1184,60 @@ describe('orphan-sweep — schedule', () => {
     expect(source).toMatch(/^\s*runOnStartup: false,$/m);
     // NCRONTAB is evaluated in UTC — there is no WEBSITE_TIME_ZONE app setting.
     expect(source).toMatch(/const SCHEDULE = '0 0 3 \* \* \*'/);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// The run record + alerting hand-off (#286)
+//
+// `runOrphanSweep` has a dozen-plus early-return abort paths. The alerting is
+// wired at the CALL SITE precisely so it catches all of them — including the
+// past-due refusal, which never enters the sweep at all — without a line of it
+// living inside the refusal logic. What is pinned here is the hand-off; what is
+// handed over is decided in ./notify.test.ts.
+// ──────────────────────────────────────────────────────────────────────────────
+describe('orphan-sweep — run record + alerting hand-off', () => {
+  it('hands a completed run over with the summary it returned', async () => {
+    stubFetch({ pages: [listPage([...referencedBlobs(), { name: 'stranded.mp4', bytes: 512 }])] });
+
+    const summary = await runScheduledSweep({ isPastDue: false }, makeLog(), NOW);
+
+    expect(mockRecordAndNotify).toHaveBeenCalledTimes(1);
+    const [handed, ctx] = mockRecordAndNotify.mock.calls[0];
+    expect(handed).toBe(summary);
+    expect(handed).toMatchObject({ aborted: false, deleted: 1, bytesReclaimed: 512 });
+    expect(ctx).toMatchObject({ startedAt: NOW, now: NOW });
+  });
+
+  it('hands an ABORTED run over too — a wedged night is the whole point', async () => {
+    process.env.ORPHAN_SWEEP_DISABLED = '1';
+
+    const summary = await runScheduledSweep({ isPastDue: false }, makeLog(), NOW);
+
+    expect(summary).toMatchObject({ aborted: true, reason: 'disabled' });
+    expect(mockRecordAndNotify).toHaveBeenCalledTimes(1);
+    expect(mockRecordAndNotify.mock.calls[0][0]).toMatchObject({ aborted: true, reason: 'disabled' });
+  });
+
+  it('hands a PAST-DUE refusal over as well, so the run is still recorded', async () => {
+    const summary = await runScheduledSweep({ isPastDue: true }, makeLog(), NOW);
+
+    expect(summary).toMatchObject({ aborted: true, reason: 'past-due' });
+    expect(mockRecordAndNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the sweep result unchanged when the alerting throws', async () => {
+    // A notification outage must never become a sweep outage — that would be a
+    // strictly worse system than the silent one this replaced.
+    mockRecordAndNotify.mockRejectedValueOnce(new Error('alerting exploded'));
+    const { deleted } = stubFetch({ pages: [listPage([...referencedBlobs(), { name: 'stranded.mp4' }])] });
+    const log = makeLog();
+
+    const summary = await runScheduledSweep({ isPastDue: false }, log, NOW);
+
+    expect(summary).toMatchObject({ aborted: false, reason: null, deleted: 1 });
+    expect(deleted).toEqual(['stranded.mp4']);
+    expect(log.error).toHaveBeenCalledWith(expect.stringContaining('the sweep result above stands'), expect.anything());
   });
 });
 

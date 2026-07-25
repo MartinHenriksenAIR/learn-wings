@@ -18,9 +18,7 @@ import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteCourseDialog } from '@/components/platform-admin/DeleteCourseDialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -661,33 +659,13 @@ export default function CoursesManager() {
         </div>
       )}
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('coursesManager.deleteCourseTitle')}</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <span className="block">{t('coursesManager.deleteIntro', { title: courseToDelete?.title })}</span>
-              <ul className="list-inside list-disc text-sm">
-                <li>{t('coursesManager.deleteItemModules')}</li>
-                <li>{t('coursesManager.deleteItemEnrollments')}</li>
-                <li>{t('coursesManager.deleteItemQuizzes')}</li>
-              </ul>
-              <span className="block font-medium">{t('coursesManager.deleteIrreversible')}</span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteCourse}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-              {t('coursesManager.deleteCourse')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteCourseDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        courseTitle={courseToDelete?.title}
+        onConfirm={handleDeleteCourse}
+        pending={deleting}
+      />
     </AppLayout>
   );
 }

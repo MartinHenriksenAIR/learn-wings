@@ -4,6 +4,7 @@ import { query } from '../shared/db';
 import { deleteBlob } from '../shared/blob';
 import { generateContainerSasToken, SAS_SIGNED_VERSION } from '../shared/sas';
 import { UPLOAD_LIMITS, fileExtension, type UploadAssetKind } from '../shared/upload-limits';
+import { recordAndNotify } from './notify';
 
 /**
  * ORPHAN SWEEP (#277) — the only unattended, scheduled DELETER of production
@@ -21,6 +22,12 @@ import { UPLOAD_LIMITS, fileExtension, type UploadAssetKind } from '../shared/up
  * UTC: list the container, build the set of blob names the database still
  * references, and delete the listed blobs that are in neither the reference set
  * nor the 24-hour grace window.
+ *
+ * ALERTING (#286)
+ * Every refusal below is a log line and nothing else, which made both failure
+ * directions silent. `./notify` records each run and turns the ones that matter
+ * into email; it is wired in at `runScheduledSweep`, so no refusal path in this
+ * file has to know it exists.
  *
  * THE DESIGN RULE — asymmetry of errors
  * Deleting a referenced blob destroys a customer's lesson video / thumbnail /
@@ -422,7 +429,22 @@ export interface OrphanSweepSummary {
   skippedByRecheck: number;
   deleted: number;
   failed: number;
+  /**
+   * Bytes behind the blobs actually deleted. A blob Azure listed without a
+   * Content-Length contributes 0 rather than guessing. This is what makes the
+   * #286 digest a readable receipt — "12 blobs" alone says nothing about whether
+   * a night was routine or the container just lost 340 MB.
+   */
+  bytesReclaimed: number;
+  /** The first `DELETED_SAMPLE_SIZE` names deleted, in delete order (#286). */
+  deletedSample: string[];
 }
+
+/**
+ * How many deleted names a run carries into its record and its digest. Enough to
+ * recognise what went, far short of a 500-name wall of text in an email.
+ */
+const DELETED_SAMPLE_SIZE = 20;
 
 const emptySummary = (): OrphanSweepSummary => ({
   aborted: false,
@@ -436,6 +458,8 @@ const emptySummary = (): OrphanSweepSummary => ({
   skippedByRecheck: 0,
   deleted: 0,
   failed: 0,
+  bytesReclaimed: 0,
+  deletedSample: [],
 });
 
 /**
@@ -940,44 +964,70 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
             `[orphan-sweep] FAILED to delete ${blob.name} (${blob.contentLength ?? 'unknown'} bytes, age ${ageHours}h)`,
           );
         }
-        return ok;
+        return { ok, blob };
       }),
     );
-    summary.deleted += outcomes.filter(Boolean).length;
-    summary.failed += outcomes.filter((ok) => !ok).length;
+    // Accumulated in CHUNK order rather than completion order, so the sample a
+    // digest quotes is the same one on every re-run of the same night.
+    for (const { ok, blob } of outcomes) {
+      if (!ok) {
+        summary.failed++;
+        continue;
+      }
+      summary.deleted++;
+      summary.bytesReclaimed += blob.contentLength ?? 0;
+      if (summary.deletedSample.length < DELETED_SAMPLE_SIZE) summary.deletedSample.push(blob.name);
+    }
   }
 
   log.log('[orphan-sweep] run complete', summary);
   return summary;
 }
 
+/** The past-due refusal. Nothing is read: no DB, no listing, no delete. */
+function refusePastDue(log: SweepLogger): OrphanSweepSummary {
+  const summary = emptySummary();
+  summary.aborted = true;
+  summary.reason = 'past-due';
+  log.warn(
+    '[orphan-sweep] REFUSED TO SWEEP — 0 blobs deleted, nothing in storage was touched. ' +
+      'Reason: past-due. The host fired this as CATCH-UP for a missed 03:00 UTC occurrence, ' +
+      'so it is running at some arbitrary time of day rather than in the maintenance window — ' +
+      'and possibly against a reference set the paired frontend/schema deploy has not caught up ' +
+      'with. WHAT TO DO: nothing; the next scheduled 03:00 UTC run proceeds normally. If this ' +
+      'appears at all, `useMonitor` has been turned back on — see the registration below.',
+    summary,
+  );
+  return summary;
+}
+
 /**
- * The scheduled entry point: the past-due gate, then the sweep.
+ * The scheduled entry point: the past-due gate, then the sweep, then the run
+ * record and the alerting (#286).
  *
  * Split out from the registration trailer purely so the refusal is testable —
  * an `InvocationContext` cannot reasonably be fabricated, a `SweepLogger` can.
+ *
+ * THE ALERTING IS WIRED HERE, NOT INSIDE `runOrphanSweep`. That function has a
+ * dozen-plus early-return abort paths; wrapping at the call site catches every
+ * one of them — including this past-due refusal, which never enters the sweep at
+ * all — without putting a single line into the refusal logic that must stay
+ * readable. `recordAndNotify` never throws and never touches the summary; the
+ * catch here is belt and braces, because a notification outage turning into a
+ * sweep outage would be a strictly worse system than the silent one it replaced.
  */
 export async function runScheduledSweep(
   timer: Pick<Timer, 'isPastDue'> | undefined,
   log: SweepLogger,
   now: number = Date.now(),
 ): Promise<OrphanSweepSummary> {
-  if (timer?.isPastDue) {
-    const summary = emptySummary();
-    summary.aborted = true;
-    summary.reason = 'past-due';
-    log.warn(
-      '[orphan-sweep] REFUSED TO SWEEP — 0 blobs deleted, nothing in storage was touched. ' +
-        'Reason: past-due. The host fired this as CATCH-UP for a missed 03:00 UTC occurrence, ' +
-        'so it is running at some arbitrary time of day rather than in the maintenance window — ' +
-        'and possibly against a reference set the paired frontend/schema deploy has not caught up ' +
-        'with. WHAT TO DO: nothing; the next scheduled 03:00 UTC run proceeds normally. If this ' +
-        'appears at all, `useMonitor` has been turned back on — see the registration below.',
-      summary,
-    );
-    return summary;
+  const summary = timer?.isPastDue ? refusePastDue(log) : await runOrphanSweep(log, now);
+  try {
+    await recordAndNotify(summary, { startedAt: now, now, log });
+  } catch (err: unknown) {
+    log.error('[orphan-sweep] run record / alerting failed — the sweep result above stands', err);
   }
-  return runOrphanSweep(log, now);
+  return summary;
 }
 
 // Registration trailer. Line-anchored `app.timer('orphan-sweep'` so the fleet

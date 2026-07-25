@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
@@ -112,12 +112,16 @@ describe('Login post-auth navigation', () => {
     });
   });
 
-  it('renders the sign-in button (not a spinner) when signed out', () => {
-    mockUseAuth.mockReturnValue({ ...baseAuth, user: null, profile: null });
+  it('renders the shared Microsoft sign-in button (not a spinner) when signed out, wired to signIn', () => {
+    const signIn = vi.fn();
+    mockUseAuth.mockReturnValue({ ...baseAuth, user: null, profile: null, signIn });
 
     render(<Login />);
 
-    expect(screen.getByRole('button')).toBeDefined();
+    const button = screen.getByRole('button', { name: /sign in with microsoft/i });
+    fireEvent.click(button);
+
+    expect(signIn).toHaveBeenCalledTimes(1);
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
