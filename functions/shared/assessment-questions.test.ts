@@ -6,17 +6,14 @@ import {
   levelForScore,
 } from './assessment-questions';
 
-// Helper: build a valid answers object using the lowest-scoring option for each question.
 function minAnswers(): Record<string, string> {
   return Object.fromEntries(ASSESSMENT_QUESTIONS.map((q) => [q.id, q.options[0]]));
 }
 
-// Helper: build a valid answers object using the highest-scoring option for each question.
 function maxAnswers(): Record<string, string> {
   return Object.fromEntries(ASSESSMENT_QUESTIONS.map((q) => [q.id, q.options[q.options.length - 1]]));
 }
 
-// Helper: build answers where each question gets index `idx`.
 function uniformAnswers(idx: number): Record<string, string> {
   return Object.fromEntries(ASSESSMENT_QUESTIONS.map((q) => [q.id, q.options[idx]]));
 }

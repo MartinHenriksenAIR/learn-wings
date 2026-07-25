@@ -12,14 +12,12 @@ export default endpoint('ai-champion-delete', async ({ req, reply, requireOrgAdm
     return reply(400, { error: 'userId is required' });
   }
 
-  // Authorization: platform admin OR org admin of the target org.
   // RLS provenance: supabase/migrations/20260202125422_*.sql —
   // "Platform admins can manage all AI champions" + "Org admins can manage AI champions" (FOR ALL).
   // No lookup-then-404 (unlike org-membership-delete): orgId is client-supplied and scopes the
   // DELETE directly, and Supabase zero-row deletes reported success — idempotent 200 is parity.
   await requireOrgAdmin(orgId);
 
-  // Blind delete — idempotent (Supabase zero-row-delete parity); see idea-vote-remove.
   await query(
     `DELETE FROM ai_champions WHERE user_id = $1 AND org_id = $2`,
     [userId, orgId],

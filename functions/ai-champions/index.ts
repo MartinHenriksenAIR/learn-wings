@@ -9,7 +9,6 @@ export default endpoint('ai-champions', async ({ req, reply, requireActiveMember
     return reply(400, { error: 'orgId is required' });
   }
 
-  // Authorization: platform admin OR active member of the org
   await requireActiveMember(orgId);
 
   const champions = await query(

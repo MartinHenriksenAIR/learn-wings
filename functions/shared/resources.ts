@@ -11,7 +11,6 @@ import { profileJson } from './profile-json';
  */
 export const RESOURCE_TYPES = ['link', 'document', 'template', 'guide'];
 
-/** The gate columns the resource write endpoints load to make an authz decision. */
 export interface ResourceRow {
   id: string;
   org_id: string;

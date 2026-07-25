@@ -181,7 +181,6 @@ describe('azure-view-url', () => {
     expect(res.status).toBe(200);
     expect(body).toHaveProperty('viewUrl');
 
-    // SECURITY: no access-check SQL executed at all
     const allQueryOneCalls = mockQueryOne.mock.calls.map(c => c[0] as string);
     expect(allQueryOneCalls.some(sql => sql.includes('can_access'))).toBe(false);
     expect(mockQueryOne).not.toHaveBeenCalled();

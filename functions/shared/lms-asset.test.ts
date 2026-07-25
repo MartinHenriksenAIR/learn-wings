@@ -110,21 +110,18 @@ describe('mintLmsAssetUrl', () => {
     expect(result).toEqual({ ok: false, status: 400, error: 'blobPath is required' });
   });
 
-  // Authz gate
   it('returns 403 when access check fails for a regular member', async () => {
     mockQueryOne.mockResolvedValueOnce({ can_access: false });
     const result = await mintLmsAssetUrl(memberProfile, 'videos/lesson.mp4');
     expect(result).toEqual({ ok: false, status: 403, error: 'Access denied' });
   });
 
-  // Platform-admin short-circuit — queryOne must NOT be called
   it('skips the access check entirely for platform admins', async () => {
     const result = await mintLmsAssetUrl(adminProfile, 'videos/lesson.mp4');
     expect(result.ok).toBe(true);
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  // Happy path — URL construction delegated to sas helpers
   it('returns ok:true with the SAS URL on access granted', async () => {
     mockQueryOne.mockResolvedValueOnce({ can_access: true });
     const result = await mintLmsAssetUrl(memberProfile, 'videos/lesson.mp4');

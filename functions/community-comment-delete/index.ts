@@ -17,7 +17,6 @@ export default endpoint('community-comment-delete', async ({ req, profile, reply
     return reply(400, { error: 'commentId is required' });
   }
 
-  // Load comment + its post (same join as update for consistency)
   const comment = await queryOne<CommentWithPost>(
     `SELECT c.user_id, c.is_hidden, p.scope, p.org_id
      FROM community_comments c
@@ -27,8 +26,7 @@ export default endpoint('community-comment-delete', async ({ req, profile, reply
   );
   if (!comment) return reply(404, { error: 'Comment not found' });
 
-  // Authorization (OR of RLS DELETE policies)
-  // NOTE: author CAN delete their own comment even when hidden (no is_hidden condition — RLS asymmetry vs UPDATE)
+  // Author CAN delete their own comment even when hidden (no is_hidden condition — RLS asymmetry vs UPDATE).
   let authorized = false;
 
   if (comment.user_id === profile.id) {
@@ -41,7 +39,6 @@ export default endpoint('community-comment-delete', async ({ req, profile, reply
 
   if (!authorized) return reply(403, { error: 'Forbidden' });
 
-  // DELETE — child replies cascade via FK
   await queryOne(
     `DELETE FROM community_comments WHERE id = $1`,
     [commentId],

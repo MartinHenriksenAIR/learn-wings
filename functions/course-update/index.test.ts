@@ -284,8 +284,6 @@ describe('course-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // --- Superseded-thumbnail cleanup (#275) ---
-
   const thumbUpdate = (thumbnailUrl: string | null) => ({ courseId: 'c1', updates: { thumbnailUrl } });
 
   it('thumbnail replaced: deletes the OLD blob exactly once', async () => {
@@ -319,7 +317,7 @@ describe('course-update', () => {
   });
 
   it('thumbnailUrl absent from updates is NOT a clear: no SELECT, no delete', async () => {
-    mockQueryOne.mockResolvedValueOnce(fakeCourse); // single call — the UPDATE
+    mockQueryOne.mockResolvedValueOnce(fakeCourse);
     const res = await handler(baseReq({ courseId: 'c1', updates: { title: 'Renamed' } }), {} as any);
     expect(res.status).toBe(200);
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
@@ -347,10 +345,8 @@ describe('course-update', () => {
     expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
-  // --- Upload size/type enforcement (#276) ---
-
   it('413 when the new thumbnail is over cap: no UPDATE is issued', async () => {
-    mockQueryOne.mockResolvedValueOnce({ thumbnail_url: null }); // only the previous-thumbnail SELECT
+    mockQueryOne.mockResolvedValueOnce({ thumbnail_url: null });
     mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
 
     const res = await handler(baseReq(thumbUpdate('thumbs/huge.png')), {} as any);
@@ -400,7 +396,7 @@ describe('course-update', () => {
   // and the cross-row reference check have to.
 
   it('400 when the ownership gate refuses the path: no probe, no UPDATE, no delete', async () => {
-    mockQueryOne.mockResolvedValueOnce({ thumbnail_url: null }); // only the previous-thumbnail SELECT
+    mockQueryOne.mockResolvedValueOnce({ thumbnail_url: null });
     mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');
 
     const res = await handler(baseReq(thumbUpdate('someone-elses-lesson.mp4')), {} as any);

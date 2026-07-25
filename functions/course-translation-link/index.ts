@@ -96,7 +96,6 @@ export default adminEndpoint('course-translation-link', async ({ req, reply }) =
     return reply(200, { ok: true });
   }
 
-  // Both standalone — the two languages must differ, then mint one shared group id.
   if (course.language === other.language) {
     return reply(409, { error: `A ${other.language} edition already exists in this group` });
   }

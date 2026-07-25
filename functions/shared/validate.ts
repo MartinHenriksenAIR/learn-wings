@@ -94,7 +94,6 @@ export interface LessonFieldsBody {
 export function validateLessonFields(body: LessonFieldsBody): string | null {
   const { moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath } = body;
 
-  // Required: moduleId — non-empty string
   if (!moduleId || typeof moduleId !== 'string') {
     return 'moduleId is required';
   }
@@ -104,17 +103,14 @@ export function validateLessonFields(body: LessonFieldsBody): string | null {
     return 'title is required';
   }
 
-  // Required: lessonType ∈ ('video','document','quiz')
   if (!lessonType || !LESSON_TYPES.includes(lessonType as (typeof LESSON_TYPES)[number])) {
     return "lessonType must be 'video', 'document', or 'quiz'";
   }
 
-  // Optional: contentText — string or null
   if (contentText !== undefined && !isStringOrNull(contentText)) {
     return 'contentText must be a string or null';
   }
 
-  // Optional: durationMinutes — integer or null
   if (durationMinutes !== undefined && !isIntOrNull(durationMinutes)) {
     return 'durationMinutes must be an integer or null';
   }
@@ -124,12 +120,10 @@ export function validateLessonFields(body: LessonFieldsBody): string | null {
     return 'videoStoragePath must be a non-empty string or null';
   }
 
-  // Optional: azureBlobPath — non-empty string or null
   if (azureBlobPath !== undefined && !isNonEmptyStringOrNull(azureBlobPath)) {
     return 'azureBlobPath must be a non-empty string or null';
   }
 
-  // Optional: documentStoragePath — non-empty string or null
   if (documentStoragePath !== undefined && !isNonEmptyStringOrNull(documentStoragePath)) {
     return 'documentStoragePath must be a non-empty string or null';
   }

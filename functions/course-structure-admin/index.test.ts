@@ -93,7 +93,6 @@ describe('course-structure-admin', () => {
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ course: null, modules: [] });
-    // Only the course queryOne should have been called; no module/lesson queries
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(mockQuery).not.toHaveBeenCalled();
   });
@@ -111,7 +110,6 @@ describe('course-structure-admin', () => {
     expect(body.course).toEqual(fakeCourse);
     expect(body.modules).toHaveLength(2);
 
-    // mod-1 has 2 lessons, mod-2 has 0
     const m1 = body.modules.find((m: any) => m.id === 'mod-1');
     const m2 = body.modules.find((m: any) => m.id === 'mod-2');
     expect(m1.lessons).toHaveLength(2);
@@ -132,7 +130,6 @@ describe('course-structure-admin', () => {
 
     const allCalls = mockQuery.mock.calls as [string, unknown[]][];
 
-    // Modules query — order-agnostic lookup
     const modulesCall = allCalls.find(([sql]) => sql.includes('course_modules') && !sql.includes('lessons'));
     expect(modulesCall).toBeDefined();
     const [modulesSql, modulesParams] = modulesCall!;
@@ -141,7 +138,6 @@ describe('course-structure-admin', () => {
     expect(modulesSql).toContain('ORDER BY sort_order, id');
     expect(modulesParams).toContain('course-1');
 
-    // Lessons query — single query for all lessons via JOIN
     const lessonsCall = allCalls.find(([sql]) => sql.includes('lessons') && sql.includes('JOIN course_modules'));
     expect(lessonsCall).toBeDefined();
     const [lessonsSql, lessonsParams] = lessonsCall!;

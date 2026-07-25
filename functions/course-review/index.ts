@@ -28,10 +28,9 @@ export default endpoint('course-review', async ({ req, profile, reply, requireAc
     return reply(400, { error: 'comment must be at most 1000 characters' });
   }
 
-  // Authorization — membership (platform admins bypass)
   await requireActiveMember(orgId);
 
-  // Upsert review — identity always from token
+  // identity always from token — never client-supplied
   const review = await queryOne(
     `INSERT INTO course_reviews (org_id, user_id, course_id, rating, comment)
 VALUES ($1, $2, $3, $4, $5)

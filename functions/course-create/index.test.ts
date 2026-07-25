@@ -172,19 +172,17 @@ describe('course-create', () => {
     const body = JSON.parse(res.body as string);
     expect(body).toEqual({ course: fakeCourse });
 
-    // Verify SQL and params
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO courses');
     expect(sql).toContain('language');
     expect(sql).toContain('RETURNING *');
     // created_by_user_id must be server-set from profile, not client
-    expect(params).toContain('admin-1'); // profile.id
+    expect(params).toContain('admin-1');
     // is_published must be false (hardcoded)
     expect(sql).toContain('false');
-    // description and thumbnailUrl default to null
-    expect(params[1]).toBeNull(); // description
-    expect(params[3]).toBe('da'); // language (from validBody)
-    expect(params[4]).toBeNull(); // thumbnailUrl
+    expect(params[1]).toBeNull();
+    expect(params[3]).toBe('da');
+    expect(params[4]).toBeNull();
   });
 
   it('happy path: creates course with all optional fields', async () => {
@@ -197,15 +195,13 @@ describe('course-create', () => {
     expect(body).toEqual({ course: fullCourse });
 
     const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
-    expect(params[0]).toBe('Full Course');    // title
-    expect(params[1]).toBe('Desc');           // description
-    expect(params[2]).toBe('advanced');       // level
-    expect(params[3]).toBe('en');             // language
-    expect(params[4]).toBe('https://example.com/thumb.jpg'); // thumbnail_url
+    expect(params[0]).toBe('Full Course');
+    expect(params[1]).toBe('Desc');
+    expect(params[2]).toBe('advanced');
+    expect(params[3]).toBe('en');
+    expect(params[4]).toBe('https://example.com/thumb.jpg');
     expect(params[5]).toBe('admin-1');        // created_by_user_id (server-set from profile)
   });
-
-  // --- Upload size/type enforcement (#276) ---
 
   it('413 when the thumbnail is over cap: nothing is inserted', async () => {
     mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
@@ -230,8 +226,6 @@ describe('course-create', () => {
     expect(mockEnforceUploadLimits).toHaveBeenCalledWith(thumbCandidate('thumbs/new.png'));
     expect(order).toEqual(['gate', 'insert']);
   });
-
-  // --- Path ownership ---
 
   it('400 when the ownership gate refuses the path: nothing is probed or inserted', async () => {
     mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');

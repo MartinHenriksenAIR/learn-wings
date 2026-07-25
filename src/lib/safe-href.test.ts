@@ -1,13 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { safeHref } from './safe-href';
 
-// safeHref (sec-1, #232): guards anchor hrefs against stored-XSS. React 18 does
-// not neutralize `javascript:` URLs in href (that shipped in React 19), so a
-// stored value like `javascript:...` would execute on click. safeHref returns
-// the URL only when its scheme is http/https/mailto, else undefined (so the
-// anchor gets no href and cannot navigate). These community links are meant to
-// be absolute external URLs, so relative/unparseable input is rejected too.
-
 describe('safeHref — allowed schemes', () => {
   it('returns a plain http URL unchanged', () => {
     expect(safeHref('http://example.com/x')).toBe('http://example.com/x');

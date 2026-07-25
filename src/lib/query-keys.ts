@@ -16,31 +16,21 @@
  * site actually passes (e.g. `string | undefined` for `currentOrg?.id`).
  */
 export const queryKeys = {
-  // ── Organizations ──────────────────────────────────────────────────────────
   organizations: {
-    /** ['organizations'] */
     all: ['organizations'] as const,
   },
 
-  // ── Branding assets (signed display URLs) ────────────────────────────────────
   brandingAsset: {
-    /** ['branding-asset', blobPath] — one signed-URL cache entry per stored path. */
+    /** One signed-URL cache entry per stored path. */
     signed: (blobPath: string) => ['branding-asset', blobPath] as const,
   },
 
-  // ── Community feed ─────────────────────────────────────────────────────────
   communityCategories: {
-    /** ['community-categories'] */
     all: ['community-categories'] as const,
   },
 
   communityPosts: {
-    /** ['community-posts'] — use for invalidation prefix */
     all: ['community-posts'] as const,
-    /**
-     * Full key: ['community-posts', scope, orgId, selectedCategory, searchQuery, selectedTags]
-     * Parameter order matches the query in CommunityFeed.tsx.
-     */
     list: (
       scope: string,
       orgId: string | undefined,
@@ -52,45 +42,23 @@ export const queryKeys = {
   },
 
   communityPost: {
-    /**
-     * Full key: ['community-post', postId]
-     * Used by PostDetail.tsx and PostEdit.tsx.
-     */
     detail: (postId: string | undefined) => ['community-post', postId] as const,
   },
 
   communityComments: {
-    /**
-     * Full key: ['community-comments', postId]
-     * Used by PostDetail.tsx.
-     */
     list: (postId: string | undefined) => ['community-comments', postId] as const,
   },
 
-  // ── Ideas ──────────────────────────────────────────────────────────────────
   idea: {
-    /**
-     * Full key: ['idea', ideaId]
-     * Used by IdeaDetail.tsx and IdeaSubmit.tsx.
-     */
     detail: (ideaId: string | undefined) => ['idea', ideaId] as const,
   },
 
   ideaComments: {
-    /**
-     * Full key: ['idea-comments', ideaId]
-     * Used by IdeaDetail.tsx.
-     */
     list: (ideaId: string | undefined) => ['idea-comments', ideaId] as const,
   },
 
   ideas: {
-    /** ['ideas'] — use for invalidation prefix */
     all: ['ideas'] as const,
-    /**
-     * Full key: ['ideas', orgId, tab, searchQuery, selectedBusinessArea, selectedTags, profileId]
-     * Parameter order matches the query in IdeaLibrary.tsx.
-     */
     list: (
       orgId: string | undefined,
       tab: string,
@@ -111,20 +79,11 @@ export const queryKeys = {
   },
 
   ideaTags: {
-    /**
-     * Full key: ['idea-tags', orgId]
-     * Used by IdeaLibrary.tsx and IdeaSubmit.tsx.
-     */
     list: (orgId: string | undefined) => ['idea-tags', orgId] as const,
   },
 
   ideasAdmin: {
-    /** ['ideas-admin'] — use for invalidation prefix */
     all: ['ideas-admin'] as const,
-    /**
-     * Full key: ['ideas-admin', orgId, searchQuery, selectedBusinessArea]
-     * Parameter order matches the query in OrgIdeasManagement.tsx.
-     */
     list: (
       orgId: string | undefined,
       searchQuery: string,
@@ -132,14 +91,8 @@ export const queryKeys = {
     ) => ['ideas-admin', orgId, searchQuery, selectedBusinessArea] as const,
   },
 
-  // ── Resources ──────────────────────────────────────────────────────────────
   communityResources: {
-    /** ['community-resources'] — use for invalidation prefix */
     all: ['community-resources'] as const,
-    /**
-     * Full key: ['community-resources', orgId, debouncedSearch, selectedType, selectedTag]
-     * Parameter order matches the query in ResourceLibrary.tsx.
-     */
     list: (
       orgId: string | undefined,
       debouncedSearch: string,
@@ -149,70 +102,48 @@ export const queryKeys = {
       ['community-resources', orgId, debouncedSearch, selectedType, selectedTag] as const,
   },
 
-  // ── Moderation ─────────────────────────────────────────────────────────────
   orgReports: {
-    /** ['org-reports'] — use for invalidation prefix */
     all: ['org-reports'] as const,
-    /**
-     * Full key: ['org-reports', orgId, activeTab]
-     * Parameter order matches the query in OrgCommunityModeration.tsx.
-     */
     list: (orgId: string | undefined, activeTab: string) =>
       ['org-reports', orgId, activeTab] as const,
   },
 
   platformReports: {
-    /** ['platform-reports'] — use for invalidation prefix */
     all: ['platform-reports'] as const,
     /**
-     * Full key: ['platform-reports', scope, activeTab]
-     * scope is 'all' | 'global' | <orgId>; parameter order matches the query
-     * in PlatformCommunityModeration.tsx.
+     * scope is 'all' | 'global' | <orgId>; different scopes must not share a
+     * cache entry because the server-side auth path differs per scope.
      */
     list: (scope: string, activeTab: string) =>
       ['platform-reports', scope, activeTab] as const,
   },
 
-  // ── AI Champions ───────────────────────────────────────────────────────────
   aiChampions: {
-    /**
-     * Full key: ['ai-champions', orgId]
-     * Used by AIChampionsList.tsx.
-     */
     list: (orgId: string | undefined) => ['ai-champions', orgId] as const,
   },
 
-  // ── Org management (platform-admin) ────────────────────────────────────────
-
   profiles: {
     /**
-     * ['profiles'] — the platform-wide user list fetched by OrganizationsManager,
-     * OrganizationDetail, and PlatformSettings (whose "Platform Admins" section
-     * derives both the current-admins and grant-candidate lists from it, #198).
-     * This IS the query key (the list takes no params); the platform-admin
-     * grant/revoke mutations invalidate it by prefix so the derived lists
-     * refresh. Kept as `all` for shape-consistency with the other list families.
+     * The platform-admin grant/revoke mutations invalidate this by prefix so the
+     * derived current-admins and grant-candidate lists both refresh (#198). Kept
+     * as `all` for shape-consistency with the other list families.
      */
     all: ['profiles'] as const,
   },
 
   orgMemberships: {
     /**
-     * Full key: ['org-memberships', orgId]
-     * Used by OrganizationDetail.tsx and OrgMembersTab.tsx.
-     * `all` is NOT exposed — nothing invalidates by prefix (each mutation
-     * targets a specific orgId and can invalidate the exact key).
+     * No `all` prefix — nothing invalidates by prefix (each mutation targets a
+     * specific orgId and can invalidate the exact key).
      */
     list: (orgId: string | undefined) => ['org-memberships', orgId] as const,
   },
 
   invitations: {
     /**
-     * Full key: ['invitations', orgId, scope]
-     * scope: 'platform' (OrganizationDetail) | 'org' (OrgMembersTab).
-     * The scope encodes the server-side auth path, so different scopes must
-     * not share a cache entry. No `all` prefix — mutations invalidate the
-     * exact (orgId, scope) pair.
+     * scope: 'platform' (OrganizationDetail) | 'org' (OrgMembersTab). The scope
+     * encodes the server-side auth path, so different scopes must not share a cache
+     * entry. No `all` prefix — mutations invalidate the exact (orgId, scope) pair.
      */
     list: (orgId: string | undefined, scope: string) =>
       ['invitations', orgId, scope] as const,
@@ -220,134 +151,85 @@ export const queryKeys = {
 
   orgDetail: {
     /**
-     * Full key: ['org-detail', orgId]
-     * Used by OrganizationDetail.tsx (platform-admin, fetches single org via
-     * `/api/organizations` with `{ orgId }`). Separate from
-     * `organizations.all` because the request body differs.
+     * Separate from `organizations.all` because the request body differs (passes
+     * `{ orgId }` to `/api/organizations` for a single-org fetch).
      */
     detail: (orgId: string | undefined) => ['org-detail', orgId] as const,
   },
 
-  // ── Platform settings (platform-admin) ────────────────────────────────────
   platformSettings: {
     /**
-     * ['platform-settings'] — the platform-wide settings list fetched by
-     * PlatformSettings. This IS the query key (the list takes no params), not
-     * merely an invalidation prefix: no mutation currently invalidates it,
-     * because saves write partial updates client-side and rely on local form
-     * state. Kept as `all` for shape-consistency with the other list families.
+     * No mutation currently invalidates this — saves write partial updates
+     * client-side and rely on local form state. Kept as `all` for shape-consistency.
      */
     all: ['platform-settings'] as const,
   },
 
-  // ── Org analytics (org-admin) ──────────────────────────────────────────────
   orgAnalyticsData: {
-    /**
-     * Full key: ['org-analytics-data', orgId]
-     * Used by useOrgAnalyticsData / OrgAnalytics.tsx.
-     */
     detail: (orgId: string | undefined) => ['org-analytics-data', orgId] as const,
   },
 
   orgCourseProgress: {
     /**
-     * Full key: ['org-course-progress', orgId, adminLang]
-     * adminLang is in the key because the representative edition's title/level
-     * shown per group depends on the admin's app language (#213).
+     * adminLang is in the key because the representative edition's title/level shown
+     * per group depends on the admin's app language (#213).
      */
     detail: (orgId: string | undefined, adminLang: string | undefined) =>
       ['org-course-progress', orgId, adminLang] as const,
   },
 
   orgCourseEnrollees: {
-    /**
-     * Full key: ['org-course-enrollees', orgId, courseId]
-     * Used by useOrgCourseEnrollees / CourseProgressTab.tsx.
-     */
     detail: (orgId: string | undefined, courseId: string | undefined) =>
       ['org-course-enrollees', orgId, courseId] as const,
   },
 
   orgCourseOrgBreakdown: {
     /**
-     * Full key: ['org-course-org-breakdown', courseId]
-     * Used by useOrgCourseOrgBreakdown / CourseProgressTab.tsx — the per-org
-     * engagement breakdown shown in the all-orgs course dialog (#163). Keyed by
-     * courseId only (the endpoint is platform-admin, cross-org by construction).
+     * Keyed by courseId only — the endpoint is platform-admin, cross-org by
+     * construction (#163).
      */
     detail: (courseId: string | undefined) =>
       ['org-course-org-breakdown', courseId] as const,
   },
 
   userProgress: {
-    /**
-     * Full key: ['user-progress', orgId, userId]
-     * Used by useUserProgress / UserProgressDialog.tsx.
-     */
     detail: (orgId: string | undefined, userId: string | undefined) =>
       ['user-progress', orgId, userId] as const,
   },
 
-  // ── LMS / Courses (platform-admin) ─────────────────────────────────────────
   coursesAdmin: {
-    /** ['courses-admin'] — the admin course list + access matrix (one query) */
+    /** The admin course list + access matrix (one query, no params). */
     all: ['courses-admin'] as const,
   },
 
   courseStructureAdmin: {
-    /**
-     * Full key: ['course-structure-admin', courseId]
-     * Used by CourseEditor.tsx.
-     */
     detail: (courseId: string) => ['course-structure-admin', courseId] as const,
   },
 
   quizAdmin: {
-    /**
-     * Full key: ['quiz-admin', lessonId]
-     * Used by QuizEditorDialog.tsx.
-     */
     detail: (lessonId: string) => ['quiz-admin', lessonId] as const,
   },
 
-  // ── Learner courses (learner) ──────────────────────────────────────────────
   learnerCourses: {
-    /**
-     * Full key: ['learner-courses', orgId]
-     * Used by useLearnerCourses / Courses.tsx.
-     * Exposed as `list` because enroll/unenroll mutations invalidate by this key.
-     */
+    /** Exposed as `list` because enroll/unenroll mutations invalidate by this key. */
     list: (orgId: string | undefined) => ['learner-courses', orgId] as const,
   },
 
-  // ── Learner dashboard (learner) ────────────────────────────────────────────
   learnerDashboard: {
-    /**
-     * Full key: ['learner-dashboard', orgId]
-     * Used by useLearnerDashboard / Dashboard.tsx.
-     */
     detail: (orgId: string | undefined) => ['learner-dashboard', orgId] as const,
   },
 
-  // ── Assessment (issue #117) ────────────────────────────────────────────────
   assessment: {
-    /**
-     * Full key: ['assessment-questions']
-     * Used by useAssessmentQuestions. No params; fixed content with a long staleTime.
-     */
+    /** No params; fixed content with a long staleTime. */
     questions: ['assessment-questions'] as const,
   },
 
-  // ── Seat requests (issue #127) ─────────────────────────────────────────────
   seatPricing: {
-    /** ['seat-pricing'] — the single platform-wide price (read-only for org admins). */
     all: ['seat-pricing'] as const,
   },
 
   seatRequests: {
-    /** ['seat-requests'] — invalidation prefix. */
     all: ['seat-requests'] as const,
-    /** Full key: ['seat-requests', orgId] */
     list: (orgId: string | undefined) => ['seat-requests', orgId] as const,
   },
 } as const;

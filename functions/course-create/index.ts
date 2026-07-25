@@ -20,28 +20,23 @@ export default adminEndpoint('course-create', async ({ req, profile, reply }) =>
 
   const { title, description, level, language, thumbnailUrl } = body;
 
-  // Validate title: required, non-empty string
   if (!title || typeof title !== 'string' || title.trim() === '') {
     return reply(400, { error: 'title is required' });
   }
 
-  // Validate level: required, must be one of the enum values
   if (!level || !VALID_LEVELS.includes(level as CourseLevel)) {
     return reply(400, { error: 'level must be basic, intermediate, or advanced' });
   }
 
-  // Validate language: required, must be 'en' or 'da'
   if (!VALID_LANGUAGES.includes(language as CourseLanguage)) {
     return reply(400, { error: "language must be 'en' or 'da'" });
   }
 
-  // Validate description: if present, must be string or null (empty string allowed;
-  // null accepted for consistency with course-update — the column is nullable)
+  // null accepted for consistency with course-update; empty string allowed (column is nullable)
   if (description !== undefined && description !== null && typeof description !== 'string') {
     return reply(400, { error: 'description must be a string or null' });
   }
 
-  // Validate thumbnailUrl: if present, must be string or null
   if (thumbnailUrl !== undefined && thumbnailUrl !== null && typeof thumbnailUrl !== 'string') {
     return reply(400, { error: 'thumbnailUrl must be a string or null' });
   }

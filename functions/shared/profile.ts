@@ -26,7 +26,6 @@ export async function isActiveMember(profileId: string, orgId: string): Promise<
   return row?.ok ?? false;
 }
 
-/** True if profileId is an active org_admin of orgId. */
 export async function isOrgAdmin(profileId: string, orgId: string): Promise<boolean> {
   const row = await queryOne<{ ok: boolean }>(
     `SELECT EXISTS(SELECT 1 FROM org_memberships WHERE user_id = $1 AND org_id = $2 AND role = 'org_admin' AND status = 'active') AS ok`,

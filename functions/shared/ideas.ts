@@ -14,7 +14,6 @@ import { queryOne } from './db';
  * SQL, the visibility PREDICATE, and the author+draft PREDICATE.
  */
 
-/** The gate columns every idea endpoint loads to make an authz decision. */
 export interface IdeaRow {
   id: string;
   org_id: string;
@@ -84,7 +83,6 @@ export function checkAuthorDraft(
   if (idea.user_id !== profile.id) {
     return { ok: false, status: 403, body: { error: 'Forbidden' } };
   }
-  // Draft-only.
   if (idea.status !== 'draft') {
     return { ok: false, status: 409, body: { error: opts.notDraftError } };
   }

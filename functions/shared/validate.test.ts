@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateLessonFields, isHttpUrl, validateHttpUrl } from './validate';
 
-// ---------------------------------------------------------------------------
-// validateLessonFields
-// ---------------------------------------------------------------------------
-
 const validBase = {
   moduleId: 'mod-1',
   title: 'Lesson Title',
@@ -16,7 +12,6 @@ describe('validateLessonFields — required fields', () => {
     expect(validateLessonFields(validBase)).toBeNull();
   });
 
-  // moduleId
   it('rejects missing moduleId', () => {
     const { moduleId: _m, ...body } = validBase;
     expect(validateLessonFields(body)).toBe('moduleId is required');
@@ -28,7 +23,6 @@ describe('validateLessonFields — required fields', () => {
     expect(validateLessonFields({ ...validBase, moduleId: 42 })).toBe('moduleId is required');
   });
 
-  // title
   it('rejects missing title', () => {
     const { title: _t, ...body } = validBase;
     expect(validateLessonFields(body)).toBe('title is required');
@@ -46,7 +40,6 @@ describe('validateLessonFields — required fields', () => {
     expect(validateLessonFields({ ...validBase, title: '  Real Title  ' })).toBeNull();
   });
 
-  // lessonType
   it('rejects missing lessonType', () => {
     const { lessonType: _l, ...body } = validBase;
     expect(validateLessonFields(body)).toBe("lessonType must be 'video', 'document', or 'quiz'");
@@ -62,7 +55,6 @@ describe('validateLessonFields — required fields', () => {
 });
 
 describe('validateLessonFields — optional fields', () => {
-  // contentText
   it('accepts contentText as a string', () => {
     expect(validateLessonFields({ ...validBase, contentText: 'some text' })).toBeNull();
   });
@@ -85,7 +77,6 @@ describe('validateLessonFields — optional fields', () => {
     expect(validateLessonFields({ ...validBase, contentText: [] })).toBe('contentText must be a string or null');
   });
 
-  // durationMinutes
   it('accepts durationMinutes as an integer', () => {
     expect(validateLessonFields({ ...validBase, durationMinutes: 30 })).toBeNull();
   });
@@ -119,7 +110,6 @@ describe('validateLessonFields — optional fields', () => {
     );
   });
 
-  // videoStoragePath
   it('accepts videoStoragePath as a non-empty string', () => {
     expect(validateLessonFields({ ...validBase, videoStoragePath: 'path/to/video.mp4' })).toBeNull();
   });
@@ -137,7 +127,6 @@ describe('validateLessonFields — optional fields', () => {
     );
   });
 
-  // azureBlobPath
   it('accepts azureBlobPath as a non-empty string', () => {
     expect(validateLessonFields({ ...validBase, azureBlobPath: 'blob/path' })).toBeNull();
   });
@@ -155,7 +144,6 @@ describe('validateLessonFields — optional fields', () => {
     );
   });
 
-  // documentStoragePath
   it('accepts documentStoragePath as a non-empty string', () => {
     expect(validateLessonFields({ ...validBase, documentStoragePath: 'doc/path.pdf' })).toBeNull();
   });
@@ -173,10 +161,6 @@ describe('validateLessonFields — optional fields', () => {
     );
   });
 });
-
-// ---------------------------------------------------------------------------
-// isHttpUrl / validateHttpUrl (sec-1, #232) — defence in depth against stored XSS
-// ---------------------------------------------------------------------------
 
 describe('isHttpUrl', () => {
   it('accepts http', () => expect(isHttpUrl('http://example.com')).toBe(true));

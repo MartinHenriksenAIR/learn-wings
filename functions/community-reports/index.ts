@@ -22,17 +22,14 @@ export default endpoint('community-reports', async ({ req, reply, requireOrgAdmi
     return reply(400, { error: 'Provide orgId or scope, not both' });
   }
 
-  // Authorization
   const whereClauses: string[] = [];
   const params: unknown[] = [];
 
   if (orgId !== undefined) {
-    // orgId mode: platform admin or org admin
     await requireOrgAdmin(orgId as string);
     params.push(orgId);
     whereClauses.push(`r.org_id = $${params.length}`);
   } else if (scope === 'global') {
-    // global scope: platform admin only
     requirePlatformAdmin();
     whereClauses.push('r.org_id IS NULL');
   } else {

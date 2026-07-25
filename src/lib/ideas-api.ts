@@ -7,7 +7,6 @@ import type {
   IdeaFilters,
 } from '@/lib/community-types';
 
-// Fetch ideas with filters
 export async function fetchIdeas(orgId: string, filters?: IdeaFilters): Promise<EnhancedIdea[]> {
   const res = await callApi<{ ideas: EnhancedIdea[] }>('/api/ideas', {
     orgId,
@@ -20,13 +19,11 @@ export async function fetchIdeas(orgId: string, filters?: IdeaFilters): Promise<
   return (res.ideas ?? []) as EnhancedIdea[];
 }
 
-// Fetch single idea
 export async function fetchIdea(ideaId: string): Promise<EnhancedIdea | null> {
   const res = await callApi<{ idea: EnhancedIdea | null }>('/api/idea', { ideaId });
   return res.idea;
 }
 
-// Create idea
 // `|| null` coercions are old-lib parity: IdeaSubmit's form defaults every field
 // to '' (incl. business_area, a PG enum server-side) — '' would 400 the endpoint's
 // enum validation, and the old client lib stored null, not ''.
@@ -54,7 +51,6 @@ export async function createIdea(input: CreateIdeaInput): Promise<EnhancedIdea> 
   return res.idea;
 }
 
-// Update idea (draft only for authors)
 export async function updateIdea(
   ideaId: string,
   updates: Partial<CreateIdeaInput>
@@ -70,13 +66,11 @@ export async function updateIdea(
   return res.idea;
 }
 
-// Submit idea (change from draft to submitted)
 export async function submitIdea(ideaId: string): Promise<EnhancedIdea> {
   const res = await callApi<{ idea: EnhancedIdea }>('/api/idea-submit', { ideaId });
   return res.idea;
 }
 
-// Update idea status (admin only)
 export async function updateIdeaStatus(
   ideaId: string,
   input: UpdateIdeaStatusInput
@@ -91,8 +85,7 @@ export async function updateIdeaStatus(
   return res.idea;
 }
 
-// Set (or clear) an idea's Value/Effort prioritization scores (admin only).
-// value/effort are 1-3 (Low/Med/High) or null to clear. Server derives org from the idea row.
+/** value/effort are 1–3 (Low/Med/High) or null to clear. Server derives org from the idea row. */
 export async function updateIdeaPriority(
   ideaId: string,
   value: number | null,
@@ -109,23 +102,19 @@ export async function deleteIdea(ideaId: string): Promise<void> {
   await callApi('/api/idea-delete', { ideaId });
 }
 
-// Vote for idea — server derives org from the idea row
 export async function voteForIdea(ideaId: string): Promise<void> {
   await callApi('/api/idea-vote', { ideaId });
 }
 
-// Remove vote from idea
 export async function removeVoteFromIdea(ideaId: string): Promise<void> {
   await callApi('/api/idea-vote-remove', { ideaId });
 }
 
-// Fetch idea comments
 export async function fetchIdeaComments(ideaId: string): Promise<IdeaComment[]> {
   const res = await callApi<{ comments: IdeaComment[] }>('/api/idea-comments', { ideaId });
   return res.comments ?? [];
 }
 
-// Create idea comment — server derives org from the idea row
 export async function createIdeaComment(
   ideaId: string,
   content: string,
@@ -139,8 +128,7 @@ export async function createIdeaComment(
   return res.comment;
 }
 
-// Fetch unique tags used by ideas in an organization
-// Client-side localeCompare sort kept for parity: SQL ASC collation can differ for non-ASCII chars (e.g. æøå)
+/** Client-side localeCompare sort: SQL ASC collation can differ for non-ASCII chars (e.g. æøå). */
 export async function fetchOrgTags(orgId: string): Promise<string[]> {
   const res = await callApi<{ tags: string[] }>('/api/idea-tags', { orgId });
   return (res.tags ?? []).sort((a, b) => a.localeCompare(b));

@@ -223,8 +223,6 @@ describe('azure-upload-url', () => {
   it('falls through to the private default when assetType is not a recognized value', async () => {
     const req = {
       ...baseReq,
-      // An allow-listed file (#276) with an unrecognized assetType: the point of
-      // this test is the CONTAINER/prefix fall-through, not the file type.
       json: async () => ({ fileName: 'clip.mp4', contentType: 'video/mp4', assetType: 'not-a-real-type' }),
     };
 
@@ -258,9 +256,7 @@ describe('azure-upload-url', () => {
     const body = JSON.parse(res.body as string);
 
     expect(res.status).toBe(200);
-    // Private default container, NO folder prefix — the flat namespace.
     expect(body.blobPath).toMatch(/^[^/]+\.ogv$/);
-    // With nothing declared, the endpoint substitutes the generic type.
     expect(body.contentType).toBe('application/octet-stream');
     expect(mockGenerateSasToken).toHaveBeenCalledWith(
       expect.any(String),
@@ -271,13 +267,6 @@ describe('azure-upload-url', () => {
       30,
     );
   });
-
-  // --- Type allow-list at mint time (#276) ---
-  //
-  // Defence in depth: the client PUTs whatever bytes it likes to the URL we hand
-  // back, so the binding check is the post-upload HEAD at persist time. What
-  // these pin is that no URL is minted for a file we would never accept, and
-  // that the minted path always carries a known-good extension.
 
   const mint = (body: Record<string, unknown>) => handler(
     { ...baseReq, json: async () => body } as any,
@@ -292,7 +281,6 @@ describe('azure-upload-url', () => {
   });
 
   it('returns 400 for a filename with no extension at all', async () => {
-    // fileName.split('.').pop() would have used the WHOLE name as the suffix.
     const res = await mint({ fileName: 'noextension', contentType: 'video/mp4' });
     expect(res.status).toBe(400);
     expect(mockGenerateSasToken).not.toHaveBeenCalled();
