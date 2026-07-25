@@ -1,16 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockHeadBlob, mockDeleteBlob,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
+    mockQuery: vi.fn(),
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
+    mockHeadBlob: vi.fn(),
+    mockDeleteBlob: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: vi.fn(), queryOne: mockQueryOne }));
+// `query` is the reference query the REAL blob-ownership bind gate issues — this
+// suite exercises that gate rather than stubbing it, so "already claimed by
+// another row" is expressed as the rows that query returns.
+vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
+// Only the two storage round trips are faked, so the tests below can assert that a
+// refused path never reaches either. `classifyBlobPath` stays REAL — it is the
+// pure string check the gate is built on.
+vi.mock('../shared/blob', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/blob')>()),
+  headBlob: mockHeadBlob,
+  deleteBlob: mockDeleteBlob,
+}));
 
 import handler from './index';
 
@@ -30,6 +46,10 @@ describe('organization-create', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
+    // Default: the bind gate's reference query finds nobody, so a well-shaped
+    // fresh logo path binds.
+    mockQuery.mockResolvedValue([]);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -143,6 +163,57 @@ describe('organization-create', () => {
     const res = await handler(baseReq({ ...validBody, logo_url: 42 }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'logo_url must be a string or null' });
+  });
+
+  // ── The bind gate (#280) ────────────────────────────────────────────────────
+  // Before this, organization-create was the seventh writer into a column in the
+  // reconciliation union and the only one outside the ownership gates: it stored
+  // whatever string it was handed.
+
+  it('refuses a foreign-shaped logo_url BEFORE any storage or write call', async () => {
+    // A lesson video path posted to logo_url. `course-player-data` hands every
+    // lesson path to any active org member, so this is not a guess.
+    const res = await handler(baseReq({ ...validBody, logo_url: 'someone-elses-lesson.mp4' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+    expect(mockHeadBlob).not.toHaveBeenCalled();
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+    // Out-of-family is a pure string verdict — it does not even cost a round trip.
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('refuses an avatar path posted to logo_url', async () => {
+    const res = await handler(baseReq({ ...validBody, logo_url: 'avatars/victim.png' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('refuses a well-shaped org-logo path another org already references', async () => {
+    // Shape alone cannot catch this: every org logo is `org-logos/<uuid>.<ext>`,
+    // and `/organizations` hands logo_url to plain learners.
+    mockQuery.mockResolvedValueOnce([{ path: 'org-logos/other-org.png' }]);
+    const res = await handler(baseReq({ ...validBody, logo_url: 'org-logos/other-org.png' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('accepts a freshly minted org-logo path no row references', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' });
+    const res = await handler(baseReq({ ...validBody, logo_url: 'org-logos/fresh.png' }), {} as any);
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params[2]).toBe('org-logos/fresh.png');
+  });
+
+  it('gates AFTER the platform-admin check — a denied caller never reaches the DB', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const res = await handler(baseReq({ ...validBody, logo_url: 'org-logos/fresh.png' }), {} as any);
+    expect(res.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
   it('returns 400 when seat_limit is not a positive integer', async () => {

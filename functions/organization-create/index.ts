@@ -1,6 +1,8 @@
 import { queryOne, isUniqueViolation } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { validateOrgName, validateOrgSlug, normalizeOrgName } from '../shared/org-validation';
+import { assertBindablePaths } from '../shared/blob-ownership';
+import type { UploadCandidate } from '../shared/upload-limits';
 
 export default endpoint('organization-create', async ({ req, reply, requirePlatformAdmin }) => {
   const body = await req.json() as Record<string, unknown>;
@@ -33,6 +35,28 @@ export default endpoint('organization-create', async ({ req, reply, requirePlatf
   // "Platform admins can do everything with orgs" was the only INSERT-capable policy.
   requirePlatformAdmin();
 
+  const nextLogoUrl = (logo_url as string | null | undefined) ?? null;
+
+  // Ownership gate on the bound logo path (#280). This endpoint was the seventh
+  // writer into a column in the reconciliation union and the only one outside the
+  // gates: it accepted any string, so a path belonging to another org's live logo
+  // (readable by any learner via `/organizations`) or to a lesson video could be
+  // bound here — and once bound, `organization-update`'s superseded-blob cleanup
+  // is what would eventually act on it. Family `'org-logo'` is the COLUMN's
+  // property, never the caller's claim, and there is no `previousPaths`: the row
+  // does not exist yet, so every path is fresh and must clear the check.
+  //
+  // Placed after `requirePlatformAdmin()` so an unauthorized caller still never
+  // reaches the DB (pinned by the 403 test), and before the INSERT so a refused
+  // path never lands in a row. Unlike `organization-update` there is no
+  // `enforceUploadLimits` to order against — creation is platform-admin-only and
+  // the org logo is re-checked on every subsequent update.
+  const candidates: UploadCandidate[] = [{ path: nextLogoUrl, kind: 'image', family: 'org-logo' }];
+  const bindError = await assertBindablePaths(candidates);
+  if (bindError) {
+    return reply(400, { error: bindError });
+  }
+
   try {
     const organization = await queryOne(
       `INSERT INTO organizations (name, slug, logo_url, seat_limit)
@@ -41,7 +65,7 @@ export default endpoint('organization-create', async ({ req, reply, requirePlatf
       [
         normalizeOrgName(name as string),
         slug,
-        (logo_url as string | null | undefined) ?? null,
+        nextLogoUrl,
         (seat_limit as number | null | undefined) ?? null,
       ],
     );

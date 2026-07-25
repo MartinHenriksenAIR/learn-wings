@@ -33,8 +33,14 @@
  *    error propagates and the request 500s. The write needs the database anyway,
  *    so there is no scenario where refusing here breaks something that would
  *    otherwise have worked.
- *  - `isBlobReleasable` fails SAFE. Anything short of a conclusive "nothing
- *    references this" returns false and the blob is left for `orphan-sweep`.
+ *  - `releasablePaths` (and its single-path form `isBlobReleasable`) fails SAFE.
+ *    Anything short of a conclusive "nothing references this" drops the path —
+ *    the whole batch, in fact — and the blobs are left for `orphan-sweep`.
+ *
+ * WHO CALLS WHICH. The update endpoints supersede at most one path per column
+ * and use `isBlobReleasable`; the cascade deletes (lesson/module/course-delete)
+ * hand whole subtrees to `releasablePaths` after the row DELETE, which is what
+ * stops a cascade from destroying a blob a surviving row still points at.
  */
 
 import { query } from './db';
@@ -166,29 +172,59 @@ export async function assertBindablePaths(
 }
 
 /**
- * May this superseded path be deleted? Call it immediately before `deleteBlob`,
- * and only AFTER the row write has landed — at that point the row no longer
- * references the old path, so "referenced by nobody" is the right question.
+ * The release gate, batched: which of `paths` may actually be deleted, in
+ * first-occurrence order. Call it immediately before the `deleteBlob` calls, and
+ * only AFTER the row write (or row DELETE) has landed — at that point no row
+ * references the superseded paths any more, so "referenced by nobody" is the
+ * right question, and anything still coming back referenced belongs to somebody
+ * else.
  *
- * Two ways to answer no, both meaning "leave it for `orphan-sweep`":
- *  - the value is not a path in this column's family (an absolute external URL,
- *    a legacy multi-segment name) — we cannot establish that it names a blob we
- *    own, and rows written before the bind gate existed can still hold one;
- *  - some other row still references it, or the database could not tell us.
+ * Three ways a path is dropped, all meaning "leave it for `orphan-sweep`":
+ *  - it is empty/absent;
+ *  - it is not a path in this column's family (an absolute external URL, a
+ *    branding path in an LMS column) — we cannot establish that it names a blob
+ *    we own, and rows written before the bind gate existed can still hold one;
+ *  - some other row still references it, OR the database could not tell us.
+ *
+ * FAILS SAFE as a unit: one unanswered reference query drops the WHOLE batch
+ * rather than guessing per path. The caller's request still succeeds — a delete
+ * that does not happen costs pennies and the nightly sweep picks it up, while a
+ * delete that should not have happened is unrecoverable.
+ *
+ * WHY BATCHED, and not `Promise.all(paths.map(isBlobReleasable))`: the cascade
+ * deletes hand it whole subtrees. A course with fifty lessons offers up to 151
+ * paths, and the per-path form would open 151 round trips to ask a question one
+ * `= ANY($1::text[])` answers. Duplicates collapse here too, so a path stored in
+ * two columns of the same row is asked about once and deleted once.
  */
-export async function isBlobReleasable(path: string, family: BlobPathFamily): Promise<boolean> {
-  if (!isStoredPath(path)) return false;
-  if (classifyBlobPath(path, family) !== 'own') return false;
+export async function releasablePaths(
+  paths: readonly (string | null | undefined)[],
+  family: BlobPathFamily,
+): Promise<string[]> {
+  const own = [...new Set(paths.filter(isStoredPath))]
+    .filter((path) => classifyBlobPath(path, family) === 'own');
+  if (own.length === 0) return [];
 
   try {
-    return (await referencedSubset([path])).size === 0;
+    const referenced = await referencedSubset(own);
+    return own.filter((path) => !referenced.has(path));
   } catch (err: unknown) {
-    // Post-write cleanup must never turn a successful update into a 500, and an
+    // Post-write cleanup must never turn a successful write into a 500, and an
     // unanswered question must never resolve to "delete it".
     console.warn(
-      '[blob-ownership] could not confirm the path is unreferenced; leaving it:',
+      '[blob-ownership] could not confirm the path(s) are unreferenced; leaving them:',
       err instanceof Error ? err.message : err,
     );
-    return false;
+    return [];
   }
+}
+
+/**
+ * May this ONE superseded path be deleted? The single-path form of
+ * `releasablePaths` — same rules, same fail-SAFE direction — for the update
+ * endpoints, which supersede at most one path per column and read better
+ * spelled `if (await isBlobReleasable(old, family)) await deleteBlob(old)`.
+ */
+export async function isBlobReleasable(path: string, family: BlobPathFamily): Promise<boolean> {
+  return (await releasablePaths([path], family)).length === 1;
 }
