@@ -3,6 +3,7 @@ import type { InvocationContext, Timer } from '@azure/functions';
 import { query } from '../shared/db';
 import { deleteBlob } from '../shared/blob';
 import { generateContainerSasToken, SAS_SIGNED_VERSION } from '../shared/sas';
+import { UPLOAD_LIMITS, fileExtension, type UploadAssetKind } from '../shared/upload-limits';
 
 /**
  * ORPHAN SWEEP (#277) — the only unattended, scheduled DELETER of production
@@ -79,30 +80,101 @@ const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
  * ceiling. Both tripwires would pass while every avatar and org logo in the
  * system was destroyed in one night.
  *
- * So the share is evaluated TWICE:
- *   - globally, over every eligible blob; and
+ * So the share is evaluated at THREE granularities, and ANY of them over the
+ * ceiling aborts the whole run:
+ *   - globally, over every eligible blob;
  *   - per TOP-LEVEL PREFIX BUCKET — `''` (container root), `avatars/`,
- *     `org-logos/`, `documents/`, and any other prefix the listing actually
- *     contains — with ANY bucket over the ceiling aborting the whole run.
- * That turns the 11% global share above into a 100% `avatars/` share.
+ *     `org-logos/`, `documents/`, `videos/`, and any other prefix the listing
+ *     actually contains; and
+ *   - per FILE-TYPE CLASS WITHIN THE CONTAINER ROOT — image / video / document /
+ *     other, read off the extension (`rootFileClass`).
+ * The second turns the 11% global share above into a 100% `avatars/` share.
  *
- * The per-bucket check deliberately has NO minimum-size floor: a bucket holding
- * two blobs, both unreferenced, trips it. A floor is exactly the hole this
- * exists to close, and the asymmetry of errors says a nuisance abort (one night
- * of unreclaimed storage, loudly logged with the bucket named) is the cheap
- * side.
+ * The third (#282) exists because the root is the one bucket that is NOT a single
+ * writer's namespace. `courses.thumbnail_url` puts images there and the bare
+ * lesson paths put videos and documents there, and production holds far more
+ * videos than thumbnails — so a break confined to thumbnails is diluted INSIDE
+ * the root bucket exactly as the branding break above was diluted inside the
+ * container. Same blind spot, one level down. Split by extension, a
+ * thumbnails-only break reads as ~100% of the root image class instead of a thin
+ * slice of everything at the root.
+ *
+ * The PREFIX buckets are deliberately not split any further. Each already belongs
+ * to one writer, so a break in it already shows up as a whole-bucket anomaly, and
+ * subdividing them would only manufacture more small populations for a healthy
+ * night to trip over.
+ *
+ * FLOORS. The prefix buckets and the container root as a whole have NO
+ * minimum-size floor: a bucket holding two blobs, both unreferenced, trips them.
+ * A floor there is exactly the hole this exists to close, and the asymmetry of
+ * errors says a nuisance abort (one night of unreclaimed storage, loudly logged
+ * with the bucket named) is the cheap side. The root FILE-TYPE CLASSES do carry a
+ * small floor, for a reason that does not apply to any of the others — see
+ * `MIN_ROOT_CLASS_ORPHANS`.
  *
  * A genuine first-run backlog can also trip this. That is the intended outcome:
  * the run logs loudly and a human decides, rather than an unattended job
  * deleting most of the container on its first night.
  *
- * WHAT IT STILL DOES NOT CATCH, stated plainly: a break confined to a column
- * that shares a bucket with a much larger one. `courses.thumbnail_url` and the
- * bare lesson-video paths both live at the container root, so a thumbnail-only
- * break shows up diluted by every root-level video. Bucketing narrows the blind
- * spot to same-bucket columns; it does not eliminate it.
+ * CONSIDERED AND DECLINED (#282) — a complementary tripwire: "the database
+ * references `avatars/` paths but the listing returned no `avatars/` blob at all,
+ * so refuse". It was weighed and deliberately left out. That decision is recorded
+ * here so the gap it leaves is on the record rather than something a later reader
+ * rediscovers as an oversight and closes without knowing the cost.
+ *   WHAT IT WOULD HAVE CAUGHT is the one hole bucketing structurally cannot: a
+ *   normalisation applied UPSTREAM, inside `parseListPage`, transforms the listed
+ *   name before anything buckets it. Every blob then collapses into the root,
+ *   every per-bucket census agrees with itself, and no amount of per-bucket
+ *   analysis sees anything wrong.
+ *   WHY IT IS NOT HERE: it also fires when branding blobs are genuinely ABSENT
+ *   from storage while rows still reference them — what a manual cleanup, a
+ *   restore, or a partly-failed migration leaves behind. That state is untidy,
+ *   not broken, and it does not heal on its own: the sweep would refuse every
+ *   night until a human intervened. A tripwire that fires on healthy data gets
+ *   its ceiling raised to shut it up, and these ceilings are the safety system.
+ *   WHAT STANDS BEHIND THE GAP, without flattery: the global share and the
+ *   per-run count ceiling, and nothing else. For the production shape described
+ *   at the top of this comment, an upstream collapse reads as roughly the same
+ *   ~11% that motivated bucketing in the first place, so those two are a thin
+ *   backstop for this specific failure rather than a substitute for the check.
+ *   What makes the trade acceptable is not their strength but that the hole
+ *   cannot open by itself: it takes a specific edit to `parseListPage`, which is
+ *   why "the listed name is used verbatim" is written at the top of this file, at
+ *   `parseListPage`, and next to `blobBucket`.
  */
 const DEFAULT_MAX_ORPHAN_SHARE = 0.5;
+
+/**
+ * How many orphans a ROOT FILE-TYPE CLASS must hold before its share is allowed
+ * to abort a run. Applies ONLY to the classes the #282 root split creates; the
+ * prefix buckets and the container root as a whole keep their no-floor rule,
+ * unchanged.
+ *
+ * WHY THE SPLIT NEEDS A FLOOR AND THE PREFIX BUCKETS DO NOT. `avatars/`,
+ * `org-logos/`, `documents/` and `videos/` are namespaces a real writer owns and
+ * keeps populated, so "this entire namespace is unreferenced" is anomalous at any
+ * size. The root classes are a synthetic subdivision of ONE namespace, and two of
+ * the four have no current writer at all: nothing mints a root-level `.pdf` or an
+ * off-allow-list extension today, so a single stray blob makes `document` or
+ * `other` 1/1 = 100%. Without a floor that one blob aborts the sweep — and keeps
+ * aborting it every night forever, because the only thing that could clear the
+ * blob is the sweep the blob is blocking. A tripwire that fires on healthy data
+ * gets its ceiling raised to shut it up, and the ceilings are the safety system.
+ *
+ * Not hypothetical: this endpoint's own healthy-container fixtures already reach
+ * 60% in the root `video` class (three stray root `.mp4`s beside two referenced
+ * ones) on runs that must NOT abort, and 100% in `other` on a single stray file.
+ *
+ * WHY FIVE, AND WHAT IT COSTS. The bug class this tripwire exists for is a break
+ * in a path-writing COLUMN, which false-orphans everything that column ever wrote
+ * — hundreds of thumbnails, not four. A floor of five therefore never stands
+ * between the tripwire and the bug it is for. What it costs is precision on tiny
+ * classes: at most four orphans per class per night go unjudged BY THIS CHECK.
+ * They are still counted by the undivided container-root bucket, by the global
+ * share and by the per-run count ceiling, all of which see them exactly as they
+ * did before the split — so no run that aborts today stops aborting.
+ */
+const MIN_ROOT_CLASS_ORPHANS = 5;
 
 /**
  * TRIPWIRE 2 — an absolute ceiling, independent of the share.
@@ -233,10 +305,85 @@ export interface ListedBlob {
  * normalisation applied at the comparison site cannot also launder the bucket.
  * (A normalisation applied further upstream — in `parseListPage` itself — WOULD
  * collapse every bucket into the root; see TRIPWIRE 1 for what remains uncaught.)
+ *
+ * This is the PREFIX bucket only. `blobBuckets` is what the census actually uses,
+ * because a root-level name is additionally counted in its file-type class.
  */
 export function blobBucket(name: string): string {
   const slash = name.indexOf('/');
   return slash < 0 ? '' : name.slice(0, slash + 1);
+}
+
+/** A root-level blob's file-type class. `other` is a real bucket, not a discard. */
+export type RootFileClass = UploadAssetKind | 'other';
+
+/**
+ * Census-key prefix for the root file-type classes.
+ *
+ * `:` is outside SAFE_BLOB_NAME and every prefix-bucket key ends in `/`, so a
+ * class key can never collide with a bucket key derived from a real blob name.
+ */
+const ROOT_CLASS_KEY = 'root:';
+
+/**
+ * The upload kinds, in lookup order. Their extension sets are disjoint
+ * (`shared/upload-limits`), so the order is documentation, not precedence.
+ */
+const UPLOAD_KINDS: readonly UploadAssetKind[] = ['image', 'video', 'document'];
+
+/** How each class is named in an abort message. */
+const ROOT_CLASS_LABELS: Readonly<Record<RootFileClass, string>> = {
+  image: 'image files at the container root',
+  video: 'video files at the container root',
+  document: 'document files at the container root',
+  other: 'files of no recognised type at the container root',
+};
+
+/**
+ * The file-type class of a root-level blob name, taken from its extension.
+ *
+ * READING an extension is not transforming the name, and the distinction is the
+ * whole discipline of this file. The lower-casing inside `fileExtension` feeds a
+ * CENSUS KEY and nothing else: `referenced.has()` and the DELETE both still
+ * address `blob.name` exactly as Azure returned it. An edit that lets a value
+ * derived here reach either of those breaks the rule the header states.
+ *
+ * The extension→kind table is `UPLOAD_LIMITS`, the same allow-list the mint and
+ * persist gates use, rather than a second list here that would drift from it. An
+ * extension off that list — a legacy `.tif`, a name with no dot at all — lands in
+ * `other`, which is counted like any other class.
+ */
+export function rootFileClass(name: string): RootFileClass {
+  const ext = fileExtension(name);
+  return UPLOAD_KINDS.find((kind) => UPLOAD_LIMITS[kind].extensions.has(ext)) ?? 'other';
+}
+
+/** The class a census key names, or null when the key is a prefix bucket instead. */
+function rootClassOf(bucket: string): RootFileClass | null {
+  if (!bucket.startsWith(ROOT_CLASS_KEY)) return null;
+  const cls = bucket.slice(ROOT_CLASS_KEY.length);
+  return cls in ROOT_CLASS_LABELS ? (cls as RootFileClass) : null;
+}
+
+/**
+ * Every census bucket a listed name belongs to (TRIPWIRE 1).
+ *
+ * A prefixed name belongs to exactly one — its prefix bucket. A root-level name
+ * belongs to TWO: the undivided container root, exactly as before #282, and its
+ * file-type class. Counting it in both is what makes the root split strictly
+ * ADDITIVE — the root-wide check keeps its old sensitivity and its no-floor rule
+ * whatever `MIN_ROOT_CLASS_ORPHANS` does, so no run that aborted before the split
+ * stops aborting after it.
+ *
+ * The root bucket is emitted FIRST, and a class key can only ever be created by a
+ * root-level name, so `''` is always inserted into the census map before any of
+ * its classes. That is what makes the whole-root diagnosis win over a class
+ * diagnosis when both are over the ceiling, whatever order the listing came in.
+ */
+export function blobBuckets(name: string): string[] {
+  const prefix = blobBucket(name);
+  if (prefix !== '') return [prefix];
+  return ['', `${ROOT_CLASS_KEY}${rootFileClass(name)}`];
 }
 
 /** Why a run refused to delete anything. Every value means "nothing was deleted". */
@@ -629,8 +776,9 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   // strip its prefix, do not lower-case it.
   const orphans: ListedBlob[] = [];
   const deletable: ListedBlob[] = [];
-  // Per-bucket census for TRIPWIRE 1, keyed by top-level prefix. Counted off the
-  // raw listed name — the same string the `referenced.has` comparison below uses.
+  // Per-bucket census for TRIPWIRE 1, keyed by top-level prefix and — for
+  // root-level names — additionally by file-type class. Counted off the raw
+  // listed name, the same string the `referenced.has` comparison below uses.
   const bucketEligible = new Map<string, number>();
   const bucketOrphaned = new Map<string, number>();
   for (const blob of blobs) {
@@ -648,12 +796,12 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
       continue;
     }
     summary.eligible++;
-    const bucket = blobBucket(blob.name);
-    bucketEligible.set(bucket, (bucketEligible.get(bucket) ?? 0) + 1);
+    const buckets = blobBuckets(blob.name);
+    for (const bucket of buckets) bucketEligible.set(bucket, (bucketEligible.get(bucket) ?? 0) + 1);
     if (referenced.has(blob.name)) continue;
 
     orphans.push(blob);
-    bucketOrphaned.set(bucket, (bucketOrphaned.get(bucket) ?? 0) + 1);
+    for (const bucket of buckets) bucketOrphaned.set(bucket, (bucketOrphaned.get(bucket) ?? 0) + 1);
     // Unknown age counts as brand new — an upload we cannot date is exactly the
     // one that might still be sitting in an open form.
     if (blob.lastModified === null || now - blob.lastModified < GRACE_PERIOD_MS) {
@@ -687,15 +835,30 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   // The per-bucket pass. The global share above can sit comfortably under the
   // ceiling while one prefix is 100% false-orphaned — that is the whole point of
   // this loop, and it is the difference between "11% of the container looks odd"
-  // and "every avatar in the system is about to be deleted".
+  // and "every avatar in the system is about to be deleted". The root file-type
+  // classes are in the same map (see `blobBuckets`), so the same reasoning runs
+  // one level down inside the root, where two writers share a bucket.
+  //
+  // ONE abort reason covers all of them: it is one tripwire with a finer census,
+  // not three failures, and it is the MESSAGE that has to be actionable — so the
+  // message names the bucket, its share, the container-wide share it hid behind,
+  // and sample paths to spot-check.
   for (const [bucket, eligible] of bucketEligible) {
     const orphaned = bucketOrphaned.get(bucket) ?? 0;
+    const rootClass = rootClassOf(bucket);
+    // The floor applies to the root classes and to nothing else — see
+    // MIN_ROOT_CLASS_ORPHANS for why they need one and the prefix buckets do not.
+    if (rootClass !== null && orphaned < MIN_ROOT_CLASS_ORPHANS) continue;
     const bucketShare = orphaned / eligible;
     if (bucketShare <= maxShare) continue;
-    const label = bucket === '' ? 'the container root' : bucket;
+    const label = rootClass !== null ? ROOT_CLASS_LABELS[rootClass] : bucket === '' ? 'the container root' : bucket;
+    const diagnosis =
+      rootClass !== null
+        ? 'The root is the one bucket two writers share — courses.thumbnail_url puts images there, the bare lesson paths put videos and documents there — so it is censused per file-type class, by extension. One class going bad like this is what a break confined to one of those columns looks like once the rest of the root has diluted it away.'
+        : 'A single prefix going bad like this is what a break confined to one path-writing column looks like.';
     return abort(
       'orphan-bucket-share-implausible',
-      `${orphaned}/${eligible} blobs under ${label} (${pct(bucketShare)}) look unreferenced, above the ${pct(maxShare)} ceiling — even though the container as a whole is only ${pct(share)} unreferenced. A single prefix going bad like this is what a break confined to one path-writing column looks like. Sample: ${sampleOf(orphans.filter((b) => blobBucket(b.name) === bucket))}.`,
+      `${orphaned}/${eligible} blobs under ${label} (${pct(bucketShare)}) look unreferenced, above the ${pct(maxShare)} ceiling — even though the container as a whole is only ${pct(share)} unreferenced. ${diagnosis} Sample: ${sampleOf(orphans.filter((b) => blobBuckets(b.name).includes(bucket)))}.`,
       brokenMatchRemedy,
     );
   }

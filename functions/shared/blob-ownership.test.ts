@@ -6,7 +6,7 @@ const { mockQuery } = vi.hoisted(() => ({ mockQuery: vi.fn() }));
 // thing, as is `classifyBlobPath` from ./blob.
 vi.mock('./db', () => ({ query: mockQuery }));
 
-import { assertBindablePaths, isBlobReleasable } from './blob-ownership';
+import { assertBindablePaths, isBlobReleasable, releasablePaths } from './blob-ownership';
 import type { UploadCandidate } from './upload-limits';
 
 const REJECTION = 'Invalid upload path';
@@ -256,6 +256,48 @@ describe('isBlobReleasable', () => {
   it('fails SAFE when the reference query throws — an unanswered question is not a delete', async () => {
     mockQuery.mockRejectedValue(new Error('connection refused'));
     await expect(isBlobReleasable('avatars/old.png', 'avatar')).resolves.toBe(false);
+  });
+});
+
+describe('releasablePaths — the batched release gate the cascade deletes use', () => {
+  it('returns the unreferenced paths in first-occurrence order', async () => {
+    referencedByNobody();
+    await expect(releasablePaths(['a.mp4', 'documents/b.pdf', 'c.png'], 'lms'))
+      .resolves.toEqual(['a.mp4', 'documents/b.pdf', 'c.png']);
+  });
+
+  it('drops ONLY the paths another row still references', async () => {
+    // The regression the cascade deletes needed: a path shared with a lesson that
+    // is NOT being deleted survives, and its unshared sibling still goes.
+    referencedBySomeone('shared.mp4');
+    await expect(releasablePaths(['shared.mp4', 'own.mp4'], 'lms'))
+      .resolves.toEqual(['own.mp4']);
+  });
+
+  it('asks about the whole batch in ONE query, each distinct path once', async () => {
+    referencedByNobody();
+    await expect(releasablePaths(['a.mp4', 'a.mp4', 'b.mp4'], 'lms'))
+      .resolves.toEqual(['a.mp4', 'b.mp4']);
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockQuery.mock.calls[0][1]).toEqual([['a.mp4', 'b.mp4']]);
+  });
+
+  it('drops nulls, undefined and empty strings without asking anything', async () => {
+    await expect(releasablePaths([null, undefined, ''], 'lms')).resolves.toEqual([]);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('drops out-of-family values and absolute URLs before the query', async () => {
+    referencedByNobody();
+    await expect(
+      releasablePaths(['https://cdn.example.com/x.png', 'avatars/victim.png', 'keep.png'], 'lms'),
+    ).resolves.toEqual(['keep.png']);
+    expect(mockQuery.mock.calls[0][1]).toEqual([['keep.png']]);
+  });
+
+  it('fails SAFE as a UNIT — one unanswered query releases nothing at all', async () => {
+    mockQuery.mockRejectedValue(new Error('connection refused'));
+    await expect(releasablePaths(['a.mp4', 'b.mp4'], 'lms')).resolves.toEqual([]);
   });
 });
 

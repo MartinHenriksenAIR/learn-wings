@@ -1,25 +1,35 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const {
-  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob,
+  mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockDeleteBlob,
 } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
+    mockQuery: vi.fn(),
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
     mockDeleteBlob: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne, withTransaction: vi.fn(), getDb: vi.fn() }));
+// `query` is the reference query the REAL blob-ownership release gate issues — this
+// suite exercises that gate rather than stubbing it, so "referenced by another row"
+// is expressed here as the rows that query returns.
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne, withTransaction: vi.fn(), getDb: vi.fn() }));
 vi.mock('../shared/profile', () => ({
   getProfile: mockGetProfile,
   isActiveMember: vi.fn(),
   isOrgAdmin: vi.fn(),
   isOrgAdminOfAny: vi.fn(),
 }));
-vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
+// Only the storage call is faked. `classifyBlobPath` stays REAL because
+// blob-ownership imports it from here and it is a pure string check — stubbing it
+// would make every release-gate assertion below vacuous.
+vi.mock('../shared/blob', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/blob')>()),
+  deleteBlob: mockDeleteBlob,
+}));
 
 import handler from './index';
 
@@ -40,6 +50,10 @@ describe('lesson-delete', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
     mockDeleteBlob.mockResolvedValue(true);
+    // Default: the release gate's reference query finds nobody, so every collected
+    // path is releasable.
+    mockQuery.mockResolvedValue([]);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -99,13 +113,17 @@ describe('lesson-delete', () => {
     expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
-  it('DELETE SQL uses RETURNING azure_blob_path', async () => {
+  it('DELETE SQL returns all three lesson blob columns', async () => {
     mockQueryOne.mockResolvedValueOnce({ id: 'lesson-1', azure_blob_path: null });
     await handler(baseReq(validBody), {} as any);
     const sql = mockQueryOne.mock.calls[0][0] as string;
     expect(sql).toMatch(/DELETE FROM lessons WHERE id = \$1/i);
     expect(sql).toMatch(/RETURNING/i);
     expect(sql).toMatch(/azure_blob_path/i);
+    // #280: document lessons and Supabase-era videos live in the other two columns;
+    // returning only azure_blob_path stranded their blobs.
+    expect(sql).toMatch(/video_storage_path/i);
+    expect(sql).toMatch(/document_storage_path/i);
     // Single DB call — no separate SELECT before the DELETE
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
   });
@@ -150,6 +168,74 @@ describe('lesson-delete', () => {
     expect(res.status).toBe(200);
     expect(mockDeleteBlob).toHaveBeenCalledWith('videos/lesson-1.mp4');
     expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: true });
+  });
+
+  it('deletes the video, the document AND the legacy video_storage_path blob — #280', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: 'lesson-1',
+      video_storage_path: 'videos/legacy.mp4',
+      azure_blob_path: 'new.mp4',
+      document_storage_path: 'documents/handout.pdf',
+    });
+    const res = await handler(baseReq(validBody), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: true });
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(3);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('videos/legacy.mp4');
+    expect(mockDeleteBlob).toHaveBeenCalledWith('new.mp4');
+    expect(mockDeleteBlob).toHaveBeenCalledWith('documents/handout.pdf');
+  });
+
+  it('deletes a path duplicated across two columns exactly once', async () => {
+    mockQueryOne.mockResolvedValueOnce({
+      id: 'lesson-1',
+      video_storage_path: 'same.mp4',
+      azure_blob_path: 'same.mp4',
+      document_storage_path: null,
+    });
+    const res = await handler(baseReq(validBody), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('same.mp4');
+  });
+
+  it('leaves a path another row still references, and still deletes its sibling — #280', async () => {
+    // Pre-#279 rows can share a path; deleting this lesson must not destroy the
+    // blob a surviving lesson points at. The unreferenced sibling in the same run
+    // is what keeps this test non-vacuous.
+    mockQueryOne.mockResolvedValueOnce({
+      id: 'lesson-1',
+      video_storage_path: null,
+      azure_blob_path: 'shared.mp4',
+      document_storage_path: 'documents/mine.pdf',
+    });
+    mockQuery.mockResolvedValueOnce([{ path: 'shared.mp4' }]);
+    const res = await handler(baseReq(validBody), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('documents/mine.pdf');
+    expect(mockDeleteBlob).not.toHaveBeenCalledWith('shared.mp4');
+  });
+
+  it('release-check DB failure: nothing deleted, request still succeeds', async () => {
+    // The gate fails SAFE — an unanswered "is anyone else using this?" must never
+    // resolve to "delete it", and must never turn a completed delete into a 500.
+    mockQueryOne.mockResolvedValueOnce({
+      id: 'lesson-1',
+      video_storage_path: null,
+      azure_blob_path: 'new.mp4',
+      document_storage_path: 'documents/handout.pdf',
+    });
+    // Standing rejection, not a queued `…Once`: the only `query` this endpoint
+    // issues IS the release check, and a leftover queue entry must not be able to
+    // satisfy the assertion by never being consumed. beforeEach's
+    // `mockResolvedValue([])` replaces it for the next test.
+    mockQuery.mockReset();
+    mockQuery.mockRejectedValue(new Error('connection refused'));
+    const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ success: true, blobDeleted: null });
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
   it('returns 500 on db error propagating err.message', async () => {

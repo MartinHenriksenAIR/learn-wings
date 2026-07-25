@@ -15,7 +15,15 @@ vi.mock('../shared/db', () => ({
   getDb: vi.fn(),
 }));
 
-import { runOrphanSweep, runScheduledSweep, referenceVariants, parseListPage, blobBucket } from './index';
+import {
+  runOrphanSweep,
+  runScheduledSweep,
+  referenceVariants,
+  parseListPage,
+  blobBucket,
+  blobBuckets,
+  rootFileClass,
+} from './index';
 
 const NOW = Date.parse('2026-07-25T03:00:00.000Z');
 const HOUR = 3_600_000;
@@ -427,6 +435,183 @@ describe('orphan-sweep — per-bucket orphan share', () => {
 
     expect(deleted).toEqual([]);
     expect(summary).toMatchObject({ aborted: true, reason: 'orphan-share-implausible' });
+  });
+
+  it('still aborts on a TWO-blob prefix bucket — the root-class floor is not applied here', async () => {
+    // The prefix buckets have no minimum-size floor and must not acquire one:
+    //   listing        = 40 referenced root .mp4 + 2 unreferenced videos/ = 42 eligible
+    //   GLOBAL share   =  2/42 = 4.8%   → under the ceiling,  does NOT trip
+    //   root bucket    =  0/40 = 0%     → does NOT trip
+    //   videos/ share  =  2/2  = 100%   → over the ceiling,   TRIPS
+    // Two orphans is below MIN_ROOT_CLASS_ORPHANS; if that floor were ever
+    // generalised to every bucket, this run would sweep instead of refusing.
+    const root = rootFleet(40);
+    mockQuery.mockResolvedValue(root.map((path) => ({ path })));
+    const { deleted } = stubFetch({
+      pages: [
+        listPage([...root.map((name) => ({ name })), { name: 'videos/a.mp4' }, { name: 'videos/b.mp4' }]),
+      ],
+    });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
+    expect(deleted).toEqual([]);
+    expect(summary).toMatchObject({ aborted: true, reason: 'orphan-bucket-share-implausible', deleted: 0 });
+    expect(log.error.mock.calls[0][0] as string).toContain('2/2');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// TRIPWIRE 1, one level down — the root file-type classes (#282)
+//
+// The root is the only bucket two writers share: `courses.thumbnail_url` puts
+// images there and the bare lesson paths put videos and documents there. So the
+// dilution the per-bucket pass was built to remove reappears INSIDE the root
+// bucket — a thumbnails-only break is a thin slice of a much larger video
+// population. Splitting the root by file-type class is what separates them.
+// ──────────────────────────────────────────────────────────────────────────────
+describe('orphan-sweep — root file-type classes', () => {
+  const rootFleet = (n: number) => Array.from({ length: n }, (_, i) => `root-${i}.mp4`);
+
+  it('aborts when the root IMAGE class is wholly unreferenced but the root as a whole is not', async () => {
+    // THE #282 REGRESSION TEST — a break confined to `courses.thumbnail_url`.
+    //
+    // ARITHMETIC — every ceiling that could have stopped this, and what it saw:
+    //   listing            = 200 referenced root .mp4
+    //                      +  12 UNREFERENCED root .png (every thumbnail in the system)
+    //                      +  20 referenced avatars/     = 232 eligible
+    //   GLOBAL share       = 12/232 =  5.2%  → under the 50% ceiling,  does NOT trip
+    //   deletion count     = 12               → under the 500 ceiling,  does NOT trip
+    //   avatars/ share     =  0/20  =  0%     → does NOT trip
+    //   ROOT BUCKET share  = 12/212 =  5.7%  → under the ceiling,      does NOT trip
+    //   root VIDEO class   =  0/200 =  0%     → does NOT trip
+    //   root IMAGE class   = 12/12  = 100%    → over the ceiling,      TRIPS
+    // Every pre-#282 check waves this through: the root bucket alone is 5.7%,
+    // because 200 healthy videos dilute 12 dead thumbnails. Remove the root split
+    // and this run deletes every course thumbnail in the container in one night.
+    const root = rootFleet(200);
+    const avatars = Array.from({ length: 20 }, (_, i) => `avatars/u-${i}.jpg`);
+    const thumbnails = Array.from({ length: 12 }, (_, i) => `thumb-${i}.png`);
+    mockQuery.mockResolvedValue([...root, ...avatars].map((path) => ({ path })));
+    const { deleted } = stubFetch({
+      pages: [listPage([...root, ...avatars, ...thumbnails].map((name) => ({ name })))],
+    });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
+    expect(deleted).toEqual([]);
+    expect(summary).toMatchObject({
+      aborted: true,
+      reason: 'orphan-bucket-share-implausible',
+      eligible: 232,
+      orphaned: 12,
+      deleted: 0,
+    });
+    // 5.2% globally — the share every other tripwire in this file was happy with.
+    expect(summary.orphaned / summary.eligible).toBeLessThan(0.5);
+    const message = log.error.mock.calls[0][0] as string;
+    // Naming "the container root" alone is not actionable when the root holds
+    // 212 blobs and only 12 are the problem — the class has to be in the message.
+    expect(message).toContain('image files at the container root');
+    expect(message).toContain('12/12');
+    expect(message).toContain('thumb-0.png');
+  });
+
+  it('sweeps a healthy container with orphans scattered across every class', async () => {
+    // THE FALSE-POSITIVE GUARD. A tripwire that fires on a normal night gets its
+    // ceiling raised to shut it up, and the ceilings are the whole safety system.
+    //
+    //   root video     = 40 referenced + 3 orphans =  3/43  =  7.0%  → fine
+    //   root image     = 12 referenced + 2 orphans =  2/14  = 14.3%  → fine
+    //   root document  =  6 referenced + 1 orphan  =  1/7   = 14.3%  → fine
+    //   root other     =  0 referenced + 1 orphan  =  1/1   =  100%  → BELOW the
+    //       floor of 5 orphans, so it does not abort. Nothing mints a root `.tif`,
+    //       so that class holds exactly one stray blob and no healthy population
+    //       to measure it against — and the only thing that could ever clear the
+    //       blob is the sweep it would be blocking.
+    //   avatars/       = 10 referenced + 1 orphan  =  1/11  =  9.1%  → fine
+    //   documents/     =  5 referenced + 1 orphan  =  1/6   = 16.7%  → fine
+    //   ROOT BUCKET    = 58 referenced + 7 orphans =  7/65  = 10.8%  → fine
+    //   GLOBAL         = 73 referenced + 9 orphans =  9/82  = 11.0%  → fine
+    const referencedFixture = [
+      ...Array.from({ length: 40 }, (_, i) => `root-${i}.mp4`),
+      ...Array.from({ length: 12 }, (_, i) => `thumb-${i}.png`),
+      ...Array.from({ length: 6 }, (_, i) => `doc-${i}.pdf`),
+      ...Array.from({ length: 10 }, (_, i) => `avatars/u-${i}.jpg`),
+      ...Array.from({ length: 5 }, (_, i) => `documents/d-${i}.pdf`),
+    ];
+    const orphanFixture = [
+      'cancelled-1.mp4',
+      'cancelled-2.mp4',
+      'cancelled-3.mp4',
+      'cancelled-1.png',
+      'cancelled-2.png',
+      'cancelled-1.pdf',
+      'stray.tif',                 // the lone blob in an otherwise-empty class
+      'avatars/cancelled.jpg',
+      'documents/cancelled.pdf',
+    ];
+    mockQuery.mockResolvedValue(referencedFixture.map((path) => ({ path })));
+    const { deleted } = stubFetch({
+      pages: [listPage([...referencedFixture, ...orphanFixture].map((name) => ({ name })))],
+    });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
+    expect(summary).toMatchObject({ aborted: false, reason: null, eligible: 82, orphaned: 9, deleted: 9, failed: 0 });
+    expect(deleted.sort()).toEqual([...orphanFixture].sort());
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it('reports the WHOLE-ROOT diagnosis, not a class one, when the whole root is unreferenced', async () => {
+    // Both the root bucket and the root image class are 100% here. "The container
+    // root" is the accurate diagnosis and must win — an operator told only about
+    // images would go looking for a thumbnail bug that is not there.
+    //   listing     = 30 referenced avatars/ + 10 unreferenced root .png = 40 eligible
+    //   GLOBAL      = 10/40 = 25%   → under the ceiling, so the global reason
+    //                                 cannot pre-empt the bucket one
+    //   root bucket = 10/10 = 100%  → TRIPS first
+    const avatars = Array.from({ length: 30 }, (_, i) => `avatars/u-${i}.jpg`);
+    const images = Array.from({ length: 10 }, (_, i) => `thumb-${i}.png`);
+    mockQuery.mockResolvedValue(avatars.map((path) => ({ path })));
+    const { deleted } = stubFetch({
+      // Prefixed blobs listed FIRST, so root keys enter the census map last —
+      // the ordering claim must not depend on what order Azure listed things in.
+      pages: [listPage([...avatars, ...images].map((name) => ({ name })))],
+    });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
+    expect(deleted).toEqual([]);
+    expect(summary).toMatchObject({ aborted: true, reason: 'orphan-bucket-share-implausible' });
+    const message = log.error.mock.calls[0][0] as string;
+    expect(message).toContain('the container root');
+    expect(message).not.toContain('image files');
+    expect(message).toContain('10/10');
+  });
+
+  it('aborts on a root class break that a first-glance reading would call videos', async () => {
+    // The classes are read off the EXTENSION, not off a guess about what the root
+    // holds: a break in the bare `lessons.document_storage_path` values shows up
+    // as the root DOCUMENT class, alongside a perfectly healthy video class.
+    //   listing            = 60 referenced root .mp4 + 8 unreferenced root .pdf
+    //   GLOBAL / root      = 8/68 = 11.8% → under the ceiling, does NOT trip
+    //   root document      = 8/8  = 100%  → over the floor of 5 AND the ceiling, TRIPS
+    const root = rootFleet(60);
+    const docs = Array.from({ length: 8 }, (_, i) => `handbook-${i}.pdf`);
+    mockQuery.mockResolvedValue(root.map((path) => ({ path })));
+    const { deleted } = stubFetch({ pages: [listPage([...root, ...docs].map((name) => ({ name })))] });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
+    expect(deleted).toEqual([]);
+    expect(summary).toMatchObject({ aborted: true, reason: 'orphan-bucket-share-implausible', orphaned: 8 });
+    expect(log.error.mock.calls[0][0] as string).toContain('document files at the container root');
   });
 });
 
@@ -945,6 +1130,66 @@ describe('blobBucket', () => {
 
   it('buckets a nested name by its FIRST segment only', () => {
     expect(blobBucket('a/b/c.mp4')).toBe('a/');
+  });
+});
+
+describe('rootFileClass', () => {
+  it('classifies by extension, using the same allow-list the upload gates use', () => {
+    expect(rootFileClass('thumb.png')).toBe('image');
+    expect(rootFileClass('thumb.jpeg')).toBe('image');
+    expect(rootFileClass('thumb.webp')).toBe('image');
+    expect(rootFileClass('clip.mp4')).toBe('video');
+    expect(rootFileClass('clip.mov')).toBe('video');
+    expect(rootFileClass('handbook.pdf')).toBe('document');
+    expect(rootFileClass('sheet.xlsx')).toBe('document');
+  });
+
+  it('reads the extension case-insensitively without touching the name itself', () => {
+    // Lower-casing here feeds a census key only — the comparison and the DELETE
+    // still address the listed name verbatim (asserted end-to-end above).
+    expect(rootFileClass('THUMB.PNG')).toBe('image');
+    expect(rootFileClass('Clip.MP4')).toBe('video');
+  });
+
+  it('puts anything it cannot classify in `other` — a real bucket, not a discard', () => {
+    expect(rootFileClass('legacy.tif')).toBe('other');
+    expect(rootFileClass('archive.zip')).toBe('other');
+    expect(rootFileClass('noextension')).toBe('other');
+    expect(rootFileClass('trailing.')).toBe('other');
+  });
+});
+
+describe('blobBuckets', () => {
+  it('gives a ROOT name two buckets: the undivided root first, then its file-type class', () => {
+    const buckets = blobBuckets('abc.mp4');
+    expect(buckets).toHaveLength(2);
+    // The root-wide census is unchanged by the split, and comes first so its
+    // diagnosis wins when both it and a class are over the ceiling.
+    expect(buckets[0]).toBe('');
+    expect(buckets[1]).not.toBe('');
+    // The second key is what the split is for: it must differ by file type.
+    expect(blobBuckets('abc.png')[1]).not.toBe(buckets[1]);
+    expect(blobBuckets('def.mp4')[1]).toBe(buckets[1]);
+  });
+
+  it('does NOT split a PREFIXED name by extension — one bucket, the prefix', () => {
+    // More buckets means more small populations for a healthy night to trip over,
+    // and a prefix already belongs to a single writer.
+    expect(blobBuckets('avatars/u-1.jpg')).toEqual(['avatars/']);
+    expect(blobBuckets('org-logos/o-1.png')).toEqual(['org-logos/']);
+    expect(blobBuckets('documents/handbook.pdf')).toEqual(['documents/']);
+    expect(blobBuckets('videos/welcome.mp4')).toEqual(['videos/']);
+  });
+
+  it('cannot collide a class key with a bucket key derived from a real blob name', () => {
+    // A prefix key always ends in `/`; a class key never can, because `:` is
+    // outside SAFE_BLOB_NAME and a class key carries no slash.
+    for (const name of ['abc.mp4', 'thumb.png', 'weird.tif', 'avatars/u.jpg']) {
+      for (const bucket of blobBuckets(name)) {
+        expect(bucket === '' || bucket.endsWith('/') || !bucket.includes('/')).toBe(true);
+      }
+    }
+    expect(blobBuckets('abc.mp4')[1]).not.toMatch(/\/$/);
   });
 });
 describe('referenceVariants', () => {
