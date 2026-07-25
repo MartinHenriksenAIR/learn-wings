@@ -45,7 +45,11 @@ const courseStructureQueryKey = (courseId: string) => queryKeys.courseStructureA
 interface CourseStructureData {
   course: Course | null;
   modules: CourseModule[];
-  /** Display URL re-signed from course.thumbnail_url (the DB row carries the raw path). */
+  /**
+   * DISPLAY-ONLY URL re-signed from course.thumbnail_url (the DB row carries the
+   * raw path). Null when there is no thumbnail OR when signing failed — which is
+   * why it is never the value the editor saves; see `editThumbnailPath`.
+   */
   signedThumbnailUrl: string | null;
 }
 
@@ -77,7 +81,21 @@ export default function CourseEditor() {
   const [editDescription, setEditDescription] = useState('');
   const [editLevel, setEditLevel] = useState<CourseLevel>('basic');
   const [editLanguage, setEditLanguage] = useState<'en' | 'da'>('da');
-  const [editThumbnailUrl, setEditThumbnailUrl] = useState<string | null>(null);
+  /**
+   * The thumbnail value that will be PERSISTED — the raw storage path, seeded
+   * from the course row and never from the signed display URL.
+   *
+   * The split matters. Signing is a display concern and is allowed to fail:
+   * `getSignedLmsAssetUrl` swallows a failed `/api/asset-signed-url` call and
+   * returns null (src/lib/storage.ts). While this field held the signed URL, that
+   * null was seeded straight into the form and the next save wrote
+   * `thumbnailUrl: null` — which #275 turned from a recoverable "column cleared,
+   * blob survives" into an irreversible `deleteBlob`. Holding the path instead
+   * means a signing blip can only cost the PREVIEW: the save still carries the
+   * path the row already has, which `course-update` sees as unchanged and leaves
+   * (and its blob) alone. Clearing the field is then unambiguously deliberate.
+   */
+  const [editThumbnailPath, setEditThumbnailPath] = useState<string | null>(null);
 
   // Module dialog state
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
@@ -150,12 +168,29 @@ export default function CourseEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course?.id]);
 
-  // Re-seed the thumbnail whenever the re-signed URL changes (initial load +
-  // post-save refetch where the path is re-signed).
+  // Seed the thumbnail from the STORED PATH, and re-seed only when that path
+  // changes — initial load, switching courses, or a refetch that brought back a
+  // genuinely different value (someone else edited the course). Keying on the
+  // signed URL instead would re-seed on every refetch, because each one carries a
+  // fresh SAS token, silently discarding an unsaved thumbnail pick.
   useEffect(() => {
-    if (course) setEditThumbnailUrl(signedThumbnailUrl);
+    // `|| null` not `?? null`: an empty stored value means "no thumbnail" and
+    // must not be persisted back as an empty string.
+    if (course) setEditThumbnailPath(course.thumbnail_url || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedThumbnailUrl]);
+  }, [course?.id, course?.thumbnail_url]);
+
+  /**
+   * What FileUpload should SHOW. While the field still holds the course's stored
+   * path, that is the signed URL the structure query resolved for it; once the
+   * user picks a replacement it is the fresh blob path, which FileUpload renders
+   * from its own local object-URL preview until the post-save refetch re-signs it.
+   *
+   * null here means "we could not resolve a viewable URL", which is NOT the same
+   * as "there is no thumbnail" — `editThumbnailPath` is what answers that.
+   */
+  const thumbnailDisplayUrl =
+    editThumbnailPath === (course?.thumbnail_url || null) ? signedThumbnailUrl : editThumbnailPath;
 
   const saveCourseMutation = useToastMutation({
     mutationFn: (updates: { title: string; description: string; level: CourseLevel; language: 'en' | 'da'; thumbnailUrl: string | null }) =>
@@ -172,7 +207,11 @@ export default function CourseEditor() {
 
   const handleSaveCourse = () => {
     if (!courseId || !editTitle.trim()) return;
-    const thumbnailToPersist = extractLmsAssetPath(editThumbnailUrl) ?? editThumbnailUrl;
+    // `editThumbnailPath` is already a path for everything this app writes; the
+    // extraction only still normalizes a LEGACY row that stored an absolute
+    // storage URL. It can no longer turn a display URL back into a path, because
+    // no display URL ever reaches this state.
+    const thumbnailToPersist = extractLmsAssetPath(editThumbnailPath) ?? editThumbnailPath;
     saveCourseMutation.mutate({
       title: editTitle,
       description: editDescription,
@@ -531,9 +570,19 @@ export default function CourseEditor() {
                 <FileUpload
                   folder="thumbnails"
                   accept="image"
-                  value={editThumbnailUrl}
-                  onChange={(url) => setEditThumbnailUrl(url)}
+                  value={thumbnailDisplayUrl}
+                  // FileUpload reports (null, null) only when the user clears the
+                  // field — a failed upload leaves the current value alone — so
+                  // this null is a deliberate removal, and the save is meant to
+                  // clear the column and delete the blob (#275).
+                  onChange={(_url, storagePath) => setEditThumbnailPath(storagePath)}
                 />
+                {/* A stored thumbnail we could not sign renders as the empty
+                    dropzone, which on its own reads as "there is no image". Say
+                    what actually happened, and that the save will not discard it. */}
+                {editThumbnailPath && !thumbnailDisplayUrl && (
+                  <p className="text-xs text-muted-foreground">{t('courseEditor.thumbnailPreviewUnavailable')}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>{t('courseEditor.levelLabel')}</Label>

@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockEnforceUploadLimits } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile,
+  mockEnforceUploadLimits, mockAssertBindablePaths,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
     mockEnforceUploadLimits: vi.fn(),
+    mockAssertBindablePaths: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -18,8 +22,12 @@ vi.mock('../shared/profile', () => ({
   isOrgAdminOfAny: vi.fn(),
 }));
 vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
+vi.mock('../shared/blob-ownership', () => ({ assertBindablePaths: mockAssertBindablePaths }));
 
 import handler from './index';
+
+/** The one candidate this endpoint ever builds, handed to both gates. */
+const thumbCandidate = (path: string | null | undefined) => [{ path, kind: 'image', family: 'lms' }];
 
 const baseReq = (body: unknown) => ({
   method: 'POST',
@@ -53,6 +61,7 @@ describe('course-create', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
     mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
+    mockAssertBindablePaths.mockResolvedValue(null); // the path is the caller's to bind
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -218,8 +227,38 @@ describe('course-create', () => {
     const res = await handler(baseReq({ ...validBody, thumbnailUrl: 'thumbs/new.png' }), {} as any);
 
     expect(res.status).toBe(200);
-    expect(mockEnforceUploadLimits).toHaveBeenCalledWith([{ path: 'thumbs/new.png', kind: 'image' }]);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(thumbCandidate('thumbs/new.png'));
     expect(order).toEqual(['gate', 'insert']);
+  });
+
+  // --- Path ownership ---
+
+  it('400 when the ownership gate refuses the path: nothing is probed or inserted', async () => {
+    mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');
+
+    const res = await handler(
+      baseReq({ ...validBody, thumbnailUrl: 'someone-elses-lesson.mp4' }),
+      {} as any,
+    );
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('runs the ownership gate BEFORE the size gate, on the same candidate list', async () => {
+    const order: string[] = [];
+    mockAssertBindablePaths.mockImplementationOnce(async () => { order.push('ownership'); return null; });
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('limits'); return null; });
+    mockQueryOne.mockResolvedValueOnce(fakeCourse);
+
+    await handler(baseReq({ ...validBody, thumbnailUrl: 'thumbs/new.png' }), {} as any);
+
+    expect(order).toEqual(['ownership', 'limits']);
+    // A create has no prior row, so nothing is ever exempt from the check.
+    expect(mockAssertBindablePaths).toHaveBeenCalledWith(thumbCandidate('thumbs/new.png'));
+    expect(mockAssertBindablePaths.mock.calls[0][0]).toEqual(mockEnforceUploadLimits.mock.calls[0][0]);
   });
 
   it('returns 500 on db error propagating err.message', async () => {

@@ -17,12 +17,116 @@ export function isBrandingAssetType(assetType?: string): boolean {
   return !!assetType && assetType in BRANDING_ASSET_PREFIXES;
 }
 
+/**
+ * Which NAMESPACE of blob paths a database column is allowed to bind.
+ *
+ * Every path this system mints has one of exactly three shapes, and the shape is
+ * decided by the endpoint that minted it — never by the client:
+ *  - `'avatar'`   — `avatars/<name>`    (azure-upload-url, assetType=avatar)
+ *  - `'org-logo'` — `org-logos/<name>`  (azure-upload-url, assetType=org-logo)
+ *  - `'lms'`      — course thumbnails, lesson videos and lesson documents. This
+ *    is the CATCH-ALL: `resolveAssetContainer` gives a non-branding upload an
+ *    EMPTY prefix, so a thumbnail and a video are `<uuid>.<ext>` alike, and the
+ *    same columns also still hold Supabase-era names with folders in them
+ *    (`thumbnails/x.png`, `videos/x.mp4`). There is no shape that separates
+ *    those three uses, and inventing one would only lock existing rows out of
+ *    being saved. What separates them is the extension allow-list
+ *    (`upload-limits.ts`) and the cross-row reference check
+ *    (`blob-ownership.ts`); the family is not asked to do a job it cannot do.
+ */
+export type BlobPathFamily = 'avatar' | 'org-logo' | 'lms';
+
+/**
+ * One path segment, as this system mints them: a leading alphanumeric then
+ * `[A-Za-z0-9._-]`. The character class is byte-identical to `SAFE_BLOB_NAME` in
+ * orphan-sweep.
+ *
+ * The leading-alphanumeric requirement is what excludes `.` and `..` — under a
+ * bare `[A-Za-z0-9._-]+` the segment `..` matches, and `avatars/..` would have
+ * been accepted as a branding path.
+ */
+const BLOB_SEGMENT = '[A-Za-z0-9][A-Za-z0-9._-]*';
+
+/**
+ * The two branding families, and only those, have a shape: a fixed folder
+ * prefix plus ONE flat segment, exactly as `azure-upload-url` mints them.
+ * `'lms'` deliberately has no entry — see `classifyBlobPath`.
+ */
+const BRANDING_FAMILY_PATTERNS: Readonly<Record<'avatar' | 'org-logo', RegExp>> = {
+  'avatar': new RegExp(`^avatars/${BLOB_SEGMENT}$`),
+  'org-logo': new RegExp(`^org-logos/${BLOB_SEGMENT}$`),
+};
+
+/**
+ * An absolute http(s) URL. `thumbnail_url` has always been allowed to hold one
+ * and the read path resolves it (`extractLmsAssetPath` in `src/lib/storage.ts`);
+ * `logo_url` and `avatar_url` have historically accepted one too, though
+ * `branding-asset-url` will not sign it, so such a value simply renders nothing.
+ * Either way it must not be rejected on write, and it is the one and only
+ * "not a blob we own" value allowed through.
+ */
+const ABSOLUTE_URL = /^https?:\/\//i;
+
+/**
+ * What a client-supplied column value IS, relative to the family the column may bind.
+ *
+ *  - `'own'`      — a value this column may legitimately hold. Subject to the
+ *    extension allow-list and the cross-row reference check, and the ONLY
+ *    verdict that permits a storage probe or a delete.
+ *  - `'external'` — an absolute http(s) URL. Allowed and stored verbatim, never
+ *    reference-checked (two courses may legitimately point at the same public
+ *    image) and never deletable — `isBlobReleasable` refuses it outright. See
+ *    `buildBlobUrl` for why it could not address a real blob even if something
+ *    tried: the whole URL becomes ONE escaped blob name, and no blob is named
+ *    `https://…`.
+ *  - `'foreign'`  — refused at bind time: a branding path posted to a column
+ *    that does not own that prefix, a malformed value under a prefix we mint
+ *    (`avatars/..`, `avatars/sub/deep.png`), or a non-branding path posted to a
+ *    branding column.
+ *
+ * NOTE WHAT IS *NOT* HERE. There is no "unrecognized, so store it and hope
+ * nothing acts on it" bucket, and equally no attempt to pin the LMS columns to a
+ * minted shape. Both were tried and both were wrong:
+ *  - waving unrecognized values through skipped the reference check, so a legacy
+ *    name like `videos/<uuid>.mp4` — which `deleteBlob` resolves perfectly well —
+ *    could be bound to a second row and then destroyed by a cascade delete;
+ *  - refusing them instead bricked real rows: `CourseEditor` re-persists
+ *    `extractLmsAssetPath(<signed url>)`, which for a legacy thumbnail yields
+ *    `thumbnails/x.png`, and a 400 there blocks saving the course's title and
+ *    description too.
+ * So the LMS columns take everything that is not branding and not a URL, and the
+ * cross-row reference check — not the spelling — decides whether it may be bound.
+ */
+export type BlobPathVerdict = 'own' | 'external' | 'foreign';
+
+/** Classifies a stored/incoming column value against the family that column may bind. */
+export function classifyBlobPath(value: string, family: BlobPathFamily): BlobPathVerdict {
+  if (value === '') return 'foreign';
+  if (ABSOLUTE_URL.test(value)) return 'external';
+
+  // A branding prefix is owned by exactly one family, so a value carrying one is
+  // decided entirely here — including a malformed one, which is a refusal rather
+  // than a legacy value (nothing predates a prefix this system invented).
+  for (const brandingFamily of ['avatar', 'org-logo'] as const) {
+    if (!value.startsWith(BRANDING_ASSET_PREFIXES[brandingFamily])) continue;
+    return family === brandingFamily && BRANDING_FAMILY_PATTERNS[brandingFamily].test(value)
+      ? 'own'
+      : 'foreign';
+  }
+
+  // Not branding, not a URL — the flat LMS namespace and its legacy leftovers.
+  // A branding column must not accept one of these: `avatar_url` holding a bare
+  // `<uuid>.mp4` is how a lesson video got aimed at an image cap.
+  return family === 'lms' ? 'own' : 'foreign';
+}
+
 /** True if a stored blob path is a branding asset — the sole gate the
  * branding-asset-url endpoint uses so it can never be coerced into signing an
  * arbitrary private course-content path. Prefix + a single flat filename only
  * (no nested slashes, no traversal). */
 export function isBrandingAssetPath(blobPath: string): boolean {
-  return /^(org-logos|avatars)\/[A-Za-z0-9._-]+$/.test(blobPath);
+  return classifyBlobPath(blobPath, 'avatar') === 'own'
+    || classifyBlobPath(blobPath, 'org-logo') === 'own';
 }
 
 /**

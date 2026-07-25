@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrgAdmin, mockDeleteBlob, mockEnforceUploadLimits } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrgAdmin, mockDeleteBlob,
+  mockEnforceUploadLimits, mockAssertBindablePaths, mockIsBlobReleasable,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
@@ -8,6 +11,8 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrg
     mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
     mockDeleteBlob: vi.fn(),
     mockEnforceUploadLimits: vi.fn(),
+    mockAssertBindablePaths: vi.fn(),
+    mockIsBlobReleasable: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -15,8 +20,15 @@ vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<ty
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: mockIsOrgAdmin, isOrgAdminOfAny: vi.fn() }));
 vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
 vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
+vi.mock('../shared/blob-ownership', () => ({
+  assertBindablePaths: mockAssertBindablePaths,
+  isBlobReleasable: mockIsBlobReleasable,
+}));
 
 import handler from './index';
+
+/** The one candidate this endpoint ever builds, handed to both gates. */
+const logoCandidate = (path: string | null) => [{ path, kind: 'image', family: 'org-logo' }];
 
 const baseReq = (body: unknown) => ({
   method: 'POST',
@@ -42,6 +54,8 @@ describe('organization-update', () => {
     mockIsOrgAdmin.mockResolvedValue(false);
     mockDeleteBlob.mockResolvedValue(true);
     mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
+    mockAssertBindablePaths.mockResolvedValue(null); // the path is the caller's to bind
+    mockIsBlobReleasable.mockResolvedValue(true);    // nothing else references the old blob
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -379,7 +393,7 @@ describe('organization-update', () => {
 
     expect(res.status).toBe(200);
     expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
-      [{ path: 'org-logos/new.png', kind: 'image' }],
+      logoCandidate('org-logos/new.png'),
       ['org-logos/old.png'], // unchanged path ⇒ not new ⇒ never probed
     );
     expect(order).toEqual(['select', 'gate', 'update']);
@@ -391,6 +405,69 @@ describe('organization-update', () => {
     const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
     expect(res.status).toBe(403);
     expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockAssertBindablePaths).not.toHaveBeenCalled();
+  });
+
+  // --- Path ownership (the BLOCKERs) ---
+  //
+  // Being an admin of THIS org says nothing about whether the path supplied is
+  // this org's. `/organizations` hands `logo_url` to plain learners, so every
+  // other org's logo path is readable by anyone with an account.
+
+  it('400 when the ownership gate refuses the path: no probe, no UPDATE, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce({ logo_url: null }); // only the previous-logo SELECT
+    mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');
+
+    const res = await handler(baseReq(logoUpdate('avatars/victim.png')), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    // The refusal must land BEFORE anything touches storage — otherwise the
+    // 413-vs-200 split is an existence oracle for other rows' blobs.
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE organizations');
+  });
+
+  it('runs the ownership gate BEFORE the size gate, on the same candidate list', async () => {
+    const order: string[] = [];
+    mockAssertBindablePaths.mockImplementationOnce(async () => { order.push('ownership'); return null; });
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('limits'); return null; });
+    mockLogoDb('org-logos/old.png');
+
+    await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+
+    expect(order).toEqual(['ownership', 'limits']);
+    expect(mockAssertBindablePaths).toHaveBeenCalledWith(
+      logoCandidate('org-logos/new.png'),
+      ['org-logos/old.png'],
+    );
+    expect(mockAssertBindablePaths.mock.calls[0][0]).toEqual(mockEnforceUploadLimits.mock.calls[0][0]);
+  });
+
+  it('step 2 of the two-step attack: a still-referenced old logo is NOT deleted', async () => {
+    mockIsBlobReleasable.mockResolvedValueOnce(false);
+    mockLogoDb('org-logos/shared.png');
+
+    const res = await handler(baseReq(logoUpdate(null)), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockIsBlobReleasable).toHaveBeenCalledWith('org-logos/shared.png', 'org-logo');
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('asks whether the old blob is releasable only AFTER the row write', async () => {
+    const order: string[] = [];
+    mockQueryOne
+      .mockImplementationOnce(async () => ({ logo_url: 'org-logos/old.png' }))
+      .mockImplementationOnce(async () => { order.push('update'); return { id: 'org-1' }; });
+    mockIsBlobReleasable.mockImplementationOnce(async () => { order.push('releasable'); return true; });
+    mockDeleteBlob.mockImplementationOnce(async () => { order.push('delete'); return true; });
+
+    await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+
+    expect(order).toEqual(['update', 'releasable', 'delete']);
   });
 
   it('deleteBlob returns false: request still succeeds with its normal body', async () => {

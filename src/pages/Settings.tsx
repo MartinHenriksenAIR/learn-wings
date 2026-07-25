@@ -96,11 +96,13 @@ export default function Settings() {
   };
 
   const handleAvatarChange = async (_url: string | null, storagePath: string | null) => {
-    // Only persist a successful upload. A null storagePath means the upload
-    // failed — FileUpload signals failure with onChange(null, null) — and
-    // persisting then would silently wipe an existing photo. (Same guard the
-    // org-logo upload uses in OrgAnalytics.) FileUpload surfaces the error to
-    // the user for retry.
+    // Only ever persist a real storage path. This call site passes no `value`,
+    // so FileUpload renders no remove button and reports only SUCCESSFUL uploads
+    // — a failed one now leaves the parent's value untouched rather than
+    // reporting null, precisely so a dropped connection cannot blank the column
+    // and (since #275) delete the photo it failed to replace. The guard keeps
+    // that guarantee local rather than inherited. (Same guard the org-logo upload
+    // uses in OrgAnalytics.) FileUpload surfaces the error to the user for retry.
     if (!profile || !storagePath) return;
 
     setAvatarSaving(true);

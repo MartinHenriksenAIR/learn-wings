@@ -1,7 +1,8 @@
 import { queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
 import { deleteBlob } from '../shared/blob';
-import { enforceUploadLimits } from '../shared/upload-limits';
+import { enforceUploadLimits, type UploadCandidate } from '../shared/upload-limits';
+import { assertBindablePaths, isBlobReleasable } from '../shared/blob-ownership';
 
 const VALID_LEVELS = ['basic', 'intermediate', 'advanced'] as const;
 type CourseLevel = typeof VALID_LEVELS[number];
@@ -110,15 +111,29 @@ export default adminEndpoint('course-update', async ({ req, reply }) => {
     previousThumbnail = prev?.thumbnail_url ?? null;
   }
 
+  // One candidate list, handed to both gates in order, so they can never be given
+  // different views of the same write. Thumbnails have NO folder prefix
+  // (`azure-upload-url` gives non-branding uploads an empty prefix), so the family
+  // is the flat `lms` namespace they share with lesson videos and documents —
+  // which is why `kind: 'image'` matters here as more than a cap: it is what makes
+  // the extension allow-list refuse a `.mp4` in `thumbnail_url`.
+  const candidates: UploadCandidate[] = [{ path: nextThumbnail, kind: 'image', family: 'lms' }];
+
+  // Ownership gate FIRST — before `enforceUploadLimits`, so no path this caller
+  // may not bind is ever handed to `headBlob`. Within the flat namespace the
+  // binding rule is "already on this row, or referenced by no row at all", since
+  // the prefix cannot distinguish one course's thumbnail from another's.
+  const bindError = await assertBindablePaths(candidates, [previousThumbnail]);
+  if (bindError) {
+    return reply(400, { error: bindError });
+  }
+
   // Size/type gate on a newly-referenced thumbnail (#276) — the client's cap is
   // advisory (the browser PUTs straight to storage), so this is where an
   // over-cap image is actually stopped, before the row is written. Reuses the
   // same change detection as the cleanup below: an unchanged path is not new, so
   // re-saving a course costs no HEAD.
-  const limitError = await enforceUploadLimits(
-    [{ path: nextThumbnail, kind: 'image' }],
-    [previousThumbnail],
-  );
+  const limitError = await enforceUploadLimits(candidates, [previousThumbnail]);
   if (limitError) {
     return reply(413, { error: limitError });
   }
@@ -133,7 +148,14 @@ export default adminEndpoint('course-update', async ({ req, reply }) => {
   // succeeded. An unchanged path is left alone; a null old path has nothing to
   // delete. deleteBlob never throws and its result is deliberately NOT surfaced in
   // the response — server logs are the only failure signal.
-  if (previousThumbnail && previousThumbnail !== nextThumbnail) {
+  //
+  // `isBlobReleasable` runs AFTER the UPDATE on purpose: the row now points at the
+  // new value, so "does any row still reference the old path?" is exactly the
+  // question worth asking — and in a flat namespace it is the only thing that can
+  // tell a superseded thumbnail from a live lesson video.
+  if (previousThumbnail
+    && previousThumbnail !== nextThumbnail
+    && await isBlobReleasable(previousThumbnail, 'lms')) {
     await deleteBlob(previousThumbnail);
   }
 

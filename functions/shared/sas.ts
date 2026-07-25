@@ -103,11 +103,63 @@ export function generateContainerSasToken(
   return generateSasToken(accountName, accountKey, containerName, '', permissions, expiryMinutes, 'c');
 }
 
+/**
+ * Percent-encodes a blob name for use in a URL PATH, segment by segment.
+ *
+ * `/` is the only character that must survive: it is the folder separator Azure
+ * itself uses, and encoding it would address a different (flat-named) blob.
+ * Everything else is escaped, which is what stops a crafted name from changing
+ * the SHAPE of the request:
+ *   - `videos/x.mp4?`  would otherwise start the query string early and truncate
+ *     the SAS that follows,
+ *   - `videos/x.mp4#`  would truncate the whole request at the fragment,
+ *   - `%41`            would otherwise be decoded by the service into `A`,
+ *     targeting a blob other than the one the caller named.
+ * All three produce a request against a DIFFERENT blob than the one the caller
+ * asked about — which, for `headBlob`/`deleteBlob`, means classifying one blob
+ * and acting on another.
+ */
+function encodeBlobPath(blobName: string): string {
+  return blobName.split('/').map(encodeSegment).join('/');
+}
+
+/**
+ * `encodeURIComponent`, but it cannot throw.
+ *
+ * A lone surrogate (an unpaired `\uD800`–`\uDFFF`, which JSON will happily carry
+ * into a request body) makes `encodeURIComponent` raise `URIError: URI malformed`
+ * — and this function is called from `lms-asset.ts`, where a platform admin's
+ * `blobPath` skips the access check and reaches here unfiltered. Before the
+ * encoding change that input produced a URL that simply matched nothing; it must
+ * not now produce a 500. Substituting U+FFFD keeps that outcome: a well-formed
+ * URL naming a blob that does not exist.
+ */
+function encodeSegment(segment: string): string {
+  try {
+    return encodeURIComponent(segment);
+  } catch {
+    return encodeURIComponent(segment.replace(/[\uD800-\uDFFF]/g, '�'));
+  }
+}
+
+/**
+ * The blob URL a signed request is sent to.
+ *
+ * NOTE THE ASYMMETRY, it is not a bug: the request path is percent-ENCODED here,
+ * while `generateSasToken` signs the DECODED name in its canonicalized resource.
+ * That is the Azure Service SAS contract (and exactly what the official
+ * `@azure/storage-blob` SDK does — `getCanonicalName` interpolates the raw blob
+ * name while the client URL is escaped). Signing the encoded form instead would
+ * produce `AuthenticationFailed` for any name that actually needs escaping.
+ *
+ * Every name this system mints is `[prefix/]<uuid>.<ext>`, for which encoding is
+ * the identity — so no existing caller changes behaviour.
+ */
 export function buildBlobUrl(
   accountName: string,
   containerName: string,
   blobName: string,
   sasToken: string
 ): string {
-  return `https://${accountName}.blob.core.windows.net/${containerName}/${blobName}?${sasToken}`;
+  return `https://${accountName}.blob.core.windows.net/${containerName}/${encodeBlobPath(blobName)}?${sasToken}`;
 }

@@ -310,7 +310,7 @@ export default function OrgAnalytics() {
                 {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
                 <DialogContent aria-describedby={undefined}>
                   <DialogHeader>
-                    <DialogTitle>Update Organization Logo</DialogTitle>
+                    <DialogTitle>{t('orgDetail.updateLogoTitle')}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-4">
                     <div className="border-2 border-dashed rounded-lg p-6 text-center">
@@ -318,10 +318,12 @@ export default function OrgAnalytics() {
                         <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted">
                           <Building2 className="h-8 w-8 text-muted-foreground" />
                         </div>
+                        {/* Size and accepted formats are stated by FileUpload
+                            itself, from the caps it actually enforces — a second
+                            statement here could only drift out of true. */}
                         <div className="space-y-1">
-                          <p className="text-sm font-medium">Recommended specifications</p>
-                          <p className="text-xs text-muted-foreground">Square image, 256×256px or larger</p>
-                          <p className="text-xs text-muted-foreground">PNG or JPG format, max 2MB</p>
+                          <p className="text-sm font-medium">{t('orgDetail.logoRecommended')}</p>
+                          <p className="text-xs text-muted-foreground">{t('orgDetail.logoSize')}</p>
                         </div>
                       </div>
                     </div>

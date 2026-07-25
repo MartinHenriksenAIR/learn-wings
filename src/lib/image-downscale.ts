@@ -3,26 +3,29 @@
  *
  * Images are uploaded straight from the browser to Azure Blob Storage, and the
  * app renders them small (course cards ~118px tall, org logos 36–64px, avatars
- * 36px). Storing and re-serving a 20 MB phone photo at full resolution costs
+ * 36px). Storing and re-serving a 15 MB phone photo at full resolution costs
  * every learner who opens the course list. We shrink before the PUT.
  *
  * Design constraints, in priority order:
  *  1. An upload must NEVER fail because of this optimisation. Every step is
- *     wrapped so any missing API / decode error / encode error falls back to
- *     uploading the original bytes untouched.
- *  2. The output MIME type is always identical to the input MIME type. That is
- *     what preserves PNG transparency: a PNG is re-encoded as a PNG (lossless,
- *     alpha intact) rather than flattened onto a black JPEG background — org
- *     logos are frequently transparent PNGs. It also keeps the blob's extension,
- *     the `contentType` negotiated with /api/azure-upload-url, and the stored
- *     path all consistent with today's behaviour.
+ *     wrapped so any missing API / decode error / encode error / encoder that
+ *     never calls back falls back to uploading the original bytes untouched.
+ *  2. The output MIME type is always identical to the input MIME type, and we
+ *     only re-encode when the BYTES agree with that type (see `sniffImageType`).
+ *     Together those preserve PNG transparency: a PNG is re-encoded as a PNG
+ *     (lossless, alpha intact) rather than flattened onto a black JPEG
+ *     background — org logos are frequently transparent PNGs, and they are
+ *     exactly the asset people rename by hand. It also keeps the blob's
+ *     extension, the `contentType` negotiated with /api/azure-upload-url, and
+ *     the stored path all consistent with today's behaviour.
  *  3. We never upscale, and we never upload a re-encode that came out *larger*
  *     than the original (common for small PNGs, where the source encoder beat
  *     the browser's).
  *
  * The decision logic here is pure and exhaustively unit-tested. The canvas work
- * lives in a thin shim at the bottom of the file which the unit tests do not
- * execute (jsdom has no Canvas API).
+ * lives in a thin shim at the bottom of the file; jsdom implements no Canvas
+ * API, so `image-downscale.test.ts` drives that shim through stubbed
+ * `getContext`/`toBlob` prototypes rather than a real encoder.
  */
 
 /** Longest-edge cap for course thumbnails. Card art, never shown large. */
@@ -32,15 +35,31 @@ export const MAX_EDGE_THUMBNAIL = 1280;
 export const MAX_EDGE_BRANDING = 512;
 
 /** Encode quality for lossy formats. Visually transparent at these sizes. */
-export const ENCODE_QUALITY = 0.85;
+const ENCODE_QUALITY = 0.85;
 
-/** Bytes of file header the WebP animation sniff needs (flags byte is at 20). */
-export const WEBP_HEADER_BYTES = 32;
+/**
+ * Bytes of file header read for the magic-number sniff. 32 covers every
+ * signature below and reaches the WebP VP8X flags byte at offset 20.
+ */
+const HEADER_SNIFF_BYTES = 32;
 
 /** VP8X flags-byte mask for the "has animation" bit. */
 const VP8X_ANIMATION_FLAG = 0x02;
 
-/** Mirrors FileUpload's `accept` prop. */
+/**
+ * Wall-clock budget for one decode and one encode.
+ *
+ * Neither `createImageBitmap` nor `toBlob` is guaranteed to settle: an encoder
+ * that runs out of memory on a large canvas can simply never invoke its
+ * callback. Without a bound the awaiting upload handler never reaches its
+ * `finally`, so the spinner spins forever and the file input is never reset —
+ * the control is unusable until the page is reloaded. Generous enough that a
+ * slow phone finishes well inside it; short enough to be a hiccup, not a brick.
+ */
+const DECODE_TIMEOUT_MS = 15_000;
+const ENCODE_TIMEOUT_MS = 15_000;
+
+/** The kinds of upload a call site can ask for; `FileUpload`'s `accept` prop. */
 export type UploadAccept = 'image' | 'video' | 'document';
 
 /** Mirrors FileUpload's `assetType` prop — the branding-container assets. */
@@ -65,6 +84,12 @@ const DOWNSCALABLE_MIME_TYPES: ReadonlySet<string> = new Set([
 /** Formats where the `quality` argument to `toBlob` is meaningful. */
 const LOSSY_MIME_TYPES: ReadonlySet<string> = new Set(['image/jpeg', 'image/webp']);
 
+/** The full 8-byte PNG signature. */
+const PNG_SIGNATURE: readonly number[] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+/** JPEG start-of-image followed by the first marker byte. */
+const JPEG_SIGNATURE: readonly number[] = [0xff, 0xd8, 0xff];
+
 export interface DownscaleTarget {
   width: number;
   height: number;
@@ -74,7 +99,7 @@ export interface DownscaleTarget {
  * Normalise a `File.type` for lookup: browsers may report casing variants or
  * append parameters (`image/jpeg; charset=binary`).
  */
-function normalizeMimeType(mimeType: string | null | undefined): string {
+export function normalizeMimeType(mimeType: string | null | undefined): string {
   if (typeof mimeType !== 'string') return '';
   return mimeType.split(';')[0].trim().toLowerCase();
 }
@@ -136,6 +161,36 @@ export function computeDownscaleTarget(
 }
 
 /**
+ * The image format the BYTES declare, or null for anything we don't re-encode.
+ *
+ * `File.type` is not evidence about content. Browsers derive it from the
+ * filename extension (Windows registry / macOS UTI), never from the payload, so
+ * `logo.jpg` holding PNG-with-alpha bytes reports `image/jpeg`. That mismatch is
+ * harmless while the bytes are passed through untouched — every browser
+ * content-sniffs an `<img>` regardless of the declared type, so the logo renders
+ * transparent — but it is fatal once we re-encode: the decode succeeds (sniffed),
+ * we draw the transparent image onto the canvas, and `toBlob(…, 'image/jpeg')`
+ * composites the alpha onto solid black, which the HTML spec MANDATES for a
+ * format with no alpha channel. `blob.type` then matches `file.type`, so the
+ * substitution guard waves it through and the logo is stored with a permanent
+ * black box behind it.
+ *
+ * So the declared type only earns the right to be re-encoded once these bytes
+ * agree with it; on any disagreement the caller uploads the original untouched.
+ *
+ * Signatures: PNG's full 8-byte signature, JPEG's SOI plus the first marker
+ * byte, and WebP's RIFF container (`RIFF` + 4-byte size + `WEBP`).
+ */
+export function sniffImageType(header: Uint8Array): string | null {
+  if (startsWithBytes(header, PNG_SIGNATURE)) return 'image/png';
+  if (startsWithBytes(header, JPEG_SIGNATURE)) return 'image/jpeg';
+  if (header.length >= 12 && readAscii(header, 0, 4) === 'RIFF' && readAscii(header, 8, 4) === 'WEBP') {
+    return 'image/webp';
+  }
+  return null;
+}
+
+/**
  * True only when `header` positively identifies a *still* (non-animated) WebP.
  *
  * WebP is a RIFF container: `RIFF` + size + `WEBP` + a first chunk FourCC.
@@ -158,6 +213,11 @@ export function isStillWebp(header: Uint8Array): boolean {
   return (header[20] & VP8X_ANIMATION_FLAG) === 0;
 }
 
+function startsWithBytes(bytes: Uint8Array, signature: readonly number[]): boolean {
+  if (bytes.length < signature.length) return false;
+  return signature.every((byte, i) => bytes[i] === byte);
+}
+
 function readAscii(bytes: Uint8Array, offset: number, length: number): string {
   let out = '';
   for (let i = offset; i < offset + length; i++) out += String.fromCharCode(bytes[i]);
@@ -166,13 +226,13 @@ function readAscii(bytes: Uint8Array, offset: number, length: number): string {
 
 // ─── Canvas shim ─────────────────────────────────────────────────────────────
 // Everything below touches the Canvas API, which jsdom does not implement. The
-// unit tests exercise the pure helpers above; file-upload.test.tsx covers the
-// fail-open paths that ARE reachable in jsdom.
+// unit tests drive it through stubbed `getContext`/`toBlob` prototypes;
+// file-upload.test.tsx covers the fail-open paths as the component sees them.
 
 /**
  * Downscale `file` so its longest edge is at most `maxEdge`, returning a new
  * `File` with the same name and MIME type. Returns the ORIGINAL file unchanged
- * whenever downscaling is impossible, unnecessary, or unprofitable — this
+ * whenever downscaling is impossible, unnecessary, unprofitable or unsafe — this
  * function never throws and never rejects.
  *
  * Decoding goes through `createImageBitmap(..., { imageOrientation: 'from-image' })`
@@ -180,27 +240,40 @@ function readAscii(bytes: Uint8Array, offset: number, length: number): string {
  * a bare `<img>` decode would bake in *unrotated* pixels and leave an
  * EXIF-rotated phone photo displayed sideways — strictly worse than today, where
  * the raw file keeps its EXIF. `from-image` applies the orientation to the
- * pixels before we draw, so the result matches what the browser shows today. If
- * the browser lacks `createImageBitmap` (or rejects the option), we bail and
- * upload the original, so orientation is never made worse than the status quo.
+ * pixels before we draw, so the result matches what the browser shows today.
+ *
+ * Three things can go wrong with that option, and all three bail:
+ *  · no `createImageBitmap` at all → bail;
+ *  · an engine that rejects `'from-image'` as an unknown enum value → it throws,
+ *    which is caught → bail;
+ *  · an engine whose `ImageBitmapOptions` dictionary simply LACKS
+ *    `imageOrientation` → WebIDL drops unknown dictionary members silently, so
+ *    nothing throws and the bitmap comes back unrotated. `decodeBitmap` detects
+ *    this directly, by observing whether the member was read (see there).
  */
 export async function downscaleImageFile(file: File, maxEdge: number): Promise<File> {
   try {
-    if (!isDownscalableImageType(file.type)) return file;
-    if (normalizeMimeType(file.type) === 'image/webp' && !(await isStillWebpFile(file))) {
-      return file;
-    }
+    const declaredType = normalizeMimeType(file.type);
+    if (!isDownscalableImageType(declaredType)) return file;
     if (typeof globalThis.createImageBitmap !== 'function') return file;
 
-    let bitmap: ImageBitmap;
-    try {
-      bitmap = await globalThis.createImageBitmap(file, { imageOrientation: 'from-image' });
-    } catch {
-      // Undecodable image, or a browser that rejects the orientation option.
-      return file;
-    }
+    const header = await readHeaderBytes(file);
+    if (!header) return file;
+    // Re-encoding is only safe when the bytes really are the format the
+    // filename claims — see sniffImageType for what a mismatch costs.
+    if (sniffImageType(header) !== declaredType) return file;
+    // A canvas decode only ever sees frame 1 of an animation.
+    if (declaredType === 'image/webp' && !isStillWebp(header)) return file;
+
+    const decoded = await decodeBitmap(file);
+    if (!decoded) return file;
+    const { bitmap, orientationApplied } = decoded;
 
     try {
+      // An unrotated decode would store a portrait phone photo sideways, which
+      // is worse than the status quo (where the original keeps its EXIF).
+      if (!orientationApplied) return file;
+
       const target = computeDownscaleTarget(bitmap.width, bitmap.height, maxEdge);
       if (!target) return file;
 
@@ -219,18 +292,14 @@ export async function downscaleImageFile(file: File, maxEdge: number): Promise<F
       // A browser without an encoder for this type silently substitutes PNG.
       // Uploading PNG bytes under the original content type would corrupt the
       // asset, so only accept a blob that came back in the format we asked for.
-      if (normalizeMimeType(blob.type) !== normalizeMimeType(file.type)) return file;
+      if (normalizeMimeType(blob.type) !== declaredType) return file;
       // Re-encoding small images often inflates them; keep whichever is smaller.
       if (blob.size >= file.size) return file;
 
       return new File([blob], file.name, { type: file.type, lastModified: file.lastModified });
     } finally {
       // Freeing the decoded bitmap must not be able to discard a good result.
-      try {
-        bitmap.close();
-      } catch {
-        /* older engines may not expose close(); the GC will handle it */
-      }
+      closeBitmap(bitmap);
     }
   } catch {
     // Fail open: any unexpected failure uploads the original bytes.
@@ -238,28 +307,118 @@ export async function downscaleImageFile(file: File, maxEdge: number): Promise<F
   }
 }
 
-/** Read just enough of a WebP file to tell a still image from an animation. */
-async function isStillWebpFile(file: File): Promise<boolean> {
+/** Read just enough of the file to identify its format, or null if unreadable. */
+async function readHeaderBytes(file: File): Promise<Uint8Array | null> {
   try {
-    const header = await file.slice(0, WEBP_HEADER_BYTES).arrayBuffer();
-    return isStillWebp(new Uint8Array(header));
+    const header = await file.slice(0, HEADER_SNIFF_BYTES).arrayBuffer();
+    return new Uint8Array(header);
   } catch {
-    return false;
+    return null;
   }
 }
 
-/** Promise wrapper for `canvas.toBlob`, resolving `null` instead of throwing. */
+/**
+ * Decode `file` with EXIF orientation applied, reporting whether the engine
+ * actually honoured the request.
+ *
+ * `imageOrientation` is passed as a GETTER rather than a plain value so we can
+ * observe the WebIDL dictionary conversion: converting an `ImageBitmapOptions`
+ * argument performs a [[Get]] for every member the implementation declares, and
+ * for no others. So a getter that never fires means this engine's dictionary has
+ * no `imageOrientation` member and quietly ignored ours — the same technique as
+ * the classic `addEventListener` "passive" probe.
+ *
+ * Preferred over decoding a fabricated 1×2 EXIF-Orientation-6 JPEG and checking
+ * the reported width: this asks the engine the exact question (is the member
+ * declared?), needs no hand-crafted test image or async warm-up, and its only
+ * failure mode is a false negative, which merely uploads the original untouched.
+ */
+async function decodeBitmap(
+  file: File,
+): Promise<{ bitmap: ImageBitmap; orientationApplied: boolean } | null> {
+  let orientationApplied = false;
+  const options = {
+    get imageOrientation() {
+      orientationApplied = true;
+      return 'from-image' as const;
+    },
+  } as ImageBitmapOptions;
+
+  let decode: Promise<ImageBitmap>;
+  try {
+    decode = globalThis.createImageBitmap(file, options);
+  } catch {
+    // An engine that rejects the orientation enum throws during conversion.
+    return null;
+  }
+
+  const bitmap = await settleWithin(decode, DECODE_TIMEOUT_MS, closeBitmap);
+  if (!bitmap) return null;
+  return { bitmap, orientationApplied };
+}
+
+/**
+ * `promise`'s value, or null if it rejects or has not settled within `ms`.
+ * A value that arrives after the timeout is handed to `onLate` for disposal,
+ * so an abandoned decode cannot leak its bitmap.
+ */
+function settleWithin<T>(
+  promise: Promise<T>,
+  ms: number,
+  onLate?: (value: T) => void,
+): Promise<T | null> {
+  return new Promise((resolve) => {
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      resolve(null);
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        if (timedOut) onLate?.(value);
+        else resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        if (!timedOut) resolve(null);
+      },
+    );
+  });
+}
+
+/** Release a decoded bitmap; older engines may not expose `close()`. */
+function closeBitmap(bitmap: ImageBitmap): void {
+  try {
+    bitmap.close();
+  } catch {
+    /* the GC will handle it */
+  }
+}
+
+/**
+ * Promise wrapper for `canvas.toBlob`, resolving `null` instead of throwing —
+ * and resolving `null` rather than hanging if the callback never comes.
+ */
 function canvasToBlob(canvas: HTMLCanvasElement, mimeType: string): Promise<Blob | null> {
   return new Promise((resolve) => {
     if (typeof canvas.toBlob !== 'function') {
       resolve(null);
       return;
     }
+    let settled = false;
+    const settle = (blob: Blob | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(blob);
+    };
+    const timer = setTimeout(() => settle(null), ENCODE_TIMEOUT_MS);
     const quality = LOSSY_MIME_TYPES.has(normalizeMimeType(mimeType)) ? ENCODE_QUALITY : undefined;
     try {
-      canvas.toBlob((blob) => resolve(blob), mimeType, quality);
+      canvas.toBlob((blob) => settle(blob), mimeType, quality);
     } catch {
-      resolve(null);
+      settle(null);
     }
   });
 }

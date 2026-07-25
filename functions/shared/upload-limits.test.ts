@@ -16,11 +16,23 @@ import {
   isGenericContentType,
   matchesContentType,
   normalizeContentType,
+  pathExtensionAllowed,
   resolveUploadKind,
+  type UploadAssetKind,
+  type UploadCandidate,
 } from './upload-limits';
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
+
+/**
+ * A candidate for the flat `lms` namespace — the family every fixture below uses
+ * unless it is specifically about branding. `family` is consumed by
+ * `assertBindablePaths`, not by the function under test, so it is noise here and
+ * is defaulted away.
+ */
+const candidate = (path: string | null | undefined, kind: UploadAssetKind): UploadCandidate =>
+  ({ path, kind, family: 'lms' });
 
 /** A conclusive "blob exists" HEAD. */
 const found = (contentLength: number | null, contentType: string | null = null) => ({
@@ -89,10 +101,32 @@ describe('fileExtension', () => {
 });
 
 describe('matchesContentType', () => {
-  it('prefix-matches for video and image', () => {
+  it('prefix-matches for video', () => {
     expect(matchesContentType('video', 'video/quicktime')).toBe(true);
+    expect(matchesContentType('video', 'image/png')).toBe(false);
+  });
+
+  it('exact-matches the picker list for images — NOT an image/ prefix', () => {
     expect(matchesContentType('image', 'image/webp')).toBe(true);
+    expect(matchesContentType('image', 'image/png')).toBe(true);
     expect(matchesContentType('image', 'video/mp4')).toBe(false);
+  });
+
+  it('rejects image/svg+xml, which an image/ prefix would have admitted', () => {
+    // The persist-time hole: mint `avatars/<uuid>.png` declaring image/png, then
+    // PUT SVG bytes with x-ms-blob-content-type: image/svg+xml. The declared
+    // filename is discarded at mint time, so this is the check that must catch it.
+    expect(matchesContentType('image', 'image/svg+xml')).toBe(false);
+  });
+
+  it('rejects the other image/* types the prefix used to admit', () => {
+    expect(matchesContentType('image', 'image/heic')).toBe(false);
+    expect(matchesContentType('image', 'image/bmp')).toBe(false);
+    expect(matchesContentType('image', 'image/tiff')).toBe(false);
+  });
+
+  it('tolerates the non-standard image/jpg alias some platforms report', () => {
+    expect(matchesContentType('image', 'image/jpg')).toBe(true);
   });
   it('exact-matches the office list for documents', () => {
     expect(matchesContentType('document', 'application/pdf')).toBe(true);
@@ -143,6 +177,27 @@ describe('resolveUploadKind', () => {
   });
 });
 
+describe('pathExtensionAllowed', () => {
+  it('accepts a STORED path whose extension matches the column kind', () => {
+    expect(pathExtensionAllowed('avatars/abc.png', 'image')).toBe(true);
+    expect(pathExtensionAllowed('abc.mp4', 'video')).toBe(true);
+    expect(pathExtensionAllowed('documents/abc.pdf', 'document')).toBe(true);
+  });
+
+  it('is what separates the columns that share the flat namespace', () => {
+    // A course thumbnail and a lesson video are both `<uuid>.<ext>` — the path
+    // shape cannot tell them apart, so the extension has to.
+    expect(pathExtensionAllowed('abc.mp4', 'image')).toBe(false);
+    expect(pathExtensionAllowed('abc.png', 'video')).toBe(false);
+    expect(pathExtensionAllowed('abc.mp4', 'document')).toBe(false);
+  });
+
+  it('rejects .svg and an extension-less path', () => {
+    expect(pathExtensionAllowed('avatars/evil.svg', 'image')).toBe(false);
+    expect(pathExtensionAllowed('avatars/noextension', 'image')).toBe(false);
+  });
+});
+
 describe('enforceUploadLimits', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -152,34 +207,31 @@ describe('enforceUploadLimits', () => {
 
   it('accepts a fresh path that is comfortably under its cap', async () => {
     await expect(
-      enforceUploadLimits([{ path: 'videos/new.mp4', kind: 'video' }]),
+      enforceUploadLimits([candidate('videos/new.mp4', 'video')]),
     ).resolves.toBeNull();
     expect(mockHeadBlob).toHaveBeenCalledWith('videos/new.mp4');
-    expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
-  it('rejects an over-cap blob with the kind-specific message and deletes it', async () => {
+  it('rejects an over-cap blob with the kind-specific message', async () => {
     mockHeadBlob.mockResolvedValue(found(2 * GB + 1));
     await expect(
-      enforceUploadLimits([{ path: 'videos/huge.mp4', kind: 'video' }]),
+      enforceUploadLimits([candidate('videos/huge.mp4', 'video')]),
     ).resolves.toBe('Video exceeds the maximum upload size of 2 GB');
-    // The refused blob must not be left behind as an orphan.
-    expect(mockDeleteBlob).toHaveBeenCalledWith('videos/huge.mp4');
   });
 
   it('accepts a blob exactly AT the cap (the cap is inclusive)', async () => {
     mockHeadBlob.mockResolvedValue(found(10 * MB));
     await expect(
-      enforceUploadLimits([{ path: 'thumbs/exact.png', kind: 'image' }]),
+      enforceUploadLimits([candidate('thumbs/exact.png', 'image')]),
     ).resolves.toBeNull();
   });
 
   it('applies the cap that belongs to the COLUMN, not to the bytes', async () => {
     // 50 MB: fine as a video, fine as a document, over the 10 MB image cap.
     mockHeadBlob.mockResolvedValue(found(50 * MB));
-    await expect(enforceUploadLimits([{ path: 'a.mp4', kind: 'video' }])).resolves.toBeNull();
-    await expect(enforceUploadLimits([{ path: 'b.pdf', kind: 'document' }])).resolves.toBeNull();
-    await expect(enforceUploadLimits([{ path: 'c.png', kind: 'image' }])).resolves.toBe(
+    await expect(enforceUploadLimits([candidate('a.mp4', 'video')])).resolves.toBeNull();
+    await expect(enforceUploadLimits([candidate('b.pdf', 'document')])).resolves.toBeNull();
+    await expect(enforceUploadLimits([candidate('c.png', 'image')])).resolves.toBe(
       'Image exceeds the maximum upload size of 10 MB',
     );
   });
@@ -187,16 +239,60 @@ describe('enforceUploadLimits', () => {
   it('rejects a blob whose STORED content type is off the allow-list', async () => {
     mockHeadBlob.mockResolvedValue(found(1024, 'application/x-msdownload'));
     await expect(
-      enforceUploadLimits([{ path: 'thumbs/trojan.png', kind: 'image' }]),
+      enforceUploadLimits([candidate('thumbs/trojan.png', 'image')]),
     ).resolves.toBe('Image content type is not allowed');
-    expect(mockDeleteBlob).toHaveBeenCalledWith('thumbs/trojan.png');
   });
 
   it('accepts a blob stored without a usable content type (inconclusive, not off-list)', async () => {
     mockHeadBlob.mockResolvedValue(found(1024, 'application/octet-stream'));
     await expect(
-      enforceUploadLimits([{ path: 'videos/new.mov', kind: 'video' }]),
+      enforceUploadLimits([candidate('videos/new.mov', 'video')]),
     ).resolves.toBeNull();
+  });
+
+  // --- The SVG/HEIC bytes-vs-declaration gap ---
+  //
+  // The declared filename is checked at mint time and then thrown away, so the
+  // only thing standing between "I said image/png" and "I stored an SVG" is what
+  // the blob ACTUALLY reports here.
+
+  it('refuses SVG bytes stored under an allow-listed .png path', async () => {
+    mockHeadBlob.mockResolvedValue(found(4 * 1024, 'image/svg+xml'));
+    await expect(
+      enforceUploadLimits([candidate('avatars/looks-fine.png', 'image')]),
+    ).resolves.toBe('Image content type is not allowed');
+  });
+
+  it('refuses SVG bytes with a charset parameter attached', async () => {
+    mockHeadBlob.mockResolvedValue(found(4 * 1024, 'image/svg+xml; charset=utf-8'));
+    await expect(
+      enforceUploadLimits([candidate('avatars/looks-fine.png', 'image')]),
+    ).resolves.toBe('Image content type is not allowed');
+  });
+
+  it('refuses HEIC bytes stored under an allow-listed .jpg path', async () => {
+    mockHeadBlob.mockResolvedValue(found(4 * 1024, 'image/heic'));
+    await expect(
+      enforceUploadLimits([candidate('avatars/looks-fine.jpg', 'image')]),
+    ).resolves.toBe('Image content type is not allowed');
+  });
+
+  it('refuses a stored path whose EXTENSION is off the allow-list', async () => {
+    // Belt to the content-type braces: a blob that exists in our container is one
+    // we minted, so its extension is ours to insist on even if it reports nothing.
+    mockHeadBlob.mockResolvedValue(found(1024, null));
+    await expect(
+      enforceUploadLimits([candidate('avatars/evil.svg', 'image')]),
+    ).resolves.toBe('Image content type is not allowed');
+  });
+
+  it('refuses a video path bound to an image column (the flat namespace)', async () => {
+    // `<uuid>.mp4` and `<uuid>.png` are indistinguishable by prefix; only the
+    // extension says which column may hold which.
+    mockHeadBlob.mockResolvedValue(found(1024, null));
+    await expect(
+      enforceUploadLimits([candidate('abc.mp4', 'image')]),
+    ).resolves.toBe('Image content type is not allowed');
   });
 
   // --- Which paths get probed at all ---
@@ -204,7 +300,7 @@ describe('enforceUploadLimits', () => {
   it('never probes a path that is already stored on the row', async () => {
     await expect(
       enforceUploadLimits(
-        [{ path: 'videos/keep.mp4', kind: 'video' }],
+        [candidate('videos/keep.mp4', 'video')],
         ['videos/keep.mp4'],
       ),
     ).resolves.toBeNull();
@@ -213,10 +309,10 @@ describe('enforceUploadLimits', () => {
 
   it('never probes a path that merely MOVED between columns of the same row', async () => {
     // Mirrors the #275 cleanup semantics: previousPaths is row-wide, so
-    // video_storage_path → azure_blob_path is not a new upload.
+    // video_storage_path -> azure_blob_path is not a new upload.
     await expect(
       enforceUploadLimits(
-        [{ path: 'videos/same.mp4', kind: 'video' }],
+        [candidate('videos/same.mp4', 'video')],
         [null, 'videos/same.mp4', null],
       ),
     ).resolves.toBeNull();
@@ -226,7 +322,7 @@ describe('enforceUploadLimits', () => {
   it('cannot fail an update because an already-stored blob was removed from storage', async () => {
     mockHeadBlob.mockResolvedValue(missing);
     await expect(
-      enforceUploadLimits([{ path: 'videos/gone.mp4', kind: 'video' }], ['videos/gone.mp4']),
+      enforceUploadLimits([candidate('videos/gone.mp4', 'video')], ['videos/gone.mp4']),
     ).resolves.toBeNull();
     expect(mockHeadBlob).not.toHaveBeenCalled();
   });
@@ -234,9 +330,9 @@ describe('enforceUploadLimits', () => {
   it('probes nothing when every candidate is null, undefined or empty', async () => {
     await expect(
       enforceUploadLimits([
-        { path: null, kind: 'video' },
-        { path: undefined, kind: 'document' },
-        { path: '', kind: 'image' },
+        candidate(null, 'video'),
+        candidate(undefined, 'document'),
+        candidate('', 'image'),
       ]),
     ).resolves.toBeNull();
     expect(mockHeadBlob).not.toHaveBeenCalled();
@@ -245,8 +341,8 @@ describe('enforceUploadLimits', () => {
   it('probes a path once even when two columns reference it', async () => {
     await expect(
       enforceUploadLimits([
-        { path: 'videos/new.mp4', kind: 'video' },
-        { path: 'videos/new.mp4', kind: 'video' },
+        candidate('videos/new.mp4', 'video'),
+        candidate('videos/new.mp4', 'video'),
       ]),
     ).resolves.toBeNull();
     expect(mockHeadBlob).toHaveBeenCalledTimes(1);
@@ -257,10 +353,8 @@ describe('enforceUploadLimits', () => {
   it('allows the save when storage is unreachable', async () => {
     mockHeadBlob.mockResolvedValue(inconclusive);
     await expect(
-      enforceUploadLimits([{ path: 'videos/new.mp4', kind: 'video' }]),
+      enforceUploadLimits([candidate('videos/new.mp4', 'video')]),
     ).resolves.toBeNull();
-    // Nothing is deleted on an inconclusive probe — the blob may be perfectly fine.
-    expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
   it('allows the save when the blob does not exist', async () => {
@@ -268,15 +362,23 @@ describe('enforceUploadLimits', () => {
     // thumbnail_url / logo_url, which HEADs as a 404.
     mockHeadBlob.mockResolvedValue(missing);
     await expect(
-      enforceUploadLimits([{ path: 'https://example.com/logo.png', kind: 'image' }]),
+      enforceUploadLimits([candidate('https://example.com/logo.png', 'image')]),
     ).resolves.toBeNull();
-    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('does not judge an absent blob by its extension', async () => {
+    // An extension-less absolute URL is a legitimate stored value; the extension
+    // check must sit BEHIND the "the blob exists" branch, not in front of it.
+    mockHeadBlob.mockResolvedValue(missing);
+    await expect(
+      enforceUploadLimits([candidate('https://example.com/branding/logo', 'image')]),
+    ).resolves.toBeNull();
   });
 
   it('allows the save when the blob exists but reports no size', async () => {
     mockHeadBlob.mockResolvedValue(found(null));
     await expect(
-      enforceUploadLimits([{ path: 'videos/new.mp4', kind: 'video' }]),
+      enforceUploadLimits([candidate('videos/new.mp4', 'video')]),
     ).resolves.toBeNull();
   });
 
@@ -288,35 +390,72 @@ describe('enforceUploadLimits', () => {
     );
     await expect(
       enforceUploadLimits([
-        { path: 'videos/ok.mp4', kind: 'video' },
-        { path: 'docs/huge.pdf', kind: 'document' },
+        candidate('videos/ok.mp4', 'video'),
+        candidate('docs/huge.pdf', 'document'),
       ]),
     ).resolves.toBe('Document exceeds the maximum upload size of 100 MB');
     expect(mockHeadBlob).toHaveBeenCalledTimes(2);
-    // Only the REFUSED blob is cleaned up; the accepted one may still be retried.
-    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
-    expect(mockDeleteBlob).toHaveBeenCalledWith('docs/huge.pdf');
   });
 
-  it('deletes every rejected blob, not just the one it reports', async () => {
+  // --- BLOCKER: the gate must never DELETE ---
+  //
+  // The refused-blob cleanup that used to live here was a one-request
+  // arbitrary-blob-delete primitive: `previousPaths` is row-scoped, so a path
+  // belonging to a DIFFERENT row counted as fresh, got probed against THIS
+  // column's cap, and was destroyed — while the row that actually referenced it
+  // was never touched, and the attacker's own row was never written. Reclaiming a
+  // refused upload is `orphan-sweep`'s job; this function only ever answers a
+  // question.
+
+  it('deletes nothing when a blob is over cap', async () => {
+    mockHeadBlob.mockResolvedValue(found(5 * GB));
+    await expect(
+      enforceUploadLimits([candidate('videos/huge.mp4', 'video')]),
+    ).resolves.toBe('Video exceeds the maximum upload size of 2 GB');
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('deletes nothing when a blob is off the content-type allow-list', async () => {
+    mockHeadBlob.mockResolvedValue(found(1024, 'application/x-msdownload'));
+    await expect(
+      enforceUploadLimits([candidate('thumbs/trojan.png', 'image')]),
+    ).resolves.toBe('Image content type is not allowed');
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('deletes nothing when several candidates are rejected at once', async () => {
     mockHeadBlob.mockResolvedValue(found(5 * GB));
     await expect(
       enforceUploadLimits([
-        { path: 'videos/a.mp4', kind: 'video' },
-        { path: 'videos/b.mp4', kind: 'video' },
+        candidate('videos/a.mp4', 'video'),
+        candidate('videos/b.mp4', 'video'),
       ]),
     ).resolves.toBe('Video exceeds the maximum upload size of 2 GB');
-    expect(mockDeleteBlob.mock.calls.map((c) => c[0]).sort()).toEqual([
-      'videos/a.mp4',
-      'videos/b.mp4',
-    ]);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
-  it('still rejects when the cleanup delete fails (storage 500)', async () => {
-    mockHeadBlob.mockResolvedValue(found(5 * GB));
-    mockDeleteBlob.mockResolvedValue(false);
+  it('deletes nothing on ANY outcome — accepted, refused or inconclusive', async () => {
+    mockHeadBlob
+      .mockResolvedValueOnce(found(1024))
+      .mockResolvedValueOnce(found(5 * GB))
+      .mockResolvedValueOnce(inconclusive);
+    await enforceUploadLimits([
+      candidate('videos/a.mp4', 'video'),
+      candidate('videos/b.mp4', 'video'),
+      candidate('videos/c.mp4', 'video'),
+    ]);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('a path from ANOTHER row cannot be destroyed by failing this column cap', async () => {
+    // The exact BLOCKER shape: a 500 MB lesson video posted to an image column.
+    // The verdict is still reported — refusing the WRITE is correct — but the
+    // victim's blob must survive it untouched.
+    mockHeadBlob.mockResolvedValue(found(500 * MB, 'video/mp4'));
     await expect(
-      enforceUploadLimits([{ path: 'videos/huge.mp4', kind: 'video' }]),
-    ).resolves.toBe('Video exceeds the maximum upload size of 2 GB');
+      enforceUploadLimits([candidate('someone-elses-lesson.mp4', 'image')]),
+    ).resolves.toBe('Image content type is not allowed');
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 });
+

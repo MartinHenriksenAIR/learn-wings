@@ -19,15 +19,39 @@
  *     replace (2), because the client's declaration says nothing about the bytes
  *     it will actually send.
  *  2. At persist time (`enforceUploadLimits`, called by every endpoint that
- *     writes a blob path to a column) the blob is HEADed and its REAL size and
- *     stored content type are checked. This is the gate that actually binds.
+ *     writes a blob path to a column) the blob is HEADed and its REAL size,
+ *     stored content type and path extension are checked.
+ *
+ * WHAT (2) IS AND IS NOT. It is the only place the real bytes are ever measured,
+ * and it is what stops an over-cap blob from being REFERENCED by a row. It is
+ * NOT an unconditional bound on what can sit in the container, and this file
+ * previously claimed otherwise. A deliberate attacker controls the ORDER of the
+ * two client steps, and the SAS stays valid for 30 minutes:
+ *     mint SAS → save the row while the blob is still absent (a conclusive 404
+ *     is a fail-open answer, see `inspectPath`) → THEN PUT the oversized bytes.
+ * Nothing re-probes afterwards, and re-probing on every save would not close it
+ * either — the attacker simply never saves again. What actually bounds container
+ * growth for an unreferenced blob is the nightly `orphan-sweep`; a blob that IS
+ * referenced by a row is bounded by nothing here. Closing that properly needs
+ * enforcement at serve time or a size reconciliation pass, neither of which
+ * exists yet.
+ *
+ * WHAT THIS MODULE DOES NOT DO AT ALL: decide whether the caller is allowed to
+ * bind this path to this row. A path is just a client-supplied string, and until
+ * #275 that string was inert. `blob-ownership.ts` is the gate for that question
+ * and MUST run first — every caller of `enforceUploadLimits` calls
+ * `assertBindablePaths` on the same candidate array immediately before it, so
+ * that no foreign path is ever handed to `headBlob`. What does still reach
+ * `headBlob` here is an `'external'` value (an absolute URL, always legal in
+ * `thumbnail_url` / `logo_url` / `avatar_url`); it is HEADed, answers 404 or 403,
+ * and takes the fail-open branch. One wasted round trip, no verdict.
  *
  * The client mirror of these numbers lives in `src/lib/upload-limits.ts` — the
  * two trees are separate npm packages with separate tsconfigs and cannot share a
  * module, so the constants are duplicated deliberately. Change both together.
  */
 
-import { deleteBlob, headBlob } from './blob';
+import { headBlob, type BlobPathFamily } from './blob';
 
 /** Which cap applies. Selected by the COLUMN being written, not by anything the client says. */
 export type UploadAssetKind = 'video' | 'document' | 'image';
@@ -42,18 +66,24 @@ export interface UploadLimit {
   /**
    * Content-type prefix match (e.g. `video/`), or null when the kind uses an
    * explicit list instead. Exactly one of this and `contentTypes` is set.
+   *
+   * A prefix is only safe for a kind where EVERY member of the type tree is
+   * acceptable. That is true of `video/` and is emphatically NOT true of
+   * `image/` — see `IMAGE_CONTENT_TYPES`.
    */
   contentTypePrefix: string | null;
   /** Exact content types, or null when the kind uses `contentTypePrefix`. */
   contentTypes: ReadonlySet<string> | null;
   /**
-   * Lower-case, dot-less filename extensions the mint endpoints will hand out.
+   * Lower-case, dot-less filename extensions this kind may be stored under.
+   * Checked against the DECLARED filename at mint time AND against the STORED
+   * path at persist time (`inspectPath`), because the declared filename is
+   * discarded once the path is minted.
    *
-   * Deliberately NARROWER than the content-type rule in two places:
-   *  - `svg` is absent although `image/svg+xml` matches `image/`. An SVG served
-   *    from a signed URL and opened directly is a scripting context; the app
-   *    never offers SVG in any file picker, so allowing it would only ever widen
-   *    the stored-XSS surface.
+   * Deliberately narrow:
+   *  - `svg` is absent. An SVG served from a signed URL and opened directly is a
+   *    scripting context; the app never offers SVG in any file picker, so
+   *    allowing it would only ever widen the stored-XSS surface.
    *  - `heic`/`heif` are absent: no browser outside Safari can render them, so
    *    accepting one stores a thumbnail nobody can see.
    */
@@ -62,8 +92,8 @@ export interface UploadLimit {
 
 /**
  * Office content types accepted for document uploads. Byte-identical to
- * `ACCEPTED_TYPES` in `src/components/ui/azure-document-upload.tsx`, which is
- * what the file picker offers.
+ * `UPLOAD_TYPE_RULES.document.contentTypes` in `src/lib/upload-limits.ts`, which
+ * is what the file picker offers.
  */
 const DOCUMENT_CONTENT_TYPES: ReadonlySet<string> = new Set([
   'application/pdf',
@@ -73,6 +103,32 @@ const DOCUMENT_CONTENT_TYPES: ReadonlySet<string> = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+
+/**
+ * Image content types accepted for image uploads — an EXPLICIT list, not an
+ * `image/` prefix match.
+ *
+ * A prefix match here was a hole, not a shortcut. `image/svg+xml` starts with
+ * `image/`, so an SVG passed the persist-time check even though `svg` is off the
+ * extension allow-list: mint `avatars/<uuid>.png` declaring `image/png`, then PUT
+ * SVG bytes with `x-ms-blob-content-type: image/svg+xml`. The declared filename
+ * is discarded at mint time, so nothing downstream ever saw the disagreement.
+ * The same hole admitted `image/heic`, `image/bmp` and `image/tiff`.
+ *
+ * The list is byte-identical to `UPLOAD_TYPE_RULES.image.contentTypes` in
+ * `src/lib/upload-limits.ts`, which is what the file pickers offer (every
+ * `<input type="file">` in the app derives its `accept` attribute from that
+ * table). `image/jpg` is on both: a non-standard alias some platforms still
+ * report for `.jpg`, it maps onto an allow-listed extension, and rejecting it
+ * would break a legitimate upload for no security gain.
+ */
+const IMAGE_CONTENT_TYPES: ReadonlySet<string> = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/gif',
+  'image/webp',
 ]);
 
 /** The agreed caps. Mirrored (in MB) by `src/lib/upload-limits.ts`. */
@@ -97,8 +153,8 @@ export const UPLOAD_LIMITS: Readonly<Record<UploadAssetKind, UploadLimit>> = {
     label: 'Image',
     maxBytes: 10 * 1024 * 1024,
     maxLabel: '10 MB',
-    contentTypePrefix: 'image/',
-    contentTypes: null,
+    contentTypePrefix: null,
+    contentTypes: IMAGE_CONTENT_TYPES,
     extensions: new Set(['png', 'jpg', 'jpeg', 'gif', 'webp']),
   },
 };
@@ -186,6 +242,32 @@ export interface UploadCandidate {
   path: string | null | undefined;
   /** Which cap applies — derived from the COLUMN, never from client input. */
   kind: UploadAssetKind;
+  /**
+   * Which blob-path namespace this COLUMN may bind — also derived from the
+   * column, never from client input. Consumed by `assertBindablePaths`
+   * (`blob-ownership.ts`); carried on the same object so an endpoint builds ONE
+   * candidate array and hands the identical list to both gates, and the two can
+   * never be given different views of the same write.
+   */
+  family: BlobPathFamily;
+}
+
+/**
+ * True when the stored path's extension is one this KIND may be stored under.
+ *
+ * The mint endpoints check the caller's DECLARED filename and then throw it
+ * away, so this is the only check that sees what the persisted path actually
+ * ends in. Called from two places with deliberately different preconditions:
+ *  - `assertBindablePaths`, for a path already classified as belonging to this
+ *    column's family — a pure check, before any storage round trip. This is what
+ *    keeps the flat `lms` namespace honest: a `<uuid>.mp4` cannot be bound to
+ *    `thumbnail_url`, whose kind is `image`.
+ *  - `inspectPath`, but only AFTER a conclusive "the blob exists" HEAD, so that
+ *    an absolute external URL (always allowed in `thumbnail_url` / `logo_url`,
+ *    and extension-less as often as not) is never judged by it.
+ */
+export function pathExtensionAllowed(path: string, kind: UploadAssetKind): boolean {
+  return UPLOAD_LIMITS[kind].extensions.has(fileExtension(path));
 }
 
 /** Narrows to a non-empty string; `filter(isStoredPath)` also narrows the array type. */
@@ -203,19 +285,31 @@ async function inspectPath(path: string, kind: UploadAssetKind): Promise<string 
   const head = await headBlob(path);
 
   // ── Fail-open branch ──────────────────────────────────────────────────────
-  // Storage did not conclusively tell us this blob is over-cap or off-list, so
-  // the save proceeds. Deliberate, and the trade is one-sided:
-  //  · Blocking here converts any storage blip into "nobody can edit a course",
-  //    and would also reject perfectly legitimate values that are not blob paths
-  //    at all — `thumbnail_url` and `logo_url` have always accepted absolute
-  //    external URLs, which HEAD as a 404.
-  //  · It buys no security. The only way to exploit an unbounded upload is to
-  //    ACTUALLY upload the bytes, and that is precisely the case a successful
-  //    HEAD answers conclusively. An attacker cannot choose to be inconclusive
-  //    without also failing to upload anything.
-  // Every inconclusive branch is logged by `headBlob`, so a storage outage that
-  // silently disabled the cap is visible in the server logs.
+  // Storage did not tell us this blob is over-cap or off-list — either because it
+  // could not answer, or because the blob is not there — so the save proceeds.
+  // Deliberate, but NOT free, and the old claim here that it "buys no security"
+  // was wrong. Both halves, honestly:
+  //  · `!head.ok` (a blip, an outage, missing env). Blocking would convert any
+  //    storage wobble into "nobody can edit a course". `headBlob` logs every one
+  //    of these, so a silently disabled cap is visible server-side.
+  //  · `!head.exists` (a conclusive 404). This is what keeps legitimate non-blob
+  //    values working — `thumbnail_url` and `logo_url` have always accepted
+  //    absolute external URLs, which HEAD as a 404 — and it is ALSO the hole an
+  //    attacker walks through: save the row while the blob is still absent, then
+  //    PUT the oversized bytes with the SAS that is valid for another 30 minutes.
+  //    Rejecting a 404 instead would break every external URL and still not close
+  //    it (a second PUT after a small first upload does the same job). See the
+  //    module docblock: nothing here bounds a blob that a row already references.
   if (!head.ok || !head.exists) return null;
+
+  // Past this point the blob demonstrably EXISTS in our container, so it is a
+  // path we minted and its extension is ours to insist on. Checked here rather
+  // than before the HEAD so that an absolute external URL — legitimate in
+  // `thumbnail_url` / `logo_url`, and frequently extension-less — reaches the
+  // 404 fail-open above instead of being rejected for its spelling.
+  if (!pathExtensionAllowed(path, kind)) {
+    return `${limit.label} content type is not allowed`;
+  }
 
   if (head.contentLength !== null && head.contentLength > limit.maxBytes) {
     return `${limit.label} exceeds the maximum upload size of ${limit.maxLabel}`;
@@ -244,10 +338,25 @@ async function inspectPath(path: string, kind: UploadAssetKind): Promise<string 
  * MOVES between columns counts as already-stored in both features — one
  * comparison concept, not two that can drift.
  *
- * Rejected blobs are best-effort deleted so a refused upload does not
- * immediately become an orphan. `deleteBlob` never throws, and (like every other
- * blob-cleanup call site) its outcome is not surfaced — server logs are the only
- * failure signal.
+ * The skip is a considered choice, not just a round-trip saving. Re-probing every
+ * path on every save was the obvious answer to the persist-then-upload ordering
+ * hole, and it does not actually close it: the attacker decides when to save, and
+ * simply never saves again. What it WOULD reliably do is make any row whose blob
+ * predates these caps permanently unsavable — a legacy 3 GB video would 413 every
+ * edit of the lesson that references it, with no way out except clearing the
+ * column. Paying that to catch an attacker who has to volunteer for it is a bad
+ * trade; the real fix belongs at serve time or in a reconciliation pass.
+ *
+ * A REFUSED BLOB IS NOT DELETED HERE, deliberately. It used to be, as a courtesy
+ * so a refused upload did not become an orphan — and that one line was a
+ * one-request arbitrary-blob-delete primitive: `previousPaths` is row-scoped, so
+ * a path belonging to a DIFFERENT row was "fresh", got probed, failed this
+ * column's cap, and was destroyed while the row that actually referenced it was
+ * untouched. `blob-ownership.ts` now refuses a foreign path before it ever gets
+ * here, but the courtesy is not worth re-introducing on top of that: it bought
+ * roughly 24 hours of storage (`orphan-sweep` reclaims unreferenced blobs after
+ * its grace window anyway) and cost a deletion path reachable from a request
+ * that never writes a row.
  */
 export async function enforceUploadLimits(
   candidates: readonly UploadCandidate[],
@@ -271,9 +380,5 @@ export async function enforceUploadLimits(
   const verdicts = await Promise.all(
     fresh.map(async ({ path, kind }) => ({ path, error: await inspectPath(path, kind) })),
   );
-  const rejected = verdicts.filter((v): v is { path: string; error: string } => v.error !== null);
-  if (rejected.length === 0) return null;
-
-  await Promise.all(rejected.map((v) => deleteBlob(v.path)));
-  return rejected[0].error;
+  return verdicts.find((v) => v.error !== null)?.error ?? null;
 }

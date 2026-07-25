@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
-  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob, mockEnforceUploadLimits,
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob,
+  mockEnforceUploadLimits, mockAssertBindablePaths, mockIsBlobReleasable,
 } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
@@ -10,6 +11,8 @@ const {
     mockGetProfile: vi.fn(),
     mockDeleteBlob: vi.fn(),
     mockEnforceUploadLimits: vi.fn(),
+    mockAssertBindablePaths: vi.fn(),
+    mockIsBlobReleasable: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -22,6 +25,10 @@ vi.mock('../shared/profile', () => ({
 }));
 vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
 vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
+vi.mock('../shared/blob-ownership', () => ({
+  assertBindablePaths: mockAssertBindablePaths,
+  isBlobReleasable: mockIsBlobReleasable,
+}));
 
 import handler from './index';
 
@@ -70,6 +77,8 @@ describe('lesson-update', () => {
     mockGetProfile.mockResolvedValue(adminProfile);
     mockDeleteBlob.mockResolvedValue(true);
     mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
+    mockAssertBindablePaths.mockResolvedValue(null); // the paths are the caller's to bind
+    mockIsBlobReleasable.mockResolvedValue(true);    // nothing else references the old blobs
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -403,9 +412,9 @@ describe('lesson-update', () => {
 
     expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
       [
-        { path: 'legacy/new.mp4', kind: 'video' },
-        { path: 'videos/new.mp4', kind: 'video' },
-        { path: 'docs/new.pdf', kind: 'document' },
+        { path: 'legacy/new.mp4', kind: 'video', family: 'lms' },
+        { path: 'videos/new.mp4', kind: 'video', family: 'lms' },
+        { path: 'docs/new.pdf', kind: 'document', family: 'lms' },
       ],
       // Row-wide previous paths in column order (video, azure, document) — the
       // same set the cleanup below diffs against, so an unchanged (or merely
@@ -425,6 +434,132 @@ describe('lesson-update', () => {
 
     expect(res.status).toBe(200);
     expect(order).toEqual(['select', 'gate', 'update']);
+  });
+
+  // --- Path ownership ---
+  //
+  // Lesson videos, lesson documents and course thumbnails all share one flat
+  // namespace (`azure-upload-url` gives non-branding uploads an empty prefix), so
+  // the path shape alone cannot say which row a `<uuid>.<ext>` belongs to.
+
+  it('400 when the ownership gate refuses a path: no probe, no UPDATE, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce(prevPaths({ azure_blob_path: 'videos/old.mp4' }));
+    mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');
+
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'avatars/victim.png' }), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE lessons');
+  });
+
+  it('runs the ownership gate BEFORE the size gate, on the same candidate list', async () => {
+    const order: string[] = [];
+    mockAssertBindablePaths.mockImplementationOnce(async () => { order.push('ownership'); return null; });
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('limits'); return null; });
+    mockDb(prevPaths(), fakeLesson);
+
+    await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+
+    expect(order).toEqual(['ownership', 'limits']);
+    expect(mockAssertBindablePaths.mock.calls[0][0]).toEqual(mockEnforceUploadLimits.mock.calls[0][0]);
+    expect(mockAssertBindablePaths.mock.calls[0][1]).toEqual(mockEnforceUploadLimits.mock.calls[0][1]);
+  });
+
+  it('a superseded video another row still references is NOT deleted', async () => {
+    mockIsBlobReleasable.mockResolvedValue(false);
+    mockDb(prevPaths({ azure_blob_path: 'shared.mp4' }), fakeLesson);
+
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockIsBlobReleasable).toHaveBeenCalledWith('shared.mp4', 'lms');
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('asks whether an old blob is releasable only AFTER the row write', async () => {
+    const order: string[] = [];
+    mockQueryOne
+      .mockImplementationOnce(async () => prevPaths({ azure_blob_path: 'videos/old.mp4' }))
+      .mockImplementationOnce(async () => { order.push('update'); return fakeLesson; });
+    mockIsBlobReleasable.mockImplementationOnce(async () => { order.push('releasable'); return true; });
+    mockDeleteBlob.mockImplementationOnce(async () => { order.push('delete'); return true; });
+
+    await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+
+    expect(order).toEqual(['update', 'releasable', 'delete']);
+  });
+
+  // --- An ABSENT key is not a clear ---
+  //
+  // `?? null` used to collapse "the caller did not mention this column" into
+  // "the caller cleared this column". That was merely lossy while the column was
+  // inert; once a clear started deleting the file, a sparse payload could destroy
+  // a lesson video by omission. course-update, organization-update and
+  // profile-update all draw this distinction — this endpoint now does too.
+
+  it('a payload omitting the blob keys keeps the stored paths and deletes nothing', async () => {
+    mockDb(
+      prevPaths({
+        video_storage_path: 'legacy/keep.mp4',
+        azure_blob_path: 'videos/keep.mp4',
+        document_storage_path: 'docs/keep.pdf',
+      }),
+      fakeLesson,
+    );
+
+    const res = await handler(baseReq(validBody), {} as any); // no *StoragePath / azureBlobPath keys
+
+    expect(res.status).toBe(200);
+    const [, params] = updateCall();
+    expect(params[5]).toBe('legacy/keep.mp4'); // video_storage_path
+    expect(params[6]).toBe('videos/keep.mp4'); // azure_blob_path
+    expect(params[7]).toBe('docs/keep.pdf');   // document_storage_path
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('an EXPLICIT null still clears the column and releases the blob', async () => {
+    mockDb(prevPaths({ azure_blob_path: 'videos/old.mp4' }), fakeLesson);
+
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: null }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(updateCall()[1][6]).toBeNull();
+    expect(mockDeleteBlob).toHaveBeenCalledWith('videos/old.mp4');
+  });
+
+  it('omitting one key while setting another touches only the key that was sent', async () => {
+    mockDb(
+      prevPaths({ video_storage_path: 'legacy/keep.mp4', azure_blob_path: 'videos/old.mp4' }),
+      fakeLesson,
+    );
+
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [, params] = updateCall();
+    expect(params[5]).toBe('legacy/keep.mp4'); // untouched, NOT nulled
+    expect(params[6]).toBe('videos/new.mp4');
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('videos/old.mp4');
+  });
+
+  it('the gate sees the kept paths, so an omitted column costs no probe', async () => {
+    mockDb(prevPaths({ azure_blob_path: 'videos/keep.mp4' }), fakeLesson);
+
+    await handler(baseReq(validBody), {} as any);
+
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      [
+        { path: null, kind: 'video', family: 'lms' },
+        { path: 'videos/keep.mp4', kind: 'video', family: 'lms' },
+        { path: null, kind: 'document', family: 'lms' },
+      ],
+      [null, 'videos/keep.mp4', null],
+    );
   });
 
   it('deleteBlob returns false (storage 500): request still succeeds with its normal body', async () => {

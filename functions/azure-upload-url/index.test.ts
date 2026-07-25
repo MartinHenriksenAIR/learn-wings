@@ -243,6 +243,35 @@ describe('azure-upload-url', () => {
     );
   });
 
+  it('reaches the container fall-through with an UNUSUAL extension and no declared type', async () => {
+    // Restores what the `weird.bin` + application/octet-stream fixture used to
+    // cover before #276 turned that input into a 400: the fall-through must not
+    // depend on the caller declaring a content type, nor on the extension being
+    // one of the two or three everybody thinks of. `.ogv` is allow-listed but
+    // obscure, and an absent content type is what some browsers actually report.
+    const req = {
+      ...baseReq,
+      json: async () => ({ fileName: 'clip.ogv', assetType: 'not-a-real-type' }),
+    };
+
+    const res = await handler(req as any, {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(res.status).toBe(200);
+    // Private default container, NO folder prefix — the flat namespace.
+    expect(body.blobPath).toMatch(/^[^/]+\.ogv$/);
+    // With nothing declared, the endpoint substitutes the generic type.
+    expect(body.contentType).toBe('application/octet-stream');
+    expect(mockGenerateSasToken).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'lms-videos',
+      body.blobPath,
+      'cw',
+      30,
+    );
+  });
+
   // --- Type allow-list at mint time (#276) ---
   //
   // Defence in depth: the client PUTs whatever bytes it likes to the URL we hand

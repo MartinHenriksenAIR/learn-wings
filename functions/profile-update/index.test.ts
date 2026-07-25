@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob, mockEnforceUploadLimits } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob,
+  mockEnforceUploadLimits, mockAssertBindablePaths, mockIsBlobReleasable,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
@@ -9,6 +12,8 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDelet
     mockGetProfile: vi.fn(),
     mockDeleteBlob: vi.fn(),
     mockEnforceUploadLimits: vi.fn(),
+    mockAssertBindablePaths: vi.fn(),
+    mockIsBlobReleasable: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -16,6 +21,13 @@ vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile }));
 vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
 vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
+vi.mock('../shared/blob-ownership', () => ({
+  assertBindablePaths: mockAssertBindablePaths,
+  isBlobReleasable: mockIsBlobReleasable,
+}));
+
+/** The one candidate this endpoint ever builds, handed to both gates. */
+const avatarCandidate = (path: string | null) => [{ path, kind: 'image', family: 'avatar' }];
 
 import handler from './index';
 
@@ -53,6 +65,8 @@ describe('profile-update', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockDeleteBlob.mockResolvedValue(true);
     mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
+    mockAssertBindablePaths.mockResolvedValue(null); // the path is the caller's to bind
+    mockIsBlobReleasable.mockResolvedValue(true);    // nothing else references the old blob
   });
 
   // 1. 401 invalid bearer token
@@ -318,7 +332,7 @@ describe('profile-update', () => {
 
     expect(res.status).toBe(200);
     expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
-      [{ path: 'avatars/new.png', kind: 'image' }],
+      avatarCandidate('avatars/new.png'),
       ['avatars/old.png'], // unchanged path ⇒ not new ⇒ never probed
     );
     expect(order).toEqual(['select', 'gate', 'update']);
@@ -329,9 +343,77 @@ describe('profile-update', () => {
     const res = await handler(baseReq({ avatar_url: '' }), {} as any);
     expect(res.status).toBe(200);
     expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
-      [{ path: null, kind: 'image' }],
+      avatarCandidate(null),
       ['avatars/old.png'],
     );
+  });
+
+  // --- Path ownership (the BLOCKERs) ---
+  //
+  // This endpoint is `endpoint()`, not `adminEndpoint()`: every authenticated
+  // user reaches it. `course-player-data` returns every lesson path to any active
+  // org member and `org-memberships` returns other members' avatar_url, so the
+  // paths a caller can name are not remotely secret.
+
+  it('400 when the ownership gate refuses the path: no probe, no UPDATE, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce({ avatar_url: null }); // only the previous-avatar SELECT
+    mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');
+
+    const res = await handler(baseReq({ avatar_url: 'someone-elses-lesson.mp4' }), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    // The refusal must land BEFORE anything touches storage — otherwise the
+    // 413-vs-200 split is an existence oracle for other rows' blobs.
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE profiles');
+  });
+
+  it('runs the ownership gate BEFORE the size gate, on the same candidate list', async () => {
+    const order: string[] = [];
+    mockAssertBindablePaths.mockImplementationOnce(async () => { order.push('ownership'); return null; });
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('limits'); return null; });
+    mockAvatarDb('avatars/old.png');
+
+    await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(order).toEqual(['ownership', 'limits']);
+    expect(mockAssertBindablePaths).toHaveBeenCalledWith(
+      avatarCandidate('avatars/new.png'),
+      ['avatars/old.png'],
+    );
+    // Both gates see the identical candidate list.
+    expect(mockAssertBindablePaths.mock.calls[0][0]).toEqual(mockEnforceUploadLimits.mock.calls[0][0]);
+  });
+
+  it('step 2 of the two-step attack: a still-referenced old path is NOT deleted', async () => {
+    // Even if a row somehow already points at a shared path (written before the
+    // bind gate existed), clearing it must not destroy the blob.
+    mockIsBlobReleasable.mockResolvedValueOnce(false);
+    mockAvatarDb('avatars/victim.png', { ...profileRow, avatar_url: null });
+
+    const res = await handler(baseReq({ avatar_url: '' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockIsBlobReleasable).toHaveBeenCalledWith('avatars/victim.png', 'avatar');
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('asks whether the old blob is releasable only AFTER the row write', async () => {
+    const order: string[] = [];
+    mockQueryOne
+      .mockImplementationOnce(async () => ({ avatar_url: 'avatars/old.png' }))
+      .mockImplementationOnce(async () => { order.push('update'); return profileRow; });
+    mockIsBlobReleasable.mockImplementationOnce(async () => { order.push('releasable'); return true; });
+    mockDeleteBlob.mockImplementationOnce(async () => { order.push('delete'); return true; });
+
+    await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    // The row must already point at the new value, or "is anything still
+    // referencing the old path?" answers the wrong question.
+    expect(order).toEqual(['update', 'releasable', 'delete']);
   });
 
   it('deleteBlob returns false: request still succeeds with its normal body', async () => {

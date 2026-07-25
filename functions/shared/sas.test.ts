@@ -154,8 +154,100 @@ describe('SAS_SIGNED_VERSION', () => {
 });
 
 describe('buildBlobUrl', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('assembles full blob URL', () => {
     const url = buildBlobUrl('myaccount', 'mycontainer', 'path/to/blob.mp4', 'tok=1&sp=r');
     expect(url).toBe('https://myaccount.blob.core.windows.net/mycontainer/path/to/blob.mp4?tok=1&sp=r');
+  });
+
+  it('leaves every name this system mints byte-identical', () => {
+    // `[prefix/]<uuid>.<ext>` needs no escaping, so no existing caller — upload,
+    // read, delete, head, branding, orphan sweep — changes behaviour.
+    for (const name of [
+      'a1b2c3d4-0000-4000-8000-abcdefabcdef.mp4',
+      'avatars/a1b2c3d4-0000-4000-8000-abcdefabcdef.png',
+      'org-logos/a1b2c3d4-0000-4000-8000-abcdefabcdef.png',
+      'documents/a1b2c3d4-0000-4000-8000-abcdefabcdef.pdf',
+    ]) {
+      expect(buildBlobUrl('acct', 'c', name, 'sig=x'))
+        .toBe(`https://acct.blob.core.windows.net/c/${name}?sig=x`);
+    }
+  });
+
+  // --- A crafted name must not be able to change the SHAPE of the request ---
+  //
+  // Without encoding, these steered the request at a different resource than the
+  // one named — and for `headBlob`/`deleteBlob` that means classifying one blob
+  // and acting on another. `?` in particular truncated the SAS query entirely,
+  // which is a deterministic route into `headBlob`'s fail-open branch.
+
+  it('escapes a `?`, so the SAS query cannot be truncated', () => {
+    const url = buildBlobUrl('acct', 'c', 'videos/x.mp4?', 'sig=x');
+    expect(url).toBe('https://acct.blob.core.windows.net/c/videos/x.mp4%3F?sig=x');
+    // Exactly one `?` — the one that starts the query string we built.
+    expect(url.split('?')).toHaveLength(2);
+    expect(new URL(url).searchParams.get('sig')).toBe('x');
+  });
+
+  it('escapes a `#`, so the request cannot be truncated at a fragment', () => {
+    const url = buildBlobUrl('acct', 'c', 'videos/x.mp4#', 'sig=x');
+    expect(url).toBe('https://acct.blob.core.windows.net/c/videos/x.mp4%23?sig=x');
+    expect(new URL(url).hash).toBe('');
+    expect(new URL(url).searchParams.get('sig')).toBe('x');
+  });
+
+  it('escapes a `%`, so an escape in the name is not decoded by the service', () => {
+    // `%41` unescaped would reach storage as `A` and address a different blob.
+    const url = buildBlobUrl('acct', 'c', '%41.mp4', 'sig=x');
+    expect(url).toBe('https://acct.blob.core.windows.net/c/%2541.mp4?sig=x');
+    expect(decodeURIComponent(new URL(url).pathname)).toBe('/c/%41.mp4');
+  });
+
+  it('escapes a smuggled `&`, which cannot become another query parameter', () => {
+    const url = buildBlobUrl('acct', 'c', 'x.mp4&sp=racwd', 'sig=x');
+    expect(new URL(url).searchParams.get('sp')).toBeNull();
+  });
+
+  it('preserves `/` as the folder separator (encoding it would flatten the path)', () => {
+    expect(buildBlobUrl('acct', 'c', 'documents/deep/name.pdf', 'sig=x'))
+      .toBe('https://acct.blob.core.windows.net/c/documents/deep/name.pdf?sig=x');
+  });
+
+  it('escapes a space rather than emitting an invalid URL', () => {
+    expect(buildBlobUrl('acct', 'c', 'my file.png', 'sig=x'))
+      .toBe('https://acct.blob.core.windows.net/c/my%20file.png?sig=x');
+  });
+
+  it('signs the DECODED name while requesting the ENCODED one (the Azure contract)', () => {
+    // Not a drift bug — the Service SAS canonicalized resource is the decoded
+    // path (the same split `@azure/storage-blob` makes). Signing the escaped form
+    // instead would fail authentication for any name that needs escaping.
+    freezeClock();
+    const name = 'my file.png';
+    const expected = [
+      'r', FROZEN_START, FROZEN_EXPIRY_120M,
+      `/blob/myaccount/mycontainer/${name}`, // decoded, space and all
+      '', '', 'https', '2022-11-02', 'b', '', '', '', '', '', '', '',
+    ].join('\n');
+
+    const token = generateSasToken('myaccount', TEST_KEY, 'mycontainer', name, 'r', 120);
+    expect(new URLSearchParams(token).get('sig')).toBe(sign(expected));
+    expect(buildBlobUrl('myaccount', 'mycontainer', name, token))
+      .toContain('/mycontainer/my%20file.png?');
+  });
+
+  it('does not throw on a lone surrogate', () => {
+    // `encodeURIComponent('\uD800')` raises URIError. `lms-asset.ts` passes a
+    // platform admin's blobPath straight through (the access check is
+    // short-circuited for them) and does not catch, so a throw here would turn a
+    // previously-harmless broken URL into a 500.
+    expect(() => buildBlobUrl('acct', 'c', '\uD800.png', 'sig=x')).not.toThrow();
+    const url = buildBlobUrl('acct', 'c', '\uD800.png', 'sig=x');
+    expect(() => new URL(url)).not.toThrow();
+    // U+FFFD — a well-formed URL naming a blob that does not exist.
+    expect(url).toContain('%EF%BF%BD.png');
   });
 });

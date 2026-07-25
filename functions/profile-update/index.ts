@@ -1,7 +1,8 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { deleteBlob } from '../shared/blob';
-import { enforceUploadLimits } from '../shared/upload-limits';
+import { enforceUploadLimits, type UploadCandidate } from '../shared/upload-limits';
+import { assertBindablePaths, isBlobReleasable } from '../shared/blob-ownership';
 
 interface ProfileUpdateBody {
   first_name?: unknown;
@@ -132,15 +133,29 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
     previousAvatarUrl = prev?.avatar_url ?? null;
   }
 
-  // Size/type gate on a newly-referenced avatar (#276). This endpoint is open to
-  // every authenticated user, and `azure-upload-url` mints avatar URLs without a
-  // platform-admin gate, so it is the only place an avatar's real size is ever
-  // checked. Reuses the same change detection as the cleanup below: an unchanged
-  // path is not new, so a name/language change costs no HEAD.
-  const limitError = await enforceUploadLimits(
-    [{ path: nextAvatarUrl, kind: 'image' }],
-    [previousAvatarUrl],
-  );
+  // One candidate list, handed to both gates in order, so they can never be
+  // given different views of the same write. `family: 'avatar'` is the column's
+  // property, not the caller's claim.
+  const candidates: UploadCandidate[] = [{ path: nextAvatarUrl, kind: 'image', family: 'avatar' }];
+
+  // Ownership gate FIRST. This endpoint is `endpoint()`, not `adminEndpoint()` —
+  // it is reachable by every authenticated user and writes only their own row, so
+  // it is the widest-open write in the fleet. Before this gate, posting another
+  // row's blob path here was enough to aim the storage probe (and, once the
+  // superseded-blob cleanup existed, the delete) at a lesson video or another
+  // user's avatar. It must precede `enforceUploadLimits` so that no foreign path
+  // is ever handed to `headBlob`.
+  const bindError = await assertBindablePaths(candidates, [previousAvatarUrl]);
+  if (bindError) {
+    return reply(400, { error: bindError });
+  }
+
+  // Size/type gate on a newly-referenced avatar (#276). `azure-upload-url` mints
+  // avatar URLs without a platform-admin gate, so this is the only place an
+  // avatar's real size is ever checked. Reuses the same change detection as the
+  // cleanup below: an unchanged path is not new, so a name/language change costs
+  // no HEAD.
+  const limitError = await enforceUploadLimits(candidates, [previousAvatarUrl]);
   if (limitError) {
     return reply(413, { error: limitError });
   }
@@ -161,7 +176,15 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
   // succeeded. An unchanged path is left alone; a null old path has nothing to
   // delete. deleteBlob never throws and its result is deliberately NOT surfaced in
   // the response — server logs are the only failure signal.
-  if (previousAvatarUrl && previousAvatarUrl !== nextAvatarUrl) {
+  //
+  // `isBlobReleasable` runs AFTER the UPDATE on purpose: the row now points at the
+  // new value, so "does any row still reference the old path?" is exactly the
+  // question worth asking. It covers rows written before the bind gate existed,
+  // where a path could already be shared; anything it cannot confirm is left for
+  // `orphan-sweep`.
+  if (previousAvatarUrl
+    && previousAvatarUrl !== nextAvatarUrl
+    && await isBlobReleasable(previousAvatarUrl, 'avatar')) {
     await deleteBlob(previousAvatarUrl);
   }
 
