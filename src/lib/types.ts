@@ -158,34 +158,6 @@ export interface CourseReview {
   profile?: Profile;
 }
 
-export interface OrgAnalytics {
-  totalUsers: number;
-  activeUsers7Days: number;
-  activeUsers30Days: number;
-  totalEnrollments: number;
-  completedEnrollments: number;
-  completionRate: number;
-  avgQuizScore: number;
-  courseProgress: CourseProgressSummary[];
-}
-
-interface CourseProgressSummary {
-  courseId: string;
-  courseTitle: string;
-  enrolledCount: number;
-  completedCount: number;
-  completionRate: number;
-  avgProgress: number;
-}
-
-interface OrgAnalyticsSummary {
-  orgId: string;
-  orgName: string;
-  totalUsers: number;
-  activeUsers: number;
-  completionRate: number;
-}
-
 export type SeatRequestStatus = 'pending' | 'fulfilled' | 'cancelled';
 
 export interface SeatRequest {
