@@ -66,7 +66,6 @@ export type EndpointRun = (ctx: AuthedCtx) => Promise<HttpResponseInit>;
 
 function makeHandler(
   requireAdmin: boolean,
-  opts: { forbiddenError?: string } | undefined,
   run: EndpointRun,
 ): AzureHandler {
   return async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
@@ -77,7 +76,7 @@ function makeHandler(
       const profile = await getProfile(user);
       if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
       if (requireAdmin && !profile.is_platform_admin) {
-        return corsResponse(origin, 403, { error: opts?.forbiddenError ?? 'Forbidden' });
+        return corsResponse(origin, 403, { error: 'Forbidden' });
       }
       const ctx: AuthedCtx = {
         req,
@@ -128,13 +127,9 @@ function register(name: string, handler: AzureHandler): AzureHandler {
 }
 
 export function endpoint(name: string, run: EndpointRun): AzureHandler {
-  return register(name, makeHandler(false, undefined, run));
+  return register(name, makeHandler(false, run));
 }
 
-export function adminEndpoint(
-  name: string,
-  run: EndpointRun,
-  opts?: { forbiddenError?: string },
-): AzureHandler {
-  return register(name, makeHandler(true, opts, run));
+export function adminEndpoint(name: string, run: EndpointRun): AzureHandler {
+  return register(name, makeHandler(true, run));
 }
