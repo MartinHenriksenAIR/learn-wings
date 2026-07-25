@@ -63,7 +63,7 @@ describe('org-membership-delete', () => {
   });
 
   it('returns 404 when membership does not exist (and does NOT issue the DELETE)', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // SELECT returns no row
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ id: 'm-missing' }), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Membership not found' });
@@ -75,7 +75,7 @@ describe('org-membership-delete', () => {
   it('returns 403 when caller is neither platform admin nor org admin (and does NOT issue the DELETE)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValueOnce(false);
-    mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT returns row
+    mockQueryOne.mockResolvedValueOnce(existingMembership);
     const res = await handler(baseReq({ id: 'm1' }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
@@ -92,14 +92,14 @@ describe('org-membership-delete', () => {
   });
 
   it('happy path (platform admin): deletes the membership and returns ok', async () => {
-    mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'm1' }); // DELETE RETURNING
+    mockQueryOne.mockResolvedValueOnce(existingMembership);
+    mockQueryOne.mockResolvedValueOnce({ id: 'm1' });
 
     const res = await handler(baseReq({ id: 'm1' }), {} as any);
 
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
-    expect(mockIsOrgAdmin).not.toHaveBeenCalled(); // platform-admin bypass
+    expect(mockIsOrgAdmin).not.toHaveBeenCalled();
 
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('DELETE FROM org_memberships');
@@ -111,8 +111,8 @@ describe('org-membership-delete', () => {
   it('happy path (org admin): authorizes via isOrgAdmin and deletes', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValueOnce(true);
-    mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'm2' }); // DELETE RETURNING
+    mockQueryOne.mockResolvedValueOnce(existingMembership);
+    mockQueryOne.mockResolvedValueOnce({ id: 'm2' });
 
     const res = await handler(baseReq({ id: 'm2' }), {} as any);
 
@@ -126,8 +126,8 @@ describe('org-membership-delete', () => {
   });
 
   it('returns 500 on generic db error during DELETE', async () => {
-    mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT
-    mockQueryOne.mockRejectedValueOnce(new Error('connection refused')); // DELETE
+    mockQueryOne.mockResolvedValueOnce(existingMembership);
+    mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
     const res = await handler(baseReq({ id: 'm1' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });

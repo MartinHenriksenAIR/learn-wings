@@ -29,7 +29,6 @@ describe('quiz-by-lesson', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
   });
 
-  // 1. 401 invalid token
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -39,7 +38,6 @@ describe('quiz-by-lesson', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -49,7 +47,6 @@ describe('quiz-by-lesson', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 lessonId missing
   it('returns 400 when lessonId is missing', async () => {
     const res = await handler(baseReq({}), {} as any);
 
@@ -71,9 +68,8 @@ describe('quiz-by-lesson', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'lessonId is required' });
   });
 
-  // 4. 403 when access EXISTS returns ok:false
   it('returns 403 when access check fails and uses correct SQL params', async () => {
-    mockQueryOne.mockResolvedValueOnce({ ok: false }); // access check
+    mockQueryOne.mockResolvedValueOnce({ ok: false });
 
     const res = await handler(baseReq({ lessonId: 'lesson-1' }), {} as any);
 
@@ -84,11 +80,10 @@ describe('quiz-by-lesson', () => {
     expect(params).toEqual(['p1', 'lesson-1']);
   });
 
-  // 5. Happy path (member)
   it('returns 200 with grouped options on happy path', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ ok: true }) // access check
-      .mockResolvedValueOnce({ id: 'quiz-1', lesson_id: 'lesson-1', passing_score: 70 }); // quiz
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ id: 'quiz-1', lesson_id: 'lesson-1', passing_score: 70 });
 
     const questions = [
       { id: 'q1', quiz_id: 'quiz-1', question_text: 'Question 1', sort_order: 1 },
@@ -102,8 +97,8 @@ describe('quiz-by-lesson', () => {
       { id: 'o4', question_id: 'q2', option_text: 'D', sort_order: 2 },
     ];
     mockQuery
-      .mockResolvedValueOnce(questions)  // quiz_questions
-      .mockResolvedValueOnce(options);   // quiz_options
+      .mockResolvedValueOnce(questions)
+      .mockResolvedValueOnce(options);
 
     const res = await handler(baseReq({ lessonId: 'lesson-1' }), {} as any);
 
@@ -113,25 +108,22 @@ describe('quiz-by-lesson', () => {
     expect(body.quiz).toEqual({ id: 'quiz-1', lesson_id: 'lesson-1', passing_score: 70 });
     expect(body.questions).toHaveLength(2);
 
-    // q1 options
     expect(body.questions[0].id).toBe('q1');
     expect(body.questions[0].options).toHaveLength(2);
     expect(body.questions[0].options[0].id).toBe('o1');
     expect(body.questions[0].options[1].id).toBe('o2');
 
-    // q2 options
     expect(body.questions[1].id).toBe('q2');
     expect(body.questions[1].options).toHaveLength(2);
     expect(body.questions[1].options[0].id).toBe('o3');
     expect(body.questions[1].options[1].id).toBe('o4');
 
-    // Assert options query used ANY($1::uuid[]) with correct question ids
+    // Options query must batch via ANY($1::uuid[]) — no N+1
     const [optionsSql, optionsParams] = mockQuery.mock.calls[1] as [string, unknown[]];
     expect(optionsSql).toContain('ANY($1::uuid[])');
     expect(optionsParams).toEqual([['q1', 'q2']]);
   });
 
-  // 6. SECURITY: is_correct never in SQL or response
   it('SECURITY: is_correct never appears in any SQL or in the response body', async () => {
     mockQueryOne
       .mockResolvedValueOnce({ ok: true })
@@ -149,7 +141,6 @@ describe('quiz-by-lesson', () => {
 
     const res = await handler(baseReq({ lessonId: 'lesson-1' }), {} as any);
 
-    // Collect all SQL strings passed to query/queryOne
     const allQueryOneSqls = mockQueryOne.mock.calls.map(([sql]: [string]) => sql);
     const allQuerySqls = mockQuery.mock.calls.map(([sql]: [string]) => sql);
     for (const sql of [...allQueryOneSqls, ...allQuerySqls]) {
@@ -161,11 +152,10 @@ describe('quiz-by-lesson', () => {
     expect(JSON.stringify(JSON.parse(res.body as string))).not.toContain('is_correct');
   });
 
-  // 7. Lesson without quiz: quiz queryOne returns null → 200 { quiz: null, questions: [] }
   it('returns 200 with quiz:null when lesson has no quiz', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ ok: true }) // access check
-      .mockResolvedValueOnce(null);         // no quiz
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce(null);
 
     const res = await handler(baseReq({ lessonId: 'lesson-1' }), {} as any);
 
@@ -177,13 +167,12 @@ describe('quiz-by-lesson', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // 8. Quiz with zero questions → no options query
   it('returns 200 with empty questions array when quiz has no questions', async () => {
     mockQueryOne
       .mockResolvedValueOnce({ ok: true })
       .mockResolvedValueOnce({ id: 'quiz-1', lesson_id: 'lesson-1', passing_score: 70 });
 
-    mockQuery.mockResolvedValueOnce([]); // zero questions
+    mockQuery.mockResolvedValueOnce([]);
 
     const res = await handler(baseReq({ lessonId: 'lesson-1' }), {} as any);
 
@@ -198,11 +187,10 @@ describe('quiz-by-lesson', () => {
     expect(sql).not.toContain('ANY');
   });
 
-  // 9. Platform-admin bypass: no access EXISTS SQL executed
   it('skips access check for platform admin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
-    mockQueryOne.mockResolvedValueOnce({ id: 'quiz-1', lesson_id: 'lesson-1', passing_score: 80 }); // quiz only
+    mockQueryOne.mockResolvedValueOnce({ id: 'quiz-1', lesson_id: 'lesson-1', passing_score: 80 });
 
     const questions = [{ id: 'q1', quiz_id: 'quiz-1', question_text: 'Q?', sort_order: 1 }];
     const options = [{ id: 'o1', question_id: 'q1', option_text: 'Yes', sort_order: 1 }];
@@ -221,10 +209,9 @@ describe('quiz-by-lesson', () => {
     expect(sql).not.toContain('EXISTS');
   });
 
-  // 10. 500 db error
   it('returns 500 on db error', async () => {
-    mockQueryOne.mockResolvedValueOnce({ ok: true }); // access
-    mockQueryOne.mockRejectedValueOnce(new Error('connection refused')); // quiz lookup fails
+    mockQueryOne.mockResolvedValueOnce({ ok: true });
+    mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
 
     const res = await handler(baseReq({ lessonId: 'lesson-1' }), { error: vi.fn() } as any);
 

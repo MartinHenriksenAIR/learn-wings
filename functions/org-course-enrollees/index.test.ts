@@ -28,7 +28,6 @@ describe('org-course-enrollees', () => {
     mockIsOrgAdmin.mockResolvedValue(false);
   });
 
-  // 1. 401 when bearer token invalid
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -38,7 +37,6 @@ describe('org-course-enrollees', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 when profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -48,7 +46,6 @@ describe('org-course-enrollees', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 when orgId missing
   it('returns 400 when orgId is missing', async () => {
     const res = await handler(baseReq({ courseId: 'c-1' }), {} as any);
 
@@ -56,7 +53,6 @@ describe('org-course-enrollees', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
-  // 4. 400 when courseId missing
   it('returns 400 when courseId is missing', async () => {
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
 
@@ -64,7 +60,6 @@ describe('org-course-enrollees', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'courseId is required' });
   });
 
-  // 5. 403 for non-admin member
   it('returns 403 for non-admin member and calls isOrgAdmin with correct args', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(false);
 
@@ -75,7 +70,6 @@ describe('org-course-enrollees', () => {
     expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
   });
 
-  // 6. Happy path as org admin — SQL parity checks
   it('returns 200 with enrollee rows for org admin', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     const rows = [
@@ -100,7 +94,6 @@ describe('org-course-enrollees', () => {
     expect(params).toEqual(['org-1', 'c-1']);
   });
 
-  // 7. Platform-admin bypass — isOrgAdmin not called
   it('returns 200 for platform admin without calling isOrgAdmin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([]);
@@ -111,7 +104,6 @@ describe('org-course-enrollees', () => {
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
-  // 8. 500 on db error
   it('returns 500 on db error', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
@@ -122,7 +114,6 @@ describe('org-course-enrollees', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // ── All-orgs aggregate (orgId 'all') — platform admins only ──────────────
   describe('all-orgs aggregate (orgId "all")', () => {
     it('returns 403 for a non-platform-admin (org admins stay isolated)', async () => {
       mockIsOrgAdmin.mockResolvedValue(true);

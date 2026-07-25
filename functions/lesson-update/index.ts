@@ -20,12 +20,10 @@ export default adminEndpoint('lesson-update', async ({ req, reply }) => {
 
   const { lessonId, moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath } = body;
 
-  // Required: lessonId (update-only field)
   if (!lessonId || typeof lessonId !== 'string') {
     return reply(400, { error: 'lessonId is required' });
   }
 
-  // Shared field validation (moduleId, title, lessonType, and all optional fields)
   const sharedError = validateLessonFields(body);
   if (sharedError) {
     return reply(400, { error: sharedError });

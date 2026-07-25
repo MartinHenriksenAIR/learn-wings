@@ -82,7 +82,7 @@ describe('org-membership-update', () => {
   });
 
   it('returns 404 when membership does not exist (and does NOT issue the UPDATE)', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // SELECT returns no row
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ id: 'm-missing', role: 'learner' }), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Membership not found' });
@@ -94,7 +94,7 @@ describe('org-membership-update', () => {
   it('returns 403 when caller is neither platform admin nor org admin (and does NOT issue the UPDATE)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValueOnce(false);
-    mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT returns row
+    mockQueryOne.mockResolvedValueOnce(existingMembership);
     const res = await handler(baseReq({ id: 'm1', role: 'learner' }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
@@ -111,14 +111,14 @@ describe('org-membership-update', () => {
       status: 'active',
       created_at: '2026-06-07T12:00:00.000Z',
     };
-    mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT
-    mockQueryOne.mockResolvedValueOnce(updated); // UPDATE RETURNING
+    mockQueryOne.mockResolvedValueOnce(existingMembership);
+    mockQueryOne.mockResolvedValueOnce(updated);
 
     const res = await handler(baseReq({ id: 'm1', role: 'org_admin' }), {} as any);
 
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ membership: updated });
-    expect(mockIsOrgAdmin).not.toHaveBeenCalled(); // platform-admin bypass
+    expect(mockIsOrgAdmin).not.toHaveBeenCalled();
 
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('UPDATE org_memberships SET');
@@ -139,8 +139,8 @@ describe('org-membership-update', () => {
       status: 'disabled',
       created_at: '2026-06-07T12:00:00.000Z',
     };
-    mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT
-    mockQueryOne.mockResolvedValueOnce(updated); // UPDATE RETURNING
+    mockQueryOne.mockResolvedValueOnce(existingMembership);
+    mockQueryOne.mockResolvedValueOnce(updated);
 
     const res = await handler(baseReq({ id: 'm2', status: 'disabled' }), {} as any);
 
@@ -163,8 +163,8 @@ describe('org-membership-update', () => {
       status: 'invited',
       created_at: '2026-06-07T12:00:00.000Z',
     };
-    mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT
-    mockQueryOne.mockResolvedValueOnce(updated); // UPDATE RETURNING
+    mockQueryOne.mockResolvedValueOnce(existingMembership);
+    mockQueryOne.mockResolvedValueOnce(updated);
 
     const res = await handler(baseReq({ id: 'm1', role: 'org_admin', status: 'invited' }), {} as any);
 
@@ -178,8 +178,8 @@ describe('org-membership-update', () => {
   });
 
   it('returns 500 on generic db error during UPDATE', async () => {
-    mockQueryOne.mockResolvedValueOnce(existingMembership); // SELECT
-    mockQueryOne.mockRejectedValueOnce(new Error('connection refused')); // UPDATE
+    mockQueryOne.mockResolvedValueOnce(existingMembership);
+    mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
     const res = await handler(baseReq({ id: 'm1', role: 'learner' }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });

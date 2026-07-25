@@ -9,7 +9,6 @@ export default endpoint('idea-tags', async ({ req, profile, reply, requireActive
     return reply(400, { error: 'orgId is required' });
   }
 
-  // Authorization: platform admin OR active member of the org
   await requireActiveMember(orgId);
 
   // Distinct, non-empty tags from the org's ideas that are VISIBLE to the caller

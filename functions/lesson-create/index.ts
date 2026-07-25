@@ -18,7 +18,6 @@ export default adminEndpoint('lesson-create', async ({ req, reply }) => {
 
   const { moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath } = body;
 
-  // Shared field validation (moduleId, title, lessonType, and all optional fields)
   const sharedError = validateLessonFields(body);
   if (sharedError) {
     return reply(400, { error: sharedError });

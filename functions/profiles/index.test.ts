@@ -28,7 +28,6 @@ describe('profiles', () => {
     mockIsOrgAdminOfAny.mockResolvedValue(false);
   });
 
-  // 1. 401 invalid token
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -38,7 +37,6 @@ describe('profiles', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -48,7 +46,6 @@ describe('profiles', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 when userIds is not an array of strings
   it('returns 400 when userIds is not an array of strings', async () => {
     const res = await handler(baseReq({ userIds: 'abc' }), {} as any);
 
@@ -56,7 +53,6 @@ describe('profiles', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'userIds must be an array of strings' });
   });
 
-  // 4. Platform admin, no filter — no JOIN, no WHERE, no entra_oid
   it('returns all profiles for platform admin without filter', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const rows = [{ id: 'u1', full_name: 'Alice' }];
@@ -75,7 +71,6 @@ describe('profiles', () => {
     expect(params ?? []).toEqual([]);
   });
 
-  // 5. Platform admin with userIds — SQL has ANY($1::uuid[])
   it('returns filtered profiles for platform admin with userIds', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const rows = [{ id: 'u1', full_name: 'Alice' }, { id: 'u2', full_name: 'Bob' }];
@@ -92,7 +87,6 @@ describe('profiles', () => {
     expect(params).toEqual([['u1', 'u2']]);
   });
 
-  // 6. Org admin tier
   it('returns org-scoped profiles for org admin', async () => {
     mockIsOrgAdminOfAny.mockResolvedValueOnce(true);
     const rows = [{ id: 'u2', full_name: 'Bob' }];
@@ -109,7 +103,6 @@ describe('profiles', () => {
     expect(params[0]).toBe('p1');
   });
 
-  // 6b. Org admin WITH userIds — SQL contains ANY($2::uuid[]), params ['p1', ['u2']]
   it('returns filtered org-scoped profiles for org admin with userIds', async () => {
     mockIsOrgAdminOfAny.mockResolvedValueOnce(true);
     const rows = [{ id: 'u2', full_name: 'Bob' }];
@@ -126,7 +119,6 @@ describe('profiles', () => {
     expect(params).toEqual(['p1', ['u2']]);
   });
 
-  // 6c. Platform admin with userIds: [] — empty array passes through as ANY-filter (empty set in → empty set out)
   it('platform admin with userIds: [] runs ANY-filter with empty array, returns empty profiles', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([]);
@@ -142,7 +134,6 @@ describe('profiles', () => {
     expect(params).toEqual([[]]);
   });
 
-  // 7. Learner tier — returns own profile only, ignores userIds
   it('returns own profile only for learner, even when userIds provided', async () => {
     const rows = [{ id: 'p1', full_name: 'Self' }];
     mockQuery.mockResolvedValueOnce(rows);
@@ -158,7 +149,6 @@ describe('profiles', () => {
     expect(params).toEqual(['p1']);
   });
 
-  // 8. 500 on db error
   it('returns 500 on db error', async () => {
     mockIsOrgAdminOfAny.mockRejectedValueOnce(new Error('connection refused'));
 

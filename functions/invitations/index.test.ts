@@ -34,14 +34,12 @@ describe('invitations', () => {
     mockIsOrgAdmin.mockResolvedValue(false);
   });
 
-  // 1. OPTIONS preflight
   it('returns 204 on OPTIONS preflight', async () => {
     const res = await handler(baseReq({}, 'OPTIONS'), {} as any);
     expect(res.status).toBe(204);
     expect(mockAuthenticate).not.toHaveBeenCalled();
   });
 
-  // 2. 401 invalid token
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -51,7 +49,6 @@ describe('invitations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 3. 401 profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -61,7 +58,6 @@ describe('invitations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 4. 400 missing scope
   it('returns 400 when scope is missing', async () => {
     const res = await handler(baseReq({}), {} as any);
 
@@ -69,7 +65,6 @@ describe('invitations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'scope must be "org" or "platform"' });
   });
 
-  // 5. 400 invalid scope value
   it('returns 400 when scope has an invalid value', async () => {
     const res = await handler(baseReq({ scope: 'self' }), {} as any);
 
@@ -77,7 +72,6 @@ describe('invitations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'scope must be "org" or "platform"' });
   });
 
-  // 6a. 400 scope=org missing orgId
   it('returns 400 when scope=org and orgId is missing', async () => {
     const res = await handler(baseReq({ scope: 'org' }), {} as any);
 
@@ -85,7 +79,6 @@ describe('invitations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required for scope=org' });
   });
 
-  // 6b. 400 scope=org with non-string orgId
   it('returns 400 when scope=org and orgId is not a string', async () => {
     const res = await handler(baseReq({ scope: 'org', orgId: 42 }), {} as any);
 
@@ -93,7 +86,6 @@ describe('invitations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required for scope=org' });
   });
 
-  // 6c. 400 scope=org with empty orgId
   it('returns 400 when scope=org and orgId is empty string', async () => {
     const res = await handler(baseReq({ scope: 'org', orgId: '' }), {} as any);
 
@@ -101,7 +93,6 @@ describe('invitations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required for scope=org' });
   });
 
-  // 6d. 400 scope=platform with empty orgId
   it('returns 400 when scope=platform and orgId is an empty string', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
@@ -112,7 +103,6 @@ describe('invitations', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // 7. 403 scope=org caller is neither platform admin nor org admin
   it('returns 403 for scope=org when caller is not platform admin and not org admin', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(false);
 
@@ -124,7 +114,6 @@ describe('invitations', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // 8. 403 scope=platform caller is not platform admin
   it('returns 403 for scope=platform when caller is not platform admin', async () => {
     const res = await handler(baseReq({ scope: 'platform' }), {} as any);
 
@@ -133,7 +122,6 @@ describe('invitations', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // 9. Happy path: scope=org as platform admin — NO invited_by_user_id filter, params=[orgId]
   it('scope=org platform admin returns 200 with no inviter filter', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const rows = [
@@ -159,7 +147,6 @@ describe('invitations', () => {
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
-  // 10. Happy path: scope=org as org admin — adds invited_by_user_id = $2, params = [orgId, profile.id]
   it('scope=org org admin returns 200 with inviter filter', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     mockQuery.mockResolvedValueOnce([]);
@@ -182,7 +169,6 @@ describe('invitations', () => {
     expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
   });
 
-  // 11. Happy path: scope=platform with orgId, platform admin — filters org_id, params=[orgId]
   it('scope=platform platform admin with orgId narrows by org_id', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([]);
@@ -204,7 +190,6 @@ describe('invitations', () => {
     expect(params).toEqual(['org-9']);
   });
 
-  // 12. Happy path: scope=platform without orgId, platform admin — no org_id predicate, params=[]
   it('scope=platform platform admin without orgId returns all pending invitations', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const rows = [
@@ -230,7 +215,6 @@ describe('invitations', () => {
     expect(params).toEqual([]);
   });
 
-  // 13. 500 on db error
   it('returns 500 on db error', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));

@@ -4,9 +4,8 @@ import { adminEndpoint } from '../shared/endpoint';
 const ALLOWED_KEYS = ['branding', 'user_access', 'email', 'features', 'seat_pricing'] as const;
 type SettingKey = typeof ALLOWED_KEYS[number];
 
-// Per-field shape validation (issue #90). Field lists derive from the frontend's
-// interfaces (src/pages/platform-admin/PlatformSettings.tsx) and the seed shapes
-// (migration/azure/02-seed.sql) — the two are kept in sync deliberately.
+// Field lists derive from the frontend's interfaces (src/pages/platform-admin/PlatformSettings.tsx)
+// and the seed shapes (migration/azure/02-seed.sql) — the two are kept in sync deliberately.
 type FieldCheck = (v: unknown) => boolean;
 const isString: FieldCheck = (v) => typeof v === 'string';
 const isStringOrNull: FieldCheck = (v) => v === null || typeof v === 'string';
@@ -77,10 +76,8 @@ export default adminEndpoint('platform-settings-update', async ({ req, profile, 
   }
   const value = body.value as Record<string, unknown>;
 
-  // Per-field validation: every field present must be a known field of this
-  // setting key with the expected shape. Unknown fields are rejected — the
-  // frontend only ever sends the known field set, so a stray field signals a
-  // bypassing caller, not a legitimate write.
+  // Unknown fields are rejected: the frontend only ever sends the known field set,
+  // so a stray field signals a bypassing caller, not a legitimate write.
   const shape = FIELD_SHAPES[key];
   for (const [field, fieldValue] of Object.entries(value)) {
     const check = shape[field];

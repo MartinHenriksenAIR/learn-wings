@@ -95,7 +95,6 @@ describe('quiz-admin', () => {
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ quiz: null, questions: [] });
-    // Only the quiz queryOne should have run; no questions/options queries
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(mockQuery).not.toHaveBeenCalled();
   });
@@ -113,13 +112,11 @@ describe('quiz-admin', () => {
     expect(body.quiz).toEqual(fakeQuiz);
     expect(body.questions).toHaveLength(2);
 
-    // q1 gets its 2 options with is_correct
     const q1 = body.questions.find((q: any) => q.id === 'q1');
     expect(q1.options).toHaveLength(2);
     expect(q1.options[0]).toMatchObject({ id: 'o1', is_correct: false });
     expect(q1.options[1]).toMatchObject({ id: 'o2', is_correct: true });
 
-    // q2 gets empty options array
     const q2 = body.questions.find((q: any) => q.id === 'q2');
     expect(q2.options).toHaveLength(0);
   });

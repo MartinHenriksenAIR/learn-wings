@@ -30,7 +30,6 @@ describe('learner-dashboard', () => {
     mockIsActiveMember.mockResolvedValue(false);
   });
 
-  // 1. 401 invalid token
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -40,7 +39,6 @@ describe('learner-dashboard', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -50,7 +48,6 @@ describe('learner-dashboard', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 orgId missing
   it('returns 400 when orgId is missing', async () => {
     const res = await handler(baseReq({}), {} as any);
 
@@ -58,7 +55,6 @@ describe('learner-dashboard', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
-  // 4. 403 non-member — isActiveMember called with ('p1','org-1')
   it('returns 403 for non-member and calls isActiveMember with correct args', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
 
@@ -69,7 +65,6 @@ describe('learner-dashboard', () => {
     expect(mockIsActiveMember).toHaveBeenCalledWith('p1', 'org-1');
   });
 
-  // 5. Happy path — member, two enrollments, zero-fill proven
   it('returns 200 with correct progress including zero-fill for missing courses', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
 
@@ -117,19 +112,16 @@ describe('learner-dashboard', () => {
     expect(enrollSql).toContain('json_build_object');
     expect(enrollParams).toEqual(['p1', 'org-1']);
 
-    // Assert totals SQL and params
     const [totalsSql, totalsParams] = mockQuery.mock.calls[1] as [string, unknown[]];
     expect(totalsSql).toContain('ANY($1::uuid[])');
     expect(totalsParams).toEqual([['c1', 'c2']]);
 
-    // Assert completed SQL and params
     const [completedSql, completedParams] = mockQuery.mock.calls[2] as [string, unknown[]];
     expect(completedSql).toContain("lp.status = 'completed'");
     expect(completedSql).toContain('ANY($3::uuid[])');
     expect(completedParams).toEqual(['p1', 'org-1', ['c1', 'c2']]);
   });
 
-  // 6. Zero enrollments early exit — only one query runs
   it('returns 200 early with empty data when no enrollments', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery.mockResolvedValueOnce([]); // empty enrollments
@@ -144,7 +136,6 @@ describe('learner-dashboard', () => {
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
-  // 7. Platform-admin bypass — isActiveMember NOT called
   it('returns 200 for platform admin without calling isActiveMember', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([]); // no enrollments
@@ -155,7 +146,6 @@ describe('learner-dashboard', () => {
     expect(mockIsActiveMember).not.toHaveBeenCalled();
   });
 
-  // 8. 500 db error
   it('returns 500 on db error', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));

@@ -280,8 +280,6 @@ describe('lesson-create', () => {
     }
   });
 
-  // --- Upload size/type enforcement (#276) ---
-
   it('413 when a referenced blob is over cap: nothing is inserted', async () => {
     mockEnforceUploadLimits.mockResolvedValueOnce('Video exceeds the maximum upload size of 2 GB');
 
@@ -326,8 +324,6 @@ describe('lesson-create', () => {
     expect(res.status).toBe(200);
     expect(order).toEqual(['gate', 'insert']);
   });
-
-  // --- Path ownership ---
 
   it('400 when the ownership gate refuses a path: nothing is probed or inserted', async () => {
     mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');

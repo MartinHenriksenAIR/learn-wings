@@ -12,7 +12,6 @@ export default endpoint('idea-vote', async ({ req, profile, reply, requireActive
 
   const idea = await loadIdea(ideaId);
 
-  // Not found → 404
   if (!idea) return reply(404, { error: 'Idea not found' });
 
   // Draft privacy (shared/ideas): other-author's draft is invisible (no admin bypass)
@@ -20,10 +19,8 @@ export default endpoint('idea-vote', async ({ req, profile, reply, requireActive
     return reply(404, { error: 'Idea not found' });
   }
 
-  // Authz: platform admin OR active member of idea's org
   await requireActiveMember(idea.org_id);
 
-  // Insert vote; catch unique violation
   try {
     await queryOne(
       `INSERT INTO idea_votes (idea_id, org_id, user_id) VALUES ($1, $2, $3)`,

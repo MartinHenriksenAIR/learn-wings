@@ -7,7 +7,6 @@ import type { ConvertibleInvitation } from '../shared/invitation-convert';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 
-// Shared projection used by both the lookup SELECT and the post-insert re-select.
 // The scalar subquery for assessment_taken_at cannot be expressed in a RETURNING clause,
 // so both branches use a full SELECT to guarantee an identical response shape.
 const PROFILE_SELECT = `id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at,
@@ -82,10 +81,8 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
 
   try {
-    // authenticate is async (Entra ID JWKS fetch)
     const user = await authenticate(req);
 
-    // First-login provisioning: look up by Entra oid+tid, create profile if absent
     let profile = await queryOne<{ id: string; full_name: string; first_name: string | null; last_name: string | null; department: string | null; email: string; avatar_url: string | null; is_platform_admin: boolean; preferred_language: string; created_at: string; assessment_level: string | null; assessment_skipped_at: string | null; assessment_taken_at: string | null }>(
       `SELECT ${PROFILE_SELECT}
          FROM profiles WHERE entra_oid = $1 AND entra_tid = $2`,
@@ -105,17 +102,12 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         // no/invalid JSON body — keep the English default
       }
 
-      // First login from this Entra identity — provision a profile row.
-      // We INSERT then re-select using PROFILE_SELECT: RETURNING cannot express the
-      // assessment_taken_at scalar subquery, so a re-select is the only way to return
-      // a shape identical to the lookup branch. assessment_* are all null for a new profile.
       const inserted = await queryOne<{ id: string }>(
         `INSERT INTO profiles (full_name, email, entra_oid, entra_tid, preferred_language)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
         [user.email.split('@')[0], user.email, user.id, user.tid, requestedLanguage]
       );
-      // Re-select with the full projection so both branches always return an identical shape.
       profile = await queryOne(
         `SELECT ${PROFILE_SELECT}
            FROM profiles WHERE id = $1`,
@@ -123,8 +115,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       );
     }
 
-    // #176: honor any pending org invites for this email BEFORE loading orgs,
-    // so a freshly adopted org shows up in this same response (no refresh).
     await adoptPendingInvites(profile!.id, user.email, context);
 
     const memberships = await query(

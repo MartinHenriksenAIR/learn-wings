@@ -33,7 +33,6 @@ describe('enrollments', () => {
     mockIsOrgAdmin.mockResolvedValue(false);
   });
 
-  // 1. 401 invalid token
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -43,7 +42,6 @@ describe('enrollments', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -53,7 +51,6 @@ describe('enrollments', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 when a provided field is wrong type
   it('returns 400 when orgId is not a string', async () => {
     const res = await handler(baseReq({ orgId: 42 }), {} as any);
 
@@ -75,7 +72,6 @@ describe('enrollments', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'courseId must be a string' });
   });
 
-  // 4. Platform admin, no filters → 200; SQL has NO WHERE; params []
   it('platform admin with no filters returns all enrollments — no WHERE, no SELECT *', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const rows = [{ id: 'e1', org_id: 'org-1', user_id: 'u1', course_id: 'c1', status: 'enrolled', enrolled_at: '2024-01-01', completed_at: null }];
@@ -95,7 +91,6 @@ describe('enrollments', () => {
     expect(params ?? []).toEqual([]);
   });
 
-  // 5. Platform admin, all three filters → SQL contains org_id = $1, user_id = $2, course_id = $3
   it('platform admin with all three filters applies them in order', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([]);
@@ -112,7 +107,6 @@ describe('enrollments', () => {
     expect(sql).toContain(EXPLICIT_COLS);
   });
 
-  // 6. Org-admin scope: non-admin profile + orgId + userId + isOrgAdmin true
   it('org-admin scope: applies org_id and user_id filters, calls isOrgAdmin correctly', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     mockQuery.mockResolvedValueOnce([]);
@@ -130,7 +124,6 @@ describe('enrollments', () => {
     expect(sql).toContain(EXPLICIT_COLS);
   });
 
-  // 7. Self scope ignores client userId
   it('self scope ignores client-supplied userId, forces own profile.id', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(false);
     mockQuery.mockResolvedValueOnce([]);
@@ -148,7 +141,6 @@ describe('enrollments', () => {
     expect(sql).toContain(EXPLICIT_COLS);
   });
 
-  // 8. Self scope, no filters → SQL WHERE user_id = $1, params ['p1']
   it('self scope with no filters forces user_id = profile.id only', async () => {
     mockQuery.mockResolvedValueOnce([]);
 
@@ -162,7 +154,6 @@ describe('enrollments', () => {
     expect(sql).toContain(EXPLICIT_COLS);
   });
 
-  // 9. 500 db error
   it('returns 500 on db error', async () => {
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
 

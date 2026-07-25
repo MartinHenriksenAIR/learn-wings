@@ -27,7 +27,6 @@ describe('org-settings', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
   });
 
-  // 1. 401 when bearer token invalid
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -37,7 +36,6 @@ describe('org-settings', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 when profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -47,7 +45,6 @@ describe('org-settings', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 when orgId is missing
   it('returns 400 when orgId is missing', async () => {
     const res = await handler(baseReq({}), {} as any);
 
@@ -55,7 +52,6 @@ describe('org-settings', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
-  // 4. 403 for non-member non-admin
   it('returns 403 when requester is not a member and not a platform admin', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
 
@@ -65,7 +61,6 @@ describe('org-settings', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // 5. Happy path — active member reads settings
   it('returns settings row for active member with correct SQL and params', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     const row = { org_id: 'org-1', features: { ai: true } };
@@ -86,7 +81,6 @@ describe('org-settings', () => {
     expect(mockIsActiveMember).toHaveBeenCalledWith('p1', 'org-1');
   });
 
-  // 6. Member read with no row → 200 { settings: null }
   it('returns 200 with settings null when no settings row exists (maybeSingle parity)', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQueryOne.mockResolvedValueOnce(null);
@@ -98,7 +92,6 @@ describe('org-settings', () => {
     expect(body).toEqual({ settings: null });
   });
 
-  // 7. Platform admin bypass — isActiveMember NOT called
   it('returns settings for platform admin without calling isActiveMember', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const row = { org_id: 'org-1', features: {} };
@@ -112,7 +105,6 @@ describe('org-settings', () => {
     expect(mockIsActiveMember).not.toHaveBeenCalled();
   });
 
-  // 8. 500 on db error
   it('returns 500 on db error', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));

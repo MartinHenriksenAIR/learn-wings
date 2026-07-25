@@ -8,7 +8,6 @@ export default endpoint('org-membership-update', async ({ req, reply, requireOrg
   const body = await req.json() as { id?: unknown; role?: unknown; status?: unknown };
   const { id, role, status } = body;
 
-  // Validation first, lookup → authz, then UPDATE.
   if (!id || typeof id !== 'string') {
     return reply(400, { error: 'id is required' });
   }
@@ -36,7 +35,6 @@ export default endpoint('org-membership-update', async ({ req, reply, requireOrg
   // + "Org admins can manage memberships in their org" (is_org_admin(org_id)).
   await requireOrgAdmin(existing.org_id);
 
-  // Dynamic UPDATE built from supplied keys only (mirrors organization-update).
   const params: unknown[] = [];
   const setClauses: string[] = [];
   if (role !== undefined) {

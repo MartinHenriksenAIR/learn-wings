@@ -39,7 +39,6 @@ export function generatePDF(data: ReportData, lang: Lang): Promise<Buffer> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    // helpers ------------------------------------------------------------
     const sec = (n: number, title: string, yy: number, ox = M, ow = CW): number => {
       doc.font('Times-Bold').fontSize(11).fillColor(INK).text('§' + n, ox, yy, { continued: true });
       doc.fillColor(NAVY).text('  ' + title);
@@ -69,7 +68,6 @@ export function generatePDF(data: ReportData, lang: Lang): Promise<Buffer> {
       return doc.y + 6;
     };
 
-    // letterhead ---------------------------------------------------------
     let y = M;
     doc.image(LOGO_BUFFER, M, y, { width: 126 });
     doc.font('Times-Bold').fontSize(11).fillColor(INK).text(s.docType, M, y + 2, { width: CW, align: 'right' });
@@ -84,13 +82,11 @@ export function generatePDF(data: ReportData, lang: Lang): Promise<Buffer> {
     doc.moveTo(M, ry + 3.5).lineTo(M + CW, ry + 3.5).lineWidth(0.75).strokeColor(NAVY).stroke();
     y = ry + 22;
 
-    // title block --------------------------------------------------------
     doc.font('Times-Bold').fontSize(21).fillColor(INK).text(s.title, M, y, { width: CW, align: 'center' });
     y = doc.y + 2;
     doc.font('Times-Italic').fontSize(10.5).fillColor(MUT).text(s.reg, M, y, { width: CW, align: 'center' });
     y = doc.y + 12;
 
-    // metadata -----------------------------------------------------------
     const meta: [string, string][] = [
       [s.metaLabels.org, data.org],
       [s.metaLabels.period, s.periodValue(data.dateStr)],
@@ -109,11 +105,9 @@ export function generatePDF(data: ReportData, lang: Lang): Promise<Buffer> {
     doc.moveTo(M, y).lineTo(M + CW, y).lineWidth(1).strokeColor(HAIR).stroke();
     y += 13;
 
-    // declaration --------------------------------------------------------
     doc.font('Times-Roman').fontSize(10).fillColor(DECL).text(s.declare, M, y, { width: CW, align: 'justify' });
     y = doc.y + 8;
 
-    // §1 summary ---------------------------------------------------------
     y = sec(1, s.s1, y);
     const kf: [string, string][] = [
       [String(data.kf.staff), s.kf.staff],
@@ -143,7 +137,6 @@ export function generatePDF(data: ReportData, lang: Lang): Promise<Buffer> {
     }
     y = doc.y + 10;
 
-    // §2 coverage by department -----------------------------------------
     y = sec(2, s.s2, y);
     if (data.depts.length === 0) {
       y = emptyRow(s.emptyDepts, M, y);
@@ -161,7 +154,6 @@ export function generatePDF(data: ReportData, lang: Lang): Promise<Buffer> {
       y = doc.y + 11;
     }
 
-    // §3 course completion / §4 assessed literacy (side by side) --------
     const gap = 30, colW = (CW - gap) / 2, rx = M + colW + gap;
     const y3h = sec(3, s.s3, y, M, colW);
     const y3 = data.courses.length === 0
@@ -178,7 +170,6 @@ export function generatePDF(data: ReportData, lang: Lang): Promise<Buffer> {
     ], data.levels, y4h);
     y = Math.max(y3, y4) + 13;
 
-    // certification + signatures (guard against a stray page break) ------
     doc.page.margins.bottom = 0;
     doc.font('Times-Italic').fontSize(10).fillColor(DECL).text(s.cert, M, y, { width: CW });
     y = doc.y + 20;
@@ -189,7 +180,6 @@ export function generatePDF(data: ReportData, lang: Lang): Promise<Buffer> {
       doc.font('Times-Roman').fontSize(8).fillColor(MUT).text(uc(cap), x, y + 5, { width: sw, characterSpacing: 0.4 });
     });
 
-    // footer(s) ----------------------------------------------------------
     const range = doc.bufferedPageRange();
     for (let i = 0; i < range.count; i++) {
       doc.switchToPage(range.start + i);

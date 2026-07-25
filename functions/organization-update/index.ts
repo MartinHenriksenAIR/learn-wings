@@ -13,14 +13,10 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
   const body = await req.json() as { orgId?: unknown; updates?: unknown };
   const { orgId, updates } = body;
 
-  // Validation first (matches resource-update order), authz second.
   if (!orgId || typeof orgId !== 'string') {
     return reply(400, { error: 'orgId is required' });
   }
 
-  // Shape check + whitelist walk + SET-clause build (shared #252). The transform
-  // persists the trimmed name (parity with organization-create); other fields
-  // pass through as validated.
   const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS, {
     transform: (key, value) => (key === 'name' ? normalizeOrgName(value as string) : value),
   });
@@ -31,7 +27,6 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
   const updatesObj = updates as Record<string, unknown>;
   const updateKeys = Object.keys(updatesObj);
 
-  // Per-field validation — messages aligned with organization-create.
   for (const key of updateKeys) {
     const v = updatesObj[key];
     if (key === 'name') {
@@ -98,9 +93,6 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
     previousLogoUrl = prev?.logo_url ?? null;
   }
 
-  // One candidate list, handed to both gates in order, so they can never be given
-  // different views of the same write. `family: 'org-logo'` is the column's
-  // property, not the caller's claim.
   const candidates: UploadCandidate[] = [{ path: nextLogoUrl, kind: 'image', family: 'org-logo' }];
 
   // Ownership gate FIRST — an org admin is authorized to write THIS org's
@@ -125,9 +117,6 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
     return reply(413, { error: limitError });
   }
 
-  // Dynamic UPDATE over the whitelisted keys (SET clauses built above).
-  // UPDATE ... RETURNING returns no row when WHERE matches nothing, giving us
-  // the 404 distinction without a separate existence SELECT.
   const { setClauses, params } = built;
   params.push(orgId);
   const idIndex = params.length;
@@ -160,9 +149,6 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
 
     return reply(200, { organization });
   } catch (dbErr: unknown) {
-    // Postgres unique_violation on the slug UNIQUE constraint.
-    // `code` is the structured machine-readable error code (ADR-0013) —
-    // the frontend matches on it instead of the English sentence.
     if (isUniqueViolation(dbErr)) {
       return reply(409, { error: 'Slug already in use', code: 'DUPLICATE_SLUG' });
     }

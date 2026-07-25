@@ -29,7 +29,6 @@ describe('org-course-org-breakdown', () => {
     mockIsOrgAdmin.mockResolvedValue(false);
   });
 
-  // 1. 401 when bearer token invalid
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -39,7 +38,6 @@ describe('org-course-org-breakdown', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 when profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -49,7 +47,6 @@ describe('org-course-org-breakdown', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 403 for a non-platform-admin (org admins stay isolated — the breakdown is cross-org)
   it('returns 403 for a non-platform-admin and never queries', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValue(true); // even a genuine org admin must not reach cross-org data
@@ -61,7 +58,6 @@ describe('org-course-org-breakdown', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // 4. 400 when courseId missing
   it('returns 400 when courseId is missing', async () => {
     const res = await handler(baseReq({}), {} as any);
 
@@ -69,7 +65,6 @@ describe('org-course-org-breakdown', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'courseId is required' });
   });
 
-  // 5. Happy path — per-org rollup for a course across every org with it enabled
   it('returns 200 with per-org rows for a platform admin', async () => {
     const rows = [
       { org_id: 'o1', org_name: 'Acme', enrolled: 64, completed: 20 },
@@ -106,7 +101,6 @@ describe('org-course-org-breakdown', () => {
     expect(params).toEqual(['c-1']);
   });
 
-  // 6. 500 on db error
   it('returns 500 on db error', async () => {
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
 

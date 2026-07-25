@@ -24,8 +24,6 @@ RETURNING id`,
   );
 
   if (!deleted) {
-    // 404 covers both nonexistent ids and other users' enrollments —
-    // deliberately indistinguishable to prevent enrollment-id probing.
     return reply(404, { error: 'Enrollment not found' });
   }
 

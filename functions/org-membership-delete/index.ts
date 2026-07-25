@@ -5,7 +5,6 @@ export default endpoint('org-membership-delete', async ({ req, reply, requireOrg
   const body = await req.json() as { id?: unknown };
   const { id } = body;
 
-  // Validation first, lookup → authz, then DELETE.
   if (!id || typeof id !== 'string') {
     return reply(400, { error: 'id is required' });
   }

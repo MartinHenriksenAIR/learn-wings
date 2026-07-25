@@ -49,7 +49,6 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
   const updatesObj = updates as Record<string, unknown>;
   const updateKeys = Object.keys(updatesObj);
 
-  // Per-field validation on present whitelisted keys.
   for (const key of updateKeys) {
     const v = updatesObj[key];
     if (key === 'tags') {
@@ -63,7 +62,6 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
         });
       }
     } else {
-      // STRING_FIELDS: string or null
       if (v !== null && typeof v !== 'string') {
         return reply(400, { error: `${key} must be a string` });
       }
@@ -78,7 +76,6 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
   const gate = checkAuthorDraft(idea, profile, { notDraftError: 'Only draft ideas can be edited' });
   if (!gate.ok) return reply(gate.status, gate.body);
 
-  // Build dynamic UPDATE over the provided whitelisted keys only.
   const { setClauses, params } = built;
   params.push(ideaId);
   const idIndex = params.length;

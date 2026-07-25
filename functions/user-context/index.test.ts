@@ -71,15 +71,14 @@ describe('user-context', () => {
   it('returns existing profile and memberships', async () => {
     const memberships = [{ org_id: 'org-1', role: 'member', organization: { name: 'Org One' } }];
     mockQueryOne.mockResolvedValueOnce(existingProfile);
-    mockQuery.mockResolvedValueOnce([]); // invite pre-check: none
-    mockQuery.mockResolvedValueOnce(memberships); // memberships load
+    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValueOnce(memberships);
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
 
     expect(body.profile.id).toBe('profile-uuid');
     expect(body.memberships).toHaveLength(1);
-    // New assessment fields are present
     expect(body.profile.assessment_level).toBe('intermediate');
     expect(body.profile.assessment_skipped_at).toBeNull();
     expect(body.profile.assessment_taken_at).toBe('2026-07-01T10:00:00.000Z');
@@ -98,15 +97,14 @@ describe('user-context', () => {
     mockQueryOne.mockResolvedValueOnce(null);        // no existing profile
     mockQueryOne.mockResolvedValueOnce(insertedId);  // INSERT RETURNING id
     mockQueryOne.mockResolvedValueOnce(newProfile);  // re-select with full shape
-    mockQuery.mockResolvedValueOnce([]);             // invite pre-check: none
-    mockQuery.mockResolvedValueOnce([]);             // memberships (empty for new user)
+    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValueOnce([]);
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
 
     expect(body.profile.id).toBe('new-uuid');
     expect(body.memberships).toHaveLength(0);
-    // Assessment fields present on provisioned profile (all null for a new user)
     expect(body.profile.assessment_level).toBeNull();
     expect(body.profile.assessment_skipped_at).toBeNull();
     expect(body.profile.assessment_taken_at).toBeNull();
@@ -116,8 +114,6 @@ describe('user-context', () => {
     expect(insertCall![1]).toContain('entra-oid-123');
     expect(insertCall![1]).toContain('entra-tid-456');
   });
-
-  // ---- #226: stamp preferred_language from the browser-derived language at provisioning ----
 
   describe('#226 preferred_language provisioning', () => {
     // Arrange a first-login provisioning flow: no existing profile, INSERT
@@ -130,8 +126,8 @@ describe('user-context', () => {
         is_platform_admin: false, avatar_url: null, preferred_language: 'da',
         assessment_level: null, assessment_skipped_at: null, assessment_taken_at: null,
       }); // re-select
-      mockQuery.mockResolvedValueOnce([]); // invite pre-check: none
-      mockQuery.mockResolvedValueOnce([]); // memberships
+      mockQuery.mockResolvedValueOnce([]);
+      mockQuery.mockResolvedValueOnce([]);
     };
 
     it('stamps the sent language (da) into the provisioning INSERT', async () => {
@@ -190,13 +186,10 @@ describe('user-context', () => {
     expect(body.error).toBe('Internal server error');
   });
 
-  // ---- #176: auto-adopt pending org invites at login ----
-
   it('adopts a matching pending org invite: creates an active membership at the invited role and marks the invite accepted', async () => {
     mockQueryOne.mockResolvedValueOnce(existingProfile);
     mockQuery.mockResolvedValueOnce([{ id: 'inv-1' }]); // pre-check: a pending invite exists
     mockClientQuery.mockResolvedValueOnce(rows({ id: 'inv-1', org_id: 'org-9', role: 'org_admin' })); // FOR UPDATE re-select
-    // convertInvitation: no existing membership -> INSERT (default rows())
 
     const res = await handler(baseReq as any, {} as any);
     expect(res.status).toBe(200);
@@ -250,7 +243,6 @@ describe('user-context', () => {
       is_platform_admin: false, avatar_url: null,
       assessment_level: null, assessment_skipped_at: null, assessment_taken_at: null,
     }); // re-select with full shape
-    // pre-check returns nothing (default [])
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
@@ -258,7 +250,7 @@ describe('user-context', () => {
     expect(res.status).toBe(200);
     expect(body.profile.id).toBe('bare-uuid');
     expect(body.memberships).toHaveLength(0);
-    // The whole point of the optimization: no connection checkout / BEGIN when there's nothing to adopt.
+    // The whole point of the pre-check optimization: no connection checkout / BEGIN when there's nothing to adopt.
     expect(mockWithTransaction).not.toHaveBeenCalled();
     expect(findClientCall('INSERT INTO org_memberships')).toBeUndefined();
   });

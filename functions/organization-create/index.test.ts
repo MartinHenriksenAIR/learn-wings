@@ -165,11 +165,6 @@ describe('organization-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'logo_url must be a string or null' });
   });
 
-  // ── The bind gate (#280) ────────────────────────────────────────────────────
-  // Before this, organization-create was the seventh writer into a column in the
-  // reconciliation union and the only one outside the ownership gates: it stored
-  // whatever string it was handed.
-
   it('refuses a foreign-shaped logo_url BEFORE any storage or write call', async () => {
     // A lesson video path posted to logo_url. `course-player-data` hands every
     // lesson path to any active org member, so this is not a guess.

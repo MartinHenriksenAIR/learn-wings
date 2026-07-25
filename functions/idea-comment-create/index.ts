@@ -26,10 +26,8 @@ export default endpoint('idea-comment-create', async ({ req, profile, reply, req
     return reply(404, { error: 'Idea not found' });
   }
 
-  // Authz: platform admin OR active member of idea's org
   await requireActiveMember(idea.org_id);
 
-  // Validate parentCommentId if provided
   if (parentCommentId !== undefined) {
     const parentComment = await queryOne<{ idea_id: string }>(
       `SELECT idea_id FROM idea_comments WHERE id = $1`,
