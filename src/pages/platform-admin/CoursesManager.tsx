@@ -327,12 +327,13 @@ export default function CoursesManager() {
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>{t('coursesManager.thumbnail')}</Label>
+            {/* No maxSizeMB: the image cap is the server's, and FileUpload
+                defaults to it (src/lib/upload-limits.ts). */}
             <FileUpload
               folder="thumbnails"
               accept="image"
               value={thumbnailUrl}
               onChange={(url) => setThumbnailUrl(url)}
-              maxSizeMB={10}
             />
           </div>
           <div className="space-y-2">

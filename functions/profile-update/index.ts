@@ -1,5 +1,8 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
+import { deleteBlob } from '../shared/blob';
+import { enforceUploadLimits, type UploadCandidate } from '../shared/upload-limits';
+import { assertBindablePaths, isBlobReleasable } from '../shared/blob-ownership';
 
 interface ProfileUpdateBody {
   first_name?: unknown;
@@ -90,16 +93,71 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
     setClauses.push(`preferred_language = $${params.length}`);
   }
 
-  if (avatarUrl !== undefined) {
-    // Empty string clears the photo (stored as NULL); otherwise store the raw
-    // container-relative blob path verbatim (display composes the URL).
-    const avatarStored = avatarUrl.length > 0 ? avatarUrl : null;
-    params.push(avatarStored);
+  // The blob path this update will write to avatar_url. Empty string clears the
+  // photo (stored as NULL); otherwise store the raw container-relative blob path
+  // verbatim (display composes the URL). `undefined` = the caller never supplied
+  // avatar_url, which is NOT a clear: an absent key leaves the column (and its
+  // blob) alone.
+  const nextAvatarUrl = avatarUrl === undefined
+    ? undefined
+    : (avatarUrl.length > 0 ? avatarUrl : null);
+
+  if (nextAvatarUrl !== undefined) {
+    params.push(nextAvatarUrl);
     setClauses.push(`avatar_url = $${params.length}`);
   }
 
   if (setClauses.length === 0) {
     return reply(400, { error: 'No updatable fields provided' });
+  }
+
+  // Previous avatar blob path, read before the write so the superseded blob can be
+  // deleted afterwards — a replace (or a clear-to-null) used to strand the file.
+  // Issued ONLY when the update actually writes the column, so a name/language
+  // change costs no extra round trip and can never delete a live avatar. The path
+  // has to be queried explicitly: CallerProfile is deliberately minimal (id +
+  // is_platform_admin) and does not carry avatar_url.
+  //
+  // A plain SELECT rather than pulling the old value out of the UPDATE itself: the
+  // RETURNING row is handed straight back to the client, so the self-join form
+  // would leak a prev_* column into the response body.
+  //
+  // Deliberately NOT transactional: blob deletes are irreversible and cannot join a
+  // DB transaction, and a stranded blob is strictly less bad than a failed update.
+  let previousAvatarUrl: string | null = null;
+  if (nextAvatarUrl !== undefined) {
+    const prev = await queryOne<{ avatar_url: string | null }>(
+      `SELECT avatar_url FROM profiles WHERE id = $1`,
+      [profile.id],
+    );
+    previousAvatarUrl = prev?.avatar_url ?? null;
+  }
+
+  // One candidate list, handed to both gates in order, so they can never be
+  // given different views of the same write. `family: 'avatar'` is the column's
+  // property, not the caller's claim.
+  const candidates: UploadCandidate[] = [{ path: nextAvatarUrl, kind: 'image', family: 'avatar' }];
+
+  // Ownership gate FIRST. This endpoint is `endpoint()`, not `adminEndpoint()` —
+  // it is reachable by every authenticated user and writes only their own row, so
+  // it is the widest-open write in the fleet. Before this gate, posting another
+  // row's blob path here was enough to aim the storage probe (and, once the
+  // superseded-blob cleanup existed, the delete) at a lesson video or another
+  // user's avatar. It must precede `enforceUploadLimits` so that no foreign path
+  // is ever handed to `headBlob`.
+  const bindError = await assertBindablePaths(candidates, [previousAvatarUrl]);
+  if (bindError) {
+    return reply(400, { error: bindError });
+  }
+
+  // Size/type gate on a newly-referenced avatar (#276). `azure-upload-url` mints
+  // avatar URLs without a platform-admin gate, so this is the only place an
+  // avatar's real size is ever checked. Reuses the same change detection as the
+  // cleanup below: an unchanged path is not new, so a name/language change costs
+  // no HEAD.
+  const limitError = await enforceUploadLimits(candidates, [previousAvatarUrl]);
+  if (limitError) {
+    return reply(413, { error: limitError });
   }
 
   // Caller can ONLY update their own row — id comes from the authenticated profile, never from the body
@@ -113,6 +171,22 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
   // The row can vanish between getProfile and the UPDATE (account deletion race) —
   // without this guard the endpoint would answer 200 { profile: null }.
   if (!updated) return reply(404, { error: 'Profile not found' });
+
+  // Best-effort cleanup of the superseded avatar, only after the row write
+  // succeeded. An unchanged path is left alone; a null old path has nothing to
+  // delete. deleteBlob never throws and its result is deliberately NOT surfaced in
+  // the response — server logs are the only failure signal.
+  //
+  // `isBlobReleasable` runs AFTER the UPDATE on purpose: the row now points at the
+  // new value, so "does any row still reference the old path?" is exactly the
+  // question worth asking. It covers rows written before the bind gate existed,
+  // where a path could already be shared; anything it cannot confirm is left for
+  // `orphan-sweep`.
+  if (previousAvatarUrl
+    && previousAvatarUrl !== nextAvatarUrl
+    && await isBlobReleasable(previousAvatarUrl, 'avatar')) {
+    await deleteBlob(previousAvatarUrl);
+  }
 
   return reply(200, { profile: updated });
 });

@@ -10,6 +10,13 @@
  * The caller returns its existing 400 response with { error: <message> }.
  *
  * NOT included: sortOrder (create-only), lessonId (update-only).
+ *
+ * SCOPE — these are TYPE checks, not authorization. The three storage-path fields
+ * are checked for "non-empty string or null" and nothing more: this function
+ * cannot tell whose blob a well-formed path names, and must not be mistaken for
+ * the place that does. Whether a path may be bound to the row being written is
+ * decided by `assertBindablePaths` (`blob-ownership.ts`), which lesson-create and
+ * lesson-update both call before the path reaches storage or the database.
  */
 
 /**

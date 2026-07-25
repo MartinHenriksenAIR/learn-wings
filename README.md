@@ -100,6 +100,16 @@ npm test                    # vitest contract tests (mocked auth/db — never hi
 
 Every function must be imported in **`functions/index.ts`** or it silently never registers. See [`.claude/rules/functions.md`](.claude/rules/functions.md) for the full backend conventions.
 
+Optional app settings for the **orphan sweep** — the nightly timer (`functions/orphan-sweep`) that deletes blobs no database row references. All three have working defaults, so none has to be set; they exist so the job can be stopped, or its blast radius changed, **without a redeploy**:
+
+| App setting | Default | Purpose |
+|-------------|---------|---------|
+| `ORPHAN_SWEEP_DISABLED` | unset | Set to `1` to stop the sweep entirely. While it is set, orphaned blobs accrue and nothing is ever reclaimed |
+| `ORPHAN_SWEEP_MAX_SHARE` | `0.5` | Refuse the run if more than this fraction of the container — **or of any single top-level prefix, such as `avatars/`** — looks unreferenced. Treated as evidence that the match is broken, not as a big cleanup |
+| `ORPHAN_SWEEP_MAX_DELETIONS` | `500` | Refuse the run if it would delete more than this many blobs |
+
+Raising either ceiling is a deliberate, temporary act: confirm the sampled names in the refusal log really are referenced by nothing, then put the default back. The sweep refuses the whole run rather than deleting a subset, and every refusal logs what an operator should do about it.
+
 ### Database
 
 The schema is a single plain-SQL file — no migration tool. Apply it to a fresh Postgres database, then seed:

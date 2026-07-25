@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile,
+  mockEnforceUploadLimits, mockAssertBindablePaths,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
+    mockEnforceUploadLimits: vi.fn(),
+    mockAssertBindablePaths: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -16,6 +21,8 @@ vi.mock('../shared/profile', () => ({
   isOrgAdmin: vi.fn(),
   isOrgAdminOfAny: vi.fn(),
 }));
+vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
+vi.mock('../shared/blob-ownership', () => ({ assertBindablePaths: mockAssertBindablePaths }));
 
 import handler from './index';
 
@@ -48,6 +55,8 @@ describe('lesson-create', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
+    mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
+    mockAssertBindablePaths.mockResolvedValue(null); // the paths are the caller's to bind
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -269,6 +278,81 @@ describe('lesson-create', () => {
       const res = await handler(baseReq({ ...validBody, lessonType }), {} as any);
       expect(res.status).toBe(200);
     }
+  });
+
+  // --- Upload size/type enforcement (#276) ---
+
+  it('413 when a referenced blob is over cap: nothing is inserted', async () => {
+    mockEnforceUploadLimits.mockResolvedValueOnce('Video exceeds the maximum upload size of 2 GB');
+
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/huge.mp4' }), {} as any);
+
+    expect(res.status).toBe(413);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Video exceeds the maximum upload size of 2 GB',
+    });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('hands every blob column to the gate, tagged with the cap its column implies', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeLesson);
+
+    await handler(baseReq({
+      ...validBody,
+      lessonType: 'document',
+      videoStoragePath: 'legacy/new.mp4',
+      azureBlobPath: 'videos/new.mp4',
+      documentStoragePath: 'docs/new.pdf',
+    }), {} as any);
+
+    // No previousPaths argument: a create has no prior row, so every supplied
+    // path is new and gets probed. `family: 'lms'` on all three — course
+    // thumbnails, lesson videos and lesson documents share one flat namespace,
+    // so `kind` is what tells them apart.
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith([
+      { path: 'legacy/new.mp4', kind: 'video', family: 'lms' },
+      { path: 'videos/new.mp4', kind: 'video', family: 'lms' },
+      { path: 'docs/new.pdf', kind: 'document', family: 'lms' },
+    ]);
+  });
+
+  it('runs the gate before the INSERT', async () => {
+    const order: string[] = [];
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('gate'); return null; });
+    mockQueryOne.mockImplementationOnce(async () => { order.push('insert'); return fakeLesson; });
+
+    const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(order).toEqual(['gate', 'insert']);
+  });
+
+  // --- Path ownership ---
+
+  it('400 when the ownership gate refuses a path: nothing is probed or inserted', async () => {
+    mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');
+
+    const res = await handler(
+      baseReq({ ...validBody, azureBlobPath: 'avatars/victim.png' }),
+      {} as any,
+    );
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('runs the ownership gate BEFORE the size gate, on the same candidate list', async () => {
+    const order: string[] = [];
+    mockAssertBindablePaths.mockImplementationOnce(async () => { order.push('ownership'); return null; });
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('limits'); return null; });
+    mockQueryOne.mockResolvedValueOnce(fakeLesson);
+
+    await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
+
+    expect(order).toEqual(['ownership', 'limits']);
+    expect(mockAssertBindablePaths.mock.calls[0][0]).toEqual(mockEnforceUploadLimits.mock.calls[0][0]);
   });
 
   it('returns 500 on db error propagating err.message', async () => {

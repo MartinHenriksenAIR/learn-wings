@@ -1,17 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob,
+  mockEnforceUploadLimits, mockAssertBindablePaths, mockIsBlobReleasable,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
     MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
+    mockDeleteBlob: vi.fn(),
+    mockEnforceUploadLimits: vi.fn(),
+    mockAssertBindablePaths: vi.fn(),
+    mockIsBlobReleasable: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile }));
+vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
+vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
+vi.mock('../shared/blob-ownership', () => ({
+  assertBindablePaths: mockAssertBindablePaths,
+  isBlobReleasable: mockIsBlobReleasable,
+}));
+
+/** The one candidate this endpoint ever builds, handed to both gates. */
+const avatarCandidate = (path: string | null) => [{ path, kind: 'image', family: 'avatar' }];
 
 import handler from './index';
 
@@ -34,11 +50,23 @@ const profileRow = {
   created_at: '2024-01-01T00:00:00Z',
 };
 
+/**
+ * When (and only when) `avatar_url` is in the body, the endpoint issues a
+ * previous-avatar SELECT before the UPDATE — so queryOne is called twice.
+ */
+const mockAvatarDb = (previousAvatarUrl: string | null, updated: unknown = profileRow) => {
+  mockQueryOne.mockResolvedValueOnce({ avatar_url: previousAvatarUrl }).mockResolvedValueOnce(updated);
+};
+
 describe('profile-update', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'alice@example.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
+    mockDeleteBlob.mockResolvedValue(true);
+    mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
+    mockAssertBindablePaths.mockResolvedValue(null); // the path is the caller's to bind
+    mockIsBlobReleasable.mockResolvedValue(true);    // nothing else references the old blob
   });
 
   // 1. 401 invalid bearer token
@@ -154,7 +182,7 @@ describe('profile-update', () => {
 
   // 9b. avatar_url round-trips through the update as the raw container-relative path
   it('updates avatar_url with the raw container-relative path', async () => {
-    mockQueryOne.mockResolvedValueOnce({ ...profileRow, avatar_url: 'avatars/abc.png' });
+    mockAvatarDb(null, { ...profileRow, avatar_url: 'avatars/abc.png' });
 
     const res = await handler(baseReq({ avatar_url: 'avatars/abc.png' }), {} as any);
 
@@ -162,7 +190,8 @@ describe('profile-update', () => {
     const body = JSON.parse(res.body as string);
     expect(body.profile.avatar_url).toBe('avatars/abc.png');
 
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    // calls[0] is the previous-avatar SELECT; calls[1] is the UPDATE.
+    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     // SET touches avatar_url but NOT full_name (avatar-only update)
     const setClause = sql.split('RETURNING')[0];
     expect(setClause).toContain('avatar_url =');
@@ -173,12 +202,12 @@ describe('profile-update', () => {
 
   // 9c. empty-string avatar_url clears the photo (stored as NULL)
   it('stores empty-string avatar_url as NULL (clears the photo)', async () => {
-    mockQueryOne.mockResolvedValueOnce({ ...profileRow, avatar_url: null });
+    mockAvatarDb(null, { ...profileRow, avatar_url: null });
 
     const res = await handler(baseReq({ avatar_url: '' }), {} as any);
 
     expect(res.status).toBe(200);
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql.split('RETURNING')[0]).toContain('avatar_url =');
     expect(params).toContain(null);
   });
@@ -201,5 +230,212 @@ describe('profile-update', () => {
 
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+  });
+
+  // --- Superseded-avatar cleanup (#275) ---
+
+  it('avatar replaced: deletes the OLD blob exactly once', async () => {
+    mockAvatarDb('avatars/old.png', { ...profileRow, avatar_url: 'avatars/new.png' });
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('avatars/old.png');
+  });
+
+  it('avatar cleared with an empty string: deletes the OLD blob', async () => {
+    mockAvatarDb('avatars/old.png', { ...profileRow, avatar_url: null });
+
+    const res = await handler(baseReq({ avatar_url: '' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('avatars/old.png');
+  });
+
+  it('avatar unchanged: deletes nothing', async () => {
+    mockAvatarDb('avatars/keep.png', { ...profileRow, avatar_url: 'avatars/keep.png' });
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/keep.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('old avatar was null: deletes nothing', async () => {
+    mockAvatarDb(null, { ...profileRow, avatar_url: 'avatars/new.png' });
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('avatar_url absent from the body is NOT a clear: no SELECT, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce(profileRow); // single call — the UPDATE
+
+    const res = await handler(baseReq({ first_name: 'Bob' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('reads the previous avatar with a SELECT scoped to the caller own id', async () => {
+    mockAvatarDb('avatars/old.png');
+
+    await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(mockQueryOne).toHaveBeenCalledTimes(2);
+    const [selectSql, selectParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(selectSql).toMatch(/SELECT avatar_url FROM profiles/i);
+    // id comes from the authenticated profile, never from the body
+    expect(selectParams).toEqual(['p1']);
+  });
+
+  it('404 (profile vanished mid-request): deletes nothing', async () => {
+    mockAvatarDb('avatars/old.png', null);
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(404);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  // --- Upload size/type enforcement (#276) ---
+
+  it('413 when the new avatar is over cap: no UPDATE is issued', async () => {
+    mockQueryOne.mockResolvedValueOnce({ avatar_url: null }); // only the previous-avatar SELECT
+    mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/huge.png' }), {} as any);
+
+    expect(res.status).toBe(413);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Image exceeds the maximum upload size of 10 MB',
+    });
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE profiles');
+    // The refused blob's cleanup is the helper's job, not the endpoint's.
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('hands the avatar to the gate with the previous path, after the SELECT and before the UPDATE', async () => {
+    const order: string[] = [];
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('gate'); return null; });
+    mockQueryOne
+      .mockImplementationOnce(async () => { order.push('select'); return { avatar_url: 'avatars/old.png' }; })
+      .mockImplementationOnce(async () => { order.push('update'); return profileRow; });
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      avatarCandidate('avatars/new.png'),
+      ['avatars/old.png'], // unchanged path ⇒ not new ⇒ never probed
+    );
+    expect(order).toEqual(['select', 'gate', 'update']);
+  });
+
+  it('clearing the avatar passes a null path, so nothing is probed', async () => {
+    mockAvatarDb('avatars/old.png', { ...profileRow, avatar_url: null });
+    const res = await handler(baseReq({ avatar_url: '' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      avatarCandidate(null),
+      ['avatars/old.png'],
+    );
+  });
+
+  // --- Path ownership (the BLOCKERs) ---
+  //
+  // This endpoint is `endpoint()`, not `adminEndpoint()`: every authenticated
+  // user reaches it. `course-player-data` returns every lesson path to any active
+  // org member and `org-memberships` returns other members' avatar_url, so the
+  // paths a caller can name are not remotely secret.
+
+  it('400 when the ownership gate refuses the path: no probe, no UPDATE, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce({ avatar_url: null }); // only the previous-avatar SELECT
+    mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');
+
+    const res = await handler(baseReq({ avatar_url: 'someone-elses-lesson.mp4' }), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    // The refusal must land BEFORE anything touches storage — otherwise the
+    // 413-vs-200 split is an existence oracle for other rows' blobs.
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE profiles');
+  });
+
+  it('runs the ownership gate BEFORE the size gate, on the same candidate list', async () => {
+    const order: string[] = [];
+    mockAssertBindablePaths.mockImplementationOnce(async () => { order.push('ownership'); return null; });
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('limits'); return null; });
+    mockAvatarDb('avatars/old.png');
+
+    await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(order).toEqual(['ownership', 'limits']);
+    expect(mockAssertBindablePaths).toHaveBeenCalledWith(
+      avatarCandidate('avatars/new.png'),
+      ['avatars/old.png'],
+    );
+    // Both gates see the identical candidate list.
+    expect(mockAssertBindablePaths.mock.calls[0][0]).toEqual(mockEnforceUploadLimits.mock.calls[0][0]);
+  });
+
+  it('step 2 of the two-step attack: a still-referenced old path is NOT deleted', async () => {
+    // Even if a row somehow already points at a shared path (written before the
+    // bind gate existed), clearing it must not destroy the blob.
+    mockIsBlobReleasable.mockResolvedValueOnce(false);
+    mockAvatarDb('avatars/victim.png', { ...profileRow, avatar_url: null });
+
+    const res = await handler(baseReq({ avatar_url: '' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockIsBlobReleasable).toHaveBeenCalledWith('avatars/victim.png', 'avatar');
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('asks whether the old blob is releasable only AFTER the row write', async () => {
+    const order: string[] = [];
+    mockQueryOne
+      .mockImplementationOnce(async () => ({ avatar_url: 'avatars/old.png' }))
+      .mockImplementationOnce(async () => { order.push('update'); return profileRow; });
+    mockIsBlobReleasable.mockImplementationOnce(async () => { order.push('releasable'); return true; });
+    mockDeleteBlob.mockImplementationOnce(async () => { order.push('delete'); return true; });
+
+    await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    // The row must already point at the new value, or "is anything still
+    // referencing the old path?" answers the wrong question.
+    expect(order).toEqual(['update', 'releasable', 'delete']);
+  });
+
+  it('deleteBlob returns false: request still succeeds with its normal body', async () => {
+    const updated = { ...profileRow, avatar_url: 'avatars/new.png' };
+    mockAvatarDb('avatars/old.png', updated);
+    mockDeleteBlob.mockResolvedValue(false);
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    // Cleanup outcome is deliberately NOT surfaced in the response.
+    expect(JSON.parse(res.body as string)).toEqual({ profile: updated });
+  });
+
+  it('storage fetch rejects (helper swallows it → false): request still succeeds', async () => {
+    const updated = { ...profileRow, avatar_url: 'avatars/new.png' };
+    mockAvatarDb('avatars/old.png', updated);
+    mockDeleteBlob.mockResolvedValue(false); // deleteBlob never throws — a rejected fetch surfaces as false
+
+    const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ profile: updated });
   });
 });

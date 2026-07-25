@@ -1,18 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrgAdmin } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockIsOrgAdmin, mockDeleteBlob,
+  mockEnforceUploadLimits, mockAssertBindablePaths, mockIsBlobReleasable,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
+    mockDeleteBlob: vi.fn(),
+    mockEnforceUploadLimits: vi.fn(),
+    mockAssertBindablePaths: vi.fn(),
+    mockIsBlobReleasable: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: vi.fn(), queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: mockIsOrgAdmin, isOrgAdminOfAny: vi.fn() }));
+vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
+vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
+vi.mock('../shared/blob-ownership', () => ({
+  assertBindablePaths: mockAssertBindablePaths,
+  isBlobReleasable: mockIsBlobReleasable,
+}));
 
 import handler from './index';
+
+/** The one candidate this endpoint ever builds, handed to both gates. */
+const logoCandidate = (path: string | null) => [{ path, kind: 'image', family: 'org-logo' }];
 
 const baseReq = (body: unknown) => ({
   method: 'POST',
@@ -22,12 +38,24 @@ const baseReq = (body: unknown) => ({
 
 const existingOrg = { id: 'org-1' };
 
+/**
+ * When (and only when) `logo_url` is in the update, the endpoint issues a
+ * previous-logo SELECT before the UPDATE — so queryOne is called twice.
+ */
+const mockLogoDb = (previousLogoUrl: string | null, updated: unknown = { id: 'org-1' }) => {
+  mockQueryOne.mockResolvedValueOnce({ logo_url: previousLogoUrl }).mockResolvedValueOnce(updated);
+};
+
 describe('organization-update', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
     mockIsOrgAdmin.mockResolvedValue(false);
+    mockDeleteBlob.mockResolvedValue(true);
+    mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
+    mockAssertBindablePaths.mockResolvedValue(null); // the path is the caller's to bind
+    mockIsBlobReleasable.mockResolvedValue(true);    // nothing else references the old blob
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -166,7 +194,7 @@ describe('organization-update', () => {
   });
 
   it('multi-field update: builds SET clauses + params in submission order', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // UPDATE RETURNING
+    mockLogoDb(null); // logo_url is in the update → previous-logo SELECT, then UPDATE RETURNING
     const res = await handler(
       baseReq({
         orgId: 'org-1',
@@ -176,7 +204,7 @@ describe('organization-update', () => {
     );
     expect(res.status).toBe(200);
 
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('name = $1');
     expect(sql).toContain('slug = $2');
     expect(sql).toContain('logo_url = $3');
@@ -204,10 +232,10 @@ describe('organization-update', () => {
   it('org admin of the target org can update logo_url only', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValueOnce(true);
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: 'https://x/logo.png' });
+    mockLogoDb(null, { id: 'org-1', logo_url: 'https://x/logo.png' });
     const res = await handler(baseReq({ orgId: 'org-1', updates: { logo_url: 'https://x/logo.png' } }), {} as any);
     expect(res.status).toBe(200);
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('UPDATE organizations SET');
     expect(sql).toContain('logo_url = $1');
     expect(sql).toContain('WHERE id = $2');
@@ -248,11 +276,216 @@ describe('organization-update', () => {
   it('org admin can clear the logo (logo_url: null)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValueOnce(true);
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: null });
+    mockLogoDb(null, { id: 'org-1', logo_url: null });
     const res = await handler(baseReq({ orgId: 'org-1', updates: { logo_url: null } }), {} as any);
     expect(res.status).toBe(200);
-    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('logo_url = $1');
     expect(params).toEqual([null, 'org-1']);
+  });
+
+  // --- Superseded-logo cleanup (#275) ---
+
+  const logoUpdate = (logo_url: string | null) => ({ orgId: 'org-1', updates: { logo_url } });
+
+  it('logo replaced: deletes the OLD blob exactly once', async () => {
+    mockLogoDb('org-logos/old.png');
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('org-logos/old.png');
+  });
+
+  it('logo cleared to null: deletes the OLD blob', async () => {
+    mockLogoDb('org-logos/old.png');
+    const res = await handler(baseReq(logoUpdate(null)), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('org-logos/old.png');
+  });
+
+  it('logo unchanged: deletes nothing', async () => {
+    mockLogoDb('org-logos/keep.png');
+    const res = await handler(baseReq(logoUpdate('org-logos/keep.png')), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('old logo was null: deletes nothing', async () => {
+    mockLogoDb(null);
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('logo_url absent from updates is NOT a clear: no SELECT, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // single call — the UPDATE
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('reads the previous logo with a SELECT before the UPDATE, after the authz gate', async () => {
+    mockLogoDb('org-logos/old.png');
+    await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+
+    expect(mockQueryOne).toHaveBeenCalledTimes(2);
+    const [selectSql, selectParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(selectSql).toMatch(/SELECT logo_url FROM organizations/i);
+    expect(selectParams).toEqual(['org-1']);
+  });
+
+  it('non-admin member gets 403 for logo_url without ever reaching the previous-logo SELECT', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(false);
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+    expect(res.status).toBe(403);
+    expect(mockQueryOne).not.toHaveBeenCalled();
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('404 (org vanished): deletes nothing', async () => {
+    mockLogoDb('org-logos/old.png', null);
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+    expect(res.status).toBe(404);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('409 duplicate slug alongside a logo change: deletes nothing', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ logo_url: 'org-logos/old.png' })
+      .mockRejectedValueOnce(Object.assign(new Error('duplicate key value'), { code: '23505' }));
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { logo_url: 'org-logos/new.png', slug: 'taken-slug' } }),
+      {} as any,
+    );
+    expect(res.status).toBe(409);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  // --- Upload size/type enforcement (#276) ---
+
+  it('413 when the new logo is over cap: no UPDATE is issued', async () => {
+    mockQueryOne.mockResolvedValueOnce({ logo_url: null }); // only the previous-logo SELECT
+    mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
+
+    const res = await handler(baseReq(logoUpdate('org-logos/huge.png')), {} as any);
+
+    expect(res.status).toBe(413);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Image exceeds the maximum upload size of 10 MB',
+    });
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE organizations');
+    // The refused blob's cleanup is the helper's job, not the endpoint's.
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('hands the logo to the gate with the previous path, after the SELECT and before the UPDATE', async () => {
+    const order: string[] = [];
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('gate'); return null; });
+    mockQueryOne
+      .mockImplementationOnce(async () => { order.push('select'); return { logo_url: 'org-logos/old.png' }; })
+      .mockImplementationOnce(async () => { order.push('update'); return { id: 'org-1' }; });
+
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      logoCandidate('org-logos/new.png'),
+      ['org-logos/old.png'], // unchanged path ⇒ not new ⇒ never probed
+    );
+    expect(order).toEqual(['select', 'gate', 'update']);
+  });
+
+  it('a non-admin member never reaches the gate (authz first, storage never touched)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(false);
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+    expect(res.status).toBe(403);
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockAssertBindablePaths).not.toHaveBeenCalled();
+  });
+
+  // --- Path ownership (the BLOCKERs) ---
+  //
+  // Being an admin of THIS org says nothing about whether the path supplied is
+  // this org's. `/organizations` hands `logo_url` to plain learners, so every
+  // other org's logo path is readable by anyone with an account.
+
+  it('400 when the ownership gate refuses the path: no probe, no UPDATE, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce({ logo_url: null }); // only the previous-logo SELECT
+    mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');
+
+    const res = await handler(baseReq(logoUpdate('avatars/victim.png')), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    // The refusal must land BEFORE anything touches storage — otherwise the
+    // 413-vs-200 split is an existence oracle for other rows' blobs.
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE organizations');
+  });
+
+  it('runs the ownership gate BEFORE the size gate, on the same candidate list', async () => {
+    const order: string[] = [];
+    mockAssertBindablePaths.mockImplementationOnce(async () => { order.push('ownership'); return null; });
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('limits'); return null; });
+    mockLogoDb('org-logos/old.png');
+
+    await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+
+    expect(order).toEqual(['ownership', 'limits']);
+    expect(mockAssertBindablePaths).toHaveBeenCalledWith(
+      logoCandidate('org-logos/new.png'),
+      ['org-logos/old.png'],
+    );
+    expect(mockAssertBindablePaths.mock.calls[0][0]).toEqual(mockEnforceUploadLimits.mock.calls[0][0]);
+  });
+
+  it('step 2 of the two-step attack: a still-referenced old logo is NOT deleted', async () => {
+    mockIsBlobReleasable.mockResolvedValueOnce(false);
+    mockLogoDb('org-logos/shared.png');
+
+    const res = await handler(baseReq(logoUpdate(null)), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockIsBlobReleasable).toHaveBeenCalledWith('org-logos/shared.png', 'org-logo');
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('asks whether the old blob is releasable only AFTER the row write', async () => {
+    const order: string[] = [];
+    mockQueryOne
+      .mockImplementationOnce(async () => ({ logo_url: 'org-logos/old.png' }))
+      .mockImplementationOnce(async () => { order.push('update'); return { id: 'org-1' }; });
+    mockIsBlobReleasable.mockImplementationOnce(async () => { order.push('releasable'); return true; });
+    mockDeleteBlob.mockImplementationOnce(async () => { order.push('delete'); return true; });
+
+    await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+
+    expect(order).toEqual(['update', 'releasable', 'delete']);
+  });
+
+  it('deleteBlob returns false: request still succeeds with its normal body', async () => {
+    const updated = { id: 'org-1', logo_url: 'org-logos/new.png' };
+    mockLogoDb('org-logos/old.png', updated);
+    mockDeleteBlob.mockResolvedValue(false);
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+    expect(res.status).toBe(200);
+    // Cleanup outcome is deliberately NOT surfaced in the response.
+    expect(JSON.parse(res.body as string)).toEqual({ organization: updated });
+  });
+
+  it('storage fetch rejects (helper swallows it → false): request still succeeds', async () => {
+    const updated = { id: 'org-1', logo_url: 'org-logos/new.png' };
+    mockLogoDb('org-logos/old.png', updated);
+    mockDeleteBlob.mockResolvedValue(false); // deleteBlob never throws — a rejected fetch surfaces as false
+    const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ organization: updated });
   });
 });

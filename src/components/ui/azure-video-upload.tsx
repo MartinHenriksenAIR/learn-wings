@@ -1,6 +1,15 @@
 import * as React from 'react';
 import { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
+import {
+  checkUploadFileType,
+  checkUploadPayloadSize,
+  effectiveMaxSizeMB,
+  formatSizeMB,
+  UPLOAD_ACCEPT_ATTRIBUTE,
+  type UploadMessage,
+} from '@/lib/upload-limits';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -19,6 +28,10 @@ export function AzureVideoUpload({
   className,
   disabled = false,
 }: AzureVideoUploadProps) {
+  const { t } = useTranslation();
+  // Via the clamp helper rather than UPLOAD_MAX_MB directly, so every call site
+  // in the app reaches the server cap through exactly one code path.
+  const capMB = effectiveMaxSizeMB('video');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -47,72 +60,100 @@ export function AzureVideoUpload({
     loadPreview();
   }, [value]);
 
+  /** Show a message from the upload-limits helpers in the user's language. */
+  const showMessage = (message: UploadMessage) => setError(t(message.key, message.values));
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('video/')) {
-      setError('Please select a video file');
-      return;
-    }
-
-    setError(null);
-    setUploading(true);
-    setProgress(0);
-    setFileName(file.name);
-
+    // Clearing the input is the single exit path for every branch below: a
+    // `change` event only fires when the value changes, so a rejected file left
+    // in the input makes re-picking it a no-op.
     try {
-      // Step 1: Get signed upload URL from edge function
-      const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>('/api/azure-upload-url', {
-        fileName: file.name,
-        contentType: file.type,
-      });
-
-      if (!uploadData?.uploadUrl) {
-        throw new Error('Failed to get upload URL');
+      // Mirrors the server's mint-time allow-list rather than a bare `video/`
+      // prefix, so .mkv/.avi/.wmv are refused here — naming the formats —
+      // instead of by the server with a bare "File type not allowed".
+      const typeError = checkUploadFileType('video', file);
+      if (typeError) {
+        showMessage(typeError);
+        return;
       }
 
-      const { uploadUrl, blobPath, contentType } = uploadData;
+      // Validate file size against the server cap (#276). This component used to
+      // have no size check at all and advertised "Unlimited file size"; without it
+      // an oversized video uploads for minutes and only then fails the save with a
+      // 413, having already cost the user (and the storage account) the transfer.
+      const sizeError = checkUploadPayloadSize(file.size, capMB);
+      if (sizeError) {
+        showMessage(sizeError);
+        return;
+      }
 
-      // Step 2: Upload directly to Azure using XMLHttpRequest for progress tracking
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 100);
-            setProgress(percentComplete);
-          }
-        };
+      setError(null);
+      setUploading(true);
+      setProgress(0);
+      setFileName(file.name);
 
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
-          }
-        };
+      try {
+        // Step 1: Get signed upload URL from edge function
+        const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>('/api/azure-upload-url', {
+          fileName: file.name,
+          contentType: file.type,
+        });
 
-        xhr.onerror = () => reject(new Error('Upload failed'));
-        xhr.ontimeout = () => reject(new Error('Upload timed out'));
+        if (!uploadData?.uploadUrl) {
+          throw new Error('Failed to get upload URL');
+        }
 
-        xhr.open('PUT', uploadUrl);
-        xhr.setRequestHeader('Content-Type', contentType);
-        xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
-        xhr.send(file);
-      });
+        const { uploadUrl, blobPath, contentType } = uploadData;
 
-      // Step 3: Success - return the blob path
-      setProgress(100);
-      onChange(blobPath);
+        // Step 2: Upload directly to Azure using XMLHttpRequest for progress tracking
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
 
-    } catch (err: any) {
-      console.error('Upload error:', err);
-      setError(err.message || 'Upload failed');
-      onChange(null);
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percentComplete = Math.round((event.loaded / event.total) * 100);
+              setProgress(percentComplete);
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Upload failed'));
+          xhr.ontimeout = () => reject(new Error('Upload timed out'));
+
+          xhr.open('PUT', uploadUrl);
+          xhr.setRequestHeader('Content-Type', contentType);
+          xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
+          xhr.send(file);
+        });
+
+        // Step 3: Success - return the blob path
+        setProgress(100);
+        onChange(blobPath);
+      } catch (err) {
+        // The thrown text is diagnostic, not actionable, and is the one string
+        // no translation could reach — log it and show the translated summary.
+        console.error('Video upload failed:', err);
+        setError(t('fileUpload.errorUploadFailed'));
+        // Deliberately NO `onChange(null)` here — same rule as FileUpload.
+        // Nothing was stored, so the parent's current value still names a live
+        // blob, and since #275 saving a null is what DELETES it. A failed
+        // replacement must not destroy the video it failed to replace, so
+        // `onChange(null)` means only one thing: the user removed the video.
+        setFileName(null);
+      } finally {
+        setUploading(false);
+      }
     } finally {
-      setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
     }
   };
@@ -133,7 +174,7 @@ export function AzureVideoUpload({
       <input
         ref={inputRef}
         type="file"
-        accept="video/mp4,video/webm,video/quicktime,video/*"
+        accept={UPLOAD_ACCEPT_ATTRIBUTE.video}
         onChange={handleFileChange}
         className="hidden"
         disabled={disabled || uploading}
@@ -152,7 +193,7 @@ export function AzureVideoUpload({
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
                   <Video className="mx-auto h-12 w-12 mb-2" />
-                  <p className="text-sm">Loading preview...</p>
+                  <p className="text-sm">{t('fileUpload.loadingPreview')}</p>
                 </div>
               </div>
             )}
@@ -171,7 +212,7 @@ export function AzureVideoUpload({
           <div className="p-3 bg-muted/50 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-success" />
             <span className="text-sm text-muted-foreground">
-              Video uploaded to Azure Cloud
+              {t('fileUpload.videoUploadedToAzure')}
             </span>
           </div>
         </div>
@@ -189,7 +230,7 @@ export function AzureVideoUpload({
             <div className="space-y-4">
               <Cloud className="h-12 w-12 mx-auto text-primary animate-pulse" />
               <div className="space-y-2">
-                <p className="text-sm font-medium">Uploading to Azure Cloud...</p>
+                <p className="text-sm font-medium">{t('fileUpload.uploadingToAzure')}</p>
                 <p className="text-xs text-muted-foreground">{fileName}</p>
                 <Progress value={progress} className="h-2 w-full max-w-xs mx-auto" />
                 <p className="text-xs text-muted-foreground">{progress}%</p>
@@ -198,12 +239,14 @@ export function AzureVideoUpload({
           ) : (
             <>
               <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm font-medium">Click to upload video</p>
+              <p className="text-sm font-medium">{t('fileUpload.ctaVideo')}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Unlimited file size • MP4, WebM, MOV
+                {t('fileUpload.maxSize', { size: formatSizeMB(capMB) })}
+                {' • '}
+                {t('fileUpload.videoFormats')}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Uploads directly to Azure Cloud Storage
+                {t('fileUpload.directToAzure')}
               </p>
             </>
           )}

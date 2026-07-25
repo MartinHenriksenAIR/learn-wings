@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile, mockDeleteBlob,
+  mockEnforceUploadLimits, mockAssertBindablePaths, mockIsBlobReleasable,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
+    mockDeleteBlob: vi.fn(),
+    mockEnforceUploadLimits: vi.fn(),
+    mockAssertBindablePaths: vi.fn(),
+    mockIsBlobReleasable: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -16,8 +23,17 @@ vi.mock('../shared/profile', () => ({
   isOrgAdmin: vi.fn(),
   isOrgAdminOfAny: vi.fn(),
 }));
+vi.mock('../shared/blob', () => ({ deleteBlob: mockDeleteBlob }));
+vi.mock('../shared/upload-limits', () => ({ enforceUploadLimits: mockEnforceUploadLimits }));
+vi.mock('../shared/blob-ownership', () => ({
+  assertBindablePaths: mockAssertBindablePaths,
+  isBlobReleasable: mockIsBlobReleasable,
+}));
 
 import handler from './index';
+
+/** The one candidate this endpoint ever builds, handed to both gates. */
+const thumbCandidate = (path: string | null | undefined) => [{ path, kind: 'image', family: 'lms' }];
 
 const baseReq = (body: unknown) => ({
   method: 'POST',
@@ -40,11 +56,23 @@ const fakeCourse = {
   is_published: false,
 };
 
+/**
+ * When (and only when) `thumbnailUrl` is in the update, the endpoint issues a
+ * previous-thumbnail SELECT before the UPDATE — so queryOne is called twice.
+ */
+const mockThumbnailDb = (previousThumbnail: string | null, updated: unknown = fakeCourse) => {
+  mockQueryOne.mockResolvedValueOnce({ thumbnail_url: previousThumbnail }).mockResolvedValueOnce(updated);
+};
+
 describe('course-update', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
+    mockDeleteBlob.mockResolvedValue(true);
+    mockEnforceUploadLimits.mockResolvedValue(null); // no upload-limit objection
+    mockAssertBindablePaths.mockResolvedValue(null); // the path is the caller's to bind
+    mockIsBlobReleasable.mockResolvedValue(true);    // nothing else references the old blob
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -186,7 +214,7 @@ describe('course-update', () => {
   });
 
   it('allows thumbnailUrl as null', async () => {
-    mockQueryOne.mockResolvedValueOnce(fakeCourse);
+    mockThumbnailDb(null);
     const res = await handler(baseReq({ courseId: 'c1', updates: { thumbnailUrl: null } }), {} as any);
     expect(res.status).toBe(200);
   });
@@ -254,5 +282,191 @@ describe('course-update', () => {
     const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+  });
+
+  // --- Superseded-thumbnail cleanup (#275) ---
+
+  const thumbUpdate = (thumbnailUrl: string | null) => ({ courseId: 'c1', updates: { thumbnailUrl } });
+
+  it('thumbnail replaced: deletes the OLD blob exactly once', async () => {
+    mockThumbnailDb('thumbs/old.png');
+    const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('thumbs/old.png');
+  });
+
+  it('thumbnail cleared to null: deletes the OLD blob', async () => {
+    mockThumbnailDb('thumbs/old.png');
+    const res = await handler(baseReq(thumbUpdate(null)), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('thumbs/old.png');
+  });
+
+  it('thumbnail unchanged: deletes nothing', async () => {
+    mockThumbnailDb('thumbs/keep.png');
+    const res = await handler(baseReq(thumbUpdate('thumbs/keep.png')), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('old thumbnail was null: deletes nothing', async () => {
+    mockThumbnailDb(null);
+    const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('thumbnailUrl absent from updates is NOT a clear: no SELECT, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeCourse); // single call — the UPDATE
+    const res = await handler(baseReq({ courseId: 'c1', updates: { title: 'Renamed' } }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('reads the previous thumbnail with a SELECT before the UPDATE', async () => {
+    mockThumbnailDb('thumbs/old.png');
+    await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+
+    expect(mockQueryOne).toHaveBeenCalledTimes(2);
+    const [selectSql, selectParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(selectSql).toMatch(/SELECT thumbnail_url FROM courses/i);
+    expect(selectParams).toEqual(['c1']);
+    const [updateSql] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(updateSql).toContain('UPDATE courses');
+  });
+
+  it('404 (course vanished): deletes nothing', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ thumbnail_url: 'thumbs/old.png' })
+      .mockResolvedValueOnce(null);
+    const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+    expect(res.status).toBe(404);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  // --- Upload size/type enforcement (#276) ---
+
+  it('413 when the new thumbnail is over cap: no UPDATE is issued', async () => {
+    mockQueryOne.mockResolvedValueOnce({ thumbnail_url: null }); // only the previous-thumbnail SELECT
+    mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
+
+    const res = await handler(baseReq(thumbUpdate('thumbs/huge.png')), {} as any);
+
+    expect(res.status).toBe(413);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'Image exceeds the maximum upload size of 10 MB',
+    });
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE courses');
+    // The refused blob's cleanup is the helper's job, not the endpoint's.
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('hands the thumbnail to the gate with the previous path, after the SELECT and before the UPDATE', async () => {
+    const order: string[] = [];
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('gate'); return null; });
+    mockQueryOne
+      .mockImplementationOnce(async () => { order.push('select'); return { thumbnail_url: 'thumbs/old.png' }; })
+      .mockImplementationOnce(async () => { order.push('update'); return fakeCourse; });
+
+    const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      thumbCandidate('thumbs/new.png'),
+      ['thumbs/old.png'], // unchanged path ⇒ not new ⇒ never probed
+    );
+    expect(order).toEqual(['select', 'gate', 'update']);
+  });
+
+  it('thumbnailUrl absent from updates: the gate sees an undefined path, so nothing is probed', async () => {
+    mockQueryOne.mockResolvedValueOnce(fakeCourse);
+    const res = await handler(baseReq({ courseId: 'c1', updates: { title: 'Renamed' } }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockEnforceUploadLimits).toHaveBeenCalledWith(
+      thumbCandidate(undefined),
+      [null],
+    );
+  });
+
+  // --- Path ownership ---
+  //
+  // Course thumbnails have NO folder prefix, so they share one flat namespace
+  // with lesson videos and documents. The prefix cannot tell one course's
+  // thumbnail from another's, or from a lesson video — the extension allow-list
+  // and the cross-row reference check have to.
+
+  it('400 when the ownership gate refuses the path: no probe, no UPDATE, no delete', async () => {
+    mockQueryOne.mockResolvedValueOnce({ thumbnail_url: null }); // only the previous-thumbnail SELECT
+    mockAssertBindablePaths.mockResolvedValueOnce('Invalid upload path');
+
+    const res = await handler(baseReq(thumbUpdate('someone-elses-lesson.mp4')), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
+    expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE courses');
+  });
+
+  it('runs the ownership gate BEFORE the size gate, on the same candidate list', async () => {
+    const order: string[] = [];
+    mockAssertBindablePaths.mockImplementationOnce(async () => { order.push('ownership'); return null; });
+    mockEnforceUploadLimits.mockImplementationOnce(async () => { order.push('limits'); return null; });
+    mockThumbnailDb('thumbs/old.png');
+
+    await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+
+    expect(order).toEqual(['ownership', 'limits']);
+    expect(mockAssertBindablePaths).toHaveBeenCalledWith(
+      thumbCandidate('thumbs/new.png'),
+      ['thumbs/old.png'],
+    );
+    expect(mockAssertBindablePaths.mock.calls[0][0]).toEqual(mockEnforceUploadLimits.mock.calls[0][0]);
+  });
+
+  it('a superseded thumbnail another row still references is NOT deleted', async () => {
+    mockIsBlobReleasable.mockResolvedValueOnce(false);
+    mockThumbnailDb('shared.png');
+
+    const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(mockIsBlobReleasable).toHaveBeenCalledWith('shared.png', 'lms');
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('asks whether the old blob is releasable only AFTER the row write', async () => {
+    const order: string[] = [];
+    mockQueryOne
+      .mockImplementationOnce(async () => ({ thumbnail_url: 'thumbs/old.png' }))
+      .mockImplementationOnce(async () => { order.push('update'); return fakeCourse; });
+    mockIsBlobReleasable.mockImplementationOnce(async () => { order.push('releasable'); return true; });
+    mockDeleteBlob.mockImplementationOnce(async () => { order.push('delete'); return true; });
+
+    await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+
+    expect(order).toEqual(['update', 'releasable', 'delete']);
+  });
+
+  it('deleteBlob returns false: request still succeeds with its normal body', async () => {
+    mockThumbnailDb('thumbs/old.png');
+    mockDeleteBlob.mockResolvedValue(false);
+    const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+    expect(res.status).toBe(200);
+    // Cleanup outcome is deliberately NOT surfaced in the response.
+    expect(JSON.parse(res.body as string)).toEqual({ course: fakeCourse });
+  });
+
+  it('storage fetch rejects (helper swallows it → false): request still succeeds', async () => {
+    mockThumbnailDb('thumbs/old.png');
+    mockDeleteBlob.mockResolvedValue(false); // deleteBlob never throws — a rejected fetch surfaces as false
+    const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ course: fakeCourse });
   });
 });

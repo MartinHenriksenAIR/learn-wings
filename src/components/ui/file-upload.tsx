@@ -1,12 +1,22 @@
 import * as React from 'react';
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
+import { downscaleImageFile, maxEdgeForUpload, type UploadAccept } from '@/lib/image-downscale';
+import {
+  checkSelectedFileSize,
+  checkUploadFileType,
+  checkUploadPayloadSize,
+  effectiveMaxSizeMB,
+  formatSizeMB,
+  willDownscale,
+  UPLOAD_ACCEPT_ATTRIBUTE,
+  type UploadMessage,
+} from '@/lib/upload-limits';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { Upload, X, FileText, Video, Image as ImageIcon, Loader2 } from 'lucide-react';
-
-export type FileUploadType = 'image' | 'video' | 'document';
 
 interface FileUploadProps {
   /**
@@ -16,24 +26,30 @@ interface FileUploadProps {
    */
   assetType?: 'org-logo' | 'avatar';
   folder?: string;
-  accept?: FileUploadType;
+  accept?: UploadAccept;
   value?: string | null;
   onChange: (url: string | null, storagePath: string | null) => void;
+  /**
+   * Tightens the limit below the server cap for this call site (avatars ask for
+   * 2 MB). Never widens it: `effectiveMaxSizeMB` clamps to the cap the backend
+   * enforces, so the UI can't promise something the save would 413 on. Defaults
+   * to the server cap for `accept`.
+   */
   maxSizeMB?: number;
   className?: string;
   disabled?: boolean;
 }
 
-const acceptTypes: Record<FileUploadType, string> = {
-  image: 'image/png,image/jpeg,image/gif,image/webp',
-  video: 'video/mp4,video/webm,video/quicktime',
-  document: 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-};
-
-const fileIcons: Record<FileUploadType, React.ReactNode> = {
+const fileIcons: Record<UploadAccept, React.ReactNode> = {
   image: <ImageIcon className="h-8 w-8 text-muted-foreground" />,
   video: <Video className="h-8 w-8 text-muted-foreground" />,
   document: <FileText className="h-8 w-8 text-muted-foreground" />,
+};
+
+const ctaKeys: Record<UploadAccept, string> = {
+  image: 'fileUpload.ctaImage',
+  video: 'fileUpload.ctaVideo',
+  document: 'fileUpload.ctaDocument',
 };
 
 export function FileUpload({
@@ -42,10 +58,13 @@ export function FileUpload({
   accept = 'image',
   value,
   onChange,
-  maxSizeMB = 50,
+  maxSizeMB,
   className,
   disabled = false,
 }: FileUploadProps) {
+  const { t } = useTranslation();
+  const capMB = effectiveMaxSizeMB(accept, maxSizeMB);
+  const maxEdge = maxEdgeForUpload(accept, assetType);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -72,55 +91,123 @@ export function FileUpload({
     if (preview && preview.forValue !== value) setPreview(null);
   }, [value, preview]);
 
+  /** Show a message from the upload-limits helpers in the user's language. */
+  const showMessage = (message: UploadMessage) => setError(t(message.key, message.values));
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size
-    if (file.size > maxSizeMB * 1024 * 1024) {
-      setError(`File size must be less than ${maxSizeMB}MB`);
-      return;
-    }
-
-    setError(null);
-    setUploading(true);
-    setProgress(0);
-    setFileName(file.name);
-
+    // Clearing the input is the single exit path for EVERY branch below,
+    // including the early returns. A `change` event only fires when the value
+    // changes, so leaving a rejected file in the input means re-picking the same
+    // file after fixing nothing does nothing at all — the control looks dead.
     try {
-      // Get a signed Azure upload URL
-      const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>(
-        '/api/azure-upload-url',
-        { fileName: file.name, contentType: file.type, ...(assetType && { assetType }) }
-      );
-
-      if (!uploadData?.uploadUrl) throw new Error('Failed to get upload URL');
-
-      // Upload directly to Azure via XHR for progress tracking
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
-        };
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed with status ${xhr.status}`)));
-        xhr.onerror = () => reject(new Error('Upload failed'));
-        xhr.open('PUT', uploadData.uploadUrl);
-        xhr.setRequestHeader('Content-Type', uploadData.contentType);
-        xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
-        xhr.send(file);
-      });
-
-      setProgress(100);
-      if (accept === 'image') {
-        setPreview({ url: URL.createObjectURL(file), forValue: uploadData.blobPath });
+      // Refuse what the server's mint endpoint would refuse, but with a message
+      // that names the formats — the server's own answer is a bare
+      // "File type not allowed".
+      const typeError = checkUploadFileType(accept, file);
+      if (typeError) {
+        showMessage(typeError);
+        return;
       }
-      // Store the blob path; use it as both the display value and storage path
-      onChange(uploadData.blobPath, uploadData.blobPath);
-    } catch (err: any) {
-      setError(err.message || 'Upload failed');
-      onChange(null, null);
+
+      // Size is validated in TWO places, and the split is the point (#276/#278).
+      // Here we only reject what could never work: for a file that is about to be
+      // downscaled the bar is the decode ceiling, not the upload cap, because a
+      // 15 MB photo destined to become a 200 KB thumbnail must be shrunk rather
+      // than refused. The cap itself is applied further down, to the bytes that
+      // will actually be PUT.
+      const downscalable = willDownscale(accept, file.type);
+      const selectionError = checkSelectedFileSize(file.size, capMB, downscalable);
+      if (selectionError) {
+        showMessage(selectionError);
+        return;
+      }
+
+      setError(null);
+      setUploading(true);
+      setProgress(0);
+      setFileName(file.name);
+
+      try {
+        // Shrink oversized images before the PUT (#278). This runs first, while
+        // the spinner is already showing and before the short-lived SAS URL is
+        // minted, so a slow decode can't eat into that URL's validity window.
+        // downscaleImageFile never throws, never hangs, and returns the original
+        // file whenever downscaling is impossible, unprofitable or unsafe, so
+        // `upload` is always safe — and its name/MIME type always match the
+        // original, keeping the contentType handshake below unchanged.
+        const upload = maxEdge === null ? file : await downscaleImageFile(file, maxEdge);
+
+        // The cap, applied to what will ACTUALLY be uploaded — this is the check
+        // that mirrors the server's post-upload HEAD, so clearing it is what makes
+        // the eventual save succeed. It can still fire after a downscale: a format
+        // we don't re-encode (animated GIF, SVG), a browser without a canvas
+        // encoder, or a re-encode that came out no smaller all leave `upload ===
+        // file`. Bailing here costs the user nothing — no SAS URL has been minted
+        // and no bytes have been sent.
+        const payloadError = checkUploadPayloadSize(upload.size, capMB);
+        if (payloadError) {
+          showMessage(payloadError);
+          // Nothing was stored, so drop the name we optimistically adopted — with a
+          // value already present the tile would otherwise label the OLD blob with
+          // the REJECTED file's name.
+          setFileName(null);
+          return;
+        }
+
+        // Get a signed Azure upload URL
+        const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>(
+          '/api/azure-upload-url',
+          { fileName: file.name, contentType: file.type, ...(assetType && { assetType }) }
+        );
+
+        if (!uploadData?.uploadUrl) throw new Error('Failed to get upload URL');
+
+        // Upload directly to Azure via XHR for progress tracking
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
+          };
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed with status ${xhr.status}`)));
+          xhr.onerror = () => reject(new Error('Upload failed'));
+          xhr.open('PUT', uploadData.uploadUrl);
+          xhr.setRequestHeader('Content-Type', uploadData.contentType);
+          xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
+          xhr.send(upload);
+        });
+
+        setProgress(100);
+        if (accept === 'image') {
+          // Preview the bytes we actually stored, so what the user sees is what
+          // the blob holds (identical to `file` when no downscale happened).
+          setPreview({ url: URL.createObjectURL(upload), forValue: uploadData.blobPath });
+        }
+        // Store the blob path; use it as both the display value and storage path
+        onChange(uploadData.blobPath, uploadData.blobPath);
+      } catch (err) {
+        // The thrown text is diagnostic, not actionable, and is the one string
+        // no translation could reach — log it and show the translated summary.
+        console.error('Upload failed:', err);
+        setError(t('fileUpload.errorUploadFailed'));
+        // Deliberately NO `onChange(null, null)` here. Nothing was stored, so
+        // whatever value the parent already holds still names a live blob — and
+        // since #275 a persisted null is what DELETES that blob, so reporting a
+        // dropped connection as "the field is now empty" would destroy the very
+        // image the retry was meant to replace. `onChange(null, null)` therefore
+        // has exactly ONE meaning in this component: the user cleared the field
+        // (handleRemove). That is the distinction the save paths rely on.
+        //
+        // Drop the optimistically-adopted name for the same reason the
+        // payload-cap bail above does: with a value still present, the tile would
+        // otherwise label the OLD blob with the REJECTED file's name.
+        setFileName(null);
+      } finally {
+        setUploading(false);
+      }
     } finally {
-      setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
     }
   };
@@ -141,7 +228,7 @@ export function FileUpload({
       <input
         ref={inputRef}
         type="file"
-        accept={acceptTypes[accept]}
+        accept={UPLOAD_ACCEPT_ATTRIBUTE[accept]}
         onChange={handleFileChange}
         className="hidden"
         disabled={disabled || uploading}
@@ -153,7 +240,7 @@ export function FileUpload({
             <div className="relative aspect-video bg-muted">
               <img
                 src={preview && preview.forValue === value ? preview.url : value}
-                alt="Uploaded file"
+                alt={t('fileUpload.uploadedFile')}
                 className="w-full h-full object-cover"
               />
               {!disabled && (
@@ -172,8 +259,8 @@ export function FileUpload({
             <div className="flex items-center gap-3 p-4 bg-muted/50">
               {fileIcons[accept]}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{fileName || 'Uploaded file'}</p>
-                <p className="text-xs text-muted-foreground">Click to replace</p>
+                <p className="text-sm font-medium truncate">{fileName || t('fileUpload.uploadedFile')}</p>
+                <p className="text-xs text-muted-foreground">{t('fileUpload.clickToReplace')}</p>
               </div>
               {!disabled && (
                 <Button
@@ -202,18 +289,25 @@ export function FileUpload({
             <div className="space-y-3">
               <Loader2 className="h-8 w-8 mx-auto animate-spin text-primary" />
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Uploading {fileName}...</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('fileUpload.uploading', { name: fileName })}
+                </p>
                 <Progress value={progress} className="h-2 w-full max-w-xs mx-auto" />
               </div>
             </div>
           ) : (
             <>
               <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Click to upload {accept === 'image' ? 'an image' : accept === 'video' ? 'a video' : 'a document'}
-              </p>
+              <p className="text-sm text-muted-foreground">{t(ctaKeys[accept])}</p>
+              {/* States what the resize actually does — it caps DIMENSIONS for
+                  three formats. The old "larger images are resized
+                  automatically" promised more than the feature delivers: a
+                  small-but-heavy PNG under the edge cap is not resized at all
+                  and is then refused by the very cap printed beside it, and GIF
+                  and SVG are never resized in any case. */}
               <p className="text-xs text-muted-foreground mt-1">
-                Max size: {maxSizeMB}MB
+                {t('fileUpload.maxSize', { size: formatSizeMB(capMB) })}
+                {maxEdge !== null && ` • ${t('fileUpload.imageResizeHint', { maxEdge })}`}
               </p>
             </>
           )}
