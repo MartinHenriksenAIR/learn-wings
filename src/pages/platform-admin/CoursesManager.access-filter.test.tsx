@@ -7,7 +7,6 @@ import React from 'react';
 // Initialize i18n so t() resolves real (English) strings, matching production.
 import '@/i18n';
 
-// --- mock AppLayout (mirrors CoursesManager.test.tsx) ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ title, children }: { title?: string; children: React.ReactNode }) => (
     <div>
@@ -17,24 +16,20 @@ vi.mock('@/components/layout/AppLayout', () => ({
   ),
 }));
 
-// --- mock api-client ---
 const mockCallApi = vi.fn();
 vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
 }));
 
-// --- mock storage helpers ---
 vi.mock('@/lib/storage', () => ({
   getSignedLmsAssetUrl: vi.fn((url: string | null) => Promise.resolve(url)),
   extractLmsAssetPath: vi.fn((url: string | null) => url),
 }));
 
-// --- mock sonner toast ---
 vi.mock('@/components/ui/sonner', () => ({
   toast: (...args: unknown[]) => vi.fn()(...args),
 }));
 
-// --- stub heavy child components that import file-upload deps ---
 vi.mock('@/components/ui/file-upload', () => ({
   FileUpload: () => <div data-testid="file-upload" />,
 }));
@@ -65,17 +60,13 @@ describe('CoursesManager — Organization Access tab filter (#166)', () => {
   it('renders the org combobox but NO standalone search input on the Access tab', async () => {
     renderPage();
 
-    // Switch to the Organization Access tab.
     const accessTab = await screen.findByRole('tab', { name: /organization access/i });
     fireEvent.click(accessTab);
 
-    // The single-org combobox is the sole org-filtering control.
     await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument());
 
-    // The redundant standalone org search field (an <input>) must be gone.
-    // The combobox trigger is role="combobox" (a button), not a textbox, and the
-    // integrated CommandInput only renders when the popover is open — so with the
-    // popover closed there must be no textbox in the filter area at all.
+    // The combobox trigger is a button (not a textbox); the CommandInput only
+    // renders when the popover is open — so with it closed there must be no textbox.
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 });

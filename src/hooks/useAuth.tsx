@@ -42,7 +42,6 @@ const VIEW_MODE_KEY = 'viewMode';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { instance, accounts, inProgress } = useMsal();
-  // useAccount tracks the active account reactively
   const account = useAccount(accounts[0] ?? null);
 
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -83,8 +82,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // real failure apart from the still-loading window and surface a retry (#232).
   const [contextError, setContextError] = useState<ContextError>(null);
 
-  // isLoading is true while MSAL is processing a redirect or popup interaction,
-  // OR while the user context (profile/memberships) is still resolving.
   const isLoading = inProgress !== InteractionStatus.None || contextLoading;
 
   const user: AppUser | null = account
@@ -135,7 +132,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Fetch profile whenever account changes or MSAL finishes an interaction
   useEffect(() => {
     if (account && inProgress === InteractionStatus.None) {
       fetchUserContext();
@@ -151,7 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [account?.localAccountId, inProgress]);
 
-  // loginRedirect sends user to Microsoft login page; MSAL handles the redirect back
   const signIn = () => {
     instance.loginRedirect({ scopes: apiScopes });
   };

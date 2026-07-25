@@ -58,7 +58,6 @@ interface KanbanColumn {
   statuses: IdeaStatusExtended[];
 }
 
-// Column icon tints mirror the prototype palette (navy / amber / green / red).
 const KANBAN_COLUMNS: KanbanColumn[] = [
   { key: 'inbox', label: 'Inbox', icon: <Inbox className="h-[15px] w-[15px]" />, iconColor: 'text-primary', statuses: ['submitted', 'in_review'] },
   { key: 'backlog', label: 'Backlog', icon: <FileText className="h-[15px] w-[15px]" />, iconColor: 'text-warning', statuses: ['accepted'] },
@@ -67,7 +66,6 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   { key: 'rejected', label: 'Rejected', icon: <XCircle className="h-[15px] w-[15px]" />, iconColor: 'text-[#c43d3d]', statuses: ['rejected'] },
 ];
 
-// Map a kanban column key to the default status to assign when dropping
 const COLUMN_DROP_STATUS: Record<string, IdeaStatusExtended> = {
   inbox: 'submitted',
   backlog: 'accepted',
@@ -88,14 +86,12 @@ export default function OrgIdeasManagement() {
   const [draggedIdeaId, setDraggedIdeaId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
-  // Status update dialog
   const [selectedIdea, setSelectedIdea] = useState<EnhancedIdea | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState<IdeaStatusExtended>('submitted');
   const [adminNotes, setAdminNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
 
-  // Fetch ALL non-draft ideas
   const { data: allIdeas = [], isLoading } = useQuery({
     queryKey: queryKeys.ideasAdmin.list(currentOrg?.id, searchQuery, selectedBusinessArea),
     queryFn: () => fetchIdeas(currentOrg!.id, {
@@ -119,7 +115,6 @@ export default function OrgIdeasManagement() {
 
   const prioritizeIdeas = allIdeasUnfiltered.filter((i) => i.status !== 'draft');
 
-  // Status update mutation
   const statusMutation = useMutation({
     mutationFn: () =>
       updateIdeaStatus(selectedIdea!.id, {
@@ -157,7 +152,6 @@ export default function OrgIdeasManagement() {
       return;
     }
 
-    // If dropping into rejected, open dialog to collect reason
     if (columnKey === 'rejected') {
       setSelectedIdea(idea);
       setNewStatus('rejected');
@@ -174,7 +168,6 @@ export default function OrgIdeasManagement() {
         admin_notes: idea.admin_notes || undefined,
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.ideasAdmin.all });
-      // Routine inline status change: the card moving columns is the feedback (no toast).
     } catch {
       toast.error(t('ideaManagement.statusUpdateFailed'));
     } finally {
@@ -196,7 +189,6 @@ export default function OrgIdeasManagement() {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
-      {/* Header + business-area filter */}
       <div className="mb-5 flex flex-col items-start justify-between gap-4 md:flex-row">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -226,7 +218,6 @@ export default function OrgIdeasManagement() {
         )}
       </div>
 
-      {/* Search */}
       {activeTab === 'board' && (
         <div className="relative mb-5 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -239,7 +230,6 @@ export default function OrgIdeasManagement() {
         </div>
       )}
 
-      {/* Board / Prioritize tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'board' | 'prioritize')}>
         <TabsList className="mb-4">
           <TabsTrigger value="board">{t('ideaManagement.tabs.board')}</TabsTrigger>
@@ -277,7 +267,6 @@ export default function OrgIdeasManagement() {
                       isDragOver ? 'bg-[#e2e7f6]' : 'bg-[#eceef3]'
                     )}
                   >
-                    {/* Column header */}
                     <div className="flex items-center gap-2 px-1.5 pb-3 pt-1">
                       <span className={cn('flex', column.iconColor)}>{column.icon}</span>
                       <span className="text-[12.5px] font-extrabold tracking-[0.02em]">
@@ -288,7 +277,6 @@ export default function OrgIdeasManagement() {
                       </span>
                     </div>
 
-                    {/* Cards */}
                     <div className="flex flex-col gap-2.5">
                       {columnIdeas.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-[#d6d8e0] p-4 text-center text-xs text-muted-foreground">
@@ -378,7 +366,6 @@ export default function OrgIdeasManagement() {
         </TabsContent>
       </Tabs>
 
-      {/* Status update dialog */}
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <DialogContent>
           <DialogHeader>

@@ -30,7 +30,6 @@ export function useLearnerDashboard(
         progress: Record<string, { total: number; completed: number }>;
       }>('/api/learner-dashboard', { orgId });
 
-      // Resolve thumbnail signed URLs, keyed by course_id
       const thumbMap: Record<string, string> = {};
       await Promise.all(
         data.enrollments.map(async (e) => {

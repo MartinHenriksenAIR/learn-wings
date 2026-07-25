@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { routes } from '@/lib/routes';
 
-// --- mock AppLayout + PostForm as passthroughs (avoid pulling heavy child deps) ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -13,7 +12,6 @@ vi.mock('@/components/community/PostForm', () => ({
   PostForm: () => <div data-testid="post-form" />,
 }));
 
-// --- mock toast ---
 vi.mock('@/components/ui/sonner', () => ({ toast: vi.fn() }));
 
 // --- mock api-client (community-api pulls it in transitively) ---

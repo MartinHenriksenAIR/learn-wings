@@ -65,7 +65,6 @@ function renderSidebar(
   );
 }
 
-/** Group headings, in render order — one per visible NavSection. */
 function groupLabels(): string[] {
   return Array.from(document.querySelectorAll('[data-sidebar="group-label"]')).map(
     (el) => el.textContent ?? '',
@@ -113,7 +112,6 @@ describe('AppSidebar nav groups (#271)', () => {
       });
       renderSidebar();
 
-      // The learner and org-admin groups are hidden in platform-admin view.
       expect(groupLabels()).toEqual([en.nav.platformAdmin]);
       expect(navLink(routes.learner.dashboard)).toBeNull();
       expect(navLink(routes.orgAdmin.settings)).toBeNull();
@@ -262,7 +260,6 @@ describe('AppSidebar nav groups (#271)', () => {
       const courses = navLink(routes.learner.courses);
       expect(courses).not.toBeNull();
       expect(courses).toHaveAttribute('data-active', 'true');
-      // Icon only — the label span is dropped while collapsed.
       expect(courses?.textContent).toBe('');
       expect(screen.queryByText(en.nav.courses)).not.toBeInTheDocument();
     });

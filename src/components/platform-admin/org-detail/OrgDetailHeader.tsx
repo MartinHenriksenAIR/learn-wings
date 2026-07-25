@@ -11,10 +11,6 @@ interface OrgDetailHeaderProps {
   onDelete: () => void;
 }
 
-/**
- * Header row for the org-detail page: logo chip + name/slug/created date +
- * Edit / Delete trigger buttons.
- */
 export function OrgDetailHeader({ org, onEdit, onDelete }: OrgDetailHeaderProps) {
   const { t, i18n } = useTranslation();
   const { data: logoSrc } = useSignedBrandingUrl(org.logo_url);

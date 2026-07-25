@@ -3,33 +3,27 @@ import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
-// --- mock react-i18next (no i18n provider needed) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-// --- mock AppLayout as a simple passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- mock api-client so no network fires ---
 vi.mock('@/lib/api-client', () => ({
   callApi: vi.fn(),
 }));
 
-// --- mock sonner toast ---
 vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
 
-// --- useAuth mock factory ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-// --- usePlatformSettings mock factory ---
 const mockUsePlatformSettings = vi.fn();
 vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => mockUsePlatformSettings(),
@@ -89,15 +83,10 @@ describe('OrgSettings — three-way loading guard', () => {
 
     renderOrgSettings();
 
-    // Empty state text keys must be visible
     expect(screen.getByText('common.noOrgSelected')).toBeInTheDocument();
     expect(screen.getByText('orgSettings.noOrgDescription')).toBeInTheDocument();
-
-    // No editable controls
     expect(screen.queryAllByRole('switch')).toHaveLength(0);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
-
-    // No spinner
     expect(document.querySelector('.animate-spin')).toBeNull();
   });
 
@@ -107,14 +96,9 @@ describe('OrgSettings — three-way loading guard', () => {
 
     renderOrgSettings();
 
-    // Spinner must be present
     expect(document.querySelector('.animate-spin')).not.toBeNull();
-
-    // No empty state
     expect(screen.queryByText('common.noOrgSelected')).toBeNull();
     expect(screen.queryByText('orgSettings.noOrgDescription')).toBeNull();
-
-    // No form
     expect(screen.queryAllByRole('switch')).toHaveLength(0);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
@@ -139,17 +123,11 @@ describe('OrgSettings — three-way loading guard', () => {
 
     renderOrgSettings();
 
-    // No spinner
     expect(document.querySelector('.animate-spin')).toBeNull();
-
-    // No empty state
     expect(screen.queryByText('common.noOrgSelected')).toBeNull();
 
-    // Five feature switches present
     const switches = screen.queryAllByRole('switch');
     expect(switches).toHaveLength(5);
-
-    // Save button present (idle label key under the i18n passthrough mock)
     expect(
       screen.getByRole('button', { name: /orgSettings\.saveButton/i })
     ).toBeInTheDocument();
@@ -162,14 +140,12 @@ describe('OrgSettings — three-way loading guard', () => {
     });
     mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
 
-    // Save call hangs so the component stays in saving=true
     let resolveSave: (v: unknown) => void = () => {};
     vi.mocked(callApi).mockReturnValue(new Promise((res) => { resolveSave = res; }));
 
     const { rerender } = renderOrgSettings();
     fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
 
-    // The save-triggered refetch flips the shared isLoading while the save is still in flight
     mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: true });
     rerender(
       <MemoryRouter>
@@ -177,7 +153,6 @@ describe('OrgSettings — three-way loading guard', () => {
       </MemoryRouter>
     );
 
-    // Form must stay mounted — no full-page spinner swap mid-save
     expect(screen.queryAllByRole('switch')).toHaveLength(5);
     expect(screen.getByRole('button', { name: /orgSettings\.saveButton/i })).toBeInTheDocument();
 
@@ -205,14 +180,12 @@ describe('OrgSettings — three-way loading guard', () => {
       fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
     });
 
-    // Save persisted via the existing endpoint and refetched
     expect(callApi).toHaveBeenCalledWith('/api/org-settings-update', {
       orgId: 'org-1',
       features: expect.any(Object),
     });
     expect(refetch).toHaveBeenCalled();
 
-    // In-button morph: the button now shows the "Saved" done label (no success toast)
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /common\.saved/i })).toBeInTheDocument();
     });

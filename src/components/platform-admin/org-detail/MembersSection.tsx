@@ -17,10 +17,6 @@ interface MembersSectionProps {
   onReactivate: (membershipId: string) => void;
 }
 
-/**
- * Members section: header + invite/add-user triggers + the members table
- * (or the empty state when the org has no members yet).
- */
 export function MembersSection({
   members,
   updatingRoleId,
@@ -34,7 +30,6 @@ export function MembersSection({
 
   return (
     <>
-      {/* Members section header + actions */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[17px] font-extrabold">{t('orgDetail.members')}</h2>
         <div className="flex gap-2">
@@ -49,7 +44,6 @@ export function MembersSection({
         </div>
       </div>
 
-      {/* Members list */}
       {members.length === 0 ? (
         <EmptyState
           icon={<Users className="h-6 w-6" />}

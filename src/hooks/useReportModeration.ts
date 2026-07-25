@@ -43,7 +43,6 @@ export function useReportModeration(
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  // Update report status — moderation decisions keep their toasts (toast policy).
   const updateReportMutation = useMutation({
     mutationFn: async ({
       reportId,
@@ -66,7 +65,6 @@ export function useReportModeration(
     },
   });
 
-  // Hide/show content — moderation decisions keep their toasts (toast policy).
   const toggleContentVisibility = useMutation({
     mutationFn: async ({
       type,
@@ -92,7 +90,6 @@ export function useReportModeration(
     },
   });
 
-  // Lock/unlock post comments — moderation decisions keep their toasts (toast policy).
   const togglePostLock = useMutation({
     mutationFn: async ({ postId, lock }: { postId: string; lock: boolean }) => {
       await togglePostLocked(postId, lock);

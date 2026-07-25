@@ -30,7 +30,6 @@ interface MembersTableProps {
   onReactivate: (membershipId: string) => void;
 }
 
-/** The members table: header row + per-member rows with role/status pills and actions. */
 export function MembersTable({
   members,
   updatingRoleId,
@@ -42,7 +41,6 @@ export function MembersTable({
 
   return (
     <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
-      {/* Header row */}
       <div className="grid grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.5fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
         <span>{t('orgDetail.colName')}</span>
         <span>{t('orgDetail.colRole')}</span>
@@ -60,7 +58,6 @@ export function MembersTable({
               member.status === 'disabled' && 'opacity-60',
             )}
           >
-            {/* Name: avatar + name */}
             <span className="flex min-w-0 items-center gap-[11px]">
               <BrandingAvatar
                 avatarPath={member.profile?.avatar_url}
@@ -71,7 +68,6 @@ export function MembersTable({
               />
               <span className="truncate text-[13px] font-bold">{member.profile?.full_name}</span>
             </span>
-            {/* Role pill */}
             <span>
               <span
                 className={cn(
@@ -82,7 +78,6 @@ export function MembersTable({
                 {isAdmin ? t('orgDetail.admin') : t('orgDetail.learner')}
               </span>
             </span>
-            {/* Status pill */}
             <span>
               <span
                 className={cn(
@@ -97,11 +92,9 @@ export function MembersTable({
                 {member.status}
               </span>
             </span>
-            {/* Added */}
             <span className="text-[12.5px] text-muted-foreground">
               {formatDate(new Date(member.created_at), 'P', i18n.language)}
             </span>
-            {/* Actions */}
             <span className="text-right">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

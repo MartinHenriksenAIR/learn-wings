@@ -111,7 +111,6 @@ export default function LearnerDashboard() {
 
   const nextUp = inProgressCourses[0];
 
-  // ----- Hero variants: in-progress / all caught up / first-time user -----
   const heroProgress = nextUp ? progressData[nextUp.course_id] : undefined;
   const heroDone = heroProgress?.completed ?? 0;
   const heroTotal = heroProgress?.total ?? 0;
@@ -152,7 +151,6 @@ export default function LearnerDashboard() {
 
   return (
     <AppLayout>
-      {/* Welcome header */}
       <div className="mb-6">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {firstName ? t('dashboard.welcomeBack', { name: firstName }) : t('dashboard.welcome')}
@@ -182,7 +180,6 @@ export default function LearnerDashboard() {
         </div>
       )}
 
-      {/* Stats Grid */}
       <div className="mb-7 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label={t('dashboard.coursesEnrolled')}
@@ -210,7 +207,6 @@ export default function LearnerDashboard() {
         />
       </div>
 
-      {/* Hero card */}
       <div
         data-testid="dashboard-hero"
         className="gradient-hero relative mb-7 flex items-center gap-7 overflow-hidden rounded-[20px] px-[30px] py-7 text-white"
@@ -257,7 +253,6 @@ export default function LearnerDashboard() {
         />
       </div>
 
-      {/* Continue Learning */}
       <div className="mb-8">
         <div className="mb-3.5 flex items-center justify-between">
           <h2 className="font-display text-[17px] font-bold">{t('dashboard.continueLearning')}</h2>
@@ -335,7 +330,6 @@ export default function LearnerDashboard() {
         )}
       </div>
 
-      {/* Completed Courses */}
       {completedCourses.length > 0 && (
         <div className="mb-8">
           <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('dashboard.completedCourses')}</h2>
@@ -360,7 +354,6 @@ export default function LearnerDashboard() {
         </div>
       )}
 
-      {/* Certificates */}
       {features.certificates_enabled && (
         <div id="certificates">
           <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('certificates.title')}</h2>

@@ -6,7 +6,6 @@ import en from '@/i18n/locales/en.json';
 import da from '@/i18n/locales/da.json';
 import '@/i18n';
 
-// --- mock api-client (upload-URL handshake) ---
 const mockCallApi = vi.fn();
 vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
@@ -14,7 +13,6 @@ vi.mock('@/lib/api-client', () => ({
 
 import { FileUpload } from './file-upload';
 
-/** Resolve a locale string the way the component's `t()` call does. */
 function line(template: string, values: Record<string, string | number> = {}) {
   return Object.entries(values).reduce(
     (text, [name, value]) => text.replace(`{{${name}}}`, String(value)),

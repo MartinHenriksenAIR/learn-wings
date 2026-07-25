@@ -4,18 +4,15 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock react-i18next (no i18n provider needed) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { resolvedLanguage: 'da' } }),
   Trans: ({ i18nKey }: { i18nKey: string }) => <>{i18nKey}</>,
 }));
 
-// --- mock AppLayout as a simple passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- mock api-client and storage so no network fires ---
 vi.mock('@/lib/api-client', () => ({
   callApi: vi.fn(),
 }));
@@ -24,12 +21,10 @@ vi.mock('@/lib/storage', () => ({
   getSignedLmsAssetUrl: vi.fn().mockResolvedValue(null),
 }));
 
-// --- mock sonner toast ---
 vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
 
-// --- useAuth mock factory ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
@@ -90,7 +85,6 @@ describe('LearnerCourses — profile-gated loading guard', () => {
 
     renderCourses();
 
-    // Spinner must NOT be present (loading resolved because profile is non-null)
     expect(document.querySelector('.animate-spin')).toBeNull();
 
     // No-org branch text
@@ -102,9 +96,7 @@ describe('LearnerCourses — profile-gated loading guard', () => {
 
     renderCourses();
 
-    // Profile is null and currentOrg is null — guard must keep spinner
     expect(document.querySelector('.animate-spin')).not.toBeNull();
-    // ...and must NOT fire the org-scoped fetch while the context is unresolved
     expect(callApi).not.toHaveBeenCalled();
   });
 
@@ -113,7 +105,6 @@ describe('LearnerCourses — profile-gated loading guard', () => {
 
     const qc = makeClient();
 
-    // Initial render: context unresolved → spinner, no fetch
     mockUseAuth.mockReturnValue({ ...baseAuthState, user: baseAuthState.user, profile: null, currentOrg: null });
     const { rerender } = render(
       <QueryClientProvider client={qc}>
@@ -125,7 +116,6 @@ describe('LearnerCourses — profile-gated loading guard', () => {
     expect(document.querySelector('.animate-spin')).not.toBeNull();
     expect(callApi).not.toHaveBeenCalled();
 
-    // Context resolves with an org → fetch fires and the spinner clears
     const currentOrg = { id: 'org-1', name: 'Org One' };
     mockUseAuth.mockReturnValue({ ...baseAuthState, profile: baseAuthState.profile, currentOrg });
     rerender(
@@ -283,11 +273,8 @@ describe('LearnerCourses — recommended section', () => {
 
     expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
     expect(screen.getByText('assessment.recommendations.forYou')).toBeInTheDocument();
-    // Chip appears on the recommended card
     expect(screen.getByTestId('recommended-chip')).toBeInTheDocument();
-    // The "All courses" heading also renders
     expect(screen.getByText('assessment.recommendations.allCourses')).toBeInTheDocument();
-    // Both courses still appear in the full catalog below
     expect(screen.getAllByText('Basic AI Course').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Advanced AI Course')).toBeInTheDocument();
   });
@@ -301,7 +288,6 @@ describe('LearnerCourses — recommended section', () => {
 
     renderCourses();
 
-    // Wait for courses to load
     await screen.findByText('Basic AI Course');
     expect(screen.queryByTestId('recommended-section')).toBeNull();
     expect(screen.queryByText('assessment.recommendations.forYou')).toBeNull();
@@ -333,18 +319,10 @@ describe('LearnerCourses — recommended section', () => {
 
     renderCourses();
 
-    // Wait for the recommended section to appear
     expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
-
-    // The recommended-chip must be present
     expect(screen.getByTestId('recommended-chip')).toBeInTheDocument();
-
-    // The enrolled status badge must appear on the recommended card (co-existing with the chip).
-    // The basic course also appears in the full catalog grid below, so there are two badges in total.
     const enrolledBadges = screen.getAllByTestId('status-badge-enrolled');
     expect(enrolledBadges.length).toBeGreaterThanOrEqual(1);
-
-    // The badge on the recommended card must sit at left-3 (pushed left to make room for the chip).
     expect(enrolledBadges[0]).toHaveClass('left-3');
   });
 });

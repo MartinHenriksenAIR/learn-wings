@@ -4,22 +4,18 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock react-i18next (no i18n provider needed) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-// --- mock AppLayout as a simple passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- mock api-client so no network fires ---
 vi.mock('@/lib/api-client', () => ({
   callApi: vi.fn(),
 }));
 
-// --- mock sonner toast ---
 vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
@@ -79,9 +75,6 @@ describe('PlatformSettings', () => {
     vi.clearAllMocks();
   });
 
-  // ----------------------------------------------------------------
-  // Round-trip: unmount + remount returns server value, not local edit
-  // ----------------------------------------------------------------
   it('round-trip: re-mount shows server value, not a locally-edited value or blank (#40 acceptance)', async () => {
     mockCallApi.mockResolvedValue(successResponse);
 
@@ -94,15 +87,12 @@ describe('PlatformSettings', () => {
       expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toBeInTheDocument();
     });
 
-    // Local edit
     const input = screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' });
     fireEvent.change(input, { target: { value: 'Edited Name' } });
     expect(input).toHaveValue('Edited Name');
 
-    // Unmount — simulates view switch away
     unmount();
 
-    // Re-mount fresh instance; fetch mock still returns server values
     renderPage();
 
     await waitFor(() => {
@@ -110,113 +100,83 @@ describe('PlatformSettings', () => {
     });
 
     const freshInput = screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' });
-    // Must show server value, not 'Edited Name' and not blank
     expect(freshInput).toHaveValue('Server Name');
     expect(freshInput).not.toHaveValue('Edited Name');
     expect(freshInput).not.toHaveValue('');
   });
 
-  // ----------------------------------------------------------------
-  // Failed read → no editable form
-  // ----------------------------------------------------------------
   it('failed read: shows error EmptyState, no textboxes, no save buttons, no write call', async () => {
     mockCallApi.mockRejectedValue(new Error('Network error'));
 
     renderPage();
 
-    // Wait for loading to resolve
     await waitFor(() => {
       expect(screen.getByText('platformSettings.loadFailedTitle')).toBeInTheDocument();
     });
 
-    // Error EmptyState keys present
     expect(screen.getByText('platformSettings.loadFailedTitle')).toBeInTheDocument();
     expect(screen.getByText('platformSettings.loadFailedDescription')).toBeInTheDocument();
-
-    // No editable textboxes
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);
 
-    // No save buttons (only the retry button should exist). Save labels are
-    // i18n keys (platformSettings.*.save); the retry button is the only one.
+    // Save labels are i18n keys (platformSettings.*.save); only the retry button should exist.
     const buttons = screen.getAllByRole('button');
     for (const btn of buttons) {
       expect(btn).not.toHaveAccessibleName(/\.save$/i);
     }
 
-    // callApi was never called with the update endpoint
     const updateCalls = mockCallApi.mock.calls.filter(
       (args: unknown[]) => args[0] === '/api/platform-settings-update'
     );
     expect(updateCalls).toHaveLength(0);
   });
 
-  // ----------------------------------------------------------------
-  // Retry path: fetch fails once then succeeds
-  // ----------------------------------------------------------------
   it('retry path: clicking retry after failure fetches again and renders form', async () => {
-    // First call rejects, second call resolves
     mockCallApi
       .mockRejectedValueOnce(new Error('Transient error'))
       .mockResolvedValueOnce(successResponse);
 
     renderPage();
 
-    // Wait for error state
     await waitFor(() => {
       expect(screen.getByText('platformSettings.loadFailedTitle')).toBeInTheDocument();
     });
 
-    // Click the retry button
     const retryBtn = screen.getByRole('button', { name: 'platformSettings.retry' });
     fireEvent.click(retryBtn);
 
-    // Wait for form to appear
     await waitFor(() => {
       expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toBeInTheDocument();
     });
 
-    // Form shows the server value
     expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toHaveValue('Server Name');
   });
 
-  // ----------------------------------------------------------------
-  // Failed retry: fetch fails twice → error EmptyState persists, no form, no write
-  // ----------------------------------------------------------------
   it('failed retry: clicking retry after two failures keeps error EmptyState and gate closed', async () => {
-    // Both the initial call and the retry call reject
     mockCallApi
       .mockRejectedValueOnce(new Error('Network error'))
       .mockRejectedValueOnce(new Error('Network error'));
 
     renderPage();
 
-    // Wait for the error EmptyState after first failure
     await waitFor(() => {
       expect(screen.getByText('platformSettings.loadFailedTitle')).toBeInTheDocument();
     });
 
-    // Click the retry button
     const retryBtn = screen.getByRole('button', { name: 'platformSettings.retry' });
     fireEvent.click(retryBtn);
 
-    // After the retry also fails, error EmptyState should still be shown
     await waitFor(() => {
       expect(screen.getByText('platformSettings.loadFailedTitle')).toBeInTheDocument();
     });
 
-    // Gate is still closed — no editable textboxes
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);
 
-    // The update endpoint was never called
     const updateCalls = mockCallApi.mock.calls.filter(
       (args: unknown[]) => args[0] === '/api/platform-settings-update'
     );
     expect(updateCalls).toHaveLength(0);
   });
 
-  // ----------------------------------------------------------------
-  // Save guarded: successful load → Save Branding calls the update endpoint
-  // ----------------------------------------------------------------
   it('save guarded: after successful load, Save Branding calls platform-settings-update with branding key', async () => {
     mockCallApi.mockResolvedValue(successResponse);
 
@@ -226,9 +186,7 @@ describe('PlatformSettings', () => {
       expect(screen.getByRole('button', { name: 'platformSettings.branding.save' })).toBeInTheDocument();
     });
 
-    // Clear previous calls (the initial fetch)
     mockCallApi.mockClear();
-    // Re-set so the save call resolves
     mockCallApi.mockResolvedValue({});
 
     fireEvent.click(screen.getByRole('button', { name: 'platformSettings.branding.save' }));
@@ -243,10 +201,6 @@ describe('PlatformSettings', () => {
     });
   });
 
-  // ----------------------------------------------------------------
-  // Per-panel SaveButton morph: a successful save flashes the button into
-  // its "Saved" done state (green), replacing the old success toast.
-  // ----------------------------------------------------------------
   it('per-panel morph: successful branding save morphs the button into the Saved state', async () => {
     mockCallApi.mockResolvedValue(successResponse);
 
@@ -261,13 +215,10 @@ describe('PlatformSettings', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'platformSettings.branding.save' }));
 
-    // After the save resolves the button shows the morphed "Saved" label.
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'common.saved' })).toBeInTheDocument();
     });
-    // The morphed button carries the success styling.
     expect(screen.getByRole('button', { name: 'common.saved' }).className).toMatch(/bg-success/);
-    // The idle "Save Branding" label is gone while morphed.
     expect(screen.queryByRole('button', { name: 'platformSettings.branding.save' })).not.toBeInTheDocument();
   });
 });

@@ -50,7 +50,6 @@ export function ReportCard({
   return (
     <Card>
       <CardContent className="px-[22px] py-[18px]">
-        {/* Meta row */}
         <div className="mb-2.5 flex flex-wrap items-center gap-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[#fdecec] text-[#c43d3d]">
             {isPost ? <FileText className="h-[15px] w-[15px]" /> : <MessageSquare className="h-[15px] w-[15px]" />}
@@ -78,7 +77,6 @@ export function ReportCard({
           </span>
         </div>
 
-        {/* Reason */}
         <p className="mb-1 text-[13.5px] font-bold">{t('moderation.reasonLabel')}</p>
         <p className="mb-3.5 text-[13px] italic leading-[1.5] text-muted-foreground">
           {report.reason}

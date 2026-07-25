@@ -34,7 +34,6 @@ interface ResourceCardProps {
   onTogglePin?: (pinned: boolean) => void;
 }
 
-// Prototype `RTYPES`: icon + tinted chip/pill colors per resource type.
 const typeStyles: Record<string, { icon: typeof Link; classes: string }> = {
   guide: { icon: BookOpen, classes: 'bg-accent text-accent-foreground' },
   template: { icon: FileCode, classes: 'bg-[#e7f6ef] text-success' },
@@ -65,7 +64,6 @@ export function ResourceCard({
         resource.is_pinned ? 'border-[#cfd6ef]' : 'border-border'
       )}
     >
-      {/* Type chip + pills + admin actions */}
       <div className="mb-2.5 flex items-center gap-2">
         <span className={cn('grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[10px]', typeClasses)}>
           <TypeIcon aria-hidden="true" className="h-[15px] w-[15px]" />
@@ -124,7 +122,6 @@ export function ResourceCard({
         )}
       </div>
 
-      {/* Title + description */}
       <h3 className="mb-1.5 line-clamp-2 text-[14.5px] font-bold leading-[1.35]">{resource.title}</h3>
       {resource.description && (
         <p className="mb-3 line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
@@ -134,7 +131,6 @@ export function ResourceCard({
 
       <TagList tags={resource.tags || []} maxVisible={3} className="mb-3" />
 
-      {/* Footer: open link + author · time */}
       <div className="flex items-center gap-2">
         {resource.url && (
           <a

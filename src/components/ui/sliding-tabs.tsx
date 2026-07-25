@@ -43,7 +43,6 @@ export function SlidingTabs({ tabs, active, onChange, className }: SlidingTabsPr
     setIndicator((prev) => (prev && prev.left === left && prev.width === width ? prev : { left, width }));
   }, [active]);
 
-  // Re-measure whenever the active tab or the tab set changes.
   React.useLayoutEffect(() => {
     measure();
   }, [measure, tabs]);
@@ -57,8 +56,6 @@ export function SlidingTabs({ tabs, active, onChange, className }: SlidingTabsPr
     return () => observer.disconnect();
   }, [measure]);
 
-  // ARIA tabs keyboard pattern (selection follows focus): arrows wrap through
-  // enabled tabs, Home/End jump to the first/last enabled tab.
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     const { key } = event;
     if (key !== "ArrowLeft" && key !== "ArrowRight" && key !== "Home" && key !== "End") return;

@@ -126,15 +126,12 @@ export default function LearnerCourses() {
     : [];
 
   const filteredCourses = courses.filter(course => {
-    // Search filter
     const matchesSearch = search === '' ||
       course.title.toLowerCase().includes(search.toLowerCase()) ||
       course.description?.toLowerCase().includes(search.toLowerCase());
 
-    // Level filter
     const matchesLevel = levelFilter === 'all' || course.level === levelFilter;
 
-    // Status filter
     const enrollment = getEnrollmentStatus(course.id);
     let matchesStatus = true;
     if (statusFilter === 'enrolled') {
@@ -297,13 +294,11 @@ export default function LearnerCourses() {
 
   return (
     <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
-      {/* Page header */}
       <div className="mb-[22px]">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('courses.title')}</h1>
         <p className="text-sm text-muted-foreground">{t('courses.subtitle', { orgName: currentOrg.name })}</p>
       </div>
 
-      {/* Search and filters */}
       <div className="mb-[22px] flex flex-wrap items-center gap-2.5">
         <div className="relative min-w-[200px] flex-1">
           <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
@@ -382,7 +377,6 @@ export default function LearnerCourses() {
         </div>
       )}
 
-      {/* Unenroll Confirmation Dialog */}
       <AlertDialog
         open={unenrollDialog.open}
         onOpenChange={(open) => !open && setUnenrollDialog({ open: false, course: null, enrollment: null })}

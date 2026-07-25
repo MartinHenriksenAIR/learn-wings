@@ -20,7 +20,6 @@ export function UpcomingEvents({
 }: UpcomingEventsProps) {
   const { t, i18n } = useTranslation();
 
-  // Filter and sort upcoming events
   const upcomingEvents = events
     .filter((e) => e.event_date && (isFuture(new Date(e.event_date)) || isToday(new Date(e.event_date))))
     .sort((a, b) => new Date(a.event_date!).getTime() - new Date(b.event_date!).getTime())

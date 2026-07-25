@@ -90,7 +90,6 @@ export function PostForm({
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
   const isEventCategory = selectedCategory?.slug === 'events';
 
-  // Filter categories based on permissions
   const availableCategories = categories.filter(
     (c) => !c.is_restricted || canPostRestricted
   );
@@ -220,7 +219,6 @@ export function PostForm({
               )}
             />
 
-            {/* Event-specific fields */}
             {isEventCategory && (
               <>
                 <FormField
@@ -282,7 +280,6 @@ export function PostForm({
               </>
             )}
 
-            {/* Tags */}
             <FormField
               control={form.control}
               name="tags"

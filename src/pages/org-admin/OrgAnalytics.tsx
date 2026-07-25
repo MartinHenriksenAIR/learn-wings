@@ -52,23 +52,20 @@ export default function OrgAnalytics() {
   const [logoDialogOpen, setLogoDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Sync tab with URL
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     setSearchParams({ tab: value });
   };
 
-  // Fetch organizations for global view filter (shared cache, #87)
   const { data: orgsData, error: orgsError } = useOrganizations({
     enabled: isGlobalView && isPlatformAdmin,
   });
-  // endpoint returns created_at DESC (accepted 3a parity break); the filter dropdown was name-ordered
+  // endpoint returns created_at DESC but the filter dropdown was name-ordered
   const organizations = useMemo(
     () => [...(orgsData ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
     [orgsData]
   );
   useEffect(() => {
-    // parity: the old client ignored fetch errors (filter just shows "All Organizations")
     if (orgsError) {
       console.error('OrgAnalytics: failed to load organizations', orgsError);
     }
@@ -84,7 +81,6 @@ export default function OrgAnalytics() {
   // 'all' aggregate; only disabled in org view before currentOrg resolves.
   const analyticsQuery = useOrgAnalyticsData(effectiveOrgId ?? undefined);
 
-  // Derive stats from query data — byte-for-byte reduction from the old fetchData
   const stats = useMemo(() => {
     const data = analyticsQuery.data;
     if (!data) return ZERO_STATS;
@@ -143,7 +139,6 @@ export default function OrgAnalytics() {
     });
   }, [analyticsQuery.data]);
 
-  // Generate compliance report
   const handleGenerateReport = async () => {
     // The compliance report is per-org — not offered for the 'all' aggregate.
     if (!effectiveOrgId || effectiveOrgId === 'all') {
@@ -153,7 +148,7 @@ export default function OrgAnalytics() {
 
     setGeneratingReport(true);
     try {
-      // #71: report follows the reader's live UI language (ADR-0016 category 3)
+      // #71: report follows the reader's live UI language
       const response = await callApiRaw('/api/generate-compliance-report', { orgId: effectiveOrgId, language: i18n.resolvedLanguage });
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -179,8 +174,6 @@ export default function OrgAnalytics() {
 
     setUploading(true);
     try {
-      // storagePath is the container-relative Azure blob path; store it raw and
-      // sign it for display at view time (useSignedBrandingUrl).
       await callApi('/api/organization-update', {
         orgId: currentOrg.id,
         updates: { logo_url: storagePath },
@@ -197,7 +190,6 @@ export default function OrgAnalytics() {
     }
   };
 
-  // Redirect if analytics are disabled
   if (!settingsLoading && !features.analytics_enabled) {
     return <Navigate to={routes.learner.dashboard} replace />;
   }
@@ -215,7 +207,6 @@ export default function OrgAnalytics() {
     );
   }
 
-  // For org-specific view, require currentOrg
   if (!isGlobalView && !currentOrg) {
     return (
       <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
@@ -246,8 +237,7 @@ export default function OrgAnalytics() {
       : t('analytics.subtitleGlobalOne')
     : t('analytics.subtitleOrg', { orgName: currentOrg?.name ?? t('nav.organization') });
 
-  // SlidingTabs definitions — the Members tab is org-only (no all-orgs membership
-  // view yet), matching the previous Tabs render exactly.
+  // Members tab is org-only; no all-orgs membership view.
   const tabs = [
     { key: 'overview', label: t('analytics.tabs.overview'), icon: <BarChart3 className="h-4 w-4" aria-hidden="true" /> },
     ...(!isGlobalView
@@ -259,7 +249,6 @@ export default function OrgAnalytics() {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
-      {/* Header: title + subtitle, with the global org filter aligned right */}
       <div className="mb-5 flex flex-col items-start justify-between gap-4 md:flex-row">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">{pageTitle}</h1>
@@ -307,7 +296,7 @@ export default function OrgAnalytics() {
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                 </DialogTrigger>
-                {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
+                {/* Explicit opt-out silences Radix's missing-Description a11y warning */}
                 <DialogContent aria-describedby={undefined}>
                   <DialogHeader>
                     <DialogTitle>{t('orgDetail.updateLogoTitle')}</DialogTitle>
@@ -318,9 +307,6 @@ export default function OrgAnalytics() {
                         <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted">
                           <Building2 className="h-8 w-8 text-muted-foreground" />
                         </div>
-                        {/* Size and accepted formats are stated by FileUpload
-                            itself, from the caps it actually enforces — a second
-                            statement here could only drift out of true. */}
                         <div className="space-y-1">
                           <p className="text-sm font-medium">{t('orgDetail.logoRecommended')}</p>
                           <p className="text-xs text-muted-foreground">{t('orgDetail.logoSize')}</p>

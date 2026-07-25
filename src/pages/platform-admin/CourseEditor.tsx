@@ -76,7 +76,6 @@ export default function CourseEditor() {
   // In-button "Save changes" success morph (toast policy: course save is routine).
   const { flashed, flash } = useFlash();
 
-  // Course edit state
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editLevel, setEditLevel] = useState<CourseLevel>('basic');
@@ -97,12 +96,10 @@ export default function CourseEditor() {
    */
   const [editThumbnailPath, setEditThumbnailPath] = useState<string | null>(null);
 
-  // Module dialog state
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [moduleTitle, setModuleTitle] = useState('');
 
-  // Lesson dialog state
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [lessonModuleId, setLessonModuleId] = useState<string | null>(null);
@@ -114,10 +111,8 @@ export default function CourseEditor() {
   const [lessonAzureBlobPath, setLessonAzureBlobPath] = useState<string | null>(null);
   const [lessonDocPath, setLessonDocPath] = useState<string | null>(null);
 
-  // Delete course state
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // Quiz editor state
   const [quizEditorOpen, setQuizEditorOpen] = useState(false);
   const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
   const [quizLessonTitle, setQuizLessonTitle] = useState('');
@@ -256,7 +251,6 @@ export default function CourseEditor() {
     );
   };
 
-  // Module handlers
   const openAddModule = () => {
     setEditingModule(null);
     setModuleTitle('');
@@ -311,7 +305,6 @@ export default function CourseEditor() {
 
   const handleDeleteModule = (modId: string) => deleteModuleMutation.mutate(modId);
 
-  // Lesson handlers
   const openAddLesson = (moduleId: string) => {
     setEditingLesson(null);
     setLessonModuleId(moduleId);
@@ -527,7 +520,6 @@ export default function CourseEditor() {
       breadcrumbs={[{ label: t('coursesManager.tabCourses'), href: routes.platformAdmin.courses }, { label: course.title }]}
     >
       <div className="mx-auto max-w-[860px]">
-        {/* Back link */}
         <button
           type="button"
           onClick={() => navigate(routes.platformAdmin.courses)}
@@ -537,7 +529,6 @@ export default function CourseEditor() {
           {t('courseEditor.backToCourses')}
         </button>
 
-        {/* Course Details Card */}
         <div className="mb-[18px] rounded-2xl border border-border bg-card p-6">
           <div className="mb-[18px] flex items-center justify-between gap-3">
             <h2 className="text-base font-extrabold">{t('courseEditor.courseDetails')}</h2>
@@ -608,8 +599,6 @@ export default function CourseEditor() {
             </div>
           </div>
 
-          {/* Language editions (#213) — link/unlink translated editions so
-              analytics count a course and its siblings as one. */}
           <div className="mb-[18px] space-y-2 border-t border-border pt-[18px]">
             <Label>{t('courseEditor.editions.title')}</Label>
             <p className="text-sm text-muted-foreground">{t('courseEditor.editions.description')}</p>
@@ -674,7 +663,6 @@ export default function CourseEditor() {
               onClick={handleSaveCourse}
               disabled={saving}
             />
-            {/* Publish toggle (switch, not button) — wired to the publish mutation. */}
             <span className="inline-flex items-center gap-2.5 rounded-[10px] border border-[#eceef3] px-3.5 py-2">
               <span className="text-[13px] font-bold text-[#4a4f60]">{t('courseEditor.publishToggleLabel')}</span>
               <Switch
@@ -695,7 +683,6 @@ export default function CourseEditor() {
           </div>
         </div>
 
-        {/* Modules & Lessons */}
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-extrabold">{t('courseEditor.modulesAndLessons')}</h2>
           <Button
@@ -714,7 +701,6 @@ export default function CourseEditor() {
           <div className="flex flex-col gap-3">
             {modules.map((mod, modIndex) => (
               <div key={mod.id} className="overflow-hidden rounded-2xl border border-border bg-card">
-                {/* Module header */}
                 <div className="flex items-center gap-2.5 bg-[#f7f8fa] px-[18px] py-3">
                   <span className="flex text-[#c3c7d3]" aria-hidden="true">
                     <GripVertical className="h-[15px] w-[15px]" />
@@ -749,7 +735,6 @@ export default function CourseEditor() {
                   </button>
                 </div>
 
-                {/* Lessons */}
                 {mod.lessons && mod.lessons.length > 0 ? (
                   mod.lessons.map((lesson) => (
                     <div
@@ -817,7 +802,6 @@ export default function CourseEditor() {
         )}
       </div>
 
-      {/* Delete Course Confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -846,7 +830,6 @@ export default function CourseEditor() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Module Dialog */}
       <Dialog open={moduleDialogOpen} onOpenChange={setModuleDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -871,7 +854,6 @@ export default function CourseEditor() {
         </DialogContent>
       </Dialog>
 
-      {/* Lesson Dialog */}
       <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>

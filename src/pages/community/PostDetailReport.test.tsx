@@ -4,7 +4,6 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock AppLayout as passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -20,7 +19,6 @@ vi.mock('@/components/community/CommentThread', () => ({
   CommentThread: () => <div data-testid="comment-thread" />,
 }));
 
-// --- mock react-i18next (t returns the key) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -28,7 +26,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// --- mock toast (assertable spy) ---
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({ toast: (...args: unknown[]) => mockToast(...args) }));
 
@@ -52,7 +49,6 @@ vi.mock('@/lib/api-client', () => ({
   callApiRaw: vi.fn(),
 }));
 
-// --- mock the community api ---
 const mockFetchPost = vi.fn();
 const mockFetchComments = vi.fn();
 const mockCreateReport = vi.fn();
@@ -71,7 +67,6 @@ vi.mock('@/lib/community-api', () => ({
   toggleCommentHidden: vi.fn(),
 }));
 
-// --- configurable hook mocks ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
@@ -134,7 +129,6 @@ function renderPost() {
   );
 }
 
-// Open the report dialog, pick a reason, and submit.
 async function submitReport() {
   fireEvent.click(await screen.findByRole('button', { name: /report/i }));
   await screen.findByRole('dialog');
@@ -169,7 +163,6 @@ describe('PostDetail — duplicate-report 409 handling (#21)', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
-    // No misleading failure toast for the duplicate case
     expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
   });
 

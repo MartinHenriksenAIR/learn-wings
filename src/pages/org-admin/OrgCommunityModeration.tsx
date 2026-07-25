@@ -28,7 +28,6 @@ export default function OrgCommunityModeration() {
   // Report whose content is shown in the "View content" dialog (#160).
   const [viewReport, setViewReport] = useState<ReportWithDetails | null>(null);
 
-  // Fetch reports for org
   const { data: reports = [], isLoading } = useQuery({
     queryKey: queryKeys.orgReports.list(currentOrg?.id, activeTab),
     queryFn: async () => {
@@ -90,7 +89,6 @@ export default function OrgCommunityModeration() {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
-      {/* Header */}
       <div className="mb-5">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('moderation.title')}
@@ -100,7 +98,6 @@ export default function OrgCommunityModeration() {
         </p>
       </div>
 
-      {/* Tabs */}
       <SlidingTabs
         tabs={tabs}
         active={activeTab}
@@ -108,7 +105,6 @@ export default function OrgCommunityModeration() {
         className="mb-5"
       />
 
-      {/* Reports list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -140,14 +136,12 @@ export default function OrgCommunityModeration() {
         </div>
       )}
 
-      {/* Reported content viewer (#160) */}
       <ReportedContentDialog
         open={!!viewReport}
         onOpenChange={(o) => { if (!o) setViewReport(null); }}
         report={viewReport}
       />
 
-      {/* Review dialog */}
       <ReviewReportDialog
         open={reviewDialogOpen}
         onOpenChange={setReviewDialogOpen}

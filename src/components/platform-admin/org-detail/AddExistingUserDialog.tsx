@@ -39,10 +39,6 @@ interface AddExistingUserDialogProps {
   pending: boolean;
 }
 
-/**
- * Add-existing-user dialog. Owns its own selectedUserId + role state, reset
- * each time the dialog opens.
- */
 export function AddExistingUserDialog({
   open,
   onOpenChange,
@@ -58,7 +54,6 @@ export function AddExistingUserDialog({
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<OrgRole>('learner');
 
-  // Reset selections each time the dialog opens.
   useEffect(() => {
     if (open) {
       setSelectedUserId('');

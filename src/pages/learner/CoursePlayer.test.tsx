@@ -8,7 +8,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
-// AppLayout → passthrough (skips breadcrumbs/i18n)
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -26,7 +25,6 @@ vi.mock('@/lib/api-client', () => ({
 }));
 vi.mock('@/lib/storage', () => ({ getSignedAssetUrl: vi.fn() }));
 
-// toast → assertable spy
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({ toast: (...args: unknown[]) => mockToast(...args) }));
 
@@ -73,7 +71,6 @@ function makeProgress(completedIds: string[]) {
   return map;
 }
 
-// Configure the player payload + feature flag for a single test.
 function setup(opts: {
   reviewsEnabled: boolean;
   completed: string[];
@@ -200,7 +197,6 @@ describe('CoursePlayer — restyled sidebar and footer', () => {
     renderPlayer();
     await screen.findByText('Intro to AI');
 
-    // Complete l-1 in-session (auto-advances to l-2)
     fireEvent.click(screen.getByRole('button', { name: /markAsComplete/i }));
 
     // The just-completed l-1 sidebar dot animates...
@@ -318,7 +314,6 @@ describe('CoursePlayer — completion semantics (#18)', () => {
       });
     });
 
-    // The failure is surfaced and the congratulations dialog is withheld
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
         title: 'coursePlayer.completionSaveFailed',

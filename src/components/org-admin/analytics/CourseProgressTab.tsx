@@ -86,7 +86,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
   // resolved language is threaded through (and lives in the query key).
   const courseProgressQuery = useOrgCourseProgress(orgId, i18n.resolvedLanguage);
 
-  // Derive courseStats with avgProgress — byte-for-byte from the old fetchCourseStats
   const courseStats = useMemo((): CourseStats[] => {
     const data = courseProgressQuery.data;
     if (!data) return [];
@@ -100,7 +99,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
     }));
   }, [courseProgressQuery.data]);
 
-  // Fetch enrollees for the selected course — enabled only while a course is selected
   const enrolleesQuery = useOrgCourseEnrollees(orgId, selectedCourse?.id);
 
   // Derive enrollees (snake_case → camelCase). In all-orgs mode each row is a
@@ -123,7 +121,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
   // lazily fetched when the dialog opens (mirrors the enrollees drill-in).
   const breakdownQuery = useOrgCourseOrgBreakdown(isAllOrgs ? selectedCourse?.id : undefined);
 
-  // Derive breakdown rows (snake_case → camelCase) + completion rate at the call site.
   const orgBreakdown = useMemo((): OrgBreakdownRow[] => {
     const data = breakdownQuery.data;
     if (!data) return [];
@@ -136,7 +133,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
     }));
   }, [breakdownQuery.data]);
 
-  // Filter courses
   const filteredCourses = useMemo(() => {
     return courseStats.filter((course) => {
       if (searchQuery && !course.title.toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -149,7 +145,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
     });
   }, [courseStats, searchQuery, levelFilter]);
 
-  // Group by level
   const groupedByLevel = useMemo(() => {
     const groups: Record<string, CourseStats[]> = {
       basic: [],
@@ -200,7 +195,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-3">
@@ -243,7 +237,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
         </CardContent>
       </Card>
 
-      {/* Results */}
       {filteredCourses.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
@@ -283,7 +276,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
         </div>
       )}
 
-      {/* Course Detail Dialog */}
       <Dialog open={!!selectedCourse} onOpenChange={(open) => !open && setSelectedCourse(null)}>
         {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
