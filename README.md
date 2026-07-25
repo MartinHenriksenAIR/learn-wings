@@ -62,9 +62,9 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | `functions/` | ~100 Azure Functions (one folder each) + `shared/` (~25 modules: `endpoint`, `auth`, `db`, `profile`, `cors`, `errors`, …) + `index.ts` barrel |
 | `migration/azure/` | The canonical Postgres schema (`01-schema.sql`), seed data (`02-seed.sql`), and apply guide |
 | `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history) |
-| `docs/adr/` | The 15 architecture decision records |
+| `docs/adr/` | The architecture decision records |
 | `.claude/` | Agent collaboration system — `rules/` (hard-won conventions), `skills/` (`pickup`/`handoff`), `collab.json` (branch topology), and the `guard-trunk` hook |
-| `supabase/` | **Dead** — the original Supabase Deno functions + migrations, kept only as authz-provenance reference. Deleted in the final migration slice (#13). |
+| `supabase/` | **Dead** — only the original Supabase SQL migrations, kept as provenance for the RLS policies the hand-written authz checks replaced. The Deno functions and the Supabase integration itself are long gone. |
 
 ## Local development
 

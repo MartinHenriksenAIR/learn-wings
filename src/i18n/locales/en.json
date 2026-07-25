@@ -248,7 +248,9 @@
     "noVideo": "No video uploaded",
     "loadingDocument": "Loading document...",
     "documentLoadFailed": "Unable to load document. Please try again.",
-    "noDocument": "No document uploaded"
+    "noDocument": "No document uploaded",
+    "loadingQuiz": "Loading quiz...",
+    "quizLoadFailed": "Unable to load the quiz"
   },
   "community": {
     "title": "Community",
@@ -969,12 +971,6 @@
     "create": "Create",
     "courseCreated": "Course created!",
     "courseDeleted": "Course deleted",
-    "deleteCourseTitle": "Delete Course?",
-    "deleteIntro": "This will permanently delete \"{{title}}\" and all associated data including:",
-    "deleteItemModules": "All modules and lessons",
-    "deleteItemEnrollments": "All learner enrollments and progress",
-    "deleteItemQuizzes": "All quiz attempts and reviews",
-    "deleteIrreversible": "This action cannot be undone.",
     "selectOrganization": "Select organization",
     "allOrganizations": "All Organizations",
     "searchOrganizationPrompt": "Search organization...",
@@ -1020,12 +1016,6 @@
     "publishAria": "Publish course",
     "unpublishAria": "Unpublish course",
     "deleteCourse": "Delete Course",
-    "deleteCourseTitle": "Delete Course?",
-    "deleteIntro": "This will permanently delete \"{{title}}\" and all associated data including:",
-    "deleteItemModules": "All modules and lessons",
-    "deleteItemEnrollments": "All learner enrollments and progress",
-    "deleteItemQuizzes": "All quiz attempts and reviews",
-    "deleteIrreversible": "This action cannot be undone.",
     "courseDeleted": "Course deleted",
     "modulesAndLessons": "Modules & lessons",
     "addModule": "Add module",
@@ -1077,6 +1067,15 @@
     "courseNotFound": "Course not found",
     "failedToLoad": "Failed to load course",
     "retry": "Retry"
+  },
+  "courseDelete": {
+    "title": "Delete Course?",
+    "intro": "This will permanently delete \"{{title}}\" and all associated data including:",
+    "itemModules": "All modules and lessons",
+    "itemEnrollments": "All learner enrollments and progress",
+    "itemQuizzes": "All quiz attempts and reviews",
+    "irreversible": "This action cannot be undone.",
+    "confirm": "Delete course"
   },
   "assessment": {
     "skip": "Skip for now",
