@@ -218,6 +218,8 @@
   "coursePlayer": {
     "completionSaveFailed": "Couldn't record course completion",
     "completionSaveFailedDescription": "Your lesson progress is saved, but the course completion wasn't recorded. Please try again later.",
+    "progressSaveFailed": "Couldn't save your progress",
+    "progressSaveFailedDescription": "This lesson wasn't marked as complete. Please check your connection and try again.",
     "moduleHeader": "Module {{number}}: {{title}}",
     "durationMinutes": "{{minutes}} min",
     "lessonTypes": {

@@ -218,7 +218,13 @@ export default function CoursePlayer() {
       // Upsert progress
       try {
         await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
-      } catch {
+      } catch (error) {
+        console.error('Error saving lesson progress:', error);
+        toast({
+          title: t('coursePlayer.progressSaveFailed'),
+          description: t('coursePlayer.progressSaveFailedDescription'),
+          variant: 'destructive',
+        });
         return;
       }
 

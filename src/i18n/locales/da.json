@@ -218,6 +218,8 @@
   "coursePlayer": {
     "completionSaveFailed": "Kursusgennemførelsen kunne ikke registreres",
     "completionSaveFailedDescription": "Din lektionsfremgang er gemt, men kursusgennemførelsen blev ikke registreret. Prøv igen senere.",
+    "progressSaveFailed": "Din fremgang kunne ikke gemmes",
+    "progressSaveFailedDescription": "Lektionen blev ikke markeret som gennemført. Tjek din forbindelse, og prøv igen.",
     "moduleHeader": "Modul {{number}}: {{title}}",
     "durationMinutes": "{{minutes}} min",
     "lessonTypes": {
