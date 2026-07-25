@@ -115,6 +115,8 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       );
     }
 
+    // #176: adopt pending org invites BEFORE loading memberships, so a freshly
+    // adopted org shows up in this same response (no client refresh needed).
     await adoptPendingInvites(profile!.id, user.email, context);
 
     const memberships = await query(

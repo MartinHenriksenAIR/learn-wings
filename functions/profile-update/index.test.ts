@@ -124,7 +124,7 @@ describe('profile-update', () => {
     const body = JSON.parse(res.body as string);
     expect(body.profile).toBeDefined();
 
-      const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('full_name');
     expect(sql).toContain('first_name');
     expect(sql).toContain('last_name');

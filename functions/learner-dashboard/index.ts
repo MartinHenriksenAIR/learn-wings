@@ -28,7 +28,7 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
     return reply(200, { enrollments: [], progress: {} });
   }
 
-  // Step 3: Batched count queries — no N+1
+  // Batched count queries — no N+1
   const courseIds = enrollments.map((e) => (e as { course_id: string }).course_id);
 
   const totalsRows = await query<{ course_id: string; total: number }>(
