@@ -4,10 +4,9 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock react-i18next (no i18n provider needed) ---
-// `t` echoes the key (so assertions pin i18n keys); `Trans` renders its key
-// text — enough for the controlled-dialog test, which never inspects the
-// interpolated member name inside descriptions.
+// `t` echoes the key so assertions pin i18n keys; `Trans` renders its key —
+// enough for the controlled-dialog test, which never inspects the interpolated
+// member name inside descriptions.
 vi.mock('react-i18next', async () => {
   const ReactActual = await import('react');
   return {
@@ -17,19 +16,16 @@ vi.mock('react-i18next', async () => {
   };
 });
 
-// --- mock AppLayout as a simple passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', null, children),
 }));
 
-// --- mock sonner toast ---
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
-// --- mock api-client so no network fires ---
 vi.mock('@/lib/api-client', () => {
   class MockApiError extends Error {
     status: number;
@@ -44,7 +40,6 @@ vi.mock('@/lib/api-client', () => {
   return { callApi: vi.fn(), ApiError: MockApiError };
 });
 
-// --- keep storage-backed children out of this focused test ---
 vi.mock('@/components/ui/file-upload', () => ({
   FileUpload: () => null,
 }));
@@ -52,7 +47,7 @@ vi.mock('@/lib/sendInvitationEmail', () => ({
   sendInvitationEmail: vi.fn(async () => ({ success: true })),
 }));
 
-// --- render the Radix dropdown menu inline (jsdom can't drive the real one) ---
+// Render the Radix dropdown menu inline — jsdom can't drive the real portal.
 vi.mock('@/components/ui/dropdown-menu', async () => {
   const ReactActual = await import('react');
   const h = ReactActual.createElement;
@@ -143,14 +138,11 @@ describe('OrganizationDetail — AlertDialog controlled from first render (#81)'
   it('opening the promote-to-admin confirm emits no uncontrolled-to-controlled warning', async () => {
     renderPage();
 
-    // Page loads with the member row (inline-mocked dropdown renders items directly)
     const promoteItem = await screen.findByRole('button', { name: 'orgDetail.promoteToAdmin' });
     fireEvent.click(promoteItem);
 
-    // The confirm dialog opened (titles/labels are i18n keys under the test's `t` echo)
     expect(await screen.findByText('orgDetail.promoteTitle')).toBeInTheDocument();
 
-    // No controlled/uncontrolled warning fired
     const controlledWarnings = [...consoleErrorSpy.mock.calls, ...consoleWarnSpy.mock.calls].filter(
       (call) =>
         call.some(
@@ -160,7 +152,6 @@ describe('OrganizationDetail — AlertDialog controlled from first render (#81)'
     );
     expect(controlledWarnings).toEqual([]);
 
-    // Dialog still dismisses correctly
     fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }));
     expect(screen.queryByText('orgDetail.promoteTitle')).toBeNull();
   });
@@ -192,7 +183,6 @@ describe('OrganizationDetail — load-failure retry (#53)', () => {
 
     renderPage();
 
-    // The load-failed state surfaces a retry button (toast policy: load errors keep toast).
     const retry = await screen.findByRole('button', { name: /orgDetail\.tryAgain/i });
     expect(retry).toBeInTheDocument();
     expect(mockToast).toHaveBeenCalledWith(
@@ -201,7 +191,6 @@ describe('OrganizationDetail — load-failure retry (#53)', () => {
 
     fireEvent.click(retry);
 
-    // After the retry succeeds, the org header renders.
     expect(await screen.findByRole('heading', { name: 'Acme Corp' })).toBeInTheDocument();
   });
 
@@ -219,7 +208,6 @@ describe('OrganizationDetail — load-failure retry (#53)', () => {
 
     renderPage();
 
-    // Not-found description shows; no Try again button (404 is honest, not retryable).
     expect(await screen.findByText('orgDetail.notFoundDescription')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /orgDetail\.tryAgain/i })).toBeNull();
   });

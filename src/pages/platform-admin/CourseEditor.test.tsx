@@ -7,35 +7,29 @@ import React from 'react';
 // Initialize i18n so t() resolves real (English) strings, matching production.
 import '@/i18n';
 
-// --- mock AppLayout as passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- mock api-client ---
 const mockCallApi = vi.fn();
 vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
 }));
 
-// --- mock storage helpers ---
 vi.mock('@/lib/storage', () => ({
   getSignedLmsAssetUrl: vi.fn((url: string | null) => Promise.resolve(url)),
   extractLmsAssetPath: vi.fn((url: string | null) => url),
 }));
 
-// --- mock sonner toast (this file uses @/components/ui/sonner) ---
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
-// --- mock usePlatformSettings ---
 vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => ({ features: { quizzes_enabled: false }, isLoading: false }),
 }));
 
-// --- stub heavy child components ---
 // The stub reproduces the only part of FileUpload's contract the editor depends
 // on: it shows `value`, and it reports (null, null) ONLY for a deliberate clear
 // (a failed upload leaves the parent's value alone — see file-upload.test.tsx).
@@ -207,7 +201,6 @@ describe('CourseEditor — mutations patch the structure cache (#48)', () => {
 
     renderPage();
 
-    // Structure loaded — module rows are always expanded (no accordion).
     await screen.findByText(/Module 1: Old Name/);
 
     // Open the rename dialog and rename
@@ -216,7 +209,6 @@ describe('CourseEditor — mutations patch the structure cache (#48)', () => {
     fireEvent.change(titleInput, { target: { value: 'New Name' } });
     fireEvent.click(screen.getByRole('button', { name: /^update$/i }));
 
-    // RETURNING'd row lands in the UI via the cache patch
     await waitFor(() =>
       expect(screen.getByText(/Module 1: New Name/)).toBeInTheDocument()
     );
@@ -244,7 +236,6 @@ describe('CourseEditor — publish toggle', () => {
 
     renderPage();
 
-    // Course loaded; the publish switch reflects the draft state.
     const toggle = await screen.findByRole('switch');
     expect(toggle).not.toBeChecked();
 
@@ -258,7 +249,6 @@ describe('CourseEditor — publish toggle', () => {
       })
     );
 
-    // The RETURNING'd row lands via the cache patch — the switch flips on.
     await waitFor(() => expect(screen.getByRole('switch')).toBeChecked());
 
     // Publish toggle is routine: the switch state IS the feedback, no toast.
@@ -299,12 +289,9 @@ describe('CourseEditor — Language editions (#213)', () => {
 
     renderPage('c-da');
 
-    // The picker renders in its "candidates available" state (courses-admin loaded).
     expect(await screen.findByText(/Choose a course to link/)).toBeInTheDocument();
     expect(screen.getByText('Language editions')).toBeInTheDocument();
-    // No group yet → the "not linked" empty state, not a linked list.
     expect(screen.getByText(/Not linked to any other language edition/)).toBeInTheDocument();
-    // An eligible candidate exists → the empty-candidates message must NOT show.
     expect(screen.queryByText(/No eligible courses to link/)).toBeNull();
   });
 
@@ -327,12 +314,9 @@ describe('CourseEditor — Language editions (#213)', () => {
 
     renderPage('c-da');
 
-    // The sibling is listed by title (visible without opening any Select).
     expect(await screen.findByText('English Edition')).toBeInTheDocument();
-    // The same-language standalone is filtered out → empty-candidates message shows.
     expect(screen.getByText(/No eligible courses to link/)).toBeInTheDocument();
 
-    // Unlink targets the sibling's own id ({ action:'unlink', courseId: <sibling> }).
     fireEvent.click(screen.getByRole('button', { name: /unlink/i }));
     await waitFor(() =>
       expect(mockCallApi).toHaveBeenCalledWith('/api/course-translation-link', {
@@ -388,8 +372,7 @@ describe('CourseEditor — a failed thumbnail signing must not clear the column'
     await waitFor(() =>
       expect(mockCallApi).toHaveBeenCalledWith('/api/course-update', expect.anything()),
     );
-    // The payload course-update would act on: an unchanged path is a no-op there,
-    // a null is a deleteBlob.
+    // An unchanged path is a no-op; a null would have triggered deleteBlob.
     expect(courseUpdatePayload().thumbnailUrl).toBe(STORED_PATH);
   });
 
@@ -407,7 +390,6 @@ describe('CourseEditor — a failed thumbnail signing must not clear the column'
   it('still clears the column when the admin actually removes the thumbnail', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByDisplayValue('Test Course')).toBeInTheDocument());
-    // Signing succeeded, so the picker shows the signed URL (identity mock).
     expect(screen.getByTestId('file-upload-value')).toHaveTextContent(STORED_PATH);
 
     fireEvent.click(screen.getByRole('button', { name: /remove thumbnail/i }));

@@ -91,7 +91,6 @@ export function FileUpload({
     if (preview && preview.forValue !== value) setPreview(null);
   }, [value, preview]);
 
-  /** Show a message from the upload-limits helpers in the user's language. */
   const showMessage = (message: UploadMessage) => setError(t(message.key, message.values));
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,7 +156,6 @@ export function FileUpload({
           return;
         }
 
-        // Get a signed Azure upload URL
         const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>(
           '/api/azure-upload-url',
           { fileName: file.name, contentType: file.type, ...(assetType && { assetType }) }
@@ -165,7 +163,6 @@ export function FileUpload({
 
         if (!uploadData?.uploadUrl) throw new Error('Failed to get upload URL');
 
-        // Upload directly to Azure via XHR for progress tracking
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.upload.onprogress = (event) => {
@@ -185,7 +182,6 @@ export function FileUpload({
           // the blob holds (identical to `file` when no downscale happened).
           setPreview({ url: URL.createObjectURL(upload), forValue: uploadData.blobPath });
         }
-        // Store the blob path; use it as both the display value and storage path
         onChange(uploadData.blobPath, uploadData.blobPath);
       } catch (err) {
         // The thrown text is diagnostic, not actionable, and is the one string

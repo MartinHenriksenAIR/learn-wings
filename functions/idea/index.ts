@@ -38,7 +38,6 @@ export default endpoint('idea', async ({ req, profile, reply }) => {
   // Not found → null (parity with Supabase .single() PGRST116)
   if (!idea) return reply(200, { idea: null });
 
-  // Org access: platform admin OR active member of the idea's org
   const canAccessOrg = profile.is_platform_admin || await isActiveMember(profile.id, idea.org_id);
   if (!canAccessOrg) return reply(200, { idea: null });
 

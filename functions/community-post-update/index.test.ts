@@ -95,7 +95,6 @@ describe('community-post-update', () => {
     );
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'event_registration_url must be a valid http(s) URL' });
-    // Rejected before the post SELECT.
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 

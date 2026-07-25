@@ -18,8 +18,6 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
     return reply(400, { error: 'resourceId is required' });
   }
 
-  // Shape check + whitelist walk + SET-clause build (shared #252). Per-field
-  // domain validation below stays local to this endpoint.
   const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS);
   if (!built.ok) {
     return reply(400, { error: built.error });
@@ -49,7 +47,6 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
         return reply(400, { error: 'title must be a non-empty string' });
       }
     } else if (key === 'url') {
-      // url — string or null (nullable in schema)
       if (v !== null && typeof v !== 'string') {
         return reply(400, { error: 'url must be a string or null' });
       }
@@ -60,7 +57,6 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
         return reply(400, { error: urlError });
       }
     } else {
-      // description — string or null (nullable in schema)
       if (v !== null && typeof v !== 'string') {
         return reply(400, { error: `${key} must be a string or null` });
       }
@@ -73,7 +69,6 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
   const resource = await loadResourceForWrite(resourceId, profile);
   if (!resource) return reply(404, { error: 'Resource not found' });
 
-  // Dynamic UPDATE over the whitelisted keys + return shape with embedded profile (CTE).
   const { setClauses, params } = built;
   params.push(resourceId);
   const idIndex = params.length;

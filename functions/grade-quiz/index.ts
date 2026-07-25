@@ -4,7 +4,6 @@ import { endpoint } from '../shared/endpoint';
 export default endpoint('grade-quiz', async ({ req, profile, reply }) => {
   const { quiz_id, answers } = await req.json() as { quiz_id: string; answers: Record<string, string> };
 
-  // Access check — short-circuit for platform admins; otherwise check org membership
   if (!profile.is_platform_admin) {
     const access = await queryOne<{ has_access: boolean }>(
       `SELECT (

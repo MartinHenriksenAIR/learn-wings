@@ -80,7 +80,6 @@ export default function IdeaLibrary() {
     [isAdmin, t]
   );
 
-  // Status filters per tab
   const tabStatusFilters: Record<string, IdeaStatusExtended[]> = {
     all: [],
     drafts: ['draft'],
@@ -89,7 +88,6 @@ export default function IdeaLibrary() {
     rejected: ['rejected'],
   };
 
-  // Fetch ideas - for drafts tab, filter by current user (primary data)
   const { data: ideas = [], isLoading, isError: ideasError, refetch: refetchIdeas } = useQuery({
     queryKey: queryKeys.ideas.list(currentOrg?.id, safeTab, searchQuery, selectedBusinessArea, selectedTags, profile?.id),
     queryFn: () => fetchIdeas(currentOrg!.id, {
@@ -116,7 +114,6 @@ export default function IdeaLibrary() {
     logLabel: 'IdeaLibrary: failed to load org tags',
   });
 
-  // Delete idea mutation
   const deleteMutation = useMutation({
     mutationFn: deleteIdea,
     onSuccess: () => {
@@ -146,7 +143,6 @@ export default function IdeaLibrary() {
 
   return (
     <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary') }]}>
-      {/* Back to community */}
       <Button
         variant="ghost"
         onClick={() => navigate(`${routes.community.feed}?scope=org`)}
@@ -156,7 +152,6 @@ export default function IdeaLibrary() {
         {t('community.backToCommunity')}
       </Button>
 
-      {/* Header */}
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -175,10 +170,7 @@ export default function IdeaLibrary() {
         </Button>
       </div>
 
-      {/* Tabs */}
       <SlidingTabs tabs={ideaTabs} active={safeTab} onChange={setActiveTab} className="mb-[18px]" />
-
-      {/* Filters */}
       <div className="mb-5 flex flex-col gap-2.5 md:flex-row">
         <div className="relative flex-1">
           <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
@@ -228,7 +220,6 @@ export default function IdeaLibrary() {
         </Select>
       </div>
 
-      {/* Active tag filters */}
       {selectedTags.length > 0 && (
         <div className="mb-5 -mt-2 flex flex-wrap items-center gap-2">
           {selectedTags.map((tag) => (
@@ -245,7 +236,6 @@ export default function IdeaLibrary() {
         </div>
       )}
 
-      {/* Ideas grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

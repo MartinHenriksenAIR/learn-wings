@@ -57,14 +57,12 @@ export default function IdeaDetail() {
   const [adminNotes, setAdminNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
 
-  // Fetch idea
   const { data: idea, isLoading: ideaLoading } = useQuery({
     queryKey: queryKeys.idea.detail(ideaId),
     queryFn: () => fetchIdea(ideaId!),
     enabled: !!ideaId,
   });
 
-  // Fetch comments
   const { data: comments = [] } = useQuery({
     queryKey: queryKeys.ideaComments.list(ideaId),
     queryFn: () => fetchIdeaComments(ideaId!),
@@ -82,7 +80,6 @@ export default function IdeaDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idea?.id]);
 
-  // Comment mutation
   const commentMutation = useMutation({
     mutationFn: (content: string) => createIdeaComment(ideaId!, content),
     onSuccess: () => {
@@ -192,7 +189,6 @@ export default function IdeaDetail() {
   return (
     <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: t('community.idea') }]}>
       <div className="max-w-[760px]">
-        {/* Back */}
         <Button
           variant="ghost"
           onClick={() => navigate(-1)}
@@ -202,7 +198,6 @@ export default function IdeaDetail() {
           {t('common.back')}
         </Button>
 
-        {/* Idea header card */}
         <div className="mb-4 rounded-2xl border border-border bg-card px-7 py-[26px]">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <IdeaStatusBadge status={idea.status} />
@@ -256,7 +251,6 @@ export default function IdeaDetail() {
           </div>
         </div>
 
-        {/* Rejection notice */}
         {idea.status === 'rejected' && idea.rejection_reason && (
           <div className="mb-4 rounded-[14px] border border-[#f3ccd0] bg-[#fdf1f1] px-5 py-4">
             <p className="mb-1 text-xs font-extrabold uppercase tracking-[0.05em] text-destructive">
@@ -266,7 +260,6 @@ export default function IdeaDetail() {
           </div>
         )}
 
-        {/* Admin notes (visible only to admins) */}
         {effectiveIsOrgAdmin && idea.admin_notes && (
           <div className="mb-4 rounded-[14px] border border-[#efddb2] bg-[#fbf2dd] px-5 py-4">
             <p className="mb-1 text-xs font-extrabold uppercase tracking-[0.05em] text-[#8a5e10]">
@@ -276,9 +269,7 @@ export default function IdeaDetail() {
           </div>
         )}
 
-        {/* Idea content sections */}
         <div className="space-y-4">
-          {/* Current Process */}
           {idea.current_process && (
             <Card className="rounded-2xl">
               <CardHeader>
@@ -290,7 +281,6 @@ export default function IdeaDetail() {
             </Card>
           )}
 
-          {/* Pain Points */}
           {idea.pain_points && (
             <Card className="rounded-2xl">
               <CardHeader>
@@ -302,7 +292,6 @@ export default function IdeaDetail() {
             </Card>
           )}
 
-          {/* Affected Roles & Frequency */}
           {(idea.affected_roles || idea.frequency_volume) && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {idea.affected_roles && (
@@ -328,7 +317,6 @@ export default function IdeaDetail() {
             </div>
           )}
 
-          {/* Proposed Improvement */}
           {idea.proposed_improvement && (
             <Card className="rounded-2xl">
               <CardHeader>
@@ -340,7 +328,6 @@ export default function IdeaDetail() {
             </Card>
           )}
 
-          {/* Desired Process */}
           {idea.desired_process && (
             <Card className="rounded-2xl">
               <CardHeader>
@@ -352,7 +339,6 @@ export default function IdeaDetail() {
             </Card>
           )}
 
-          {/* Success Metrics */}
           {idea.success_metrics && (
             <Card className="rounded-2xl">
               <CardHeader>
@@ -366,7 +352,6 @@ export default function IdeaDetail() {
             </Card>
           )}
 
-          {/* Technical Details */}
           {(idea.data_inputs || idea.systems_involved || idea.constraints_risks) && (
             <Card className="rounded-2xl">
               <CardHeader>
@@ -450,14 +435,12 @@ export default function IdeaDetail() {
           </div>
         )}
 
-        {/* Comments section */}
         <div className="mt-8 space-y-4">
           <h2 className="flex items-center gap-2 text-[17px] font-bold">
             <MessageSquare aria-hidden="true" className="h-[18px] w-[18px]" />
             {t('community.discussion', { count: comments.length })}
           </h2>
 
-          {/* Comment input */}
           <div className="rounded-2xl border border-border bg-card px-5 py-4">
             <div className="flex gap-3">
               <BrandingAvatar
@@ -492,7 +475,6 @@ export default function IdeaDetail() {
             </div>
           </div>
 
-          {/* Comments list */}
           {comments.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-8 text-center text-muted-foreground">
               <MessageSquare aria-hidden="true" className="mx-auto mb-2 h-8 w-8 opacity-50" />

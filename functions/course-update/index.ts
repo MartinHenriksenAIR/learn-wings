@@ -28,19 +28,16 @@ export default adminEndpoint('course-update', async ({ req, reply }) => {
 
   const { courseId, updates } = body;
 
-  // Validate courseId
   if (!courseId || typeof courseId !== 'string') {
     return reply(400, { error: 'courseId is required' });
   }
 
-  // Validate updates: must be a non-null object with at least one whitelisted key
   if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
     return reply(400, { error: 'No valid fields to update' });
   }
 
   const updatesObj = updates as Record<string, unknown>;
 
-  // Validate individual fields and build SET clause
   const setClauses: string[] = [];
   const params: unknown[] = [];
 
@@ -79,7 +76,6 @@ export default adminEndpoint('course-update', async ({ req, reply }) => {
     setClauses.push(`${column} = $${params.length}`);
   }
 
-  // Must have at least one field to update
   if (setClauses.length === 0) {
     return reply(400, { error: 'No valid fields to update' });
   }

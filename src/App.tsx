@@ -8,7 +8,6 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { routes } from "@/lib/routes";
 
-// Pages
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -43,20 +42,17 @@ const queryClient = new QueryClient();
 function AppRoutes() {
   return (
     <Routes>
-      {/* Public routes */}
       <Route path={routes.auth.login} element={<Login />} />
       <Route path={routes.auth.signup} element={<Signup />} />
       <Route path={routes.auth.forgotPassword} element={<ForgotPassword />} />
       <Route path={routes.auth.resetPassword} element={<ResetPassword />} />
 
-      {/* Protected learner routes - not accessible by platform admins */}
       <Route path={routes.learner.dashboard} element={<ProtectedRoute learnerOnly><LearnerDashboard /></ProtectedRoute>} />
       <Route path={routes.learner.courses} element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
       <Route path={routes.learner.assessment} element={<ProtectedRoute learnerOnly><Assessment /></ProtectedRoute>} />
       <Route path={routes.learner.coursePlayerPattern} element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
       <Route path={routes.learner.certificates} element={<Navigate to={routes.learner.dashboard} replace />} />
 
-      {/* Community routes */}
       <Route path={routes.community.feed} element={<ProtectedRoute><CommunityFeed /></ProtectedRoute>} />
       <Route path={routes.community.postEditPattern} element={<ProtectedRoute><PostEdit /></ProtectedRoute>} />
       <Route path={routes.community.postDetailPattern} element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
@@ -66,13 +62,11 @@ function AppRoutes() {
       <Route path={routes.community.ideaDetailPattern} element={<ProtectedRoute><IdeaDetail /></ProtectedRoute>} />
       <Route path={routes.community.resources} element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
       
-      {/* Protected org admin routes */}
       <Route path={routes.orgAdmin.root} element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
       <Route path={routes.orgAdmin.settings} element={<ProtectedRoute requireOrgAdmin><OrgSettings /></ProtectedRoute>} />
       <Route path={routes.orgAdmin.ideas} element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />
       <Route path={routes.orgAdmin.moderation} element={<ProtectedRoute requireOrgAdmin><OrgCommunityModeration /></ProtectedRoute>} />
 
-      {/* Protected platform admin routes */}
       <Route path={routes.platformAdmin.organizations} element={<ProtectedRoute requirePlatformAdmin><OrganizationsManager /></ProtectedRoute>} />
       <Route path={routes.platformAdmin.organizationDetailPattern} element={<ProtectedRoute requirePlatformAdmin><OrganizationDetail /></ProtectedRoute>} />
       <Route path={routes.platformAdmin.courses} element={<ProtectedRoute requirePlatformAdmin><CoursesManager /></ProtectedRoute>} />
@@ -82,11 +76,9 @@ function AppRoutes() {
       <Route path={routes.platformAdmin.moderation} element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
       <Route path={routes.settings} element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-      {/* Redirects */}
       <Route path={routes.root} element={<Navigate to={routes.auth.login} replace />} />
       <Route path={routes.appRoot} element={<Navigate to={routes.learner.dashboard} replace />} />
       
-      {/* 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

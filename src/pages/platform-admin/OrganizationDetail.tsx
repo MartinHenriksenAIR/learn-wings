@@ -66,7 +66,6 @@ export default function OrganizationDetail() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  // ── Data layer (shared TanStack Query hooks) ───────────────────────────────
   const orgQuery = useOrgDetail(orgId);
   const membershipsQuery = useOrgMemberships(orgId);
   const invitationsQuery = useInvitations(orgId, 'platform');
@@ -77,8 +76,6 @@ export default function OrganizationDetail() {
   const members = useMemo<Member[]>(() => membershipsQuery.data ?? [], [membershipsQuery.data]);
   const invitations = useMemo(() => invitationsQuery.data ?? [], [invitationsQuery.data]);
 
-  // availableUsers = all profiles not present in ANY membership (active or not),
-  // preserving the original's use of the full membership set.
   const availableUsers = useMemo<Profile[]>(() => {
     const profiles = profilesQuery.data ?? [];
     const memberUserIds = new Set(members.map((m) => m.user_id));
@@ -95,9 +92,6 @@ export default function OrganizationDetail() {
     [activeMembers],
   );
 
-  // Query-error toasts reproduce TanStack v5's missing useQuery onError.
-  // Members / invitations / org failures toast; the org one skips the 404→null
-  // case (that surfaces as the not-found screen). Profiles is console-only.
   useQueryErrorToast({
     isError: membershipsQuery.isError,
     error: membershipsQuery.error,
@@ -122,7 +116,6 @@ export default function OrganizationDetail() {
     logLabel: 'OrganizationDetail: failed to load profiles',
   });
 
-  // ── Dialog open + selection state ──────────────────────────────────────────
   const [inviteOpen, setInviteOpen] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -134,9 +127,6 @@ export default function OrganizationDetail() {
   // policy: copy is routine — no toast).
   const { flashed: copyFlashed, flash: flashCopy } = useFlash();
 
-  // ── Mutations (targeted invalidation replaces imperative refetch) ──────────
-  // `useToastMutation` bakes in the shared destructive-toast-on-failure idiom
-  // (title + err.message); success behavior stays per-handler.
   const invalidateMemberships = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.orgMemberships.list(orgId) });
   const invalidateInvitations = () =>
@@ -220,7 +210,6 @@ export default function OrganizationDetail() {
         },
       );
 
-      // Send invitation email using link_id returned directly by invitation-create.
       if (invitation?.link_id) {
         const emailResult = await sendInvitationEmail({
           email: payload.email,
@@ -323,7 +312,6 @@ export default function OrganizationDetail() {
     },
   });
 
-  // ── Handlers (validation + selection wiring) ───────────────────────────────
   const handleAddUser = (payload: AddUserPayload) => {
     const result = addUserSchema.safeParse({ userId: payload.userId, role: payload.role });
     if (!result.success) {
@@ -378,7 +366,6 @@ export default function OrganizationDetail() {
     flashCopy(linkId);
   };
 
-  // ── Three-way render: spinner → not-found/load-failed → content ────────────
   const loading =
     orgQuery.isLoading ||
     membershipsQuery.isLoading ||
@@ -409,7 +396,6 @@ export default function OrganizationDetail() {
     );
   }
 
-  // Seats consumed = active members + server-computed pending invites.
   const seatUsage = getSeatUsage({
     activeMembers: activeMembers.length,
     pendingInvites: org.pending_invite_count ?? 0,
@@ -440,7 +426,6 @@ export default function OrganizationDetail() {
         { label: org.name },
       ]}
     >
-      {/* Back link */}
       <button
         type="button"
         onClick={() => navigate(routes.platformAdmin.organizations)}

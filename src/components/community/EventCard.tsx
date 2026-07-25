@@ -72,7 +72,6 @@ export function EventCard({ event }: EventCardProps) {
         </div>
       )}
 
-      {/* Details */}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h3 className="line-clamp-2 text-[15px] font-bold leading-[1.3]">{event.title}</h3>
         {hostName && (

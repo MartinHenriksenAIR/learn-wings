@@ -34,7 +34,6 @@ export default endpoint('resource-create', async ({ req, profile, reply, require
     return reply(400, { error: 'tags must be an array of strings' });
   }
 
-  // Authorization: platform admin OR active member of the org
   await requireActiveMember(orgId);
 
   // INSERT + LEFT JOIN profiles in one round trip so the response matches the

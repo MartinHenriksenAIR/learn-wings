@@ -122,7 +122,7 @@ describe('community-post-create', () => {
     );
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'eventRegistrationUrl must be a valid http(s) URL' });
-    expect(mockQueryOne).not.toHaveBeenCalled(); // never reaches the category lookup / INSERT
+    expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
   it('accepts a valid https eventRegistrationUrl', async () => {
@@ -137,7 +137,6 @@ describe('community-post-create', () => {
 
   it('returns 403 when scope=org and caller is not a member', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
-    // category check won't be reached
     const res = await handler(baseReq(validOrgBody), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
@@ -201,8 +200,8 @@ describe('community-post-create', () => {
     // Verify INSERT SQL uses profile.id not client-supplied user_id
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO community_posts');
-    expect(params).toContain('p1'); // profile.id server-set
-    expect(params).not.toContain('user_id'); // the field value, not the column name
+    expect(params).toContain('p1');
+    expect(params).not.toContain('user_id');
   });
 
   it('platform admin bypasses membership check for org scope', async () => {

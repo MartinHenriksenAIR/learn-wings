@@ -5,7 +5,6 @@ export default endpoint('ai-champion-create', async ({ req, profile, reply, requ
   const body = await req.json() as { orgId?: unknown; userId?: unknown };
   const { orgId, userId } = body;
 
-  // Validation first, authz second, db third (mirrors org-membership-create).
   if (!orgId || typeof orgId !== 'string') {
     return reply(400, { error: 'orgId is required' });
   }
@@ -13,7 +12,6 @@ export default endpoint('ai-champion-create', async ({ req, profile, reply, requ
     return reply(400, { error: 'userId is required' });
   }
 
-  // Authorization: platform admin OR org admin of the target org.
   // RLS provenance: supabase/migrations/20260202125422_*.sql —
   // "Platform admins can manage all AI champions" (is_platform_admin())
   // + "Org admins can manage AI champions" (is_org_admin(org_id)), both FOR ALL.

@@ -15,26 +15,22 @@ interface ProfileUpdateBody {
 export default endpoint('profile-update', async ({ req, profile, reply }) => {
   const body = await req.json() as ProfileUpdateBody;
 
-  // Validate types — all provided values must be strings
   for (const key of ['first_name', 'last_name', 'department', 'preferred_language', 'avatar_url'] as const) {
     if (body[key] !== undefined && typeof body[key] !== 'string') {
       return reply(400, { error: `${key} must be a string` });
     }
   }
 
-  // Extract and trim string fields (only those actually provided in the body)
   const firstName  = body.first_name  !== undefined ? (body.first_name  as string).trim() : undefined;
   const lastName   = body.last_name   !== undefined ? (body.last_name   as string).trim() : undefined;
   const department = body.department  !== undefined ? (body.department  as string).trim() : undefined;
   const prefLang   = body.preferred_language !== undefined ? (body.preferred_language as string).trim() : undefined;
   const avatarUrl  = body.avatar_url  !== undefined ? (body.avatar_url  as string).trim() : undefined;
 
-  // last_name without first_name: reject (full_name derivation requires first_name)
   if (lastName !== undefined && firstName === undefined) {
     return reply(400, { error: 'first_name is required when last_name is provided' });
   }
 
-  // Validate first_name non-empty and max 50 chars
   if (firstName !== undefined) {
     if (firstName.length === 0) {
       return reply(400, { error: 'first_name must not be empty' });
@@ -54,7 +50,6 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
     return reply(400, { error: 'department must be 100 characters or fewer' });
   }
 
-  // Validate preferred_language
   if (prefLang !== undefined && prefLang !== 'en' && prefLang !== 'da') {
     return reply(400, { error: "preferred_language must be 'en' or 'da'" });
   }
@@ -64,12 +59,10 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
     return reply(400, { error: 'avatar_url must be 255 characters or fewer' });
   }
 
-  // Build dynamic parameterized SET clause
   const setClauses: string[] = [];
   const params: unknown[] = [];
 
   if (firstName !== undefined) {
-    // When first_name is provided, always update first_name, last_name, and full_name together
     params.push(firstName);
     setClauses.push(`first_name = $${params.length}`);
 
@@ -133,9 +126,6 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
     previousAvatarUrl = prev?.avatar_url ?? null;
   }
 
-  // One candidate list, handed to both gates in order, so they can never be
-  // given different views of the same write. `family: 'avatar'` is the column's
-  // property, not the caller's claim.
   const candidates: UploadCandidate[] = [{ path: nextAvatarUrl, kind: 'image', family: 'avatar' }];
 
   // Ownership gate FIRST. This endpoint is `endpoint()`, not `adminEndpoint()` —
@@ -160,7 +150,6 @@ export default endpoint('profile-update', async ({ req, profile, reply }) => {
     return reply(413, { error: limitError });
   }
 
-  // Caller can ONLY update their own row — id comes from the authenticated profile, never from the body
   params.push(profile.id);
   const whereParam = `$${params.length}`;
 

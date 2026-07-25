@@ -27,7 +27,7 @@ describe('generate-certificate', () => {
   });
 
   it('returns 403 if enrollment does not belong to the user', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // no enrollment found for this user
+    mockQueryOne.mockResolvedValueOnce(null);
 
     const res = await handler(baseReq as any, {} as any);
 

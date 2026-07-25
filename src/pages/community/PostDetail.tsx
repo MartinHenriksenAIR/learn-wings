@@ -76,14 +76,12 @@ export default function PostDetail() {
   const [reportTargetType, setReportTargetType] = useState<'post' | 'comment'>('post');
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
 
-  // Fetch post
   const { data: post, isLoading: postLoading } = useQuery({
     queryKey: queryKeys.communityPost.detail(postId),
     queryFn: () => fetchPost(postId!),
     enabled: !!postId,
   });
 
-  // Fetch comments
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: queryKeys.communityComments.list(postId),
     queryFn: () => fetchComments(postId!),
@@ -96,7 +94,6 @@ export default function PostDetail() {
     : effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
   const isRestricted = post?.category?.is_restricted;
 
-  // Mutations
   const createCommentMutation = useMutation({
     mutationFn: ({ content, parentId }: { content: string; parentId?: string }) =>
       createComment({ post_id: postId!, content, parent_comment_id: parentId }),
@@ -255,7 +252,6 @@ export default function PostDetail() {
   return (
     <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.post') }]}>
       <div className="max-w-[760px]">
-        {/* Back button */}
         <Button
           variant="ghost"
           onClick={() => navigate(`${routes.community.feed}?scope=${scope}`)}
@@ -265,7 +261,6 @@ export default function PostDetail() {
           {t('community.backToCommunity')}
         </Button>
 
-        {/* Post card */}
         <div className="mb-4 rounded-2xl border border-border bg-card px-[26px] py-6">
           <div className="mb-3.5 flex items-center gap-2.5">
             <BrandingAvatar
@@ -309,13 +304,8 @@ export default function PostDetail() {
             </div>
           </div>
 
-          {/* Title */}
           <h1 className="mb-2.5 font-display text-[21px] font-extrabold tracking-[-0.01em]">{post.title}</h1>
-
-          {/* Content */}
           <p className="mb-4 whitespace-pre-wrap text-sm leading-[1.65] text-[#4a4f60]">{post.content}</p>
-
-          {/* Event date/time/place chips */}
           {isEvent && post.event_date && (
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-[7px] bg-muted px-2.5 py-[5px] text-[12px] font-semibold text-muted-foreground">
@@ -353,10 +343,7 @@ export default function PostDetail() {
             </div>
           )}
 
-          {/* Tags */}
           <TagList tags={post.tags || []} className="mb-4" />
-
-          {/* Actions */}
           <div className="flex items-center justify-between border-t border-[#eceef3] pt-3.5">
             <div className="flex items-center gap-2">
               {!isAuthor && (
@@ -446,7 +433,6 @@ export default function PostDetail() {
           </div>
         </div>
 
-        {/* Comments */}
         <CommentThread
           comments={comments}
           postId={postId!}
@@ -475,7 +461,6 @@ export default function PostDetail() {
           } : undefined}
         />
 
-        {/* Report dialog */}
         <ReportDialog
           open={showReportDialog}
           onOpenChange={setShowReportDialog}

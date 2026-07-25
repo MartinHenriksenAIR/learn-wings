@@ -50,7 +50,6 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
       )}
       onClick={onClick}
     >
-      {/* Pills row */}
       <div className="mb-2.5 flex items-center gap-2">
         <IdeaStatusBadge status={idea.status} />
         {businessAreaLabel && (
@@ -96,7 +95,6 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
         )}
       </div>
 
-      {/* Title + summary */}
       <h3 className="mb-1.5 line-clamp-2 text-[14.5px] font-bold leading-[1.35]">{idea.title}</h3>
       {(idea.description || idea.pain_points) && (
         <p className="mb-3 line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
@@ -106,7 +104,6 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
 
       <TagList tags={idea.tags || []} maxVisible={2} className="mb-3" />
 
-      {/* Footer: votes, comments, author · time */}
       <div className="flex items-center gap-3 text-xs text-[#9aa0af]">
         <span className="inline-flex items-center gap-[5px] font-semibold">
           <ThumbsUp aria-hidden="true" className="h-[13px] w-[13px]" />

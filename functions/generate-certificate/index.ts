@@ -89,7 +89,6 @@ function pdfText(value: string): string {
   return toWinAnsi(pdfString(value));
 }
 
-// Pure TypeScript PDF generation — no Deno APIs, works unchanged in Node.js
 function generateCertificatePDF(
   recipientName: string,
   courseName: string,
@@ -196,7 +195,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const user = await authenticate(req);
     const { enrollmentId } = await req.json() as { enrollmentId: string };
 
-    // Look up enrollment owned by this user (join via profiles.entra_oid)
     const enrollment = await queryOne<{ user_id: string; status: string; course_id: string; completed_at: string }>(
       `SELECT e.user_id, e.status, e.course_id, e.completed_at
        FROM enrollments e

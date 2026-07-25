@@ -5,16 +5,6 @@ import {
   clearPostLoginRedirect,
 } from './post-login-redirect';
 
-// post-login-redirect (sec-4, #244): the stored URL is fed straight into
-// react-router's navigate(), so an attacker-controlled value must never be able
-// to leave the SPA. react-router 6.x still carries an open-redirect bypass via
-// backslash (CVE-2025-68470 / GHSA-wrjc-x8rr-h8h6, fixed only in v7), so this
-// guard is our independent line of defence: browsers normalize '\' to '/', so
-// '/\evil.com' and '//evil.com' both resolve to an external origin. Only a
-// single-slash in-app path with no backslashes or control chars is accepted.
-// The guard is exercised through the public save/consume round-trip (the only
-// surface that reaches navigate()).
-
 beforeEach(() => {
   sessionStorage.clear();
 });

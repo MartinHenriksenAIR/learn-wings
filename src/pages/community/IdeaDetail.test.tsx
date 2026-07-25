@@ -4,12 +4,10 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock AppLayout as passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- mock react-i18next (t returns the key) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -17,10 +15,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// --- mock sonner toast ---
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-
-// --- mock the ideas api ---
 const mockFetchIdea = vi.fn();
 const mockFetchIdeaComments = vi.fn();
 const mockUpdateIdeaStatus = vi.fn();
@@ -35,7 +30,6 @@ vi.mock('@/lib/ideas-api', () => ({
   removeVoteFromIdea: vi.fn(),
 }));
 
-// --- configurable hook mocks ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
@@ -134,7 +128,6 @@ describe('IdeaDetail admin status panel', () => {
       rejection_reason: undefined,
     });
 
-    // In-button success feedback: the button morphs to the green done state.
     const doneButton = await screen.findByRole('button', { name: 'common.saved' });
     expect(doneButton.className).toContain('bg-success');
   });
@@ -150,8 +143,6 @@ describe('IdeaDetail admin status panel', () => {
     // Panel seeded from the idea: status=rejected, empty reason → save gated off.
     expect(screen.getByText('community.rejectionReason')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
-
-    // Providing a reason re-enables the save.
     fireEvent.change(screen.getByPlaceholderText('community.rejectionReasonPlaceholder'), {
       target: { value: 'Out of scope' },
     });

@@ -19,7 +19,6 @@ interface DeleteOrganizationDialogProps {
   pending: boolean;
 }
 
-/** Delete-organization confirmation AlertDialog. */
 export function DeleteOrganizationDialog({
   open,
   onOpenChange,

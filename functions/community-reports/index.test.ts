@@ -85,7 +85,6 @@ describe('community-reports', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Provide orgId or scope, not both' });
   });
 
-  // orgId mode — non-admin (neither platform admin nor org admin) → 403
   it('returns 403 when non-admin requests org reports', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(false);
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
@@ -93,7 +92,6 @@ describe('community-reports', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // scope: global — non-platform-admin → 403
   it('returns 403 when org admin requests global scope', async () => {
     mockIsOrgAdmin.mockResolvedValue(true); // is org admin but NOT platform admin
     const res = await handler(baseReq({ scope: 'global' }), {} as any);
@@ -111,7 +109,6 @@ describe('community-reports', () => {
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
-  // org admin with orgId → 200
   it('happy path: org admin can list reports for their org', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
@@ -151,7 +148,6 @@ describe('community-reports', () => {
     expect(sql).toMatch(/CASE WHEN r\.target_type = 'comment' THEN tc\.post_id ELSE NULL END AS post_id/);
   });
 
-  // platform admin with orgId — isOrgAdmin NOT called
   it('platform admin can list reports without calling isOrgAdmin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
@@ -159,7 +155,6 @@ describe('community-reports', () => {
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
-  // platform admin with scope: global
   it('platform admin can list global scope reports', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const res = await handler(baseReq({ scope: 'global' }), {} as any);
@@ -168,7 +163,6 @@ describe('community-reports', () => {
     expect(queryCall[0]).toContain('r.org_id IS NULL');
   });
 
-  // platform admin with no filter
   it('platform admin can list all reports without filter', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const res = await handler(baseReq({}), {} as any);
@@ -177,7 +171,6 @@ describe('community-reports', () => {
     expect(queryCall[0]).not.toContain('WHERE');
   });
 
-  // status filter applied
   it('applies status filter when provided', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     const res = await handler(baseReq({ orgId: 'org-1', status: 'pending' }), {} as any);

@@ -9,7 +9,6 @@ vi.mock('react-i18next', () => ({
 import { SaveButton } from './save-button';
 import { useFlash } from '@/hooks/useFlash';
 
-/** Caller-owned timing, as in production: useFlash drives the `done` prop. */
 function Harness({ onSave }: { onSave?: () => void }) {
   const { flashed, flash } = useFlash();
   return (

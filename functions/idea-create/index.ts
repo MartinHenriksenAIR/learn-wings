@@ -35,7 +35,6 @@ export default endpoint('idea-create', async ({ req, profile, reply, requireActi
     return reply(400, { error: 'title is required' });
   }
 
-  // Validate string fields (string or null if present)
   for (const field of STRING_FIELDS) {
     const v = body[field];
     if (v !== undefined && v !== null && typeof v !== 'string') {
@@ -43,7 +42,6 @@ export default endpoint('idea-create', async ({ req, profile, reply, requireActi
     }
   }
 
-  // Validate tags (array of strings if present)
   if (body.tags !== undefined && (!Array.isArray(body.tags) || !body.tags.every((t) => typeof t === 'string'))) {
     return reply(400, { error: 'tags must be an array of strings' });
   }
@@ -56,7 +54,6 @@ export default endpoint('idea-create', async ({ req, profile, reply, requireActi
     });
   }
 
-  // Authorization: platform admin OR active member of the org
   await requireActiveMember(orgId);
 
   // Insert. user_id is ALWAYS profile.id (never client-supplied); status is ALWAYS 'draft'.

@@ -52,8 +52,6 @@ function MiniBar({ pct }: { pct: number }) {
   );
 }
 
-// ─── Level distribution helpers ──────────────────────────────────────────────
-
 interface LevelCounts {
   basic: number;
   intermediate: number;
@@ -103,7 +101,6 @@ function LevelDistributionCard({
     ? t('assessment.analytics.distributionTitleAll')
     : t('assessment.analytics.distributionTitle');
 
-  // Build legend items (always 4, including not-assessed).
   const legendItems: DistSegment[] = [
     ...LEVELS.map(level => ({
       key: level,
@@ -132,7 +129,6 @@ function LevelDistributionCard({
           {t('assessment.analytics.distributionSubtitle')}
         </p>
 
-        {/* Segmented bar */}
         {counts.total === 0 ? (
           <div
             className="mb-4 h-3 w-full rounded-full"
@@ -165,7 +161,6 @@ function LevelDistributionCard({
           </div>
         )}
 
-        {/* Legend */}
         <div className="flex flex-wrap gap-x-5 gap-y-2">
           {legendItems.map(seg => (
             <span key={seg.key} className="flex items-center gap-1.5 text-[12.5px]">
@@ -183,8 +178,6 @@ function LevelDistributionCard({
     </Card>
   );
 }
-
-// ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
  * Visual-first analytics overview: a row of stat cards (icon chips, ProgressRings
@@ -285,7 +278,6 @@ export function AnalyticsOverview({
 
   return (
     <div className="space-y-5">
-      {/* Visual-first stat cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {cards.map((card) => (
           <div
@@ -299,7 +291,6 @@ export function AnalyticsOverview({
         ))}
       </div>
 
-      {/* Summary rows: activity + learning */}
       <div className="grid gap-3.5 md:grid-cols-2">
         <Card>
           <CardContent className="px-[22px] py-5">
@@ -326,14 +317,12 @@ export function AnalyticsOverview({
         </Card>
       </div>
 
-      {/* AI level distribution */}
       <LevelDistributionCard
         members={members}
         isGlobalView={isGlobalView}
         selectedOrgId={selectedOrgId}
       />
 
-      {/* AI Act compliance report */}
       {showComplianceReport && (
         <Card>
           <CardContent className="flex items-center justify-between gap-4 px-[22px] py-5">

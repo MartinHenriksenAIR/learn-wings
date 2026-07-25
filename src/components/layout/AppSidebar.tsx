@@ -137,14 +137,12 @@ export function AppSidebar() {
 
   const viewModeLabels = useViewModeLabels();
 
-  // Build learner items based on feature toggles
   const learnerItems = [
     { title: t('nav.dashboard'), url: routes.learner.dashboard, icon: LayoutDashboard },
     { title: t('nav.courses'), url: routes.learner.courses, icon: BookOpen },
     ...(features.community_enabled ? [{ title: t('nav.community'), url: routes.community.feed, icon: MessageSquare }] : []),
   ];
 
-  // Build org admin items based on feature toggles
   const orgAdminItems = [
 
     ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: routes.orgAdmin.root, icon: BarChart3 }] : []),
@@ -155,7 +153,6 @@ export function AppSidebar() {
     { title: t('nav.settings'), url: routes.orgAdmin.settings, icon: SettingsIcon },
   ];
 
-  // Build platform admin items based on feature toggles
   const platformAdminItems = [
     { title: t('nav.organizations'), url: routes.platformAdmin.organizations, icon: Building2 },
     { title: t('nav.courseManager'), url: routes.platformAdmin.courses, icon: GraduationCap },
@@ -190,21 +187,17 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      {/* Org selector for platform admins viewing as learner/org_admin */}
       <OrgSelector />
 
       <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2">
-        {/* Learner section - hidden when viewing as platform admin */}
         {!effectiveIsPlatformAdmin && (
           <NavSection label={t('nav.learning')} items={learnerItems} />
         )}
 
-        {/* Org Admin section - hidden when viewing as platform admin */}
         {effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && (
           <NavSection label={t('nav.organization')} items={orgAdminItems} />
         )}
 
-        {/* Platform Admin section */}
         {effectiveIsPlatformAdmin && (
           <NavSection label={t('nav.platformAdmin')} items={platformAdminItems} />
         )}

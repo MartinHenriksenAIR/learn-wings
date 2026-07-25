@@ -11,7 +11,6 @@ export default adminEndpoint('course-delete', async ({ req, reply }) => {
     return reply(400, { error: 'courseId is required' });
   }
 
-  // Collect descendant blob paths before deletion.
   // Intentionally not transactional — blob deletes are irreversible and cannot join a DB
   // transaction; the tiny race window (lesson created between SELECT and DELETE) is acceptable
   // for an admin tool.

@@ -26,7 +26,6 @@ interface AssessmentResult {
   level: CourseLevel;
 }
 
-// ── Score ring ───────────────────────────────────────────────────────────────
 // A drawn SVG progress ring (NOT an icon) showing score / MAX_SCORE, its arc
 // stroked with the same per-level color LevelBadge uses.
 function ScoreRing({ score, level }: { score: number; level: CourseLevel }) {
@@ -70,7 +69,6 @@ function ScoreRing({ score, level }: { score: number; level: CourseLevel }) {
   );
 }
 
-// ── Top row (logo + skip) ────────────────────────────────────────────────────
 function TopRow({ onSkip, skipDisabled }: { onSkip?: () => void; skipDisabled?: boolean }) {
   const { t } = useTranslation();
   const logo = i18n.language === 'da' ? logoLightDa : logoLightEn;
@@ -96,7 +94,6 @@ function TopRow({ onSkip, skipDisabled }: { onSkip?: () => void; skipDisabled?: 
   );
 }
 
-// ── Wizard ───────────────────────────────────────────────────────────────────
 function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -198,7 +195,6 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
       <TopRow onSkip={() => skipMutation.mutate()} skipDisabled={skipMutation.isPending || submitMutation.isPending} />
 
       <div className="mx-auto flex w-full max-w-[600px] flex-1 flex-col px-4 pb-16 pt-10">
-        {/* Meta row */}
         <div className="mb-2 flex items-center justify-between text-[12.5px] font-semibold text-muted-foreground">
           <span>{t('assessment.questionOf', { current: index + 1, total })}</span>
           <span>{t('assessment.timeEstimate')}</span>
@@ -261,7 +257,6 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
           </div>
         </div>
 
-        {/* Footer */}
         <div className="mt-10 flex items-center justify-between">
           <Button
             variant="ghost"
@@ -287,7 +282,6 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
   );
 }
 
-// ── Result: recommended course row ───────────────────────────────────────────
 function RecommendedRow({
   course,
   enrollment,
@@ -358,7 +352,6 @@ function RecommendedRow({
   );
 }
 
-// ── Result view (variant B split) ────────────────────────────────────────────
 function ResultView({ result }: { result: AssessmentResult }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -392,7 +385,6 @@ function ResultView({ result }: { result: AssessmentResult }) {
       <TopRow />
 
       <div className="mx-auto grid w-full max-w-[960px] flex-1 gap-8 px-4 pb-16 pt-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        {/* Left card */}
         <div className="flex flex-col items-center rounded-3xl border border-border bg-card p-8 text-center">
           <span className="mb-5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
             {t('assessment.result.eyebrow')}
@@ -416,7 +408,6 @@ function ResultView({ result }: { result: AssessmentResult }) {
           </Button>
         </div>
 
-        {/* Right column */}
         <div className="flex flex-col">
           <h2 className="mb-4 font-display text-[19px] font-extrabold tracking-[-0.01em]">
             {t('assessment.result.startHere')}
@@ -443,7 +434,6 @@ function ResultView({ result }: { result: AssessmentResult }) {
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
 export default function Assessment() {
   const [result, setResult] = useState<AssessmentResult | null>(null);
 

@@ -123,14 +123,6 @@ describe('azure-document-upload-url', () => {
     }
   });
 
-  // --- Type allow-list at mint time (#276) ---
-  //
-  // Defence in depth: the client PUTs whatever bytes it likes to the URL we hand
-  // back, so the binding check is the post-upload HEAD at persist time. Unlike
-  // azure-upload-url this endpoint has exactly one purpose, so the kind is
-  // pinned: a video minted here would land under documents/ and be measured
-  // against the wrong cap.
-
   const mint = (body: Record<string, unknown>) => handler(
     { ...baseReq, json: async () => body } as any,
     {} as any,
@@ -168,7 +160,6 @@ describe('azure-document-upload-url', () => {
 
   it('returns 400 for an off-allowlist extension and for a name with no extension', async () => {
     expect((await mint({ fileName: 'payload.exe' })).status).toBe(400);
-    // fileName.split('.').pop() would have used the WHOLE name as the suffix.
     expect((await mint({ fileName: 'noextension', contentType: 'application/pdf' })).status).toBe(400);
     expect(mockGenerateSasToken).not.toHaveBeenCalled();
   });

@@ -9,7 +9,6 @@ interface IdeaStatusBadgeProps {
   className?: string;
 }
 
-// Prototype `ST` map: squarer pills, tinted bg + strong fg per status.
 const STATUS_STYLES: Partial<Record<IdeaStatusExtended, string>> = {
   draft: 'bg-[#f3f4f8] text-[#686d7e]',
   submitted: 'bg-accent text-accent-foreground',

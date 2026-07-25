@@ -11,7 +11,6 @@ export default endpoint('org-membership-create', async ({ req, reply, requireOrg
   const body = await req.json() as { orgId?: unknown; userId?: unknown; role?: unknown; status?: unknown };
   const { orgId, userId, role, status } = body;
 
-  // Validation first, authz second, db third (mirrors organization-update).
   if (!orgId || typeof orgId !== 'string') {
     return reply(400, { error: 'orgId is required' });
   }

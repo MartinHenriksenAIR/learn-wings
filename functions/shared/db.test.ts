@@ -34,7 +34,6 @@ function effectiveSsl(config: PoolConfig): false | { ca?: string; rejectUnauthor
 
 const skip = !process.env.DATABASE_URL;
 
-// Pure unit tests — no DATABASE_URL gate.
 describe('buildSslConfig', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -83,8 +82,6 @@ describe('buildSslConfig', () => {
   });
 });
 
-// Pure unit tests — no DATABASE_URL gate. Asserts the URL's sslmode can't
-// clobber our pinned-CA ssl, exercised through pg's real config resolution.
 describe('buildPoolConfig', () => {
   const PROD_SHAPED_URL =
     'postgres://app:secret@db.example.postgres.database.azure.com:5432/learnwings?sslmode=require';
@@ -132,9 +129,6 @@ describe('buildPoolConfig', () => {
   });
 });
 
-// getDb() is the only production caller of buildPoolConfig; pin the wiring so a
-// revert to `new Pool({ connectionString, ssl })` (the original #103 bug) fails
-// here instead of slipping past the buildPoolConfig-only tests above.
 describe('getDb wiring', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -159,7 +153,6 @@ describe('getDb wiring', () => {
   });
 });
 
-// Pure unit tests — no DATABASE_URL gate.
 describe('isUniqueViolation', () => {
   it('returns true for a Postgres unique_violation (code 23505)', () => {
     expect(isUniqueViolation(Object.assign(new Error('duplicate key value'), { code: '23505' }))).toBe(true);

@@ -84,7 +84,6 @@ export function QuizEditorDialog({
     }
   }, [loadError]);
 
-  // Seed the editable form from the fetched quiz (or defaults when none exists).
   useEffect(() => {
     if (!quizData) return;
     if (quizData.quiz) {
@@ -102,7 +101,6 @@ export function QuizEditorDialog({
         }))
       );
     } else {
-      // No quiz exists yet — reset all fields to defaults
       setPassingScore(70);
       setQuestions([]);
     }
@@ -123,7 +121,6 @@ export function QuizEditorDialog({
 
   const removeQuestion = (questionIndex: number) => {
     const updated = questions.filter((_, i) => i !== questionIndex);
-    // Update sort orders
     updated.forEach((q, i) => (q.sort_order = i));
     setQuestions(updated);
   };
@@ -150,7 +147,6 @@ export function QuizEditorDialog({
     updated[questionIndex].options = updated[questionIndex].options.filter(
       (_, i) => i !== optionIndex
     );
-    // If we removed the correct answer, make the first option correct
     if (wasCorrect && updated[questionIndex].options.length > 0) {
       updated[questionIndex].options[0].is_correct = true;
     }
@@ -269,7 +265,6 @@ export function QuizEditorDialog({
           </div>
         ) : (
           <div className="space-y-6 py-4">
-            {/* Passing Score */}
             <div className="flex items-center gap-4">
               <Label className="whitespace-nowrap">Passing Score (%)</Label>
               <Input
@@ -285,7 +280,6 @@ export function QuizEditorDialog({
               </span>
             </div>
 
-            {/* Questions */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold">Questions</Label>

@@ -76,7 +76,6 @@ describe('community-comments', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'postId is required' });
   });
 
-  // RLS parity: missing post → 200 { comments: [] }
   it('returns 200 empty array when post is not found (RLS parity)', async () => {
     mockQuery.mockResolvedValueOnce([]); // post query returns no rows
     const res = await handler(baseReq({ postId: 'post-999' }), {} as any);
@@ -86,14 +85,12 @@ describe('community-comments', () => {
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
-  // RLS parity: inaccessible org post → 200 { comments: [] }, no comments query
   it('returns 200 empty array for org post when caller is not a member (no comments query)', async () => {
     mockQuery.mockResolvedValueOnce([orgPost]); // post found
     mockIsActiveMember.mockResolvedValueOnce(false);
     const res = await handler(baseReq({ postId: 'post-1' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ comments: [] });
-    // Only the post SELECT should have fired
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 

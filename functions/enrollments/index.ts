@@ -6,7 +6,6 @@ export default endpoint('enrollments', async ({ req, profile, reply }) => {
   const body = await req.json() as { orgId?: unknown; userId?: unknown; courseId?: unknown };
   const { orgId, userId, courseId } = body;
 
-  // Validate: any present field must be a non-empty string
   if (orgId !== undefined && (typeof orgId !== 'string' || orgId === '')) {
     return reply(400, { error: 'orgId must be a string' });
   }
@@ -17,7 +16,6 @@ export default endpoint('enrollments', async ({ req, profile, reply }) => {
     return reply(400, { error: 'courseId must be a string' });
   }
 
-  // Narrowed typed locals — runtime guards above guarantee these are string | undefined
   const vOrgId = orgId as string | undefined;
   const vUserId = userId as string | undefined;
   const vCourseId = courseId as string | undefined;
@@ -30,7 +28,6 @@ export default endpoint('enrollments', async ({ req, profile, reply }) => {
   };
 
   if (profile.is_platform_admin) {
-    // Tier 1: Platform admin — apply filters exactly as given
     if (vOrgId) add('org_id', vOrgId);
     if (vUserId) add('user_id', vUserId);
     if (vCourseId) add('course_id', vCourseId);

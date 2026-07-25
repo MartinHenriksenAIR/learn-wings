@@ -9,7 +9,6 @@ function getResend(): Resend {
   return resendClient;
 }
 
-// The single branded sender for every seat-request email.
 const FROM_ADDRESS = 'AI Uddannelse <no-reply@ai-uddannelse.dk>';
 
 // Subjects are raw plain text (never HTML-escaped — that is bodies-only). Strip
@@ -85,8 +84,6 @@ export function renderSeatRequestEmail(p: SeatRequestEmailParams): { subject: st
   return { subject, html };
 }
 
-// Best-effort: the request row is already committed and visible in-app. A failed
-// email is logged, never thrown — we must not lose the persisted request.
 export async function notifySeatRequest(context: InvocationContext, p: SeatRequestEmailParams): Promise<void> {
   const { subject, html } = renderSeatRequestEmail(p);
   await sendBestEffort(context, {
@@ -179,8 +176,6 @@ export function renderSeatRequestFulfilledEmail(p: SeatRequestFulfilledParams): 
   };
 }
 
-// Best-effort, same contract as notifySeatRequest: a null recipient or a Resend
-// failure is logged and swallowed — the request/fulfilment must never be blocked.
 export async function notifySeatRequestReceived(context: InvocationContext, p: SeatRequestReceivedParams): Promise<void> {
   const { subject, html } = renderSeatRequestReceivedEmail(p);
   await sendBestEffort(context, {

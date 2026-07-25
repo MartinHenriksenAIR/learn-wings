@@ -22,7 +22,6 @@ export default endpoint('idea-comments', async ({ req, profile, reply }) => {
     return reply(200, { comments: [] });
   }
 
-  // Access: platform admin OR active member of idea's org
   const canAccess = profile.is_platform_admin || await isActiveMember(profile.id, idea.org_id);
   if (!canAccess) return reply(200, { comments: [] });
 

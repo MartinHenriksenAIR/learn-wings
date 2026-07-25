@@ -90,10 +90,6 @@ export function OrgMembersTab() {
   const { user, profile, currentOrg } = useAuth();
   const queryClient = useQueryClient();
 
-  // ── Data layer (shared TanStack Query hooks) ───────────────────────────────
-  // useOrgMemberships returns the same reshaped (OrgMembership & { profile })[]
-  // the tab used to hand-roll; useInvitations uses the 'org' scope (org-admin
-  // authz path); useAiChampions supplies the champion user_ids we fold to a Set.
   const membershipsQuery = useOrgMemberships(currentOrg?.id);
   const invitationsQuery = useInvitations(currentOrg?.id, 'org');
   const championsQuery = useAiChampions(currentOrg?.id);
@@ -138,11 +134,6 @@ export function OrgMembersTab() {
   const pendingSeatRequest = seatRequests.find((r) => r.status === 'pending') ?? null;
   const hasFiniteSeatLimit = (orgDetail?.seat_limit ?? currentOrg?.seat_limit ?? null) !== null;
 
-  // Query-error toasts reproduce TanStack v5's missing useQuery onError.
-  // Members / invitations failures toast; the champions failure stays SILENT
-  // (parity: the old client swallowed champion-fetch errors — badges simply
-  // don't render). No toastTitle → console-only, same as OrganizationDetail's
-  // profiles query.
   useQueryErrorToast({
     isError: membershipsQuery.isError,
     error: membershipsQuery.error,
@@ -188,7 +179,6 @@ export function OrgMembersTab() {
     member: (OrgMembership & { profile: Profile }) | null;
   } | null>(null);
 
-  // ── Cache helpers (targeted invalidation replaces imperative refetch) ──────
   const invalidateMemberships = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.orgMemberships.list(currentOrg?.id) });
   const invalidateInvitations = () =>
@@ -201,8 +191,6 @@ export function OrgMembersTab() {
   const invalidateOrgDetail = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(currentOrg?.id) });
 
-  // Behavior-identical replacement for the old `fetchData` handed to the bulk /
-  // enroll dialogs: both used to refetch all three lists on success.
   const refetchAll = () => {
     if (!currentOrg) return;
     invalidateMemberships();
@@ -211,9 +199,6 @@ export function OrgMembersTab() {
     invalidateOrgDetail();
   };
 
-  // ── Mutations ──────────────────────────────────────────────────────────────
-  // `useToastMutation` bakes in the shared destructive-toast-on-failure idiom
-  // (title + err.message); success behavior stays per-handler.
   const inviteMutation = useToastMutation({
     mutationFn: async () => {
       const { invitation } = await callApi<{ invitation: { id: string; link_id: string } }>(
@@ -242,7 +227,6 @@ export function OrgMembersTab() {
     },
     errorTitle: 'Failed to create invitation',
     onSuccess: ({ emailSent }) => {
-      // Invitation creation is a submission — keep the success toast (toast policy).
       toast({
         title: 'Invitation created!',
         description: emailSent
@@ -374,7 +358,6 @@ export function OrgMembersTab() {
   const handleCopyInviteLink = async (linkId: string) => {
     const link = getInviteLink(linkId);
     await navigator.clipboard.writeText(link);
-    // In-button "Copied!" morph instead of a toast (toast policy: copy is routine).
     flashCopy(linkId);
   };
 
@@ -403,8 +386,6 @@ export function OrgMembersTab() {
     if (!currentOrg) return;
 
     const isCurrentlyChampion = aiChampions.has(member.user_id);
-    // In-flight guard (same pattern as updatingRole): set before mutate, cleared
-    // in onSettled, so a double-click can't fire a second request.
     setTogglingChampion(member.id);
     toggleChampionMutation.mutate({ member, isCurrentlyChampion });
   };
@@ -419,8 +400,6 @@ export function OrgMembersTab() {
 
   const hasFilters = searchQuery !== '' || roleFilter !== 'all';
 
-  // Loading gate: only meaningful when an org is selected — disabled queries
-  // (no org) report isLoading=false, so this falls through to the empty state.
   if (
     currentOrg &&
     (membershipsQuery.isLoading || invitationsQuery.isLoading || championsQuery.isLoading)
@@ -439,7 +418,6 @@ export function OrgMembersTab() {
 
   return (
     <div>
-      {/* Search and actions toolbar */}
       <div className="mb-4 flex flex-wrap items-center gap-2.5">
         <div className="relative min-w-[200px] flex-1">
           <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
@@ -598,7 +576,6 @@ export function OrgMembersTab() {
         )}
       </div>
 
-      {/* Bulk Invite Dialog */}
       <BulkInviteDialog
         open={bulkInviteOpen}
         onOpenChange={setBulkInviteOpen}
@@ -608,7 +585,6 @@ export function OrgMembersTab() {
         onSuccess={refetchAll}
       />
 
-      {/* Enroll User Dialog */}
       <EnrollUserDialog
         open={enrollDialogOpen}
         onOpenChange={setEnrollDialogOpen}
@@ -618,12 +594,10 @@ export function OrgMembersTab() {
         onSuccess={refetchAll}
       />
 
-      {/* Request Seats Dialog */}
       {currentOrg?.id && (
         <RequestSeatsDialog orgId={currentOrg.id} open={requestSeatsOpen} onOpenChange={setRequestSeatsOpen} />
       )}
 
-      {/* Members table */}
       {filteredMembers.length === 0 ? (
         <EmptyState
           icon={<Users className="h-6 w-6" />}
@@ -649,7 +623,6 @@ export function OrgMembersTab() {
         />
       ) : (
         <div className="mb-[18px] overflow-hidden rounded-2xl border border-border bg-card">
-          {/* Header row */}
           <div className="grid grid-cols-[2.2fr_1.2fr_0.9fr_0.9fr_0.9fr_0.6fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
             <span>{t('analytics.members.colMember')}</span>
             <span>{t('analytics.members.colDepartment')}</span>
@@ -666,7 +639,6 @@ export function OrgMembersTab() {
                 key={member.id}
                 className="grid grid-cols-[2.2fr_1.2fr_0.9fr_0.9fr_0.9fr_0.6fr] items-center gap-3 border-t border-[#f3f4f8] px-5 py-3"
               >
-                {/* Member: avatar + name/email */}
                 <span className="flex min-w-0 items-center gap-[11px]">
                   <BrandingAvatar
                     avatarPath={member.profile?.avatar_url}
@@ -687,11 +659,9 @@ export function OrgMembersTab() {
                     </span>
                   </span>
                 </span>
-                {/* Department */}
                 <span className="truncate text-[12.5px] text-[#4a4f60]">
                   {member.profile?.department || '-'}
                 </span>
-                {/* Role pill */}
                 <span>
                   <span
                     className={cn(
@@ -702,7 +672,6 @@ export function OrgMembersTab() {
                     {isAdmin ? t('analytics.members.admin') : t('analytics.members.learner')}
                   </span>
                 </span>
-                {/* Status pill */}
                 <span>
                   <span
                     className={cn(
@@ -715,11 +684,9 @@ export function OrgMembersTab() {
                     {member.status}
                   </span>
                 </span>
-                {/* Joined */}
                 <span className="text-[12.5px] text-muted-foreground">
                   {formatDate(new Date(member.created_at), 'P', i18n.language)}
                 </span>
-                {/* Actions */}
                 <span className="text-right">
                   {member.user_id !== profile?.id && member.status === 'active' && (
                     <DropdownMenu>
@@ -775,7 +742,6 @@ export function OrgMembersTab() {
         </div>
       )}
 
-      {/* Pending invitations */}
       {invitations.length > 0 && (
         <>
           <h3 className="mb-3 text-[15px] font-extrabold">{t('analytics.members.pendingInvitations')}</h3>
@@ -834,7 +800,6 @@ export function OrgMembersTab() {
         </>
       )}
 
-      {/* Role Change Confirmation Dialog */}
       {/* `open` must be a boolean from the first render — `roleChangeDialog?.open` is
           undefined until the dialog is first used, which flips the AlertDialog from
           uncontrolled to controlled and triggers a React console warning (#81 pattern). */}
@@ -872,7 +837,6 @@ export function OrgMembersTab() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Remove Member Confirmation Dialog */}
       <AlertDialog
         open={!!removeMemberDialog?.open}
         onOpenChange={(open) => !open && setRemoveMemberDialog(null)}

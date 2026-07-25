@@ -14,7 +14,6 @@ export default endpoint('org-settings-update', async ({ req, profile, reply, req
 
   await requireOrgAdmin(orgId);
 
-  // updated_at is managed by a DB trigger on UPDATE; updated_by is the authenticated caller's profile id.
   // JSON.stringify is deliberate, not required: pg would auto-stringify a plain object, but explicit
   // serialization sidesteps pg's array-vs-jsonb param footgun if the features guard ever loosens.
   const settings = await queryOne(

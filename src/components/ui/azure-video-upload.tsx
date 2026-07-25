@@ -39,7 +39,6 @@ export function AzureVideoUpload({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load preview URL when value changes
   React.useEffect(() => {
     const loadPreview = async () => {
       if (!value) {
@@ -60,7 +59,6 @@ export function AzureVideoUpload({
     loadPreview();
   }, [value]);
 
-  /** Show a message from the upload-limits helpers in the user's language. */
   const showMessage = (message: UploadMessage) => setError(t(message.key, message.values));
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,7 +94,6 @@ export function AzureVideoUpload({
       setFileName(file.name);
 
       try {
-        // Step 1: Get signed upload URL from edge function
         const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>('/api/azure-upload-url', {
           fileName: file.name,
           contentType: file.type,
@@ -108,7 +105,6 @@ export function AzureVideoUpload({
 
         const { uploadUrl, blobPath, contentType } = uploadData;
 
-        // Step 2: Upload directly to Azure using XMLHttpRequest for progress tracking
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
 
@@ -136,7 +132,6 @@ export function AzureVideoUpload({
           xhr.send(file);
         });
 
-        // Step 3: Success - return the blob path
         setProgress(100);
         onChange(blobPath);
       } catch (err) {

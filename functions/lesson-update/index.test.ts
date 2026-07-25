@@ -305,8 +305,6 @@ describe('lesson-update', () => {
     expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
-  // --- Superseded-blob cleanup (#275) ---
-
   it('video replaced: deletes the OLD blob exactly once', async () => {
     mockDb(prevPaths({ azure_blob_path: 'videos/old.mp4' }), fakeLesson);
     const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
@@ -381,8 +379,6 @@ describe('lesson-update', () => {
     expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
-  // --- Upload size/type enforcement (#276) ---
-
   it('413 when a newly-referenced blob is over cap: no UPDATE is issued', async () => {
     mockQueryOne.mockResolvedValueOnce(prevPaths()); // only the previous-paths SELECT
     mockEnforceUploadLimits.mockResolvedValueOnce('Video exceeds the maximum upload size of 2 GB');
@@ -393,7 +389,6 @@ describe('lesson-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({
       error: 'Video exceeds the maximum upload size of 2 GB',
     });
-    // The SELECT ran; the UPDATE must not have.
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE lessons');
     // The refused blob's cleanup is the helper's job, not the endpoint's.
@@ -436,8 +431,6 @@ describe('lesson-update', () => {
     expect(order).toEqual(['select', 'gate', 'update']);
   });
 
-  // --- Path ownership ---
-  //
   // Lesson videos, lesson documents and course thumbnails all share one flat
   // namespace (`azure-upload-url` gives non-branding uploads an empty prefix), so
   // the path shape alone cannot say which row a `<uuid>.<ext>` belongs to.
@@ -493,8 +486,6 @@ describe('lesson-update', () => {
     expect(order).toEqual(['update', 'releasable', 'delete']);
   });
 
-  // --- An ABSENT key is not a clear ---
-  //
   // `?? null` used to collapse "the caller did not mention this column" into
   // "the caller cleared this column". That was merely lossy while the column was
   // inert; once a clear started deleting the file, a sparse payload could destroy

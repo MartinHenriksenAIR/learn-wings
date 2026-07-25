@@ -32,11 +32,9 @@ export default function PlatformCommunityModeration() {
   const [adminNotes, setAdminNotes] = useState('');
   // Report whose content is shown in the "View content" dialog (#160).
   const [viewReport, setViewReport] = useState<ReportWithDetails | null>(null);
-  // Scope filter: 'all' | 'global' | <orgId> (#164).
   const [scope, setScope] = useState<string>('all');
   const [scopeOpen, setScopeOpen] = useState(false);
 
-  // Fetch reports for the selected scope: all orgs + global, global only, or one org.
   const { data: reports = [], isLoading } = useQuery({
     queryKey: queryKeys.platformReports.list(scope, activeTab),
     queryFn: async () => {
@@ -50,7 +48,6 @@ export default function PlatformCommunityModeration() {
     },
   });
 
-  // Fetch all organizations for name lookup (shared ['organizations'] cache, #87).
   // org names don't change mid-session; the longer staleTime avoids window-focus refetches.
   const { data: orgsData } = useOrganizations({ staleTime: 5 * 60 * 1000 });
   const orgsMap = useMemo(() => {
@@ -121,7 +118,6 @@ export default function PlatformCommunityModeration() {
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
-      {/* Header */}
       <div className="mb-5">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('platformModeration.title')}
@@ -129,7 +125,6 @@ export default function PlatformCommunityModeration() {
         <p className="text-sm text-muted-foreground">{t('platformModeration.description')}</p>
       </div>
 
-      {/* Scope filter (#164) */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-muted-foreground">
           {t('platformModeration.scopeSelectLabel')}
@@ -184,7 +179,6 @@ export default function PlatformCommunityModeration() {
         </Popover>
       </div>
 
-      {/* Tabs */}
       <SlidingTabs
         tabs={tabs}
         active={activeTab}
@@ -192,7 +186,6 @@ export default function PlatformCommunityModeration() {
         className="mb-5"
       />
 
-      {/* Reports list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -212,7 +205,6 @@ export default function PlatformCommunityModeration() {
                 key={report.id}
                 report={report}
                 scopeBadge={
-                  /* Org column: platform queue spans orgs + global */
                   <span
                     className={cn(
                       'rounded-[7px] px-[11px] py-1 text-[11px] font-bold',
@@ -240,14 +232,12 @@ export default function PlatformCommunityModeration() {
         </div>
       )}
 
-      {/* Reported content viewer (#160) */}
       <ReportedContentDialog
         open={!!viewReport}
         onOpenChange={(o) => { if (!o) setViewReport(null); }}
         report={viewReport}
       />
 
-      {/* Review dialog */}
       <ReviewReportDialog
         open={reviewDialogOpen}
         onOpenChange={setReviewDialogOpen}

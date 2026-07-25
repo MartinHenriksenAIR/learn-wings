@@ -14,8 +14,6 @@ const msalConfig: Configuration = {
   },
 };
 
-// Exported singleton — import this wherever MSAL is needed
 export const msalInstance = new PublicClientApplication(msalConfig);
 
-// Scope exposed via App Registration → Expose an API → access_as_user
 export const apiScopes = [`api://${import.meta.env.VITE_ENTRA_CLIENT_ID}/access_as_user`];

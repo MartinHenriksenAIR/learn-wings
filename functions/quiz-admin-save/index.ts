@@ -22,22 +22,18 @@ export default adminEndpoint('quiz-admin-save', async ({ req, reply }) => {
 
   const { lessonId, passingScore, questions } = body;
 
-  // ── Validate lessonId ────────────────────────────────────────────────────
   if (!lessonId || typeof lessonId !== 'string') {
     return reply(400, { error: 'lessonId is required' });
   }
 
-  // ── Validate passingScore ────────────────────────────────────────────────
   if (!Number.isInteger(passingScore) || (passingScore as number) < 0 || (passingScore as number) > 100) {
     return reply(400, { error: 'passingScore must be an integer between 0 and 100' });
   }
 
-  // ── Validate questions array ─────────────────────────────────────────────
   if (!Array.isArray(questions) || questions.length < 1) {
     return reply(400, { error: 'At least one question is required' });
   }
 
-  // ── Validate each question and its options ───────────────────────────────
   for (let qi = 0; qi < questions.length; qi++) {
     const q = questions[qi] as QuizQuestion;
 
@@ -55,7 +51,6 @@ export default adminEndpoint('quiz-admin-save', async ({ req, reply }) => {
 
     const opts = q.options as QuizOption[];
 
-    // Validate each option's field types first (isCorrect boolean check before aggregate hasCorrect check)
     for (let oi = 0; oi < opts.length; oi++) {
       const o = opts[oi];
 
@@ -74,9 +69,7 @@ export default adminEndpoint('quiz-admin-save', async ({ req, reply }) => {
     }
   }
 
-  // ── Atomic transaction: upsert quiz, replace questions+options ───────────
   const quiz = await withTransaction(async (client: PoolClient) => {
-    // 1. Upsert quiz by lesson_id (UNIQUE constraint is the conflict arbiter)
     const upsertResult = await client.query(
       `INSERT INTO quizzes (lesson_id, passing_score)
        VALUES ($1, $2)
@@ -86,13 +79,11 @@ export default adminEndpoint('quiz-admin-save', async ({ req, reply }) => {
     );
     const savedQuiz = upsertResult.rows[0] as { id: string; lesson_id: string; passing_score: number };
 
-    // 2. Delete all existing questions (CASCADE deletes their options)
     await client.query(
       'DELETE FROM quiz_questions WHERE quiz_id = $1',
       [savedQuiz.id],
     );
 
-    // 3. Re-insert questions and options in array order
     for (const q of questions as QuizQuestion[]) {
       const qInsert = await client.query(
         `INSERT INTO quiz_questions (quiz_id, question_text, sort_order)
@@ -104,13 +95,12 @@ export default adminEndpoint('quiz-admin-save', async ({ req, reply }) => {
 
       const opts = q.options as QuizOption[];
 
-      // Build multi-row VALUES for all options in one insert.
       // sort_order = array index: old client inserted without sort_order leaving all 0/nondeterministic;
       // this makes learner-side ordering deterministic.
       const valuePlaceholders: string[] = [];
       const optParams: unknown[] = [questionId];
       for (let oi = 0; oi < opts.length; oi++) {
-        const base = optParams.length; // 1-indexed placeholder offset
+        const base = optParams.length;
         valuePlaceholders.push(`($1, $${base + 1}, $${base + 2}, $${base + 3})`);
         optParams.push(opts[oi].optionText as string, opts[oi].isCorrect as boolean, oi);
       }

@@ -10,22 +10,21 @@ import React from 'react';
 // derivation and that a profiles failure renders an error, NOT the misleading
 // "all users are already admins" empty-state.
 
-// --- i18n echo: t/Trans return the key (Trans is used by PlatformAdminsSection). ---
+// `t`/`Trans` echo the key; Trans is used by PlatformAdminsSection.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
   Trans: ({ i18nKey }: { i18nKey: string }) => React.createElement('span', null, i18nKey),
 }));
 
-// --- mock AppLayout as a simple passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- passthrough Select: each item is a button so candidate names render into
-// the DOM (jsdom can't drive the Radix Select portal). ---
+// Passthrough Select: each item is a button so candidate names render into the
+// DOM (jsdom can't drive the Radix Select portal).
 vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
-// --- passthrough AlertDialog (not exercised here, but the section imports it). ---
+// Passthrough AlertDialog — not exercised here, but the section imports it.
 vi.mock('@/components/ui/alert-dialog', () => {
   const pass = ({ children }: { children?: React.ReactNode }) =>
     React.createElement('div', null, children);
@@ -41,12 +40,10 @@ vi.mock('@/components/ui/alert-dialog', () => {
   };
 });
 
-// --- mock api-client so no network fires ---
 vi.mock('@/lib/api-client', () => ({
   callApi: vi.fn(),
 }));
 
-// --- mock sonner toast ---
 vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
@@ -76,7 +73,6 @@ const profiles = [
 ];
 
 function renderPage() {
-  // retry:false so a profiles failure surfaces immediately as an error.
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -110,23 +106,18 @@ describe('PlatformSettings — platform-settings-derived (#198)', () => {
     renderPage();
     await openAdminsTab();
 
-    // Current admins (is_platform_admin === true) are listed.
     await waitFor(() => {
       expect(screen.getByText('Ada Admin')).toBeInTheDocument();
     });
     expect(screen.getByText('Bo Boss')).toBeInTheDocument();
 
-    // The lone non-admin is offered as a grant candidate (a Select item button).
     expect(screen.getByRole('button', { name: 'Cy Candidate' })).toBeInTheDocument();
-    // ...and it is NOT shown in the current-admins list.
     expect(screen.queryByText('Cy Candidate')).toBe(
       screen.getByRole('button', { name: 'Cy Candidate' }),
     );
-    // Admins are not offered as grant candidates.
     expect(screen.queryByRole('button', { name: 'Ada Admin' })).toBeNull();
 
-    // Both lists came from ONE profiles read — the dropped /api/platform-admins
-    // endpoint is never called.
+    // Both lists come from ONE profiles read — the dropped /api/platform-admins endpoint is never called.
     const profilesCalls = mockCallApi.mock.calls.filter((a: unknown[]) => a[0] === '/api/profiles');
     expect(profilesCalls).toHaveLength(1);
     const adminsCalls = mockCallApi.mock.calls.filter((a: unknown[]) => a[0] === '/api/platform-admins');
@@ -143,15 +134,13 @@ describe('PlatformSettings — platform-settings-derived (#198)', () => {
     renderPage();
     await openAdminsTab();
 
-    // The failure surfaces as an explicit error, with a retry.
     await waitFor(() => {
       expect(screen.getByText('platformAdmins.loadFailedTitle')).toBeInTheDocument();
     });
     expect(screen.getByText('platformAdmins.loadFailedDescription')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'platformSettings.retry' })).toBeInTheDocument();
 
-    // The misleading empty-state (rendered when the candidate list is empty) must
-    // NOT appear — an error is an error, not "everyone is already an admin".
+    // An error must NOT render as the "no candidates" empty-state.
     expect(screen.queryByText('platformAdmins.noCandidates')).toBeNull();
     expect(screen.queryByText('platformAdmins.empty')).toBeNull();
   });

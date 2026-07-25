@@ -1,8 +1,5 @@
-// Community Module Type Definitions
-
 import type { Profile, Organization } from './types';
 
-// Enums
 export type CommunityScope = 'org' | 'global';
 /**
  * The community page's view selector: the two post scopes plus the events tab
@@ -14,8 +11,7 @@ export type ReportStatus = 'pending' | 'reviewed' | 'dismissed';
 type ReportTargetType = 'post' | 'comment';
 export type BusinessArea = 'hr' | 'finance' | 'sales' | 'support' | 'ops' | 'it' | 'legal' | 'other';
 
-// Extended idea status (includes new values)
-export type IdeaStatusExtended = 
+export type IdeaStatusExtended =
   | 'draft' 
   | 'submitted' 
   | 'under_review' 
@@ -28,7 +24,6 @@ export type IdeaStatusExtended =
   | 'done'
   | 'archived';
 
-// Category interface
 export interface CommunityCategory {
   id: string;
   name: string;
@@ -40,7 +35,6 @@ export interface CommunityCategory {
   created_at: string;
 }
 
-// Post interface
 export interface CommunityPost {
   id: string;
   scope: CommunityScope;
@@ -59,14 +53,12 @@ export interface CommunityPost {
   event_recording_url: string | null;
   created_at: string;
   updated_at: string;
-  // Joined relations
   category?: CommunityCategory;
   profile?: Profile;
   organization?: Organization;
   comment_count?: number;
 }
 
-// Comment interface
 export interface CommunityComment {
   id: string;
   post_id: string;
@@ -76,12 +68,10 @@ export interface CommunityComment {
   is_hidden: boolean;
   created_at: string;
   updated_at: string;
-  // Joined relations
   profile?: Profile;
   replies?: CommunityComment[];
 }
 
-// Report interface
 export interface CommunityReport {
   id: string;
   reporter_user_id: string;
@@ -104,14 +94,12 @@ export interface CommunityReport {
    *  (+ null lock); NULL when the target was deleted. */
   target_is_hidden?: boolean | null;
   target_is_locked?: boolean | null;
-  // Joined relations
   reporter?: Profile;
   reviewer?: Profile;
   target_post?: CommunityPost;
   target_comment?: CommunityComment;
 }
 
-// Enhanced Idea interface (with new fields)
 export interface EnhancedIdea {
   id: string;
   org_id: string;
@@ -128,7 +116,6 @@ export interface EnhancedIdea {
   submitted_at: string | null;
   created_at: string;
   updated_at: string;
-  // New structured fields
   business_area: BusinessArea | null;
   tags: string[];
   current_process: string | null;
@@ -144,10 +131,8 @@ export interface EnhancedIdea {
   // Prioritization scores (#118) — admin-set Value/Effort, 1=Low 2=Med 3=High, null=unscored
   value_score: number | null;
   effort_score: number | null;
-  // Admin-only fields
   admin_notes: string | null;
   rejection_reason: string | null;
-  // Joined relations
   profile?: Profile;
   organization?: Organization;
   comment_count?: number;
@@ -155,7 +140,6 @@ export interface EnhancedIdea {
   user_has_voted?: boolean;
 }
 
-// Idea comment (idea_comments row + the server's joined profile embed)
 export interface IdeaComment {
   id: string;
   idea_id: string;
@@ -167,7 +151,6 @@ export interface IdeaComment {
   profile: { id: string; full_name: string | null; avatar_url?: string | null } | null;
 }
 
-// Business area options for forms
 export const BUSINESS_AREAS: { value: BusinessArea; label: string }[] = [
   { value: 'hr', label: 'HR / People' },
   { value: 'finance', label: 'Finance / Accounting' },
@@ -192,7 +175,6 @@ export const IDEA_STATUS_OPTIONS: { value: IdeaStatusExtended; labelKey: string 
   { value: 'done', labelKey: 'community.ideaStatus.done' },
 ];
 
-// Form types
 export interface CreatePostInput {
   scope: CommunityScope;
   org_id?: string;
@@ -246,7 +228,6 @@ export interface UpdateIdeaStatusInput {
   rejection_reason?: string;
 }
 
-// Filter types
 export interface PostFilters {
   category_id?: string;
   tags?: string[];

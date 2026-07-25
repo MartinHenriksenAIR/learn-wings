@@ -57,7 +57,6 @@ function generateEmailHtml({
     ? 'Du er blevet inviteret til at blive Platform Administrator på AI Uddannelse.'
     : `Du er blevet inviteret til at blive ${roleLabel} hos <strong>${orgName}</strong> på AI Uddannelse.`;
 
-  // Logo served from SWA static assets — not Supabase storage
   const logoUrl = `${process.env.STATIC_ASSETS_BASE_URL ?? 'https://ai-uddannelse.dk'}/logo-light.png`;
 
   return `
@@ -128,7 +127,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
   try {
     const user = await authenticate(req);
 
-    // Platform admin OR org admin can send invitations
     const profile = await queryOne<{ is_platform_admin: boolean; is_org_admin: boolean }>(
       `SELECT p.is_platform_admin,
         EXISTS(
@@ -147,7 +145,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return corsResponse(origin, 400, { error: 'Missing required fields: email and inviteLink' });
     }
 
-    // Validate invite link domain — only production domain allowed
     try {
       const linkUrl = new URL(inviteLink);
       if (!allowedLinkDomains().includes(linkUrl.hostname)) {

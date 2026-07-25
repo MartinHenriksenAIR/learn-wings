@@ -14,7 +14,6 @@ import { generatePDF, type DeptRow, type CourseRow, type LevelRow, type ReportDa
 const TARGET = 80; // baseline participation target (%), per department and overall
 const REFRESHER_MONTHS = 12;
 
-// ---- data assembly helpers ----
 const LVL_NUM: Record<string, number> = { basic: 1, intermediate: 2, advanced: 3 };
 const LVL_BY_NUM: Record<number, LevelKey> = { 1: 'basic', 2: 'intermediate', 3: 'advanced' };
 
@@ -46,7 +45,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const lang = resolveLang(language);
     const s = STRINGS[lang];
 
-    // Access + caller identity in one lookup (entra_oid-scoped)
     const caller = await queryOne<{ full_name: string; is_platform_admin: boolean; is_org_admin: boolean }>(
       `SELECT p.full_name, p.is_platform_admin,
         EXISTS(
@@ -65,7 +63,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return { status: 404, headers: getCorsHeaders(origin), body: JSON.stringify({ error: 'Organization not found' }) };
     }
 
-    // Course completion across the org's enabled courses (§3 + the "AI-literacy course" set)
     const courseStats = await query<CourseStat>(
       `SELECT c.title,
         COUNT(e.user_id) AS enrolled,
@@ -78,7 +75,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [orgId]
     );
 
-    // Active members: department, assessed level, trained flag, latest completion
     const members = await query<MemberRow>(
       `SELECT p.department, p.assessment_level::text AS assessment_level,
         EXISTS(
@@ -95,7 +91,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [orgId]
     );
 
-    // ---- assemble ----
     const staff = members.length;
     const trained = members.filter((m) => m.trained).length;
     const participation = staff ? Math.round((trained / staff) * 100) : 0;

@@ -50,8 +50,6 @@ describe('quiz-admin-save', () => {
     mockGetProfile.mockResolvedValue(adminProfile);
   });
 
-  // ── Auth & preflight ─────────────────────────────────────────────────────────
-
   it('handles OPTIONS preflight', async () => {
     const req = { method: 'OPTIONS', headers: { get: () => 'https://ai-uddannelse.dk' } } as any;
     const res = await handler(req, {} as any);
@@ -79,8 +77,6 @@ describe('quiz-admin-save', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // ── Validation: lessonId ─────────────────────────────────────────────────────
-
   it('returns 400 when lessonId is missing', async () => {
     const { lessonId: _l, ...body } = validBody;
     const res = await handler(baseReq(body), {} as any);
@@ -99,8 +95,6 @@ describe('quiz-admin-save', () => {
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'lessonId is required' });
   });
-
-  // ── Validation: passingScore ────────────────────────────────────────────────
 
   it('returns 400 when passingScore is a float', async () => {
     const res = await handler(baseReq({ ...validBody, passingScore: 70.5 }), {} as any);
@@ -151,8 +145,6 @@ describe('quiz-admin-save', () => {
     expect(res.status).toBe(200);
   });
 
-  // ── Validation: questions ────────────────────────────────────────────────────
-
   it('returns 400 when questions is missing', async () => {
     const { questions: _q, ...body } = validBody;
     const res = await handler(baseReq(body), {} as any);
@@ -171,8 +163,6 @@ describe('quiz-admin-save', () => {
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'At least one question is required' });
   });
-
-  // ── Validation: per-question ─────────────────────────────────────────────────
 
   it('returns 400 when questionText is empty string', async () => {
     const res = await handler(baseReq({
@@ -286,8 +276,6 @@ describe('quiz-admin-save', () => {
     expect(body.error).toContain('isCorrect');
   });
 
-  // ── Happy path ───────────────────────────────────────────────────────────────
-
   it('happy path: withTransaction called, correct SQL sequence executed, 200 response', async () => {
     const mockClientQuery = vi.fn()
       .mockResolvedValueOnce({ rows: [{ id: 'quiz-1', lesson_id: 'lesson-1', passing_score: 70 }] }) // upsert
@@ -345,10 +333,8 @@ describe('quiz-admin-save', () => {
     // Call 3: INSERT options; sort_order = array index, is_correct values correct
     const [optInsertSql, optInsertParams] = mockClientQuery.mock.calls[3] as [string, unknown[]];
     expect(optInsertSql).toContain('INSERT INTO quiz_options');
-    // sort_order for first option = 0, second option = 1
     expect(optInsertParams).toContain(0); // sort_order of option[0]
     expect(optInsertParams).toContain(1); // sort_order of option[1]
-    // is_correct values
     expect(optInsertParams).toContain(false);
     expect(optInsertParams).toContain(true);
   });
@@ -392,7 +378,6 @@ describe('quiz-admin-save', () => {
     const res = await handler(baseReq(body), {} as any);
     expect(res.status).toBe(200);
 
-    // 6 calls total: upsert + delete + q1_insert + q1_opts + q2_insert + q2_opts
     expect(mockClientQuery).toHaveBeenCalledTimes(6);
 
     // q2 insert is call index 4
@@ -401,8 +386,6 @@ describe('quiz-admin-save', () => {
     expect(q2InsertParams[1]).toBe('Q2');
     expect(q2InsertParams[2]).toBe(1);
   });
-
-  // ── Transaction rollback ─────────────────────────────────────────────────────
 
   it('returns 500 with err.message when transaction throws mid-sequence', async () => {
     mockWithTransaction.mockImplementationOnce(async (cb: any) => {
@@ -415,8 +398,6 @@ describe('quiz-admin-save', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
-
-  // ── 500 on auth-level DB error ───────────────────────────────────────────────
 
   it('returns 500 on auth-level db error propagating err.message', async () => {
     mockWithTransaction.mockRejectedValueOnce(new Error('connection pool exhausted'));

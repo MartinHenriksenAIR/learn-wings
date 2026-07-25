@@ -4,12 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- AppLayout passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- stub the feed's heavy children (not under test here) ---
 vi.mock('@/components/community/PostCard', () => ({
   PostCard: ({ post }: { post: { title: string } }) => <div data-testid="post-card">{post.title}</div>,
 }));
@@ -20,7 +18,6 @@ vi.mock('@/components/community/CommunityEmptyState', () => ({
 vi.mock('@/components/community/AIChampionsList', () => ({ AIChampionsList: () => null }));
 vi.mock('@/components/community/UpcomingEvents', () => ({ UpcomingEvents: () => null }));
 
-// --- mock the community api: fetchPosts returns events per scope ---
 const mockFetchPosts = vi.fn();
 vi.mock('@/lib/community-api', () => ({
   fetchPosts: (...args: unknown[]) => mockFetchPosts(...args),
@@ -133,7 +130,6 @@ describe('Community Events tab (#125)', () => {
     renderAt('/community?scope=events');
 
     expect(await screen.findByText('Soon Global Event')).toBeInTheDocument();
-    // No feed chrome on the events view.
     expect(screen.queryByPlaceholderText('community.searchPosts')).not.toBeInTheDocument();
   });
 
@@ -149,7 +145,6 @@ describe('Community Events tab (#125)', () => {
     renderAt('/community?scope=events');
 
     await screen.findByText('Soon Global Event');
-    // Org event is merged in.
     expect(screen.getByText('Mid Org Event')).toBeInTheDocument();
 
     // Join links appear in soonest-first order: soon (2999-01) < org-mid

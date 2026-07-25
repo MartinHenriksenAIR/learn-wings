@@ -29,7 +29,6 @@ export default endpoint('resources', async ({ req, reply, requireActiveMember })
     return reply(400, { error: 'tags must be an array of strings' });
   }
 
-  // Authorization: platform admin OR active member of the org
   await requireActiveMember(orgId);
 
   const conditions: string[] = [];
@@ -68,7 +67,7 @@ export default endpoint('resources', async ({ req, reply, requireActiveMember })
     ORDER BY r.is_pinned DESC, r.created_at DESC
   `, params);
 
-  // Distinct tags for the org, regardless of search/type/tag filters — powers the tag dropdown.
+  // Distinct tags for the org, regardless of search/type/tag filters.
   const tagsRow = await queryOne<{ all_tags: string[] }>(
     `SELECT COALESCE(array_agg(DISTINCT t ORDER BY t), '{}'::text[]) AS all_tags
      FROM community_resources r, unnest(r.tags) AS t

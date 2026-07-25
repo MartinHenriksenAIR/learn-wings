@@ -64,7 +64,6 @@ describe('lesson-progress', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
     expect(mockIsActiveMember).toHaveBeenCalledWith('p1', 'org-1');
 
-    // No INSERT into lesson_progress should have been made
     const upsertCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('lesson_progress'));
     expect(upsertCall).toBeUndefined();
   });

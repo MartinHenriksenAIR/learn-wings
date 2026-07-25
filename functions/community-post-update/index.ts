@@ -41,14 +41,12 @@ export default endpoint('community-post-update', async ({ req, profile, reply })
 
   const updatesObj = updates as Record<string, unknown>;
 
-  // Validate update fields whitelist
   for (const key of Object.keys(updatesObj)) {
     if (!ALLOWED_UPDATE_FIELDS.has(key)) {
       return reply(400, { error: `Invalid update field: ${key}` });
     }
   }
 
-  // Collect whitelisted keys present in updates
   const updateKeys = Object.keys(updatesObj).filter((k) => ALLOWED_UPDATE_FIELDS.has(k));
   if (updateKeys.length === 0) {
     return reply(400, { error: 'No valid update fields provided' });
@@ -64,14 +62,12 @@ export default endpoint('community-post-update', async ({ req, profile, reply })
     }
   }
 
-  // Load post
   const post = await queryOne<PostRow>(
     `SELECT user_id, scope, org_id, is_hidden, category_id FROM community_posts WHERE id = $1`,
     [postId],
   );
   if (!post) return reply(404, { error: 'Post not found' });
 
-  // Authorization
   let authorized = false;
 
   if (profile.is_platform_admin) {
@@ -79,12 +75,10 @@ export default endpoint('community-post-update', async ({ req, profile, reply })
   } else if (post.scope === 'org' && post.org_id && await isOrgAdmin(profile.id, post.org_id)) {
     authorized = true;
   } else if (post.user_id === profile.id) {
-    // Author can only edit if not hidden
     if (post.is_hidden) {
       return reply(403, { error: 'Forbidden' });
     }
 
-    // Author cannot edit posts in restricted categories
     const currentCatRow = await queryOne<{ is_restricted: boolean }>(
       `SELECT is_restricted FROM community_categories WHERE id = $1`,
       [post.category_id],
@@ -112,7 +106,6 @@ export default endpoint('community-post-update', async ({ req, profile, reply })
 
   if (!authorized) return reply(403, { error: 'Forbidden' });
 
-  // Build dynamic UPDATE
   const params: unknown[] = [];
   const setClauses = updateKeys.map((key) => {
     params.push(updatesObj[key]);

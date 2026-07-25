@@ -224,7 +224,6 @@ function readAscii(bytes: Uint8Array, offset: number, length: number): string {
   return out;
 }
 
-// ─── Canvas shim ─────────────────────────────────────────────────────────────
 // Everything below touches the Canvas API, which jsdom does not implement. The
 // unit tests drive it through stubbed `getContext`/`toBlob` prototypes;
 // file-upload.test.tsx covers the fail-open paths as the component sees them.

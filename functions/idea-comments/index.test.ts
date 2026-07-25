@@ -98,11 +98,9 @@ describe('idea-comments', () => {
     const res = await handler(baseReq({ ideaId: 'idea-999' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ comments: [] });
-    // comments query must NOT be issued
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // Draft privacy: other-author's draft → 200 {comments: []}
   it('returns 200 empty comments for another author\'s draft', async () => {
     mockQueryOne.mockResolvedValueOnce(othersDraft);
     const res = await handler(baseReq({ ideaId: 'idea-2' }), {} as any);
@@ -111,7 +109,6 @@ describe('idea-comments', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // No-admin-bypass on draft visibility
   it('returns 200 empty comments for another author\'s draft even when caller is platform admin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce(othersDraft);
@@ -142,7 +139,6 @@ describe('idea-comments', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // Own draft → comments returned
   it('returns comments for caller\'s own draft', async () => {
     mockQueryOne.mockResolvedValueOnce(ownDraft);
     mockIsActiveMember.mockResolvedValueOnce(true);
@@ -152,7 +148,6 @@ describe('idea-comments', () => {
     expect(JSON.parse(res.body as string)).toEqual({ comments: [sampleComment] });
   });
 
-  // Happy member path asserting SQL shape
   it('happy path: returns comments with profile embed ordered by created_at ASC', async () => {
     mockQueryOne.mockResolvedValueOnce(submittedIdea);
     mockIsActiveMember.mockResolvedValueOnce(true);
@@ -169,7 +164,6 @@ describe('idea-comments', () => {
     expect(params).toContain('idea-1');
   });
 
-  // Platform admin bypasses membership check
   it('platform admin bypasses membership check and gets comments', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce(submittedIdea);

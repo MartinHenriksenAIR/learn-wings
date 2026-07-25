@@ -5,7 +5,6 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
   const { orgId } = await req.json() as { orgId?: string };
 
   if (orgId) {
-    // Single org lookup
     await requireActiveMember(orgId);
 
     const organization = await queryOne(

@@ -8,9 +8,6 @@ export default endpoint('organization-create', async ({ req, reply, requirePlatf
   const body = await req.json() as Record<string, unknown>;
   const { name, slug, logo_url, seat_limit } = body;
 
-  // Validation first (matches resource-create / org-settings-update order),
-  // authz second. Rules live in shared/org-validation (mirrored by the
-  // frontend zod schema in src/lib/org-validation.ts).
   const nameError = validateOrgName(name);
   if (nameError) {
     return reply(400, { error: nameError });
@@ -72,9 +69,6 @@ export default endpoint('organization-create', async ({ req, reply, requirePlatf
 
     return reply(200, { organization });
   } catch (dbErr: unknown) {
-    // Postgres unique_violation on the slug UNIQUE constraint.
-    // `code` is the structured machine-readable error code (ADR-0013) —
-    // the frontend matches on it instead of the English sentence.
     if (isUniqueViolation(dbErr)) {
       return reply(409, { error: 'Slug already in use', code: 'DUPLICATE_SLUG' });
     }

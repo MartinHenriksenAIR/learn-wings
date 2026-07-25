@@ -165,7 +165,7 @@ describe('organization-update', () => {
   });
 
   it('returns 404 when organization does not exist', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // UPDATE RETURNING null = no row matched
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ orgId: 'org-x', updates: { name: 'New Name' } }), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization not found' });
@@ -180,7 +180,7 @@ describe('organization-update', () => {
       seat_limit: 25,
       created_at: '2026-06-06T12:00:00.000Z',
     };
-    mockQueryOne.mockResolvedValueOnce(updated); // UPDATE RETURNING
+    mockQueryOne.mockResolvedValueOnce(updated);
     const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ organization: updated });
@@ -226,8 +226,6 @@ describe('organization-update', () => {
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
-
-  // --- Org-admin logo_url parity (RLS 20260128223657) ---
 
   it('org admin of the target org can update logo_url only', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
@@ -284,8 +282,6 @@ describe('organization-update', () => {
     expect(params).toEqual([null, 'org-1']);
   });
 
-  // --- Superseded-logo cleanup (#275) ---
-
   const logoUpdate = (logo_url: string | null) => ({ orgId: 'org-1', updates: { logo_url } });
 
   it('logo replaced: deletes the OLD blob exactly once', async () => {
@@ -319,7 +315,7 @@ describe('organization-update', () => {
   });
 
   it('logo_url absent from updates is NOT a clear: no SELECT, no delete', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // single call — the UPDATE
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' });
     const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
     expect(res.status).toBe(200);
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
@@ -364,8 +360,6 @@ describe('organization-update', () => {
     expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
-  // --- Upload size/type enforcement (#276) ---
-
   it('413 when the new logo is over cap: no UPDATE is issued', async () => {
     mockQueryOne.mockResolvedValueOnce({ logo_url: null }); // only the previous-logo SELECT
     mockEnforceUploadLimits.mockResolvedValueOnce('Image exceeds the maximum upload size of 10 MB');
@@ -408,8 +402,6 @@ describe('organization-update', () => {
     expect(mockAssertBindablePaths).not.toHaveBeenCalled();
   });
 
-  // --- Path ownership (the BLOCKERs) ---
-  //
   // Being an admin of THIS org says nothing about whether the path supplied is
   // this org's. `/organizations` hands `logo_url` to plain learners, so every
   // other org's logo path is readable by anyone with an account.

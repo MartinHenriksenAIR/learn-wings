@@ -48,21 +48,18 @@ export default function CoursePlayer() {
   // Lessons already completed on load render the completed state with no animation.
   const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set());
 
-  // Quiz state
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<(QuizQuestion & { options: QuizOption[] })[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
 
-  // Signed URLs for secure content access
   const [signedVideoUrl, setSignedVideoUrl] = useState<string | null>(null);
   const [signedDocUrl, setSignedDocUrl] = useState<string | null>(null);
   const [azureVideoUrl, setAzureVideoUrl] = useState<string | null>(null);
   const [azureDocUrl, setAzureDocUrl] = useState<string | null>(null);
   const [loadingAssets, setLoadingAssets] = useState(false);
 
-  // Course completion and review state
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [existingReview, setExistingReview] = useState<CourseReview | null>(null);
@@ -143,7 +140,6 @@ export default function CoursePlayer() {
     loadQuiz();
   }, [currentLesson]);
 
-  // Load signed URLs for secure content access when lesson changes
   useEffect(() => {
     const loadSignedUrls = async () => {
       if (!currentLesson) {
@@ -156,7 +152,6 @@ export default function CoursePlayer() {
 
       setLoadingAssets(true);
       try {
-        // Check for Azure blob path first (preferred for videos)
         if (currentLesson.azure_blob_path) {
           const data = await callApi<{ viewUrl: string }>('/api/azure-view-url', {
             blobPath: currentLesson.azure_blob_path, lessonId: currentLesson.id,
@@ -178,10 +173,8 @@ export default function CoursePlayer() {
           setAzureVideoUrl(null);
         }
 
-        // Load document URL - check if it's an Azure path (starts with 'documents/')
         if (currentLesson.document_storage_path) {
           if (currentLesson.document_storage_path.startsWith('documents/')) {
-            // Azure-stored document
             const data = await callApi<{ viewUrl: string }>('/api/azure-view-url', {
               blobPath: currentLesson.document_storage_path, lessonId: currentLesson.id,
             });
@@ -193,7 +186,6 @@ export default function CoursePlayer() {
             }
             setSignedDocUrl(null);
           } else {
-            // Legacy storage-path document
             const docUrl = await getSignedAssetUrl(currentLesson.document_storage_path);
             setSignedDocUrl(docUrl);
             setAzureDocUrl(null);
@@ -273,7 +265,6 @@ export default function CoursePlayer() {
         // Routine confirmation: the sidebar status dot pops in green (and the
         // footer shows the Completed badge) — no success toast.
 
-        // Auto-advance to next lesson if not last
         const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
         if (currentIndex < allLessons.length - 1) {
           setCurrentLesson(allLessons[currentIndex + 1]);
@@ -364,7 +355,6 @@ export default function CoursePlayer() {
       ]}
     >
       <div className="grid items-start gap-5 lg:grid-cols-[320px,1fr]">
-        {/* Sidebar - Module List */}
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
           <div className="border-b border-[#eceef3] px-[18px] pb-3.5 pt-[18px]">
             <h2 className="mb-3 font-display text-[15px] font-extrabold leading-[1.3]">{course.title}</h2>
@@ -447,7 +437,6 @@ export default function CoursePlayer() {
           </div>
         </div>
 
-        {/* Main Content */}
         {currentLesson ? (
           <div className="rounded-2xl border border-border bg-card px-[26px] py-6">
             <div className="mb-[18px] flex items-center gap-2.5">
@@ -457,7 +446,6 @@ export default function CoursePlayer() {
               <h2 className="font-display text-lg font-extrabold">{currentLesson.title}</h2>
             </div>
 
-            {/* Lesson content based on type */}
             {currentLesson.lesson_type === 'video' && (
               <div className="space-y-4">
                 <div className="flex aspect-video items-center justify-center overflow-hidden rounded-[14px] bg-muted">
@@ -560,7 +548,6 @@ export default function CoursePlayer() {
                         (() => {
                           const isLastLesson = currentIndex >= allLessons.length - 1;
 
-                          // Find current module and check if this is the last lesson in the module
                           const currentModule = modules.find(m => m.lessons.some(l => l.id === currentLesson.id));
                           const isLastInModule = currentModule &&
                             currentModule.lessons[currentModule.lessons.length - 1]?.id === currentLesson.id;
@@ -757,7 +744,6 @@ export default function CoursePlayer() {
         )}
       </div>
 
-      {/* Course Completion Dialog */}
       {course && (
         <CourseCompletionDialog
           open={showCompletionDialog}
@@ -767,7 +753,6 @@ export default function CoursePlayer() {
         />
       )}
 
-      {/* Course Review Dialog */}
       {course && user && currentOrg && (
         <CourseReviewDialog
           open={showReviewDialog}

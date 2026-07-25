@@ -37,7 +37,6 @@ export interface BuildUpdateSetOk {
   params: unknown[];
 }
 
-/** Failure: a 400-worthy message the caller returns as `reply(400, { error })`. */
 export interface BuildUpdateSetError {
   ok: false;
   error: string;
@@ -55,11 +54,8 @@ export interface BuildUpdateSetOptions {
    * raw, un-validated values — guard any type assumption inside the transform.
    */
   transform?: (key: string, value: unknown) => unknown;
-  /** 400 message when `updates` fails the object-shape check. */
   notObjectError?: string;
-  /** 400 message factory for an unknown (non-whitelisted) key. */
   unknownKeyError?: (key: string) => string;
-  /** 400 message when no recognized keys remain. */
   emptyError?: string;
 }
 
@@ -87,7 +83,6 @@ export function buildUpdateSet(
   const unknownKeyError = options.unknownKeyError ?? DEFAULTS.unknownKeyError;
   const emptyError = options.emptyError ?? DEFAULTS.emptyError;
 
-  // 1. Shape: must be a non-null, non-array object.
   if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
     return { ok: false, error: notObjectError };
   }
@@ -102,7 +97,6 @@ export function buildUpdateSet(
     }
   }
 
-  // 3. Empty after the whitelist walk → error.
   if (updateKeys.length === 0) {
     return { ok: false, error: emptyError };
   }

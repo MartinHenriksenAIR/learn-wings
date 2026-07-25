@@ -42,10 +42,6 @@ interface InviteUserDialogProps {
   pending: boolean;
 }
 
-/**
- * Invite-user dialog. Owns its own form state (email/first/last/department/
- * role), reset each time the dialog opens.
- */
 export function InviteUserDialog({
   open,
   onOpenChange,
@@ -63,7 +59,6 @@ export function InviteUserDialog({
   const [department, setDepartment] = useState('');
   const [role, setRole] = useState<OrgRole>('learner');
 
-  // Reset the form each time the dialog opens so a fresh invite starts clean.
   useEffect(() => {
     if (open) {
       setEmail('');

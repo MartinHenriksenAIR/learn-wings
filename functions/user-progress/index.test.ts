@@ -229,7 +229,6 @@ describe('user-progress', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // ── All-orgs aggregate (orgId 'all') — platform admins only ──────────────
   describe('all-orgs aggregate (orgId "all")', () => {
     it('returns 403 for a non-platform-admin (org admins stay isolated)', async () => {
       mockIsOrgAdmin.mockResolvedValue(true);

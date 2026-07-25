@@ -40,7 +40,6 @@ describe('asset-signed-url', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
   });
 
-  // 1. 401 bad token
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -74,7 +73,6 @@ describe('asset-signed-url', () => {
     expect(ctx.error).toHaveBeenCalledWith(expect.stringContaining('db connection token expired'));
   });
 
-  // 2. 401 no profile
   it('returns 401 when profile is not found', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -84,7 +82,6 @@ describe('asset-signed-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 missing blobPath
   it('returns 400 when blobPath is missing from body', async () => {
     const res = await handler(baseReq({}) as any, {} as any);
 
@@ -92,7 +89,6 @@ describe('asset-signed-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'blobPath is required' });
   });
 
-  // 4. 400 empty-string blobPath
   it('returns 400 when blobPath is empty string', async () => {
     const res = await handler(baseReq({ blobPath: '' }) as any, {} as any);
 
@@ -100,7 +96,6 @@ describe('asset-signed-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'blobPath is required' });
   });
 
-  // 5. 403 when can_access false — SQL must contain BOTH thumbnail_url and video_storage_path branches
   it('returns 403 when can_access is false; SQL covers both lesson and thumbnail branches', async () => {
     mockQueryOne.mockResolvedValueOnce({ can_access: false });
 
@@ -112,10 +107,8 @@ describe('asset-signed-url', () => {
     const accessCall = mockQueryOne.mock.calls.find(c => (c[0] as string).includes('can_access'));
     expect(accessCall).toBeDefined();
     const [sql, params] = accessCall as [string, unknown[]];
-    // Both branches present
     expect(sql).toContain('thumbnail_url');
     expect(sql).toContain('video_storage_path');
-    // Params: profileId first, blobPath second
     expect(params).toEqual(['p1', 'thumbnails/course.jpg']);
   });
 
@@ -135,7 +128,6 @@ describe('asset-signed-url', () => {
     expect(sql).toContain('l.azure_blob_path = $2');
   });
 
-  // 6. Happy non-admin path → 200 with { url }
   it('returns 200 with url on happy member path', async () => {
     mockQueryOne.mockResolvedValueOnce({ can_access: true });
 
@@ -149,7 +141,6 @@ describe('asset-signed-url', () => {
     expect(body.url).toContain('videos/lesson.mp4');
   });
 
-  // 7. Platform admin bypass — queryOne NOT called → 200
   it('platform admin bypasses access check: queryOne not called, returns 200', async () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
 
@@ -161,7 +152,6 @@ describe('asset-signed-url', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  // 8. 500 db error: generic body, real message logged server-side (ADR-0014)
   it('returns 500 when db throws with generic body, real error logged on context', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
     const ctx = { error: vi.fn() };

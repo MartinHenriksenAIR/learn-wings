@@ -49,7 +49,7 @@ export interface AuthedCtx {
   req: HttpRequest;                  // body parsing stays the endpoint's job — the module never touches the body
   context: InvocationContext;
   origin: string | null;
-  user: AuthUser;                    // from shared/auth
+  user: AuthUser;
   profile: CallerProfile;            // from shared/profile — non-null by construction
   reply(status: number, body: unknown): HttpResponseInit;   // exactly corsResponse(origin, status, body)
   // Guards throw Reply(403, { error: 'Forbidden' }) on denial. Custom 403 bodies:

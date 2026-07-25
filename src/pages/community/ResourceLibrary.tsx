@@ -69,7 +69,6 @@ export default function ResourceLibrary() {
 
   const isAdmin = effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
-  // Single fetch: filtered resources for display + the org's distinct tags for the dropdown.
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.communityResources.list(currentOrg?.id, debouncedSearch, selectedType, selectedTag),
     queryFn: () =>
@@ -83,7 +82,6 @@ export default function ResourceLibrary() {
   const resources = data?.resources ?? [];
   const allTags = data?.allTags ?? [];
 
-  // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: Omit<Parameters<typeof createResource>[0], 'org_id'>) =>
       createResource({
@@ -99,7 +97,6 @@ export default function ResourceLibrary() {
     },
   });
 
-  // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateResource>[1] }) =>
       updateResource(id, data),
@@ -113,7 +110,6 @@ export default function ResourceLibrary() {
     },
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteResource,
     onSuccess: () => {
@@ -126,7 +122,6 @@ export default function ResourceLibrary() {
     },
   });
 
-  // Pin toggle mutation
   const pinMutation = useMutation({
     mutationFn: ({ id, pinned }: { id: string; pinned: boolean }) =>
       toggleResourcePinned(id, pinned),
@@ -146,7 +141,6 @@ export default function ResourceLibrary() {
 
   return (
     <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.resources') }]}>
-      {/* Back to community */}
       <Button
         variant="ghost"
         onClick={() => navigate(`${routes.community.feed}?scope=org`)}
@@ -156,7 +150,6 @@ export default function ResourceLibrary() {
         {t('community.backToCommunity')}
       </Button>
 
-      {/* Header */}
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -175,7 +168,6 @@ export default function ResourceLibrary() {
         </Button>
       </div>
 
-      {/* Filters */}
       <div className="mb-5 flex flex-col gap-2.5 md:flex-row">
         <div className="relative flex-1">
           <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
@@ -222,7 +214,6 @@ export default function ResourceLibrary() {
         )}
       </div>
 
-      {/* Resources grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -252,7 +243,6 @@ export default function ResourceLibrary() {
         </div>
       )}
 
-      {/* Add/Edit form */}
       <ResourceForm
         open={showForm}
         onOpenChange={(open) => {
@@ -269,7 +259,6 @@ export default function ResourceLibrary() {
         }}
       />
 
-      {/* Delete confirmation */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

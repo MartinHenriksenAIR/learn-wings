@@ -8,8 +8,6 @@ import { getInitials, getAvatarColor } from '@/lib/utils';
 // pin that the internal derivation equals the old per-site logic and that any
 // explicit prop wins over the derived value.
 
-// Resolve a stored avatar path to a deterministic signed URL (real hook hits a
-// query). null/undefined path → no URL, so the fallback initials show.
 vi.mock('@/hooks/useSignedBrandingUrl', () => ({
   useSignedBrandingUrl: (path: string | null | undefined) => ({
     data: path ? `https://signed.example/${path}` : undefined,

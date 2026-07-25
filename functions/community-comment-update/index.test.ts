@@ -111,7 +111,6 @@ describe('community-comment-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // Org admin CAN edit hidden comments
   it('org admin can update a hidden comment in their org', async () => {
     const hiddenOtherComment = { ...otherUserComment, is_hidden: true };
     mockQueryOne.mockResolvedValueOnce(hiddenOtherComment);
