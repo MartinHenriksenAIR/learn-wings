@@ -1602,3 +1602,16 @@ Plus a classification rule for future surfaces. Ratifies the courses model alrea
 **Filed, not fixed here:** `organization-delete` drops the org row without ever collecting `organizations.logo_url` — a fourth instance of the same class, outside #280's stated scope. Also noted: nothing alerts on a sweep that aborts or that has reclaimed nothing for a week; every abort is a log line only.
 
 **Deploy:** merging auto-fires both workflows. Announce on PR #284.
+
+## 2026-07-25 — Codebase-wide comment audit (#287, PR #288)
+
+**Who:** claude (Fable) + emil. User-directed: comments had spread everywhere and were increasingly rot-prone as the codebase grows; keep only what cannot be inferred from reading the code.
+
+**What:** Comment-only sweep of `src/` + `functions/` — **248 files, −1,894/+201 lines, zero behavior change.** Removed: narration of the next line, section banners mirroring structure, JSDoc restating signatures, arrange/act/assert markers, changelog stamps with no reasoning. Kept: WHY-comments (invariants, security rationale, workarounds, deliberate trade-offs), all tool directives, issue-referenced decisions, and the convention-mandated pointer comments on hand-rolled endpoints. Run as 12 disjoint implementer subagent batches in 3 waves, then two adversarial whole-diff reviewers.
+
+- **Deliberately untouched:** `functions/orphan-sweep/` — its comments are decision records (TRIPWIRE docblocks, asymmetry-of-errors rule, CONSIDERED-AND-DECLINED notes); a dedicated conservative pass confirmed zero removable lines. The storage/SAS cluster (`shared/upload-limits`/`blob`/`blob-ownership`/`sas`/`lms-asset`) kept near-100% — those comments are security rationale. Out of scope: `migration/azure/*.sql` + `shared/__fixtures__/schema.ts` (fixture-coupled schema documentation of record), `supabase/` (authz provenance), vendored workflow templates.
+- **Review pass:** an exhaustive hunk-by-hunk verifier matched every removed/added non-comment line byte-for-byte — verdict comment-only; no tool directive, string literal, or SQL `--` data touched. The judgment reviewer found one removal worth restoring — the #176 adopt-invites-BEFORE-memberships-load ordering invariant in `user-context` — plus one stray test re-indent; both fixed pre-merge.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 102 files / 765 pass · `build` exit 0; functions `build` exit 0 · `test` 138 files / 2454 pass (3 skipped). CI green on PR #288.
+
+**Deploy:** merging auto-fires both workflows (comment-only — no functional change expected). Announce on PR #288.
