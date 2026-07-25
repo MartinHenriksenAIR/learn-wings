@@ -43,7 +43,6 @@ export function ResourceForm({
   const [url, setUrl] = useState('');
   const [tagsInput, setTagsInput] = useState('');
 
-  // Sync form fields when editResource changes
   useEffect(() => {
     if (editResource) {
       setTitle(editResource.title || '');
@@ -79,7 +78,6 @@ export function ResourceForm({
         tags: tags.length > 0 ? tags : undefined,
       });
 
-      // Reset form
       setTitle('');
       setDescription('');
       setResourceType('link');

@@ -182,7 +182,6 @@ export function CommentItem({
           <p className="whitespace-pre-wrap text-[13px] leading-[1.55] text-[#4a4f60]">{comment.content}</p>
         )}
 
-        {/* Nested replies */}
         {comment.replies && comment.replies.length > 0 && (
           <div className="mt-4 space-y-4">
             {comment.replies.map((reply) => (

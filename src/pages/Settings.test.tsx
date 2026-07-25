@@ -3,22 +3,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
-// --- mock AppLayout as a simple passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- mock api-client so no network fires ---
 const mockCallApi = vi.fn();
 vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
 }));
 
-// --- mock sonner toast (assertable spy) ---
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({ toast: (...args: unknown[]) => mockToast(...args) }));
 
-// --- mock react-i18next (t returns the key) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -26,7 +22,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// --- useAuth mock factory ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
 // Avatar signing hits a query hook; stub it so this focused save-feedback test
@@ -66,13 +61,11 @@ describe('Settings — profile save feedback (#20)', () => {
       });
     });
 
-    // Button morphs to the "Saved" label with success styling.
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'common.saved' })).toBeInTheDocument();
     });
     expect(screen.getByRole('button', { name: 'common.saved' }).className).toMatch(/bg-success/);
 
-    // No success toast is fired for the routine save.
     expect(mockToast).not.toHaveBeenCalledWith(
       expect.objectContaining({ variant: 'success' })
     );

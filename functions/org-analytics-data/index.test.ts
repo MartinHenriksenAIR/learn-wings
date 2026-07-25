@@ -44,8 +44,7 @@ describe('org-analytics-data', () => {
     const quizAttempts = [{ id: 'qa-1', score: 80 }];
     const org = { id: 'org-uuid', name: 'Test Org' };
 
-    mockQueryOne.mockResolvedValueOnce({ can_access: true }); // auth check
-    // Promise.all: members, enrollments, quizAttempts (query), org (queryOne)
+    mockQueryOne.mockResolvedValueOnce({ can_access: true });
     mockQuery.mockResolvedValueOnce(members);
     mockQuery.mockResolvedValueOnce(enrollments);
     mockQuery.mockResolvedValueOnce(quizAttempts);
@@ -59,16 +58,12 @@ describe('org-analytics-data', () => {
     expect(body.enrollments).toHaveLength(1);
     expect(body.quizAttempts).toHaveLength(1);
     expect(body.org.name).toBe('Test Org');
-    // assessment_level is present in single-org members rows
     expect(body.members[0].assessment_level).toBe('basic');
-    // SQL includes p.assessment_level
     const [membersSql] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(membersSql).toContain('p.assessment_level');
   });
 
   it('returns 403 when an org admin requests a different org (tenant isolation)', async () => {
-    // Simulate: the authz check returns can_access = false for a cross-org request.
-    // This mirrors the case where an org admin of org A requests org B.
     mockQueryOne.mockResolvedValueOnce({ can_access: false });
 
     const crossOrgReq = {
@@ -83,10 +78,9 @@ describe('org-analytics-data', () => {
     expect(JSON.parse(res.body).error).toBe('Forbidden');
   });
 
-  // ── All-orgs aggregate (orgId 'all') — platform admins only ──────────────
   describe('all-orgs aggregate (orgId "all")', () => {
     it('returns 403 for a non-platform-admin', async () => {
-      mockQueryOne.mockResolvedValueOnce({ is_admin: false }); // platform-admin check
+      mockQueryOne.mockResolvedValueOnce({ is_admin: false });
 
       const res = await handler(allOrgsReq as any, {} as any);
 
@@ -105,7 +99,7 @@ describe('org-analytics-data', () => {
       ];
       const quizAttempts = [{ id: 'qa1', score: 90, user_id: 'u1' }];
 
-      mockQueryOne.mockResolvedValueOnce({ is_admin: true }); // platform-admin check
+      mockQueryOne.mockResolvedValueOnce({ is_admin: true });
       mockQuery.mockResolvedValueOnce(members);
       mockQuery.mockResolvedValueOnce(enrollments);
       mockQuery.mockResolvedValueOnce(quizAttempts);
@@ -118,20 +112,15 @@ describe('org-analytics-data', () => {
       expect(body.enrollments).toHaveLength(2);
       expect(body.quizAttempts).toHaveLength(1);
 
-      // assessment_level is present in all-orgs members rows
       expect(body.members[0].assessment_level).toBeNull();    // org_admin → null (skipped/not prompted)
       expect(body.members[1].assessment_level).toBe('basic');
 
-      // members query dedups by user; enrollments/attempts span all orgs (no org bind param)
       const [membersSql] = mockQuery.mock.calls[0] as [string, unknown[]];
       expect(membersSql).toContain('DISTINCT ON');
-      // department is a profiles column, not an org_memberships one (om.department would 500)
       expect(membersSql).toContain('p.department');
       expect(membersSql).not.toContain('om.department');
-      // om.role and p.assessment_level are included for level-distribution exclusion logic
       expect(membersSql).toContain('om.role');
       expect(membersSql).toContain('p.assessment_level');
-      // ORDER BY includes om.role so org_admin rows win for dual-role users
       expect(membersSql).toContain('ORDER BY p.id, om.role');
       const enrollmentsCall = mockQuery.mock.calls[1] as [string, unknown[]?];
       expect(enrollmentsCall[0]).not.toContain('$1');
@@ -144,7 +133,6 @@ describe('org-analytics-data', () => {
 
       await handler(allOrgsReq as any, {} as any);
 
-      // exactly one queryOne (the platform-admin check), never the can_access join
       expect(mockQueryOne).toHaveBeenCalledTimes(1);
       const [authSql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
       expect(authSql).not.toContain('can_access');

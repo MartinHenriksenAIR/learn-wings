@@ -9,7 +9,6 @@ export default endpoint('enrollment-create', async ({ req, profile, reply, requi
   const body = await req.json() as { orgId?: unknown; userId?: unknown; courseId?: unknown; status?: unknown };
   const { orgId, userId, courseId, status } = body;
 
-  // Validation first, authz second, db third (mirrors org-membership-create).
   if (!orgId || typeof orgId !== 'string') {
     return reply(400, { error: 'orgId is required' });
   }
@@ -31,7 +30,6 @@ export default endpoint('enrollment-create', async ({ req, profile, reply, requi
   // via isOrgAdmin to match the suite's admin-create convention.
   await requireOrgAdmin(orgId);
 
-  // Course-precondition: course must exist and be published.
   const course = await queryOne<{ is_published: boolean }>(
     `SELECT is_published FROM courses WHERE id = $1`,
     [courseId],

@@ -1,5 +1,3 @@
-// AIR Academy Type Definitions
-
 export type OrgRole = 'org_admin' | 'learner';
 type MembershipStatus = 'active' | 'invited' | 'disabled';
 type InvitationStatus = 'pending' | 'accepted' | 'expired';
@@ -180,7 +178,6 @@ export interface CourseReview {
   profile?: Profile;
 }
 
-// Analytics types
 export interface OrgAnalytics {
   totalUsers: number;
   activeUsers7Days: number;
@@ -209,7 +206,6 @@ interface OrgAnalyticsSummary {
   completionRate: number;
 }
 
-// Seat requests (issue #127)
 export type SeatRequestStatus = 'pending' | 'fulfilled' | 'cancelled';
 
 export interface SeatRequest {

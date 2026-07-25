@@ -47,7 +47,6 @@ export function PriorityOverview({ ideas }: PriorityOverviewProps) {
 
   return (
     <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-      {/* Quadrant summary */}
       <div className="rounded-2xl border border-[#e4e6ee] bg-card p-4">
         <div className="grid grid-cols-2 gap-2">
           {BANDS.map((band) => (
@@ -61,7 +60,6 @@ export function PriorityOverview({ ideas }: PriorityOverviewProps) {
         </div>
       </div>
 
-      {/* Do next */}
       <div className="rounded-2xl border border-[#e4e6ee] bg-card p-4">
         <h3 className="mb-3 text-[13px] font-extrabold tracking-[0.02em]">
           {t('ideaManagement.prioritize.doNext')}
@@ -81,7 +79,6 @@ export function PriorityOverview({ ideas }: PriorityOverviewProps) {
         </ol>
       </div>
 
-      {/* By business area */}
       <div className="rounded-2xl border border-[#e4e6ee] bg-card p-4">
         <h3 className="mb-3 text-[13px] font-extrabold tracking-[0.02em]">
           {t('ideaManagement.prioritize.byBusinessArea')}

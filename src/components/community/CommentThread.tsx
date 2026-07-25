@@ -55,7 +55,6 @@ export function CommentThread({
   const [replyContent, setReplyContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Build nested comment tree
   const buildTree = (comments: CommunityComment[]): CommunityComment[] => {
     const map = new Map<string, CommunityComment>();
     const roots: CommunityComment[] = [];
@@ -127,7 +126,6 @@ export function CommentThread({
         {t('community.comments')} {comments.length > 0 && `(${comments.length})`}
       </h3>
 
-      {/* Comments list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -155,7 +153,6 @@ export function CommentThread({
         </div>
       )}
 
-      {/* Reply form */}
       {replyingTo && (
         <div className="ml-8 space-y-2 border-l-2 border-primary pl-4">
           <p className="text-[13px] text-muted-foreground">
@@ -191,7 +188,6 @@ export function CommentThread({
         </div>
       )}
 
-      {/* Locked banner */}
       {!readOnly && isLocked && (
         <div className="flex items-center gap-2.5 rounded-[14px] border border-[#efddb2] bg-[#fbf2dd] px-[18px] py-3.5 text-[13px] font-semibold text-[#8a5e10]">
           <Lock aria-hidden="true" className="h-[15px] w-[15px] shrink-0" />
@@ -199,7 +195,6 @@ export function CommentThread({
         </div>
       )}
 
-      {/* Add comment composer */}
       {!readOnly && !isLocked && currentUserId && (
         <div className="flex items-end gap-2.5 rounded-2xl border border-border bg-card p-4">
           {(currentUserAvatarPath || currentUserName) && (

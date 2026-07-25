@@ -98,8 +98,8 @@ describe('resource-update', () => {
   });
 
   it('allows null for description (nullable in schema)', async () => {
-    mockQueryOne.mockResolvedValueOnce(myResource); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'r1', description: null, profile: null }); // UPDATE
+    mockQueryOne.mockResolvedValueOnce(myResource);
+    mockQueryOne.mockResolvedValueOnce({ id: 'r1', description: null, profile: null });
     const res = await handler(baseReq({ resourceId: 'r1', updates: { description: null } }), {} as any);
     expect(res.status).toBe(200);
     const [, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
@@ -107,12 +107,27 @@ describe('resource-update', () => {
   });
 
   it('allows null for url (nullable in schema)', async () => {
-    mockQueryOne.mockResolvedValueOnce(myResource); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'r1', url: null, profile: null }); // UPDATE
+    mockQueryOne.mockResolvedValueOnce(myResource);
+    mockQueryOne.mockResolvedValueOnce({ id: 'r1', url: null, profile: null });
     const res = await handler(baseReq({ resourceId: 'r1', updates: { url: null } }), {} as any);
     expect(res.status).toBe(200);
     const [, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(params).toEqual([null, 'r1']);
+  });
+
+  it('returns 400 when url has a javascript: scheme (stored-XSS guard, #232)', async () => {
+    const res = await handler(baseReq({ resourceId: 'r1', updates: { url: 'javascript:alert(1)' } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'url must be a valid http(s) URL' });
+    // Rejected before any DB access (validation precedes the SELECT).
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('accepts a valid https url update', async () => {
+    mockQueryOne.mockResolvedValueOnce(myResource);
+    mockQueryOne.mockResolvedValueOnce({ id: 'r1', url: 'https://example.com', profile: null });
+    const res = await handler(baseReq({ resourceId: 'r1', updates: { url: 'https://example.com' } }), {} as any);
+    expect(res.status).toBe(200);
   });
 
   it('returns 400 when is_pinned is not boolean', async () => {
@@ -136,7 +151,7 @@ describe('resource-update', () => {
   });
 
   it('returns 404 when resource not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // SELECT
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ resourceId: 'r-x', updates: { title: 'x' } }), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Resource not found' });
@@ -151,8 +166,8 @@ describe('resource-update', () => {
   });
 
   it('happy path: author updates their own resource', async () => {
-    mockQueryOne.mockResolvedValueOnce(myResource); // SELECT
-    mockQueryOne.mockResolvedValueOnce({ id: 'r1', title: 'new', profile: null }); // UPDATE
+    mockQueryOne.mockResolvedValueOnce(myResource);
+    mockQueryOne.mockResolvedValueOnce({ id: 'r1', title: 'new', profile: null });
     const res = await handler(baseReq({ resourceId: 'r1', updates: { title: 'new' } }), {} as any);
     expect(res.status).toBe(200);
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];

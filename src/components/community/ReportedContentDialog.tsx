@@ -84,7 +84,6 @@ export function ReportedContentDialog({ open, onOpenChange, report }: ReportedCo
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Reported post */}
             <div className="rounded-2xl border border-border bg-card px-[22px] py-5">
               <div className="mb-3 flex items-center gap-2.5">
                 <Avatar className="h-9 w-9 shrink-0">
@@ -131,7 +130,6 @@ export function ReportedContentDialog({ open, onOpenChange, report }: ReportedCo
               </p>
             </div>
 
-            {/* Comment thread — read-only */}
             <CommentThread
               comments={comments}
               postId={post.id}

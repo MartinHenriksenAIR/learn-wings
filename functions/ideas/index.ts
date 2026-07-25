@@ -43,14 +43,11 @@ export default endpoint('ideas', async ({ req, profile, reply, requireActiveMemb
   const vSearch = search as string | undefined;
   const vUserId = userId as string | undefined;
 
-  // Authorization: platform admin OR active member of the org
   await requireActiveMember(orgId);
 
-  // Build dynamic WHERE + params
   const conditions: string[] = [];
   const params: unknown[] = [];
 
-  // org scoping
   params.push(orgId);
   conditions.push(`i.org_id = $${params.length}`);
 

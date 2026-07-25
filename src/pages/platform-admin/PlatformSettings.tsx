@@ -146,8 +146,6 @@ export default function PlatformSettings() {
   const platformAdminsTabActive = activeTab === 'platform_admins';
   const profilesQuery = useProfiles({ enabled: platformAdminsTabActive });
 
-  // Current admins: every user already holding is_platform_admin, projected to
-  // the shape PlatformAdminsSection renders.
   const admins = useMemo(
     () =>
       (profilesQuery.data ?? [])
@@ -156,14 +154,11 @@ export default function PlatformSettings() {
     [profilesQuery.data],
   );
 
-  // Grant candidates: every user who is not already a platform admin.
   const grantCandidates = useMemo(
     () => (profilesQuery.data ?? []).filter((p) => !p.is_platform_admin),
     [profilesQuery.data],
   );
 
-  // Grant/revoke flips is_platform_admin, so refresh the profiles read that both
-  // derived lists come from.
   const invalidatePlatformAdmins = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.profiles.all });
   };
@@ -182,8 +177,6 @@ export default function PlatformSettings() {
 
   const adminsPending = grantAdminMutation.isPending || revokeAdminMutation.isPending;
 
-  // Seed local form state from the server — runs the same switch as the old
-  // fetchSettings so merge semantics are byte-for-byte identical.
   useEffect(() => {
     if (!query.data) return;
     query.data.forEach((setting) => {
@@ -222,8 +215,6 @@ export default function PlatformSettings() {
     },
   });
 
-  // Per-panel disabled state derived from the single shared mutation: only the
-  // panel whose save is in flight is disabled (matches the old `saving === key`).
   const isSaving = (key: SettingsKey) =>
     saveSettingMutation.isPending && saveSettingMutation.variables?.key === key;
 

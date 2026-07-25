@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── hoist mock before any module load ────────────────────────────────────
 const { mockCallApi } = vi.hoisted(() => ({
   mockCallApi: vi.fn(),
 }));
@@ -9,11 +8,7 @@ vi.mock('./api-client', () => ({ callApi: mockCallApi }));
 
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from './storage';
 
-// ── extractLmsAssetPath ────────────────────────────────────────────────────
-
 describe('extractLmsAssetPath', () => {
-  // ── Azure blob URL branch ──────────────────────────────────────────────
-
   it('Azure SAS URL → container-relative blob path', () => {
     const url =
       'https://myaccount.blob.core.windows.net/lms-assets/course-thumbnails/abc.png' +
@@ -63,10 +58,6 @@ describe('extractLmsAssetPath', () => {
     expect(extractLmsAssetPath(url)).toBeNull();
   });
 
-  // ── Legacy storage-prefix branches (pinned — must not regress) ───────
-  // Matched by URL path prefix (/storage/v1/object/{sign,public}/lms-assets/),
-  // NOT by hostname — so any host carrying that path hits these branches.
-
   it('legacy signed-URL prefix → storage path', () => {
     const url =
       'https://legacy.example.com/storage/v1/object/sign/lms-assets/course-thumbnails/xyz.png?token=abc';
@@ -79,8 +70,6 @@ describe('extractLmsAssetPath', () => {
     expect(extractLmsAssetPath(url)).toBe('course-thumbnails/xyz.png');
   });
 
-  // ── Raw / non-URL paths (pinned) ─────────────────────────────────────
-
   it('raw container-relative path without leading slash → returned as-is', () => {
     expect(extractLmsAssetPath('course-thumbnails/abc.png')).toBe('course-thumbnails/abc.png');
   });
@@ -88,8 +77,6 @@ describe('extractLmsAssetPath', () => {
   it('raw path with leading slash → slash stripped', () => {
     expect(extractLmsAssetPath('/course-thumbnails/abc.png')).toBe('course-thumbnails/abc.png');
   });
-
-  // ── Null / empty / garbage (pinned) ──────────────────────────────────
 
   it('null input → null', () => {
     expect(extractLmsAssetPath(null)).toBeNull();
@@ -112,8 +99,6 @@ describe('extractLmsAssetPath', () => {
     expect(extractLmsAssetPath('https://cdn.example.com/some/image.png')).toBeNull();
   });
 });
-
-// ── getSignedLmsAssetUrl ───────────────────────────────────────────────────
 
 describe('getSignedLmsAssetUrl', () => {
   beforeEach(() => {

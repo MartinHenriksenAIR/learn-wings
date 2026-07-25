@@ -12,7 +12,6 @@ interface OrgStatCardsProps {
   seatLimit: number | null;
 }
 
-/** The four summary StatCards for the org-detail page. */
 export function OrgStatCards({
   activeCount,
   usedSeats,

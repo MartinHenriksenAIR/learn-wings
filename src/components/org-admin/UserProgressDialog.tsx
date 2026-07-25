@@ -60,7 +60,6 @@ export function UserProgressDialog({
   const courseProgress: CourseProgress[] = query.data?.courses ?? [];
   const loading = query.isLoading;
 
-  // Summary stats
   const totalEnrolled = courseProgress.length;
   const totalCompleted = courseProgress.filter(c => c.enrollmentStatus === 'completed').length;
   const allQuizAttempts = courseProgress.flatMap(c => c.quizAttempts);
@@ -117,7 +116,6 @@ export function UserProgressDialog({
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Summary Stats */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Card>
                 <CardContent className="p-3 text-center">
@@ -151,7 +149,6 @@ export function UserProgressDialog({
               </Card>
             </div>
 
-            {/* Course Progress */}
             <div className="space-y-3">
               <h3 className="font-semibold">Course Progress</h3>
               {courseProgress.length === 0 ? (
@@ -206,7 +203,6 @@ export function UserProgressDialog({
 
                         <CollapsibleContent>
                           <div className="border-t px-4 pb-4 pt-3">
-                            {/* Modules and Lessons */}
                             <div className="space-y-3">
                               {course.modules.map(module => (
                                 <div key={module.id}>
@@ -248,7 +244,6 @@ export function UserProgressDialog({
                               ))}
                             </div>
 
-                            {/* Quiz Attempts */}
                             {course.quizAttempts.length > 0 && (
                               <div className="mt-4">
                                 <p className="mb-2 text-sm font-medium">Quiz Attempts</p>

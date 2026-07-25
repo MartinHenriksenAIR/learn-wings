@@ -6,17 +6,14 @@ import { queryKeys } from './query-keys';
 // matters because TanStack Query invalidation uses prefix matching.
 
 describe('queryKeys', () => {
-  // organizations
   it('organizations.all returns the root key', () => {
     expect(queryKeys.organizations.all).toEqual(['organizations']);
   });
 
-  // community-categories
   it('communityCategories.all returns the root key', () => {
     expect(queryKeys.communityCategories.all).toEqual(['community-categories']);
   });
 
-  // community-posts
   it('communityPosts.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.communityPosts.all).toEqual(['community-posts']);
   });
@@ -31,27 +28,22 @@ describe('queryKeys', () => {
     ).toEqual(['community-posts', 'global', undefined, '', '', []]);
   });
 
-  // community-post (single)
   it('communityPost.detail returns the parameterized key', () => {
     expect(queryKeys.communityPost.detail('post-123')).toEqual(['community-post', 'post-123']);
   });
 
-  // community-comments
   it('communityComments.list returns the parameterized key', () => {
     expect(queryKeys.communityComments.list('post-123')).toEqual(['community-comments', 'post-123']);
   });
 
-  // idea (single)
   it('idea.detail returns the parameterized key', () => {
     expect(queryKeys.idea.detail('idea-abc')).toEqual(['idea', 'idea-abc']);
   });
 
-  // idea-comments
   it('ideaComments.list returns the parameterized key', () => {
     expect(queryKeys.ideaComments.list('idea-abc')).toEqual(['idea-comments', 'idea-abc']);
   });
 
-  // ideas (list)
   it('ideas.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.ideas.all).toEqual(['ideas']);
   });
@@ -61,12 +53,10 @@ describe('queryKeys', () => {
     ).toEqual(['ideas', 'org-1', 'all', 'search', 'finance', ['t1'], 'user-1']);
   });
 
-  // idea-tags
   it('ideaTags.list returns the parameterized key', () => {
     expect(queryKeys.ideaTags.list('org-1')).toEqual(['idea-tags', 'org-1']);
   });
 
-  // ideas-admin
   it('ideasAdmin.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.ideasAdmin.all).toEqual(['ideas-admin']);
   });
@@ -76,7 +66,6 @@ describe('queryKeys', () => {
     ).toEqual(['ideas-admin', 'org-1', 'search', 'finance']);
   });
 
-  // community-resources
   it('communityResources.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.communityResources.all).toEqual(['community-resources']);
   });
@@ -86,7 +75,6 @@ describe('queryKeys', () => {
     ).toEqual(['community-resources', 'org-1', 'search', 'link', 'tag1']);
   });
 
-  // org-reports
   it('orgReports.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.orgReports.all).toEqual(['org-reports']);
   });
@@ -94,7 +82,6 @@ describe('queryKeys', () => {
     expect(queryKeys.orgReports.list('org-1', 'pending')).toEqual(['org-reports', 'org-1', 'pending']);
   });
 
-  // platform-reports
   it('platformReports.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.platformReports.all).toEqual(['platform-reports']);
   });
@@ -102,27 +89,22 @@ describe('queryKeys', () => {
     expect(queryKeys.platformReports.list('all', 'pending')).toEqual(['platform-reports', 'all', 'pending']);
   });
 
-  // ai-champions
   it('aiChampions.list returns the parameterized key', () => {
     expect(queryKeys.aiChampions.list('org-1')).toEqual(['ai-champions', 'org-1']);
   });
 
-  // courses-admin
   it('coursesAdmin.all returns the root key', () => {
     expect(queryKeys.coursesAdmin.all).toEqual(['courses-admin']);
   });
 
-  // course-structure-admin
   it('courseStructureAdmin.detail returns the parameterized key', () => {
     expect(queryKeys.courseStructureAdmin.detail('course-1')).toEqual(['course-structure-admin', 'course-1']);
   });
 
-  // quiz-admin
   it('quizAdmin.detail returns the parameterized key', () => {
     expect(queryKeys.quizAdmin.detail('lesson-1')).toEqual(['quiz-admin', 'lesson-1']);
   });
 
-  // exercise-admin / exercise-by-lesson
   it('exerciseAdmin.detail returns the parameterized key', () => {
     expect(queryKeys.exerciseAdmin.detail('l1')).toEqual(['exercise-admin', 'l1']);
   });
@@ -131,17 +113,14 @@ describe('queryKeys', () => {
     expect(queryKeys.exerciseByLesson.detail('l1')).toEqual(['exercise-by-lesson', 'l1']);
   });
 
-  // platform-settings
   it('platformSettings.all returns the root key', () => {
     expect(queryKeys.platformSettings.all).toEqual(['platform-settings']);
   });
 
-  // profiles
   it('profiles.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.profiles.all).toEqual(['profiles']);
   });
 
-  // org-memberships
   it('orgMemberships.list returns the parameterized key', () => {
     expect(queryKeys.orgMemberships.list('org-1')).toEqual(['org-memberships', 'org-1']);
   });
@@ -149,7 +128,6 @@ describe('queryKeys', () => {
     expect(queryKeys.orgMemberships.list(undefined)).toEqual(['org-memberships', undefined]);
   });
 
-  // invitations
   it('invitations.list returns the parameterized key for platform scope', () => {
     expect(queryKeys.invitations.list('org-1', 'platform')).toEqual(['invitations', 'org-1', 'platform']);
   });
@@ -160,7 +138,6 @@ describe('queryKeys', () => {
     expect(queryKeys.invitations.list(undefined, 'platform')).toEqual(['invitations', undefined, 'platform']);
   });
 
-  // org-detail
   it('orgDetail.detail returns the parameterized key', () => {
     expect(queryKeys.orgDetail.detail('org-1')).toEqual(['org-detail', 'org-1']);
   });
@@ -168,7 +145,6 @@ describe('queryKeys', () => {
     expect(queryKeys.orgDetail.detail(undefined)).toEqual(['org-detail', undefined]);
   });
 
-  // org-analytics-data
   it('orgAnalyticsData.detail returns the parameterized key', () => {
     expect(queryKeys.orgAnalyticsData.detail('org-1')).toEqual(['org-analytics-data', 'org-1']);
   });
@@ -176,7 +152,6 @@ describe('queryKeys', () => {
     expect(queryKeys.orgAnalyticsData.detail(undefined)).toEqual(['org-analytics-data', undefined]);
   });
 
-  // org-course-progress
   it('orgCourseProgress.detail returns the parameterized key', () => {
     expect(queryKeys.orgCourseProgress.detail('org-1', 'da')).toEqual(['org-course-progress', 'org-1', 'da']);
   });
@@ -184,7 +159,6 @@ describe('queryKeys', () => {
     expect(queryKeys.orgCourseProgress.detail(undefined, undefined)).toEqual(['org-course-progress', undefined, undefined]);
   });
 
-  // org-course-enrollees
   it('orgCourseEnrollees.detail returns the parameterized key', () => {
     expect(queryKeys.orgCourseEnrollees.detail('org-1', 'course-1')).toEqual(['org-course-enrollees', 'org-1', 'course-1']);
   });
@@ -192,7 +166,6 @@ describe('queryKeys', () => {
     expect(queryKeys.orgCourseEnrollees.detail(undefined, undefined)).toEqual(['org-course-enrollees', undefined, undefined]);
   });
 
-  // org-course-org-breakdown
   it('orgCourseOrgBreakdown.detail returns the parameterized key', () => {
     expect(queryKeys.orgCourseOrgBreakdown.detail('course-1')).toEqual(['org-course-org-breakdown', 'course-1']);
   });
@@ -200,7 +173,6 @@ describe('queryKeys', () => {
     expect(queryKeys.orgCourseOrgBreakdown.detail(undefined)).toEqual(['org-course-org-breakdown', undefined]);
   });
 
-  // user-progress
   it('userProgress.detail returns the parameterized key', () => {
     expect(queryKeys.userProgress.detail('org-1', 'user-1')).toEqual(['user-progress', 'org-1', 'user-1']);
   });
@@ -208,7 +180,6 @@ describe('queryKeys', () => {
     expect(queryKeys.userProgress.detail(undefined, undefined)).toEqual(['user-progress', undefined, undefined]);
   });
 
-  // learner-courses
   it('learnerCourses.list returns the parameterized key', () => {
     expect(queryKeys.learnerCourses.list('org-1')).toEqual(['learner-courses', 'org-1']);
   });
@@ -216,7 +187,6 @@ describe('queryKeys', () => {
     expect(queryKeys.learnerCourses.list(undefined)).toEqual(['learner-courses', undefined]);
   });
 
-  // learner-dashboard
   it('learnerDashboard.detail returns the parameterized key', () => {
     expect(queryKeys.learnerDashboard.detail('org-1')).toEqual(['learner-dashboard', 'org-1']);
   });
@@ -224,12 +194,10 @@ describe('queryKeys', () => {
     expect(queryKeys.learnerDashboard.detail(undefined)).toEqual(['learner-dashboard', undefined]);
   });
 
-  // seat-pricing
   it('seatPricing.all is stable', () => {
     expect(queryKeys.seatPricing.all).toEqual(['seat-pricing']);
   });
 
-  // seat-requests
   it('seatRequests.list is keyed by orgId', () => {
     expect(queryKeys.seatRequests.all).toEqual(['seat-requests']);
     expect(queryKeys.seatRequests.list('org-1')).toEqual(['seat-requests', 'org-1']);

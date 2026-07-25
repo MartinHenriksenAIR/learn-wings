@@ -74,7 +74,6 @@ export function EnrollUserDialog({
     setLoading(true);
 
     try {
-      // Get courses available to this org (joined with course details server-side)
       const accessResult = await callApi<{
         access: Array<{
           id: string;
@@ -82,13 +81,12 @@ export function EnrollUserDialog({
           access: string;
           course: Course;
         }>;
-      }>('/api/org-course-access', { orgId, language: i18n.resolvedLanguage ?? 'da' });
+      }>('/api/org-course-access', { orgId, language: i18n.resolvedLanguage ?? 'en' });
 
       const availableCourseList = accessResult.access
         .filter((row) => row.access === 'enabled' && row.course.is_published === true)
         .map((row) => row.course);
 
-      // Get existing enrollments for selected user
       const enrollmentResult = await callApi<{
         enrollments: Array<{
           id: string;
@@ -222,7 +220,6 @@ export function EnrollUserDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 py-4">
-          {/* User Selection */}
           <div className="space-y-2">
             <Label>Select Team Member</Label>
             {activeLearners.length === 0 ? (
@@ -254,7 +251,6 @@ export function EnrollUserDialog({
             )}
           </div>
 
-          {/* Course Selection */}
           {selectedUserId && (
             <div className="space-y-2">
               <Label>Select Courses</Label>
@@ -272,7 +268,6 @@ export function EnrollUserDialog({
               ) : (
                 <ScrollArea className="h-64 border rounded-lg">
                   <div className="p-2 space-y-1">
-                    {/* Available courses */}
                     {availableCourses.map((course) => (
                       <div
                         key={course.id}
@@ -292,7 +287,6 @@ export function EnrollUserDialog({
                       </div>
                     ))}
 
-                    {/* Already enrolled courses */}
                     {enrolledCourses.length > 0 && (
                       <>
                         <div className="px-3 py-2 text-xs text-muted-foreground font-medium uppercase">
@@ -320,7 +314,6 @@ export function EnrollUserDialog({
             </div>
           )}
 
-          {/* Per-row failure reasons (pattern follows BulkInviteDialog results) */}
           {failures.length > 0 && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />

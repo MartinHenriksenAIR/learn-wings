@@ -18,7 +18,6 @@ function assertQuestionKeyCoverage(locale: LocaleJson, localeName: string) {
   const serverIds = ASSESSMENT_QUESTIONS.map((q: { id: string }) => q.id);
   const localeIds = Object.keys(locale.assessment.questions);
 
-  // Same set, same length — no extras, no omissions.
   expect(
     new Set(localeIds),
     `${localeName}: locale question keys must exactly equal server question IDs`,
@@ -28,7 +27,6 @@ function assertQuestionKeyCoverage(locale: LocaleJson, localeName: string) {
     `${localeName}: locale question count must equal server question count`,
   ).toBe(serverIds.length);
 
-  // Per-question: option keys must match.
   for (const question of ASSESSMENT_QUESTIONS as Array<{ id: string; options: readonly string[] }>) {
     const localeQ = locale.assessment.questions[question.id as keyof typeof locale.assessment.questions] as
       | { text: string; options: Record<string, string> }

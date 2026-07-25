@@ -49,7 +49,33 @@
     "completedOn": "Completed on",
     "noOrgSelected": "No organization selected.",
     "joinOrgToContinue": "Join an organization to continue.",
-    "clear": "Clear"
+    "clear": "Clear",
+    "loadErrorTitle": "Couldn't load this page",
+    "loadErrorDescription": "Something went wrong while loading. Please try again.",
+    "retry": "Try again"
+  },
+  "fileUpload": {
+    "ctaImage": "Click to upload an image",
+    "ctaVideo": "Click to upload a video",
+    "ctaDocument": "Click to upload a document",
+    "maxSize": "Max size: {{size}}",
+    "imageResizeHint": "JPEG, PNG and WebP images over {{maxEdge}} px are scaled down",
+    "videoFormats": "MP4, WebM, MOV, M4V, OGV",
+    "documentFormats": "PDF, Word, Excel, PowerPoint",
+    "uploading": "Uploading {{name}}...",
+    "uploadingToAzure": "Uploading to Azure Cloud Storage...",
+    "directToAzure": "Uploads directly to Azure Cloud Storage",
+    "loadingPreview": "Loading preview...",
+    "uploadedFile": "Uploaded file",
+    "clickToReplace": "Click to replace",
+    "uploadedToAzure": "Uploaded to Azure Cloud Storage",
+    "videoUploadedToAzure": "Video uploaded to Azure Cloud Storage",
+    "errorTooLarge": "File size must be less than {{size}}",
+    "errorTooLargeToDecode": "Image is too large to process. Choose a file under {{size}}.",
+    "errorTypeImage": "Choose a PNG, JPEG, GIF or WebP image.",
+    "errorTypeVideo": "Choose an MP4, WebM, MOV, M4V or OGV video.",
+    "errorTypeDocument": "Choose a PDF, Word, Excel or PowerPoint document.",
+    "errorUploadFailed": "Upload failed. Please try again."
   },
   "nav": {
     "home": "Home",
@@ -83,17 +109,29 @@
     "passwordResetInfo": "Password reset is managed by your organization's IT administrator via Microsoft Entra ID.",
     "backToSignIn": "Back to sign in"
   },
+  "contextError": {
+    "title": "We couldn't load your account",
+    "networkDescription": "Something went wrong while loading your profile. This is usually temporary — please try again.",
+    "authDescription": "Your session may have expired. Please sign in again to continue.",
+    "retry": "Try again",
+    "signInAgain": "Sign in again"
+  },
   "notFound": {
     "title": "Page not found",
     "description": "The page you're looking for doesn't exist or has moved.",
     "returnHome": "Return to home"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "An unexpected error interrupted the page. Reloading usually fixes it.",
+    "reload": "Reload page"
   },
   "settings": {
     "title": "Settings",
     "profile": "Profile",
     "updateProfile": "Update your personal information.",
     "profilePhoto": "Profile photo",
-    "profilePhotoHint": "Square image recommended. PNG or JPG, max 2MB.",
+    "profilePhotoHint": "Square image recommended, 256×256px or larger.",
     "firstName": "First Name",
     "lastName": "Last Name",
     "department": "Department",
@@ -448,8 +486,13 @@
       "postDeleted": "Post deleted",
       "postDeleteFailed": "Failed to delete post",
       "commentAddFailed": "Failed to add comment",
+      "commentUpdateFailed": "Failed to update comment",
       "commentDeleted": "Comment deleted",
+      "commentDeleteFailed": "Failed to delete comment",
+      "commentHideFailed": "Failed to update comment visibility",
       "commentLinkCopied": "Comment link copied",
+      "postHideFailed": "Failed to update post visibility",
+      "postLockFailed": "Failed to update post lock",
       "voteFailed": "Failed to vote",
       "unvoteFailed": "Failed to remove vote",
       "statusUpdateFailed": "Failed to update status",
@@ -468,7 +511,8 @@
       "resourceUpdated": "Resource updated!",
       "resourceUpdateFailed": "Failed to update resource",
       "resourceDeleted": "Resource deleted",
-      "resourceDeleteFailed": "Failed to delete resource"
+      "resourceDeleteFailed": "Failed to delete resource",
+      "resourcePinFailed": "Failed to update pin"
     }
   },
   "ideas": {
@@ -675,7 +719,7 @@
     "logo": "Logo",
     "logoRecommended": "Recommended specifications",
     "logoSize": "Square image, 256×256px or larger",
-    "logoFormat": "PNG or JPG format, max 5MB",
+    "updateLogoTitle": "Update Organization Logo",
     "organizationName": "Organization Name",
     "slug": "Slug",
     "slugHint": "Used in URLs. Only lowercase letters, numbers, and hyphens.",
@@ -956,6 +1000,7 @@
     "published": "Published",
     "draft": "Draft",
     "thumbnail": "Thumbnail",
+    "thumbnailPreviewUnavailable": "The current thumbnail could not be loaded for preview. It is still saved and will be kept unless you upload a new one or remove it.",
     "titleLabel": "Title",
     "descriptionLabel": "Description",
     "levelLabel": "Level",
@@ -1024,7 +1069,7 @@
     "contentTextLabel": "Content Text (optional)",
     "contentTextPlaceholder": "Additional lesson content or description...",
     "videoFileLabel": "Video File (Azure Cloud)",
-    "videoFileHint": "Ingen filstørrelses-begrænsning. Videoer uploades direkte til Azure Cloud Storage.",
+    "videoFileHint": "Maximum file size 2 GB. Videos are uploaded directly to Azure Cloud Storage.",
     "quizContentPlaceholder": "Quiz instructions or additional context...",
     "quizSetupHintEdit": "Save the lesson first, then use \"Edit Quiz\" to configure questions.",
     "quizSetupHintCreate": "Create the lesson first, then configure the quiz questions.",

@@ -42,6 +42,7 @@ import {
   Lightbulb,
   Flag,
   MessageSquare,
+  type LucideIcon,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
 import { getInitials } from '@/lib/utils';
@@ -63,6 +64,56 @@ const GROUP_LABEL_CLASSES =
 
 const MENU_ITEM_CLASSES = 'rounded-[9px] text-[13px] font-medium';
 
+/** One entry in a sidebar nav group. All three groups share this shape. */
+type NavItem = {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+};
+
+/**
+ * One labelled nav group (label + pill menu). The three groups in AppSidebar were
+ * byte-identical apart from label and items (#271).
+ *
+ * Deliberately at module scope, not nested inside AppSidebar: a component declared
+ * inside a render body gets a fresh identity every render, so React would unmount and
+ * remount the whole menu subtree (losing tooltip/focus state) on every sidebar render.
+ * `collapsed` and `pathname` are read from context here rather than threaded as props,
+ * exactly as the underlying sidebar primitives do.
+ */
+function NavSection({ label, items }: { label: string; items: NavItem[] }) {
+  const { state } = useSidebar();
+  const collapsed = state === 'collapsed';
+  const location = useLocation();
+
+  return (
+    <SidebarGroup className="p-0">
+      <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
+        {label}
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu className="gap-[3px]">
+          {items.map((item) => (
+            <SidebarMenuItem key={item.url}>
+              <SidebarMenuButton
+                asChild
+                isActive={location.pathname === item.url}
+                tooltip={collapsed ? item.title : undefined}
+                className={NAV_BUTTON_CLASSES}
+              >
+                <NavLink to={item.url} end className="flex items-center">
+                  <item.icon />
+                  {!collapsed && <span>{item.title}</span>}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
@@ -72,14 +123,12 @@ export function AppSidebar() {
     isPlatformAdmin,
     effectiveIsPlatformAdmin,
     effectiveIsOrgAdmin,
-    currentOrg,
     signOut,
     viewMode,
     setViewMode,
   } = useAuth();
   const { features } = usePlatformSettings();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleSignOut = async () => {
     await signOut();
@@ -88,14 +137,12 @@ export function AppSidebar() {
 
   const viewModeLabels = useViewModeLabels();
 
-  // Build learner items based on feature toggles
   const learnerItems = [
     { title: t('nav.dashboard'), url: routes.learner.dashboard, icon: LayoutDashboard },
     { title: t('nav.courses'), url: routes.learner.courses, icon: BookOpen },
     ...(features.community_enabled ? [{ title: t('nav.community'), url: routes.community.feed, icon: MessageSquare }] : []),
   ];
 
-  // Build org admin items based on feature toggles
   const orgAdminItems = [
 
     ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: routes.orgAdmin.root, icon: BarChart3 }] : []),
@@ -106,7 +153,6 @@ export function AppSidebar() {
     { title: t('nav.settings'), url: routes.orgAdmin.settings, icon: SettingsIcon },
   ];
 
-  // Build platform admin items based on feature toggles
   const platformAdminItems = [
     { title: t('nav.organizations'), url: routes.platformAdmin.organizations, icon: Building2 },
     { title: t('nav.courseManager'), url: routes.platformAdmin.courses, icon: GraduationCap },
@@ -141,92 +187,19 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      {/* Org selector for platform admins viewing as learner/org_admin */}
       <OrgSelector />
 
       <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2">
-        {/* Learner section - hidden when viewing as platform admin */}
         {!effectiveIsPlatformAdmin && (
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
-              {t('nav.learning')}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-[3px]">
-                {learnerItems.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === item.url}
-                      tooltip={collapsed ? item.title : undefined}
-                      className={NAV_BUTTON_CLASSES}
-                    >
-                      <NavLink to={item.url} end className="flex items-center">
-                        <item.icon />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <NavSection label={t('nav.learning')} items={learnerItems} />
         )}
 
-        {/* Org Admin section - hidden when viewing as platform admin */}
         {effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && (
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
-              {t('nav.organization')}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-[3px]">
-                {orgAdminItems.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === item.url}
-                      tooltip={collapsed ? item.title : undefined}
-                      className={NAV_BUTTON_CLASSES}
-                    >
-                      <NavLink to={item.url} end className="flex items-center">
-                        <item.icon />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <NavSection label={t('nav.organization')} items={orgAdminItems} />
         )}
 
-        {/* Platform Admin section */}
         {effectiveIsPlatformAdmin && (
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
-              {t('nav.platformAdmin')}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-[3px]">
-                {platformAdminItems.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location.pathname === item.url}
-                      tooltip={collapsed ? item.title : undefined}
-                      className={NAV_BUTTON_CLASSES}
-                    >
-                      <NavLink to={item.url} end className="flex items-center">
-                        <item.icon />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <NavSection label={t('nav.platformAdmin')} items={platformAdminItems} />
         )}
       </SidebarContent>
 

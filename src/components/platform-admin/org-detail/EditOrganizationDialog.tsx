@@ -32,10 +32,6 @@ interface EditOrganizationDialogProps {
   pending: boolean;
 }
 
-/**
- * Edit-organization dialog (logo FileUpload + name / slug / seat-limit).
- * Owns its own form state, seeded from `org` each time the dialog opens.
- */
 export function EditOrganizationDialog({
   open,
   onOpenChange,
@@ -52,7 +48,6 @@ export function EditOrganizationDialog({
   // logoUrl holds the raw container-relative path (for save); sign it for display.
   const { data: logoDisplaySrc } = useSignedBrandingUrl(logoUrl);
 
-  // Seed the form from the org each time the dialog opens.
   useEffect(() => {
     if (open) {
       setName(org.name);
@@ -77,10 +72,12 @@ export function EditOrganizationDialog({
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
                   <Building2 className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
                 </div>
+                {/* Size and accepted formats are stated by FileUpload itself,
+                    from the caps it actually enforces — a second statement here
+                    could only drift out of true. */}
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">{t('orgDetail.logoRecommended')}</p>
                   <p className="text-xs text-muted-foreground">{t('orgDetail.logoSize')}</p>
-                  <p className="text-xs text-muted-foreground">{t('orgDetail.logoFormat')}</p>
                 </div>
               </div>
             </div>

@@ -45,7 +45,6 @@ export function evaluateAnswers(
 
   const obj = answers as Record<string, unknown>;
 
-  // Check for unexpected question ids.
   const expectedIds = new Set(ASSESSMENT_QUESTIONS.map((q) => q.id));
   for (const key of Object.keys(obj)) {
     if (!expectedIds.has(key)) {
@@ -53,7 +52,6 @@ export function evaluateAnswers(
     }
   }
 
-  // Check for missing question ids and validate each option.
   let score = 0;
   for (const question of ASSESSMENT_QUESTIONS) {
     if (!(question.id in obj)) {

@@ -33,17 +33,14 @@ export default endpoint('community-post', async ({ req, profile, reply }) => {
     WHERE p.id = $1
   `, [postId]);
 
-  // Not found → null (parity with Supabase .maybeSingle())
-  if (!post) return reply(200, { post: null });
+  if (!post) return reply(200, { post: null }); // parity: Supabase .maybeSingle() returned null
 
-  // Scope visibility check
   if (post.scope === 'org') {
     const canAccess = profile.is_platform_admin ||
       await isActiveMember(profile.id, post.org_id!);
     if (!canAccess) return reply(200, { post: null });
   }
 
-  // Hidden visibility check
   if (post.is_hidden) {
     const canSeeHidden = profile.is_platform_admin ||
       (post.scope === 'org' && await isOrgAdmin(profile.id, post.org_id!));

@@ -88,7 +88,6 @@ describe('community-post-moderate', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Post not found' });
   });
 
-  // Non-admin on org post → 403
   it('returns 403 when non-admin tries to moderate an org post', async () => {
     mockQueryOne.mockResolvedValueOnce(orgPost);
     mockIsOrgAdmin.mockResolvedValueOnce(false);
@@ -97,7 +96,6 @@ describe('community-post-moderate', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // Org admin of different org → 403 (isOrgAdmin returns false)
   it('returns 403 when org admin of a different org tries to moderate', async () => {
     mockQueryOne.mockResolvedValueOnce(orgPost); // org_id = 'org-1'
     mockIsOrgAdmin.mockResolvedValueOnce(false); // not admin of org-1
@@ -105,7 +103,6 @@ describe('community-post-moderate', () => {
     expect(res.status).toBe(403);
   });
 
-  // Global post — non-platform-admin → 403, isOrgAdmin NOT called
   it('returns 403 for global post when non-platform-admin (isOrgAdmin not called)', async () => {
     mockQueryOne.mockResolvedValueOnce(globalPost);
     const res = await handler(baseReq({ postId: 'post-1', isHidden: true }), {} as any);
@@ -113,7 +110,6 @@ describe('community-post-moderate', () => {
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
-  // Happy path: org admin hides post
   it('happy path: org admin can hide post', async () => {
     mockQueryOne.mockResolvedValueOnce(orgPost);
     mockIsOrgAdmin.mockResolvedValueOnce(true);
@@ -132,7 +128,6 @@ describe('community-post-moderate', () => {
     expect(params).toContain('post-1');
   });
 
-  // Happy path: both fields updated
   it('happy path: both isHidden and isLocked updated together', async () => {
     mockQueryOne.mockResolvedValueOnce(orgPost);
     mockIsOrgAdmin.mockResolvedValueOnce(true);
@@ -147,7 +142,6 @@ describe('community-post-moderate', () => {
     expect(sql).toContain('is_locked =');
   });
 
-  // Platform admin bypasses isOrgAdmin
   it('platform admin can moderate any post without calling isOrgAdmin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce(globalPost);

@@ -49,7 +49,33 @@
     "completedOn": "Afsluttet den",
     "noOrgSelected": "Ingen organisation valgt.",
     "joinOrgToContinue": "Tilmeld dig en organisation for at fortsætte.",
-    "clear": "Ryd"
+    "clear": "Ryd",
+    "loadErrorTitle": "Kunne ikke indlæse denne side",
+    "loadErrorDescription": "Noget gik galt under indlæsningen. Prøv igen.",
+    "retry": "Prøv igen"
+  },
+  "fileUpload": {
+    "ctaImage": "Klik for at uploade et billede",
+    "ctaVideo": "Klik for at uploade en video",
+    "ctaDocument": "Klik for at uploade et dokument",
+    "maxSize": "Maks. størrelse: {{size}}",
+    "imageResizeHint": "JPEG-, PNG- og WebP-billeder over {{maxEdge}} px skaleres ned",
+    "videoFormats": "MP4, WebM, MOV, M4V, OGV",
+    "documentFormats": "PDF, Word, Excel, PowerPoint",
+    "uploading": "Uploader {{name}}...",
+    "uploadingToAzure": "Uploader til Azure Cloud Storage...",
+    "directToAzure": "Uploades direkte til Azure Cloud Storage",
+    "loadingPreview": "Indlæser forhåndsvisning...",
+    "uploadedFile": "Uploadet fil",
+    "clickToReplace": "Klik for at erstatte",
+    "uploadedToAzure": "Uploadet til Azure Cloud Storage",
+    "videoUploadedToAzure": "Video uploadet til Azure Cloud Storage",
+    "errorTooLarge": "Filstørrelsen skal være mindre end {{size}}",
+    "errorTooLargeToDecode": "Billedet er for stort til at behandle. Vælg en fil under {{size}}.",
+    "errorTypeImage": "Vælg et PNG-, JPEG-, GIF- eller WebP-billede.",
+    "errorTypeVideo": "Vælg en MP4-, WebM-, MOV-, M4V- eller OGV-video.",
+    "errorTypeDocument": "Vælg et PDF-, Word-, Excel- eller PowerPoint-dokument.",
+    "errorUploadFailed": "Upload mislykkedes. Prøv igen."
   },
   "nav": {
     "home": "Hjem",
@@ -83,17 +109,29 @@
     "passwordResetInfo": "Nulstilling af adgangskode håndteres af din organisations IT-administrator via Microsoft Entra ID.",
     "backToSignIn": "Tilbage til login"
   },
+  "contextError": {
+    "title": "Vi kunne ikke indlæse din konto",
+    "networkDescription": "Noget gik galt under indlæsningen af din profil. Det er som regel midlertidigt — prøv venligst igen.",
+    "authDescription": "Din session er muligvis udløbet. Log venligst ind igen for at fortsætte.",
+    "retry": "Prøv igen",
+    "signInAgain": "Log ind igen"
+  },
   "notFound": {
     "title": "Siden blev ikke fundet",
     "description": "Den side, du leder efter, findes ikke eller er blevet flyttet.",
     "returnHome": "Tilbage til forsiden"
+  },
+  "errorBoundary": {
+    "title": "Noget gik galt",
+    "description": "En uventet fejl afbrød siden. En genindlæsning løser det som regel.",
+    "reload": "Genindlæs siden"
   },
   "settings": {
     "title": "Indstillinger",
     "profile": "Profil",
     "updateProfile": "Opdater dine personlige oplysninger.",
     "profilePhoto": "Profilbillede",
-    "profilePhotoHint": "Kvadratisk billede anbefales. PNG eller JPG, maks. 2 MB.",
+    "profilePhotoHint": "Kvadratisk billede anbefales, 256×256px eller større.",
     "firstName": "Fornavn",
     "lastName": "Efternavn",
     "department": "Afdeling",
@@ -448,8 +486,13 @@
       "postDeleted": "Opslaget blev slettet",
       "postDeleteFailed": "Kunne ikke slette opslaget",
       "commentAddFailed": "Kunne ikke tilføje kommentaren",
+      "commentUpdateFailed": "Kunne ikke opdatere kommentaren",
       "commentDeleted": "Kommentaren blev slettet",
+      "commentDeleteFailed": "Kunne ikke slette kommentaren",
+      "commentHideFailed": "Kunne ikke opdatere kommentarens synlighed",
       "commentLinkCopied": "Link til kommentaren blev kopieret",
+      "postHideFailed": "Kunne ikke opdatere opslagets synlighed",
+      "postLockFailed": "Kunne ikke opdatere opslagets lås",
       "voteFailed": "Kunne ikke stemme",
       "unvoteFailed": "Kunne ikke fjerne stemmen",
       "statusUpdateFailed": "Kunne ikke opdatere status",
@@ -468,7 +511,8 @@
       "resourceUpdated": "Ressourcen blev opdateret!",
       "resourceUpdateFailed": "Kunne ikke opdatere ressourcen",
       "resourceDeleted": "Ressourcen blev slettet",
-      "resourceDeleteFailed": "Kunne ikke slette ressourcen"
+      "resourceDeleteFailed": "Kunne ikke slette ressourcen",
+      "resourcePinFailed": "Kunne ikke opdatere fastgørelsen"
     }
   },
   "ideas": {
@@ -675,7 +719,7 @@
     "logo": "Logo",
     "logoRecommended": "Anbefalede specifikationer",
     "logoSize": "Kvadratisk billede, 256×256px eller større",
-    "logoFormat": "PNG- eller JPG-format, maks. 5MB",
+    "updateLogoTitle": "Opdater organisationens logo",
     "organizationName": "Organisationsnavn",
     "slug": "Slug",
     "slugHint": "Bruges i URL'er. Kun små bogstaver, tal og bindestreger.",
@@ -956,6 +1000,7 @@
     "published": "Udgivet",
     "draft": "Kladde",
     "thumbnail": "Miniature",
+    "thumbnailPreviewUnavailable": "Den nuværende miniature kunne ikke indlæses til forhåndsvisning. Den er stadig gemt og bevares, medmindre du uploader en ny eller fjerner den.",
     "titleLabel": "Titel",
     "descriptionLabel": "Beskrivelse",
     "levelLabel": "Niveau",
@@ -1024,7 +1069,7 @@
     "contentTextLabel": "Indholdstekst (valgfri)",
     "contentTextPlaceholder": "Yderligere lektionsindhold eller beskrivelse...",
     "videoFileLabel": "Videofil (Azure Cloud)",
-    "videoFileHint": "Ingen filstørrelses-begrænsning. Videoer uploades direkte til Azure Cloud Storage.",
+    "videoFileHint": "Maksimal filstørrelse 2 GB. Videoer uploades direkte til Azure Cloud Storage.",
     "quizContentPlaceholder": "Quizinstruktioner eller yderligere kontekst...",
     "quizSetupHintEdit": "Gem lektionen først, og brug derefter \"Redigér quiz\" til at konfigurere spørgsmål.",
     "quizSetupHintCreate": "Opret lektionen først, og konfigurér derefter quizspørgsmålene.",

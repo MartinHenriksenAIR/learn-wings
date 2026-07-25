@@ -14,12 +14,10 @@ export default adminEndpoint('quiz-admin', async ({ req, reply }) => {
     [lessonId],
   );
 
-  // No quiz for this lesson — return empty editor state (maybeSingle parity; NOT 404)
   if (!quiz) {
     return reply(200, { quiz: null, questions: [] });
   }
 
-  // Both queries are keyed solely on quiz.id — run them in parallel.
   const [questions, options] = await Promise.all([
     query<{ id: string; quiz_id: string; question_text: string; sort_order: number }>(
       'SELECT id, quiz_id, question_text, sort_order FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order',
@@ -43,7 +41,6 @@ export default adminEndpoint('quiz-admin', async ({ req, reply }) => {
     ),
   ]);
 
-  // Group options by question_id in JS — course-structure-admin Map-grouping pattern
   const optionsByQuestion = new Map<string, typeof options>();
   for (const opt of options) {
     const bucket = optionsByQuestion.get(opt.question_id) ?? [];

@@ -82,7 +82,6 @@ describe('courses-admin', () => {
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
     expect(body).toEqual({ courses: fakeCourses, accessRecords: fakeAccessRecords });
-    // Verify both SQL queries were made (order-agnostic)
     const allSqls = mockQuery.mock.calls.map(([sql]: [string]) => sql);
     expect(allSqls.some((s) => s.includes('FROM courses') && s.includes('ORDER BY created_at DESC'))).toBe(true);
     expect(allSqls.some((s) => s.includes('FROM org_course_access'))).toBe(true);

@@ -27,7 +27,6 @@ describe('platform-settings', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
   });
 
-  // 1. 401 when bearer token invalid
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -37,7 +36,6 @@ describe('platform-settings', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 when profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -47,7 +45,6 @@ describe('platform-settings', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. Admin happy path — queries platform_settings and returns rows
   it('returns all settings for platform admin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([
@@ -65,7 +62,6 @@ describe('platform-settings', () => {
     expect(sql).toContain('platform_settings');
   });
 
-  // 4. Non-admin gets { settings: [] } without any DB query
   it('returns empty settings for non-admin without querying the DB', async () => {
     const res = await handler(baseReq({}), {} as any);
 
@@ -75,7 +71,6 @@ describe('platform-settings', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // 5. 500 on db error
   it('returns 500 on db error', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));

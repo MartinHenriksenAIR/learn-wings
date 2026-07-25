@@ -33,6 +33,7 @@ import { Organization, OrgRole } from '@/lib/types';
 import { Building2, Plus, Loader2, ChevronRight, UserPlus, Mail, Search } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
+import { formatDate } from '@/lib/date-locale';
 import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
 import { orgSchema } from '@/lib/org-validation';
 import { SeatUsageBar } from '@/components/platform-admin/SeatUsageBar';
@@ -56,7 +57,7 @@ function OrgRowLogo({ logoPath }: { logoPath: string | null }) {
 
 export default function OrganizationsManager() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     data: orgsData,
     isLoading: loading,
@@ -92,7 +93,6 @@ export default function OrganizationsManager() {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [inviteEmail, setInviteEmail] = useState('');
 
-  // Org list failures surface the same way the old inline fetch did.
   useEffect(() => {
     if (orgsError) {
       toast({
@@ -104,7 +104,6 @@ export default function OrganizationsManager() {
     }
   }, [orgsError]);
 
-  // Profile list failures surface the same way the old inline fetch did.
   useEffect(() => {
     if (profilesError) {
       toast({
@@ -155,8 +154,6 @@ export default function OrganizationsManager() {
         return;
       }
 
-      // Post-create steps capture each step's error so a follow-up failure no
-      // longer hides behind a green success toast.
       let postCreateError: string | null = null;
 
       if (adminTab === 'existing' && selectedUserId) {
@@ -228,7 +225,6 @@ export default function OrganizationsManager() {
     setErrors({});
   };
 
-  // Auto-generate slug from name
   useEffect(() => {
     const generatedSlug = name
       .toLowerCase()
@@ -265,7 +261,6 @@ export default function OrganizationsManager() {
           <DialogDescription>{t('organizations.createDialogDescription')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          {/* Logo Upload */}
           <div className="space-y-2">
             <Label>{t('organizations.logoOptional')}</Label>
             <FileUpload
@@ -322,7 +317,6 @@ export default function OrganizationsManager() {
             </p>
           </div>
 
-          {/* Initial Admin Assignment */}
           <div className="space-y-2">
             <Label>{t('organizations.initialAdminOptional')}</Label>
             <Tabs value={adminTab} onValueChange={(v) => setAdminTab(v as 'existing' | 'invite')}>
@@ -389,7 +383,6 @@ export default function OrganizationsManager() {
         {createDialog}
       </div>
 
-      {/* Search */}
       <div className="relative mb-[18px] max-w-[420px]">
         <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
         <Input
@@ -400,7 +393,6 @@ export default function OrganizationsManager() {
         />
       </div>
 
-      {/* Organizations List */}
       {filteredOrgs.length === 0 ? (
         <EmptyState
           icon={<Building2 className="h-6 w-6" />}
@@ -417,7 +409,6 @@ export default function OrganizationsManager() {
         />
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          {/* Header row */}
           <div className="grid grid-cols-[2.2fr_1.2fr_0.9fr_1fr_1fr_0.4fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
             <span>{t('organizations.colOrganization')}</span>
             <span>{t('organizations.colSlug')}</span>
@@ -435,16 +426,12 @@ export default function OrganizationsManager() {
                 onClick={() => navigate(routes.platformAdmin.organizationDetail(org.id))}
                 className="grid w-full grid-cols-[2.2fr_1.2fr_0.9fr_1fr_1fr_0.4fr] items-center gap-3 border-t border-[#f3f4f8] px-5 py-3.5 text-left transition-colors hover:bg-[#f7f8fa]"
               >
-                {/* Organization: icon chip + name */}
                 <span className="flex min-w-0 items-center gap-3">
                   <OrgRowLogo logoPath={org.logo_url} />
                   <span className="truncate text-[13.5px] font-bold">{org.name}</span>
                 </span>
-                {/* Slug (mono) */}
                 <span className="truncate font-mono text-[12.5px] text-muted-foreground">{org.slug}</span>
-                {/* Members */}
                 <span className="text-[13px] font-semibold text-[#4a4f60]">{org.memberCount}</span>
-                {/* Seats: label + usage bar */}
                 <span className="min-w-0">
                   {org.seat_limit ? (
                     <>
@@ -463,11 +450,9 @@ export default function OrganizationsManager() {
                     </span>
                   )}
                 </span>
-                {/* Created */}
                 <span className="text-[12.5px] text-muted-foreground">
-                  {new Date(org.created_at).toLocaleDateString()}
+                  {formatDate(new Date(org.created_at), 'P', i18n.language)}
                 </span>
-                {/* Chevron */}
                 <span className="flex justify-end text-[#c3c7d3]">
                   <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </span>

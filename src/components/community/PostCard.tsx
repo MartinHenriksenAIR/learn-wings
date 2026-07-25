@@ -6,6 +6,7 @@ import { CategoryBadge } from './CategoryBadge';
 import { TagList } from './TagList';
 import { MessageSquare, Pin, Lock, Calendar, MapPin, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { formatDate, formatDistanceToNowLocalized } from '@/lib/date-locale';
+import { safeHref } from '@/lib/safe-href';
 import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
@@ -37,7 +38,6 @@ export function PostCard({
       )}
       onClick={onClick}
     >
-      {/* Author row */}
       <div className="mb-2.5 flex items-center gap-2.5">
         <BrandingAvatar
           avatarPath={post.profile?.avatar_url}
@@ -83,7 +83,6 @@ export function PostCard({
       <h3 className="mb-1.5 line-clamp-2 text-[15px] font-bold leading-[1.35]">{post.title}</h3>
       <p className="mb-3 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">{post.content}</p>
 
-      {/* Event date/time/place chips */}
       {isEvent && post.event_date && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-[7px] text-xs font-bold text-accent-foreground">
@@ -98,7 +97,7 @@ export function PostCard({
           )}
           {post.event_registration_url && (
             <a
-              href={post.event_registration_url}
+              href={safeHref(post.event_registration_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg px-2 py-[7px] text-xs font-bold text-primary hover:underline"
@@ -111,7 +110,6 @@ export function PostCard({
         </div>
       )}
 
-      {/* Footer: comment count + tags */}
       <div className="flex items-center gap-3.5">
         <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#9aa0af]">
           <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
@@ -121,7 +119,6 @@ export function PostCard({
         <TagList tags={post.tags} maxVisible={3} />
       </div>
 
-      {/* Admin controls */}
       {isAdmin && (onToggleHide || onToggleLock) && (
         <div
           className="mt-3 flex items-center gap-2 border-t border-border pt-3"

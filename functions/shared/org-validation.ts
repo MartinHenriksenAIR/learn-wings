@@ -38,7 +38,6 @@ export function normalizeOrgName(value: string): string {
   return value.trim();
 }
 
-/** Returns an error message for an invalid org slug, or null when valid. */
 export function validateOrgSlug(value: unknown): string | null {
   if (typeof value !== 'string' || value.length < ORG_SLUG_MIN_LENGTH || value.length > ORG_SLUG_MAX_LENGTH) {
     return `slug must be a string between ${ORG_SLUG_MIN_LENGTH} and ${ORG_SLUG_MAX_LENGTH} characters`;

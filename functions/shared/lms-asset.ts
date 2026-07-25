@@ -1,4 +1,6 @@
 import { queryOne } from './db';
+import { generateSasToken, buildBlobUrl } from './sas';
+import type { CallerProfile } from './profile';
 
 /**
  * TS port of the canonical authz rule public.can_user_access_lms_asset
@@ -48,4 +50,44 @@ export async function canAccessLmsAsset(profileId: string, blobPath: string): Pr
     [profileId, blobPath],
   );
   return result?.can_access ?? false;
+}
+
+/**
+ * Tagged result returned by mintLmsAssetUrl — lets thin endpoint wrappers
+ * dispatch to their own reply() without importing Reply from endpoint.ts.
+ */
+export type MintResult =
+  | { ok: true; url: string }
+  | { ok: false; status: 400 | 403; error: string };
+
+/**
+ * Shared core for asset-signed-url and azure-view-url (#239):
+ *   validate blobPath (strict typeof — the ONE sanctioned behaviour change vs the
+ *   old azure-view-url truthiness check) → platform-admin short-circuit → authz
+ *   gate via canAccessLmsAsset → mint 120-min read SAS → build blob URL.
+ *
+ * Env vars read lazily here (not at module load) per functions.md.
+ * Returns a tagged MintResult; callers map ok:false → reply(status, {error}).
+ */
+export async function mintLmsAssetUrl(
+  profile: CallerProfile,
+  blobPath: unknown,
+): Promise<MintResult> {
+  if (!blobPath || typeof blobPath !== 'string') {
+    return { ok: false, status: 400, error: 'blobPath is required' };
+  }
+
+  if (!profile.is_platform_admin) {
+    const hasAccess = await canAccessLmsAsset(profile.id, blobPath);
+    if (!hasAccess) return { ok: false, status: 403, error: 'Access denied' };
+  }
+
+  const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME!;
+  const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY!;
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME ?? 'lms-videos';
+
+  const sasToken = generateSasToken(accountName, accountKey, containerName, blobPath, 'r', 120);
+  const url = buildBlobUrl(accountName, containerName, blobPath, sasToken);
+
+  return { ok: true, url };
 }

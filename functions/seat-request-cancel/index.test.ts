@@ -27,7 +27,7 @@ describe('seat-request-cancel', () => {
   });
 
   it('returns 404 when the request does not exist', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // existence lookup
+    mockQueryOne.mockResolvedValueOnce(null);
     expect((await handler(baseReq({ id: 'req-x' }), {} as any)).status).toBe(404);
   });
 

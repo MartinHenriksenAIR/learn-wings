@@ -10,7 +10,6 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
 
   await requireActiveMember(orgId);
 
-  // Step 1: Own enrollments with embedded course
   const enrollments = await query(
     `SELECT e.id, e.org_id, e.user_id, e.course_id, e.status, e.enrolled_at, e.completed_at,
             json_build_object(
@@ -25,12 +24,11 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
     [profile.id, orgId],
   );
 
-  // Step 2: Early exit if no enrollments
   if (enrollments.length === 0) {
     return reply(200, { enrollments: [], progress: {} });
   }
 
-  // Step 3: Batched count queries — no N+1
+  // Batched count queries — no N+1
   const courseIds = enrollments.map((e) => (e as { course_id: string }).course_id);
 
   const totalsRows = await query<{ course_id: string; total: number }>(
@@ -53,7 +51,6 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
     [profile.id, orgId, courseIds],
   );
 
-  // Step 4: Build progress map — zero-fill for every enrolled course_id
   const totalsMap = new Map<string, number>();
   for (const row of totalsRows) {
     totalsMap.set(row.course_id, row.total);
@@ -72,6 +69,5 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
     };
   }
 
-  // Step 5: Respond
   return reply(200, { enrollments, progress });
 });

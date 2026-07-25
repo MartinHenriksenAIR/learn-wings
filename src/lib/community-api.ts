@@ -11,13 +11,11 @@ import type {
   ReportStatus,
 } from '@/lib/community-types';
 
-// Fetch categories
 export async function fetchCategories(): Promise<CommunityCategory[]> {
   const res = await callApi<{ categories: CommunityCategory[] }>('/api/community-categories', {});
   return res.categories;
 }
 
-// Fetch posts with filters
 export async function fetchPosts(filters: PostFilters): Promise<CommunityPost[]> {
   const res = await callApi<{ posts: CommunityPost[] }>('/api/community-posts', {
     scope: filters.scope,
@@ -29,13 +27,11 @@ export async function fetchPosts(filters: PostFilters): Promise<CommunityPost[]>
   return res.posts;
 }
 
-// Fetch single post
 export async function fetchPost(postId: string): Promise<CommunityPost | null> {
   const res = await callApi<{ post: CommunityPost | null }>('/api/community-post', { postId });
   return res.post;
 }
 
-// Create post
 export async function createPost(input: CreatePostInput): Promise<CommunityPost> {
   const res = await callApi<{ post: CommunityPost }>('/api/community-post-create', {
     scope: input.scope,
@@ -51,7 +47,6 @@ export async function createPost(input: CreatePostInput): Promise<CommunityPost>
   return res.post;
 }
 
-// Update post
 export async function updatePost(
   postId: string,
   updates: Partial<CommunityPost>
@@ -78,18 +73,15 @@ export async function updatePost(
   return res.post;
 }
 
-// Delete post
 export async function deletePost(postId: string): Promise<void> {
   await callApi('/api/community-post-delete', { postId });
 }
 
-// Fetch comments for a post
 export async function fetchComments(postId: string): Promise<CommunityComment[]> {
   const res = await callApi<{ comments: CommunityComment[] }>('/api/community-comments', { postId });
   return res.comments;
 }
 
-// Create comment
 export async function createComment(input: CreateCommentInput): Promise<CommunityComment> {
   const res = await callApi<{ comment: CommunityComment }>('/api/community-comment-create', {
     postId: input.post_id,
@@ -99,7 +91,6 @@ export async function createComment(input: CreateCommentInput): Promise<Communit
   return res.comment;
 }
 
-// Update comment
 export async function updateComment(
   commentId: string,
   content: string
@@ -111,12 +102,10 @@ export async function updateComment(
   return res.comment;
 }
 
-// Delete comment
 export async function deleteComment(commentId: string): Promise<void> {
   await callApi('/api/community-comment-delete', { commentId });
 }
 
-// Create report
 export async function createReport(input: CreateReportInput): Promise<CommunityReport> {
   const res = await callApi<{ report: CommunityReport }>('/api/community-report-create', {
     targetType: input.target_type,
@@ -127,7 +116,6 @@ export async function createReport(input: CreateReportInput): Promise<CommunityR
   return res.report;
 }
 
-// Fetch reports (admin)
 export async function fetchReports(
   orgId?: string,
   opts?: { scope?: 'global'; status?: ReportStatus }
@@ -140,7 +128,6 @@ export async function fetchReports(
   return res.reports;
 }
 
-// Update report (admin)
 export async function updateReport(
   reportId: string,
   updates: { status?: 'reviewed' | 'dismissed'; admin_notes?: string | null }
@@ -153,17 +140,14 @@ export async function updateReport(
   return res.report;
 }
 
-// Toggle post visibility (admin)
 export async function togglePostHidden(postId: string, hidden: boolean): Promise<void> {
   await callApi('/api/community-post-moderate', { postId, isHidden: hidden });
 }
 
-// Toggle post lock (admin)
 export async function togglePostLocked(postId: string, locked: boolean): Promise<void> {
   await callApi('/api/community-post-moderate', { postId, isLocked: locked });
 }
 
-// Toggle comment visibility (admin)
 export async function toggleCommentHidden(commentId: string, hidden: boolean): Promise<void> {
   await callApi('/api/community-comment-moderate', { commentId, isHidden: hidden });
 }

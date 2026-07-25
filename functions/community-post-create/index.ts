@@ -1,6 +1,7 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { isActiveMember } from '../shared/profile';
+import { validateHttpUrl } from '../shared/validate';
 
 export default endpoint('community-post-create', async ({ req, profile, reply, requireOrgAdmin, requirePlatformAdmin }) => {
   const body = await req.json() as {
@@ -17,22 +18,19 @@ export default endpoint('community-post-create', async ({ req, profile, reply, r
 
   const { scope, orgId, categoryId, title, content, tags, eventDate, eventLocation, eventRegistrationUrl } = body;
 
-  // Validate scope
   if (!scope || (scope !== 'org' && scope !== 'global')) {
     return reply(400, { error: 'scope must be "org" or "global"' });
   }
 
-  // scope='org' requires orgId
   if (scope === 'org' && (!orgId || typeof orgId !== 'string')) {
     return reply(400, { error: 'orgId is required for org scope' });
   }
 
-  // scope='global' must NOT have orgId (fail-fast before DB CHECK violation)
+  // fail-fast before DB CHECK violation
   if (scope === 'global' && orgId !== undefined && orgId !== null) {
     return reply(400, { error: 'orgId must not be provided for global scope' });
   }
 
-  // Validate required fields
   if (!categoryId || typeof categoryId !== 'string') {
     return reply(400, { error: 'categoryId is required' });
   }
@@ -43,9 +41,14 @@ export default endpoint('community-post-create', async ({ req, profile, reply, r
     return reply(400, { error: 'content is required' });
   }
 
-  // Validate optional fields
   if (tags !== undefined && (!Array.isArray(tags) || !tags.every((t) => typeof t === 'string'))) {
     return reply(400, { error: 'tags must be an array of strings' });
+  }
+  // Defence in depth against stored-XSS (sec-1, #232): the registration URL is
+  // rendered into an anchor href, so reject non-http(s) schemes on write.
+  const eventRegistrationUrlError = validateHttpUrl(eventRegistrationUrl, 'eventRegistrationUrl');
+  if (eventRegistrationUrlError) {
+    return reply(400, { error: eventRegistrationUrlError });
   }
 
   const vScope = scope as 'org' | 'global';
@@ -58,16 +61,14 @@ export default endpoint('community-post-create', async ({ req, profile, reply, r
   const vEventLocation = (eventLocation as string | null | undefined) ?? null;
   const vEventRegistrationUrl = (eventRegistrationUrl as string | null | undefined) ?? null;
 
-  // Authorization: scope gate
   if (!profile.is_platform_admin) {
     if (vScope === 'org') {
       const isMember = await isActiveMember(profile.id, vOrgId!);
       if (!isMember) return reply(403, { error: 'Forbidden' });
     }
-    // global scope is open to all profiles (no extra check needed beyond having a profile)
+    // global scope: any authenticated profile may post
   }
 
-  // Restricted-category gate
   const categoryRow = await queryOne<{ is_restricted: boolean }>(
     `SELECT is_restricted FROM community_categories WHERE id = $1`,
     [vCategoryId],
@@ -76,15 +77,12 @@ export default endpoint('community-post-create', async ({ req, profile, reply, r
 
   if (categoryRow.is_restricted) {
     if (vScope === 'global') {
-      // Only platform admins can post in restricted categories globally
       requirePlatformAdmin();
     } else {
-      // scope='org': platform admin OR org admin
       await requireOrgAdmin(vOrgId!);
     }
   }
 
-  // Insert
   const post = await queryOne(
     `INSERT INTO community_posts
       (scope, org_id, user_id, category_id, title, content, tags,

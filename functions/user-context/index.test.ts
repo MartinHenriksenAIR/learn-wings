@@ -30,6 +30,16 @@ const baseReq = {
   headers: { get: (k: string) => (k === 'origin' ? 'https://ai-uddannelse.dk' : 'Bearer tok') },
 };
 
+// A request carrying a JSON body (the client sends { language } on the
+// user-context call, #226). Mirrors the Azure HttpRequest.json() contract.
+const reqWith = (body: unknown) => ({
+  ...baseReq,
+  json: async () => body,
+});
+
+const insertParams = () =>
+  (mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT'))?.[1] ?? []) as unknown[];
+
 // pg QueryResult shape: the shared helper (client.query) reads `.rows`.
 const rows = (...r: unknown[]) => ({ rows: r });
 
@@ -61,15 +71,14 @@ describe('user-context', () => {
   it('returns existing profile and memberships', async () => {
     const memberships = [{ org_id: 'org-1', role: 'member', organization: { name: 'Org One' } }];
     mockQueryOne.mockResolvedValueOnce(existingProfile);
-    mockQuery.mockResolvedValueOnce([]); // invite pre-check: none
-    mockQuery.mockResolvedValueOnce(memberships); // memberships load
+    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValueOnce(memberships);
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
 
     expect(body.profile.id).toBe('profile-uuid');
     expect(body.memberships).toHaveLength(1);
-    // New assessment fields are present
     expect(body.profile.assessment_level).toBe('intermediate');
     expect(body.profile.assessment_skipped_at).toBeNull();
     expect(body.profile.assessment_taken_at).toBe('2026-07-01T10:00:00.000Z');
@@ -88,15 +97,14 @@ describe('user-context', () => {
     mockQueryOne.mockResolvedValueOnce(null);        // no existing profile
     mockQueryOne.mockResolvedValueOnce(insertedId);  // INSERT RETURNING id
     mockQueryOne.mockResolvedValueOnce(newProfile);  // re-select with full shape
-    mockQuery.mockResolvedValueOnce([]);             // invite pre-check: none
-    mockQuery.mockResolvedValueOnce([]);             // memberships (empty for new user)
+    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValueOnce([]);
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
 
     expect(body.profile.id).toBe('new-uuid');
     expect(body.memberships).toHaveLength(0);
-    // Assessment fields present on provisioned profile (all null for a new user)
     expect(body.profile.assessment_level).toBeNull();
     expect(body.profile.assessment_skipped_at).toBeNull();
     expect(body.profile.assessment_taken_at).toBeNull();
@@ -105,6 +113,66 @@ describe('user-context', () => {
     expect(insertCall).toBeDefined();
     expect(insertCall![1]).toContain('entra-oid-123');
     expect(insertCall![1]).toContain('entra-tid-456');
+  });
+
+  describe('#226 preferred_language provisioning', () => {
+    // Arrange a first-login provisioning flow: no existing profile, INSERT
+    // returns an id, re-select returns the full shape, no invites, no memberships.
+    const arrangeNewProfile = () => {
+      mockQueryOne.mockResolvedValueOnce(null); // no existing profile
+      mockQueryOne.mockResolvedValueOnce({ id: 'new-uuid' }); // INSERT RETURNING id
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'new-uuid', full_name: 'user', email: 'user@contoso.com',
+        is_platform_admin: false, avatar_url: null, preferred_language: 'da',
+        assessment_level: null, assessment_skipped_at: null, assessment_taken_at: null,
+      }); // re-select
+      mockQuery.mockResolvedValueOnce([]);
+      mockQuery.mockResolvedValueOnce([]);
+    };
+
+    it('stamps the sent language (da) into the provisioning INSERT', async () => {
+      arrangeNewProfile();
+      await handler(reqWith({ language: 'da' }) as any, {} as any);
+      expect(insertParams()).toContain('da');
+    });
+
+    it('stamps the sent language (en) into the provisioning INSERT', async () => {
+      arrangeNewProfile();
+      await handler(reqWith({ language: 'en' }) as any, {} as any);
+      expect(insertParams()).toContain('en');
+    });
+
+    it('defaults to English when the request body omits a language', async () => {
+      arrangeNewProfile();
+      await handler(reqWith({}) as any, {} as any);
+      expect(insertParams()).toContain('en');
+    });
+
+    it('defaults to English (never persists) an unsupported language', async () => {
+      arrangeNewProfile();
+      await handler(reqWith({ language: 'fr' }) as any, {} as any);
+      const params = insertParams();
+      expect(params).toContain('en');
+      expect(params).not.toContain('fr');
+    });
+
+    it('defaults to English when there is no JSON body at all (e.g. a GET probe)', async () => {
+      arrangeNewProfile();
+      // baseReq has no json() method — the handler must tolerate that and default.
+      await handler(baseReq as any, {} as any);
+      expect(insertParams()).toContain('en');
+    });
+
+    it('does NOT overwrite an existing profile — later logins never touch preferred_language', async () => {
+      mockQueryOne.mockResolvedValueOnce(existingProfile); // profile already exists
+      await handler(reqWith({ language: 'da' }) as any, {} as any);
+      // No INSERT (already provisioned) and no UPDATE of the profile: existing
+      // users keep whatever language they have (Q1 — no backfill).
+      const insertCall = mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT'));
+      const updateCall = mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('UPDATE profiles'));
+      expect(insertCall).toBeUndefined();
+      expect(updateCall).toBeUndefined();
+    });
   });
 
   it('returns 500 on unexpected database error', async () => {
@@ -118,13 +186,10 @@ describe('user-context', () => {
     expect(body.error).toBe('Internal server error');
   });
 
-  // ---- #176: auto-adopt pending org invites at login ----
-
   it('adopts a matching pending org invite: creates an active membership at the invited role and marks the invite accepted', async () => {
     mockQueryOne.mockResolvedValueOnce(existingProfile);
     mockQuery.mockResolvedValueOnce([{ id: 'inv-1' }]); // pre-check: a pending invite exists
     mockClientQuery.mockResolvedValueOnce(rows({ id: 'inv-1', org_id: 'org-9', role: 'org_admin' })); // FOR UPDATE re-select
-    // convertInvitation: no existing membership -> INSERT (default rows())
 
     const res = await handler(baseReq as any, {} as any);
     expect(res.status).toBe(200);
@@ -178,7 +243,6 @@ describe('user-context', () => {
       is_platform_admin: false, avatar_url: null,
       assessment_level: null, assessment_skipped_at: null, assessment_taken_at: null,
     }); // re-select with full shape
-    // pre-check returns nothing (default [])
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body);
@@ -186,7 +250,7 @@ describe('user-context', () => {
     expect(res.status).toBe(200);
     expect(body.profile.id).toBe('bare-uuid');
     expect(body.memberships).toHaveLength(0);
-    // The whole point of the optimization: no connection checkout / BEGIN when there's nothing to adopt.
+    // The whole point of the pre-check optimization: no connection checkout / BEGIN when there's nothing to adopt.
     expect(mockWithTransaction).not.toHaveBeenCalled();
     expect(findClientCall('INSERT INTO org_memberships')).toBeUndefined();
   });

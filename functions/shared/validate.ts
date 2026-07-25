@@ -10,7 +10,55 @@
  * The caller returns its existing 400 response with { error: <message> }.
  *
  * NOT included: sortOrder (create-only), lessonId (update-only).
+ *
+ * SCOPE — these are TYPE checks, not authorization. The three storage-path fields
+ * are checked for "non-empty string or null" and nothing more: this function
+ * cannot tell whose blob a well-formed path names, and must not be mistaken for
+ * the place that does. Whether a path may be bound to the row being written is
+ * decided by `assertBindablePaths` (`blob-ownership.ts`), which lesson-create and
+ * lesson-update both call before the path reaches storage or the database.
  */
+
+/**
+ * True when `value` is a string whose scheme is http: or https: (defence in
+ * depth against stored-XSS — sec-1, #232). Community URL fields (event
+ * registration/recording URLs, resource URLs) are rendered into anchor hrefs,
+ * where React 18 does NOT block `javascript:` and friends; rejecting non-http(s)
+ * schemes on write keeps such payloads out of the database entirely.
+ *
+ * Parses with the URL constructor (no base) so casing, whitespace, and exotic
+ * encodings can't smuggle a bad scheme past, and relative/unparseable input is
+ * rejected — these fields are meant to be absolute external URLs.
+ */
+export function isHttpUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  try {
+    const { protocol } = new URL(trimmed);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates an OPTIONAL URL field that must be an http(s) URL when present.
+ * Returns null when the value is acceptable (absent, null, empty string, or a
+ * valid http/https URL); returns an error message string otherwise. `fieldName`
+ * is interpolated into the message so callers get a field-specific 400.
+ *
+ * Empty/absent is allowed because these fields are optional in the schema and
+ * elsewhere (the create/update handlers) coalesce '' → null.
+ */
+export function validateHttpUrl(value: unknown, fieldName: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  if (!isHttpUrl(value)) {
+    return `${fieldName} must be a valid http(s) URL`;
+  }
+  return null;
+}
 
 function isStringOrNull(v: unknown): boolean {
   return v === null || typeof v === 'string';
@@ -46,7 +94,6 @@ export interface LessonFieldsBody {
 export function validateLessonFields(body: LessonFieldsBody): string | null {
   const { moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath } = body;
 
-  // Required: moduleId — non-empty string
   if (!moduleId || typeof moduleId !== 'string') {
     return 'moduleId is required';
   }
@@ -56,17 +103,14 @@ export function validateLessonFields(body: LessonFieldsBody): string | null {
     return 'title is required';
   }
 
-  // Required: lessonType ∈ ('video','document','quiz','exercise')
   if (!lessonType || !LESSON_TYPES.includes(lessonType as (typeof LESSON_TYPES)[number])) {
     return "lessonType must be 'video', 'document', 'quiz', or 'exercise'";
   }
 
-  // Optional: contentText — string or null
   if (contentText !== undefined && !isStringOrNull(contentText)) {
     return 'contentText must be a string or null';
   }
 
-  // Optional: durationMinutes — integer or null
   if (durationMinutes !== undefined && !isIntOrNull(durationMinutes)) {
     return 'durationMinutes must be an integer or null';
   }
@@ -76,12 +120,10 @@ export function validateLessonFields(body: LessonFieldsBody): string | null {
     return 'videoStoragePath must be a non-empty string or null';
   }
 
-  // Optional: azureBlobPath — non-empty string or null
   if (azureBlobPath !== undefined && !isNonEmptyStringOrNull(azureBlobPath)) {
     return 'azureBlobPath must be a non-empty string or null';
   }
 
-  // Optional: documentStoragePath — non-empty string or null
   if (documentStoragePath !== undefined && !isNonEmptyStringOrNull(documentStoragePath)) {
     return 'documentStoragePath must be a non-empty string or null';
   }

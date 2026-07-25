@@ -1,18 +1,14 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-import { isOrgAdmin } from '../shared/profile';
-import { RESOURCE_PROFILE_PROJECTION } from '../shared/resources';
+import {
+  RESOURCE_PROFILE_PROJECTION, RESOURCE_TYPES, loadResourceForWrite,
+} from '../shared/resources';
+import { buildUpdateSet } from '../shared/update-builder';
+import { validateHttpUrl } from '../shared/validate';
 
-const RESOURCE_TYPES = ['link', 'document', 'template', 'guide'];
 const ALLOWED_UPDATE_FIELDS = new Set([
   'title', 'description', 'resource_type', 'url', 'tags', 'is_pinned',
 ]);
-
-interface ResourceRow {
-  id: string;
-  org_id: string;
-  user_id: string;
-}
 
 export default endpoint('resource-update', async ({ req, profile, reply }) => {
   const body = await req.json() as { resourceId?: unknown; updates?: unknown };
@@ -21,21 +17,14 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
   if (!resourceId || typeof resourceId !== 'string') {
     return reply(400, { error: 'resourceId is required' });
   }
-  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-    return reply(400, { error: 'updates must be an object' });
+
+  const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS);
+  if (!built.ok) {
+    return reply(400, { error: built.error });
   }
 
   const updatesObj = updates as Record<string, unknown>;
   const updateKeys = Object.keys(updatesObj);
-  for (const key of updateKeys) {
-    if (!ALLOWED_UPDATE_FIELDS.has(key)) {
-      return reply(400, { error: `Invalid update field: ${key}` });
-    }
-  }
-  if (updateKeys.length === 0) {
-    return reply(400, { error: 'No update fields provided' });
-  }
-
   for (const key of updateKeys) {
     const v = updatesObj[key];
     if (key === 'tags') {
@@ -57,43 +46,30 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
       if (!v || typeof v !== 'string') {
         return reply(400, { error: 'title must be a non-empty string' });
       }
+    } else if (key === 'url') {
+      if (v !== null && typeof v !== 'string') {
+        return reply(400, { error: 'url must be a string or null' });
+      }
+      // Defence in depth against stored-XSS (sec-1, #232): reject non-http(s)
+      // schemes so a `javascript:` payload never persists.
+      const urlError = validateHttpUrl(v, 'url');
+      if (urlError) {
+        return reply(400, { error: urlError });
+      }
     } else {
-      // description, url — string or null (nullable in schema)
       if (v !== null && typeof v !== 'string') {
         return reply(400, { error: `${key} must be a string or null` });
       }
     }
   }
 
-  const resource = await queryOne<ResourceRow>(
-    `SELECT id, org_id, user_id FROM community_resources WHERE id = $1`,
-    [resourceId],
-  );
+  // Load + authorize (shared gate, #261): null covers both "missing" and
+  // "not authorized" — the single 404 is the anti-enumeration contract
+  // documented on loadResourceForWrite.
+  const resource = await loadResourceForWrite(resourceId, profile);
   if (!resource) return reply(404, { error: 'Resource not found' });
 
-  // Authorization (OR of RLS policies, provenance 20260202125517):
-  //   - platform admin (suite convention)
-  //   - author of the resource
-  //   - org admin of the resource's org
-  let authorized = false;
-  if (profile.is_platform_admin) {
-    authorized = true;
-  } else if (resource.user_id === profile.id) {
-    authorized = true;
-  } else if (await isOrgAdmin(profile.id, resource.org_id)) {
-    authorized = true;
-  }
-  // Returning 404 here keeps an authenticated caller from distinguishing
-  // "exists but I'm not allowed" from "doesn't exist" — prevents
-  // cross-org enumeration of resource IDs.
-  if (!authorized) return reply(404, { error: 'Resource not found' });
-
-  // Dynamic UPDATE over the whitelisted keys + return shape with embedded profile (CTE).
-  const params: unknown[] = [];
-  const setClauses = updateKeys.map((key) => {
-    params.push(updatesObj[key]);
-    return `${key} = $${params.length}`;
-  });
+  const { setClauses, params } = built;
   params.push(resourceId);
   const idIndex = params.length;
 

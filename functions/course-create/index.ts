@@ -1,5 +1,7 @@
 import { queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
+import { enforceUploadLimits, type UploadCandidate } from '../shared/upload-limits';
+import { assertBindablePaths } from '../shared/blob-ownership';
 
 const VALID_LEVELS = ['basic', 'intermediate', 'advanced'] as const;
 type CourseLevel = typeof VALID_LEVELS[number];
@@ -18,30 +20,48 @@ export default adminEndpoint('course-create', async ({ req, profile, reply }) =>
 
   const { title, description, level, language, thumbnailUrl } = body;
 
-  // Validate title: required, non-empty string
   if (!title || typeof title !== 'string' || title.trim() === '') {
     return reply(400, { error: 'title is required' });
   }
 
-  // Validate level: required, must be one of the enum values
   if (!level || !VALID_LEVELS.includes(level as CourseLevel)) {
     return reply(400, { error: 'level must be basic, intermediate, or advanced' });
   }
 
-  // Validate language: required, must be 'en' or 'da'
   if (!VALID_LANGUAGES.includes(language as CourseLanguage)) {
     return reply(400, { error: "language must be 'en' or 'da'" });
   }
 
-  // Validate description: if present, must be string or null (empty string allowed;
-  // null accepted for consistency with course-update — the column is nullable)
+  // null accepted for consistency with course-update; empty string allowed (column is nullable)
   if (description !== undefined && description !== null && typeof description !== 'string') {
     return reply(400, { error: 'description must be a string or null' });
   }
 
-  // Validate thumbnailUrl: if present, must be string or null
   if (thumbnailUrl !== undefined && thumbnailUrl !== null && typeof thumbnailUrl !== 'string') {
     return reply(400, { error: 'thumbnailUrl must be a string or null' });
+  }
+
+  // One candidate list, handed to both gates in order. There is no previous row,
+  // so no path is ever exempt: every supplied path must be one no row references.
+  const candidates: UploadCandidate[] = [
+    { path: thumbnailUrl as string | null | undefined, kind: 'image', family: 'lms' },
+  ];
+
+  // Ownership gate FIRST, before `enforceUploadLimits` reaches storage. A create
+  // has nothing to supersede, so this cannot lead to a delete — but binding
+  // another course's live thumbnail would make the two rows share a blob, which is
+  // exactly the state that later turns an ordinary edit into someone else's data
+  // loss.
+  const bindError = await assertBindablePaths(candidates);
+  if (bindError) {
+    return reply(400, { error: bindError });
+  }
+
+  // Size/type gate on the thumbnail (#276). No previous row, so a supplied path
+  // is always new; over-cap or off-allowlist means no row is inserted at all.
+  const limitError = await enforceUploadLimits(candidates);
+  if (limitError) {
+    return reply(413, { error: limitError });
   }
 
   const course = await queryOne(

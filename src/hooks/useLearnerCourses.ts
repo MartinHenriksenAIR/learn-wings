@@ -18,7 +18,7 @@ export function useLearnerCourses(
   options: { enabled?: boolean; staleTime?: number } = {},
 ) {
   const { i18n } = useTranslation();
-  const lang = i18n.resolvedLanguage ?? 'da';
+  const lang = i18n.resolvedLanguage ?? 'en';
 
   return useQuery({
     queryKey: [...queryKeys.learnerCourses.list(orgId), lang],

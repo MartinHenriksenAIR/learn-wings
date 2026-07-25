@@ -1,5 +1,5 @@
-import jwksClient from 'jwks-rsa';
-import { verify } from 'jsonwebtoken';
+import jwksClient, { SigningKeyNotFoundError } from 'jwks-rsa';
+import { verify, JsonWebTokenError } from 'jsonwebtoken';
 import type { HttpRequest } from '@azure/functions';
 
 export class AuthError extends Error {
@@ -40,7 +40,26 @@ function verifyToken(token: string): Promise<AuthUser> {
         // issuer intentionally omitted — multi-tenant tokens have per-tenant issuers
       },
       (err, decoded) => {
-        if (err) return reject(new AuthError(err.message));
+        // Only genuine token-verification failures become AuthError → 401.
+        // Two token-problem classes qualify:
+        //   • JsonWebTokenError — covers TokenExpiredError and NotBeforeError (both subclasses),
+        //     i.e. every jsonwebtoken validation error (bad signature, expiry, etc.).
+        //   • SigningKeyNotFoundError — jwks-rsa found no signing key for the token's `kid`.
+        //     An unknown/garbage kid is attacker-controllable via a crafted token, so it's a
+        //     TOKEN problem (→ 401), NOT a server fault. Bucketing it as 500 would let bad-kid
+        //     tokens spam logged 500s on demand, masking a real Entra outage.
+        // Any OTHER error here is a signing-key transport/fetch failure surfaced via
+        // getKey/jwks-rsa (JwksError/JwksRateLimitError/DNS fetching login.microsoftonline.com
+        // keys) — reject it AS-IS so the endpoint factory's catch routes it through internalError
+        // (logs + generic 500, ADR-0014) instead of a silent 401.
+        if (err) {
+          // NB: jsonwebtoken types `err` as VerifyErrors (JWT subclasses only), but errors from
+          // getKey/jwks-rsa (SigningKeyNotFoundError, JwksError, transport) also surface here at
+          // runtime — its types don't model that. Widen to Error so both instanceof checks are live.
+          const e: Error = err;
+          const isTokenFailure = e instanceof JsonWebTokenError || e instanceof SigningKeyNotFoundError;
+          return reject(isTokenFailure ? new AuthError(e.message) : e);
+        }
         const d = decoded as Record<string, string>;
         if (!ISSUER_RE.test(d.iss)) return reject(new AuthError('Invalid token issuer'));
         if (!d.oid || !d.tid) return reject(new AuthError('Missing oid or tid claims'));

@@ -7,7 +7,7 @@ export default endpoint('course-player-data', async ({ req, profile, reply }) =>
   const course = await queryOne('SELECT * FROM courses WHERE id = $1', [courseId]);
   if (!course) return reply(404, { error: 'Course not found' });
 
-  // Access check — platform admins bypass (suite convention); everyone else needs an active
+  // Platform admins bypass (suite convention); everyone else needs an active
   // membership in an org that has this course enabled and published (parity with quiz-by-lesson).
   if (!profile.is_platform_admin) {
     const access = await queryOne<{ ok: boolean }>(

@@ -27,19 +27,17 @@ export default endpoint('community-report-update', async ({ req, profile, reply 
     return reply(400, { error: 'Provide status or adminNotes to update' });
   }
 
-  // Load report
   const report = await queryOne<ReportRow>(
     `SELECT org_id FROM community_reports WHERE id = $1`,
     [reportId],
   );
   if (!report) return reply(404, { error: 'Report not found' });
 
-  // Authorization: platform admin OR org admin of the report's org (global reports = plat admin only)
+  // Platform admin OR org admin of the report's org; global reports → platform admin only.
   const canAccess = profile.is_platform_admin ||
     (report.org_id !== null && await isOrgAdmin(profile.id, report.org_id));
   if (!canAccess) return reply(403, { error: 'Forbidden' });
 
-  // Build dynamic UPDATE
   const params: unknown[] = [];
   const setClauses: string[] = [];
 
@@ -52,7 +50,6 @@ export default endpoint('community-report-update', async ({ req, profile, reply 
     setClauses.push(`admin_notes = $${params.length}`);
   }
 
-  // Always set reviewed_by and reviewed_at (server-set)
   params.push(profile.id);
   setClauses.push(`reviewed_by = $${params.length}`);
   setClauses.push(`reviewed_at = now()`);

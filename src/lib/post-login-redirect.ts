@@ -5,7 +5,19 @@
 const KEY = 'postLoginRedirect';
 
 // Only in-app absolute paths — never anything that could leave the SPA.
-const isInAppPath = (url: string) => url.startsWith('/') && !url.startsWith('//');
+// Must start with a single '/' (not '//', a protocol-relative open redirect)
+// and contain no backslash or control char anywhere: browsers and react-router
+// normalize '\' to '/', so '/\evil.com' would escape to an external origin
+// (CVE-2025-68470 / GHSA-wrjc-x8rr-h8h6 class, unpatched in react-router 6.x).
+// This guard is defense-in-depth, independent of the router version.
+const isInAppPath = (url: string): boolean => {
+  if (!/^\/(?!\/)/.test(url)) return false; // single leading slash only
+  for (let i = 0; i < url.length; i++) {
+    const c = url.charCodeAt(i);
+    if (c <= 0x1f || url[i] === '\\') return false; // control chars or backslash
+  }
+  return true;
+};
 
 export function savePostLoginRedirect(url: string) {
   if (!isInAppPath(url)) return;

@@ -47,12 +47,10 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
   const { effectiveIsPlatformAdmin, isPlatformAdmin, viewMode } = useAuth();
   const { t } = useTranslation();
 
-  // Platform admins go to Organizations, others go to Dashboard
   const homeHref = effectiveIsPlatformAdmin ? routes.platformAdmin.organizations : routes.learner.dashboard;
 
   const viewModeLabels = useViewModeLabels();
 
-  // Surface the existing view-mode state as a header chip when it differs from the real role
   const showViewingAsChip = isPlatformAdmin && viewMode !== 'platform_admin';
 
   return (

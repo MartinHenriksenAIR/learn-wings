@@ -23,7 +23,6 @@ export default endpoint('community-post-delete', async ({ req, profile, reply })
   );
   if (!post) return reply(404, { error: 'Post not found' });
 
-  // Authorization (OR of three RLS DELETE policies)
   let authorized = false;
 
   if (profile.is_platform_admin) {

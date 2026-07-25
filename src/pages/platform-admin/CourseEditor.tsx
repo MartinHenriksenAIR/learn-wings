@@ -46,7 +46,11 @@ const courseStructureQueryKey = (courseId: string) => queryKeys.courseStructureA
 interface CourseStructureData {
   course: Course | null;
   modules: CourseModule[];
-  /** Display URL re-signed from course.thumbnail_url (the DB row carries the raw path). */
+  /**
+   * DISPLAY-ONLY URL re-signed from course.thumbnail_url (the DB row carries the
+   * raw path). Null when there is no thumbnail OR when signing failed — which is
+   * why it is never the value the editor saves; see `editThumbnailPath`.
+   */
   signedThumbnailUrl: string | null;
 }
 
@@ -73,19 +77,30 @@ export default function CourseEditor() {
   // In-button "Save changes" success morph (toast policy: course save is routine).
   const { flashed, flash } = useFlash();
 
-  // Course edit state
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editLevel, setEditLevel] = useState<CourseLevel>('basic');
   const [editLanguage, setEditLanguage] = useState<'en' | 'da'>('da');
-  const [editThumbnailUrl, setEditThumbnailUrl] = useState<string | null>(null);
+  /**
+   * The thumbnail value that will be PERSISTED — the raw storage path, seeded
+   * from the course row and never from the signed display URL.
+   *
+   * The split matters. Signing is a display concern and is allowed to fail:
+   * `getSignedLmsAssetUrl` swallows a failed `/api/asset-signed-url` call and
+   * returns null (src/lib/storage.ts). While this field held the signed URL, that
+   * null was seeded straight into the form and the next save wrote
+   * `thumbnailUrl: null` — which #275 turned from a recoverable "column cleared,
+   * blob survives" into an irreversible `deleteBlob`. Holding the path instead
+   * means a signing blip can only cost the PREVIEW: the save still carries the
+   * path the row already has, which `course-update` sees as unchanged and leaves
+   * (and its blob) alone. Clearing the field is then unambiguously deliberate.
+   */
+  const [editThumbnailPath, setEditThumbnailPath] = useState<string | null>(null);
 
-  // Module dialog state
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [moduleTitle, setModuleTitle] = useState('');
 
-  // Lesson dialog state
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [lessonModuleId, setLessonModuleId] = useState<string | null>(null);
@@ -97,10 +112,8 @@ export default function CourseEditor() {
   const [lessonAzureBlobPath, setLessonAzureBlobPath] = useState<string | null>(null);
   const [lessonDocPath, setLessonDocPath] = useState<string | null>(null);
 
-  // Delete course state
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // Quiz editor state
   const [quizEditorOpen, setQuizEditorOpen] = useState(false);
   const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
   const [quizLessonTitle, setQuizLessonTitle] = useState('');
@@ -156,12 +169,29 @@ export default function CourseEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course?.id]);
 
-  // Re-seed the thumbnail whenever the re-signed URL changes (initial load +
-  // post-save refetch where the path is re-signed).
+  // Seed the thumbnail from the STORED PATH, and re-seed only when that path
+  // changes — initial load, switching courses, or a refetch that brought back a
+  // genuinely different value (someone else edited the course). Keying on the
+  // signed URL instead would re-seed on every refetch, because each one carries a
+  // fresh SAS token, silently discarding an unsaved thumbnail pick.
   useEffect(() => {
-    if (course) setEditThumbnailUrl(signedThumbnailUrl);
+    // `|| null` not `?? null`: an empty stored value means "no thumbnail" and
+    // must not be persisted back as an empty string.
+    if (course) setEditThumbnailPath(course.thumbnail_url || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedThumbnailUrl]);
+  }, [course?.id, course?.thumbnail_url]);
+
+  /**
+   * What FileUpload should SHOW. While the field still holds the course's stored
+   * path, that is the signed URL the structure query resolved for it; once the
+   * user picks a replacement it is the fresh blob path, which FileUpload renders
+   * from its own local object-URL preview until the post-save refetch re-signs it.
+   *
+   * null here means "we could not resolve a viewable URL", which is NOT the same
+   * as "there is no thumbnail" — `editThumbnailPath` is what answers that.
+   */
+  const thumbnailDisplayUrl =
+    editThumbnailPath === (course?.thumbnail_url || null) ? signedThumbnailUrl : editThumbnailPath;
 
   const saveCourseMutation = useToastMutation({
     mutationFn: (updates: { title: string; description: string; level: CourseLevel; language: 'en' | 'da'; thumbnailUrl: string | null }) =>
@@ -178,7 +208,11 @@ export default function CourseEditor() {
 
   const handleSaveCourse = () => {
     if (!courseId || !editTitle.trim()) return;
-    const thumbnailToPersist = extractLmsAssetPath(editThumbnailUrl) ?? editThumbnailUrl;
+    // `editThumbnailPath` is already a path for everything this app writes; the
+    // extraction only still normalizes a LEGACY row that stored an absolute
+    // storage URL. It can no longer turn a display URL back into a path, because
+    // no display URL ever reaches this state.
+    const thumbnailToPersist = extractLmsAssetPath(editThumbnailPath) ?? editThumbnailPath;
     saveCourseMutation.mutate({
       title: editTitle,
       description: editDescription,
@@ -223,7 +257,6 @@ export default function CourseEditor() {
     );
   };
 
-  // Module handlers
   const openAddModule = () => {
     setEditingModule(null);
     setModuleTitle('');
@@ -278,7 +311,6 @@ export default function CourseEditor() {
 
   const handleDeleteModule = (modId: string) => deleteModuleMutation.mutate(modId);
 
-  // Lesson handlers
   const openAddLesson = (moduleId: string) => {
     setEditingLesson(null);
     setLessonModuleId(moduleId);
@@ -496,7 +528,6 @@ export default function CourseEditor() {
       breadcrumbs={[{ label: t('coursesManager.tabCourses'), href: routes.platformAdmin.courses }, { label: course.title }]}
     >
       <div className="mx-auto max-w-[860px]">
-        {/* Back link */}
         <button
           type="button"
           onClick={() => navigate(routes.platformAdmin.courses)}
@@ -506,7 +537,6 @@ export default function CourseEditor() {
           {t('courseEditor.backToCourses')}
         </button>
 
-        {/* Course Details Card */}
         <div className="mb-[18px] rounded-2xl border border-border bg-card p-6">
           <div className="mb-[18px] flex items-center justify-between gap-3">
             <h2 className="text-base font-extrabold">{t('courseEditor.courseDetails')}</h2>
@@ -534,13 +564,24 @@ export default function CourseEditor() {
             <div className="w-full shrink-0 space-y-3.5 md:w-[220px]">
               <div className="space-y-1.5">
                 <Label>{t('courseEditor.thumbnail')}</Label>
+                {/* No maxSizeMB: the image cap is the server's, and FileUpload
+                    defaults to it (src/lib/upload-limits.ts). */}
                 <FileUpload
                   folder="thumbnails"
                   accept="image"
-                  value={editThumbnailUrl}
-                  onChange={(url) => setEditThumbnailUrl(url)}
-                  maxSizeMB={10}
+                  value={thumbnailDisplayUrl}
+                  // FileUpload reports (null, null) only when the user clears the
+                  // field — a failed upload leaves the current value alone — so
+                  // this null is a deliberate removal, and the save is meant to
+                  // clear the column and delete the blob (#275).
+                  onChange={(_url, storagePath) => setEditThumbnailPath(storagePath)}
                 />
+                {/* A stored thumbnail we could not sign renders as the empty
+                    dropzone, which on its own reads as "there is no image". Say
+                    what actually happened, and that the save will not discard it. */}
+                {editThumbnailPath && !thumbnailDisplayUrl && (
+                  <p className="text-xs text-muted-foreground">{t('courseEditor.thumbnailPreviewUnavailable')}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>{t('courseEditor.levelLabel')}</Label>
@@ -566,8 +607,6 @@ export default function CourseEditor() {
             </div>
           </div>
 
-          {/* Language editions (#213) — link/unlink translated editions so
-              analytics count a course and its siblings as one. */}
           <div className="mb-[18px] space-y-2 border-t border-border pt-[18px]">
             <Label>{t('courseEditor.editions.title')}</Label>
             <p className="text-sm text-muted-foreground">{t('courseEditor.editions.description')}</p>
@@ -632,7 +671,6 @@ export default function CourseEditor() {
               onClick={handleSaveCourse}
               disabled={saving}
             />
-            {/* Publish toggle (switch, not button) — wired to the publish mutation. */}
             <span className="inline-flex items-center gap-2.5 rounded-[10px] border border-[#eceef3] px-3.5 py-2">
               <span className="text-[13px] font-bold text-[#4a4f60]">{t('courseEditor.publishToggleLabel')}</span>
               <Switch
@@ -653,7 +691,6 @@ export default function CourseEditor() {
           </div>
         </div>
 
-        {/* Modules & Lessons */}
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-extrabold">{t('courseEditor.modulesAndLessons')}</h2>
           <Button
@@ -672,7 +709,6 @@ export default function CourseEditor() {
           <div className="flex flex-col gap-3">
             {modules.map((mod, modIndex) => (
               <div key={mod.id} className="overflow-hidden rounded-2xl border border-border bg-card">
-                {/* Module header */}
                 <div className="flex items-center gap-2.5 bg-[#f7f8fa] px-[18px] py-3">
                   <span className="flex text-[#c3c7d3]" aria-hidden="true">
                     <GripVertical className="h-[15px] w-[15px]" />
@@ -707,7 +743,6 @@ export default function CourseEditor() {
                   </button>
                 </div>
 
-                {/* Lessons */}
                 {mod.lessons && mod.lessons.length > 0 ? (
                   mod.lessons.map((lesson) => (
                     <div
@@ -788,7 +823,6 @@ export default function CourseEditor() {
         )}
       </div>
 
-      {/* Delete Course Confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -817,7 +851,6 @@ export default function CourseEditor() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Module Dialog */}
       <Dialog open={moduleDialogOpen} onOpenChange={setModuleDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -842,7 +875,6 @@ export default function CourseEditor() {
         </DialogContent>
       </Dialog>
 
-      {/* Lesson Dialog */}
       <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -883,10 +915,11 @@ export default function CourseEditor() {
               <>
                 <div className="space-y-2">
                   <Label>{t('courseEditor.documentFileLabel')}</Label>
+                  {/* No maxSizeMB: the document cap is the server's, and
+                      AzureDocumentUpload defaults to it (src/lib/upload-limits.ts). */}
                   <AzureDocumentUpload
                     value={lessonDocPath}
                     onChange={setLessonDocPath}
-                    maxSizeMB={100}
                   />
                 </div>
                 <div className="space-y-2">

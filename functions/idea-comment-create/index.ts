@@ -1,13 +1,7 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { profileJson } from '../shared/profile-json';
-
-interface IdeaRow {
-  id: string;
-  org_id: string;
-  user_id: string;
-  status: string;
-}
+import { loadIdea, isIdeaVisibleTo } from '../shared/ideas';
 
 export default endpoint('idea-comment-create', async ({ req, profile, reply, requireActiveMember }) => {
   const body = await req.json() as { ideaId?: unknown; content?: unknown; parentCommentId?: unknown };
@@ -23,23 +17,17 @@ export default endpoint('idea-comment-create', async ({ req, profile, reply, req
     return reply(400, { error: 'parentCommentId must be a string' });
   }
 
-  // Load idea
-  const idea = await queryOne<IdeaRow>(
-    `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
-    [ideaId],
-  );
+  const idea = await loadIdea(ideaId);
 
   if (!idea) return reply(404, { error: 'Idea not found' });
 
-  // Draft privacy: other-author's draft is invisible (no admin bypass)
-  if (idea.status === 'draft' && idea.user_id !== profile.id) {
+  // Draft privacy (shared/ideas): other-author's draft is invisible (no admin bypass)
+  if (!isIdeaVisibleTo(idea, profile)) {
     return reply(404, { error: 'Idea not found' });
   }
 
-  // Authz: platform admin OR active member of idea's org
   await requireActiveMember(idea.org_id);
 
-  // Validate parentCommentId if provided
   if (parentCommentId !== undefined) {
     const parentComment = await queryOne<{ idea_id: string }>(
       `SELECT idea_id FROM idea_comments WHERE id = $1`,

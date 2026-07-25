@@ -24,7 +24,7 @@ import { TagList } from '@/components/community/TagList';
 import { CommentThread } from '@/components/community/CommentThread';
 import { ReportDialog } from '@/components/community/ReportDialog';
 import { useAuth } from '@/hooks/useAuth';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { toast } from '@/components/ui/sonner';
 import { ApiError } from '@/lib/api-client';
 import {
@@ -55,6 +55,7 @@ import {
   Pin,
 } from 'lucide-react';
 import { formatDate } from '@/lib/date-locale';
+import { safeHref } from '@/lib/safe-href';
 import type { CommunityScope } from '@/lib/community-types';
 
 export default function PostDetail() {
@@ -62,7 +63,11 @@ export default function PostDetail() {
   const navigate = useNavigate();
   const scope = (routeScope || 'org') as CommunityScope;
   const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  // allowPlatformAdmin: the gate is keyed on the VIEWER's effective flags (platform +
+  // their currentOrg override), not the reported post's org. Platform admins moderating
+  // an org-scoped report must not be bounced just because their own org has community
+  // disabled (or they have no org selected). Backend authz already permits them.
+  const communityGate = useCommunityGate({ allowPlatformAdmin: true });
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -71,14 +76,12 @@ export default function PostDetail() {
   const [reportTargetType, setReportTargetType] = useState<'post' | 'comment'>('post');
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
 
-  // Fetch post
   const { data: post, isLoading: postLoading } = useQuery({
     queryKey: queryKeys.communityPost.detail(postId),
     queryFn: () => fetchPost(postId!),
     enabled: !!postId,
   });
 
-  // Fetch comments
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: queryKeys.communityComments.list(postId),
     queryFn: () => fetchComments(postId!),
@@ -91,7 +94,6 @@ export default function PostDetail() {
     : effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
   const isRestricted = post?.category?.is_restricted;
 
-  // Mutations
   const createCommentMutation = useMutation({
     mutationFn: ({ content, parentId }: { content: string; parentId?: string }) =>
       createComment({ post_id: postId!, content, parent_comment_id: parentId }),
@@ -109,6 +111,9 @@ export default function PostDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
     },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.commentUpdateFailed'), description: error.message, variant: 'destructive' });
+    },
   });
 
   const deleteCommentMutation = useMutation({
@@ -116,6 +121,9 @@ export default function PostDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
       toast({ title: t('community.toasts.commentDeleted') });
+    },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.commentDeleteFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -135,12 +143,18 @@ export default function PostDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPost.detail(postId) });
     },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.postHideFailed'), description: error.message, variant: 'destructive' });
+    },
   });
 
   const toggleLockMutation = useMutation({
     mutationFn: (locked: boolean) => togglePostLocked(postId!, locked),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPost.detail(postId) });
+    },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.postLockFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -149,6 +163,9 @@ export default function PostDetail() {
       toggleCommentHidden(commentId, hidden),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityComments.list(postId) });
+    },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.commentHideFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -198,13 +215,7 @@ export default function PostDetail() {
     return () => window.clearTimeout(timer);
   }, [comments]);
 
-  // The community gate is keyed on the VIEWER's effective flags (platform + their
-  // currentOrg override), not the reported post's org. Platform admins moderating an
-  // org-scoped report must not be bounced just because their own org has community
-  // disabled (or they have no org selected). Backend authz already permits them.
-  if (!settingsLoading && !features.community_enabled && !effectiveIsPlatformAdmin) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   if (postLoading) {
     return (
@@ -241,7 +252,6 @@ export default function PostDetail() {
   return (
     <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.post') }]}>
       <div className="max-w-[760px]">
-        {/* Back button */}
         <Button
           variant="ghost"
           onClick={() => navigate(`${routes.community.feed}?scope=${scope}`)}
@@ -251,7 +261,6 @@ export default function PostDetail() {
           {t('community.backToCommunity')}
         </Button>
 
-        {/* Post card */}
         <div className="mb-4 rounded-2xl border border-border bg-card px-[26px] py-6">
           <div className="mb-3.5 flex items-center gap-2.5">
             <BrandingAvatar
@@ -295,13 +304,8 @@ export default function PostDetail() {
             </div>
           </div>
 
-          {/* Title */}
           <h1 className="mb-2.5 font-display text-[21px] font-extrabold tracking-[-0.01em]">{post.title}</h1>
-
-          {/* Content */}
           <p className="mb-4 whitespace-pre-wrap text-sm leading-[1.65] text-[#4a4f60]">{post.content}</p>
-
-          {/* Event date/time/place chips */}
           {isEvent && post.event_date && (
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-[7px] bg-muted px-2.5 py-[5px] text-[12px] font-semibold text-muted-foreground">
@@ -316,7 +320,7 @@ export default function PostDetail() {
               )}
               {post.event_registration_url && (
                 <a
-                  href={post.event_registration_url}
+                  href={safeHref(post.event_registration_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-lg px-2 py-[9px] text-[12.5px] font-bold text-primary hover:underline"
@@ -327,7 +331,7 @@ export default function PostDetail() {
               )}
               {post.event_recording_url && (
                 <a
-                  href={post.event_recording_url}
+                  href={safeHref(post.event_recording_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-lg px-2 py-[9px] text-[12.5px] font-bold text-primary hover:underline"
@@ -339,10 +343,7 @@ export default function PostDetail() {
             </div>
           )}
 
-          {/* Tags */}
           <TagList tags={post.tags || []} className="mb-4" />
-
-          {/* Actions */}
           <div className="flex items-center justify-between border-t border-[#eceef3] pt-3.5">
             <div className="flex items-center gap-2">
               {!isAuthor && (
@@ -432,7 +433,6 @@ export default function PostDetail() {
           </div>
         </div>
 
-        {/* Comments */}
         <CommentThread
           comments={comments}
           postId={postId!}
@@ -447,18 +447,20 @@ export default function PostDetail() {
             await createCommentMutation.mutateAsync({ content, parentId });
           }}
           onEditComment={async (commentId, content) => {
-            await updateCommentMutation.mutateAsync({ commentId, content });
+            // onError toasts the failure; swallow the rejection so it doesn't
+            // surface as an unhandled promise rejection (no post-await success
+            // dependency at the call site — CommentItem closes edit mode eagerly).
+            await updateCommentMutation.mutateAsync({ commentId, content }).catch(() => {});
           }}
           onDeleteComment={async (commentId) => {
-            await deleteCommentMutation.mutateAsync(commentId);
+            await deleteCommentMutation.mutateAsync(commentId).catch(() => {});
           }}
           onReportComment={handleReportComment}
           onToggleHideComment={isAdmin ? async (commentId, hidden) => {
-            await toggleCommentHideMutation.mutateAsync({ commentId, hidden });
+            await toggleCommentHideMutation.mutateAsync({ commentId, hidden }).catch(() => {});
           } : undefined}
         />
 
-        {/* Report dialog */}
         <ReportDialog
           open={showReportDialog}
           onOpenChange={setShowReportDialog}

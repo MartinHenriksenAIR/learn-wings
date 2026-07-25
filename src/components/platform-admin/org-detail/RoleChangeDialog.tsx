@@ -24,7 +24,6 @@ interface RoleChangeDialogProps {
   onConfirm: () => void;
 }
 
-/** Role-change confirmation AlertDialog (promote to admin / change to learner). */
 export function RoleChangeDialog({ selection, orgName, onOpenChange, onConfirm }: RoleChangeDialogProps) {
   const { t } = useTranslation();
 

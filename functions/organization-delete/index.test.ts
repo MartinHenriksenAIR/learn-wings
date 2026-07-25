@@ -77,14 +77,14 @@ describe('organization-delete', () => {
   });
 
   it('returns 404 when organization not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // DELETE RETURNING null = no row
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ orgId: 'org-x' }), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization not found' });
   });
 
   it('happy path: platform admin deletes an organization', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // DELETE RETURNING id
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' });
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });

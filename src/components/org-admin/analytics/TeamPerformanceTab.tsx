@@ -91,7 +91,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
   const [selectedUser, setSelectedUser] = useState<UserStats | null>(null);
   const [progressDialogOpen, setProgressDialogOpen] = useState(false);
 
-  // Filter and sort user stats
   const filteredUserStats = useMemo(() => {
     return userStats
       .filter((user) => {
@@ -125,7 +124,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
       });
   }, [userStats, searchQuery, selectedDepartment, sortBy, sortDirection]);
 
-  // Group by department
   const groupedByDepartment = useMemo(() => {
     const groups: Record<string, UserStats[]> = {};
     filteredUserStats.forEach((user) => {
@@ -136,14 +134,12 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
     return groups;
   }, [filteredUserStats]);
 
-  // Pagination
   const totalPages = Math.ceil(filteredUserStats.length / ITEMS_PER_PAGE);
   const paginatedUsers = filteredUserStats.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
 
-  // Export to CSV
   const handleExportCSV = () => {
     const headers = ['Name', 'Department', t('assessment.analytics.aiLevel'), 'Courses Enrolled', 'Courses Completed', 'Avg Quiz Score'];
     const rows = filteredUserStats.map((user) => [
@@ -202,11 +198,9 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
 
   return (
     <div className="space-y-4">
-      {/* Filters and Controls */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-3">
-            {/* Search */}
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -220,7 +214,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
               />
             </div>
 
-            {/* Department Filter */}
             <Select value={selectedDepartment} onValueChange={(v) => { setSelectedDepartment(v); setCurrentPage(1); }}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="All Departments" />
@@ -236,7 +229,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
               </SelectContent>
             </Select>
 
-            {/* Sort */}
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'name' | 'completed' | 'score' | 'level')}>
               <SelectTrigger className="w-32">
                 <SelectValue placeholder="Sort by" />
@@ -262,7 +254,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
               )}
             </Button>
 
-            {/* View Mode */}
             <Select value={viewMode} onValueChange={(v) => setViewMode(v as 'list' | 'grouped')}>
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -273,7 +264,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
               </SelectContent>
             </Select>
 
-            {/* Export */}
             <Button variant="outline" onClick={handleExportCSV} className="gap-2 ml-auto">
               <Download className="h-4 w-4" />
               Export CSV
@@ -286,7 +276,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
         </CardContent>
       </Card>
 
-      {/* Results */}
       {filteredUserStats.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
@@ -373,7 +362,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
             </TableBody>
           </Table>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
               <p className="text-sm text-muted-foreground">
@@ -402,7 +390,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
         </Card>
       )}
 
-      {/* User Progress Dialog */}
       {selectedUser && orgId && (
         <UserProgressDialog
           userId={selectedUser.id}

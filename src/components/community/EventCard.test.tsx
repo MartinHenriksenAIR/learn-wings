@@ -74,6 +74,20 @@ describe('EventCard (#125)', () => {
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
   });
 
+  it('drops a javascript: registration URL so the Join anchor has no href (stored-XSS guard, #232)', () => {
+    const { container } = renderCard({
+      ...event,
+      event_registration_url: 'javascript:alert(document.cookie)',
+    } as CommunityPost);
+    // An <a> with no href isn't exposed with the "link" role, so query the DOM
+    // directly: the Join anchor still renders but carries no (dangerous) href.
+    const anchor = container.querySelector('a');
+    expect(anchor).not.toBeNull();
+    expect(anchor).not.toHaveAttribute('href');
+    // getByRole('link') finds nothing precisely because the href was stripped.
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
   it('navigates to the post detail via post.scope when the card body is clicked', () => {
     renderCard();
     fireEvent.click(screen.getByText('Prompt Engineering Workshop'));

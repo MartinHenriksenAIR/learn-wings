@@ -21,15 +21,13 @@ export default endpoint('community-comment-moderate', async ({ req, profile, rep
     return reply(400, { error: 'isHidden is required and must be a boolean' });
   }
 
-  // Load comment + post scope
   const row = await queryOne<CommentPostRow>(
     `SELECT p.scope, p.org_id FROM community_comments c JOIN community_posts p ON p.id = c.post_id WHERE c.id = $1`,
     [commentId],
   );
   if (!row) return reply(404, { error: 'Comment not found' });
 
-  // Authorization: platform admin OR (org post AND org admin)
-  // Comments on global posts: platform admin only
+  // Platform admin OR org admin of the org post; global posts: platform admin only.
   const canAccess = profile.is_platform_admin ||
     (row.scope === 'org' && row.org_id !== null && await isOrgAdmin(profile.id, row.org_id));
   if (!canAccess) return reply(403, { error: 'Forbidden' });

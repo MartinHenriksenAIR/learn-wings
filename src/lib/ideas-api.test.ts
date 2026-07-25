@@ -7,7 +7,13 @@ vi.mock('@/lib/api-client', () => ({
   callApiRaw: vi.fn(),
 }));
 
-import { createIdea, updateIdea, updateIdeaPriority } from './ideas-api';
+import {
+  createIdea,
+  updateIdea,
+  updateIdeaPriority,
+  voteForIdea,
+  createIdeaComment,
+} from './ideas-api';
 import type { BusinessArea } from '@/lib/community-types';
 
 describe('ideas-api payload coercions (old client-lib parity)', () => {
@@ -79,5 +85,42 @@ describe('ideas-api payload coercions (old client-lib parity)', () => {
     expect(path).toBe('/api/idea-prioritize');
     expect(body).toEqual({ ideaId: 'idea-1', value: 3, effort: 1 });
     expect(result).toEqual({ id: 'idea-1' });
+  });
+});
+
+// #268 removed the vestigial `orgId` from these two bodies — the server derives the org
+// from the idea row, and the endpoints ignore (and must keep ignoring) a client-sent one.
+// These assert the wire payload with `toEqual`, not `toMatchObject`, so a re-added `orgId`
+// fails here: the IdeaDetail tests mock this module wholesale and only pin call-site arity.
+describe('ideas-api wire payloads (no vestigial orgId — #268)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCallApi.mockResolvedValue({ comment: { id: 'comment-1' } });
+  });
+
+  it('voteForIdea posts only the ideaId', async () => {
+    await voteForIdea('idea-1');
+
+    const [path, body] = mockCallApi.mock.calls[0] as [string, Record<string, unknown>];
+    expect(path).toBe('/api/idea-vote');
+    expect(body).toEqual({ ideaId: 'idea-1' });
+  });
+
+  it('createIdeaComment posts the ideaId and content, with no parent for a top-level comment', async () => {
+    await createIdeaComment('idea-1', 'hello');
+
+    const [path, body] = mockCallApi.mock.calls[0] as [string, Record<string, unknown>];
+    expect(path).toBe('/api/idea-comment-create');
+    // parentCommentId is undefined, not omitted — JSON.stringify drops it on the wire
+    expect(body).toEqual({ ideaId: 'idea-1', content: 'hello', parentCommentId: undefined });
+    expect(Object.keys(body).sort()).toEqual(['content', 'ideaId', 'parentCommentId']);
+  });
+
+  it('createIdeaComment threads the parentId through as parentCommentId', async () => {
+    await createIdeaComment('idea-1', 'a reply', 'comment-0');
+
+    const [path, body] = mockCallApi.mock.calls[0] as [string, Record<string, unknown>];
+    expect(path).toBe('/api/idea-comment-create');
+    expect(body).toEqual({ ideaId: 'idea-1', content: 'a reply', parentCommentId: 'comment-0' });
   });
 });

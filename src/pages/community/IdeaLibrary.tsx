@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { OrgGate } from '@/components/layout/OrgGate';
 import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,10 +18,11 @@ import {
 import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import { IdeaCard } from '@/components/community/IdeaCard';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
-import { PageSpinner } from '@/components/ui/page-spinner';
+import { QueryErrorState } from '@/components/ui/query-error-state';
+import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQueryErrorToast';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { fetchIdeas, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { IdeaStatusExtended, BusinessArea } from '@/lib/community-types';
@@ -43,7 +45,7 @@ export default function IdeaLibrary() {
   // and never matches ideas.user_id post-migration.
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
 
   const initialTab = searchParams.get('tab') || 'all';
   const [activeTab, setActiveTab] = useState<string>(initialTab);
@@ -78,7 +80,6 @@ export default function IdeaLibrary() {
     [isAdmin, t]
   );
 
-  // Status filters per tab
   const tabStatusFilters: Record<string, IdeaStatusExtended[]> = {
     all: [],
     drafts: ['draft'],
@@ -87,8 +88,7 @@ export default function IdeaLibrary() {
     rejected: ['rejected'],
   };
 
-  // Fetch ideas - for drafts tab, filter by current user
-  const { data: ideas = [], isLoading } = useQuery({
+  const { data: ideas = [], isLoading, isError: ideasError, refetch: refetchIdeas } = useQuery({
     queryKey: queryKeys.ideas.list(currentOrg?.id, safeTab, searchQuery, selectedBusinessArea, selectedTags, profile?.id),
     queryFn: () => fetchIdeas(currentOrg!.id, {
       status: tabStatusFilters[safeTab].length > 0 ? tabStatusFilters[safeTab] : undefined,
@@ -100,13 +100,20 @@ export default function IdeaLibrary() {
     enabled: !!currentOrg,
   });
 
-  const { data: orgTags = [] } = useQuery({
+  // Org tags are secondary (the tag filter dropdown) — a failure degrades the
+  // filter but should not blank the page, so it toasts + logs instead.
+  const { data: orgTags = [], isError: orgTagsError, error: orgTagsErrorObj } = useQuery({
     queryKey: queryKeys.ideaTags.list(currentOrg?.id),
     queryFn: () => fetchOrgTags(currentOrg!.id),
     enabled: !!currentOrg,
   });
+  useQueryErrorToast({
+    isError: orgTagsError,
+    error: orgTagsErrorObj,
+    toastTitle: t('common.loadErrorTitle'),
+    logLabel: 'IdeaLibrary: failed to load org tags',
+  });
 
-  // Delete idea mutation
   const deleteMutation = useMutation({
     mutationFn: deleteIdea,
     onSuccess: () => {
@@ -128,36 +135,14 @@ export default function IdeaLibrary() {
 
   const hasActiveFilters = Boolean(searchQuery || selectedBusinessArea || selectedTags.length > 0);
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
-  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
-  // while the signed-in user's context is still resolving.
-  if (orgGuard === 'loading') {
-    return (
-      <AppLayout>
-        <PageSpinner />
-      </AppLayout>
-    );
-  }
-
-  if (!currentOrg) {
-    return (
-      <AppLayout>
-        <div className="py-12 text-center">
-          <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
-            {t('community.noOrganizationTitle')}
-          </h1>
-          <p className="text-sm text-muted-foreground">{t('community.noOrgIdeas')}</p>
-        </div>
-      </AppLayout>
-    );
+  if (orgGuard === 'loading' || !currentOrg) {
+    return <OrgGate titleKey="community.noOrganizationTitle" descriptionKey="community.noOrgIdeas" />;
   }
 
   return (
     <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary') }]}>
-      {/* Back to community */}
       <Button
         variant="ghost"
         onClick={() => navigate(`${routes.community.feed}?scope=org`)}
@@ -167,7 +152,6 @@ export default function IdeaLibrary() {
         {t('community.backToCommunity')}
       </Button>
 
-      {/* Header */}
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -186,10 +170,7 @@ export default function IdeaLibrary() {
         </Button>
       </div>
 
-      {/* Tabs */}
       <SlidingTabs tabs={ideaTabs} active={safeTab} onChange={setActiveTab} className="mb-[18px]" />
-
-      {/* Filters */}
       <div className="mb-5 flex flex-col gap-2.5 md:flex-row">
         <div className="relative flex-1">
           <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
@@ -239,7 +220,6 @@ export default function IdeaLibrary() {
         </Select>
       </div>
 
-      {/* Active tag filters */}
       {selectedTags.length > 0 && (
         <div className="mb-5 -mt-2 flex flex-wrap items-center gap-2">
           {selectedTags.map((tag) => (
@@ -256,11 +236,13 @@ export default function IdeaLibrary() {
         </div>
       )}
 
-      {/* Ideas grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : ideasError ? (
+        // A failed fetch must not render the "no ideas yet" empty state.
+        <QueryErrorState onRetry={() => refetchIdeas()} />
       ) : filteredIdeas.length === 0 ? (
         <CommunityEmptyState
           variant={safeTab === 'drafts' ? 'drafts' : 'ideas'}

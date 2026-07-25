@@ -27,7 +27,6 @@ describe('platform-settings-update', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
   });
 
-  // 1. 401 when bearer token invalid
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -37,7 +36,6 @@ describe('platform-settings-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 when profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -47,7 +45,6 @@ describe('platform-settings-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 403 for non-admin — no DB call
   it('returns 403 for non-admin without querying the DB', async () => {
     const res = await handler(baseReq({ key: 'branding', value: {} }), {} as any);
 
@@ -56,7 +53,6 @@ describe('platform-settings-update', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  // 4. 400 for invalid key
   it('returns 400 when key is not an allowed setting key', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
@@ -66,7 +62,6 @@ describe('platform-settings-update', () => {
     expect(JSON.parse(res.body as string).error).toMatch(/key must be one of/);
   });
 
-  // 5. 400 when value is null
   it('returns 400 when value is null', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
@@ -76,7 +71,6 @@ describe('platform-settings-update', () => {
     expect(JSON.parse(res.body as string).error).toMatch(/plain object/);
   });
 
-  // 6. 400 when value is an array
   it('returns 400 when value is an array', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
@@ -86,7 +80,6 @@ describe('platform-settings-update', () => {
     expect(JSON.parse(res.body as string).error).toMatch(/plain object/);
   });
 
-  // 7. 400 when value is a non-object primitive
   it('returns 400 when value is a string', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
@@ -96,7 +89,6 @@ describe('platform-settings-update', () => {
     expect(JSON.parse(res.body as string).error).toMatch(/plain object/);
   });
 
-  // 7b. 400 when value contains an unknown field for the setting key
   it('returns 400 when value contains an unknown field', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
@@ -107,7 +99,6 @@ describe('platform-settings-update', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  // 7c. 400 when a known field has the wrong shape
   it('returns 400 when a known field has the wrong type', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
@@ -118,7 +109,6 @@ describe('platform-settings-update', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  // 7d. 400 when an enum field has a value outside its set
   it('returns 400 when smtp_encryption is not a known mode', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
@@ -129,7 +119,6 @@ describe('platform-settings-update', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  // 7e. 400 when smtp_port is not a number
   it('returns 400 when smtp_port is not a number', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
@@ -140,7 +129,6 @@ describe('platform-settings-update', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  // 8. Happy path — correct SQL, params, and response shape; write MERGES per key
   it('updates the setting via a jsonb merge and returns the updated row', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const updatedRow = { key: 'branding', value: { logo_url: 'new-logo.png' } };
@@ -159,13 +147,11 @@ describe('platform-settings-update', () => {
     // Merge semantics pinned: stored value is the base, body fields overlay it —
     // absent fields keep their stored values (no more blind replace).
     expect(sql).toContain('value = value || $2::jsonb');
-    // params: [key, JSON.stringify(value), profile.id]
     expect(params[0]).toBe('branding');
     expect(params[1]).toBe(JSON.stringify({ logo_url: 'new-logo.png' }));
     expect(params[2]).toBe('p1');
   });
 
-  // 8b. Partial body only sends the present fields into the merge
   it('a partial body merges only the fields present (stored SMTP config survives)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const updatedRow = { key: 'email', value: { from_name: 'New Name', smtp_host: 'smtp.kept.example' } };
@@ -179,7 +165,6 @@ describe('platform-settings-update', () => {
     expect(params[1]).toBe(JSON.stringify({ from_name: 'New Name' }));
   });
 
-  // 8c. Full-body write still works
   it('a full-body write passes validation and merges all fields', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const fullEmail = {
@@ -201,7 +186,6 @@ describe('platform-settings-update', () => {
     expect(params[1]).toBe(JSON.stringify(fullEmail));
   });
 
-  // 9. 404 when no row updated (key not in DB)
   it('returns 404 when the setting key does not exist in the DB', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce(null);
@@ -212,7 +196,6 @@ describe('platform-settings-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Setting not found' });
   });
 
-  // 10. 500 on db error
   it('returns 500 on db error', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
@@ -223,7 +206,6 @@ describe('platform-settings-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // 11. seat_pricing — accepts a valid update
   it('accepts a valid seat_pricing update', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce({ key: 'seat_pricing', value: { annual_price_per_seat: 1200, currency: 'DKK', notification_email: 'jacob@ai-raadgivning.dk' } });
@@ -231,7 +213,6 @@ describe('platform-settings-update', () => {
     expect(res.status).toBe(200);
   });
 
-  // 12. seat_pricing — accepts a null seat price (unsetting)
   it('accepts a null seat price (unsetting)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce({ key: 'seat_pricing', value: { annual_price_per_seat: null } });
@@ -239,14 +220,12 @@ describe('platform-settings-update', () => {
     expect(res.status).toBe(200);
   });
 
-  // 13. seat_pricing — rejects a negative seat price
   it('rejects a negative seat price', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const res = await handler(baseReq({ key: 'seat_pricing', value: { annual_price_per_seat: -5 } }), {} as any);
     expect(res.status).toBe(400);
   });
 
-  // 14. seat_pricing — rejects an unknown field
   it('rejects an unknown seat_pricing field', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const res = await handler(baseReq({ key: 'seat_pricing', value: { bogus: 1 } }), {} as any);

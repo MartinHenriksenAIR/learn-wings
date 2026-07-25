@@ -8,10 +8,8 @@ export default endpoint('quiz-by-lesson', async ({ req, profile, reply }) => {
     return reply(400, { error: 'lessonId is required' });
   }
 
-  // Access check — skip entirely for platform admins
   if (!profile.is_platform_admin) {
     const access = await queryOne<{ ok: boolean }>(
-      // Check that the calling user has an active membership in an org that has this lesson's course enabled
       `SELECT EXISTS(
         SELECT 1
           FROM lessons l
@@ -26,20 +24,17 @@ export default endpoint('quiz-by-lesson', async ({ req, profile, reply }) => {
     if (!access?.ok) return reply(403, { error: 'Quiz access denied' });
   }
 
-  // Fetch the quiz for this lesson; if none, return early — no further queries
   const quiz = await queryOne<{ id: string; lesson_id: string; passing_score: number }>(
     'SELECT id, lesson_id, passing_score FROM quizzes WHERE lesson_id = $1',
     [lessonId],
   );
   if (!quiz) return reply(200, { quiz: null, questions: [] });
 
-  // Fetch questions ordered by sort_order
   const questions = await query<{ id: string; quiz_id: string; question_text: string; sort_order: number }>(
     'SELECT id, quiz_id, question_text, sort_order FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order',
     [quiz.id],
   );
 
-  // If no questions, skip options query entirely
   if (questions.length === 0) {
     return reply(200, { quiz, questions: [] });
   }
@@ -51,7 +46,6 @@ export default endpoint('quiz-by-lesson', async ({ req, profile, reply }) => {
     [questionIds],
   );
 
-  // Group options by question_id preserving the per-question sort_order from SQL
   const optionsByQuestion = new Map<string, typeof options>();
   for (const opt of options) {
     const bucket = optionsByQuestion.get(opt.question_id) ?? [];

@@ -88,7 +88,6 @@ describe('community-report-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Report not found' });
   });
 
-  // Global report — non-platform-admin → 403
   it('returns 403 when non-admin tries to update a global report', async () => {
     mockQueryOne.mockResolvedValueOnce(globalReport);
     const res = await handler(baseReq({ reportId: 'r1', status: 'reviewed' }), {} as any);
@@ -97,7 +96,6 @@ describe('community-report-update', () => {
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
-  // Org report — org admin of different org → 403
   it('returns 403 when org admin of a different org tries to update', async () => {
     mockQueryOne.mockResolvedValueOnce(orgReport); // org_id = 'org-1'
     mockIsOrgAdmin.mockResolvedValueOnce(false); // not admin of org-1
@@ -106,7 +104,6 @@ describe('community-report-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // Happy path: org admin updates status only
   it('happy path: org admin updates status', async () => {
     mockQueryOne.mockResolvedValueOnce(orgReport); // report loaded
     mockIsOrgAdmin.mockResolvedValueOnce(true);
@@ -126,7 +123,6 @@ describe('community-report-update', () => {
     expect(params).toEqual(['reviewed', 'p1', 'r1']); // exact placeholder order
   });
 
-  // Happy path: update adminNotes only
   it('happy path: updates adminNotes only (reviewed_by and reviewed_at still set)', async () => {
     mockQueryOne.mockResolvedValueOnce(orgReport);
     mockIsOrgAdmin.mockResolvedValueOnce(true);
@@ -145,7 +141,6 @@ describe('community-report-update', () => {
     expect(params).toEqual(['Checked', 'p1', 'r1']); // exact placeholder order
   });
 
-  // Happy path: update both status and adminNotes
   it('happy path: updates both status and adminNotes', async () => {
     mockQueryOne.mockResolvedValueOnce(orgReport);
     mockIsOrgAdmin.mockResolvedValueOnce(true);
@@ -163,7 +158,6 @@ describe('community-report-update', () => {
     expect(params).toEqual(['dismissed', 'Not valid', 'p1', 'r1']); // exact placeholder order
   });
 
-  // adminNotes can be null (set to null explicitly)
   it('happy path: adminNotes can be set to null', async () => {
     mockQueryOne.mockResolvedValueOnce(orgReport);
     mockIsOrgAdmin.mockResolvedValueOnce(true);
@@ -175,7 +169,6 @@ describe('community-report-update', () => {
     expect(updateCall[1]).toEqual([null, 'p1', 'r1']); // exact placeholder order
   });
 
-  // Platform admin bypasses isOrgAdmin
   it('platform admin can update any report without calling isOrgAdmin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce(orgReport);
