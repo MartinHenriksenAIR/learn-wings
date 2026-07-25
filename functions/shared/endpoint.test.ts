@@ -252,21 +252,12 @@ describe('adminEndpoint', () => {
     expect(ok).toHaveBeenCalledTimes(1);
   });
 
-  it('non-admin → 403 Forbidden and run NOT called (no opts, default message)', async () => {
+  it('non-admin → 403 Forbidden and run NOT called', async () => {
     mockGetProfile.mockResolvedValueOnce(nonAdminProfile);
     const handler = adminEndpoint('t-admin-403', ok);
     const res = await handler(baseReq({}), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
-    expect(ok).not.toHaveBeenCalled();
-  });
-
-  it('non-admin → 403 with custom forbiddenError (trailing opts)', async () => {
-    mockGetProfile.mockResolvedValueOnce(nonAdminProfile);
-    const handler = adminEndpoint('t-admin-custom', ok, { forbiddenError: 'Platform admins only' });
-    const res = await handler(baseReq({}), {} as any);
-    expect(res.status).toBe(403);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'Platform admins only' });
     expect(ok).not.toHaveBeenCalled();
   });
 

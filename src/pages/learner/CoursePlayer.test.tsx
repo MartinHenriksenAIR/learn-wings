@@ -240,6 +240,7 @@ describe('CoursePlayer — completion semantics (#18)', () => {
   function setupCompletion(opts: {
     progressMap?: Record<string, { status: string; completed_at: string }>;
     enrollmentCompleteError?: Error;
+    lessonProgressError?: Error;
   }) {
     mockCallApi.mockImplementation(async (url: string) => {
       if (url === '/api/course-player-data') {
@@ -251,6 +252,9 @@ describe('CoursePlayer — completion semantics (#18)', () => {
         };
       }
       if (url === '/api/quiz-by-lesson') return { quiz: null, questions: [] };
+      if (url === '/api/lesson-progress' && opts.lessonProgressError) {
+        throw opts.lessonProgressError;
+      }
       if (url === '/api/enrollment-complete' && opts.enrollmentCompleteError) {
         throw opts.enrollmentCompleteError;
       }
@@ -321,5 +325,34 @@ describe('CoursePlayer — completion semantics (#18)', () => {
       }));
     });
     expect(screen.queryByText(/congratulations/i)).toBeNull();
+  });
+
+  it('surfaces a failed lesson-progress save and does not advance progress optimistically (#289)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setupCompletion({ lessonProgressError: new Error('boom') });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    fireEvent.click(await screen.findByRole('button', { name: /markAsComplete/i }));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'coursePlayer.progressSaveFailed',
+        description: 'coursePlayer.progressSaveFailedDescription',
+        variant: 'destructive',
+      }));
+    });
+
+    // Nothing optimistic survives the failure: the sidebar counter stays at 0/2,
+    // the lesson keeps its Mark-as-complete affordance, and no celebration plays.
+    expect(
+      screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '0/2 · 0%')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /markAsComplete/i })).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.completed')).toBeNull();
+    expect(document.querySelector('.animate-pop-in')).toBeNull();
+    expect(mockCallApi).not.toHaveBeenCalledWith('/api/enrollment-complete', expect.anything());
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });

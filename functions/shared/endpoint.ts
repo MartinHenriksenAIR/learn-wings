@@ -14,8 +14,9 @@ import { internalError } from './errors';
  * generic internalError catch, and the app.http registration trailer.
  *
  * Ordering guarantee (byte-identical to the legacy envelope — pinned by every
- * migrated endpoint's tests; 90 endpoints use the factory, and 8 deliberately
- * hand-rolled endpoints remain — grep app.http for the list):
+ * migrated endpoint's tests; most endpoints use the factory, and a small number
+ * of deliberate hand-rolled exceptions remain, each carrying a pointer comment
+ * — grep app.http( for the list):
  *   1. origin = req.headers.get('origin')
  *   2. OPTIONS → corsPreflightResponse(origin), before any auth work
  *   3. authenticate(req)
@@ -66,7 +67,6 @@ export type EndpointRun = (ctx: AuthedCtx) => Promise<HttpResponseInit>;
 
 function makeHandler(
   requireAdmin: boolean,
-  opts: { forbiddenError?: string } | undefined,
   run: EndpointRun,
 ): AzureHandler {
   return async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
@@ -77,7 +77,7 @@ function makeHandler(
       const profile = await getProfile(user);
       if (!profile) return corsResponse(origin, 401, { error: 'Profile not found' });
       if (requireAdmin && !profile.is_platform_admin) {
-        return corsResponse(origin, 403, { error: opts?.forbiddenError ?? 'Forbidden' });
+        return corsResponse(origin, 403, { error: 'Forbidden' });
       }
       const ctx: AuthedCtx = {
         req,
@@ -128,13 +128,9 @@ function register(name: string, handler: AzureHandler): AzureHandler {
 }
 
 export function endpoint(name: string, run: EndpointRun): AzureHandler {
-  return register(name, makeHandler(false, undefined, run));
+  return register(name, makeHandler(false, run));
 }
 
-export function adminEndpoint(
-  name: string,
-  run: EndpointRun,
-  opts?: { forbiddenError?: string },
-): AzureHandler {
-  return register(name, makeHandler(true, opts, run));
+export function adminEndpoint(name: string, run: EndpointRun): AzureHandler {
+  return register(name, makeHandler(true, run));
 }
