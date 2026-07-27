@@ -252,7 +252,9 @@
     "documentLoadFailed": "Dokumentet kunne ikke indlæses. Prøv igen.",
     "noDocument": "Intet dokument uploadet",
     "loadingQuiz": "Indlæser quiz...",
-    "quizLoadFailed": "Quizzen kunne ikke indlæses"
+    "quizLoadFailed": "Quizzen kunne ikke indlæses",
+    "quizNotReady": "Denne quiz er ikke klar endnu",
+    "quizNotReadyDescription": "Der er endnu ingen spørgsmål at besvare her. Du kan fortsætte til næste lektion."
   },
   "community": {
     "title": "Fællesskab",

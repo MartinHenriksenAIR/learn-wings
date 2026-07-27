@@ -252,7 +252,9 @@
     "documentLoadFailed": "Unable to load document. Please try again.",
     "noDocument": "No document uploaded",
     "loadingQuiz": "Loading quiz...",
-    "quizLoadFailed": "Unable to load the quiz"
+    "quizLoadFailed": "Unable to load the quiz",
+    "quizNotReady": "This quiz isn't ready yet",
+    "quizNotReadyDescription": "There are no questions to answer here yet. You can continue to the next lesson."
   },
   "community": {
     "title": "Community",
