@@ -360,8 +360,24 @@ git commit -m "test(e2e): SSO sign-in from a human-captured session (#124)"
 - Modify: `e2e/specs/01-auth.spec.ts` (use the fixture instead of an inline `beforeEach`)
 
 **Interfaces:**
-- Consumes: nothing beyond Playwright.
+- Consumes: `signInThroughSso`, `sidebarNav` from `e2e/fixtures/auth.ts`.
 - Produces: `export const test` — a Playwright `test` extended with an options-driven `session` fixture, plus `type ViewMode = 'platform_admin' | 'org_admin' | 'learner'` and `seedSession(page: Page, opts: { viewMode?: ViewMode; language?: 'en' | 'da' }): Promise<void>`. Later tasks import `test` and `expect` from **this** module, not from `@playwright/test`.
+
+**Required by Task 2's review (Important — this task cannot work without it):**
+
+`signInThroughSso` currently waits for the sidebar's **`Organizations`** link, which is rendered only for `effectiveIsPlatformAdmin` (`src/hooks/useAuth.tsx:98` — `isPlatformAdmin && viewMode === 'platform_admin'`). The moment this fixture seeds `viewMode` as `org_admin` or `learner`, that link is absent and sign-in fails after a long wait, **blaming a healthy captured session for a view-mode problem**. That misdiagnosis is the real cost, not the failure.
+
+Parameterise the post-sign-in assertion per view. Use the sidebar link each view actually renders, all with `exact: true`:
+
+| viewMode | sidebar link that must appear | i18n key |
+|---|---|---|
+| `platform_admin` | `Organizations` | `nav.organizations` |
+| `org_admin` | `Organization` | `nav.organization` |
+| `learner` | `Dashboard` | `nav.dashboard` |
+
+Note `Organization` is a **substring** of `Organizations` — without `exact: true` the org-admin assertion would pass in platform view and vice versa. This table is the reason that constraint exists.
+
+Keep `signInThroughSso(page)` working with its current signature for callers that want the default platform-admin view; add the view as an optional second parameter rather than breaking existing call sites in `auth.setup.ts` and `01-auth.spec.ts`.
 
 - [ ] **Step 1: Write the fixture**
 
