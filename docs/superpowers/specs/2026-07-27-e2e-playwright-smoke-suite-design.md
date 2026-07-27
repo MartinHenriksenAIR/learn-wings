@@ -106,13 +106,15 @@ Every artefact the suite creates is named with an `e2e-<timestamp>-` prefix, and
 
 **Learner certificates are deliberately excluded** from `06`. They require a *completed course*, not just a completed lesson, and `generate-certificate` has a known latent corruption bug tracked separately — asserting on it would make the suite red for a reason unrelated to the change under test. The compliance PDF covers the "does PDF generation work at all" question without that entanglement.
 
-### Learner journey prerequisite
+### Learner journey prerequisite — resolved
 
-`03-learner-course` has a dependency worth naming, because it is the one place this design could stall: a platform-admin account has **no org memberships and no enrollments**, so its learner dashboard is likely empty and there is no course to open.
+This was the one place the design could have stalled: a platform-admin account has no org memberships or enrollments, so its learner dashboard could have been empty with no course to open.
 
-Chosen approach: the fenced org is populated to make the journey possible, entirely inside the fence — create a course in the e2e org, add the account as a **learner** member of that org, then drive the lesson. All of it is torn down with the org, and a `learner` membership does not perturb the other specs (`isOrgAdmin` stays false, and `currentOrg` auto-select already skips platform admins — `useAuth.tsx:115`).
+**Resolved by the owner (2026-07-27): in learner view this account can open and work through the "AI Fundamentals" course.** So `05-learner-course` drives that course, and `07-quiz-compliance-pdf` reaches its quiz by navigating into it the same way. No fenced-org course-seeding, no membership grant, and no skipped test.
 
-If it turns out the membership or course-access step is not reachable through the API with the available rights, the fallback is for `03` to assert that the learner surfaces render their **empty states** correctly and to report the skipped lesson-completion explicitly, rather than silently passing on a page with nothing in it. The implementation plan resolves which of the two applies before writing the spec.
+Both journeys locate the course **by name, never positionally** ("the first course in the list" would pass against whatever the list happened to contain — a green that asserts nothing). If the named course is absent, the failure message says exactly that.
+
+One consequence to accept: the lesson progress this writes belongs to the account's own enrollment in a **pre-existing** course, so it is not cleaned up by the fenced-org teardown. Re-completing an already-complete lesson is idempotent, so repeat runs stay green.
 
 ## Error handling and failure modes
 

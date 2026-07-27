@@ -715,17 +715,11 @@ git commit -m "test(e2e): platform-admin course create/edit/delete journey (#124
 - Consumes: `test`/`expect` from `e2e/fixtures/session`. Branch 2a drives whichever course the learner surface already exposes, so it consumes no course fixture; branch 2b drives empty states only. Step 1 decides which.
 - Produces: nothing consumed later.
 
-- [ ] **Step 1: Establish whether the learner surface has a course to drive**
+- [ ] **Step 1: Write the spec**
 
-The account is a platform admin with no memberships or enrollments, so its learner dashboard may be empty (spec: "Learner journey prerequisite"). Determine which branch applies before writing assertions:
+The account owner confirmed (2026-07-27) that in **learner view this account can open and work through the "AI Fundamentals" course**. So this journey drives that course by name — there is no empty-surface branch and no skipped test.
 
-```bash
-npx playwright codegen --load-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/"
-```
-
-Switch to Learner view via the sidebar footer, open Course Overview, and observe: are any courses listed, and is there an enroll affordance? Record the answer — it decides Step 2.
-
-- [ ] **Step 2a: If courses are reachable — write the full journey**
+Drive it **by name, never "the first course in the list"**: a positional locator would silently pass against whatever else the list happened to contain, which is the vacuous-green failure mode.
 
 Create `e2e/specs/05-learner-course.spec.ts`:
 
@@ -734,14 +728,22 @@ import { test, expect } from '../fixtures/session';
 
 test.use({ viewMode: 'learner' });
 
+const COURSE = 'AI Fundamentals';
+
 test('a lesson can be opened and its progress survives a reload', async ({ page }) => {
   await page.goto('/app/courses');
 
-  const firstCourse = page.getByRole('link').filter({ hasText: /.+/ }).first();
-  await expect(firstCourse).toBeVisible();
-  await firstCourse.click();
+  // Named, not positional: if this course is absent the failure says so, rather
+  // than the test quietly driving some other course.
+  const course = page.getByRole('link', { name: new RegExp(COURSE, 'i') });
+  await expect(
+    course,
+    `expected the "${COURSE}" course on the learner course list — the journey drives it by name`,
+  ).toBeVisible();
+  await course.click();
 
-  // Complete the first lesson, then prove persistence rather than local state.
+  // Complete a lesson, then prove the progress was persisted server-side rather
+  // than only held in local component state.
   await page.getByRole('button', { name: /mark as complete|complete/i }).first().click();
   await expect(page.getByText(/complete/i).first()).toBeVisible();
 
@@ -750,38 +752,20 @@ test('a lesson can be opened and its progress survives a reload', async ({ page 
 });
 ```
 
-- [ ] **Step 2b: If the learner surface is empty — write the empty-state journey instead**
-
-```ts
-import { test, expect } from '../fixtures/session';
-
-test.use({ viewMode: 'learner' });
-
-/**
- * This account has no org membership or enrollment, so its learner surface is
- * empty by construction. The journey therefore asserts the empty states render
- * correctly and reports the un-driven lesson-completion explicitly rather than
- * passing silently on a blank page (spec: "Learner journey prerequisite").
- */
-test('learner surfaces render their empty states, not a blank page', async ({ page }) => {
-  await page.goto('/app/courses');
-  await expect(page.getByText('There are no courses available for your organization yet.')).toBeVisible();
-
-  await page.goto('/app/dashboard');
-  await expect(page.getByRole('heading')).toBeVisible();
-  await expect(page).not.toHaveURL(/\/login/);
-});
-
-test.fixme('lesson completion persists across a reload', async () => {
-  // Blocked: needs an enrolled course for this account. Enable once the fenced
-  // org grants it a learner membership with course access.
-});
-```
-
-- [ ] **Step 3: Run**
+- [ ] **Step 2: Run**
 
 Run: `npm run e2e -- 05-learner-course`
-Expected: PASS for whichever branch applies. Report which branch was taken and why.
+Expected: PASS.
+
+The completion control's exact accessible name was not read from source. If the locator misses, capture the real one rather than widening the regex:
+
+```bash
+npx playwright codegen --load-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/app/courses"
+```
+
+Switch to learner view, open **AI Fundamentals**, and record the completion control's accessible name and the text that marks a lesson complete.
+
+Note the progress this writes belongs to the account's own enrollment in a pre-existing course, so it is **not** removed by the fenced-org teardown. That is accepted: the journey re-completing an already-complete lesson on a later run is idempotent. If the lesson turns out not to be re-completable, report it rather than resetting anything.
 
 - [ ] **Step 4: Commit**
 
@@ -887,13 +871,17 @@ git commit -m "test(e2e): org-admin invitation lifecycle journey (#124)"
 - Consumes: `test`/`expect`.
 - Produces: nothing consumed later.
 
-- [ ] **Step 1: Locate a quiz lesson and the compliance-PDF trigger**
+- [ ] **Step 1: Locate the quiz lesson inside AI Fundamentals, and the compliance-PDF trigger**
+
+The quiz is reached by **navigating into the "AI Fundamentals" course the same way Task 7 does** — not via a captured raw URL and not via an env var. An env-var URL with a fallback was the original plan and was wrong: a missing value would have let this test pass while looking at the course list, never seeing a quiz.
 
 ```bash
-npx playwright codegen --load-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/"
+npx playwright codegen --load-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/app/courses"
 ```
 
-Find a course containing a quiz lesson (note its URL), and the compliance-report download control. Record both.
+Record: how a quiz lesson is reached from inside AI Fundamentals (its lesson-list entry name), and the compliance-report download control's accessible name.
+
+If AI Fundamentals contains **no** quiz lesson, do not substitute another course silently and do not skip the test — report it to the controller, who will resolve which course to use.
 
 - [ ] **Step 2: Write the spec**
 
@@ -904,9 +892,18 @@ import { test, expect } from '../fixtures/session';
 
 test.use({ viewMode: 'learner' });
 
+const COURSE = 'AI Fundamentals';
+
 test('a quiz lesson is never a dead end', async ({ page }) => {
-  // URL captured in Step 1.
-  await page.goto(process.env.E2E_QUIZ_LESSON_URL ?? '/app/courses');
+  await page.goto('/app/courses');
+
+  const course = page.getByRole('link', { name: new RegExp(COURSE, 'i') });
+  await expect(course, `expected the "${COURSE}" course to reach its quiz lesson`).toBeVisible();
+  await course.click();
+
+  // Open the quiz lesson by the name captured in Step 1. No fallback: if it is
+  // not here the test must fail, not quietly assert against another page.
+  await page.getByRole('button', { name: QUIZ_LESSON_NAME }).click();
 
   const working = page.getByRole('button', { name: /submit/i });
   const notReady = page.getByText("This quiz isn't ready yet");
@@ -936,22 +933,25 @@ test('the compliance PDF downloads and is a real PDF', async ({ page }) => {
 });
 ```
 
-- [ ] **Step 3: Add `E2E_QUIZ_LESSON_URL` to `.env.e2e.example`**
+- [ ] **Step 3: Declare the captured lesson name as a constant**
 
+At the top of the spec, next to `COURSE`, add the lesson name recorded in Step 1:
+
+```ts
+const QUIZ_LESSON_NAME = /* exact accessible name captured in Step 1 */ '';
 ```
-# Optional: a course-player URL containing a quiz lesson, captured once.
-E2E_QUIZ_LESSON_URL=
-```
+
+Replace the empty string with the real value. Do **not** leave it empty and do not add a fallback — the test must fail loudly if the quiz lesson cannot be reached.
 
 - [ ] **Step 4: Run**
 
 Run: `npm run e2e -- 07-quiz-compliance-pdf`
-Expected: both PASS. If no quiz lesson exists anywhere, mark the first test `test.fixme` with a comment saying so — do not delete it, and report the finding.
+Expected: both PASS. If AI Fundamentals has no quiz lesson, stop and report to the controller — do not skip the test and do not silently switch courses.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add e2e/specs/07-quiz-compliance-pdf.spec.ts .env.e2e.example
+git add e2e/specs/07-quiz-compliance-pdf.spec.ts
 git commit -m "test(e2e): quiz-surface and compliance-PDF journey (#124)"
 ```
 
