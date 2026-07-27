@@ -133,18 +133,24 @@ One consequence to accept: the lesson progress this writes belongs to the accoun
 
 ## Prerequisites from the owner
 
-One gitignored `.env.e2e` at the repo root:
+**No credentials.** One gitignored `.env.e2e` holding two non-secret values:
 
 ```
 E2E_BASE_URL=https://black-forest-0d7f96c03.7.azurestaticapps.net
-E2E_USER=<platform-admin email>
-E2E_PASSWORD=<password>
-E2E_INVITE_TO=<same address; where journey 05 mails>
+E2E_INVITE_TO=<address where journey 06 mails — the owner's own>
 ```
 
-Nothing else. No database seeding, no new Entra accounts, no Azure changes.
+Plus a **captured browser session**, refreshed by hand whenever it expires:
 
-Two constraints on that account: it must authenticate with a **password** the browser can type (no MFA prompt, no conditional-access gate on this login), and it must be a **platform admin**. If MFA cannot be waived, the fallback is a once-per-session manual login whose `storageState` is reused until it expires — noted here so the constraint is not discovered mid-implementation.
+```bash
+npx playwright open --save-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/login"
+```
+
+Sign in as normal — MFA included, since a human is doing it — then close the window, which writes the session. The file is gitignored.
+
+No database seeding, no new Entra accounts, no Azure changes, and **no password stored anywhere**. The only requirement on the account is that it be a platform admin; MFA and conditional access are irrelevant because no automation ever touches the login form.
+
+The accepted cost: the capture expires, so the suite is deliberately not unattended. An expired capture fails in the `setup` project with the re-capture command in the message.
 
 ## Known gap: this does not prove isolation
 
