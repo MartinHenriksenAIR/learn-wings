@@ -81,10 +81,16 @@ describe('PlatformSettings', () => {
     // First mount
     const { unmount } = renderPage();
 
-    // Wait for the form to appear (branding tab is default). Labels are i18n
-    // keys here (the mocked t returns the key).
+    // Wait for the server value, not merely for the textbox to exist (#305).
+    // The component seeds local state with defaults and copies query.data in via
+    // an effect, so there is a render in which the textbox exists and still
+    // holds 'AIR Academy'. Awaiting existence can resolve inside that window;
+    // awaiting the value cannot. Labels are i18n keys here (the mocked t returns
+    // the key).
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' }),
+      ).toHaveValue('Server Name');
     });
 
     const input = screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' });
@@ -96,11 +102,12 @@ describe('PlatformSettings', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' }),
+      ).toHaveValue('Server Name');
     });
 
     const freshInput = screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' });
-    expect(freshInput).toHaveValue('Server Name');
     expect(freshInput).not.toHaveValue('Edited Name');
     expect(freshInput).not.toHaveValue('');
   });
@@ -144,11 +151,12 @@ describe('PlatformSettings', () => {
     const retryBtn = screen.getByRole('button', { name: 'platformSettings.retry' });
     fireEvent.click(retryBtn);
 
+    // Await the value, not the element (#305) — see the round-trip test above.
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' }),
+      ).toHaveValue('Server Name');
     });
-
-    expect(screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' })).toHaveValue('Server Name');
   });
 
   it('failed retry: clicking retry after two failures keeps error EmptyState and gate closed', async () => {

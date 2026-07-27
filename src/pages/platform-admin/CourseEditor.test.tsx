@@ -383,9 +383,11 @@ describe('CourseEditor — a failed thumbnail signing must not clear the column'
     vi.mocked(getSignedLmsAssetUrl).mockResolvedValue(null);
 
     renderPage();
-    await waitFor(() => expect(screen.getByDisplayValue('Test Course')).toBeInTheDocument());
+    // Await the failure notice, not the course query's value (#305): resolving
+    // the signed URL is a second async step, so the form can hold 'Test Course'
+    // a render before the preview attempt has settled.
+    await waitFor(() => expect(screen.getByText(/could not be loaded for preview/i)).toBeInTheDocument());
 
-    expect(screen.getByText(/could not be loaded for preview/i)).toBeInTheDocument();
     // The picker gets no display URL — but the field still holds the path.
     expect(screen.getByTestId('file-upload-value')).toHaveTextContent('');
   });
