@@ -21,7 +21,7 @@ Stated explicitly so a green run is not over-read:
 | Decision | Choice | Why |
 |---|---|---|
 | What it drives | Real login, full stack, writes included | The only shape that exercises the Functions and SQL a user actually hits. Stubbed-API tests would not have caught the #306/#307/#309 invite-email defects. |
-| Where writes land | A fenced test org in the prod DB | There is no staging tier — the SWA preview environments build against the *production* function app, so a preview env is just another frontend on prod data. |
+| Where writes land | A fenced test org in the prod DB | There is no staging tier — the SWA preview environments build against the *production* function app, so a preview env is just another frontend on prod data. Every org in the app is currently a test org, so the fence is about repeatable runs today and about customer safety after the #115 cutover. |
 | Identity | The owner's existing platform-admin account, using the role-view switcher | No new Entra accounts to provision. Accepted cost in "Known gap". |
 | Fence lifecycle | Suite creates and deletes its own org | `organization-create` and `organization-delete` are both `requirePlatformAdmin`, so the suite bootstraps its fence through the real API. No manual prod DML, no seed script. |
 | Invitation email | Sent to the account owner's own address | Exercises the real Resend path end to end. Cost: one e2e invitation lands in that inbox per run. |
@@ -63,9 +63,14 @@ What actually carries the session is the **Entra SSO cookies** captured in that 
 - **`02-role-views.spec.ts` drives the real switcher UI** through the bottom-left profile menu. That is the actual mechanism a user uses and the thing that can break, so at least one spec must exercise it rather than bypass it.
 - **Every other spec seeds `viewMode` via `page.addInitScript`** before app boot, for speed and to keep each spec independent of the switcher's markup.
 
-### Fencing: the trap this must guard
+### Fencing: determinism now, safety at cutover
 
-When a platform admin enters org-admin view, `OrgSelector` **auto-selects `orgs[0]`** (`src/components/OrgSelector.tsx:28,42`) — a real customer organization. A write journey that merely switches view and starts clicking would mutate real data.
+When a platform admin enters org-admin view, `OrgSelector` **auto-selects `orgs[0]`** (`src/components/OrgSelector.tsx:28,42`). A write journey that merely switches view and starts clicking mutates whichever org happens to sort first.
+
+**Every organization currently in the app is a test org** (owner, 2026-07-27), so today that is untidy rather than dangerous. Two reasons the fence still earns its place:
+
+1. **Determinism.** The suite must assert on artefacts it created itself. Writing into an arbitrary pre-existing org makes runs depend on data the suite does not control — the flakiness class that #305 just cost a PR to fix.
+2. **Cutover.** Real customer orgs arrive with the prod domain binding (#115, open). The suite will outlive that moment, and a guard added now costs a few lines, whereas discovering its absence afterwards costs customer data.
 
 The `fencedOrg` fixture therefore:
 
