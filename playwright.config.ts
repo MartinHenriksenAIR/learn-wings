@@ -1,8 +1,7 @@
-import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 import { config as loadEnv } from 'dotenv';
-import { AUTH_STATE_PATH } from './e2e/fixtures/auth';
+import { AUTH_STATE_PATH, describeCapturedSessionProblem } from './e2e/fixtures/auth';
 
 // dotenv resolves a relative `path` against process.cwd(), so `.env.e2e` would go
 // unfound whenever Playwright is invoked from a subdirectory. Anchor it to this
@@ -11,11 +10,11 @@ import { AUTH_STATE_PATH } from './e2e/fixtures/auth';
 const envFile = fileURLToPath(new URL('.env.e2e', import.meta.url));
 const { error: envFileError } = loadEnv({ path: envFile, quiet: true });
 
-// Pointing `storageState` at a file that is not there makes Playwright fail
-// context creation with a bare ENOENT, which pre-empts the setup guard and hides
-// the one thing the reader needs — how to re-capture. Passing `undefined` instead
-// lets the guard run and say it (e2e/auth.setup.ts).
-const storageState = existsSync(AUTH_STATE_PATH) ? AUTH_STATE_PATH : undefined;
+// Pointing `storageState` at a file that is missing or unparseable makes Playwright
+// fail context creation with a bare ENOENT or JSON error, which pre-empts the setup
+// guard and hides the one thing the reader needs — how to re-capture. Passing
+// `undefined` instead lets the guard run and say it (e2e/auth.setup.ts).
+const storageState = describeCapturedSessionProblem() === null ? AUTH_STATE_PATH : undefined;
 
 const baseURL = process.env.E2E_BASE_URL;
 if (!baseURL) {
@@ -39,6 +38,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   // A real network and a real database: one retry absorbs a cold Functions start.
+  // The setup project opts out — see its `retries` below.
   retries: 1,
   timeout: 60_000,
   expect: { timeout: 15_000 },
@@ -51,8 +51,16 @@ export default defineConfig({
   projects: [
     // The guard needs the captured cookies too — it signs in for real, so a
     // project without storageState would meet a credential prompt and report a
-    // dead capture that is in fact fine.
-    { name: 'setup', testMatch: /auth\.setup\.ts/, use: { storageState } },
+    // dead capture that is in fact fine. Same device as the specs it gates, so it
+    // cannot end up validating a browser configuration they never run under.
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+      use: { ...devices['Desktop Chrome'], storageState },
+      // A precondition check, not a flaky test: a retry cannot revive an expired
+      // capture, it only doubles the wall clock before the run says so.
+      retries: 0,
+    },
     {
       name: 'chromium',
       testMatch: /specs\/.*\.spec\.ts/,
