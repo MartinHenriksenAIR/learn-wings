@@ -3,6 +3,40 @@ import { errors, expect, type Locator, type Page } from '@playwright/test';
 
 export const AUTH_STATE_PATH = 'e2e/.auth/platform-admin.json';
 
+/**
+ * The three role views the app can render, mirroring `ViewMode` in
+ * src/hooks/useAuth.tsx.
+ *
+ * Declared here rather than in e2e/fixtures/session.ts — which re-exports it as
+ * the fixture's public name — because `signInThroughSso` needs it and session.ts
+ * imports this module at runtime. Owning it there would make the cycle a real one.
+ */
+export type ViewMode = 'platform_admin' | 'org_admin' | 'learner';
+
+/**
+ * The sidebar link whose presence proves sign-in finished in the seeded view.
+ *
+ * Each string is a link `AppSidebar` renders only when the view allows it
+ * (src/components/layout/AppSidebar.tsx:193-203): the platform-admin group for
+ * `Organizations`, the org-admin group for `Organization`, the learning group —
+ * shown to every non-platform view — for `Dashboard`.
+ *
+ * `Dashboard` is therefore NOT exclusive to learner view: org-admin view renders
+ * it too. It still does the job asked of it, because the failure it has to catch
+ * is a seed that never took, and an unseeded `viewMode` falls back to
+ * `platform_admin` (useAuth.tsx:53-57) — which renders no `Dashboard` link at all.
+ * What it does not do is tell learner and org-admin view apart.
+ *
+ * English strings, so they hold only while `preferred_language` is seeded `en`
+ * (the `seedSession` default). A Danish-seeded spec needs Danish labels, and hits
+ * the same substring trap: `Organisation` is a prefix of `Organisationer`.
+ */
+const SIDEBAR_LANDMARK: Record<ViewMode, string> = {
+  platform_admin: 'Organizations',
+  org_admin: 'Organization',
+  learner: 'Dashboard',
+};
+
 export const RECAPTURE_HINT =
   'Captured session is missing or expired. Re-capture it with:\n' +
   '  npx playwright open --save-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/login"\n' +
@@ -18,6 +52,16 @@ const CREDENTIAL_FIELDS = 'input[name="loginfmt"], input[name="passwd"]';
 
 /** Budget for the Entra round-trip plus the app's first authenticated render. */
 const SIGN_IN_TIMEOUT = 45_000;
+
+/**
+ * Budget for the seeded view's landmark link, once the sidebar itself is up.
+ *
+ * Short on purpose: the nav groups are decided by `viewMode`, which is already in
+ * sessionStorage before boot, so they render in the same commit as the sidebar
+ * shell. Nothing further is awaited — spending the full sign-in budget here would
+ * only delay a view-mode diagnosis that is already knowable.
+ */
+const VIEW_RENDER_TIMEOUT = 10_000;
 
 /**
  * Why the captured session cannot be replayed, or null when it can.
@@ -97,8 +141,15 @@ export function sidebarNav(page: Page): Locator {
  * cookies but NOT MSAL's token cache (it lives in sessionStorage), so the app
  * boots with no account and waits on the button. With the cookies present the
  * click round-trips through Entra without any credential prompt.
+ *
+ * `viewMode` says which view the caller seeded (e2e/fixtures/session.ts) and so
+ * which sidebar link to wait for. It has to be told: seeding `org_admin` or
+ * `learner` removes the `Organizations` link this used to hardcode, and waiting
+ * on an absent link fails after the full sign-in budget with a message accusing a
+ * perfectly good capture. Defaulted, so callers already on the platform-admin
+ * view need not pass it.
  */
-export async function signInThroughSso(page: Page): Promise<void> {
+export async function signInThroughSso(page: Page, viewMode: ViewMode = 'platform_admin'): Promise<void> {
   await page.goto('/login');
 
   const signIn = page.getByRole('button', { name: 'Sign in with Microsoft', exact: true });
@@ -108,8 +159,7 @@ export async function signInThroughSso(page: Page): Promise<void> {
     await signIn.click();
   }
 
-  // Nav is scoped to the sidebar: page content must never satisfy this.
-  const signedIn = sidebarNav(page).getByRole('link', { name: 'Organizations', exact: true });
+  const nav = sidebarNav(page);
   const credentialPrompt = page.locator(CREDENTIAL_FIELDS);
 
   // One wait for either outcome, so an expired capture is named within seconds of
@@ -117,7 +167,11 @@ export async function signInThroughSso(page: Page): Promise<void> {
   // fields *after* the sidebar assertion (as the first draft did) can only ever
   // count zero: a prompt on screen means the sidebar never arrived, so the sidebar
   // assertion fails first and the credential check never runs.
-  await expect(signedIn.or(credentialPrompt).first(), RECAPTURE_HINT).toBeVisible({
+  //
+  // The sidebar shell, not the landmark link, is what settles this race: the shell
+  // means "signed in", which is the only claim the recapture hint is about. Which
+  // view rendered inside it is a separate question, answered below.
+  await expect(nav.or(credentialPrompt).first(), RECAPTURE_HINT).toBeVisible({
     timeout: SIGN_IN_TIMEOUT,
   });
 
@@ -126,7 +180,22 @@ export async function signInThroughSso(page: Page): Promise<void> {
     throw new Error(`Microsoft asked for credentials, so the captured session is no longer valid.\n${RECAPTURE_HINT}`);
   }
 
-  // The wait above is satisfied by either locator; this pins the outcome to the
-  // signed-in one. Already true here, so it costs nothing on the happy path.
-  await expect(signedIn, RECAPTURE_HINT).toBeVisible();
+  // Scoped to the sidebar: page content must never satisfy this. `exact: true` is
+  // load-bearing rather than defensive — accessible names match as substrings by
+  // default, and `Organization` is a substring of `Organizations`, so each of those
+  // two landmarks would otherwise be satisfied by the other's view.
+  const landmark = nav.getByRole('link', { name: SIDEBAR_LANDMARK[viewMode], exact: true });
+  if (!(await becameVisible(landmark, VIEW_RENDER_TIMEOUT))) {
+    // Signed in, so the capture is fine and saying otherwise would send the reader
+    // to re-capture a healthy session. Name the view asked for and the links that
+    // did render, which is what separates a seed that never applied from a nav
+    // group that no longer contains the link this table expects.
+    const rendered = await nav.getByRole('link').allInnerTexts();
+    const present = rendered.map((text) => JSON.stringify(text.trim())).join(', ') || '(none)';
+    throw new Error(
+      `Signed in and the sidebar rendered, but its ${JSON.stringify(SIDEBAR_LANDMARK[viewMode])} ` +
+        `link — the landmark for viewMode=${viewMode} — never appeared. Sidebar links present: ${present}. ` +
+        'The captured session is valid; this is a view-mode or nav problem, not an expired capture.',
+    );
+  }
 }

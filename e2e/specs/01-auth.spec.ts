@@ -1,12 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/session';
 import { sidebarNav, signInThroughSso } from '../fixtures/auth';
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('preferred_language', 'en');
-    sessionStorage.setItem('viewMode', 'platform_admin');
-  });
-});
+// `test` comes from ../fixtures/session, not @playwright/test: its auto fixture
+// seeds `viewMode` and `preferred_language` before app boot, which is what the
+// deleted beforeEach here used to do by hand. Both tests run in the fixture's
+// default platform-admin view.
 
 test('the captured session reaches the platform-admin surface', async ({ page }) => {
   await signInThroughSso(page);
