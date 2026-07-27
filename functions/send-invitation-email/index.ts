@@ -54,7 +54,9 @@ function generateEmailHtml({
   // its path/query reach the body verbatim. Both are escaped before they touch
   // the markup so neither can break out of the attribute or inject a link (#195).
   // `roleLabel` comes from the EMAIL_STRINGS whitelist, so it needs no escaping.
-  const safeOrgName = orgName === null ? null : escapeHtml(orgName);
+  // The truthy guard also covers a null/undefined org name (unused on the
+  // platform-admin path) so escapeHtml is never handed a non-string.
+  const safeOrgName = orgName ? escapeHtml(orgName) : null;
   const safeInviteLink = escapeHtml(inviteLink);
   const welcomeMessage = isPlatformAdmin ? s.welcomePlatformAdmin : s.welcomeOrg(roleLabel, safeOrgName);
   const logoUrl = `${process.env.STATIC_ASSETS_BASE_URL ?? 'https://ai-uddannelse.dk'}/logo-light.png`;
@@ -155,6 +157,15 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     }
 
     const isPlatformAdminInvite = role === 'platform_admin';
+
+    // An org invite names the org in its subject and body; without a name the
+    // template would render the literal string "null". The UI only ever passes
+    // a null org name when its org context is missing (a broken state), so a
+    // 400 surfaces that instead of sending a malformed email. Platform-admin
+    // invites carry no org and are exempt.
+    if (!isPlatformAdminInvite && !orgName) {
+      return corsResponse(origin, 400, { error: 'Missing required field: orgName for organization invitations' });
+    }
 
     // Resolve email language (ADR-0016 cat.3): existing recipient's stored
     // preference wins; else the inviter's dialog pick; else default 'da'.
