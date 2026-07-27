@@ -1,11 +1,24 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 import { config as loadEnv } from 'dotenv';
 
-loadEnv({ path: '.env.e2e' });
+// dotenv resolves a relative `path` against process.cwd(), so `.env.e2e` would go
+// unfound whenever Playwright is invoked from a subdirectory. Anchor it to this
+// config file instead, and keep `quiet` on — dotenv v17 otherwise prints a
+// promotional tip line every time the config is loaded (once per process).
+const envFile = fileURLToPath(new URL('.env.e2e', import.meta.url));
+const { error: envFileError } = loadEnv({ path: envFile, quiet: true });
 
 const baseURL = process.env.E2E_BASE_URL;
 if (!baseURL) {
-  throw new Error('E2E_BASE_URL is not set. Copy .env.e2e.example to .env.e2e and fill it in.');
+  // The file is only required when the variable is not already in the environment,
+  // so a missing file and a missing variable are reported as the distinct problems
+  // they are.
+  throw new Error(
+    envFileError
+      ? `Could not read .env.e2e: ${envFileError.message}. Copy .env.e2e.example to .env.e2e and fill it in.`
+      : `E2E_BASE_URL is not set. Add it to ${envFile} — see .env.e2e.example.`,
+  );
 }
 
 export default defineConfig({
