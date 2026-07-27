@@ -106,6 +106,7 @@
   "auth": {
     "email": "Email",
     "platformDescription": "Enterprise Learning Platform",
+    "signInWithMicrosoft": "Sign in with Microsoft",
     "accessProvidedByOrg": "Access is provided by your organization",
     "passwordResetInfo": "Password reset is managed by your organization's IT administrator via Microsoft Entra ID.",
     "backToSignIn": "Back to sign in"

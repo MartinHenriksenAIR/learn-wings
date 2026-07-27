@@ -106,6 +106,7 @@
   "auth": {
     "email": "E-mail",
     "platformDescription": "Enterprise læringsplatform",
+    "signInWithMicrosoft": "Log ind med Microsoft",
     "accessProvidedByOrg": "Adgang leveres af din organisation",
     "passwordResetInfo": "Nulstilling af adgangskode håndteres af din organisations IT-administrator via Microsoft Entra ID.",
     "backToSignIn": "Tilbage til login"
