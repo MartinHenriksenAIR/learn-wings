@@ -49,6 +49,7 @@
     "completedOn": "Afsluttet den",
     "noOrgSelected": "Ingen organisation valgt.",
     "joinOrgToContinue": "Tilmeld dig en organisation for at fortsætte.",
+    "emailLanguage": "E-mailsprog",
     "clear": "Ryd",
     "loadErrorTitle": "Kunne ikke indlæse denne side",
     "loadErrorDescription": "Noget gik galt under indlæsningen. Prøv igen.",

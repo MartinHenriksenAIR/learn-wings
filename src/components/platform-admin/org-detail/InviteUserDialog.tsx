@@ -20,6 +20,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SeatUsageNote } from '@/components/SeatUsageNote';
+import { InviteLanguageSelect } from '@/components/InviteLanguageSelect';
+import { uiLangToInvite, type InviteLanguage } from '@/lib/inviteLanguage';
 import type { SeatUsage } from '@/lib/seats';
 import type { OrgRole } from '@/lib/types';
 
@@ -29,6 +31,7 @@ export interface InvitePayload {
   lastName: string;
   department: string;
   role: OrgRole;
+  language: InviteLanguage;
 }
 
 interface InviteUserDialogProps {
@@ -51,13 +54,14 @@ export function InviteUserDialog({
   onSubmit,
   pending,
 }: InviteUserDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const atLimit = !seatUsage.isUnlimited && seatUsage.atLimit;
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [department, setDepartment] = useState('');
   const [role, setRole] = useState<OrgRole>('learner');
+  const [language, setLanguage] = useState<InviteLanguage>(() => uiLangToInvite(i18n.resolvedLanguage));
 
   useEffect(() => {
     if (open) {
@@ -66,8 +70,9 @@ export function InviteUserDialog({
       setLastName('');
       setDepartment('');
       setRole('learner');
+      setLanguage(uiLangToInvite(i18n.resolvedLanguage));
     }
-  }, [open]);
+  }, [open, i18n.resolvedLanguage]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -129,6 +134,7 @@ export function InviteUserDialog({
               </SelectContent>
             </Select>
           </div>
+          <InviteLanguageSelect value={language} onChange={setLanguage} />
         </div>
         {(atLimit || errorMessage) && (
           <p className="text-xs font-medium text-destructive">
@@ -140,7 +146,7 @@ export function InviteUserDialog({
             {t('common.cancel')}
           </Button>
           <Button
-            onClick={() => onSubmit({ email, firstName, lastName, department, role })}
+            onClick={() => onSubmit({ email, firstName, lastName, department, role, language })}
             disabled={pending || atLimit}
           >
             {pending ? (

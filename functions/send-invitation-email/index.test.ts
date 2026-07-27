@@ -31,6 +31,8 @@ const validBody = {
   inviteLink: 'https://ai-uddannelse.dk/invite/abc123',
 };
 
+const makeCtx = () => ({ log: vi.fn(), error: vi.fn(), warn: vi.fn() });
+
 describe('send-invitation-email', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -102,5 +104,143 @@ describe('send-invitation-email', () => {
 
     expect(res.status).toBe(400);
     expect(mockEmailSend).not.toHaveBeenCalled();
+  });
+
+  it("uses the existing recipient's preferred_language over the inviter's pick", async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ is_platform_admin: true })      // authz
+      .mockResolvedValueOnce({ preferred_language: 'en' });    // invitee profile
+    mockEmailSend.mockResolvedValueOnce({ id: 'e1' });
+
+    const res = await handler(makeReq({ ...validBody, inviterLanguage: 'da' }) as any, {} as any);
+    const html = mockEmailSend.mock.calls[0][0].html as string;
+    const subject = mockEmailSend.mock.calls[0][0].subject as string;
+
+    expect(res.status).toBe(200);
+    expect(html).toContain('lang="en"');
+    expect(html).toContain("You're invited!");
+    expect(subject).toContain('You have been invited');
+  });
+
+  it("uses the inviter's pick when the recipient has no profile", async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ is_platform_admin: true })      // authz
+      .mockResolvedValueOnce(undefined);                        // no invitee profile
+    mockEmailSend.mockResolvedValueOnce({ id: 'e2' });
+
+    const res = await handler(makeReq({ ...validBody, inviterLanguage: 'en' }) as any, {} as any);
+    const html = mockEmailSend.mock.calls[0][0].html as string;
+
+    expect(res.status).toBe(200);
+    expect(html).toContain('lang="en"');
+    expect(html).toContain("You're invited!");
+  });
+
+  it('falls back to Danish when no profile and no inviter pick', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ is_platform_admin: true })      // authz
+      .mockResolvedValueOnce(undefined);                        // no invitee profile
+    mockEmailSend.mockResolvedValueOnce({ id: 'e3' });
+
+    const res = await handler(makeReq(validBody) as any, {} as any); // no inviterLanguage
+    const html = mockEmailSend.mock.calls[0][0].html as string;
+
+    expect(res.status).toBe(200);
+    expect(html).toContain('lang="da"');
+    expect(html).toContain('Du er inviteret!');
+  });
+
+  // The SDK resolves `{ data: null, error }` for every non-2xx (bad key,
+  // unverified domain, quota) rather than rejecting — the shape the old
+  // `return { success: true, data }` reported as a delivered email.
+  it('reports a Resend-rejected send as a failure instead of success', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ is_platform_admin: true })
+      .mockResolvedValueOnce(undefined);
+    mockEmailSend.mockResolvedValueOnce({ data: null, error: { message: 'Invalid recipient' } });
+    const ctx = makeCtx();
+
+    const res = await handler(makeReq(validBody) as any, ctx as any);
+    const body = JSON.parse(res.body);
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('Email delivery failed');
+    expect(ctx.error).toHaveBeenCalled();
+  });
+
+  it('reports a thrown send as a failure', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ is_platform_admin: true })
+      .mockResolvedValueOnce(undefined);
+    mockEmailSend.mockRejectedValueOnce(new Error('network down'));
+    const ctx = makeCtx();
+
+    const res = await handler(makeReq(validBody) as any, ctx as any);
+    const body = JSON.parse(res.body);
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(false);
+    expect(ctx.error).toHaveBeenCalled();
+  });
+
+  // sec-2: orgName is caller-supplied and reaches the body; an org admin could
+  // otherwise plant markup in a mail sent from the trusted no-reply address.
+  it('escapes orgName before it reaches the email body', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ is_platform_admin: true })
+      .mockResolvedValueOnce(undefined);
+    mockEmailSend.mockResolvedValueOnce({ id: 'e4' });
+
+    const res = await handler(
+      makeReq({ ...validBody, orgName: '<script>alert(1)</script>Evil' }) as any,
+      makeCtx() as any,
+    );
+    const html = mockEmailSend.mock.calls[0][0].html as string;
+
+    expect(res.status).toBe(200);
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;Evil');
+  });
+
+  // Only the hostname is validated, so the path/query arrive verbatim — a quote
+  // would otherwise break out of the href attribute.
+  it('escapes the invite link so it cannot break out of the href attribute', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ is_platform_admin: true })
+      .mockResolvedValueOnce(undefined);
+    mockEmailSend.mockResolvedValueOnce({ id: 'e5' });
+
+    const res = await handler(
+      makeReq({
+        ...validBody,
+        inviteLink: 'https://ai-uddannelse.dk/invite/abc"><img src=x onerror=alert(1)>',
+      }) as any,
+      makeCtx() as any,
+    );
+    const html = mockEmailSend.mock.calls[0][0].html as string;
+
+    expect(res.status).toBe(200);
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('&quot;&gt;&lt;img');
+  });
+
+  // Subjects are plain text, so they are NOT HTML-escaped — but a CR/LF would
+  // let an interpolated org name inject extra mail headers.
+  it('keeps the subject plain text and strips CR/LF from it', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ is_platform_admin: true })
+      .mockResolvedValueOnce(undefined);
+    mockEmailSend.mockResolvedValueOnce({ id: 'e6' });
+
+    const res = await handler(
+      makeReq({ ...validBody, orgName: 'Acme & Co\r\nBcc: attacker@evil.com' }) as any,
+      makeCtx() as any,
+    );
+    const subject = mockEmailSend.mock.calls[0][0].subject as string;
+
+    expect(res.status).toBe(200);
+    expect(subject).toContain('Acme & Co');
+    expect(subject).not.toMatch(/[\r\n]/);
   });
 });

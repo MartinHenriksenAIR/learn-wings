@@ -49,6 +49,7 @@
     "completedOn": "Completed on",
     "noOrgSelected": "No organization selected.",
     "joinOrgToContinue": "Join an organization to continue.",
+    "emailLanguage": "Email language",
     "clear": "Clear",
     "loadErrorTitle": "Couldn't load this page",
     "loadErrorDescription": "Something went wrong while loading. Please try again.",

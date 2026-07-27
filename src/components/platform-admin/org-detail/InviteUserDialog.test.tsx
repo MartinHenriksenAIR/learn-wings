@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
 import React from 'react';
 import { getSeatUsage } from '@/lib/seats';
 
 // --- i18n echo; interpolation params are appended so the seat summary is assertable ---
+// `i18n.resolvedLanguage` is 'en' so the language selector defaults to 'en'
+// (uiLangToInvite), which the submit-payload test asserts is forwarded.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) =>
@@ -13,6 +15,7 @@ vi.mock('react-i18next', () => ({
             .map(([k, v]) => `${k}=${v}`)
             .join(',')}`
         : key,
+    i18n: { resolvedLanguage: 'en' },
   }),
 }));
 
@@ -82,5 +85,22 @@ describe('InviteUserDialog — seat cap', () => {
       />,
     );
     expect(screen.getByText('Organization is at seat limit')).toBeInTheDocument();
+  });
+});
+
+describe('InviteUserDialog — language pick', () => {
+  it('includes the language in the submit payload, defaulting to the UI language', () => {
+    const usage = getSeatUsage({ activeMembers: 2, pendingInvites: 1, seatLimit: 10 });
+    const onSubmit = vi.fn();
+    render(
+      <InviteUserDialog open onOpenChange={noop} orgName="Acme" seatUsage={usage} onSubmit={onSubmit} pending={false} />,
+    );
+
+    fireEvent.click(submit());
+
+    // i18n.resolvedLanguage is 'en' in this suite, so uiLangToInvite → 'en'.
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ language: 'en' }),
+    );
   });
 });
