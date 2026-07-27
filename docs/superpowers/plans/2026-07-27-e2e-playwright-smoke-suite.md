@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Never add this suite to `npm test` or to any CI workflow.** It is on-demand only. `npm test` must keep running exactly the 812 vitest tests it runs today.
-- **`.env.e2e` is gitignored and never committed.** It holds `E2E_BASE_URL`, `E2E_USER`, `E2E_PASSWORD`, `E2E_INVITE_TO`. Never print `E2E_PASSWORD` in logs, error messages, or test titles.
+- **`.env.e2e` is gitignored and never committed.** It holds exactly two non-secret values: `E2E_BASE_URL` and `E2E_INVITE_TO`. (Task 1's template listed credential keys; Task 2 removes them — authentication is a captured browser session, not a stored password.)
 - **Language is pinned to English** by seeding `localStorage.preferred_language = 'en'` before app boot in every spec. Text-based locators depend on this; without it the app renders Danish and every locator breaks. (Verified live: the app honours this key.)
 - **Prefer stable locators in this order:** element `id` (`#name`, `#slug`), then `getByRole` with the English accessible name, then text. Never CSS class chains — the codebase uses generated Tailwind classes that change freely.
 - **`getByRole(..., { name })` matches the accessible name as a SUBSTRING by default.** Always pass `exact: true`, or scope the locator to a landmark, or both. This is not theoretical: a probe against the live app found `getByRole('link', { name: 'Organizations' })` resolving to **two** elements — the sidebar nav link and a data row whose org name also contains "organisation" — and failing on strict mode. `{ name: 'Delete' }` would likewise match `'Delete organization'`. Every locator in this plan is subject to this; treat a strict-mode violation as an ambiguity to resolve, never as a reason to add `.first()`.
