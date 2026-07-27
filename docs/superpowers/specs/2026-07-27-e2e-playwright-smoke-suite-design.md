@@ -58,11 +58,18 @@ The six journeys of the table below are `03`–`07` plus the deep-link half of `
 
 MSAL caches tokens in **`sessionStorage`** (`src/lib/msal-config.ts:13`), and Playwright's `storageState` persists **cookies and `localStorage` only**. The standard "log in once, reuse the state" recipe therefore *silently fails* on this app: the saved state looks valid and the browser is logged out.
 
-What actually carries the session is the **Entra SSO cookies** captured in that same state. With them present, MSAL's redirect completes non-interactively on later specs and repopulates `sessionStorage` itself. So:
+What carries the session is the **Entra SSO cookies** captured in that same state. What they do *not* do is log the app in by themselves — that was the first draft's assumption and **it was wrong, verified empirically** (2026-07-27):
 
-1. `auth.setup.ts` performs one real interactive login through the Microsoft form and saves `storageState`.
-2. Each spec loads that state, navigates, and lets MSAL complete silently.
-3. Specs assert they are authenticated before proceeding, so a stale or rejected session fails loudly instead of masquerading as an empty page.
+- Loading the app with only the captured state renders the **login page**. MSAL starts with an empty cache, so it has no account, and the app has no silent-SSO path: `loginRedirect` is called only from the sign-in button's `onClick` (`src/hooks/useAuth.tsx:151`), and `acquireTokenSilent` needs an account that isn't there.
+- **Clicking "Sign in with Microsoft" does complete without a credential prompt.** Entra recognises the captured cookies and returns through `/common/reprocess` — no email, no password, no MFA. That is the mechanism this suite runs on.
+
+So the flow is:
+
+1. **A human logs in once, by hand**, via `npx playwright open --save-storage=e2e/.auth/platform-admin.json <baseURL>/login`. Closing the window writes the state. No password is ever stored: `.env.e2e` holds only `E2E_BASE_URL` and `E2E_INVITE_TO`, both non-secret.
+2. Every spec loads that state and **clicks through SSO** — centralised in the session fixture, not repeated per spec. It costs a few seconds per spec and requires no secrets.
+3. Specs assert they are authenticated before proceeding, so an expired capture fails loudly with an instruction to re-run the login command, rather than masquerading as an empty page.
+
+The tradeoff accepted: the capture expires, so the suite is not unattended — a human re-runs the one-line login command periodically. In exchange, no credential lives on disk or in CI.
 
 `viewMode` is **also** in `sessionStorage` (`src/hooks/useAuth.tsx:53`), so it cannot be seeded through `storageState` either. It is set two ways, deliberately:
 

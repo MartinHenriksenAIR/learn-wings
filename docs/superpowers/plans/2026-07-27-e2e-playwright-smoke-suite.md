@@ -16,6 +16,9 @@
 - **`.env.e2e` is gitignored and never committed.** It holds `E2E_BASE_URL`, `E2E_USER`, `E2E_PASSWORD`, `E2E_INVITE_TO`. Never print `E2E_PASSWORD` in logs, error messages, or test titles.
 - **Language is pinned to English** by seeding `localStorage.preferred_language = 'en'` before app boot in every spec. Text-based locators depend on this; without it the app renders Danish and every locator breaks. (Verified live: the app honours this key.)
 - **Prefer stable locators in this order:** element `id` (`#name`, `#slug`), then `getByRole` with the English accessible name, then text. Never CSS class chains — the codebase uses generated Tailwind classes that change freely.
+- **`getByRole(..., { name })` matches the accessible name as a SUBSTRING by default.** Always pass `exact: true`, or scope the locator to a landmark, or both. This is not theoretical: a probe against the live app found `getByRole('link', { name: 'Organizations' })` resolving to **two** elements — the sidebar nav link and a data row whose org name also contains "organisation" — and failing on strict mode. `{ name: 'Delete' }` would likewise match `'Delete organization'`. Every locator in this plan is subject to this; treat a strict-mode violation as an ambiguity to resolve, never as a reason to add `.first()`.
+- **Nav assertions scope to the sidebar**, e.g. `page.getByRole('navigation').getByRole('link', { name: 'Organizations', exact: true })`, so page content can never satisfy a navigation assertion.
+- **No credentials exist anywhere.** Authentication is a human-captured browser session (see Task 2); `.env.e2e` holds only `E2E_BASE_URL` and `E2E_INVITE_TO`. Never add `E2E_USER`/`E2E_PASSWORD` back, and never type into the Microsoft login form.
 - **Radix components are not native HTML.** `Select` and `DropdownMenu` require clicking the trigger, then clicking an option with `role="option"` (Select) or `role="menuitemradio"` (DropdownMenu radio group). `selectOption()` does not work on them.
 - **Every artefact the suite creates is named `e2e-<RUN_ID>-<kind>`** so anything left behind is identifiable. Cleanup runs in `finally`.
 - **Test file naming:** `e2e/specs/NN-name.spec.ts`. Fixtures in `e2e/fixtures/`. Nothing under `src/` — the vitest `include` glob is `src/**/*.{test,spec}.{ts,tsx}` and must not pick these up.
@@ -166,61 +169,91 @@ git commit -m "test(e2e): Playwright harness + unauthenticated login-page smoke 
 
 ---
 
-### Task 2: Real Entra login, saved once per run
+### Task 2: SSO sign-in from a human-captured session
 
 **Files:**
+- Create: `e2e/fixtures/auth.ts`
 - Create: `e2e/auth.setup.ts`
 - Create: `e2e/specs/01-auth.spec.ts`
 - Modify: `playwright.config.ts` (add the `setup` project and the dependency)
+- Modify: `.env.e2e.example` (remove `E2E_USER` and `E2E_PASSWORD` — no credentials are used)
 
 **Interfaces:**
-- Consumes: `RUN_ID` (unused here), `baseURL`.
-- Produces: a `storageState` file at `e2e/.auth/platform-admin.json`, consumed by every later spec via the project's `use.storageState`.
+- Consumes: `baseURL`.
+- Produces: `signInThroughSso(page: Page): Promise<void>` from `e2e/fixtures/auth.ts`, and the const `AUTH_STATE_PATH = 'e2e/.auth/platform-admin.json'`. Task 3's session fixture wraps `signInThroughSso`; every later spec reaches an authenticated page through that fixture, never by calling this directly.
 
-- [ ] **Step 1: Write the login setup**
+**How authentication works here — all three points verified against the live app on 2026-07-27, do not re-litigate:**
+
+1. The session is **captured by a human**, once, with:
+   ```bash
+   npx playwright open --save-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/login"
+   ```
+   They sign in (MFA and all), then close the window, which writes the file. **No password is stored anywhere** and no spec ever types into the Microsoft form.
+2. Loading the app with that state alone renders the **login page**, not the app. MSAL caches in `sessionStorage`, which `storageState` does not carry, so it has no account — and this app has no silent-SSO path (`loginRedirect` is called only from the sign-in button's `onClick`, `src/hooks/useAuth.tsx:151`).
+3. **Clicking "Sign in with Microsoft" completes with no prompt**, because the captured cookies let Entra return through `/common/reprocess`. That click is therefore a required step of every authenticated spec, not an optional fallback.
+
+- [ ] **Step 1: Write the sign-in helper**
+
+Create `e2e/fixtures/auth.ts`:
+
+```ts
+import { expect, type Page } from '@playwright/test';
+
+export const AUTH_STATE_PATH = 'e2e/.auth/platform-admin.json';
+
+export const RECAPTURE_HINT =
+  'Captured session is missing or expired. Re-capture it with:\n' +
+  '  npx playwright open --save-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/login"\n' +
+  'Sign in by hand, then close the browser window.';
+
+/**
+ * Complete sign-in using the human-captured Entra cookies.
+ *
+ * The click is required, not decorative: storageState carries the Entra SSO
+ * cookies but NOT MSAL's token cache (it lives in sessionStorage), so the app
+ * boots with no account and waits on the button. With the cookies present the
+ * click round-trips through Entra without any credential prompt.
+ */
+export async function signInThroughSso(page: Page): Promise<void> {
+  await page.goto('/login');
+
+  const signIn = page.getByRole('button', { name: 'Sign in with Microsoft', exact: true });
+  if (await signIn.isVisible({ timeout: 10_000 }).catch(() => false)) {
+    await signIn.click();
+  }
+
+  // Nav is scoped to the sidebar: page content must never satisfy this.
+  const nav = page.getByRole('navigation');
+  await expect(
+    nav.getByRole('link', { name: 'Organizations', exact: true }),
+    RECAPTURE_HINT,
+  ).toBeVisible({ timeout: 45_000 });
+
+  // A credential prompt means the capture is dead — say so, don't hang.
+  expect(await page.locator('input[name="passwd"]').count(), RECAPTURE_HINT).toBe(0);
+}
+```
+
+- [ ] **Step 2: Write the setup guard**
+
+This exists so a dead capture fails **once**, fast, with an actionable message — instead of every spec failing in a confusing way.
 
 Create `e2e/auth.setup.ts`:
 
 ```ts
 import { test as setup, expect } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { AUTH_STATE_PATH, RECAPTURE_HINT, signInThroughSso } from './fixtures/auth';
 
-const STATE_PATH = 'e2e/.auth/platform-admin.json';
-
-setup('authenticate as platform admin', async ({ page }) => {
-  const user = process.env.E2E_USER;
-  const password = process.env.E2E_PASSWORD;
-  if (!user || !password) {
-    throw new Error('E2E_USER / E2E_PASSWORD missing from .env.e2e');
-  }
+setup('captured session is present and still valid', async ({ page }) => {
+  expect(existsSync(AUTH_STATE_PATH), `${AUTH_STATE_PATH} does not exist. ${RECAPTURE_HINT}`).toBe(true);
 
   await page.addInitScript(() => {
     localStorage.setItem('preferred_language', 'en');
+    sessionStorage.setItem('viewMode', 'platform_admin');
   });
 
-  await page.goto('/login');
-  await page.getByRole('button', { name: 'Sign in with Microsoft' }).click();
-
-  // Microsoft's hosted form. Field names are stable across its redesigns.
-  await page.waitForURL(/login\.microsoftonline\.com/);
-  await page.fill('input[name="loginfmt"]', user);
-  await page.getByRole('button', { name: /next/i }).click();
-  await page.fill('input[name="passwd"]', password);
-  await page.getByRole('button', { name: /sign in/i }).click();
-
-  // "Stay signed in?" — answering yes keeps the SSO cookie, which is exactly
-  // what later specs rely on to complete MSAL's redirect non-interactively.
-  const staySignedIn = page.getByRole('button', { name: /^yes$/i });
-  if (await staySignedIn.isVisible({ timeout: 10_000 }).catch(() => false)) {
-    await staySignedIn.click();
-  }
-
-  // Back on our origin, authenticated.
-  await page.waitForURL((url) => !url.host.includes('login.microsoftonline.com'), {
-    timeout: 45_000,
-  });
-  await expect(page.getByRole('link', { name: 'Organizations' })).toBeVisible({ timeout: 30_000 });
-
-  await page.context().storageState({ path: STATE_PATH });
+  await signInThroughSso(page);
 });
 ```
 
@@ -241,12 +274,33 @@ In `playwright.config.ts`, replace the `projects` array:
 
 Then widen `testDir` so the setup file is discoverable: change `testDir: './e2e/specs'` to `testDir: './e2e'`. The `setup` project's `testMatch` picks up `auth.setup.ts`, and the `chromium` project needs its own `testMatch: /specs\/.*\.spec\.ts/` so it does not also try to run the setup file as a spec.
 
-- [ ] **Step 3: Write the authenticated smoke**
+- [ ] **Step 3: Wire the projects**
+
+In `playwright.config.ts`, replace the `projects` array:
+
+```ts
+  projects: [
+    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    {
+      name: 'chromium',
+      testMatch: /specs\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/platform-admin.json' },
+      dependencies: ['setup'],
+    },
+  ],
+```
+
+Widen `testDir` from `'./e2e/specs'` to `'./e2e'` so the setup file is discoverable. The `chromium` project's `testMatch` keeps it from also running the setup file as a spec.
+
+Note `00-harness.spec.ts` is unauthenticated by design — it will now load the storageState too, which is harmless: it only visits `/login` and asserts the button and `<html lang>`, neither of which the captured cookies change. Do not exclude it.
+
+- [ ] **Step 4: Write the authenticated smoke**
 
 Create `e2e/specs/01-auth.spec.ts`:
 
 ```ts
 import { test, expect } from '@playwright/test';
+import { signInThroughSso } from '../fixtures/auth';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -255,41 +309,46 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('saved session lands on the platform-admin surface', async ({ page }) => {
-  await page.goto('/');
+test('the captured session reaches the platform-admin surface', async ({ page }) => {
+  await signInThroughSso(page);
 
-  // MSAL re-acquires tokens into sessionStorage using the Entra SSO cookie from
-  // the saved state; assert on something only an authenticated platform admin sees.
-  await expect(page.getByRole('link', { name: 'Organizations' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Platform Settings' })).toBeVisible();
+  const nav = page.getByRole('navigation');
+  await expect(nav.getByRole('link', { name: 'Platform Settings', exact: true })).toBeVisible();
   await expect(page).not.toHaveURL(/\/login/);
 });
 
-test('a deep link survives the authenticated load', async ({ page }) => {
+test('a deep link is honoured after signing in', async ({ page }) => {
+  await signInThroughSso(page);
+
   await page.goto('/app/admin/platform/courses');
 
   await expect(page).toHaveURL(/\/app\/admin\/platform\/courses/);
-  await expect(page.getByRole('heading', { name: 'Course Manager' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Course Manager', exact: true })).toBeVisible();
 });
 ```
 
-- [ ] **Step 4: Run it**
+- [ ] **Step 5: Trim the env template**
+
+Remove the `E2E_USER` and `E2E_PASSWORD` lines from `.env.e2e.example` and replace the comment with a pointer to the capture command. The suite uses no credentials; leaving those keys in the template invites someone to put a password on disk for no reason.
+
+- [ ] **Step 6: Run it**
 
 Run: `npm run e2e -- 01-auth`
-Expected: the setup project logs in (a browser window drives the Microsoft form), then both tests PASS.
+Expected: the `setup` project validates the capture, then both tests PASS with no credential prompt anywhere.
 
-If it fails at the Microsoft form with an MFA or "approve sign-in request" prompt, the account cannot be automated. Stop and report — the fallback in the spec is a manual login whose state is reused, which changes this task's approach and needs a decision.
+If a Microsoft password field appears, the capture has expired — re-run the capture command from the task header and try again. Do **not** add credential typing to make it pass; that is explicitly out of scope for this suite.
 
-- [ ] **Step 5: Confirm the session is actually reused, not re-logged-in**
+- [ ] **Step 7: Prove the failure mode is actionable**
 
-Run: `npm run e2e -- 01-auth` a second time and watch the output.
-Expected: the `setup` project runs again (it is not cached) but the *specs* never show a Microsoft form. If a spec redirects to `/login`, the storageState is not carrying the session — re-read the spec's auth section before proceeding.
+Temporarily rename `e2e/.auth/platform-admin.json`, run `npm run e2e -- 01-auth`, and confirm the run fails in **setup** with the re-capture instruction rather than deep inside a spec. Then rename it back.
 
-- [ ] **Step 6: Commit**
+An expired capture is the single most likely reason this suite ever fails. Its error message is load-bearing, so verify it rather than assuming it reads well.
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add e2e/auth.setup.ts e2e/specs/01-auth.spec.ts playwright.config.ts
-git commit -m "test(e2e): real Entra login saved once per run (#124)"
+git add e2e/fixtures/auth.ts e2e/auth.setup.ts e2e/specs/01-auth.spec.ts playwright.config.ts .env.e2e.example
+git commit -m "test(e2e): SSO sign-in from a human-captured session (#124)"
 ```
 
 ---
