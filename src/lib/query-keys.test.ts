@@ -105,6 +105,14 @@ describe('queryKeys', () => {
     expect(queryKeys.quizAdmin.detail('lesson-1')).toEqual(['quiz-admin', 'lesson-1']);
   });
 
+  it('exerciseAdmin.detail returns the parameterized key', () => {
+    expect(queryKeys.exerciseAdmin.detail('l1')).toEqual(['exercise-admin', 'l1']);
+  });
+
+  it('exerciseByLesson.detail returns the parameterized key', () => {
+    expect(queryKeys.exerciseByLesson.detail('l1')).toEqual(['exercise-by-lesson', 'l1']);
+  });
+
   it('platformSettings.all returns the root key', () => {
     expect(queryKeys.platformSettings.all).toEqual(['platform-settings']);
   });

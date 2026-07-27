@@ -9,6 +9,8 @@ import { QueryErrorState } from '@/components/ui/query-error-state';
 import { PdfViewer } from '@/components/learner/PdfViewer';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useExerciseByLesson } from '@/hooks/useExerciseByLesson';
+import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
 import { callApi } from '@/lib/api-client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
@@ -73,6 +75,12 @@ export default function CoursePlayer() {
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [existingReview, setExistingReview] = useState<CourseReview | null>(null);
   const [courseJustCompleted, setCourseJustCompleted] = useState(false);
+
+  // Exercise for the current lesson — the hook self-gates on lessonId + enabled.
+  const { data: exerciseData } = useExerciseByLesson(
+    currentLesson?.id,
+    { enabled: currentLesson?.lesson_type === 'exercise' },
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -728,8 +736,14 @@ export default function CoursePlayer() {
               </div>
             )}
 
-            {/* Footer: Previous / Mark as complete · Completed badge / Next (non-quiz lessons) */}
-            {currentLesson.lesson_type !== 'quiz' && (
+            {currentLesson.lesson_type === 'exercise' && exerciseData?.exercise && (
+              <div className="mt-4">
+                <ExercisePlayer key={exerciseData.exercise.id} exercise={exerciseData.exercise} onComplete={() => handleCompleteLesson()} />
+              </div>
+            )}
+
+            {/* Footer: Previous / Mark as complete · Completed badge / Next (non-quiz, non-exercise lessons) */}
+            {currentLesson.lesson_type !== 'quiz' && currentLesson.lesson_type !== 'exercise' && (
               <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#eceef3] pt-[18px]">
                 <Button
                   variant="outline"

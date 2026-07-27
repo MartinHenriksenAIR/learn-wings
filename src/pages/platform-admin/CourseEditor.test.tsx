@@ -27,7 +27,7 @@ vi.mock('@/components/ui/sonner', () => ({
 }));
 
 vi.mock('@/hooks/usePlatformSettings', () => ({
-  usePlatformSettings: () => ({ features: { quizzes_enabled: false }, isLoading: false }),
+  usePlatformSettings: () => ({ features: { quizzes_enabled: false, exercises_enabled: false }, isLoading: false }),
 }));
 
 // The stub reproduces the only part of FileUpload's contract the editor depends
@@ -61,6 +61,9 @@ vi.mock('@/components/ui/azure-document-upload', () => ({
 }));
 vi.mock('@/components/platform-admin/QuizEditorDialog', () => ({
   QuizEditorDialog: () => <div data-testid="quiz-editor-dialog" />,
+}));
+vi.mock('@/components/platform-admin/ExerciseEditorDialog', () => ({
+  ExerciseEditorDialog: () => <div data-testid="exercise-editor-dialog" />,
 }));
 
 import { getSignedLmsAssetUrl } from '@/lib/storage';

@@ -152,7 +152,8 @@ INSERT INTO public.platform_settings (key, value) VALUES
      "quizzes_enabled": true,
      "analytics_enabled": true,
      "course_reviews_enabled": false,
-     "community_enabled": true
+     "community_enabled": true,
+     "exercises_enabled": false
    }'::jsonb);
 
 -- ---------------------------------------------------------------------

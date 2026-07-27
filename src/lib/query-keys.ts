@@ -210,6 +210,14 @@ export const queryKeys = {
     detail: (lessonId: string) => ['quiz-admin', lessonId] as const,
   },
 
+  exerciseAdmin: {
+    detail: (lessonId: string) => ['exercise-admin', lessonId] as const,
+  },
+
+  exerciseByLesson: {
+    detail: (lessonId: string | undefined) => ['exercise-by-lesson', lessonId] as const,
+  },
+
   learnerCourses: {
     /** Exposed as `list` because enroll/unenroll mutations invalidate by this key. */
     list: (orgId: string | undefined) => ['learner-courses', orgId] as const,

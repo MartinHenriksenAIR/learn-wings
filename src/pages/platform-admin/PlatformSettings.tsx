@@ -61,6 +61,7 @@ interface FeatureSettings {
   analytics_enabled: boolean;
   community_enabled: boolean;
   course_reviews_enabled: boolean;
+  exercises_enabled: boolean;
 }
 
 interface SeatPricingSettings {
@@ -105,6 +106,7 @@ const defaultFeatures: FeatureSettings = {
   analytics_enabled: true,
   community_enabled: true,
   course_reviews_enabled: false,
+  exercises_enabled: false,
 };
 
 const defaultSeatPricing: SeatPricingSettings = {
@@ -119,6 +121,7 @@ const featureKeys: (keyof FeatureSettings)[] = [
   'analytics_enabled',
   'community_enabled',
   'course_reviews_enabled',
+  'exercises_enabled',
 ];
 
 export default function PlatformSettings() {

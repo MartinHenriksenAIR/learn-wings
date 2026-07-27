@@ -2,7 +2,7 @@
  * Shared field validators for Azure Functions endpoint validation.
  *
  * validateLessonFields(body) — validates the fields shared by lesson-create AND lesson-update:
- *   Required: moduleId, title (non-empty trim), lessonType ∈ ('video','document','quiz')
+ *   Required: moduleId, title (non-empty trim), lessonType ∈ ('video','document','quiz','exercise')
  *   Optional: contentText (string|null), durationMinutes (int|null),
  *             videoStoragePath / azureBlobPath / documentStoragePath (non-empty string|null)
  *
@@ -73,7 +73,7 @@ function isIntOrNull(v: unknown): boolean {
   return v === null || Number.isInteger(v);
 }
 
-const LESSON_TYPES = ['video', 'document', 'quiz'] as const;
+const LESSON_TYPES = ['video', 'document', 'quiz', 'exercise'] as const;
 
 export interface LessonFieldsBody {
   moduleId?: unknown;
@@ -104,7 +104,7 @@ export function validateLessonFields(body: LessonFieldsBody): string | null {
   }
 
   if (!lessonType || !LESSON_TYPES.includes(lessonType as (typeof LESSON_TYPES)[number])) {
-    return "lessonType must be 'video', 'document', or 'quiz'";
+    return "lessonType must be 'video', 'document', 'quiz', or 'exercise'";
   }
 
   if (contentText !== undefined && !isStringOrNull(contentText)) {

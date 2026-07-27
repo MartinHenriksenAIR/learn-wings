@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Design System Chooser — learn-wings UI redo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&family=Figtree:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500;600&family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f6f7f9;
+    --panel:#ffffff;
+    --ink:#16181d;
+    --ink-soft:#5b616e;
+    --ink-faint:#8a909c;
+    --line:#e6e8ec;
+    --line-strong:#d2d6dd;
+    --brand:#2563eb;     /* chooser chrome accent only — not a design choice */
+    --brand-soft:#eef3ff;
+    --ok:#16a34a;
+    --radius:14px;
+    --shadow-sm:0 1px 2px rgba(16,18,29,.06), 0 1px 3px rgba(16,18,29,.05);
+    --shadow-md:0 4px 16px rgba(16,18,29,.08);
+    --shadow-lg:0 12px 40px rgba(16,18,29,.14);
+    --maxw:1080px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:40;background:rgba(246,247,249,.86);
+    backdrop-filter:saturate(160%) blur(10px);border-bottom:1px solid var(--line);
+  }
+  .topbar-inner{max-width:var(--maxw);margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:16px}
+  .topbar h1{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em;white-space:nowrap}
+  .topbar .meta{font-size:12.5px;color:var(--ink-faint);white-space:nowrap}
+  .progresswrap{flex:1;height:8px;background:#e9ebef;border-radius:99px;overflow:hidden;min-width:80px}
+  .progressbar{height:100%;width:0;background:linear-gradient(90deg,#2563eb,#3b82f6);border-radius:99px;transition:width .35s ease}
+  .count{font-size:13px;font-weight:600;color:var(--ink-soft);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .btn-done{
+    border:0;cursor:pointer;background:var(--brand);color:#fff;font-weight:600;font-size:13.5px;
+    padding:9px 16px;border-radius:10px;white-space:nowrap;transition:filter .15s,transform .15s;
+  }
+  .btn-done:hover{filter:brightness(1.06)}
+  .btn-done:active{transform:translateY(1px)}
+  .btn-done[disabled]{opacity:.5;cursor:not-allowed}
+
+  /* ---------- layout ---------- */
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:40px 24px 160px}
+  .intro{margin:8px 0 40px}
+  .intro h2{font-size:30px;line-height:1.15;letter-spacing:-.02em;margin:0 0 10px;font-weight:800}
+  .intro p{font-size:15.5px;color:var(--ink-soft);margin:0;max-width:62ch}
+  .intro .hint{margin-top:14px;font-size:13px;color:var(--ink-faint)}
+
+  .group-head{display:flex;align-items:baseline;gap:12px;margin:48px 0 6px}
+  .group-head .ix{font-size:12px;font-weight:700;color:var(--brand);letter-spacing:.08em;text-transform:uppercase}
+  .group-head h3{font-size:20px;font-weight:700;letter-spacing:-.01em;margin:0}
+  .group-sub{font-size:13.5px;color:var(--ink-faint);margin:0 0 18px}
+
+  .q{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px 22px 24px;margin:16px 0;box-shadow:var(--shadow-sm)}
+  .q-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
+  .q-num{flex:none;width:24px;height:24px;border-radius:7px;background:var(--brand-soft);color:var(--brand);font-size:12.5px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+  .q-title{font-size:16.5px;font-weight:650;letter-spacing:-.01em;margin:0}
+  .q-help{font-size:13.5px;color:var(--ink-soft);margin:2px 0 0}
+  .q.answered{border-color:#c9e0cf;box-shadow:0 0 0 1px #d6ecdb inset, var(--shadow-sm)}
+  .q-tag{margin-left:auto;font-size:11px;font-weight:600;color:var(--ink-faint);border:1px solid var(--line);padding:2px 8px;border-radius:99px;white-space:nowrap}
+  .q.answered .q-tag{color:var(--ok);border-color:#bfe3c6;background:#f3faf4}
+  .q-tag.multi{color:#7c5cd6;border-color:#e2d8f7;background:#f8f5ff}
+
+  /* ---------- option grids ---------- */
+  .opts{display:grid;gap:12px;margin-top:16px}
+  .cols-2{grid-template-columns:repeat(2,1fr)}
+  .cols-3{grid-template-columns:repeat(3,1fr)}
+  .cols-4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:820px){.cols-3,.cols-4{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.opts{grid-template-columns:1fr!important}}
+
+  .opt{
+    position:relative;border:1.5px solid var(--line-strong);border-radius:12px;background:#fff;
+    cursor:pointer;overflow:hidden;transition:border-color .15s,box-shadow .15s,transform .12s;
+    display:flex;flex-direction:column;text-align:left;padding:0;
+  }
+  .opt:hover{border-color:#b7c0cf;box-shadow:var(--shadow-md);transform:translateY(-2px)}
+  .opt.sel{border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.16)}
+  .opt .preview{padding:18px;min-height:96px;display:flex;flex-direction:column;justify-content:center;gap:8px;border-bottom:1px solid var(--line)}
+  .opt .label{padding:12px 16px 14px}
+  .opt .label b{display:block;font-size:14px;font-weight:650;margin-bottom:2px;letter-spacing:-.01em}
+  .opt .label span{display:block;font-size:12.5px;color:var(--ink-soft);line-height:1.45}
+  .opt .tick{
+    position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:99px;background:var(--brand);
+    color:#fff;display:none;place-items:center;font-size:13px;z-index:3;box-shadow:0 1px 4px rgba(0,0,0,.2)
+  }
+  .opt.sel .tick{display:grid}
+
+  /* swatch grid (color) */
+  .swatch .preview{align-items:center;justify-content:center;min-height:84px}
+  .chip{width:100%;height:48px;border-radius:9px;border:1px solid rgba(0,0,0,.06)}
+  .swrow{display:flex;gap:6px;width:100%}
+  .swrow i{flex:1;height:34px;border-radius:7px;border:1px solid rgba(0,0,0,.06);display:block}
+
+  /* type previews */
+  .typ-h{font-size:21px;line-height:1.1;margin:0;letter-spacing:-.02em}
+  .typ-b{font-size:12.5px;color:var(--ink-soft);margin:0}
+
+  /* radius / shape demo */
+  .shapebox{width:100%;height:46px;background:#dbe3f0;border:1.5px solid #b9c6db}
+  .btn-demo{display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;height:34px;padding:0 16px}
+
+  /* density demo */
+  .dens-row{display:flex;align-items:center;gap:8px;border-radius:6px;background:#f1f3f7}
+  .dens-row i{display:block;height:8px;border-radius:99px;background:#c3ccda}
+
+  /* elevation demo */
+  .elev-card{width:78%;height:48px;background:#fff;border-radius:10px;margin:6px auto}
+
+  /* mini-ui (mood) */
+  .mini{width:100%;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;min-height:160px;justify-content:space-between}
+  .mini .eyebrow{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;opacity:.7}
+  .mini .ttl{font-size:16px;line-height:1.15;margin:0;font-weight:700}
+  .mini .sub{font-size:11px;margin:0;opacity:.72;line-height:1.4}
+  .mini .bar{height:7px;border-radius:99px;background:rgba(0,0,0,.08);overflow:hidden}
+  .mini .bar i{display:block;height:100%;width:62%;border-radius:99px}
+  .mini .cta{align-self:flex-start;font-size:11.5px;font-weight:700;padding:7px 14px}
+
+  /* notes */
+  .notes label{display:block;font-size:13.5px;font-weight:600;margin-bottom:8px}
+  .notes textarea{width:100%;min-height:90px;border:1.5px solid var(--line-strong);border-radius:10px;padding:12px 14px;font:inherit;font-size:14px;resize:vertical;color:var(--ink)}
+  .notes textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.14)}
+
+  /* results modal */
+  .scrim{position:fixed;inset:0;background:rgba(16,18,29,.5);backdrop-filter:blur(3px);display:none;z-index:60;align-items:flex-start;justify-content:center;padding:40px 20px;overflow:auto}
+  .scrim.open{display:flex}
+  .modal{background:#fff;border-radius:18px;max-width:720px;width:100%;box-shadow:var(--shadow-lg);overflow:hidden}
+  .modal-head{padding:22px 26px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  .modal-head h3{margin:0;font-size:19px;font-weight:750;letter-spacing:-.01em}
+  .modal-head .x{margin-left:auto;border:0;background:#f1f3f7;width:32px;height:32px;border-radius:9px;cursor:pointer;font-size:16px;color:var(--ink-soft)}
+  .modal-body{padding:22px 26px;max-height:60vh;overflow:auto}
+  .summary-list{margin:0 0 20px;padding:0;list-style:none}
+  .summary-list li{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+  .summary-list li b{flex:none;width:46%;color:var(--ink-soft);font-weight:550}
+  .summary-list li span{font-weight:650}
+  .summary-list li.miss span{color:var(--ink-faint);font-weight:500;font-style:italic}
+  pre.copyblock{background:#0f1115;color:#e7ebf2;border-radius:12px;padding:16px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;line-height:1.55;overflow:auto;margin:0;white-space:pre-wrap;word-break:break-word}
+  .modal-foot{padding:18px 26px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .btn-copy{border:0;cursor:pointer;background:var(--brand);color:#fff;font-weight:650;font-size:14px;padding:11px 18px;border-radius:10px}
+  .btn-ghost{border:1.5px solid var(--line-strong);background:#fff;cursor:pointer;font-weight:600;font-size:14px;padding:10px 16px;border-radius:10px;color:var(--ink)}
+  .copied{color:var(--ok);font-size:13px;font-weight:600;display:none}
+  .copied.show{display:inline}
+
+  .footnote{margin-top:40px;font-size:12.5px;color:var(--ink-faint);text-align:center}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <h1>🎨 Design System Chooser</h1>
+    <span class="meta">learn-wings UI redo</span>
+    <div class="progresswrap"><div class="progressbar" id="pbar"></div></div>
+    <span class="count" id="count">0 / 18</span>
+    <button class="btn-done" id="doneBtn" onclick="openSummary()">See my picks →</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="intro">
+    <h2>Let's design your design system, one choice at a time.</h2>
+    <p>This is a guided pick-list for the full UI redo. Each question shows you real, rendered options — fonts in the actual typeface, colors as real swatches, radii on real boxes, whole mini-screens for the overall vibe. Click the one you want. Change your mind anytime.</p>
+    <p class="intro.hint hint">When you're done (or partway, that's fine), hit <b>"See my picks"</b> — it generates a summary you paste back into chat, and I'll turn it into your real Tailwind tokens + a design-system spec. Single-choice unless a question is marked <b>multi</b>.</p>
+  </div>
+
+  <!-- ============ GROUP 1: THE VIBE ============ -->
+  <div class="group-head"><span class="ix">01</span><h3>The overall vibe</h3></div>
+  <p class="group-sub">The single most important choice — it colors everything else. Each card is a real mini-screen rendered in that direction.</p>
+
+  <div class="q" data-q="vibe" data-qtitle="Overall direction / vibe">
+    <div class="q-head"><span class="q-num">1</span><div><p class="q-title">Which overall direction feels right for the platform?</p><p class="q-help">These are four distinct personalities. Look at the whole feel — type, color, roundness, energy.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-4">
+      <button class="opt" data-val="Clean SaaS (Linear / Geist)">
+        <div class="preview" style="padding:0">
+          <div class="mini" style="background:#fff;border:1px solid #e8eaed;font-family:'Inter',sans-serif;color:#1c1f26;border-radius:0">
+            <span class="eyebrow" style="color:#0d9488">COURSE</span>
+            <div><p class="ttl" style="font-weight:650;letter-spacing:-.02em">Prompt Engineering</p><p class="sub">12 lessons · 3h 40m</p></div>
+            <div class="bar"><i style="background:#0d9488;width:62%"></i></div>
+            <span class="cta" style="background:#16181d;color:#fff;border-radius:7px">Continue</span>
+          </div>
+        </div>
+        <div class="label"><b>Clean SaaS</b><span>Crisp, neutral, restrained. Linear / Vercel Geist energy. Professional & quiet.</span></div>
+        <div class="tick">✓</div>
+      </button>
+
+      <button class="opt" data-val="Friendly Learning (Duolingo-ish)">
+        <div class="preview" style="padding:0">
+          <div class="mini" style="background:#f3fbf4;border:2px solid #c8edcf;font-family:'Figtree',sans-serif;color:#13361c;border-radius:18px">
+            <span class="eyebrow" style="color:#22a559">COURSE</span>
+            <div><p class="ttl" style="font-weight:800">Prompt Engineering</p><p class="sub">12 lessons · earn 240 XP</p></div>
+            <div class="bar" style="background:#d6f0db"><i style="background:#22c55e;width:62%"></i></div>
+            <span class="cta" style="background:#22c55e;color:#fff;border-radius:99px;box-shadow:0 4px 0 #16923f">Continue</span>
+          </div>
+        </div>
+        <div class="label"><b>Friendly learning</b><span>Rounded, warm, encouraging, gamified. Approachable for nervous beginners.</span></div>
+        <div class="tick">✓</div>
+      </button>
+
+      <button class="opt" data-val="Editorial / Refined">
+        <div class="preview" style="padding:0">
+          <div class="mini" style="background:#fbfaf7;border:1px solid #e7e2d8;font-family:'Source Serif 4',serif;color:#23201a;border-radius:4px">
+            <span class="eyebrow" style="color:#9a7b4f;font-family:'Inter',sans-serif">COURSE</span>
+            <div><p class="ttl" style="font-weight:700;font-family:'Playfair Display',serif">Prompt Engineering</p><p class="sub" style="font-style:italic">A measured introduction</p></div>
+            <div class="bar" style="background:#e9e3d6"><i style="background:#b08442;width:62%"></i></div>
+            <span class="cta" style="background:transparent;color:#23201a;border:1px solid #23201a;border-radius:3px;font-family:'Inter',sans-serif">Continue →</span>
+          </div>
+        </div>
+        <div class="label"><b>Editorial / refined</b><span>Serif headings, generous space, content-first. Sophisticated, premium, calm.</span></div>
+        <div class="tick">✓</div>
+      </button>
+
+      <button class="opt" data-val="Bold & Vibrant">
+        <div class="preview" style="padding:0">
+          <div class="mini" style="background:#0f1020;border:1px solid #2a2c52;font-family:'Space Grotesk',sans-serif;color:#fff;border-radius:14px">
+            <span class="eyebrow" style="color:#a78bfa">COURSE</span>
+            <div><p class="ttl" style="font-weight:700">Prompt Engineering</p><p class="sub">12 lessons · 3h 40m</p></div>
+            <div class="bar" style="background:rgba(255,255,255,.12)"><i style="background:linear-gradient(90deg,#6366f1,#ec4899);width:62%"></i></div>
+            <span class="cta" style="background:linear-gradient(90deg,#6366f1,#8b5cf6);color:#fff;border-radius:10px">Continue</span>
+          </div>
+        </div>
+        <div class="label"><b>Bold &amp; vibrant</b><span>Confident, high-contrast, energetic accents. Modern, memorable, marketing-forward.</span></div>
+        <div class="tick">✓</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ GROUP 2: COLOR ============ -->
+  <div class="group-head"><span class="ix">02</span><h3>Color</h3></div>
+  <p class="group-sub">Your neutral foundation, your signature accent, and how much color the UI actually uses.</p>
+
+  <div class="q" data-q="neutral" data-qtitle="Neutral base temperature">
+    <div class="q-head"><span class="q-num">2</span><div><p class="q-title">What temperature should the neutral base (greys) be?</p><p class="q-help">This is the backdrop for 90% of the screen. Subtle but sets the mood.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-4">
+      <button class="opt swatch" data-val="Cool grey (slate)"><div class="preview"><div class="swrow"><i style="background:#f8fafc"></i><i style="background:#e2e8f0"></i><i style="background:#94a3b8"></i><i style="background:#334155"></i><i style="background:#0f172a"></i></div></div><div class="label"><b>Cool (slate)</b><span>Slight blue tint. Techy, current default.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="True neutral grey (zinc)"><div class="preview"><div class="swrow"><i style="background:#fafafa"></i><i style="background:#e4e4e7"></i><i style="background:#a1a1aa"></i><i style="background:#3f3f46"></i><i style="background:#18181b"></i></div></div><div class="label"><b>True neutral (zinc)</b><span>No tint. Clean, timeless, shadcn default.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="Warm grey (stone)"><div class="preview"><div class="swrow"><i style="background:#fafaf9"></i><i style="background:#e7e5e4"></i><i style="background:#a8a29e"></i><i style="background:#44403c"></i><i style="background:#1c1917"></i></div></div><div class="label"><b>Warm (stone)</b><span>Hint of beige. Soft, human, inviting.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="Brand-tinted neutral"><div class="preview"><div class="swrow"><i style="background:#f7f9fb"></i><i style="background:#dfe7ee"></i><i style="background:#8ba0b3"></i><i style="background:#2f4256"></i><i style="background:#101c28"></i></div></div><div class="label"><b>Brand-tinted</b><span>Greys carry a whisper of your accent hue.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="accent" data-qtitle="Accent / signature color">
+    <div class="q-head"><span class="q-num">3</span><div><p class="q-title">Pick your signature accent color.</p><p class="q-help">Used for buttons, links, focus rings, progress, active states. You have teal today.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-4">
+      <button class="opt swatch" data-val="Teal (current)"><div class="preview"><div class="chip" style="background:#14b8a6"></div></div><div class="label"><b>Teal</b><span>Your current accent. Fresh, calm, distinctive.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="Indigo"><div class="preview"><div class="chip" style="background:#4f46e5"></div></div><div class="label"><b>Indigo</b><span>Trustworthy, classic SaaS, very legible.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="Blue"><div class="preview"><div class="chip" style="background:#2563eb"></div></div><div class="label"><b>Blue</b><span>Safe, universal, friendly authority.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="Emerald"><div class="preview"><div class="chip" style="background:#10b981"></div></div><div class="label"><b>Emerald</b><span>Growth, progress, learning. Optimistic.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="Violet"><div class="preview"><div class="chip" style="background:#7c3aed"></div></div><div class="label"><b>Violet</b><span>AI-forward, creative, premium.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="Orange"><div class="preview"><div class="chip" style="background:#f97316"></div></div><div class="label"><b>Orange</b><span>Energetic, warm, motivating.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="Rose"><div class="preview"><div class="chip" style="background:#e11d48"></div></div><div class="label"><b>Rose</b><span>Bold, human, memorable.</span></div><div class="tick">✓</div></button>
+      <button class="opt swatch" data-val="Deep navy + bright accent"><div class="preview"><div class="swrow"><i style="background:#0f2942;flex:2"></i><i style="background:#38bdf8;flex:1"></i></div></div><div class="label"><b>Navy + sky</b><span>Serious navy base, one bright pop.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="colorRichness" data-qtitle="Color richness">
+    <div class="q-head"><span class="q-num">4</span><div><p class="q-title">How much color should the UI use overall?</p><p class="q-help">From near-monochrome to richly multi-colored category coding.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt" data-val="Monochrome + 1 accent"><div class="preview" style="gap:6px"><div class="swrow"><i style="background:#1c1917"></i><i style="background:#78716c"></i><i style="background:#e7e5e4"></i><i style="background:#14b8a6;flex:.5"></i></div><p class="typ-b">One pop of color, everything else greyscale.</p></div><div class="label"><b>Restrained</b><span>Mono + single accent. Elegant, focused.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Two-tone (primary + accent)"><div class="preview" style="gap:6px"><div class="swrow"><i style="background:#0f2942"></i><i style="background:#14b8a6"></i><i style="background:#e2e8f0"></i></div><p class="typ-b">A primary + an accent working together.</p></div><div class="label"><b>Two-tone</b><span>Primary + accent. Balanced, branded.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Rich multi-color (semantic categories)"><div class="preview" style="gap:6px"><div class="swrow"><i style="background:#6366f1"></i><i style="background:#10b981"></i><i style="background:#f59e0b"></i><i style="background:#ec4899"></i><i style="background:#06b6d4"></i></div><p class="typ-b">Colors code course tracks, states, roles.</p></div><div class="label"><b>Rich &amp; colorful</b><span>Many hues for categories &amp; status. Lively.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <!-- ============ GROUP 3: TYPOGRAPHY ============ -->
+  <div class="group-head"><span class="ix">03</span><h3>Typography</h3></div>
+  <p class="group-sub">Rendered in the actual fonts. Headings carry most of the personality; body should disappear and just be readable.</p>
+
+  <div class="q" data-q="headingFont" data-qtitle="Heading font personality">
+    <div class="q-head"><span class="q-num">5</span><div><p class="q-title">Pick the heading typeface personality.</p><p class="q-help">You have Plus Jakarta Sans today (geometric).</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-4">
+      <button class="opt" data-val="Geometric sans (Plus Jakarta / Poppins)"><div class="preview"><p class="typ-h" style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">Master AI</p><p class="typ-b" style="font-family:'Plus Jakarta Sans',sans-serif">Plus Jakarta Sans</p></div><div class="label"><b>Geometric</b><span>Friendly, modern, rounded forms. Current.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Neutral grotesk (Inter / Geist)"><div class="preview"><p class="typ-h" style="font-family:'Geist','Inter',sans-serif;font-weight:650">Master AI</p><p class="typ-b" style="font-family:'Geist','Inter',sans-serif">Geist / Inter</p></div><div class="label"><b>Neutral grotesk</b><span>Clean, precise, gets out of the way. SaaS.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Humanist sans (Figtree)"><div class="preview"><p class="typ-h" style="font-family:'Figtree',sans-serif;font-weight:700">Master AI</p><p class="typ-b" style="font-family:'Figtree',sans-serif">Figtree</p></div><div class="label"><b>Humanist</b><span>Warm, soft, approachable. Education-friendly.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Serif display (Playfair / Source Serif)"><div class="preview"><p class="typ-h" style="font-family:'Playfair Display',serif;font-weight:700">Master AI</p><p class="typ-b" style="font-family:'Source Serif 4',serif">Playfair / Source Serif</p></div><div class="label"><b>Serif display</b><span>Editorial, premium, authoritative.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="bodyFont" data-qtitle="Body font">
+    <div class="q-head"><span class="q-num">6</span><div><p class="q-title">Pick the body / UI text typeface.</p><p class="q-help">Used for paragraphs, labels, tables. Readability is everything here.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-4">
+      <button class="opt" data-val="Inter (current)"><div class="preview"><p class="typ-h" style="font-family:'Inter',sans-serif;font-size:15px;font-weight:600">The quick brown fox</p><p class="typ-b" style="font-family:'Inter',sans-serif">Inter — the workhorse. Neutral, superb at small sizes.</p></div><div class="label"><b>Inter</b><span>Current. Safe, excellent, ubiquitous.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Geist"><div class="preview"><p class="typ-h" style="font-family:'Geist','Inter',sans-serif;font-size:15px;font-weight:600">The quick brown fox</p><p class="typ-b" style="font-family:'Geist','Inter',sans-serif">Geist — Vercel's font. Crisp, slightly tighter, modern.</p></div><div class="label"><b>Geist</b><span>Sharper, more distinctive than Inter.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Figtree"><div class="preview"><p class="typ-h" style="font-family:'Figtree',sans-serif;font-size:15px;font-weight:600">The quick brown fox</p><p class="typ-b" style="font-family:'Figtree',sans-serif">Figtree — rounded, warm, friendly for learners.</p></div><div class="label"><b>Figtree</b><span>Softer, more human than Inter.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="System font stack"><div class="preview"><p class="typ-h" style="font-family:system-ui,sans-serif;font-size:15px;font-weight:600">The quick brown fox</p><p class="typ-b" style="font-family:system-ui,sans-serif">System UI — zero load, native to each OS.</p></div><div class="label"><b>System</b><span>Fastest, native feel, no web font.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="typeScale" data-qtitle="Type scale contrast">
+    <div class="q-head"><span class="q-num">7</span><div><p class="q-title">How much contrast between headings and body?</p><p class="q-help">Tight scales feel dense and functional; expressive scales feel bold and spacious.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt" data-val="Tight & functional"><div class="preview" style="gap:4px"><p style="margin:0;font-weight:700;font-size:18px;letter-spacing:-.01em">Heading</p><p class="typ-b">Body text sits close in size. Dense dashboards.</p></div><div class="label"><b>Tight</b><span>Small steps. Information-dense.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Balanced"><div class="preview" style="gap:6px"><p style="margin:0;font-weight:700;font-size:24px;letter-spacing:-.015em">Heading</p><p class="typ-b">Body text. Clear hierarchy, comfortable.</p></div><div class="label"><b>Balanced</b><span>Clear, comfortable hierarchy. Safe default.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Expressive"><div class="preview" style="gap:6px"><p style="margin:0;font-weight:800;font-size:32px;line-height:.95;letter-spacing:-.03em">Heading</p><p class="typ-b">Body text. Big, confident display moments.</p></div><div class="label"><b>Expressive</b><span>Dramatic jumps. Marketing-grade impact.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <!-- ============ GROUP 4: SHAPE & SPACE ============ -->
+  <div class="group-head"><span class="ix">04</span><h3>Shape &amp; space</h3></div>
+  <p class="group-sub">Roundness and breathing room — the two knobs people feel most without being able to name.</p>
+
+  <div class="q" data-q="radius" data-qtitle="Corner radius">
+    <div class="q-head"><span class="q-num">8</span><div><p class="q-title">How round should corners be?</p><p class="q-help">Buttons, cards, inputs. You're at ~10px today.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-4">
+      <button class="opt" data-val="Sharp (2-4px)"><div class="preview" style="gap:10px"><div class="shapebox" style="border-radius:3px"></div><span class="btn-demo" style="background:#16181d;color:#fff;border-radius:3px">Button</span></div><div class="label"><b>Sharp</b><span>Crisp, technical, serious.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Subtle (6-10px)"><div class="preview" style="gap:10px"><div class="shapebox" style="border-radius:8px"></div><span class="btn-demo" style="background:#16181d;color:#fff;border-radius:8px">Button</span></div><div class="label"><b>Subtle</b><span>Modern SaaS default. Current.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Rounded (14-18px)"><div class="preview" style="gap:10px"><div class="shapebox" style="border-radius:16px"></div><span class="btn-demo" style="background:#16181d;color:#fff;border-radius:14px">Button</span></div><div class="label"><b>Rounded</b><span>Soft, friendly, approachable.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Pill / very round"><div class="preview" style="gap:10px"><div class="shapebox" style="border-radius:24px"></div><span class="btn-demo" style="background:#16181d;color:#fff;border-radius:99px">Button</span></div><div class="label"><b>Pill</b><span>Playful, consumer-app, energetic.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="density" data-qtitle="Density / spacing">
+    <div class="q-head"><span class="q-num">9</span><div><p class="q-title">How dense or airy should layouts be?</p><p class="q-help">Trades information-per-screen against calm and focus.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt" data-val="Compact"><div class="preview" style="gap:4px"><div class="dens-row" style="padding:5px 8px"><i style="width:30%"></i><i style="width:50%"></i></div><div class="dens-row" style="padding:5px 8px"><i style="width:45%"></i><i style="width:25%"></i></div><div class="dens-row" style="padding:5px 8px"><i style="width:35%"></i><i style="width:40%"></i></div></div><div class="label"><b>Compact</b><span>Max info per screen. Admin tables, dashboards.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Comfortable"><div class="preview" style="gap:9px"><div class="dens-row" style="padding:9px 12px"><i style="width:30%"></i><i style="width:50%"></i></div><div class="dens-row" style="padding:9px 12px"><i style="width:45%"></i><i style="width:25%"></i></div></div><div class="label"><b>Comfortable</b><span>Balanced breathing room. Safe default.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Spacious"><div class="preview" style="gap:14px"><div class="dens-row" style="padding:14px 16px"><i style="width:30%"></i><i style="width:45%"></i></div><div class="dens-row" style="padding:14px 16px"><i style="width:40%"></i></div></div><div class="label"><b>Spacious</b><span>Lots of whitespace. Calm, premium, focused.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <!-- ============ GROUP 5: DEPTH ============ -->
+  <div class="group-head"><span class="ix">05</span><h3>Depth &amp; separation</h3></div>
+  <p class="group-sub">How elements lift off the page and how you tell one surface from the next.</p>
+
+  <div class="q" data-q="elevation" data-qtitle="Elevation / depth">
+    <div class="q-head"><span class="q-num">10</span><div><p class="q-title">How much shadow / depth?</p><p class="q-help">From totally flat to clearly layered cards.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt" data-val="Flat (no shadows)"><div class="preview" style="background:#eef1f5"><div class="elev-card" style="border:1px solid #d7dce3;box-shadow:none"></div></div><div class="label"><b>Flat</b><span>Borders only, no shadow. Crisp, modern.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Soft shadows"><div class="preview" style="background:#eef1f5"><div class="elev-card" style="box-shadow:0 2px 8px rgba(16,18,29,.10)"></div></div><div class="label"><b>Soft</b><span>Subtle lift. Gentle, current-ish.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Layered (pronounced)"><div class="preview" style="background:#eef1f5"><div class="elev-card" style="box-shadow:0 10px 30px rgba(16,18,29,.20)"></div></div><div class="label"><b>Layered</b><span>Cards pop. Clear depth hierarchy.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="separation" data-qtitle="Separation method">
+    <div class="q-head"><span class="q-num">11</span><div><p class="q-title">How should sections be separated?</p><p class="q-help">The primary device for dividing content areas.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt" data-val="Hairline borders"><div class="preview" style="background:#fff;gap:0;padding:0"><div style="padding:14px;border-bottom:1px solid #e6e8ec;font-size:12px;color:#5b616e">Section A</div><div style="padding:14px;font-size:12px;color:#5b616e">Section B</div></div><div class="label"><b>Borders</b><span>Thin lines. Precise, structured.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Shadows / floating cards"><div class="preview" style="background:#eef1f5;gap:8px"><div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.08);font-size:12px;color:#5b616e">Card A</div><div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.08);font-size:12px;color:#5b616e">Card B</div></div><div class="label"><b>Floating cards</b><span>Cards on tinted bg. Soft, distinct.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Surface contrast (tinted backgrounds)"><div class="preview" style="gap:0;padding:0"><div style="padding:14px;background:#fff;font-size:12px;color:#5b616e">Surface 1</div><div style="padding:14px;background:#f1f3f7;font-size:12px;color:#5b616e">Surface 2</div></div><div class="label"><b>Surface tint</b><span>Alternating background shades. Seamless.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <!-- ============ GROUP 6: COMPONENTS ============ -->
+  <div class="group-head"><span class="ix">06</span><h3>Components</h3></div>
+  <p class="group-sub">How the building blocks people click and read actually look.</p>
+
+  <div class="q" data-q="buttonStyle" data-qtitle="Primary button style">
+    <div class="q-head"><span class="q-num">12</span><div><p class="q-title">Primary button style?</p><p class="q-help">The most-clicked element on every screen.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-4">
+      <button class="opt" data-val="Solid fill"><div class="preview" style="align-items:center;justify-content:center"><span class="btn-demo" style="background:#14b8a6;color:#fff;border-radius:9px">Get started</span></div><div class="label"><b>Solid</b><span>Filled accent. Bold, obvious, classic.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Soft / tonal"><div class="preview" style="align-items:center;justify-content:center"><span class="btn-demo" style="background:#cffafe;color:#0f766e;border-radius:9px">Get started</span></div><div class="label"><b>Tonal</b><span>Tinted fill. Gentle, low-contrast, calm.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Outline / ghost"><div class="preview" style="align-items:center;justify-content:center"><span class="btn-demo" style="background:#fff;color:#0f766e;border:1.5px solid #14b8a6;border-radius:9px">Get started</span></div><div class="label"><b>Outline</b><span>Bordered. Minimal, restrained, light.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Gradient"><div class="preview" style="align-items:center;justify-content:center"><span class="btn-demo" style="background:linear-gradient(90deg,#14b8a6,#3b82f6);color:#fff;border-radius:9px">Get started</span></div><div class="label"><b>Gradient</b><span>Two-color blend. Vibrant, expressive.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="iconStyle" data-qtitle="Iconography style">
+    <div class="q-head"><span class="q-num">13</span><div><p class="q-title">Icon style?</p><p class="q-help">You use Lucide (line icons) today.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt" data-val="Line / outline (Lucide)"><div class="preview" style="align-items:center;justify-content:center;flex-direction:row;gap:18px;font-size:0"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16181d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16181d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div><div class="label"><b>Line</b><span>Outline strokes. Clean, light. Current.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Filled / solid"><div class="preview" style="align-items:center;justify-content:center;flex-direction:row;gap:18px"><svg width="28" height="28" viewBox="0 0 24 24" fill="#16181d"><path d="M6 2h13a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6 2z"/></svg><svg width="28" height="28" viewBox="0 0 24 24" fill="#16181d"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="label"><b>Filled</b><span>Solid shapes. Bold, high-presence.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Duotone"><div class="preview" style="align-items:center;justify-content:center;flex-direction:row;gap:18px"><svg width="28" height="28" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#bdeae4"/><path d="m9 12 2 2 4-4" stroke="#0f766e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><svg width="28" height="28" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2" fill="#bdeae4"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#0f766e" stroke-width="1.8" stroke-linecap="round"/></svg></div><div class="label"><b>Duotone</b><span>Two-tone fills. Friendly, characterful.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <!-- ============ GROUP 7: MOTION & DATA ============ -->
+  <div class="group-head"><span class="ix">07</span><h3>Motion &amp; data</h3></div>
+  <p class="group-sub">How it feels when things move, and how progress &amp; charts are colored.</p>
+
+  <div class="q" data-q="motion" data-qtitle="Motion feel">
+    <div class="q-head"><span class="q-num">14</span><div><p class="q-title">How should interactions feel?</p><p class="q-help">Hover the cards to feel the difference in the transition.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt motion-min" data-val="Minimal / instant"><div class="preview" style="align-items:center;justify-content:center"><span class="btn-demo" style="background:#14b8a6;color:#fff;border-radius:8px;transition:transform .04s">Hover me</span></div><div class="label"><b>Minimal</b><span>Near-instant. Snappy, no-nonsense.</span></div><div class="tick">✓</div></button>
+      <button class="opt motion-sub" data-val="Subtle (150-200ms)"><div class="preview" style="align-items:center;justify-content:center"><span class="btn-demo" style="background:#14b8a6;color:#fff;border-radius:8px;transition:transform .18s ease">Hover me</span></div><div class="label"><b>Subtle</b><span>Smooth 150–200ms. Polished. Current pref.</span></div><div class="tick">✓</div></button>
+      <button class="opt motion-play" data-val="Playful / springy"><div class="preview" style="align-items:center;justify-content:center"><span class="btn-demo" style="background:#14b8a6;color:#fff;border-radius:8px;transition:transform .4s cubic-bezier(.34,1.56,.64,1)">Hover me</span></div><div class="label"><b>Playful</b><span>Springy, bouncy. Fun, consumer-app.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="dataViz" data-qtitle="Data-viz palette">
+    <div class="q-head"><span class="q-num">15</span><div><p class="q-title">How should charts &amp; progress be colored?</p><p class="q-help">The LMS has progress rings, completion stats, dashboards.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt" data-val="Monochrome accent shades"><div class="preview"><div class="swrow"><i style="background:#ccfbf1"></i><i style="background:#5eead4"></i><i style="background:#14b8a6"></i><i style="background:#0f766e"></i></div><p class="typ-b">Shades of one accent. Calm, on-brand.</p></div><div class="label"><b>Mono shades</b><span>One hue, light→dark. Quiet, cohesive.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Categorical multi-hue"><div class="preview"><div class="swrow"><i style="background:#6366f1"></i><i style="background:#14b8a6"></i><i style="background:#f59e0b"></i><i style="background:#ec4899"></i></div><p class="typ-b">Distinct hues per category. Easy to read.</p></div><div class="label"><b>Categorical</b><span>Many hues. Best for comparing categories.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Sequential gradient"><div class="preview"><div class="swrow"><i style="background:linear-gradient(90deg,#cffafe,#22d3ee,#0e7490)"></i></div><p class="typ-b">Smooth ramp for intensity / heatmaps.</p></div><div class="label"><b>Sequential</b><span>Gradient ramp. Great for intensity/scores.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <!-- ============ GROUP 8: PLATFORM-SPECIFIC ============ -->
+  <div class="group-head"><span class="ix">08</span><h3>Platform specifics</h3></div>
+  <p class="group-sub">Decisions unique to a multi-tenant LMS with platform-admin, org-admin, and learner roles.</p>
+
+  <div class="q" data-q="darkMode" data-qtitle="Dark mode priority">
+    <div class="q-head"><span class="q-num">16</span><div><p class="q-title">How much does dark mode matter?</p><p class="q-help">You have full dark-mode parity today.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt" data-val="Light-first, dark supported"><div class="preview" style="flex-direction:row;gap:8px;align-items:stretch"><div style="flex:2;background:#fff;border:1px solid #e6e8ec;border-radius:8px"></div><div style="flex:1;background:#16181d;border-radius:8px"></div></div><div class="label"><b>Light-first</b><span>Optimize light, dark is a solid extra.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Equal parity"><div class="preview" style="flex-direction:row;gap:8px;align-items:stretch"><div style="flex:1;background:#fff;border:1px solid #e6e8ec;border-radius:8px"></div><div style="flex:1;background:#16181d;border-radius:8px"></div></div><div class="label"><b>Equal parity</b><span>Both first-class. Current. More work.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Dark-first"><div class="preview" style="flex-direction:row;gap:8px;align-items:stretch"><div style="flex:2;background:#16181d;border-radius:8px"></div><div style="flex:1;background:#fff;border:1px solid #e6e8ec;border-radius:8px"></div></div><div class="label"><b>Dark-first</b><span>Dark is the hero. Techy, focused.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="roleDiff" data-qtitle="Role differentiation">
+    <div class="q-head"><span class="q-num">17</span><div><p class="q-title">Should the three roles look different?</p><p class="q-help">Platform-admin, org-admin, learner. You have distinct sidebar theming today.</p></div><span class="q-tag">Pick one</span></div>
+    <div class="opts cols-3">
+      <button class="opt" data-val="Uniform (role shown via labels only)"><div class="preview" style="flex-direction:row;gap:6px;align-items:stretch"><div style="flex:1;background:#14b8a6;border-radius:6px"></div><div style="flex:1;background:#14b8a6;border-radius:6px"></div><div style="flex:1;background:#14b8a6;border-radius:6px"></div></div><div class="label"><b>Uniform</b><span>One look for all. Simplest, most consistent.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Subtle accent shift per role"><div class="preview" style="flex-direction:row;gap:6px;align-items:stretch"><div style="flex:1;background:#14b8a6;border-radius:6px"></div><div style="flex:1;background:#0ea5e9;border-radius:6px"></div><div style="flex:1;background:#6366f1;border-radius:6px"></div></div><div class="label"><b>Subtle shift</b><span>Same system, role-tinted accent. Orienting.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Distinct theming per role"><div class="preview" style="flex-direction:row;gap:6px;align-items:stretch"><div style="flex:1;background:#0f2942;border-radius:6px"></div><div style="flex:1;background:#134e4a;border-radius:6px"></div><div style="flex:1;background:#f3fbf4;border:1px solid #c8edcf;border-radius:6px"></div></div><div class="label"><b>Distinct</b><span>Each role visibly different. Current. Strong context.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <div class="q" data-q="references" data-qtitle="Reference systems you admire (multi)" data-multi="1">
+    <div class="q-head"><span class="q-num">18</span><div><p class="q-title">Which existing products' look do you admire? <span style="font-weight:500;color:var(--ink-faint)">(pick any)</span></p><p class="q-help">Helps me anchor the system to references we both know. Multi-select.</p></div><span class="q-tag multi">Pick any</span></div>
+    <div class="opts cols-4">
+      <button class="opt" data-val="Linear"><div class="preview" style="background:#fff;align-items:flex-start;justify-content:center"><p class="typ-h" style="font-size:15px;font-weight:650;font-family:'Inter'">Linear</p><p class="typ-b">Sharp, fast, dark, minimal.</p></div><div class="label"><b>Linear</b><span>Precision SaaS.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Vercel / Geist"><div class="preview" style="background:#fff;align-items:flex-start;justify-content:center"><p class="typ-h" style="font-size:15px;font-weight:650;font-family:'Geist','Inter'">Vercel</p><p class="typ-b">Black/white, crisp, modern.</p></div><div class="label"><b>Vercel / Geist</b><span>Monochrome clarity.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Stripe"><div class="preview" style="background:#fff;align-items:flex-start;justify-content:center"><p class="typ-h" style="font-size:15px;font-weight:650;font-family:'Inter'">Stripe</p><p class="typ-b">Gradients, polish, depth.</p></div><div class="label"><b>Stripe</b><span>Premium &amp; refined.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Notion"><div class="preview" style="background:#fff;align-items:flex-start;justify-content:center"><p class="typ-h" style="font-size:15px;font-weight:650;font-family:'Inter'">Notion</p><p class="typ-b">Calm, warm grey, content-first.</p></div><div class="label"><b>Notion</b><span>Calm &amp; flexible.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Duolingo"><div class="preview" style="background:#fff;align-items:flex-start;justify-content:center"><p class="typ-h" style="font-size:15px;font-weight:700;font-family:'Figtree'">Duolingo</p><p class="typ-b">Playful, rounded, gamified.</p></div><div class="label"><b>Duolingo</b><span>Fun learning.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Apple / HIG"><div class="preview" style="background:#fff;align-items:flex-start;justify-content:center"><p class="typ-h" style="font-size:15px;font-weight:600;font-family:system-ui">Apple</p><p class="typ-b">Spacious, elegant, restrained.</p></div><div class="label"><b>Apple</b><span>Premium minimal.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Supabase"><div class="preview" style="background:#171717;align-items:flex-start;justify-content:center"><p class="typ-h" style="font-size:15px;font-weight:650;color:#3ecf8e;font-family:'Inter'">Supabase</p><p class="typ-b" style="color:#a3a3a3">Dark, green, developer.</p></div><div class="label"><b>Supabase</b><span>Dark + green.</span></div><div class="tick">✓</div></button>
+      <button class="opt" data-val="Coursera / Khan (classic LMS)"><div class="preview" style="background:#fff;align-items:flex-start;justify-content:center"><p class="typ-h" style="font-size:15px;font-weight:650;color:#1d4ed8;font-family:'Inter'">Coursera</p><p class="typ-b">Trustworthy, blue, classic edu.</p></div><div class="label"><b>Classic LMS</b><span>Coursera / Khan.</span></div><div class="tick">✓</div></button>
+    </div>
+  </div>
+
+  <!-- ============ NOTES ============ -->
+  <div class="group-head"><span class="ix">09</span><h3>Anything else</h3></div>
+  <div class="q notes">
+    <label for="notes">Free-form notes — anything I should know, must-haves, must-avoids, links to sites you love:</label>
+    <textarea id="notes" placeholder="e.g. 'Keep it accessible WCAG AA', 'avoid purple gradients', 'must feel trustworthy for corporate buyers but not intimidating for first-time learners', 'I love how stripe.com looks'…"></textarea>
+  </div>
+
+  <p class="footnote">Throwaway brainstorming artifact — not part of the app. Your picks live only in this page until you copy them out.</p>
+</div>
+
+<!-- ============ RESULTS MODAL ============ -->
+<div class="scrim" id="scrim">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Your design system picks</h3>
+      <span class="count" id="modalCount"></span>
+      <button class="x" onclick="closeSummary()">✕</button>
+    </div>
+    <div class="modal-body">
+      <ul class="summary-list" id="summaryList"></ul>
+      <pre class="copyblock" id="copyBlock"></pre>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-copy" onclick="copyOut()">Copy to clipboard</button>
+      <button class="btn-ghost" onclick="closeSummary()">Keep editing</button>
+      <span class="copied" id="copied">✓ Copied — paste it back to me in chat</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const questions = Array.from(document.querySelectorAll('.q[data-q]'));
+  const total = questions.length;
+  document.getElementById('count').textContent = '0 / ' + total;
+
+  document.querySelectorAll('.q[data-q] .opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const q = opt.closest('.q');
+      const multi = q.dataset.multi === '1';
+      if (multi) {
+        opt.classList.toggle('sel');
+      } else {
+        q.querySelectorAll('.opt').forEach(o => { if (o !== opt) o.classList.remove('sel'); });
+        opt.classList.toggle('sel');
+      }
+      q.classList.toggle('answered', !!q.querySelector('.opt.sel'));
+      updateProgress();
+    });
+  });
+
+  function updateProgress(){
+    const answered = questions.filter(q => q.querySelector('.opt.sel')).length;
+    const pct = Math.round((answered/total)*100);
+    document.getElementById('pbar').style.width = pct + '%';
+    document.getElementById('count').textContent = answered + ' / ' + total;
+  }
+
+  function collect(){
+    const out = [];
+    questions.forEach(q => {
+      const title = q.dataset.qtitle;
+      const sels = Array.from(q.querySelectorAll('.opt.sel')).map(o => o.dataset.val);
+      out.push({ id:q.dataset.q, title, values:sels });
+    });
+    const notes = document.getElementById('notes').value.trim();
+    return { out, notes };
+  }
+
+  function openSummary(){
+    const { out, notes } = collect();
+    const list = document.getElementById('summaryList');
+    list.innerHTML = '';
+    out.forEach(item => {
+      const li = document.createElement('li');
+      const val = item.values.length ? item.values.join(', ') : '— not chosen —';
+      li.className = item.values.length ? '' : 'miss';
+      li.innerHTML = '<b>'+item.title+'</b><span>'+val+'</span>';
+      list.appendChild(li);
+    });
+    if (notes){
+      const li = document.createElement('li');
+      li.innerHTML = '<b>Notes</b><span>'+notes.replace(/</g,'&lt;')+'</span>';
+      list.appendChild(li);
+    }
+
+    // build paste-back block
+    let txt = 'DESIGN SYSTEM CHOICES — learn-wings UI redo\n';
+    txt += '============================================\n';
+    out.forEach(item => {
+      const val = item.values.length ? item.values.join(', ') : '(not chosen)';
+      txt += '• ' + item.title + ': ' + val + '\n';
+    });
+    if (notes) txt += '\nNotes: ' + notes + '\n';
+    const answered = out.filter(i=>i.values.length).length;
+    txt += '\n(' + answered + '/' + total + ' answered)';
+    document.getElementById('copyBlock').textContent = txt;
+    document.getElementById('modalCount').textContent = answered + ' / ' + total + ' answered';
+
+    document.getElementById('scrim').classList.add('open');
+  }
+  function closeSummary(){ document.getElementById('scrim').classList.remove('open'); }
+  document.getElementById('scrim').addEventListener('click', e => { if(e.target.id==='scrim') closeSummary(); });
+
+  function copyOut(){
+    const txt = document.getElementById('copyBlock').textContent;
+    navigator.clipboard.writeText(txt).then(()=>{
+      const c = document.getElementById('copied'); c.classList.add('show');
+      setTimeout(()=>c.classList.remove('show'), 4000);
+    }, ()=>{
+      const r = document.createRange(); r.selectNode(document.getElementById('copyBlock'));
+      window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+    });
+  }
+</script>
+</body>
+</html>
