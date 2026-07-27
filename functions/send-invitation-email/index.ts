@@ -1,19 +1,11 @@
-// Hand-rolled (not shared/endpoint.ts): lazy Resend client plus bespoke authz (org-admin in ANY org, oid-only lookup) and a custom 403 body.
+// Hand-rolled (not shared/endpoint.ts): bespoke authz (org-admin in ANY org, oid-only lookup) and a custom 403 body.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
+import { escapeHtml, sendBestEffort } from '../shared/resend';
 import { EMAIL_STRINGS, resolveEmailLanguage, type EmailLanguage } from './strings';
-import { Resend } from 'resend';
-
-// Lazy init — constructing Resend without an API key throws, which would
-// crash the worker entry point at load time and deregister ALL functions.
-let resendClient: Resend | null = null;
-function getResend(): Resend {
-  if (!resendClient) resendClient = new Resend(process.env.RESEND_API_KEY);
-  return resendClient;
-}
 
 // Link targets are restricted to hosts the app actually runs on: the production
 // domain (post-#115 cutover) plus every host in ALLOWED_ORIGINS — the same env
@@ -58,7 +50,13 @@ function generateEmailHtml({
   lang: EmailLanguage;
   s: typeof EMAIL_STRINGS[EmailLanguage];
 }): string {
-  const welcomeMessage = isPlatformAdmin ? s.welcomePlatformAdmin : s.welcomeOrg(roleLabel, orgName);
+  // `orgName` is caller-supplied and `inviteLink` is only validated by hostname —
+  // its path/query reach the body verbatim. Both are escaped before they touch
+  // the markup so neither can break out of the attribute or inject a link (#195).
+  // `roleLabel` comes from the EMAIL_STRINGS whitelist, so it needs no escaping.
+  const safeOrgName = orgName === null ? null : escapeHtml(orgName);
+  const safeInviteLink = escapeHtml(inviteLink);
+  const welcomeMessage = isPlatformAdmin ? s.welcomePlatformAdmin : s.welcomeOrg(roleLabel, safeOrgName);
   const logoUrl = `${process.env.STATIC_ASSETS_BASE_URL ?? 'https://ai-uddannelse.dk'}/logo-light.png`;
 
   return `
@@ -94,12 +92,12 @@ function generateEmailHtml({
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="text-align: center; padding: 8px 0;">
-                    <a href="${inviteLink}" style="display: inline-block; padding: 14px 32px; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px;">${s.cta}</a>
+                    <a href="${safeInviteLink}" style="display: inline-block; padding: 14px 32px; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px;">${s.cta}</a>
                   </td>
                 </tr>
               </table>
               <p style="margin: 24px 0 0; font-size: 14px; color: #71717a; text-align: center;">${s.copyLinkHint}</p>
-              <p style="margin: 8px 0 0; font-size: 12px; word-break: break-all; color: #a1a1aa; text-align: center;">${inviteLink}</p>
+              <p style="margin: 8px 0 0; font-size: 12px; word-break: break-all; color: #a1a1aa; text-align: center;">${safeInviteLink}</p>
             </td>
           </tr>
           <tr>
@@ -183,14 +181,25 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const subject = isPlatformAdminInvite ? s.subjectPlatformAdmin : s.subjectOrg(orgName);
     const html = generateEmailHtml({ orgName, roleLabel, inviteLink, isPlatformAdmin: isPlatformAdminInvite, lang, s });
 
-    const emailResponse = await getResend().emails.send({
-      from: 'AI Uddannelse <no-reply@ai-uddannelse.dk>',
-      to: [email],
+    // The Resend SDK resolves `{ data: null, error }` instead of rejecting on a
+    // failed send, so a bad address, unverified domain or quota breach used to
+    // return `success: true` and the admin was never told to share the link
+    // manually. `sendBestEffort` is the shared path that reads `error`.
+    const sent = await sendBestEffort(context, {
+      recipient: email,
       subject,
       html,
+      skipLog: `send-invitation-email: no recipient address for invite to ${orgName ?? 'platform'}`,
+      failLog: 'send-invitation-email: Resend rejected the invitation email',
     });
+    // 200, not 5xx: the invitation itself was already created by the caller and
+    // stands — only delivery failed. `success: false` is the partial-success
+    // shape the client reads to tell the admin to share the link manually.
+    if (!sent) {
+      return corsResponse(origin, 200, { success: false, error: 'Email delivery failed' });
+    }
 
-    return corsResponse(origin, 200, { success: true, data: emailResponse });
+    return corsResponse(origin, 200, { success: true });
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
     return internalError(context, origin, err);
