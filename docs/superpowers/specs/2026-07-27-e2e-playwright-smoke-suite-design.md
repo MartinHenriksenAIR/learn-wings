@@ -31,20 +31,26 @@ Stated explicitly so a green run is not over-read:
 
 ```
 e2e/
-  fixtures/
-    auth.ts          # authenticated context + viewMode seeding
-    fenced-org.ts    # creates/selects/asserts/tears down the e2e org
-  specs/
-    01-auth.spec.ts
-    02-role-views.spec.ts
-    03-learner-course.spec.ts
-    04-course-lifecycle.spec.ts
-    05-org-members.spec.ts
-    06-quiz-certificate.spec.ts
+  run-id.ts          # one id per run; names every artefact
   auth.setup.ts      # one real Entra login per run, saves storageState
+  fixtures/
+    session.ts       # re-seeds viewMode + language before app boot
+    fenced-org.ts    # creates/selects/asserts/tears down the e2e org
+    course.ts        # course create/delete helpers
+  specs/
+    00-harness.spec.ts             # unauthenticated: config + login page render
+    01-auth.spec.ts                # saved session, deep link
+    02-fence.spec.ts               # the fence fixture's own self-test
+    03-role-views.spec.ts
+    04-course-lifecycle.spec.ts
+    05-learner-course.spec.ts
+    06-org-members.spec.ts
+    07-quiz-compliance-pdf.spec.ts
 playwright.config.ts # root; targets E2E_BASE_URL
 .env.e2e             # gitignored: credentials + target
 ```
+
+The six journeys of the table below are `03`–`07` plus the deep-link half of `01`. `00` and `02` are not journeys: they are self-tests that prove the harness and the write guard work before anything relies on them.
 
 `npm run e2e` → `playwright test`. A `setup` project runs `auth.setup.ts` first; every spec project depends on it and reuses the saved state.
 
@@ -60,8 +66,14 @@ What actually carries the session is the **Entra SSO cookies** captured in that 
 
 `viewMode` is **also** in `sessionStorage` (`src/hooks/useAuth.tsx:53`), so it cannot be seeded through `storageState` either. It is set two ways, deliberately:
 
-- **`02-role-views.spec.ts` drives the real switcher UI** through the bottom-left profile menu. That is the actual mechanism a user uses and the thing that can break, so at least one spec must exercise it rather than bypass it.
+- **`03-role-views.spec.ts` drives the real switcher UI** through the bottom-left profile menu. That is the actual mechanism a user uses and the thing that can break, so at least one spec must exercise it rather than bypass it.
 - **Every other spec seeds `viewMode` via `page.addInitScript`** before app boot, for speed and to keep each spec independent of the switcher's markup.
+
+### Language is pinned to English
+
+The same `addInitScript` seeds `localStorage.preferred_language = 'en'`. This is load-bearing, not cosmetic: the app renders Danish by default, so every text-based locator would break against a Danish UI, and the accessible names the specs assert on are the English ones. Pinning it also makes the suite's own output readable to any reviewer.
+
+It costs one thing worth naming — the specs then exercise the English surface, so a Danish-only copy regression would not be caught here. `01-auth` compensates by asserting `<html lang>` tracks the *rendered* language (the #311 guard), and the locale-drift unit tests already cover key parity between `en` and `da`.
 
 ### Fencing: determinism now, safety at cutover
 
