@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 import { config as loadEnv } from 'dotenv';
-import { AUTH_STATE_PATH, describeCapturedSessionProblem } from './e2e/fixtures/auth';
+import { AUTH_STATE_PATH, SIGN_IN_WORST_CASE_TIMEOUT, describeCapturedSessionProblem } from './e2e/fixtures/auth';
 
 // dotenv resolves a relative `path` against process.cwd(), so `.env.e2e` would go
 // unfound whenever Playwright is invoked from a subdirectory. Anchor it to this
@@ -40,7 +40,12 @@ export default defineConfig({
   // A real network and a real database: one retry absorbs a cold Functions start.
   // The setup project opts out — see its `retries` below.
   retries: 1,
-  timeout: 60_000,
+  // Derived from signInThroughSso's own budget rather than picked, so a later
+  // change to one of its waits cannot silently outgrow this again: at 60s the
+  // helper's 65s worst path was cut off mid-wait and the run reported Playwright's
+  // generic timeout instead of naming an expired capture or a wrong view mode. The
+  // headroom covers `page.goto` plus the assertions a spec makes after signing in.
+  timeout: SIGN_IN_WORST_CASE_TIMEOUT + 25_000,
   expect: { timeout: 15_000 },
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {

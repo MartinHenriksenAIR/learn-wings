@@ -19,20 +19,19 @@ export type { ViewMode };
  * The account is a platform admin, so `viewMode` alone reaches all three views:
  * `effectiveIsOrgAdmin` is granted by the mode with no membership row
  * (useAuth.tsx:99-101).
+ *
+ * The language is fixed at `en` rather than offered as a choice: every text
+ * locator the authenticated helpers use is an English accessible name (see
+ * SIDEBAR_LANDMARK in ./auth), so a Danish seed would break them all. The one spec
+ * that does render Danish is unauthenticated and seeds the key itself
+ * (e2e/specs/00-harness.spec.ts).
  */
-export async function seedSession(
-  page: Page,
-  opts: { viewMode?: ViewMode; language?: 'en' | 'da' } = {},
-): Promise<void> {
+export async function seedSession(page: Page, opts: { viewMode?: ViewMode } = {}): Promise<void> {
   const viewMode = opts.viewMode ?? 'platform_admin';
-  const language = opts.language ?? 'en';
-  await page.addInitScript(
-    ([mode, lang]) => {
-      localStorage.setItem('preferred_language', lang);
-      sessionStorage.setItem('viewMode', mode);
-    },
-    [viewMode, language] as const,
-  );
+  await page.addInitScript((mode) => {
+    localStorage.setItem('preferred_language', 'en');
+    sessionStorage.setItem('viewMode', mode);
+  }, viewMode);
 }
 
 /**

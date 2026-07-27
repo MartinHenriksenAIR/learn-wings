@@ -27,9 +27,10 @@ export type ViewMode = 'platform_admin' | 'org_admin' | 'learner';
  * `platform_admin` (useAuth.tsx:53-57) — which renders no `Dashboard` link at all.
  * What it does not do is tell learner and org-admin view apart.
  *
- * English strings, so they hold only while `preferred_language` is seeded `en`
- * (the `seedSession` default). A Danish-seeded spec needs Danish labels, and hits
- * the same substring trap: `Organisation` is a prefix of `Organisationer`.
+ * English strings, so they hold only while `preferred_language` is seeded `en` —
+ * which `seedSession` always does (e2e/fixtures/session.ts). A spec that seeds the
+ * key itself in Danish needs Danish labels, and hits the same substring trap:
+ * `Organisation` is a prefix of `Organisationer`.
  */
 const SIDEBAR_LANDMARK: Record<ViewMode, string> = {
   platform_admin: 'Organizations',
@@ -50,6 +51,9 @@ export const RECAPTURE_HINT =
  */
 const CREDENTIAL_FIELDS = 'input[name="loginfmt"], input[name="passwd"]';
 
+/** Budget for the login page's own first render, up to the sign-in button. */
+const SIGN_IN_BUTTON_TIMEOUT = 10_000;
+
 /** Budget for the Entra round-trip plus the app's first authenticated render. */
 const SIGN_IN_TIMEOUT = 45_000;
 
@@ -62,6 +66,18 @@ const SIGN_IN_TIMEOUT = 45_000;
  * only delay a view-mode diagnosis that is already knowable.
  */
 const VIEW_RENDER_TIMEOUT = 10_000;
+
+/**
+ * Everything `signInThroughSso` can spend before it reports what went wrong.
+ *
+ * The three waits above run in sequence and each is bounded, so their sum is the
+ * helper's whole budget. Exported because playwright.config.ts sizes the per-test
+ * timeout from it: a test timeout below this figure kills the test mid-wait and
+ * prints Playwright's generic "Test timeout exceeded" instead of the helper's own
+ * message — expired capture, or a view whose landmark never rendered. It bounds
+ * this helper only; `page.goto` and whatever a spec does afterwards sit on top.
+ */
+export const SIGN_IN_WORST_CASE_TIMEOUT = SIGN_IN_BUTTON_TIMEOUT + SIGN_IN_TIMEOUT + VIEW_RENDER_TIMEOUT;
 
 /**
  * Why the captured session cannot be replayed, or null when it can.
@@ -155,7 +171,7 @@ export async function signInThroughSso(page: Page, viewMode: ViewMode = 'platfor
   const signIn = page.getByRole('button', { name: 'Sign in with Microsoft', exact: true });
   // waitFor, not isVisible: isVisible() returns immediately and its `timeout`
   // option is a documented no-op, so it would race the app's first render.
-  if (await becameVisible(signIn, 10_000)) {
+  if (await becameVisible(signIn, SIGN_IN_BUTTON_TIMEOUT)) {
     await signIn.click();
   }
 

@@ -24,7 +24,9 @@ for (const { seed, language, signInLabel } of cases) {
 
     await page.goto('/login');
 
-    await expect(page.getByRole('button', { name: signInLabel })).toBeVisible();
+    // `exact: true` throughout the suite: accessible names match as substrings by
+    // default, which is how two earlier locators here matched the wrong element.
+    await expect(page.getByRole('button', { name: signInLabel, exact: true })).toBeVisible();
     // Guards #311 in a real browser: the document must declare the language it renders.
     await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe(seed);
   });

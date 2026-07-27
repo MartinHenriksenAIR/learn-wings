@@ -1,5 +1,6 @@
 import { test as setup } from '@playwright/test';
 import { RECAPTURE_HINT, describeCapturedSessionProblem, signInThroughSso } from './fixtures/auth';
+import { seedSession } from './fixtures/session';
 
 setup('captured session is present and still valid', async ({ page }) => {
   // Missing, truncated and cookie-less captures all get the same actionable
@@ -11,10 +12,12 @@ setup('captured session is present and still valid', async ({ page }) => {
     throw new Error(`${problem}\n${RECAPTURE_HINT}`);
   }
 
-  await page.addInitScript(() => {
-    localStorage.setItem('preferred_language', 'en');
-    sessionStorage.setItem('viewMode', 'platform_admin');
-  });
+  // Seeded through the specs' own helper, not a second hand-written copy of it:
+  // this guard has to sign in under the session the specs get, and two copies of
+  // the storage keys would drift the moment either side changes. `test` here stays
+  // the plain one — the fixture's auto-seeding belongs to the spec project, and
+  // borrowing it would make the precondition guard depend on the thing it gates.
+  await seedSession(page);
 
   await signInThroughSso(page);
 });
