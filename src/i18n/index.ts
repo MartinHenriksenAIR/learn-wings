@@ -35,10 +35,15 @@ i18n
 // (#189): screen readers and browser "translate page" read it. Use
 // resolvedLanguage, not the raw detected code — an unsupported browser language
 // renders the English fallback (#226), so the document should declare 'en'.
+// Call it directly rather than on the 'initialized' event (#311): all resources
+// are bundled and there is no async backend, so init() above resolves
+// synchronously and has already emitted 'initialized' by the time this runs — a
+// listener registered here would never fire, leaving index.html's static lang in
+// place until the user manually switched language.
 const syncDocumentLang = () => {
   document.documentElement.lang = i18n.resolvedLanguage ?? 'en';
 };
-i18n.on('initialized', syncDocumentLang);
+syncDocumentLang();
 i18n.on('languageChanged', syncDocumentLang);
 
 export default i18n;
