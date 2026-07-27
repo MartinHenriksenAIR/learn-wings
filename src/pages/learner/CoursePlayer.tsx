@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { PageSpinner } from '@/components/ui/page-spinner';
+import { QueryErrorState } from '@/components/ui/query-error-state';
 import { PdfViewer } from '@/components/learner/PdfViewer';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
@@ -55,6 +56,14 @@ export default function CoursePlayer() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
+  const [quizLoading, setQuizLoading] = useState(false);
+  // Distinct from `quiz === null`, which also means "this quiz lesson has no quiz yet".
+  // Only a thrown request sets this, so the retry card never shows on an empty lesson.
+  const [quizLoadFailed, setQuizLoadFailed] = useState(false);
+  // Monotonic token identifying the newest quiz request. The sidebar stays clickable
+  // while a quiz loads, so a slow-failing request for the lesson the learner just left
+  // could otherwise stamp its error over the lesson that loaded fine after it.
+  const quizReq = useRef(0);
 
   const [signedVideoUrl, setSignedVideoUrl] = useState<string | null>(null);
   const [signedDocUrl, setSignedDocUrl] = useState<string | null>(null);
@@ -110,43 +119,62 @@ export default function CoursePlayer() {
     fetchData();
   }, [user, currentOrg, courseId]);
 
-  // Load quiz when lesson changes - single endpoint, no is_correct exposed
-  useEffect(() => {
-    const loadQuiz = async () => {
-      if (!currentLesson || currentLesson.lesson_type !== 'quiz') {
+  // Load quiz when lesson changes - single endpoint, no is_correct exposed.
+  // Kept as a callback (not inline in the effect) so the failure card's Retry button
+  // can re-run the exact same load for the current lesson.
+  const loadQuiz = useCallback(async () => {
+    if (!currentLesson || currentLesson.lesson_type !== 'quiz') {
+      quizReq.current += 1;
+      setQuiz(null);
+      setQuestions([]);
+      setAnswers({});
+      setQuizSubmitted(false);
+      setQuizLoadFailed(false);
+      setQuizLoading(false);
+      return;
+    }
+
+    const req = ++quizReq.current;
+    setQuizLoading(true);
+    // Drop any earlier failure first, so a stale card never outlives the lesson or
+    // the retry that fixed it.
+    setQuizLoadFailed(false);
+    try {
+      const data = await callApi<{
+        quiz: Quiz | null;
+        questions: Array<QuizQuestion & { options: QuizOption[] }>;
+      }>('/api/quiz-by-lesson', { lessonId: currentLesson.id });
+
+      if (req !== quizReq.current) return;
+      setQuizLoadFailed(false);
+
+      if (data.quiz) {
+        setQuiz(data.quiz as Quiz);
+        setQuestions(data.questions as any);
+      } else {
         setQuiz(null);
         setQuestions([]);
         setAnswers({});
         setQuizSubmitted(false);
-        return;
       }
-
-      try {
-        const data = await callApi<{
-          quiz: Quiz | null;
-          questions: Array<QuizQuestion & { options: QuizOption[] }>;
-        }>('/api/quiz-by-lesson', { lessonId: currentLesson.id });
-
-        if (data.quiz) {
-          setQuiz(data.quiz as Quiz);
-          setQuestions(data.questions as any);
-        } else {
-          setQuiz(null);
-          setQuestions([]);
-          setAnswers({});
-          setQuizSubmitted(false);
-        }
-      } catch (error) {
-        console.error('Error loading quiz:', error);
-        setQuiz(null);
-        setQuestions([]);
-        setAnswers({});
-        setQuizSubmitted(false);
-      }
-    };
-
-    loadQuiz();
+    } catch (error) {
+      // Without the flag the pane renders empty — no quiz, no complete button (the
+      // footer excludes quiz lessons), no way forward but leaving the course (#294).
+      console.error('Error loading quiz:', error);
+      if (req !== quizReq.current) return;
+      setQuiz(null);
+      setQuestions([]);
+      setAnswers({});
+      setQuizSubmitted(false);
+      setQuizLoadFailed(true);
+    } finally {
+      if (req === quizReq.current) setQuizLoading(false);
+    }
   }, [currentLesson]);
+
+  useEffect(() => {
+    loadQuiz();
+  }, [loadQuiz]);
 
   useEffect(() => {
     const loadSignedUrls = async () => {
@@ -226,7 +254,13 @@ export default function CoursePlayer() {
       // Upsert progress
       try {
         await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
-      } catch {
+      } catch (error) {
+        console.error('Error saving lesson progress:', error);
+        toast({
+          title: t('coursePlayer.progressSaveFailed'),
+          description: t('coursePlayer.progressSaveFailedDescription'),
+          variant: 'destructive',
+        });
         return;
       }
 
@@ -524,7 +558,22 @@ export default function CoursePlayer() {
               </div>
             )}
 
-            {currentLesson.lesson_type === 'quiz' && quiz && (
+            {currentLesson.lesson_type === 'quiz' && quizLoading && (
+              <div className="flex items-center justify-center rounded-[14px] border bg-muted/50 py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-3 text-muted-foreground">{t('coursePlayer.loadingQuiz')}</span>
+              </div>
+            )}
+
+            {currentLesson.lesson_type === 'quiz' && quizLoadFailed && (
+              <QueryErrorState
+                className="rounded-[14px]"
+                title={t('coursePlayer.quizLoadFailed')}
+                onRetry={() => { void loadQuiz(); }}
+              />
+            )}
+
+            {currentLesson.lesson_type === 'quiz' && quiz && !quizLoading && (
               <div className="space-y-6">
                 {quizSubmitted ? (
                   <div

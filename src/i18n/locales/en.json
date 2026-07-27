@@ -218,6 +218,8 @@
   "coursePlayer": {
     "completionSaveFailed": "Couldn't record course completion",
     "completionSaveFailedDescription": "Your lesson progress is saved, but the course completion wasn't recorded. Please try again later.",
+    "progressSaveFailed": "Couldn't save your progress",
+    "progressSaveFailedDescription": "This lesson wasn't marked as complete. Please check your connection and try again.",
     "moduleHeader": "Module {{number}}: {{title}}",
     "durationMinutes": "{{minutes}} min",
     "lessonTypes": {
@@ -247,7 +249,9 @@
     "noVideo": "No video uploaded",
     "loadingDocument": "Loading document...",
     "documentLoadFailed": "Unable to load document. Please try again.",
-    "noDocument": "No document uploaded"
+    "noDocument": "No document uploaded",
+    "loadingQuiz": "Loading quiz...",
+    "quizLoadFailed": "Unable to load the quiz"
   },
   "community": {
     "title": "Community",
@@ -970,12 +974,6 @@
     "create": "Create",
     "courseCreated": "Course created!",
     "courseDeleted": "Course deleted",
-    "deleteCourseTitle": "Delete Course?",
-    "deleteIntro": "This will permanently delete \"{{title}}\" and all associated data including:",
-    "deleteItemModules": "All modules and lessons",
-    "deleteItemEnrollments": "All learner enrollments and progress",
-    "deleteItemQuizzes": "All quiz attempts and reviews",
-    "deleteIrreversible": "This action cannot be undone.",
     "selectOrganization": "Select organization",
     "allOrganizations": "All Organizations",
     "searchOrganizationPrompt": "Search organization...",
@@ -1021,12 +1019,6 @@
     "publishAria": "Publish course",
     "unpublishAria": "Unpublish course",
     "deleteCourse": "Delete Course",
-    "deleteCourseTitle": "Delete Course?",
-    "deleteIntro": "This will permanently delete \"{{title}}\" and all associated data including:",
-    "deleteItemModules": "All modules and lessons",
-    "deleteItemEnrollments": "All learner enrollments and progress",
-    "deleteItemQuizzes": "All quiz attempts and reviews",
-    "deleteIrreversible": "This action cannot be undone.",
     "courseDeleted": "Course deleted",
     "modulesAndLessons": "Modules & lessons",
     "addModule": "Add module",
@@ -1081,6 +1073,15 @@
     "courseNotFound": "Course not found",
     "failedToLoad": "Failed to load course",
     "retry": "Retry"
+  },
+  "courseDelete": {
+    "title": "Delete Course?",
+    "intro": "This will permanently delete \"{{title}}\" and all associated data including:",
+    "itemModules": "All modules and lessons",
+    "itemEnrollments": "All learner enrollments and progress",
+    "itemQuizzes": "All quiz attempts and reviews",
+    "irreversible": "This action cannot be undone.",
+    "confirm": "Delete course"
   },
   "assessment": {
     "skip": "Skip for now",

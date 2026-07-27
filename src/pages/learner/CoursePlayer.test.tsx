@@ -260,6 +260,7 @@ describe('CoursePlayer — completion semantics (#18)', () => {
   function setupCompletion(opts: {
     progressMap?: Record<string, { status: string; completed_at: string }>;
     enrollmentCompleteError?: Error;
+    lessonProgressError?: Error;
   }) {
     mockCallApi.mockImplementation(async (url: string) => {
       if (url === '/api/course-player-data') {
@@ -271,6 +272,9 @@ describe('CoursePlayer — completion semantics (#18)', () => {
         };
       }
       if (url === '/api/quiz-by-lesson') return { quiz: null, questions: [] };
+      if (url === '/api/lesson-progress' && opts.lessonProgressError) {
+        throw opts.lessonProgressError;
+      }
       if (url === '/api/enrollment-complete' && opts.enrollmentCompleteError) {
         throw opts.enrollmentCompleteError;
       }
@@ -341,6 +345,216 @@ describe('CoursePlayer — completion semantics (#18)', () => {
       }));
     });
     expect(screen.queryByText(/congratulations/i)).toBeNull();
+  });
+
+  it('surfaces a failed lesson-progress save and does not advance progress optimistically (#289)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setupCompletion({ lessonProgressError: new Error('boom') });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    fireEvent.click(await screen.findByRole('button', { name: /markAsComplete/i }));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'coursePlayer.progressSaveFailed',
+        description: 'coursePlayer.progressSaveFailedDescription',
+        variant: 'destructive',
+      }));
+    });
+
+    // Nothing optimistic survives the failure: the sidebar counter stays at 0/2,
+    // the lesson keeps its Mark-as-complete affordance, and no celebration plays.
+    expect(
+      screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '0/2 · 0%')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /markAsComplete/i })).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.completed')).toBeNull();
+    expect(document.querySelector('.animate-pop-in')).toBeNull();
+    expect(mockCallApi).not.toHaveBeenCalledWith('/api/enrollment-complete', expect.anything());
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+});
+
+describe('CoursePlayer — quiz load failure (#294)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(baseAuth);
+    mockUsePlatformSettings.mockReturnValue({
+      features: {
+        certificates_enabled: false,
+        quizzes_enabled: true,
+        analytics_enabled: true,
+        course_reviews_enabled: false,
+        community_enabled: true,
+      },
+    });
+  });
+
+  const quizPayload = {
+    quiz: { id: 'q-1', lesson_id: 'l-1', title: 'Quiz 1', passing_score: 70 },
+    questions: [
+      {
+        id: 'qq-1',
+        question_text: 'What is 2 + 2?',
+        sort_order: 0,
+        options: [
+          { id: 'o-1', option_text: '4' },
+          { id: 'o-2', option_text: '5' },
+        ],
+      },
+    ],
+  };
+
+  // Lesson 1 is the quiz (the initially selected lesson); lesson 2 defaults to a plain
+  // video so a test can navigate away, and becomes a second quiz for the interleaving test.
+  function courseData(secondLessonType: 'video' | 'quiz' = 'video') {
+    return {
+      course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+      modules: [
+        {
+          id: 'm-1',
+          title: 'Module 1',
+          sort_order: 0,
+          lessons: [
+            { id: 'l-1', title: 'Lesson 1', lesson_type: 'quiz', module_id: 'm-1', sort_order: 0 },
+            { id: 'l-2', title: 'Lesson 2', lesson_type: secondLessonType, module_id: 'm-1', sort_order: 1 },
+          ],
+        },
+      ],
+      progressMap: {},
+      review: null,
+    };
+  }
+
+  // `quizResults` is consumed one entry per quiz-by-lesson call — the last entry sticks —
+  // which is how the retry path gets a different outcome.
+  function setupQuizLesson(quizResults: Array<'fail' | 'empty' | 'ok'>) {
+    let call = 0;
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') return courseData();
+      if (url === '/api/quiz-by-lesson') {
+        const result = quizResults[Math.min(call, quizResults.length - 1)];
+        call += 1;
+        if (result === 'fail') throw new Error('boom');
+        if (result === 'empty') return { quiz: null, questions: [] };
+        return quizPayload;
+      }
+      return {};
+    });
+  }
+
+  // Each quiz-by-lesson call parks on its own deferred so a test can settle the requests
+  // out of order — the only way to reproduce two loads overlapping in flight.
+  function setupDeferredQuizLoads(secondLessonType: 'video' | 'quiz' = 'video') {
+    const pending: Array<{ resolve: (value: unknown) => void; reject: (error: unknown) => void }> = [];
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') return courseData(secondLessonType);
+      if (url === '/api/quiz-by-lesson') {
+        return new Promise((resolve, reject) => { pending.push({ resolve, reject }); });
+      }
+      return {};
+    });
+    return pending;
+  }
+
+  function quizCallCount() {
+    return mockCallApi.mock.calls.filter((args) => args[0] === '/api/quiz-by-lesson').length;
+  }
+
+  it('renders the error card with a retry instead of an empty pane when the quiz load fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setupQuizLesson(['fail']);
+    renderPlayer();
+
+    // The shared QueryErrorState: announced to screen readers and visually distinct
+    // from the "nothing uploaded" empty states, with the app-wide retry label.
+    const card = await screen.findByRole('alert');
+    expect(within(card).getByText('coursePlayer.quizLoadFailed')).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: /common\.retry/i })).toBeInTheDocument();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('re-issues the request on retry and renders the quiz once it succeeds', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setupQuizLesson(['fail', 'ok']);
+    renderPlayer();
+
+    fireEvent.click(await screen.findByRole('button', { name: /common\.retry/i }));
+
+    expect(await screen.findByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
+    expect(quizCallCount()).toBe(2);
+    expect(screen.queryByText('coursePlayer.quizLoadFailed')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    consoleError.mockRestore();
+  });
+
+  it('shows the loading spinner while the quiz request is in flight, then swaps it for the quiz', async () => {
+    const pending = setupDeferredQuizLoads();
+    renderPlayer();
+
+    expect(await screen.findByText('coursePlayer.loadingQuiz')).toBeInTheDocument();
+    expect(screen.queryByText(/What is 2 \+ 2\?/)).toBeNull();
+
+    pending[0].resolve(quizPayload);
+
+    expect(await screen.findByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.loadingQuiz')).toBeNull();
+  });
+
+  it('ignores a stale failed load that lands after the learner switched to a quiz that loads fine', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const pending = setupDeferredQuizLoads('quiz');
+    renderPlayer();
+
+    // Lesson 1's request is still in flight when the learner clicks lesson 2 — the
+    // sidebar stays mounted and clickable during a quiz load.
+    await screen.findByText('coursePlayer.loadingQuiz');
+    await waitFor(() => expect(pending).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
+    await waitFor(() => expect(pending).toHaveLength(2));
+
+    // The abandoned lesson-1 request fails first; lesson 2 then succeeds.
+    pending[0].reject(new Error('boom'));
+    await waitFor(() => expect(consoleError).toHaveBeenCalled());
+    pending[1].resolve(quizPayload);
+
+    // The working quiz must not carry the dead lesson's error card on top of it.
+    expect(await screen.findByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.quizLoadFailed')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    consoleError.mockRestore();
+  });
+
+  it('does NOT show the error card on a quiz lesson that legitimately has no quiz', async () => {
+    setupQuizLesson(['empty']);
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/quiz-by-lesson', { lessonId: 'l-1' });
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('coursePlayer.loadingQuiz')).toBeNull();
+    });
+    expect(screen.queryByText('coursePlayer.quizLoadFailed')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('clears the error when the learner navigates to another lesson', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setupQuizLesson(['fail']);
+    renderPlayer();
+
+    await screen.findByText('coursePlayer.quizLoadFailed');
+    fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('coursePlayer.quizLoadFailed')).toBeNull();
+    });
+    consoleError.mockRestore();
   });
 });
 

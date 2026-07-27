@@ -6,6 +6,7 @@ import { callApi, ApiError } from '@/lib/api-client';
 import { savePostLoginRedirect } from '@/lib/post-login-redirect';
 import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
+import { MicrosoftSignInButton } from '@/components/auth/MicrosoftSignInButton';
 import {
   CircleCheck,
   Clock,
@@ -159,15 +160,11 @@ export default function Signup() {
         <CardBody>
           <Trans i18nKey="invitationAccept.invitedBody" />
         </CardBody>
-        <Button className={PRIMARY_BUTTON_CLASSES} onClick={handleSignIn}>
-          <svg width="16" height="16" viewBox="0 0 23 23" aria-hidden="true">
-            <rect x="1" y="1" width="10" height="10" fill="#ffffff" />
-            <rect x="12" y="1" width="10" height="10" fill="#dfe4f7" />
-            <rect x="1" y="12" width="10" height="10" fill="#dfe4f7" />
-            <rect x="12" y="12" width="10" height="10" fill="#ffffff" />
-          </svg>
-          {t('invitationAccept.signInWithMicrosoft')}
-        </Button>
+        <MicrosoftSignInButton
+          className={PRIMARY_BUTTON_CLASSES}
+          onClick={handleSignIn}
+          label={t('invitationAccept.signInWithMicrosoft')}
+        />
       </AuthShell>
     );
   }
