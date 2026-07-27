@@ -10,6 +10,8 @@ if (!baseURL) {
 
 export default defineConfig({
   testDir: './e2e/specs',
+  // Mints E2E_RUN_ID once for the whole invocation — see e2e/run-id.ts.
+  globalSetup: './e2e/global-setup.ts',
   // Writes land in one shared fenced org, so specs must not race each other.
   workers: 1,
   fullyParallel: false,
