@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- **Never add this suite to `npm test` or to any CI workflow.** It is on-demand only. `npm test` must keep running exactly the 811 vitest tests it runs today.
+- **Never add this suite to `npm test` or to any CI workflow.** It is on-demand only. `npm test` must keep running exactly the 812 vitest tests it runs today.
 - **`.env.e2e` is gitignored and never committed.** It holds `E2E_BASE_URL`, `E2E_USER`, `E2E_PASSWORD`, `E2E_INVITE_TO`. Never print `E2E_PASSWORD` in logs, error messages, or test titles.
 - **Language is pinned to English** by seeding `localStorage.preferred_language = 'en'` before app boot in every spec. Text-based locators depend on this; without it the app renders Danish and every locator breaks. (Verified live: the app honours this key.)
 - **Prefer stable locators in this order:** element `id` (`#name`, `#slug`), then `getByRole` with the English accessible name, then text. Never CSS class chains — the codebase uses generated Tailwind classes that change freely.
@@ -155,7 +155,7 @@ Expected: PASS. If `E2E_BASE_URL` is missing it fails fast with the config's exp
 - [ ] **Step 8: Verify vitest is untouched**
 
 Run: `npm test`
-Expected: 811 tests pass, and **no** `e2e/` files appear in the output. If any do, the vitest `include` glob is wrong — the suite must live outside `src/`.
+Expected: 812 tests pass, and **no** `e2e/` files appear in the output. If any do, the vitest `include` glob is wrong — the suite must live outside `src/`.
 
 - [ ] **Step 9: Commit**
 
@@ -987,7 +987,7 @@ npm test
 npm run build
 ```
 
-Expected: all exit 0, and `npm test` still reports 811 tests with no `e2e/` files. `tsconfig.app.json` may need `e2e` added to its `exclude` if it starts type-checking the specs — if so, add it rather than loosening any compiler option.
+Expected: all exit 0, and `npm test` still reports 812 tests with no `e2e/` files. `tsconfig.app.json` may need `e2e` added to its `exclude` if it starts type-checking the specs — if so, add it rather than loosening any compiler option.
 
 - [ ] **Step 4: Write `e2e/README.md`**
 
