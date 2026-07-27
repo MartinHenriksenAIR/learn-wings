@@ -1,10 +1,8 @@
-// AIR Academy Type Definitions
-
 export type OrgRole = 'org_admin' | 'learner';
 type MembershipStatus = 'active' | 'invited' | 'disabled';
 type InvitationStatus = 'pending' | 'accepted' | 'expired';
 export type CourseLevel = 'basic' | 'intermediate' | 'advanced';
-export type LessonType = 'video' | 'document' | 'quiz';
+export type LessonType = 'video' | 'document' | 'quiz' | 'exercise';
 type EnrollmentStatus = 'enrolled' | 'completed';
 type ProgressStatus = 'not_started' | 'in_progress' | 'completed';
 type AccessType = 'enabled' | 'disabled';
@@ -119,6 +117,26 @@ export interface QuizOption {
   is_correct: boolean;
 }
 
+// ── Exercises (ADR-0017) — ungraded interactive lessons ──────────────────────
+export type ExerciseKind = 'quick_check' | 'bucket_sort';
+
+export interface QuickCheckOption { id: string; text: string; correct: boolean; }
+export interface QuickCheckQuestion { id: string; text: string; options: QuickCheckOption[]; }
+export interface QuickCheckConfig { version: 1; questions: QuickCheckQuestion[]; }
+
+export interface BucketSortBucket { id: string; label: string; }
+export interface BucketSortItem { id: string; text: string; bucketId: string; }
+export interface BucketSortConfig { version: 1; buckets: BucketSortBucket[]; items: BucketSortItem[]; }
+
+export type ExerciseConfig = QuickCheckConfig | BucketSortConfig;
+
+export interface Exercise {
+  id: string;
+  lesson_id: string;
+  exercise_kind: ExerciseKind;
+  config: ExerciseConfig;
+}
+
 export interface OrgCourseAccess {
   id: string;
   org_id: string;
@@ -160,36 +178,6 @@ export interface CourseReview {
   profile?: Profile;
 }
 
-// Analytics types
-export interface OrgAnalytics {
-  totalUsers: number;
-  activeUsers7Days: number;
-  activeUsers30Days: number;
-  totalEnrollments: number;
-  completedEnrollments: number;
-  completionRate: number;
-  avgQuizScore: number;
-  courseProgress: CourseProgressSummary[];
-}
-
-interface CourseProgressSummary {
-  courseId: string;
-  courseTitle: string;
-  enrolledCount: number;
-  completedCount: number;
-  completionRate: number;
-  avgProgress: number;
-}
-
-interface OrgAnalyticsSummary {
-  orgId: string;
-  orgName: string;
-  totalUsers: number;
-  activeUsers: number;
-  completionRate: number;
-}
-
-// Seat requests (issue #127)
 export type SeatRequestStatus = 'pending' | 'fulfilled' | 'cancelled';
 
 export interface SeatRequest {

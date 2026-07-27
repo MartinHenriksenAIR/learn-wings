@@ -27,7 +27,6 @@ export default endpoint('community-report-create', async ({ req, profile, reply 
     return reply(400, { error: 'orgId must be a string or null' });
   }
 
-  // Dedupe check (RLS parity)
   const existing = await queryOne<ReportRow>(
     `SELECT id FROM community_reports WHERE reporter_user_id = $1 AND target_id = $2 AND target_type = $3`,
     [profile.id, targetId, targetType],

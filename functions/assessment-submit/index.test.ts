@@ -36,12 +36,10 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// Build answers where every question gets a specific option index.
 function uniformAnswers(idx: number): Record<string, string> {
   return Object.fromEntries(ASSESSMENT_QUESTIONS.map((q) => [q.id, q.options[idx]]));
 }
 
-// Build valid minimum answers (all index 0 → score 0).
 function minAnswers(): Record<string, string> {
   return uniformAnswers(0);
 }
@@ -114,7 +112,6 @@ describe('assessment-submit', () => {
     const body = JSON.parse(res.body as string);
     expect(body).toEqual({ score: 7, level: 'basic' });
 
-    // INSERT params: user_id, score, level, answers jsonb, version.
     const [insertSql, insertParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
     expect(insertSql).toContain('INSERT INTO assessment_attempts');
     expect(insertParams[0]).toBe('p1');
@@ -123,7 +120,6 @@ describe('assessment-submit', () => {
     expect(insertParams[3]).toBe(JSON.stringify(answers));
     expect(insertParams[4]).toBe(QUESTIONNAIRE_VERSION);
 
-    // UPDATE profiles params: level, user_id.
     const [updateSql, updateParams] = mockClientQuery.mock.calls[1] as [string, unknown[]];
     expect(updateSql).toContain('UPDATE profiles');
     expect(updateSql).toContain('assessment_level');

@@ -1,11 +1,7 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-import { RESOURCE_PROFILE_PROJECTION } from '../shared/resources';
-
-// Mirrors RESOURCE_TYPES in src/lib/resources-api.ts. No DB CHECK constraint exists
-// (the column is plain TEXT DEFAULT 'link'); validating here keeps types consistent
-// with the form's <Select> options.
-const RESOURCE_TYPES = ['link', 'document', 'template', 'guide'];
+import { RESOURCE_PROFILE_PROJECTION, RESOURCE_TYPES } from '../shared/resources';
+import { validateHttpUrl } from '../shared/validate';
 
 export default endpoint('resource-create', async ({ req, profile, reply, requireActiveMember }) => {
   const body = await req.json() as Record<string, unknown>;
@@ -28,11 +24,16 @@ export default endpoint('resource-create', async ({ req, profile, reply, require
   if (url !== undefined && url !== null && typeof url !== 'string') {
     return reply(400, { error: 'url must be a string' });
   }
+  // Defence in depth against stored-XSS (sec-1, #232): reject non-http(s) schemes
+  // so a `javascript:` payload never persists to be rendered into an anchor href.
+  const urlError = validateHttpUrl(url, 'url');
+  if (urlError) {
+    return reply(400, { error: urlError });
+  }
   if (tags !== undefined && (!Array.isArray(tags) || !tags.every((t) => typeof t === 'string'))) {
     return reply(400, { error: 'tags must be an array of strings' });
   }
 
-  // Authorization: platform admin OR active member of the org
   await requireActiveMember(orgId);
 
   // INSERT + LEFT JOIN profiles in one round trip so the response matches the

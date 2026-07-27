@@ -19,25 +19,21 @@ vi.mock('@/components/layout/AppLayout', () => ({
   ),
 }));
 
-// --- mock api-client ---
 const mockCallApi = vi.fn();
 vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
 }));
 
-// --- mock storage helpers ---
 vi.mock('@/lib/storage', () => ({
   getSignedLmsAssetUrl: vi.fn((url: string | null) => Promise.resolve(url)),
   extractLmsAssetPath: vi.fn((url: string | null) => url),
 }));
 
-// --- mock sonner toast (this file uses @/components/ui/sonner) ---
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
-// --- stub heavy child components that import file-upload deps ---
 vi.mock('@/components/ui/file-upload', () => ({
   FileUpload: () => <div data-testid="file-upload" />,
 }));
@@ -49,8 +45,6 @@ const successResponse = [
 ];
 
 function renderPage() {
-  // useOrganizations needs a QueryClient; fresh per render (retry off) so the
-  // call-count-based mocks below stay deterministic and no cache leaks between tests.
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -71,17 +65,10 @@ describe('CoursesManager — fetchData error handling', () => {
 
     renderPage();
 
-    // Wait for loading to resolve and error to appear
     const errorText = await screen.findByText('Failed to load courses');
     expect(errorText).toBeInTheDocument();
-
-    // Retry button present
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
-
-    // Spinner must be gone
     expect(document.querySelector('.animate-spin')).toBeNull();
-
-    // Toast fired with destructive variant
     expect(mockToast).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Failed to load courses', variant: 'destructive' })
     );
@@ -101,18 +88,13 @@ describe('CoursesManager — fetchData error handling', () => {
 
     renderPage();
 
-    // Wait for error block
     const retryBtn = await screen.findByRole('button', { name: /retry/i });
-
-    // Click retry
     fireEvent.click(retryBtn);
 
-    // Error block should disappear, Courses tab should appear
     await waitFor(() =>
       expect(screen.queryByText('Failed to load courses')).toBeNull()
     );
 
-    // Normal page content: tabs rendered
     await waitFor(() =>
       expect(screen.getByRole('tab', { name: /courses/i })).toBeInTheDocument()
     );
@@ -126,7 +108,6 @@ describe('CoursesManager — fetchData error handling', () => {
 
     renderPage();
 
-    // Tabs rendered (no error block)
     await waitFor(() =>
       expect(screen.getByRole('tab', { name: /courses/i })).toBeInTheDocument()
     );
@@ -185,7 +166,6 @@ describe('CoursesManager — mutations patch the courses cache (#48)', () => {
 
     fireEvent.click(toggle);
 
-    // The RETURNING'd row lands in the UI via the cache patch
     await waitFor(() => expect(screen.getByText('Published')).toBeInTheDocument());
     expect(mockCallApi).toHaveBeenCalledWith('/api/course-update', {
       courseId: 'c1',
@@ -231,15 +211,12 @@ describe('CoursesManager — mutations patch the courses cache (#48)', () => {
 
     fireEvent.click(toggle);
 
-    // While mutation is in flight, switch should be disabled
     await waitFor(() => {
       expect(toggle.disabled).toBe(true);
     });
 
-    // Resolve the mutation
     updateResolve!();
 
-    // After mutation completes, switch should be re-enabled
     await waitFor(() => {
       expect(toggle.disabled).toBe(false);
     });
@@ -286,8 +263,6 @@ describe('CoursesManager — language field (#191)', () => {
 
     renderPage();
 
-    // With an existing course in the list, the header's "New Course" button is
-    // unambiguous (the empty-state's own "New Course" action isn't rendered).
     await screen.findByText('Existing Course');
     fireEvent.click(screen.getByRole('button', { name: /new course/i }));
 

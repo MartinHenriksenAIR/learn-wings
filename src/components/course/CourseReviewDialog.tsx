@@ -90,7 +90,6 @@ export function CourseReviewDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Star Rating */}
           <div className="flex flex-col items-center gap-2">
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -123,7 +122,6 @@ export function CourseReviewDialog({
             </span>
           </div>
 
-          {/* Comment */}
           <div className="space-y-2">
             <label htmlFor="comment" className="text-sm font-medium">
               Comments (optional)

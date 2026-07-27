@@ -122,4 +122,57 @@ describe('azure-document-upload-url', () => {
       expect((call[0] as string)).not.toContain('FROM profiles WHERE id =');
     }
   });
+
+  const mint = (body: Record<string, unknown>) => handler(
+    { ...baseReq, json: async () => body } as any,
+    {} as any,
+  );
+
+  it('accepts every office type the document picker offers', async () => {
+    const cases: [string, string][] = [
+      ['notes.doc', 'application/msword'],
+      ['notes.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+      ['data.xls', 'application/vnd.ms-excel'],
+      ['data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+      ['deck.ppt', 'application/vnd.ms-powerpoint'],
+      ['deck.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+    ];
+    for (const [fileName, contentType] of cases) {
+      const res = await mint({ fileName, contentType });
+      expect(res.status).toBe(200);
+      expect(JSON.parse(res.body as string).blobPath).toMatch(
+        new RegExp(`^documents/[^/]+\\.${fileName.split('.').pop()}$`),
+      );
+    }
+  });
+
+  it('returns 400 for a video or image, minting no SAS', async () => {
+    for (const body of [
+      { fileName: 'clip.mp4', contentType: 'video/mp4' },
+      { fileName: 'logo.png', contentType: 'image/png' },
+    ]) {
+      const res = await mint(body);
+      expect(res.status).toBe(400);
+      expect(JSON.parse(res.body as string)).toEqual({ error: 'File type not allowed' });
+    }
+    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an off-allowlist extension and for a name with no extension', async () => {
+    expect((await mint({ fileName: 'payload.exe' })).status).toBe(400);
+    expect((await mint({ fileName: 'noextension', contentType: 'application/pdf' })).status).toBe(400);
+    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the declared contentType contradicts the extension', async () => {
+    const res = await mint({ fileName: 'curriculum.pdf', contentType: 'video/mp4' });
+    expect(res.status).toBe(400);
+    expect(mockGenerateSasToken).not.toHaveBeenCalled();
+  });
+
+  it('normalizes the extension into the blob path rather than echoing the caller', async () => {
+    const res = await mint({ fileName: 'Course.Notes.PDF', contentType: 'application/pdf' });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string).blobPath).toMatch(/^documents\/[^/]+\.pdf$/);
+  });
 });

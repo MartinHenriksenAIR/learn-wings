@@ -28,7 +28,6 @@ describe('org-course-access', () => {
     mockIsOrgAdmin.mockResolvedValue(false);
   });
 
-  // 1. 401 when bearer token invalid
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -38,7 +37,6 @@ describe('org-course-access', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 when profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -48,7 +46,6 @@ describe('org-course-access', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3a. 400 when orgId missing
   it('returns 400 when orgId is missing', async () => {
     const res = await handler(baseReq({}), {} as any);
 
@@ -56,7 +53,6 @@ describe('org-course-access', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
-  // 3b. 400 when orgId is not a string
   it('returns 400 when orgId is not a string', async () => {
     const res = await handler(baseReq({ orgId: 42 }), {} as any);
 
@@ -64,7 +60,6 @@ describe('org-course-access', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
-  // 4. 403 for non-admin member
   it('returns 403 for non-admin member and calls isOrgAdmin with correct args', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(false);
 
@@ -75,7 +70,6 @@ describe('org-course-access', () => {
     expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
   });
 
-  // 5. Happy path as org admin
   it('returns 200 with access rows for org admin', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     const rows = [
@@ -112,15 +106,11 @@ describe('org-course-access', () => {
     expect(sql).toContain('WHERE oca.org_id = $1');
     expect(sql).toContain('AND c.language = $2');
     expect(sql).toContain('ORDER BY c.title');
-    // No language sent — defaults to 'da'
     expect(params).toEqual(['org-1', 'da']);
-    // Admin toggle management — both 'enabled' and 'disabled' rows returned; no access filter
     expect(sql).not.toMatch(/WHERE.*oca\.access/);
-    // No SELECT *
     expect(sql).not.toContain('SELECT *');
   });
 
-  // 5b. language: 'en' in body — param reflects it
   it('passes language "en" through to the query param', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     mockQuery.mockResolvedValueOnce([]);
@@ -133,7 +123,6 @@ describe('org-course-access', () => {
     expect(params).toEqual(['org-1', 'en']);
   });
 
-  // 5c. missing/invalid language — defaults to 'da'
   it('defaults to "da" when language is missing or invalid', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     mockQuery.mockResolvedValueOnce([]);
@@ -145,7 +134,6 @@ describe('org-course-access', () => {
     expect(params).toEqual(['org-1', 'da']);
   });
 
-  // 6. Platform admin bypass — isOrgAdmin not called
   it('returns 200 for platform admin without calling isOrgAdmin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([]);
@@ -156,7 +144,6 @@ describe('org-course-access', () => {
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
-  // 7. 500 on db error
   it('returns 500 on db error', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));

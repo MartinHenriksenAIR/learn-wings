@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { PageSpinner } from '@/components/ui/page-spinner';
+import { QueryErrorState } from '@/components/ui/query-error-state';
 import { PdfViewer } from '@/components/learner/PdfViewer';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useExerciseByLesson } from '@/hooks/useExerciseByLesson';
+import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
 import { callApi } from '@/lib/api-client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
@@ -48,25 +51,36 @@ export default function CoursePlayer() {
   // Lessons already completed on load render the completed state with no animation.
   const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set());
 
-  // Quiz state
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<(QuizQuestion & { options: QuizOption[] })[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
+  const [quizLoading, setQuizLoading] = useState(false);
+  // Distinct from `quiz === null`, which also means "this quiz lesson has no quiz yet".
+  // Only a thrown request sets this, so the retry card never shows on an empty lesson.
+  const [quizLoadFailed, setQuizLoadFailed] = useState(false);
+  // Monotonic token identifying the newest quiz request. The sidebar stays clickable
+  // while a quiz loads, so a slow-failing request for the lesson the learner just left
+  // could otherwise stamp its error over the lesson that loaded fine after it.
+  const quizReq = useRef(0);
 
-  // Signed URLs for secure content access
   const [signedVideoUrl, setSignedVideoUrl] = useState<string | null>(null);
   const [signedDocUrl, setSignedDocUrl] = useState<string | null>(null);
   const [azureVideoUrl, setAzureVideoUrl] = useState<string | null>(null);
   const [azureDocUrl, setAzureDocUrl] = useState<string | null>(null);
   const [loadingAssets, setLoadingAssets] = useState(false);
 
-  // Course completion and review state
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [existingReview, setExistingReview] = useState<CourseReview | null>(null);
   const [courseJustCompleted, setCourseJustCompleted] = useState(false);
+
+  // Exercise for the current lesson — the hook self-gates on lessonId + enabled.
+  const { data: exerciseData } = useExerciseByLesson(
+    currentLesson?.id,
+    { enabled: currentLesson?.lesson_type === 'exercise' },
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -105,45 +119,63 @@ export default function CoursePlayer() {
     fetchData();
   }, [user, currentOrg, courseId]);
 
-  // Load quiz when lesson changes - single endpoint, no is_correct exposed
-  useEffect(() => {
-    const loadQuiz = async () => {
-      if (!currentLesson || currentLesson.lesson_type !== 'quiz') {
+  // Load quiz when lesson changes - single endpoint, no is_correct exposed.
+  // Kept as a callback (not inline in the effect) so the failure card's Retry button
+  // can re-run the exact same load for the current lesson.
+  const loadQuiz = useCallback(async () => {
+    if (!currentLesson || currentLesson.lesson_type !== 'quiz') {
+      quizReq.current += 1;
+      setQuiz(null);
+      setQuestions([]);
+      setAnswers({});
+      setQuizSubmitted(false);
+      setQuizLoadFailed(false);
+      setQuizLoading(false);
+      return;
+    }
+
+    const req = ++quizReq.current;
+    setQuizLoading(true);
+    // Drop any earlier failure first, so a stale card never outlives the lesson or
+    // the retry that fixed it.
+    setQuizLoadFailed(false);
+    try {
+      const data = await callApi<{
+        quiz: Quiz | null;
+        questions: Array<QuizQuestion & { options: QuizOption[] }>;
+      }>('/api/quiz-by-lesson', { lessonId: currentLesson.id });
+
+      if (req !== quizReq.current) return;
+      setQuizLoadFailed(false);
+
+      if (data.quiz) {
+        setQuiz(data.quiz as Quiz);
+        setQuestions(data.questions as any);
+      } else {
         setQuiz(null);
         setQuestions([]);
         setAnswers({});
         setQuizSubmitted(false);
-        return;
       }
-
-      try {
-        const data = await callApi<{
-          quiz: Quiz | null;
-          questions: Array<QuizQuestion & { options: QuizOption[] }>;
-        }>('/api/quiz-by-lesson', { lessonId: currentLesson.id });
-
-        if (data.quiz) {
-          setQuiz(data.quiz as Quiz);
-          setQuestions(data.questions as any);
-        } else {
-          setQuiz(null);
-          setQuestions([]);
-          setAnswers({});
-          setQuizSubmitted(false);
-        }
-      } catch (error) {
-        console.error('Error loading quiz:', error);
-        setQuiz(null);
-        setQuestions([]);
-        setAnswers({});
-        setQuizSubmitted(false);
-      }
-    };
-
-    loadQuiz();
+    } catch (error) {
+      // Without the flag the pane renders empty — no quiz, no complete button (the
+      // footer excludes quiz lessons), no way forward but leaving the course (#294).
+      console.error('Error loading quiz:', error);
+      if (req !== quizReq.current) return;
+      setQuiz(null);
+      setQuestions([]);
+      setAnswers({});
+      setQuizSubmitted(false);
+      setQuizLoadFailed(true);
+    } finally {
+      if (req === quizReq.current) setQuizLoading(false);
+    }
   }, [currentLesson]);
 
-  // Load signed URLs for secure content access when lesson changes
+  useEffect(() => {
+    loadQuiz();
+  }, [loadQuiz]);
+
   useEffect(() => {
     const loadSignedUrls = async () => {
       if (!currentLesson) {
@@ -156,7 +188,6 @@ export default function CoursePlayer() {
 
       setLoadingAssets(true);
       try {
-        // Check for Azure blob path first (preferred for videos)
         if (currentLesson.azure_blob_path) {
           const data = await callApi<{ viewUrl: string }>('/api/azure-view-url', {
             blobPath: currentLesson.azure_blob_path, lessonId: currentLesson.id,
@@ -178,10 +209,8 @@ export default function CoursePlayer() {
           setAzureVideoUrl(null);
         }
 
-        // Load document URL - check if it's an Azure path (starts with 'documents/')
         if (currentLesson.document_storage_path) {
           if (currentLesson.document_storage_path.startsWith('documents/')) {
-            // Azure-stored document
             const data = await callApi<{ viewUrl: string }>('/api/azure-view-url', {
               blobPath: currentLesson.document_storage_path, lessonId: currentLesson.id,
             });
@@ -193,7 +222,6 @@ export default function CoursePlayer() {
             }
             setSignedDocUrl(null);
           } else {
-            // Legacy storage-path document
             const docUrl = await getSignedAssetUrl(currentLesson.document_storage_path);
             setSignedDocUrl(docUrl);
             setAzureDocUrl(null);
@@ -226,7 +254,13 @@ export default function CoursePlayer() {
       // Upsert progress
       try {
         await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
-      } catch {
+      } catch (error) {
+        console.error('Error saving lesson progress:', error);
+        toast({
+          title: t('coursePlayer.progressSaveFailed'),
+          description: t('coursePlayer.progressSaveFailedDescription'),
+          variant: 'destructive',
+        });
         return;
       }
 
@@ -273,7 +307,6 @@ export default function CoursePlayer() {
         // Routine confirmation: the sidebar status dot pops in green (and the
         // footer shows the Completed badge) — no success toast.
 
-        // Auto-advance to next lesson if not last
         const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
         if (currentIndex < allLessons.length - 1) {
           setCurrentLesson(allLessons[currentIndex + 1]);
@@ -364,7 +397,6 @@ export default function CoursePlayer() {
       ]}
     >
       <div className="grid items-start gap-5 lg:grid-cols-[320px,1fr]">
-        {/* Sidebar - Module List */}
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
           <div className="border-b border-[#eceef3] px-[18px] pb-3.5 pt-[18px]">
             <h2 className="mb-3 font-display text-[15px] font-extrabold leading-[1.3]">{course.title}</h2>
@@ -447,7 +479,6 @@ export default function CoursePlayer() {
           </div>
         </div>
 
-        {/* Main Content */}
         {currentLesson ? (
           <div className="rounded-2xl border border-border bg-card px-[26px] py-6">
             <div className="mb-[18px] flex items-center gap-2.5">
@@ -457,7 +488,6 @@ export default function CoursePlayer() {
               <h2 className="font-display text-lg font-extrabold">{currentLesson.title}</h2>
             </div>
 
-            {/* Lesson content based on type */}
             {currentLesson.lesson_type === 'video' && (
               <div className="space-y-4">
                 <div className="flex aspect-video items-center justify-center overflow-hidden rounded-[14px] bg-muted">
@@ -528,7 +558,22 @@ export default function CoursePlayer() {
               </div>
             )}
 
-            {currentLesson.lesson_type === 'quiz' && quiz && (
+            {currentLesson.lesson_type === 'quiz' && quizLoading && (
+              <div className="flex items-center justify-center rounded-[14px] border bg-muted/50 py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-3 text-muted-foreground">{t('coursePlayer.loadingQuiz')}</span>
+              </div>
+            )}
+
+            {currentLesson.lesson_type === 'quiz' && quizLoadFailed && (
+              <QueryErrorState
+                className="rounded-[14px]"
+                title={t('coursePlayer.quizLoadFailed')}
+                onRetry={() => { void loadQuiz(); }}
+              />
+            )}
+
+            {currentLesson.lesson_type === 'quiz' && quiz && !quizLoading && (
               <div className="space-y-6">
                 {quizSubmitted ? (
                   <div
@@ -560,7 +605,6 @@ export default function CoursePlayer() {
                         (() => {
                           const isLastLesson = currentIndex >= allLessons.length - 1;
 
-                          // Find current module and check if this is the last lesson in the module
                           const currentModule = modules.find(m => m.lessons.some(l => l.id === currentLesson.id));
                           const isLastInModule = currentModule &&
                             currentModule.lessons[currentModule.lessons.length - 1]?.id === currentLesson.id;
@@ -692,8 +736,14 @@ export default function CoursePlayer() {
               </div>
             )}
 
-            {/* Footer: Previous / Mark as complete · Completed badge / Next (non-quiz lessons) */}
-            {currentLesson.lesson_type !== 'quiz' && (
+            {currentLesson.lesson_type === 'exercise' && exerciseData?.exercise && (
+              <div className="mt-4">
+                <ExercisePlayer key={exerciseData.exercise.id} exercise={exerciseData.exercise} onComplete={() => handleCompleteLesson()} />
+              </div>
+            )}
+
+            {/* Footer: Previous / Mark as complete · Completed badge / Next (non-quiz, non-exercise lessons) */}
+            {currentLesson.lesson_type !== 'quiz' && currentLesson.lesson_type !== 'exercise' && (
               <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#eceef3] pt-[18px]">
                 <Button
                   variant="outline"
@@ -757,7 +807,6 @@ export default function CoursePlayer() {
         )}
       </div>
 
-      {/* Course Completion Dialog */}
       {course && (
         <CourseCompletionDialog
           open={showCompletionDialog}
@@ -767,7 +816,6 @@ export default function CoursePlayer() {
         />
       )}
 
-      {/* Course Review Dialog */}
       {course && user && currentOrg && (
         <CourseReviewDialog
           open={showReviewDialog}

@@ -20,7 +20,6 @@ export default endpoint('community-comment-update', async ({ req, profile, reply
     return reply(400, { error: 'content is required' });
   }
 
-  // Load comment + its post
   const comment = await queryOne<CommentWithPost>(
     `SELECT c.user_id, c.is_hidden, p.scope, p.org_id
      FROM community_comments c
@@ -30,7 +29,6 @@ export default endpoint('community-comment-update', async ({ req, profile, reply
   );
   if (!comment) return reply(404, { error: 'Comment not found' });
 
-  // Authorization (OR of RLS UPDATE policies)
   let authorized = false;
 
   if (profile.is_platform_admin) {

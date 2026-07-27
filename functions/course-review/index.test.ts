@@ -30,7 +30,6 @@ describe('course-review', () => {
     mockIsActiveMember.mockResolvedValue(false);
   });
 
-  // 1. 401 invalid token
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -40,7 +39,6 @@ describe('course-review', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -50,7 +48,6 @@ describe('course-review', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 orgId missing
   it('returns 400 when orgId is missing', async () => {
     const res = await handler(baseReq({ courseId: 'c-1', rating: 5 }), {} as any);
 
@@ -58,7 +55,6 @@ describe('course-review', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
-  // 4. 400 courseId missing
   it('returns 400 when courseId is missing', async () => {
     const res = await handler(baseReq({ orgId: 'org-1', rating: 5 }), {} as any);
 
@@ -66,7 +62,6 @@ describe('course-review', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'courseId is required' });
   });
 
-  // 5. 400 invalid ratings — 0, 6, 2.5, and '3' (string)
   it.each([
     [0],
     [6],
@@ -80,7 +75,6 @@ describe('course-review', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'rating must be an integer between 1 and 5' });
   });
 
-  // 6. 400 comment longer than 1000 chars
   it('returns 400 when comment exceeds 1000 characters', async () => {
     const longComment = 'a'.repeat(1001);
 
@@ -90,7 +84,6 @@ describe('course-review', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'comment must be at most 1000 characters' });
   });
 
-  // 6b. 400 comment present but not a string
   it('returns 400 when comment is not a string', async () => {
     const res = await handler(baseReq({ orgId: 'org-1', courseId: 'c-1', rating: 4, comment: 42 }), {} as any);
 
@@ -98,7 +91,6 @@ describe('course-review', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'comment must be a string' });
   });
 
-  // 7. 403 non-member — isActiveMember called with ('p1','org-1'); no INSERT ran
   it('returns 403 for non-member and does not call INSERT', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
 
@@ -114,7 +106,6 @@ describe('course-review', () => {
     expect(insertCall).toBeUndefined();
   });
 
-  // 8. Happy path insert
   it('returns 200 with review on success (security: user_id = profile.id from token)', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     const reviewRow = {
@@ -140,7 +131,6 @@ describe('course-review', () => {
     expect(insertParams).toEqual(['org-1', 'p1', 'c-1', 5, 'Great course']);
   });
 
-  // 9. userId in body is IGNORED
   it('ignores userId in body — params still use token-derived profile id', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     const reviewRow = {
@@ -163,7 +153,6 @@ describe('course-review', () => {
     expect(insertParams).not.toContain('evil');
   });
 
-  // 10. Comment normalization: whitespace-only → null
   it('normalizes whitespace-only comment to null', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQueryOne.mockResolvedValueOnce({
@@ -180,7 +169,6 @@ describe('course-review', () => {
     expect(insertParams[4]).toBeNull();
   });
 
-  // 11. Platform-admin bypass — isActiveMember NOT called
   it('platform admin: bypasses isActiveMember check and returns 200', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce({
@@ -195,7 +183,6 @@ describe('course-review', () => {
     expect(mockIsActiveMember).not.toHaveBeenCalled();
   });
 
-  // 12. 500 db error
   it('returns 500 on db error', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));

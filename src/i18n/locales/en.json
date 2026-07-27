@@ -50,7 +50,33 @@
     "noOrgSelected": "No organization selected.",
     "joinOrgToContinue": "Join an organization to continue.",
     "emailLanguage": "Email language",
-    "clear": "Clear"
+    "clear": "Clear",
+    "loadErrorTitle": "Couldn't load this page",
+    "loadErrorDescription": "Something went wrong while loading. Please try again.",
+    "retry": "Try again"
+  },
+  "fileUpload": {
+    "ctaImage": "Click to upload an image",
+    "ctaVideo": "Click to upload a video",
+    "ctaDocument": "Click to upload a document",
+    "maxSize": "Max size: {{size}}",
+    "imageResizeHint": "JPEG, PNG and WebP images over {{maxEdge}} px are scaled down",
+    "videoFormats": "MP4, WebM, MOV, M4V, OGV",
+    "documentFormats": "PDF, Word, Excel, PowerPoint",
+    "uploading": "Uploading {{name}}...",
+    "uploadingToAzure": "Uploading to Azure Cloud Storage...",
+    "directToAzure": "Uploads directly to Azure Cloud Storage",
+    "loadingPreview": "Loading preview...",
+    "uploadedFile": "Uploaded file",
+    "clickToReplace": "Click to replace",
+    "uploadedToAzure": "Uploaded to Azure Cloud Storage",
+    "videoUploadedToAzure": "Video uploaded to Azure Cloud Storage",
+    "errorTooLarge": "File size must be less than {{size}}",
+    "errorTooLargeToDecode": "Image is too large to process. Choose a file under {{size}}.",
+    "errorTypeImage": "Choose a PNG, JPEG, GIF or WebP image.",
+    "errorTypeVideo": "Choose an MP4, WebM, MOV, M4V or OGV video.",
+    "errorTypeDocument": "Choose a PDF, Word, Excel or PowerPoint document.",
+    "errorUploadFailed": "Upload failed. Please try again."
   },
   "nav": {
     "home": "Home",
@@ -84,17 +110,29 @@
     "passwordResetInfo": "Password reset is managed by your organization's IT administrator via Microsoft Entra ID.",
     "backToSignIn": "Back to sign in"
   },
+  "contextError": {
+    "title": "We couldn't load your account",
+    "networkDescription": "Something went wrong while loading your profile. This is usually temporary — please try again.",
+    "authDescription": "Your session may have expired. Please sign in again to continue.",
+    "retry": "Try again",
+    "signInAgain": "Sign in again"
+  },
   "notFound": {
     "title": "Page not found",
     "description": "The page you're looking for doesn't exist or has moved.",
     "returnHome": "Return to home"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "An unexpected error interrupted the page. Reloading usually fixes it.",
+    "reload": "Reload page"
   },
   "settings": {
     "title": "Settings",
     "profile": "Profile",
     "updateProfile": "Update your personal information.",
     "profilePhoto": "Profile photo",
-    "profilePhotoHint": "Square image recommended. PNG or JPG, max 2MB.",
+    "profilePhotoHint": "Square image recommended, 256×256px or larger.",
     "firstName": "First Name",
     "lastName": "Last Name",
     "department": "Department",
@@ -181,12 +219,15 @@
   "coursePlayer": {
     "completionSaveFailed": "Couldn't record course completion",
     "completionSaveFailedDescription": "Your lesson progress is saved, but the course completion wasn't recorded. Please try again later.",
+    "progressSaveFailed": "Couldn't save your progress",
+    "progressSaveFailedDescription": "This lesson wasn't marked as complete. Please check your connection and try again.",
     "moduleHeader": "Module {{number}}: {{title}}",
     "durationMinutes": "{{minutes}} min",
     "lessonTypes": {
       "video": "Video",
       "document": "Document",
-      "quiz": "Quiz"
+      "quiz": "Quiz",
+      "exercise": "Exercise"
     },
     "rateThisCourse": "Rate this course",
     "editYourReview": "Edit your review",
@@ -209,7 +250,9 @@
     "noVideo": "No video uploaded",
     "loadingDocument": "Loading document...",
     "documentLoadFailed": "Unable to load document. Please try again.",
-    "noDocument": "No document uploaded"
+    "noDocument": "No document uploaded",
+    "loadingQuiz": "Loading quiz...",
+    "quizLoadFailed": "Unable to load the quiz"
   },
   "community": {
     "title": "Community",
@@ -448,8 +491,13 @@
       "postDeleted": "Post deleted",
       "postDeleteFailed": "Failed to delete post",
       "commentAddFailed": "Failed to add comment",
+      "commentUpdateFailed": "Failed to update comment",
       "commentDeleted": "Comment deleted",
+      "commentDeleteFailed": "Failed to delete comment",
+      "commentHideFailed": "Failed to update comment visibility",
       "commentLinkCopied": "Comment link copied",
+      "postHideFailed": "Failed to update post visibility",
+      "postLockFailed": "Failed to update post lock",
       "voteFailed": "Failed to vote",
       "unvoteFailed": "Failed to remove vote",
       "statusUpdateFailed": "Failed to update status",
@@ -468,7 +516,8 @@
       "resourceUpdated": "Resource updated!",
       "resourceUpdateFailed": "Failed to update resource",
       "resourceDeleted": "Resource deleted",
-      "resourceDeleteFailed": "Failed to delete resource"
+      "resourceDeleteFailed": "Failed to delete resource",
+      "resourcePinFailed": "Failed to update pin"
     }
   },
   "ideas": {
@@ -675,7 +724,7 @@
     "logo": "Logo",
     "logoRecommended": "Recommended specifications",
     "logoSize": "Square image, 256×256px or larger",
-    "logoFormat": "PNG or JPG format, max 5MB",
+    "updateLogoTitle": "Update Organization Logo",
     "organizationName": "Organization Name",
     "slug": "Slug",
     "slugHint": "Used in URLs. Only lowercase letters, numbers, and hyphens.",
@@ -785,6 +834,8 @@
       "community_enabled_hint": "Enable community feed, ideas and moderation features.",
       "course_reviews_enabled": "Course reviews",
       "course_reviews_enabled_hint": "Allow learners to leave reviews on courses.",
+      "exercises_enabled": "Exercises",
+      "exercises_enabled_hint": "Interactive practice lessons (Quick-check, drag-and-drop). Ungraded.",
       "save": "Save feature settings"
     },
     "seatPricing": {
@@ -924,12 +975,6 @@
     "create": "Create",
     "courseCreated": "Course created!",
     "courseDeleted": "Course deleted",
-    "deleteCourseTitle": "Delete Course?",
-    "deleteIntro": "This will permanently delete \"{{title}}\" and all associated data including:",
-    "deleteItemModules": "All modules and lessons",
-    "deleteItemEnrollments": "All learner enrollments and progress",
-    "deleteItemQuizzes": "All quiz attempts and reviews",
-    "deleteIrreversible": "This action cannot be undone.",
     "selectOrganization": "Select organization",
     "allOrganizations": "All Organizations",
     "searchOrganizationPrompt": "Search organization...",
@@ -954,6 +999,7 @@
     "published": "Published",
     "draft": "Draft",
     "thumbnail": "Thumbnail",
+    "thumbnailPreviewUnavailable": "The current thumbnail could not be loaded for preview. It is still saved and will be kept unless you upload a new one or remove it.",
     "titleLabel": "Title",
     "descriptionLabel": "Description",
     "levelLabel": "Level",
@@ -974,12 +1020,6 @@
     "publishAria": "Publish course",
     "unpublishAria": "Unpublish course",
     "deleteCourse": "Delete Course",
-    "deleteCourseTitle": "Delete Course?",
-    "deleteIntro": "This will permanently delete \"{{title}}\" and all associated data including:",
-    "deleteItemModules": "All modules and lessons",
-    "deleteItemEnrollments": "All learner enrollments and progress",
-    "deleteItemQuizzes": "All quiz attempts and reviews",
-    "deleteIrreversible": "This action cannot be undone.",
     "courseDeleted": "Course deleted",
     "modulesAndLessons": "Modules & lessons",
     "addModule": "Add module",
@@ -992,6 +1032,7 @@
     "editLesson": "Edit lesson",
     "deleteLesson": "Delete lesson",
     "editQuiz": "Edit quiz",
+    "editExercise": "Edit exercise",
     "minutesShort": "{{count}} min",
     "moduleDialogAddTitle": "Add Module",
     "moduleDialogEditTitle": "Edit Module",
@@ -1014,16 +1055,18 @@
     "lessonTypeVideo": "Video",
     "lessonTypeDocument": "Document",
     "lessonTypeQuiz": "Quiz",
+    "lessonTypeExercise": "Exercise",
     "lessonDurationLabel": "Duration (minutes)",
     "lessonDurationPlaceholder": "e.g., 15",
     "documentFileLabel": "Document File (optional)",
     "contentTextLabel": "Content Text (optional)",
     "contentTextPlaceholder": "Additional lesson content or description...",
     "videoFileLabel": "Video File (Azure Cloud)",
-    "videoFileHint": "Ingen filstørrelses-begrænsning. Videoer uploades direkte til Azure Cloud Storage.",
+    "videoFileHint": "Maximum file size 2 GB. Videos are uploaded directly to Azure Cloud Storage.",
     "quizContentPlaceholder": "Quiz instructions or additional context...",
     "quizSetupHintEdit": "Save the lesson first, then use \"Edit Quiz\" to configure questions.",
     "quizSetupHintCreate": "Create the lesson first, then configure the quiz questions.",
+    "exerciseSetupHint": "Save the lesson first, then use \"Edit exercise\" to build the activity.",
     "quizSetupSubhint": "Learners will need to pass the quiz to complete this lesson.",
     "lessonCreated": "Lesson created!",
     "lessonUpdated": "Lesson updated!",
@@ -1031,6 +1074,15 @@
     "courseNotFound": "Course not found",
     "failedToLoad": "Failed to load course",
     "retry": "Retry"
+  },
+  "courseDelete": {
+    "title": "Delete Course?",
+    "intro": "This will permanently delete \"{{title}}\" and all associated data including:",
+    "itemModules": "All modules and lessons",
+    "itemEnrollments": "All learner enrollments and progress",
+    "itemQuizzes": "All quiz attempts and reviews",
+    "irreversible": "This action cannot be undone.",
+    "confirm": "Delete course"
   },
   "assessment": {
     "skip": "Skip for now",
@@ -1186,5 +1238,33 @@
     "goToSignIn": "Go to sign in",
     "signOut": "Sign out",
     "tryAgain": "Try again"
+  },
+  "exercise": {
+    "check": "Check",
+    "allCorrect": "Correct!",
+    "tryAgain": "Not quite — try again",
+    "placeHere": "Place here",
+    "placeInBucket": "Place in {{label}}",
+    "kind": {
+      "quick_check": "Quick check",
+      "bucket_sort": "Sort into buckets"
+    },
+    "editor": {
+      "title": "Exercise: {{title}}",
+      "saved": "Exercise saved",
+      "switchKindConfirm": "Switching the exercise type will clear the current content. Continue?",
+      "buckets": "Buckets",
+      "bucketLabel": "Bucket label",
+      "addBucket": "Add bucket",
+      "items": "Items",
+      "itemText": "Item text",
+      "correctBucket": "Correct bucket",
+      "addItem": "Add item",
+      "questionText": "Question text",
+      "optionText": "Option text",
+      "markCorrect": "Mark as correct",
+      "addOption": "Add option",
+      "addQuestion": "Add question"
+    }
   }
 }

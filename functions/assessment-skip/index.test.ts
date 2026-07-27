@@ -73,7 +73,6 @@ describe('assessment-skip', () => {
     const body = JSON.parse(res.body as string);
     expect(body.skipped_at).toBe(SKIP_TS);
 
-    // Assert the SQL uses COALESCE so first-skip is preserved server-side.
     const [sql] = mockQueryOne.mock.calls[0] as [string];
     expect(sql).toContain('COALESCE');
     expect(sql).toContain('assessment_skipped_at');

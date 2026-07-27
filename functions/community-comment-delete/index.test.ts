@@ -85,26 +85,24 @@ describe('community-comment-delete', () => {
   // RLS asymmetry: author CAN delete their own hidden comment (unlike UPDATE which forbids it)
   it('author CAN delete their own hidden comment (RLS asymmetry vs update)', async () => {
     mockQueryOne.mockResolvedValueOnce(myHiddenComment);
-    mockQueryOne.mockResolvedValueOnce(null); // DELETE returns null
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ commentId: 'c1' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
   });
 
-  // Org admin of global post → 403 (only platform admin moderates global)
   it('org admin of global post cannot delete other user comment on global post', async () => {
-    mockQueryOne.mockResolvedValueOnce(globalOtherComment); // global scope, org_id null
+    mockQueryOne.mockResolvedValueOnce(globalOtherComment);
     // isOrgAdmin called with null org_id — should not matter because scope check prevents it
     const res = await handler(baseReq({ commentId: 'c1' }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
-    // isOrgAdmin should NOT be called for global posts (no org_id)
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
   it('happy path: author deletes their own visible comment', async () => {
     mockQueryOne.mockResolvedValueOnce(myComment);
-    mockQueryOne.mockResolvedValueOnce(null); // DELETE RETURNING is fine returning null
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ commentId: 'c1' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
@@ -122,7 +120,7 @@ describe('community-comment-delete', () => {
   it('org admin can delete a comment in their org', async () => {
     mockQueryOne.mockResolvedValueOnce(otherUserComment);
     mockIsOrgAdmin.mockResolvedValueOnce(true);
-    mockQueryOne.mockResolvedValueOnce(null); // DELETE
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ commentId: 'c1' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
@@ -131,7 +129,7 @@ describe('community-comment-delete', () => {
   it('platform admin can delete any comment without calling isOrgAdmin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce(otherUserComment);
-    mockQueryOne.mockResolvedValueOnce(null); // DELETE
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ commentId: 'c1' }), {} as any);
     expect(res.status).toBe(200);
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
@@ -140,7 +138,7 @@ describe('community-comment-delete', () => {
   it('platform admin can delete global post comment', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce(globalOtherComment);
-    mockQueryOne.mockResolvedValueOnce(null); // DELETE
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ commentId: 'c1' }), {} as any);
     expect(res.status).toBe(200);
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();

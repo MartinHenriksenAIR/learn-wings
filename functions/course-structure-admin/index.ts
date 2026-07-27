@@ -24,7 +24,6 @@ export default adminEndpoint('course-structure-admin', async ({ req, reply }) =>
     ),
   ]);
 
-  // Group lessons by module_id in JS — no N+1
   const lessonsByModule = new Map<string, Record<string, unknown>[]>();
   for (const lesson of lessons as Record<string, unknown>[]) {
     const mid = lesson['module_id'] as string;

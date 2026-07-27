@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { OrgGate } from '@/components/layout/OrgGate';
 import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,11 +28,10 @@ import {
 import { ResourceCard } from '@/components/community/ResourceCard';
 import { ResourceForm } from '@/components/community/ResourceForm';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
-import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { toast } from '@/components/ui/sonner';
 import {
   fetchResources,
@@ -54,7 +54,7 @@ export default function ResourceLibrary() {
   const { t } = useTranslation();
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
   const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);
@@ -69,7 +69,6 @@ export default function ResourceLibrary() {
 
   const isAdmin = effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
-  // Single fetch: filtered resources for display + the org's distinct tags for the dropdown.
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.communityResources.list(currentOrg?.id, debouncedSearch, selectedType, selectedTag),
     queryFn: () =>
@@ -83,7 +82,6 @@ export default function ResourceLibrary() {
   const resources = data?.resources ?? [];
   const allTags = data?.allTags ?? [];
 
-  // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: Omit<Parameters<typeof createResource>[0], 'org_id'>) =>
       createResource({
@@ -99,7 +97,6 @@ export default function ResourceLibrary() {
     },
   });
 
-  // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateResource>[1] }) =>
       updateResource(id, data),
@@ -113,7 +110,6 @@ export default function ResourceLibrary() {
     },
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteResource,
     onSuccess: () => {
@@ -126,45 +122,25 @@ export default function ResourceLibrary() {
     },
   });
 
-  // Pin toggle mutation
   const pinMutation = useMutation({
     mutationFn: ({ id, pinned }: { id: string; pinned: boolean }) =>
       toggleResourcePinned(id, pinned),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityResources.all });
     },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.resourcePinFailed'), description: error.message, variant: 'destructive' });
+    },
   });
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
-  // Profile-gated guard (useOrgGuard): don't flash "No Organization Selected"
-  // while the signed-in user's context is still resolving.
-  if (orgGuard === 'loading') {
-    return (
-      <AppLayout>
-        <PageSpinner />
-      </AppLayout>
-    );
-  }
-
-  if (!currentOrg) {
-    return (
-      <AppLayout>
-        <div className="py-12 text-center">
-          <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
-            {t('community.noOrganizationTitle')}
-          </h1>
-          <p className="text-sm text-muted-foreground">{t('community.noOrgResources')}</p>
-        </div>
-      </AppLayout>
-    );
+  if (orgGuard === 'loading' || !currentOrg) {
+    return <OrgGate titleKey="community.noOrganizationTitle" descriptionKey="community.noOrgResources" />;
   }
 
   return (
     <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.resources') }]}>
-      {/* Back to community */}
       <Button
         variant="ghost"
         onClick={() => navigate(`${routes.community.feed}?scope=org`)}
@@ -174,7 +150,6 @@ export default function ResourceLibrary() {
         {t('community.backToCommunity')}
       </Button>
 
-      {/* Header */}
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -193,7 +168,6 @@ export default function ResourceLibrary() {
         </Button>
       </div>
 
-      {/* Filters */}
       <div className="mb-5 flex flex-col gap-2.5 md:flex-row">
         <div className="relative flex-1">
           <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
@@ -240,7 +214,6 @@ export default function ResourceLibrary() {
         )}
       </div>
 
-      {/* Resources grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -270,7 +243,6 @@ export default function ResourceLibrary() {
         </div>
       )}
 
-      {/* Add/Edit form */}
       <ResourceForm
         open={showForm}
         onOpenChange={(open) => {
@@ -287,7 +259,6 @@ export default function ResourceLibrary() {
         }}
       />
 
-      {/* Delete confirmation */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

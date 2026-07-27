@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { routes } from '@/lib/routes';
+import en from '@/i18n/locales/en.json';
 
 // OrgAnalytics is one component serving two routes; it decides which by
 // matching location.pathname against routes.platformAdmin.analytics. This test
 // pins that branch so a future route rename can't silently flip the platform
 // "Global Analytics" page into the org-scoped view (review #174, findings #1/#2).
 
-// `t` echoes the key so assertions pin i18n keys.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
@@ -31,7 +31,6 @@ vi.mock('@/components/ui/sliding-tabs', () => ({
     ),
 }));
 
-// Keep the tab-content and storage-backed children out of this focused test.
 vi.mock('@/components/org-admin/analytics/AnalyticsOverview', () => ({ AnalyticsOverview: () => null }));
 vi.mock('@/components/org-admin/analytics/TeamPerformanceTab', () => ({ TeamPerformanceTab: () => null }));
 vi.mock('@/components/org-admin/analytics/CourseProgressTab', () => ({ CourseProgressTab: () => null }));
@@ -39,7 +38,6 @@ vi.mock('@/components/org-admin/OrgMembersTab', () => ({ OrgMembersTab: () => nu
 vi.mock('@/components/ui/file-upload', () => ({ FileUpload: () => null }));
 vi.mock('@/lib/api-client', () => ({ callApi: vi.fn(), callApiRaw: vi.fn() }));
 
-// Data hooks: mocked so no network fires; return values set per test.
 vi.mock('@/hooks/useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('@/hooks/usePlatformSettings', () => ({ usePlatformSettings: vi.fn() }));
 vi.mock('@/hooks/useOrganizations', () => ({ useOrganizations: vi.fn() }));
@@ -91,7 +89,6 @@ describe('OrgAnalytics — view is selected by route (#120)', () => {
     renderAt(routes.platformAdmin.analytics);
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('nav.globalAnalytics');
-    // Members tab is org-only — absent in the global view.
     expect(screen.queryByText('analytics.tabs.members')).not.toBeInTheDocument();
   });
 
@@ -100,7 +97,36 @@ describe('OrgAnalytics — view is selected by route (#120)', () => {
     renderAt(routes.orgAdmin.root);
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('nav.organization');
-    // Members tab is present in the org view.
     expect(screen.getByText('analytics.tabs.members')).toBeInTheDocument();
+  });
+});
+
+describe('OrgAnalytics — failed fetch shows error fork, not all-zero stats', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the retryable error state (not the stats tabs) when the analytics fetch fails', () => {
+    primeHooks({ isPlatformAdmin: false, currentOrg: org });
+    // Override the analytics query to a failed state.
+    const refetch = vi.fn();
+    vi.mocked(useOrgAnalyticsData).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    } as unknown as ReturnType<typeof useOrgAnalyticsData>);
+
+    renderAt(routes.orgAdmin.root);
+
+    expect(screen.getByText('common.loadErrorTitle')).toBeInTheDocument();
+    // en.common.retry is the accessible name under the mocked `t`; verify it's non-empty.
+    expect(en.common.retry.length).toBeGreaterThan(0);
+    const retryButton = screen.getByRole('button', { name: 'common.retry' });
+    expect(retryButton).toBeInTheDocument();
+    expect(screen.queryByText('analytics.tabs.overview')).not.toBeInTheDocument();
+
+    fireEvent.click(retryButton);
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

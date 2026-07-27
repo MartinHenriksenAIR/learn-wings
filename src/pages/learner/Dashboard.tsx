@@ -7,6 +7,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { ProgressRing } from '@/components/ui/progress-ring';
 import { LevelBadge } from '@/components/ui/level-badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { QueryErrorState } from '@/components/ui/query-error-state';
 import { Button } from '@/components/ui/button';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,13 +19,14 @@ import { callApiRaw } from '@/lib/api-client';
 import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Clock, Award, Play, ArrowRight, TrendingUp, Sparkles } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
+import { formatDate } from '@/lib/date-locale';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerDashboard() {
   const { currentOrg, profile, memberships, isPlatformAdmin, isOrgAdmin } = useAuth();
   const orgGuard = useOrgGuard();
   const { features } = usePlatformSettings();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { flashed, flash } = useFlash();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -95,9 +97,20 @@ export default function LearnerDashboard() {
     );
   }
 
+  // A failed dashboard fetch must not masquerade as the first-time-user hero
+  // (all-empty derived state); show a distinct error fork with retry instead.
+  if (query.isError) {
+    return (
+      <AppLayout title={t('dashboard.title')}>
+        <div className="flex h-64 items-center justify-center">
+          <QueryErrorState onRetry={() => query.refetch()} />
+        </div>
+      </AppLayout>
+    );
+  }
+
   const nextUp = inProgressCourses[0];
 
-  // ----- Hero variants: in-progress / all caught up / first-time user -----
   const heroProgress = nextUp ? progressData[nextUp.course_id] : undefined;
   const heroDone = heroProgress?.completed ?? 0;
   const heroTotal = heroProgress?.total ?? 0;
@@ -138,7 +151,6 @@ export default function LearnerDashboard() {
 
   return (
     <AppLayout>
-      {/* Welcome header */}
       <div className="mb-6">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {firstName ? t('dashboard.welcomeBack', { name: firstName }) : t('dashboard.welcome')}
@@ -168,7 +180,6 @@ export default function LearnerDashboard() {
         </div>
       )}
 
-      {/* Stats Grid */}
       <div className="mb-7 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label={t('dashboard.coursesEnrolled')}
@@ -196,7 +207,6 @@ export default function LearnerDashboard() {
         />
       </div>
 
-      {/* Hero card */}
       <div
         data-testid="dashboard-hero"
         className="gradient-hero relative mb-7 flex items-center gap-7 overflow-hidden rounded-[20px] px-[30px] py-7 text-white"
@@ -243,7 +253,6 @@ export default function LearnerDashboard() {
         />
       </div>
 
-      {/* Continue Learning */}
       <div className="mb-8">
         <div className="mb-3.5 flex items-center justify-between">
           <h2 className="font-display text-[17px] font-bold">{t('dashboard.continueLearning')}</h2>
@@ -321,7 +330,6 @@ export default function LearnerDashboard() {
         )}
       </div>
 
-      {/* Completed Courses */}
       {completedCourses.length > 0 && (
         <div className="mb-8">
           <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('dashboard.completedCourses')}</h2>
@@ -337,7 +345,7 @@ export default function LearnerDashboard() {
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-[13.5px] font-bold">{enrollment.course?.title}</span>
                   <span className="text-xs text-[#9aa0af]">
-                    {t('common.completedOn')} {new Date(enrollment.completed_at!).toLocaleDateString()}
+                    {t('common.completedOn')} {formatDate(new Date(enrollment.completed_at!), 'P', i18n.language)}
                   </span>
                 </span>
               </div>
@@ -346,7 +354,6 @@ export default function LearnerDashboard() {
         </div>
       )}
 
-      {/* Certificates */}
       {features.certificates_enabled && (
         <div id="certificates">
           <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('certificates.title')}</h2>

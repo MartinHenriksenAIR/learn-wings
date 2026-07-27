@@ -4,12 +4,10 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock AppLayout as passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- stub heavy child components ---
 vi.mock('@/components/community/CategoryBadge', () => ({
   CategoryBadge: () => <div data-testid="category-badge" />,
 }));
@@ -23,10 +21,7 @@ vi.mock('@/components/community/ReportDialog', () => ({
   ReportDialog: () => <div data-testid="report-dialog" />,
 }));
 
-// --- mock toast (PostDetail imports from '@/components/ui/sonner') ---
 vi.mock('@/components/ui/sonner', () => ({ toast: vi.fn() }));
-
-// --- mock react-i18next (PostDetail uses t() for the duplicate-report toast) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -44,7 +39,6 @@ vi.mock('@/lib/api-client', () => ({
   callApiRaw: vi.fn(),
 }));
 
-// --- mock the community api ---
 const mockFetchPost = vi.fn();
 const mockFetchComments = vi.fn();
 vi.mock('@/lib/community-api', () => ({
@@ -60,7 +54,6 @@ vi.mock('@/lib/community-api', () => ({
   toggleCommentHidden: vi.fn(),
 }));
 
-// --- configurable hook mocks ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),

@@ -23,7 +23,6 @@ export default endpoint('community-comment-create', async ({ req, profile, reply
     return reply(400, { error: 'parentCommentId must be a string' });
   }
 
-  // Load post
   const post = await queryOne<PostRow>(
     `SELECT scope, org_id, is_locked FROM community_posts WHERE id = $1`,
     [postId],
@@ -39,12 +38,11 @@ export default endpoint('community-comment-create', async ({ req, profile, reply
     // global scope: all authenticated profiles can access
   }
 
-  // Locked check (after accessibility)
   if (post.is_locked) {
     return reply(403, { error: 'Post is locked' });
   }
 
-  // Insert with profile join via CTE (parity: old lib selected profile on inserted row)
+  // Profile join via CTE: parity with old lib, which selected profile on inserted row.
   const comment = await queryOne(
     `WITH ins AS (
        INSERT INTO community_comments (post_id, user_id, content, parent_comment_id)

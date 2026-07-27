@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, ExternalLink } from 'lucide-react';
 import { isFuture, isToday } from 'date-fns';
 import { formatDate } from '@/lib/date-locale';
+import { safeHref } from '@/lib/safe-href';
 import { cn } from '@/lib/utils';
 import type { CommunityPost } from '@/lib/community-types';
 
@@ -19,7 +20,6 @@ export function UpcomingEvents({
 }: UpcomingEventsProps) {
   const { t, i18n } = useTranslation();
 
-  // Filter and sort upcoming events
   const upcomingEvents = events
     .filter((e) => e.event_date && (isFuture(new Date(e.event_date)) || isToday(new Date(e.event_date))))
     .sort((a, b) => new Date(a.event_date!).getTime() - new Date(b.event_date!).getTime())
@@ -82,7 +82,7 @@ export function UpcomingEvents({
               </span>
               {event.event_registration_url && (
                 <a
-                  href={event.event_registration_url}
+                  href={safeHref(event.event_registration_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="shrink-0"

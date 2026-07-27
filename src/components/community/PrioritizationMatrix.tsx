@@ -90,7 +90,6 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
 
   return (
     <div className="space-y-4">
-      {/* Unscored tray */}
       <div
         data-testid="unscored-tray"
         onDragOver={(e) => e.preventDefault()}
@@ -112,9 +111,7 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
         )}
       </div>
 
-      {/* 3x3 grid with axis labels */}
       <div className="grid grid-cols-[auto_1fr] gap-2">
-        {/* Value axis label (vertical) */}
         <div className="flex items-center">
           <span className="rotate-180 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground [writing-mode:vertical-rl]">
             {t('ideaManagement.prioritize.axisValue')} →
@@ -134,7 +131,6 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
               </div>
             )),
           )}
-          {/* Effort axis label (horizontal), spanning the 3 columns */}
           <div className="col-span-3 pt-1 text-center text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
             {t('ideaManagement.prioritize.axisEffort')} →
           </div>

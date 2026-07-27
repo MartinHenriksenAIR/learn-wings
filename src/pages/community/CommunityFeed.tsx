@@ -14,8 +14,10 @@ import { UpcomingEvents } from '@/components/community/UpcomingEvents';
 import { EventsTab } from '@/pages/community/EventsTab';
 import { CommunityEmptyState } from '@/components/community/CommunityEmptyState';
 import { AIChampionsList } from '@/components/community/AIChampionsList';
+import { QueryErrorState } from '@/components/ui/query-error-state';
+import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQueryErrorToast';
 import { useAuth } from '@/hooks/useAuth';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -44,7 +46,7 @@ export default function CommunityFeed() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
-  const { features, isLoading: settingsLoading } = usePlatformSettings();
+  const communityGate = useCommunityGate();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -67,14 +69,24 @@ export default function CommunityFeed() {
     }
   }, [view, currentOrg, setSearchParams]);
 
-  // Fetch categories
-  const { data: categories = [] } = useQuery({
+  // Fetch categories (secondary data — the chip row degrades gracefully; a
+  // failure just toasts + logs rather than blocking the feed).
+  const {
+    data: categories = [],
+    isError: categoriesError,
+    error: categoriesErrorObj,
+  } = useQuery({
     queryKey: queryKeys.communityCategories.all,
     queryFn: fetchCategories,
   });
+  useQueryErrorToast({
+    isError: categoriesError,
+    error: categoriesErrorObj,
+    toastTitle: t('common.loadErrorTitle'),
+    logLabel: 'CommunityFeed: failed to load categories',
+  });
 
-  // Fetch posts
-  const { data: posts = [], isLoading } = useQuery({
+  const { data: posts = [], isLoading, isError: postsError, refetch: refetchPosts } = useQuery({
     queryKey: queryKeys.communityPosts.list(scope, currentOrg?.id, selectedCategory, searchQuery, selectedTags),
     queryFn: () => fetchPosts({
       scope,
@@ -86,7 +98,6 @@ export default function CommunityFeed() {
     enabled: view !== 'events' && (scope === 'global' || !!currentOrg),
   });
 
-  // Create post mutation
   const createPostMutation = useMutation({
     mutationFn: createPost,
     onSuccess: () => {
@@ -98,12 +109,14 @@ export default function CommunityFeed() {
     },
   });
 
-  // Admin actions
   const toggleHideMutation = useMutation({
     mutationFn: ({ postId, hidden }: { postId: string; hidden: boolean }) =>
       togglePostHidden(postId, hidden),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPosts.all });
+    },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.postHideFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -112,6 +125,9 @@ export default function CommunityFeed() {
       togglePostLocked(postId, locked),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.communityPosts.all });
+    },
+    onError: (error: Error) => {
+      toast({ title: t('community.toasts.postLockFailed'), description: error.message, variant: 'destructive' });
     },
   });
 
@@ -135,16 +151,11 @@ export default function CommunityFeed() {
     ? effectiveIsPlatformAdmin
     : effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
 
-  // Filter event posts for the widget
   const eventPosts = posts.filter((p) => p.category?.slug === 'events');
-
-  // Get all unique tags from posts
   const allTags = [...new Set(posts.flatMap((p) => p.tags || []))];
   const hasActiveFilters = Boolean(searchQuery || selectedCategory || selectedTags.length > 0);
 
-  if (!settingsLoading && !features.community_enabled) {
-    return <Navigate to={routes.learner.dashboard} replace />;
-  }
+  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   const scopeTabs = [
     ...(currentOrg
@@ -159,8 +170,7 @@ export default function CommunityFeed() {
   ];
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('community.title') }]}> {/* single crumb: page itself, no default href needed */}
-      {/* Header */}
+    <AppLayout breadcrumbs={[{ label: t('community.title') }]}>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -207,7 +217,6 @@ export default function CommunityFeed() {
         </div>
       </div>
 
-      {/* Scope tabs */}
       <SlidingTabs
         tabs={scopeTabs}
         active={view}
@@ -219,11 +228,8 @@ export default function CommunityFeed() {
         <EventsTab canCreateEvent={canCreateEvent} onNewEvent={() => setShowPostForm(true)} />
       ) : (
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_300px]">
-        {/* Main content */}
         <div className="flex flex-col gap-3.5">
-          {/* Search and category chips */}
           <div className="flex flex-col gap-[13px] rounded-2xl border border-border bg-card px-[18px] py-4">
-            {/* Search bar */}
             <div className="relative">
               <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
               <Input
@@ -234,7 +240,6 @@ export default function CommunityFeed() {
               />
             </div>
 
-            {/* Category chips */}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -269,7 +274,6 @@ export default function CommunityFeed() {
               })}
             </div>
 
-            {/* Active tag filters */}
             {selectedTags.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[12.5px] font-semibold text-muted-foreground">{t('community.tagsLabel')}</span>
@@ -295,11 +299,13 @@ export default function CommunityFeed() {
             )}
           </div>
 
-          {/* Posts list */}
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
+          ) : postsError ? (
+            // A failed fetch must not render the "no posts yet" empty state.
+            <QueryErrorState onRetry={() => refetchPosts()} />
           ) : posts.length === 0 ? (
             <CommunityEmptyState
               variant="posts"
@@ -329,9 +335,7 @@ export default function CommunityFeed() {
           )}
         </div>
 
-        {/* Sidebar */}
         <div className="flex flex-col gap-3.5">
-          {/* Upcoming Events */}
           {eventPosts.length > 0 && (
             <UpcomingEvents
               events={eventPosts}
@@ -339,7 +343,6 @@ export default function CommunityFeed() {
             />
           )}
 
-          {/* Libraries (org only) */}
           {scope === 'org' && currentOrg && (
             <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card px-5 py-[18px]">
               <h3 className="mb-2 text-[13.5px] font-extrabold">{t('community.libraries')}</h3>
@@ -364,12 +367,10 @@ export default function CommunityFeed() {
             </div>
           )}
 
-          {/* AI Champions (org only) */}
           {scope === 'org' && currentOrg && (
             <AIChampionsList orgId={currentOrg.id} />
           )}
 
-          {/* Popular tags */}
           {allTags.length > 0 && (
             <div className="rounded-2xl border border-border bg-card px-5 py-[18px]">
               <h3 className="mb-3 text-[13.5px] font-extrabold">{t('community.popularTags')}</h3>

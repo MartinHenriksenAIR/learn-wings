@@ -4,12 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- AppLayout passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- stub heavy children not under test ---
 vi.mock('@/components/community/PostCard', () => ({
   PostCard: ({ post }: { post: { title: string } }) => <div>{post.title}</div>,
 }));
@@ -41,7 +39,6 @@ vi.mock('@/components/community/PostForm', () => ({
     ) : null,
 }));
 
-// --- community api: fetchPosts drives the events tab ---
 const mockFetchPosts = vi.fn();
 const eventsCategory = { id: 'cat-events', slug: 'events', name: 'Events' };
 vi.mock('@/lib/community-api', () => ({
@@ -52,7 +49,6 @@ vi.mock('@/lib/community-api', () => ({
   togglePostLocked: vi.fn(),
 }));
 
-// --- t returns the key so assertions can key off it ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -129,7 +125,6 @@ describe('Community Events tab — admin affordance + empty state (#125)', () =>
       await screen.findByTestId('event-card');
       const newEvent = screen.getByRole('button', { name: 'community.newEvent' });
       expect(newEvent).toBeInTheDocument();
-      // No "New Post" label on the events view.
       expect(screen.queryByText('community.newPost')).not.toBeInTheDocument();
 
       fireEvent.click(newEvent);
@@ -192,7 +187,6 @@ describe('Community Events tab — admin affordance + empty state (#125)', () =>
       const title = await screen.findByText('community.emptyState.eventsTitle');
       const emptyState = title.closest('div') as HTMLElement;
       expect(within(emptyState).queryByRole('button')).not.toBeInTheDocument();
-      // The learner still gets the description, just no action.
       expect(screen.getByText('community.emptyState.eventsDescription')).toBeInTheDocument();
     });
   });

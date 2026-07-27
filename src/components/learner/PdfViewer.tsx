@@ -48,7 +48,6 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
         }
         const blob = await response.blob();
         
-        // Only update state if the effect hasn't been cleaned up
         if (!isCancelled) {
           // Create an object URL from the blob - this avoids ArrayBuffer issues
           objectUrl = URL.createObjectURL(blob);
@@ -71,7 +70,6 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
     
     return () => {
       isCancelled = true;
-      // Clean up the object URL when the component unmounts or URL changes
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
       }
@@ -109,6 +107,9 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
   const handleDownload = async () => {
     try {
       const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status}`);
+      }
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -126,7 +127,6 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
 
   return (
     <div className={cn('flex flex-col', className)}>
-      {/* Toolbar */}
       <div className="flex items-center justify-between gap-2 p-3 border-b bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-2">
           <Button
@@ -182,7 +182,6 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
         </Button>
       </div>
 
-      {/* PDF Content */}
       <div className="flex-1 overflow-auto bg-muted/30 rounded-b-lg" style={{ maxHeight: '65vh' }}>
         {error ? (
           <div className="flex items-center justify-center h-64 text-destructive">

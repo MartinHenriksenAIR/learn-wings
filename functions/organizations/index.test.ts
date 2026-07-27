@@ -27,7 +27,6 @@ describe('organizations', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
   });
 
-  // 1. 401 when bearer token invalid
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -37,7 +36,6 @@ describe('organizations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 when profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -47,7 +45,6 @@ describe('organizations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. List all orgs as platform admin
   it('returns all organizations for platform admin (no outer JOIN) with member_count and pending_invite_count', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([
@@ -74,7 +71,6 @@ describe('organizations', () => {
     expect(params ?? []).toEqual([]);
   });
 
-  // 4. List orgs as regular member
   it('returns member orgs for non-admin user via JOIN on org_memberships with member_count and pending_invite_count', async () => {
     mockQuery.mockResolvedValueOnce([{ id: 'org-1', member_count: 3, pending_invite_count: 1 }]);
 
@@ -97,7 +93,6 @@ describe('organizations', () => {
     expect(params).toEqual(['p1']);
   });
 
-  // 4b. member_count is returned as a number, not a string (documents the ::int cast intent)
   it('returns member_count as integer, not string', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([{ id: 'org-1', member_count: 3 }]);
@@ -113,7 +108,6 @@ describe('organizations', () => {
     expect(sql).toContain('COUNT(*)::int');
   });
 
-  // 5. Single org as active member
   it('returns single organization for active member with member_count and pending_invite_count', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQueryOne.mockResolvedValueOnce({ id: 'org-1', name: 'X', member_count: 4, pending_invite_count: 2 });
@@ -134,7 +128,6 @@ describe('organizations', () => {
     expect(params).toEqual(['org-1']);
   });
 
-  // 6. Single org 403 for non-member non-admin
   it('returns 403 when requester is non-member non-admin', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
 
@@ -144,7 +137,6 @@ describe('organizations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // 7. Single org 404 when org not found
   it('returns 404 when organization does not exist', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQueryOne.mockResolvedValueOnce(null);
@@ -155,7 +147,6 @@ describe('organizations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization not found' });
   });
 
-  // 8. 500 on db error
   it('returns 500 on db error', async () => {
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
 
@@ -165,7 +156,6 @@ describe('organizations', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // 9. Platform admin + orgId bypasses membership check
   it('returns org for platform admin without calling isActiveMember', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce({ id: 'org-1', name: 'Admin Org' });

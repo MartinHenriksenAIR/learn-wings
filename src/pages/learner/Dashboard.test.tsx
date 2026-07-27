@@ -4,17 +4,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock react-i18next (no i18n provider needed) ---
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
-// --- mock AppLayout as a simple passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- mock api-client and storage so no network fires ---
 vi.mock('@/lib/api-client', () => ({
   callApi: vi.fn(),
   callApiRaw: vi.fn(),
@@ -24,23 +21,19 @@ vi.mock('@/lib/storage', () => ({
   getSignedLmsAssetUrl: vi.fn().mockResolvedValue(null),
 }));
 
-// --- mock CertificateCard to avoid deep imports ---
 vi.mock('@/components/learner/CertificateCard', () => ({
   CertificateCard: () => <div data-testid="cert-card" />,
 }));
 
-// --- mock sonner toast ---
 vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
 
-// --- useAuth mock factory ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-// --- usePlatformSettings mock ---
 vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => ({ features: { certificates_enabled: false } }),
 }));
@@ -89,10 +82,7 @@ describe('LearnerDashboard — no-membership empty state', () => {
 
     renderDashboard();
 
-    // Spinner must NOT be present (loading resolved)
     expect(document.querySelector('.animate-spin')).toBeNull();
-
-    // Empty-state title key must be rendered (t returns the key)
     expect(screen.getByText('dashboard.noMembershipTitle')).toBeInTheDocument();
     expect(screen.getByText('dashboard.noMembershipDescription')).toBeInTheDocument();
   });
@@ -110,7 +100,6 @@ describe('LearnerDashboard — no-membership empty state', () => {
 
     expect(document.querySelector('.animate-spin')).toBeNull();
 
-    // Non-membership path uses common.noOrgSelected key
     expect(screen.getByText('common.noOrgSelected')).toBeInTheDocument();
   });
 
@@ -154,13 +143,10 @@ describe('LearnerDashboard — completion count (#18)', () => {
 
     renderDashboard();
 
-    // Stat card: dashboard.completed must show 1 (counts enrollments.status === 'completed')
     const completedTitle = await screen.findByText('dashboard.completed');
     const completedCard = completedTitle.closest('.rounded-2xl') as HTMLElement;
     expect(completedCard).not.toBeNull();
     expect(within(completedCard).getByText('1')).toBeInTheDocument();
-
-    // The completed course is listed under Completed Courses, the ongoing one under Continue Learning
     expect(screen.getByText('dashboard.completedCourses')).toBeInTheDocument();
     expect(screen.getByText('Finished Course')).toBeInTheDocument();
     // The ongoing course renders twice: as the hero card title and in the In-progress grid
@@ -205,7 +191,6 @@ describe('LearnerDashboard — assessment banner', () => {
 
     renderDashboard();
 
-    // Wait for the page to settle (hero card appears) then assert banner absent
     await screen.findByTestId('dashboard-hero');
     expect(screen.queryByTestId('assessment-banner')).toBeNull();
   });
@@ -239,6 +224,29 @@ describe('LearnerDashboard — assessment banner', () => {
 
     await screen.findByTestId('dashboard-hero');
     expect(screen.queryByTestId('assessment-banner')).toBeNull();
+  });
+});
+
+describe('LearnerDashboard — failed fetch shows error fork, not first-time hero', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the retryable error state (not the first-time hero) when the dashboard fetch fails', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockRejectedValue(new Error('boom'));
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
+      currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText('common.loadErrorTitle')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-hero')).toBeNull();
+    expect(screen.queryByText('dashboard.heroFirstTimeTitle')).toBeNull();
   });
 });
 
@@ -279,7 +287,6 @@ describe('LearnerDashboard — hero variants', () => {
     expect(within(hero).getByText('dashboard.heroLessonsDone')).toBeInTheDocument();
     // Ring reflects the in-progress course (1 of 4 lessons = 25%)
     expect(within(hero).getByText('25%')).toBeInTheDocument();
-    // CTA resumes the in-progress course
     const cta = within(hero).getByRole('link', { name: /dashboard\.heroResumeCta/ });
     expect(cta).toHaveAttribute('href', '/app/learn/c-2');
   });
@@ -297,7 +304,6 @@ describe('LearnerDashboard — hero variants', () => {
     expect(within(hero).getByText('dashboard.heroAllCaughtUpBadge')).toBeInTheDocument();
     expect(within(hero).getByText('dashboard.heroAllDoneTitle')).toBeInTheDocument();
     expect(within(hero).getByText('100%')).toBeInTheDocument();
-    // CTA suggests starting a new course, pointing at the catalog
     const cta = within(hero).getByRole('link', { name: /dashboard\.heroStartNewCta/ });
     expect(cta).toHaveAttribute('href', '/app/courses');
   });

@@ -4,12 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock AppLayout as passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- stub heavy child components ---
 vi.mock('@/components/community/IdeaCard', () => ({
   IdeaCard: ({ idea }: { idea: { id: string } }) => <div data-testid="idea-card">{idea.id}</div>,
 }));
@@ -17,7 +15,6 @@ vi.mock('@/components/community/CommunityEmptyState', () => ({
   CommunityEmptyState: () => <div data-testid="empty-state" />,
 }));
 
-// --- mock the ideas api ---
 const mockFetchIdeas = vi.fn();
 const mockFetchOrgTags = vi.fn();
 vi.mock('@/lib/ideas-api', () => ({
@@ -26,10 +23,7 @@ vi.mock('@/lib/ideas-api', () => ({
   deleteIdea: vi.fn(),
 }));
 
-// --- mock sonner toast ---
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-
-// --- mock react-i18next (t returns the key) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -106,5 +100,23 @@ describe('IdeaLibrary drafts tab — caller identity is the profile id, not the 
     renderDraftsTab();
 
     await waitFor(() => expect(screen.getByTestId('idea-card')).toBeInTheDocument());
+  });
+});
+
+describe('IdeaLibrary — failed fetch shows error fork, not empty state', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(authState);
+    mockFetchOrgTags.mockResolvedValue([]);
+  });
+
+  it('renders the retryable error state (not CommunityEmptyState) when the ideas fetch fails', async () => {
+    mockFetchIdeas.mockRejectedValue(new Error('boom'));
+
+    renderDraftsTab();
+
+    expect(await screen.findByText('common.loadErrorTitle')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
+    expect(screen.queryByTestId('empty-state')).toBeNull();
   });
 });

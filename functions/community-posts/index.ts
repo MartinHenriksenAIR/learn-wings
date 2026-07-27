@@ -14,17 +14,14 @@ export default endpoint('community-posts', async ({ req, profile, reply, require
 
   const { scope, orgId, categoryId, search, tags } = body;
 
-  // Validate scope
   if (!scope || (scope !== 'org' && scope !== 'global')) {
     return reply(400, { error: 'scope must be "org" or "global"' });
   }
 
-  // Validate orgId for org scope
   if (scope === 'org' && (!orgId || typeof orgId !== 'string')) {
     return reply(400, { error: 'orgId is required for org scope' });
   }
 
-  // Validate optional params
   if (categoryId !== undefined && typeof categoryId !== 'string') {
     return reply(400, { error: 'categoryId must be a string' });
   }
@@ -41,20 +38,16 @@ export default endpoint('community-posts', async ({ req, profile, reply, require
   const vSearch = search as string | undefined;
   const vTags = tags as string[] | undefined;
 
-  // Authorization
   if (vScope === 'org') {
     await requireActiveMember(vOrgId!);
   }
 
-  // Hidden visibility
   const includeHidden = profile.is_platform_admin ||
     (vScope === 'org' && await isOrgAdmin(profile.id, vOrgId!));
 
-  // Build dynamic WHERE + params
   const conditions: string[] = [];
   const params: unknown[] = [];
 
-  // scope is always required
   params.push(vScope);
   conditions.push(`p.scope = $${params.length}`);
 

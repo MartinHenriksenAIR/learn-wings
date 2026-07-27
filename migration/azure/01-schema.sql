@@ -59,7 +59,7 @@ CREATE TYPE public.org_role            AS ENUM ('org_admin', 'learner');
 CREATE TYPE public.membership_status   AS ENUM ('active', 'invited', 'disabled');
 CREATE TYPE public.invitation_status   AS ENUM ('pending', 'accepted', 'expired');
 CREATE TYPE public.course_level        AS ENUM ('basic', 'intermediate', 'advanced');
-CREATE TYPE public.lesson_type         AS ENUM ('video', 'document', 'quiz');
+CREATE TYPE public.lesson_type         AS ENUM ('video', 'document', 'quiz', 'exercise');
 CREATE TYPE public.enrollment_status   AS ENUM ('enrolled', 'completed');
 CREATE TYPE public.progress_status     AS ENUM ('not_started', 'in_progress', 'completed');
 CREATE TYPE public.access_type         AS ENUM ('enabled', 'disabled');
@@ -109,6 +109,8 @@ CREATE TABLE public.profiles (
   preferred_language text DEFAULT 'en' CHECK (preferred_language IN ('en', 'da')),
   entra_oid          text,                         -- ADDED (Entra object id)
   entra_tid          text,                         -- ADDED (Entra tenant id)
+  assessment_level      public.course_level,       -- #117: self-assessed AI level
+  assessment_skipped_at timestamptz,               -- #117: set when the learner skips the assessment
   created_at         timestamptz NOT NULL DEFAULT now()
 );
 
@@ -237,6 +239,19 @@ CREATE TABLE public.quiz_options (
   sort_order  integer NOT NULL DEFAULT 0   -- ADDED
 );
 
+-- ---- exercises ----
+-- Ungraded interactive lessons (ADR-0017). One row per exercise lesson.
+-- exercise_kind is TEXT (not an enum) so new kinds need no DDL; config is a
+-- kind-specific JSONB payload validated in code by functions/shared/exercises.
+-- Every config embeds an integer "version" for forward migration.
+CREATE TABLE public.exercises (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  lesson_id     uuid UNIQUE NOT NULL REFERENCES public.lessons(id) ON DELETE CASCADE,
+  exercise_kind text NOT NULL,
+  config        jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT exercises_config_is_object CHECK (jsonb_typeof(config) = 'object')
+);
+
 -- ---- org_course_access ----
 CREATE TABLE public.org_course_access (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -283,6 +298,20 @@ CREATE TABLE public.quiz_attempts (
   started_at  timestamptz NOT NULL DEFAULT now(),
   finished_at timestamptz
 );
+
+-- ---- assessment_attempts (issue #117) ----
+-- #117: AI self-assessment. One row per completed questionnaire attempt.
+-- functions/user-context reads the latest attempt (assessment_taken_at) on every login.
+CREATE TABLE public.assessment_attempts (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id               uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  score                 integer NOT NULL,
+  level                 public.course_level NOT NULL,
+  answers               jsonb NOT NULL,
+  questionnaire_version text NOT NULL,
+  created_at            timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_assessment_attempts_user ON public.assessment_attempts (user_id, created_at DESC);
 
 -- ---- course_reviews ----
 CREATE TABLE public.course_reviews (

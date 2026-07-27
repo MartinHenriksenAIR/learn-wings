@@ -140,9 +140,9 @@ describe('community-comment-create', () => {
   });
 
   it('happy path: member creates comment on org post', async () => {
-    mockQueryOne.mockResolvedValueOnce(orgPost); // post
+    mockQueryOne.mockResolvedValueOnce(orgPost);
     mockIsActiveMember.mockResolvedValueOnce(true);
-    mockQueryOne.mockResolvedValueOnce(newComment); // INSERT CTE RETURNING
+    mockQueryOne.mockResolvedValueOnce(newComment);
     const res = await handler(baseReq({ postId: 'post-1', content: 'A comment' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ comment: newComment });

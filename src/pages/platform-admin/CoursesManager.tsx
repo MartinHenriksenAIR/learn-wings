@@ -18,9 +18,7 @@ import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteCourseDialog } from '@/components/platform-admin/DeleteCourseDialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -57,10 +55,8 @@ export default function CoursesManager() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Tab state from URL
   const activeTab = searchParams.get('tab') || 'courses';
 
-  // Course list state
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -71,14 +67,11 @@ export default function CoursesManager() {
   const [language, setLanguage] = useState<'en' | 'da'>('da');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
-  // Delete state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
 
-  // Publish in-flight tracking
   const [publishingId, setPublishingId] = useState<string | null>(null);
 
-  // Course Access state — org list comes from the shared cache (#87)
   const {
     data: orgsData,
     isLoading: orgsLoading,
@@ -103,8 +96,6 @@ export default function CoursesManager() {
   const courses = coursesData?.courses ?? [];
   const accessRecords = coursesData?.accessRecords ?? [];
 
-  // Load failures (either query) surface through the page's "Failed to load
-  // courses" error block + toast, same as the pre-TanStack version.
   useEffect(() => {
     if (coursesError) {
       toast({ title: 'Failed to load courses', description: coursesError.message, variant: 'destructive' });
@@ -120,7 +111,6 @@ export default function CoursesManager() {
     setSearchParams({ tab: value });
   };
 
-  // ========== Course CRUD ==========
   const createCourseMutation = useToastMutation({
     mutationFn: (input: { title: string; description: string; level: CourseLevel; language: 'en' | 'da'; thumbnailUrl: string | null }) =>
       callApi<{ course: Course }>('/api/course-create', input),
@@ -197,7 +187,6 @@ export default function CoursesManager() {
     deleteCourseMutation.mutate(courseToDelete);
   };
 
-  // ========== Course Access ==========
   const getAccessStatus = (orgId: string, courseId: string): boolean => {
     const record = accessRecords.find(
       (r) => r.org_id === orgId && r.course_id === courseId
@@ -251,7 +240,6 @@ export default function CoursesManager() {
     enableAllMutation.mutate(orgId);
   };
 
-  // ========== Filtering ==========
   const clearFilters = () => {
     setSearchQuery('');
     setLevelFilter('all');
@@ -279,8 +267,6 @@ export default function CoursesManager() {
 
   const combinedLoadError = coursesError?.message ?? (orgsError ? (orgsError as Error).message : null);
 
-  // isLoading is true only while there is no cached data, so a post-mutation
-  // refetch keeps rendering the stale page instead of blanking to the spinner.
   if (coursesLoading || orgsLoading) {
     return (
       <AppLayout title={t('coursesManager.title')}>
@@ -298,8 +284,6 @@ export default function CoursesManager() {
           <Button
             variant="outline"
             onClick={() => {
-              // Retry is a full reload — with no data cached, isLoading goes true
-              // during the refetch, so the spinner shows, not a flash of empty UI.
               refetchCourses();
               if (orgsError) refetchOrgs();
             }}
@@ -327,12 +311,13 @@ export default function CoursesManager() {
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>{t('coursesManager.thumbnail')}</Label>
+            {/* No maxSizeMB: the image cap is the server's, and FileUpload
+                defaults to it (src/lib/upload-limits.ts). */}
             <FileUpload
               folder="thumbnails"
               accept="image"
               value={thumbnailUrl}
               onChange={(url) => setThumbnailUrl(url)}
-              maxSizeMB={10}
             />
           </div>
           <div className="space-y-2">
@@ -400,10 +385,8 @@ export default function CoursesManager() {
         />
       </div>
 
-      {/* ========== Courses Tab ========== */}
       {activeTab === 'courses' && (
         <div className="space-y-[18px]">
-          {/* Search + filters */}
           <div className="flex flex-col gap-[10px] sm:flex-row">
             <div className="relative flex-1">
               <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
@@ -456,7 +439,6 @@ export default function CoursesManager() {
             />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-border bg-card">
-              {/* Header row */}
               <div className="grid grid-cols-[2.4fr_0.9fr_1fr_0.9fr_0.8fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
                 <span>{t('coursesManager.colCourse')}</span>
                 <span>{t('coursesManager.colLevel')}</span>
@@ -469,7 +451,6 @@ export default function CoursesManager() {
                   key={course.id}
                   className="grid grid-cols-[2.4fr_0.9fr_1fr_0.9fr_0.8fr] items-center gap-3 border-t border-[#f3f4f8] px-5 py-3.5"
                 >
-                  {/* Course: thumb chip + title */}
                   <button
                     type="button"
                     onClick={() => navigate(routes.platformAdmin.courseEditor(course.id))}
@@ -486,12 +467,10 @@ export default function CoursesManager() {
                     )}
                     <span className="truncate text-[13px] font-bold">{course.title}</span>
                   </button>
-                  {/* Level */}
                   <span className="flex items-center gap-2">
                     <LevelBadge level={course.level} />
                     <LanguageBadge language={course.language} />
                   </span>
-                  {/* Status pill + publish switch */}
                   <span className="flex items-center gap-2">
                     <span
                       className={cn(
@@ -508,9 +487,7 @@ export default function CoursesManager() {
                       aria-label={course.is_published ? t('courseEditor.unpublishAria') : t('courseEditor.publishAria')}
                     />
                   </span>
-                  {/* Org-access count */}
                   <span className="text-[13px] font-semibold text-[#4a4f60]">{orgAccessCount(course.id)}</span>
-                  {/* Actions */}
                   <span className="flex justify-end gap-1.5">
                     <button
                       type="button"
@@ -538,10 +515,8 @@ export default function CoursesManager() {
         </div>
       )}
 
-      {/* ========== Organization Access Tab ========== */}
       {activeTab === 'access' && (
         <div className="space-y-6">
-          {/* Info Banner */}
           <div className="flex items-start gap-3 rounded-2xl border border-[#d7ddf4] bg-[#eef1fb] px-5 py-4">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
             <div>
@@ -550,7 +525,6 @@ export default function CoursesManager() {
             </div>
           </div>
 
-          {/* Filters */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
@@ -600,7 +574,6 @@ export default function CoursesManager() {
             </div>
           </div>
 
-          {/* Access Matrix */}
           {publishedCourses.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center">
               <BookOpen className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
@@ -616,7 +589,6 @@ export default function CoursesManager() {
             <div className="space-y-6">
               {filteredOrgs.map((org) => (
                 <div key={org.id} className="overflow-hidden rounded-2xl border border-border bg-card">
-                  {/* Org header */}
                   <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                     <div className="flex items-center gap-3">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
@@ -636,7 +608,6 @@ export default function CoursesManager() {
                       {t('coursesManager.enableAllCourses')}
                     </Button>
                   </div>
-                  {/* Access rows */}
                   <div className="border-t border-[#f3f4f8]">
                     {publishedCourses.map((course) => {
                       const isEnabled = getAccessStatus(org.id, course.id);
@@ -688,34 +659,13 @@ export default function CoursesManager() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('coursesManager.deleteCourseTitle')}</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <span className="block">{t('coursesManager.deleteIntro', { title: courseToDelete?.title })}</span>
-              <ul className="list-inside list-disc text-sm">
-                <li>{t('coursesManager.deleteItemModules')}</li>
-                <li>{t('coursesManager.deleteItemEnrollments')}</li>
-                <li>{t('coursesManager.deleteItemQuizzes')}</li>
-              </ul>
-              <span className="block font-medium">{t('coursesManager.deleteIrreversible')}</span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteCourse}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-              {t('coursesManager.deleteCourse')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteCourseDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        courseTitle={courseToDelete?.title}
+        onConfirm={handleDeleteCourse}
+        pending={deleting}
+      />
     </AppLayout>
   );
 }

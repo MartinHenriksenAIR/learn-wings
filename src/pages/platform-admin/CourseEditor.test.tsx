@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,37 +7,51 @@ import React from 'react';
 // Initialize i18n so t() resolves real (English) strings, matching production.
 import '@/i18n';
 
-// --- mock AppLayout as passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- mock api-client ---
 const mockCallApi = vi.fn();
 vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
 }));
 
-// --- mock storage helpers ---
 vi.mock('@/lib/storage', () => ({
   getSignedLmsAssetUrl: vi.fn((url: string | null) => Promise.resolve(url)),
   extractLmsAssetPath: vi.fn((url: string | null) => url),
 }));
 
-// --- mock sonner toast (this file uses @/components/ui/sonner) ---
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
-// --- mock usePlatformSettings ---
 vi.mock('@/hooks/usePlatformSettings', () => ({
-  usePlatformSettings: () => ({ features: { quizzes_enabled: false }, isLoading: false }),
+  usePlatformSettings: () => ({ features: { quizzes_enabled: false, exercises_enabled: false }, isLoading: false }),
 }));
 
-// --- stub heavy child components ---
+// The stub reproduces the only part of FileUpload's contract the editor depends
+// on: it shows `value`, and it reports (null, null) ONLY for a deliberate clear
+// (a failed upload leaves the parent's value alone — see file-upload.test.tsx).
 vi.mock('@/components/ui/file-upload', () => ({
-  FileUpload: () => <div data-testid="file-upload" />,
+  FileUpload: ({
+    value,
+    onChange,
+  }: {
+    value?: string | null;
+    onChange: (url: string | null, storagePath: string | null) => void;
+  }) => (
+    <div data-testid="file-upload">
+      <span data-testid="file-upload-value">{value ?? ''}</span>
+      <button type="button" onClick={() => onChange(null, null)}>remove thumbnail</button>
+      <button
+        type="button"
+        onClick={() => onChange('thumbnails/new.png', 'thumbnails/new.png')}
+      >
+        upload thumbnail
+      </button>
+    </div>
+  ),
 }));
 vi.mock('@/components/ui/azure-video-upload', () => ({
   AzureVideoUpload: () => <div data-testid="azure-video-upload" />,
@@ -48,7 +62,11 @@ vi.mock('@/components/ui/azure-document-upload', () => ({
 vi.mock('@/components/platform-admin/QuizEditorDialog', () => ({
   QuizEditorDialog: () => <div data-testid="quiz-editor-dialog" />,
 }));
+vi.mock('@/components/platform-admin/ExerciseEditorDialog', () => ({
+  ExerciseEditorDialog: () => <div data-testid="exercise-editor-dialog" />,
+}));
 
+import { getSignedLmsAssetUrl } from '@/lib/storage';
 import CourseEditor from './CourseEditor';
 
 const successResponse = {
@@ -186,7 +204,6 @@ describe('CourseEditor — mutations patch the structure cache (#48)', () => {
 
     renderPage();
 
-    // Structure loaded — module rows are always expanded (no accordion).
     await screen.findByText(/Module 1: Old Name/);
 
     // Open the rename dialog and rename
@@ -195,7 +212,6 @@ describe('CourseEditor — mutations patch the structure cache (#48)', () => {
     fireEvent.change(titleInput, { target: { value: 'New Name' } });
     fireEvent.click(screen.getByRole('button', { name: /^update$/i }));
 
-    // RETURNING'd row lands in the UI via the cache patch
     await waitFor(() =>
       expect(screen.getByText(/Module 1: New Name/)).toBeInTheDocument()
     );
@@ -223,7 +239,6 @@ describe('CourseEditor — publish toggle', () => {
 
     renderPage();
 
-    // Course loaded; the publish switch reflects the draft state.
     const toggle = await screen.findByRole('switch');
     expect(toggle).not.toBeChecked();
 
@@ -237,7 +252,6 @@ describe('CourseEditor — publish toggle', () => {
       })
     );
 
-    // The RETURNING'd row lands via the cache patch — the switch flips on.
     await waitFor(() => expect(screen.getByRole('switch')).toBeChecked());
 
     // Publish toggle is routine: the switch state IS the feedback, no toast.
@@ -278,12 +292,9 @@ describe('CourseEditor — Language editions (#213)', () => {
 
     renderPage('c-da');
 
-    // The picker renders in its "candidates available" state (courses-admin loaded).
     expect(await screen.findByText(/Choose a course to link/)).toBeInTheDocument();
     expect(screen.getByText('Language editions')).toBeInTheDocument();
-    // No group yet → the "not linked" empty state, not a linked list.
     expect(screen.getByText(/Not linked to any other language edition/)).toBeInTheDocument();
-    // An eligible candidate exists → the empty-candidates message must NOT show.
     expect(screen.queryByText(/No eligible courses to link/)).toBeNull();
   });
 
@@ -306,12 +317,9 @@ describe('CourseEditor — Language editions (#213)', () => {
 
     renderPage('c-da');
 
-    // The sibling is listed by title (visible without opening any Select).
     expect(await screen.findByText('English Edition')).toBeInTheDocument();
-    // The same-language standalone is filtered out → empty-candidates message shows.
     expect(screen.getByText(/No eligible courses to link/)).toBeInTheDocument();
 
-    // Unlink targets the sibling's own id ({ action:'unlink', courseId: <sibling> }).
     fireEvent.click(screen.getByRole('button', { name: /unlink/i }));
     await waitFor(() =>
       expect(mockCallApi).toHaveBeenCalledWith('/api/course-translation-link', {
@@ -319,6 +327,95 @@ describe('CourseEditor — Language editions (#213)', () => {
         courseId: 'c-en-sib',
       }),
     );
+  });
+});
+
+// #275 made a persisted null DESTRUCTIVE: course-update now deletes the
+// superseded blob. That turned every transient path to a null thumbnail into
+// permanent data loss, and the editor had one — signing the display URL happens
+// on the read path, `getSignedLmsAssetUrl` swallows the failure and returns null,
+// and that null used to be seeded straight into the field the save reads.
+describe('CourseEditor — a failed thumbnail signing must not clear the column', () => {
+  const STORED_PATH = 'thumbnails/live.png';
+  const courseWithThumbnail = { ...successResponse.course, thumbnail_url: STORED_PATH };
+
+  /** The `updates` object of the single course-update call. */
+  function courseUpdatePayload(): Record<string, unknown> {
+    const call = mockCallApi.mock.calls.find(([path]) => path === '/api/course-update');
+    return (call![1] as { updates: Record<string, unknown> }).updates;
+  }
+
+  function mockApi() {
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/course-structure-admin') return { course: courseWithThumbnail, modules: [] };
+      if (path === '/api/course-update') return { course: courseWithThumbnail };
+      if (path === '/api/courses-admin') return { courses: [courseWithThumbnail] };
+      throw new Error(`Unexpected call: ${path}`);
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApi();
+  });
+
+  afterEach(() => {
+    // clearAllMocks keeps implementations, so restore the pass-through signer.
+    vi.mocked(getSignedLmsAssetUrl).mockImplementation((url: string | null) => Promise.resolve(url));
+  });
+
+  it('saves the stored path unchanged when signing fails', async () => {
+    vi.mocked(getSignedLmsAssetUrl).mockResolvedValue(null);
+
+    renderPage();
+    await waitFor(() => expect(screen.getByDisplayValue('Test Course')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith('/api/course-update', expect.anything()),
+    );
+    // An unchanged path is a no-op; a null would have triggered deleteBlob.
+    expect(courseUpdatePayload().thumbnailUrl).toBe(STORED_PATH);
+  });
+
+  it('says the preview failed instead of silently showing an empty picker', async () => {
+    vi.mocked(getSignedLmsAssetUrl).mockResolvedValue(null);
+
+    renderPage();
+    await waitFor(() => expect(screen.getByDisplayValue('Test Course')).toBeInTheDocument());
+
+    expect(screen.getByText(/could not be loaded for preview/i)).toBeInTheDocument();
+    // The picker gets no display URL — but the field still holds the path.
+    expect(screen.getByTestId('file-upload-value')).toHaveTextContent('');
+  });
+
+  it('still clears the column when the admin actually removes the thumbnail', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByDisplayValue('Test Course')).toBeInTheDocument());
+    expect(screen.getByTestId('file-upload-value')).toHaveTextContent(STORED_PATH);
+
+    fireEvent.click(screen.getByRole('button', { name: /remove thumbnail/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith('/api/course-update', expect.anything()),
+    );
+    // #275 working as intended: the column is cleared and the blob is deleted.
+    expect(courseUpdatePayload().thumbnailUrl).toBeNull();
+  });
+
+  it('sends the newly uploaded path when the admin replaces the thumbnail', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByDisplayValue('Test Course')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /upload thumbnail/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith('/api/course-update', expect.anything()),
+    );
+    expect(courseUpdatePayload().thumbnailUrl).toBe('thumbnails/new.png');
   });
 });
 

@@ -136,14 +136,14 @@ describe('org-membership-create', () => {
       status: 'active',
       created_at: '2026-06-07T12:00:00.000Z',
     };
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 5, 0))); // seat_limit null — never blocks
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(null, 5, 0)));
     mockClientQuery.mockResolvedValueOnce(rows(inserted));
 
     const res = await handler(baseReq(validBody), {} as any);
 
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ membership: inserted });
-    expect(mockIsOrgAdmin).not.toHaveBeenCalled(); // platform-admin bypass
+    expect(mockIsOrgAdmin).not.toHaveBeenCalled();
 
     // First query: seat-limit lookup counts active members + pending invitations
     const [seatSql, seatParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
@@ -262,7 +262,7 @@ describe('org-membership-create', () => {
 
   it('seat-limit count is active + pending (excludes disabled members and invited memberships)', async () => {
     const inserted = { id: 'm5', org_id: 'org-1', user_id: 'user-1', role: 'learner', status: 'active', created_at: '2026-06-07T12:00:00.000Z' };
-    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 2, 0))); // 2 active (disabled members not counted)
+    mockClientQuery.mockResolvedValueOnce(rows(seatRow(5, 2, 0)));
     mockClientQuery.mockResolvedValueOnce(rows(inserted));
 
     const res = await handler(baseReq(validBody), {} as any);

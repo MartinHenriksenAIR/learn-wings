@@ -2,7 +2,7 @@
 
 This folder contains a plain PostgreSQL 15 port of the app's database,
 derived from the Supabase migration history (`supabase/migrations/*.sql`,
-42 files, final state), reconciled against the generated DB types
+44 files, final state), reconciled against the generated DB types
 (`src/integrations/supabase/types.ts`, the authoritative final column
 sets) and the Azure Functions in `functions/*/index.ts` (the runtime
 consumers).
@@ -12,7 +12,14 @@ consumers).
 | `01-schema.sql` | Types, tables, indexes, ported functions, triggers. Single `BEGIN/COMMIT`. |
 | `02-seed.sql`   | Synthetic, FK-valid, end-to-end-usable seed data. Single `BEGIN/COMMIT`. |
 | `03-seat-requests.sql` | Additive, idempotent migration for #127 (seat-request flow) — apply to prod directly. |
+| `04-idea-priority-scores.sql` | Additive, idempotent migration for #118 (idea Value × Effort scores). |
+| `05-course-group-id.sql` | Additive, idempotent migration for #213 (multilingual course grouping). |
+| `06-assessment.sql` | Additive, idempotent migration for #117 (AI self-assessment). |
+| _(`07-*.sql` — not in this folder)_ | Slot claimed by `07-exercises.sql` on the unmerged `feat/exercises-lesson-family-227` branch (#227). The gap is deliberate; do not reuse `07`. |
+| `08-orphan-sweep-runs.sql` | Additive, idempotent migration for #286 (orphan-sweep run records + the `ops_alerts` recipients row). |
 | `README.md`     | This file. |
+
+> **Standing rule:** additive prod migrations (the numbered `0N-*.sql` files) are folded into `01-schema.sql` after they are applied to prod, so a fresh DB stood up from `01`+`02` is always complete. The numbered files stay in this folder as the applied-migration record.
 
 Plain SQL only — no `psql` meta-commands (`\i`, `\dt`, …). PG15-compatible.
 No Supabase schemas (`auth` / `storage` / `realtime`).
@@ -45,8 +52,9 @@ a no-op.
 
 ## Added columns (the Entra delta + function-required columns)
 
-These are not in the Supabase migrations but are required by the
-consuming functions, so they were added to `profiles` / `quiz_options`:
+These are not in the Supabase migrations but were added to
+`profiles` / `quiz_options` for the Entra identity model and the
+consuming functions:
 
 | Column | Why |
 |--------|-----|
@@ -55,7 +63,7 @@ consuming functions, so they were added to `profiles` / `quiz_options`:
 | `idx_profiles_entra` — `UNIQUE (entra_oid, entra_tid) WHERE entra_oid IS NOT NULL` | Partial unique so many not-yet-provisioned (NULL) rows can coexist; enforces one profile per Entra identity. |
 | `profiles.email text` | Selected and inserted by `user-context`; selected by `org-analytics-data`. |
 | `profiles.avatar_url text` | Selected and inserted by `user-context`. |
-| `quiz_options.sort_order integer DEFAULT 0` | Selected/ordered by `quiz-options` and `quiz-options-admin`. |
+| `quiz_options.sort_order integer DEFAULT 0` | Selected/ordered by the quiz functions (`quiz-by-lesson`, `quiz-admin`, `quiz-admin-save`, `grade-quiz`). |
 
 > The exact `user-context` INSERT/SELECT was matched:
 > `INSERT INTO profiles (full_name, email, entra_oid, entra_tid) … RETURNING id, full_name, email, is_platform_admin, avatar_url`
@@ -89,9 +97,10 @@ already perform the equivalent checks inline:
 - `get_invitation_by_token(lookup_token)`, `accept_invitation(link_id, user_id)`
 - `get_org_invitations_safe(p_org_id)`, `get_platform_invitations_safe(p_org_id)`
 - `get_quiz_options_for_learner(p_question_id)`, `get_quiz_options_with_answers(p_question_id)`
-- `hash_invitation_token()` — **kept** (no `auth.uid()`; plain trigger)
 - `handle_new_user()` / `on_auth_user_created` — dropped (was on `auth.users`; replaced by `user-context` first-login provisioning)
-- `quiz_options_public` view — dropped (was a learner-safe view; `quiz-options` excludes `is_correct` in app code)
+- `quiz_options_public` view — dropped (was a learner-safe view; `quiz-by-lesson` excludes `is_correct` in app code)
+
+Kept (not omitted): `hash_invitation_token()` — no `auth.uid()` dependency; plain trigger.
 
 ---
 
@@ -102,61 +111,39 @@ against `01-schema.sql`.
 
 | Function | Tables / columns consumed | OK? |
 |----------|---------------------------|-----|
-| `user-context` | `profiles(id, full_name, email, is_platform_admin, avatar_url, entra_oid, entra_tid)`; `org_memberships(*, user_id, org_id, status)`; `organizations(*)` | ✅ |
-| `admin-user-actions` | `profiles(is_platform_admin, id, entra_oid)`; `org_memberships(role, id, org_id, user_id, status)` | ✅ |
-| `delete-user` | `profiles(id, is_platform_admin, entra_oid)` | ✅ |
+| `user-context` | `profiles(id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at, entra_oid, entra_tid, assessment_level, assessment_skipped_at)` + `max(assessment_attempts.created_at)` subquery; `invitations(id, org_id, role, status, email, expires_at)` (login-time invite adoption); `org_memberships(*, user_id, org_id, status)`; `organizations(*)` | ✅ |
 | `course-player-data` | `courses(*)`; `course_modules(course_id, sort_order)`; `lessons(module_id, sort_order)`; `lesson_progress(lesson_id, status, completed_at, user_id, org_id)`; `course_reviews(id, rating, comment, user_id, org_id, course_id)` | ✅ |
 | `enrollment-complete` | `enrollments(status, completed_at, user_id, org_id, course_id)` | ✅ |
 | `lesson-progress` | `lesson_progress(org_id, user_id, lesson_id, status, completed_at)` + `ON CONFLICT (org_id,user_id,lesson_id)` | ✅ (unique constraint present) |
 | `grade-quiz` | `profiles(id, is_platform_admin)`; `quizzes(id, lesson_id, passing_score)`; `lessons(id, module_id)`; `course_modules(id, course_id)`; `courses(id, is_published)`; `org_course_access(course_id, access)`; `org_memberships(org_id, user_id, status)`; `quiz_questions(id, quiz_id, sort_order)`; `quiz_options(id, is_correct, question_id)`; `quiz_attempts(org_id, user_id, quiz_id, score, passed, finished_at)` | ✅ |
-| `quiz-options` | `quiz_options(id, option_text, sort_order, question_id)` | ✅ (`sort_order` added) |
-| `quiz-options-admin` | `profiles(is_platform_admin, entra_oid)`; `quiz_options(id, option_text, is_correct, sort_order, question_id)`; `quiz_questions(id, quiz_id, sort_order)` | ✅ (`sort_order` added) |
+| `quiz-by-lesson` / `quiz-admin` / `quiz-admin-save` | `quiz_options(id, option_text, is_correct, sort_order, question_id)`; `quiz_questions(id, quiz_id, sort_order)` | ✅ (`sort_order` added) |
 | `generate-certificate` | `enrollments(id, user_id, status, course_id, completed_at)`; `profiles(id, full_name, entra_oid)`; `courses(id, title)`; `organizations(id, name)`; `org_memberships(org_id, user_id, status)` | ✅ |
 | `generate-compliance-report` | `profiles(entra_oid, is_platform_admin, id, department)`; `org_memberships(org_id, user_id, role, status)`; `organizations(id, name)`; `enrollments(status, org_id, user_id, course_id)`; `quiz_attempts(score, org_id, user_id)`; `org_course_access(course_id, org_id, access)`; `courses(id, title)` | ✅ |
 | `org-analytics-data` | `profiles(entra_oid, is_platform_admin, id, full_name, email)`; `org_memberships(*, org_id, user_id, role, status)`; `enrollments(*, org_id, user_id)`; `quiz_attempts(*, user_id)`; `organizations(*)` | ✅ |
 | `send-invitation-email` | `profiles(is_platform_admin, id, entra_oid)`; `org_memberships(user_id, role, status)` | ✅ |
 | `test-smtp-connection` | `profiles(is_platform_admin, entra_oid)` | ✅ |
-| `azure-upload-url` / `azure-document-upload-url` / `azure-delete-blob` | `profiles(is_platform_admin, id)` | ✅ |
+| `azure-upload-url` / `azure-document-upload-url` | `profiles(is_platform_admin, id)` (resolved by the `endpoint()` factory's `getProfile` from the caller's Entra oid) | ✅ |
 | `azure-view-url` | `profiles(id, is_platform_admin)`; `lessons(module_id, video_storage_path, document_storage_path)`; `course_modules(id, course_id)`; `courses(id, is_published)`; `org_course_access(course_id, access, org_id)`; `org_memberships(org_id, user_id, status)` | ✅ |
-| `invitation-link` | **`invitation_links(id, org_id, expires_at, created_at)`** | ⚠️ **FLAGGED — see below** |
 
-### ⚠️ Flags from the completeness check
+Identity resolution note: the current suite resolves the caller
+through the `endpoint()` factory's `getProfile` (Entra `oid`/`tid` →
+`profiles.id`), so `WHERE profiles.id = $1` / `om.user_id = $1` in the
+functions above receive a real `profiles.id`, not a raw Entra `oid`.
+The only functions that query by Entra id directly are the hand-rolled
+ones that resolve it (e.g. `user-context` on `entra_oid`/`entra_tid`).
 
-1. **`functions/invitation-link` references a table `invitation_links`
-   that no migration ever creates** (and it is absent from the generated
-   `types.ts`). The migrated schema models invitations in a single
-   `invitations` table with a shareable `link_id` column — there is no
-   separate `invitation_links` table. This function appears to query a
-   non-existent table and would fail at runtime as written. **It is NOT
-   created in `01-schema.sql`** — creating a speculative table would be
-   guessing at columns the app never defined. Resolution options for the
-   team: (a) fix the function to query `invitations` (e.g.
-   `SELECT link_id AS id FROM invitations WHERE org_id = $1 AND status='pending' AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`),
-   or (b) define the intended `invitation_links` table. This is left to
-   the app owners; it is a function bug, not a schema-port omission.
+### Tables with no direct function consumer
 
-2. **Profile-id vs. entra-oid inconsistency in some functions.** Several
-   functions resolve the caller via `profiles.entra_oid = $1` (correct:
-   `$1` is the Entra `oid`), but `grade-quiz`, `azure-upload-url`,
-   `azure-document-upload-url`, `azure-delete-blob`, and `azure-view-url`
-   use `WHERE profiles.id = $1` / `om.user_id = $1` with the same Entra
-   `oid` value. The schema supports both columns; whether those functions
-   behave correctly is an app-logic concern, not a schema gap. Noted so
-   the team is aware before go-live.
+The frontend has no direct DB layer — every read/write goes through the
+Azure Functions (there is no `pg`/Supabase client in `src/`). As of this
+port every schema table has at least one function consumer **except**
+`ai_conversations`, `idea_categories`, `idea_evaluations`, and
+`idea_specifications`, which have no consumer in `functions/` or `src/`.
 
-### Tables with no current function consumer (frontend-only)
-
-Included for completeness (frontend uses them via the data layer):
-`platform_settings`, `org_settings`, `community_categories`,
-`community_posts`, `community_comments`, `community_reports`,
-`community_resources`, `ai_champions`, `ai_conversations`,
-`idea_categories`, `ideas`, `idea_votes`, `idea_comments`,
-`idea_evaluations`, `idea_specifications`, `invitations`, `course_reviews`.
-
-> `idea_categories`, `idea_evaluations`, `idea_specifications`, and
-> `ai_conversations` exist in the generated `types.ts` but are **never
-> created by any migration** (Supabase project drift). They were
-> reconstructed here from `types.ts` so the frontend's references resolve.
+> Those four tables exist in the generated `types.ts` but are **never
+> created by any Supabase migration** (Supabase project drift). They were
+> reconstructed here from `types.ts` so a `01-schema.sql` stood up from
+> the types is complete; nothing in the current app reads or writes them.
 
 ---
 
@@ -199,8 +186,9 @@ node -e '
 ```
 
 Each file is a single transaction, so a failure rolls the whole file
-back. Re-running on a populated DB will fail on duplicate keys — drop and
-recreate the schema (or a fresh database) for a clean re-apply.
+back. Re-running `01`/`02` on a populated DB will fail on duplicate keys —
+drop and recreate the schema (or a fresh database) for a clean re-apply.
+(The additive `0N-*.sql` migrations are idempotent and safe to re-run.)
 
 ---
 
@@ -266,22 +254,18 @@ ON CONFLICT (org_id, user_id) DO UPDATE SET role = 'org_admin', status = 'active
 
 ## Summary
 
-- **Tables:** 31 (`organizations, profiles, org_memberships, invitations,
-  courses, course_modules, lessons, quizzes, quiz_questions, quiz_options,
-  org_course_access, enrollments, lesson_progress, quiz_attempts,
-  course_reviews, platform_settings, org_settings, community_categories,
-  community_posts, community_comments, community_reports,
-  community_resources, ai_champions, ai_conversations, idea_categories,
-  ideas, idea_votes, idea_comments, idea_evaluations,
-  idea_specifications, seat_requests`).
-- **Enums:** 13 (incl. the fully-expanded `idea_status` and `seat_request_status`).
+- **Tables:** 32 (`organizations, profiles, seat_requests, org_memberships,
+  invitations, courses, course_modules, lessons, quizzes, quiz_questions,
+  quiz_options, org_course_access, enrollments, lesson_progress,
+  quiz_attempts, assessment_attempts, course_reviews, platform_settings,
+  org_settings, community_categories, community_posts, community_comments,
+  community_reports, community_resources, ai_champions, idea_categories,
+  ideas, idea_votes, idea_comments, idea_evaluations, idea_specifications,
+  ai_conversations`).
+- **Enums:** 14 (incl. the fully-expanded `idea_status` and `seat_request_status`).
 - **Ported RPCs:** 3 (`can_user_access_lms_asset`, `user_can_access_quiz`,
   `get_invitation_link_id`) — all auth.uid() → `p_user_id`.
 - **Kept trigger fn:** `set_updated_at` (11 triggers) + `hash_invitation_token`.
 - **Dropped:** all RLS/policies, all `auth.*`, all `storage.*`,
   realtime/grants, ~15 auth-only RPCs, `handle_new_user`,
   `quiz_options_public` view.
-- **Flag:** `functions/invitation-link` queries a non-existent
-  `invitation_links` table (function bug; table intentionally not
-  fabricated). Minor profile-id-vs-entra_oid inconsistencies noted in a
-  few functions.

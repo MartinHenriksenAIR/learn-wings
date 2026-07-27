@@ -30,7 +30,6 @@ describe('learner-courses', () => {
     mockIsActiveMember.mockResolvedValue(false);
   });
 
-  // 1. 401 invalid token
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
 
@@ -40,7 +39,6 @@ describe('learner-courses', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 2. 401 profile not provisioned
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
 
@@ -50,7 +48,6 @@ describe('learner-courses', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
-  // 3. 400 orgId missing
   it('returns 400 when orgId is missing', async () => {
     const res = await handler(baseReq({}), {} as any);
 
@@ -58,7 +55,6 @@ describe('learner-courses', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
-  // 4. 403 non-member — isActiveMember called with ('p1','org-1')
   it('returns 403 for non-member and calls isActiveMember with correct args', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
 
@@ -69,7 +65,6 @@ describe('learner-courses', () => {
     expect(mockIsActiveMember).toHaveBeenCalledWith('p1', 'org-1');
   });
 
-  // 5. Happy path — member, two courses, one enrollment
   it('returns 200 with courses and enrollments for a member', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
 
@@ -121,7 +116,6 @@ describe('learner-courses', () => {
     expect(enrollParams).toEqual(['p1', 'org-1']);
   });
 
-  // 5b. language: 'en' in body — courses query param reflects it
   it('passes language "en" through to the courses query param', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery
@@ -136,8 +130,6 @@ describe('learner-courses', () => {
     expect(coursesParams).toEqual(['org-1', 'en', 'p1']);
   });
 
-  // 5b-i. Enrolled-course-across-languages: body language 'en' still retains any
-  // enrolled course regardless of its own language, via profile.id as $3.
   it('always includes the enrolled-courses EXISTS clause with profile.id as $3', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery
@@ -176,7 +168,6 @@ describe('learner-courses', () => {
     expect(orExistsIdx).toBeGreaterThan(orGroupIdx); // the OR lives inside that group
   });
 
-  // 5c. missing/invalid language — defaults to 'da'
   it('defaults to "da" when language is missing or invalid', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery
@@ -190,7 +181,6 @@ describe('learner-courses', () => {
     expect(coursesParams).toEqual(['org-1', 'da', 'p1']);
   });
 
-  // 6. Platform-admin bypass — isActiveMember NOT called
   it('returns 200 for platform admin without calling isActiveMember', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery
@@ -203,7 +193,6 @@ describe('learner-courses', () => {
     expect(mockIsActiveMember).not.toHaveBeenCalled();
   });
 
-  // 7. 500 db error
   it('returns 500 on db error', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));

@@ -4,7 +4,6 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock AppLayout as passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -20,7 +19,6 @@ vi.mock('@/components/community/CommentThread', () => ({
   CommentThread: () => <div data-testid="comment-thread" />,
 }));
 
-// --- mock react-i18next (t returns the key) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -28,7 +26,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// --- mock toast (assertable spy) ---
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({ toast: (...args: unknown[]) => mockToast(...args) }));
 
@@ -52,10 +49,11 @@ vi.mock('@/lib/api-client', () => ({
   callApiRaw: vi.fn(),
 }));
 
-// --- mock the community api ---
 const mockFetchPost = vi.fn();
 const mockFetchComments = vi.fn();
 const mockCreateReport = vi.fn();
+const mockTogglePostHidden = vi.fn();
+const mockTogglePostLocked = vi.fn();
 vi.mock('@/lib/community-api', () => ({
   fetchPost: (...args: unknown[]) => mockFetchPost(...args),
   fetchComments: (...args: unknown[]) => mockFetchComments(...args),
@@ -64,12 +62,11 @@ vi.mock('@/lib/community-api', () => ({
   deleteComment: vi.fn(),
   createReport: (...args: unknown[]) => mockCreateReport(...args),
   deletePost: vi.fn(),
-  togglePostHidden: vi.fn(),
-  togglePostLocked: vi.fn(),
+  togglePostHidden: (...args: unknown[]) => mockTogglePostHidden(...args),
+  togglePostLocked: (...args: unknown[]) => mockTogglePostLocked(...args),
   toggleCommentHidden: vi.fn(),
 }));
 
-// --- configurable hook mocks ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
@@ -132,7 +129,6 @@ function renderPost() {
   );
 }
 
-// Open the report dialog, pick a reason, and submit.
 async function submitReport() {
   fireEvent.click(await screen.findByRole('button', { name: /report/i }));
   await screen.findByRole('dialog');
@@ -167,7 +163,6 @@ describe('PostDetail — duplicate-report 409 handling (#21)', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
-    // No misleading failure toast for the duplicate case
     expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
   });
 
@@ -198,6 +193,48 @@ describe('PostDetail — duplicate-report 409 handling (#21)', () => {
     });
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+});
+
+// #243 — moderation toggles were silent on failure (no onError): a 403/500 left
+// the click doing nothing. These assert the destructive toast now fires.
+describe('PostDetail — moderation toggle failure paths (#243)', () => {
+  const adminAuth = { ...viewerAuth, isPlatformAdmin: true, effectiveIsPlatformAdmin: true };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetchPost.mockResolvedValue(basePost);
+    mockFetchComments.mockResolvedValue([]);
+    mockUseAuth.mockReturnValue(adminAuth);
+    mockUsePlatformSettings.mockReturnValue({ features: { community_enabled: true }, isLoading: false });
+  });
+
+  it('surfaces a destructive toast when hiding a post fails', async () => {
+    mockTogglePostHidden.mockRejectedValue(new MockApiError('Forbidden', 403));
+
+    renderPost();
+    fireEvent.click(await screen.findByRole('button', { name: /community\.hide/i }));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'community.toasts.postHideFailed',
+        variant: 'destructive',
+      }));
+    });
+  });
+
+  it('surfaces a destructive toast when locking a post fails', async () => {
+    mockTogglePostLocked.mockRejectedValue(new MockApiError('Server error', 500));
+
+    renderPost();
+    fireEvent.click(await screen.findByRole('button', { name: /community\.lock/i }));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'community.toasts.postLockFailed',
+        variant: 'destructive',
+      }));
     });
   });
 });

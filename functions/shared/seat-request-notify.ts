@@ -1,50 +1,5 @@
 import type { InvocationContext } from '@azure/functions';
-import { Resend } from 'resend';
-
-// Lazy init — constructing Resend without an API key throws at load time, which
-// would deregister ALL functions (functions.md).
-let resendClient: Resend | null = null;
-function getResend(): Resend {
-  if (!resendClient) resendClient = new Resend(process.env.RESEND_API_KEY);
-  return resendClient;
-}
-
-// The single branded sender for every seat-request email.
-const FROM_ADDRESS = 'AI Uddannelse <no-reply@ai-uddannelse.dk>';
-
-// Subjects are raw plain text (never HTML-escaped — that is bodies-only). Strip
-// CR/LF so an org/requester name can't inject extra mail headers (LOW hardening).
-function sanitizeSubject(subject: string): string {
-  return subject.replace(/[\r\n]+/g, ' ');
-}
-
-interface BestEffortEmail {
-  recipient: string | null; // null → skip the send
-  subject: string;
-  html: string;
-  skipLog: string; // info-logged when the recipient is null
-  failLog: string; // error-logged when the Resend send throws
-}
-
-// Best-effort send shared by every seat-request notification: a null recipient
-// is skipped and a Resend failure is swallowed — both are logged, never thrown.
-// The persisted request/fulfilment must never be blocked by mail delivery.
-async function sendBestEffort(context: InvocationContext, email: BestEffortEmail): Promise<void> {
-  if (!email.recipient) {
-    context.log(email.skipLog);
-    return;
-  }
-  try {
-    await getResend().emails.send({
-      from: FROM_ADDRESS,
-      to: [email.recipient],
-      subject: sanitizeSubject(email.subject),
-      html: email.html,
-    });
-  } catch (err) {
-    context.error(email.failLog, err);
-  }
-}
+import { escapeHtml, sendBestEffort } from './resend';
 
 export interface SeatRequestEmailParams {
   recipient: string;
@@ -85,8 +40,6 @@ export function renderSeatRequestEmail(p: SeatRequestEmailParams): { subject: st
   return { subject, html };
 }
 
-// Best-effort: the request row is already committed and visible in-app. A failed
-// email is logged, never thrown — we must not lose the persisted request.
 export async function notifySeatRequest(context: InvocationContext, p: SeatRequestEmailParams): Promise<void> {
   const { subject, html } = renderSeatRequestEmail(p);
   await sendBestEffort(context, {
@@ -101,15 +54,7 @@ export async function notifySeatRequest(context: InvocationContext, p: SeatReque
 // --- Requester-facing emails (#193) --------------------------------------
 // These go to the requesting org admin, not the platform admin. They embed
 // user- and org-supplied strings, so every interpolated string is HTML-escaped
-// via this local helper — as is the platform-admin template above (#195).
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+// — as is the platform-admin template above (#195).
 
 // Danish is the default: only an explicit 'en' preference selects English.
 function isEnglish(language: string | null): boolean {
@@ -179,8 +124,6 @@ export function renderSeatRequestFulfilledEmail(p: SeatRequestFulfilledParams): 
   };
 }
 
-// Best-effort, same contract as notifySeatRequest: a null recipient or a Resend
-// failure is logged and swallowed — the request/fulfilment must never be blocked.
 export async function notifySeatRequestReceived(context: InvocationContext, p: SeatRequestReceivedParams): Promise<void> {
   const { subject, html } = renderSeatRequestReceivedEmail(p);
   await sendBestEffort(context, {

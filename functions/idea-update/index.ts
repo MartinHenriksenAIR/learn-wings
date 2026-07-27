@@ -1,5 +1,7 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
+import { buildUpdateSet } from '../shared/update-builder';
+import { loadIdea, checkAuthorDraft } from '../shared/ideas';
 
 // Author-writable fields. status, user_id, org_id, submitted_at, admin_notes,
 // rejection_reason, category_id, course/lesson context are NOT editable here —
@@ -26,13 +28,6 @@ const ALLOWED_UPDATE_FIELDS = new Set([...STRING_FIELDS, 'tags', 'business_area'
 
 const BUSINESS_AREAS = ['hr', 'finance', 'sales', 'support', 'ops', 'it', 'legal', 'other'];
 
-interface IdeaRow {
-  id: string;
-  org_id: string;
-  user_id: string;
-  status: string;
-}
-
 export default endpoint('idea-update', async ({ req, profile, reply }) => {
   const body = await req.json() as { ideaId?: unknown; updates?: unknown };
   const { ideaId, updates } = body;
@@ -40,19 +35,20 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
   if (!ideaId || typeof ideaId !== 'string') {
     return reply(400, { error: 'ideaId is required' });
   }
-  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
-    return reply(400, { error: 'updates must be an object' });
+
+  // Shape check + whitelist walk + SET-clause build (shared #252). NOTE: unknown
+  // keys now 400 ("Invalid update field: X") — this endpoint used to silently
+  // drop them; the frontend only ever sends whitelisted keys (verified #252).
+  const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS, {
+    emptyError: 'No valid update fields provided',
+  });
+  if (!built.ok) {
+    return reply(400, { error: built.error });
   }
 
   const updatesObj = updates as Record<string, unknown>;
+  const updateKeys = Object.keys(updatesObj);
 
-  // Filter to recognized whitelisted keys only (unknown keys are silently ignored).
-  const updateKeys = Object.keys(updatesObj).filter((k) => ALLOWED_UPDATE_FIELDS.has(k));
-  if (updateKeys.length === 0) {
-    return reply(400, { error: 'No valid update fields provided' });
-  }
-
-  // Per-field validation on present whitelisted keys.
   for (const key of updateKeys) {
     const v = updatesObj[key];
     if (key === 'tags') {
@@ -66,36 +62,21 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
         });
       }
     } else {
-      // STRING_FIELDS: string or null
       if (v !== null && typeof v !== 'string') {
         return reply(400, { error: `${key} must be a string` });
       }
     }
   }
 
-  // Load idea
-  const idea = await queryOne<IdeaRow>(
-    `SELECT id, org_id, user_id, status FROM ideas WHERE id = $1`,
-    [ideaId],
-  );
+  const idea = await loadIdea(ideaId);
   if (!idea) return reply(404, { error: 'Idea not found' });
 
-  // Author-only: no admin bypass (org-admin writes go through idea-status-update).
-  if (idea.user_id !== profile.id) {
-    return reply(403, { error: 'Forbidden' });
-  }
+  // Author-only-403 + draft-only-409 (shared/ideas; no admin bypass — org-admin
+  // writes go through idea-status-update).
+  const gate = checkAuthorDraft(idea, profile, { notDraftError: 'Only draft ideas can be edited' });
+  if (!gate.ok) return reply(gate.status, gate.body);
 
-  // Draft-only.
-  if (idea.status !== 'draft') {
-    return reply(409, { error: 'Only draft ideas can be edited' });
-  }
-
-  // Build dynamic UPDATE over the provided whitelisted keys only.
-  const params: unknown[] = [];
-  const setClauses = updateKeys.map((key) => {
-    params.push(updatesObj[key]);
-    return `${key} = $${params.length}`;
-  });
+  const { setClauses, params } = built;
   params.push(ideaId);
   const idIndex = params.length;
 

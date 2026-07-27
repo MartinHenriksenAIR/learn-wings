@@ -103,7 +103,6 @@ export function BulkInviteDialog({
               const roleRaw = String(row.role || '').trim().toLowerCase();
               const role = roleRaw === 'org_admin' || roleRaw === 'admin' ? 'org_admin' : 'learner';
 
-              // Validate email
               const emailResult = emailSchema.safeParse(email);
               if (!emailResult.success) {
                 return {
@@ -120,7 +119,6 @@ export function BulkInviteDialog({
               return { email, first_name: firstName, last_name: lastName, department, role, valid: true };
             });
 
-            // Check for duplicates
             const seen = new Set<string>();
             parsed.forEach((item) => {
               if (item.valid) {
@@ -289,7 +287,6 @@ export function BulkInviteDialog({
           {/* Email language — applies to the whole batch */}
           <InviteLanguageSelect value={inviteLanguage} onChange={setInviteLanguage} />
 
-          {/* Download Template */}
           <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
             <div className="flex items-center gap-3">
               <FileSpreadsheet className="h-8 w-8 text-primary" />
@@ -306,7 +303,6 @@ export function BulkInviteDialog({
             </Button>
           </div>
 
-          {/* Upload Section */}
           <div className="space-y-2">
             <Label>Upload CSV File</Label>
             <input
@@ -336,7 +332,6 @@ export function BulkInviteDialog({
             </div>
           </div>
 
-          {/* Preview Table */}
           {parsedData.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-4">
@@ -395,7 +390,6 @@ export function BulkInviteDialog({
             </div>
           )}
 
-          {/* Results */}
           {results && (
             <Alert>
               <AlertCircle className="h-4 w-4" />

@@ -131,7 +131,6 @@ describe('community-report-create', () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ report });
 
-    // Verify dedupe check params
     const dedupeCall = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(dedupeCall[1]).toContain('p1'); // reporter from profile, not body
 

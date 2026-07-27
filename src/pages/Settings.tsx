@@ -42,26 +42,20 @@ export default function Settings() {
   const { flashed, flash } = useFlash();
   const { data: avatarSrc } = useSignedBrandingUrl(profile?.avatar_url);
 
-  // Profile state
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [department, setDepartment] = useState('');
   const [saving, setSaving] = useState(false);
   const [profileErrors, setProfileErrors] = useState<{ firstName?: string; lastName?: string; department?: string }>({});
 
-  // Language state
   const [languageSaving, setLanguageSaving] = useState(false);
-
-  // Profile-photo state
   const [avatarSaving, setAvatarSaving] = useState(false);
 
-  // Sync profile fields when profile loads
   useEffect(() => {
     if (profile) {
       setFirstName(profile.first_name || '');
       setLastName(profile.last_name || '');
       setDepartment(profile.department || '');
-      // Sync i18n language with profile preference
       if (profile.preferred_language && profile.preferred_language !== i18n.language) {
         i18n.changeLanguage(profile.preferred_language);
       }
@@ -77,7 +71,6 @@ export default function Settings() {
     await i18n.changeLanguage(newLanguage);
     localStorage.setItem('preferred_language', newLanguage);
 
-    // Persist to database
     try {
       await callApi('/api/profile-update', { preferred_language: newLanguage });
       toast({
@@ -96,11 +89,13 @@ export default function Settings() {
   };
 
   const handleAvatarChange = async (_url: string | null, storagePath: string | null) => {
-    // Only persist a successful upload. A null storagePath means the upload
-    // failed — FileUpload signals failure with onChange(null, null) — and
-    // persisting then would silently wipe an existing photo. (Same guard the
-    // org-logo upload uses in OrgAnalytics.) FileUpload surfaces the error to
-    // the user for retry.
+    // Only ever persist a real storage path. This call site passes no `value`,
+    // so FileUpload renders no remove button and reports only SUCCESSFUL uploads
+    // — a failed one now leaves the parent's value untouched rather than
+    // reporting null, precisely so a dropped connection cannot blank the column
+    // and (since #275) delete the photo it failed to replace. The guard keeps
+    // that guarantee local rather than inherited. (Same guard the org-logo upload
+    // uses in OrgAnalytics.) FileUpload surfaces the error to the user for retry.
     if (!profile || !storagePath) return;
 
     setAvatarSaving(true);
@@ -156,7 +151,6 @@ export default function Settings() {
     }
   };
 
-  // Determine role display
   const getRoleDisplay = () => {
     if (isPlatformAdmin) {
       return { label: t('nav.roles.platformAdmin'), variant: 'default' as const };
@@ -191,7 +185,6 @@ export default function Settings() {
           {t('settings.title')}
         </h1>
 
-        {/* Profile Section */}
         <Card className="mb-4">
           <CardContent className="space-y-3.5 px-[26px] py-6">
             <div className="mb-1 flex items-center gap-3.5">
@@ -301,7 +294,6 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Language Section */}
         <Card className="mb-4">
           <CardContent className="space-y-3 px-[26px] py-6">
             <div>
@@ -370,7 +362,6 @@ export default function Settings() {
           </Card>
         )}
 
-        {/* Account Information Section */}
         <Card>
           <CardContent className="space-y-3.5 px-[26px] py-6">
             <h3 className="text-[15px] font-extrabold">{t('settings.accountInfo')}</h3>

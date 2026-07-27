@@ -9,7 +9,6 @@ export default endpoint('profiles', async ({ req, profile, reply }) => {
   const body = await req.json() as { userIds?: unknown };
   const { userIds } = body;
 
-  // Validate userIds if present
   if (userIds !== undefined) {
     if (!Array.isArray(userIds) || !userIds.every((v) => typeof v === 'string')) {
       return reply(400, { error: 'userIds must be an array of strings' });
@@ -18,7 +17,6 @@ export default endpoint('profiles', async ({ req, profile, reply }) => {
 
   const validatedUserIds = userIds as string[] | undefined;
 
-  // Tier 1: Platform admin
   if (profile.is_platform_admin) {
     let rows: unknown[];
     if (validatedUserIds) {
@@ -34,7 +32,6 @@ export default endpoint('profiles', async ({ req, profile, reply }) => {
     return reply(200, { profiles: rows });
   }
 
-  // Tier 2: Org admin of at least one org
   if (await isOrgAdminOfAny(profile.id)) {
     let rows: unknown[];
     if (validatedUserIds) {
@@ -62,7 +59,6 @@ export default endpoint('profiles', async ({ req, profile, reply }) => {
     return reply(200, { profiles: rows });
   }
 
-  // Tier 3: Plain learner — own profile only
   const rows = await query(
     `SELECT ${PROFILE_COLUMNS} FROM profiles WHERE id = $1`,
     [profile.id],

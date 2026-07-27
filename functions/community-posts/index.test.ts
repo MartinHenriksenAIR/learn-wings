@@ -119,7 +119,6 @@ describe('community-posts', () => {
 
     expect(res.status).toBe(200);
     const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // The WHERE clause should not filter by p.is_hidden for admins
     expect(sql).not.toContain('p.is_hidden = false');
   });
 
@@ -169,7 +168,6 @@ describe('community-posts', () => {
     const res = await handler(baseReq({ scope: 'global' }), {} as any);
     expect(res.status).toBe(200);
     const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // p.is_hidden = false should not appear in the WHERE clause for admins
     expect(sql).not.toContain('p.is_hidden = false');
   });
 
@@ -191,12 +189,11 @@ describe('community-posts', () => {
     // $1=scope, $2=orgId, $3=categoryId, $4=search, $5=tags, $6=includeHidden
     expect(params).toEqual(['org', 'org-1', 'cat-1', 'foo', ['a', 'b'], true]);
 
-    // SQL must contain ILIKE and && fragments
     expect(sql).toContain('ILIKE');
     expect(sql).toContain('&&');
 
-    // includeHidden=true means p.is_hidden = false must NOT appear in the WHERE clause
-    // (the comment_count subquery's cc.is_hidden = false will still be present)
+    // The comment_count subquery's cc.is_hidden = false will still be present;
+    // only the post-level filter must be absent.
     expect(sql).not.toContain('p.is_hidden = false');
   });
 

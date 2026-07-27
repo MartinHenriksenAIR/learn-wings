@@ -6,6 +6,7 @@ import { callApi, ApiError } from '@/lib/api-client';
 import { savePostLoginRedirect } from '@/lib/post-login-redirect';
 import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
+import { MicrosoftSignInButton } from '@/components/auth/MicrosoftSignInButton';
 import {
   CircleCheck,
   Clock,
@@ -54,7 +55,6 @@ function errorKindFor(err: unknown): ErrorKind {
   return 'generic';
 }
 
-/** Full-page gradient wrapper + the Login-style white card. */
 function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className={`grid min-h-screen place-items-center ${PAGE_GRADIENT_CLASSES} px-4`}>
@@ -63,7 +63,6 @@ function AuthShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** Lucide icon in a soft tinted circle (success green or destructive red). */
 function StatusIcon({ tone, children }: { tone: 'success' | 'error'; children: ReactNode }) {
   return (
     <div
@@ -161,20 +160,15 @@ export default function Signup() {
         <CardBody>
           <Trans i18nKey="invitationAccept.invitedBody" />
         </CardBody>
-        <Button className={PRIMARY_BUTTON_CLASSES} onClick={handleSignIn}>
-          <svg width="16" height="16" viewBox="0 0 23 23" aria-hidden="true">
-            <rect x="1" y="1" width="10" height="10" fill="#ffffff" />
-            <rect x="12" y="1" width="10" height="10" fill="#dfe4f7" />
-            <rect x="1" y="12" width="10" height="10" fill="#dfe4f7" />
-            <rect x="12" y="12" width="10" height="10" fill="#ffffff" />
-          </svg>
-          {t('invitationAccept.signInWithMicrosoft')}
-        </Button>
+        <MicrosoftSignInButton
+          className={PRIMARY_BUTTON_CLASSES}
+          onClick={handleSignIn}
+          label={t('invitationAccept.signInWithMicrosoft')}
+        />
       </AuthShell>
     );
   }
 
-  // ---- Success cards ----
   if (state.phase === 'success') {
     const { result } = state;
     if (result.kind === 'platform') {
@@ -230,7 +224,6 @@ export default function Signup() {
     );
   }
 
-  // ---- Error cards ----
   if (state.phase === 'error') {
     if (state.kind === 'emailMismatch') {
       return (
@@ -303,7 +296,6 @@ export default function Signup() {
     );
   }
 
-  // ---- Authenticated: explicit Accept card ----
   return (
     <AuthShell>
       <img src={logoLight} alt="AI Uddannelse" className="h-[52px] w-auto object-contain" />

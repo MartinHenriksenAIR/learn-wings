@@ -1,16 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const {
+  mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockDeleteBlob, mockCleanupBlobs,
+} = vi.hoisted(() => {
   class MockAuthError extends Error {}
+  const mockDeleteBlob = vi.fn();
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
+    mockQuery: vi.fn(),
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
+    mockDeleteBlob,
+    mockCleanupBlobs: vi.fn(async (paths: string[], _logTag: string, _id: string) => {
+      const results = await Promise.all(paths.map((p) => mockDeleteBlob(p)));
+      const blobsDeleted = results.filter(Boolean).length;
+      return { blobsDeleted, blobsFailed: results.length - blobsDeleted };
+    }),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ queryOne: mockQueryOne }));
+// This endpoint issues no collect SELECT of its own, so `query` has exactly one
+// caller: the reference query the REAL blob-ownership release gate runs after the
+// DELETE. The gate is exercised rather than stubbed, so "another row still
+// references this logo" is expressed as the rows that call returns.
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne, withTransaction: vi.fn(), getDb: vi.fn() }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
+// cleanupBlobs is faked in terms of mockDeleteBlob so the assertions pin what belongs
+// to THIS endpoint: which paths it collects and that it echoes the counts back. Its
+// own counting/warning contract is covered by describe('cleanupBlobs') in
+// shared/blob.test.ts. `classifyBlobPath` stays REAL (spread from the original)
+// because blob-ownership imports it from here and it is a pure string check —
+// stubbing it would make every release-gate assertion below vacuous.
+vi.mock('../shared/blob', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/blob')>()),
+  deleteBlob: mockDeleteBlob,
+  cleanupBlobs: mockCleanupBlobs,
+}));
 
 import handler from './index';
 
@@ -25,6 +50,10 @@ describe('organization-delete', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
+    mockDeleteBlob.mockResolvedValue(true);
+    // Default: the release gate's reference query answers "nobody references these".
+    mockQuery.mockResolvedValue([]);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -76,22 +105,86 @@ describe('organization-delete', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
-  it('returns 404 when organization not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null); // DELETE RETURNING null = no row
+  it('returns 404 when organization not found — deleteBlob never called', async () => {
+    mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq({ orgId: 'org-x' }), {} as any);
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization not found' });
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
   it('happy path: platform admin deletes an organization', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // DELETE RETURNING id
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: null });
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.body as string)).toEqual({ ok: true });
+    expect(JSON.parse(res.body as string)).toEqual({ ok: true, blobsDeleted: 0, blobsFailed: 0 });
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('DELETE FROM organizations');
     expect(sql).toContain('RETURNING id');
+    // #285: the logo rides the DELETE, so it is still ONE round trip.
+    expect(sql).toContain('logo_url');
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(params).toEqual(['org-1']);
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('deletes the org logo blob — #285', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: 'org-logos/logo.png' });
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ ok: true, blobsDeleted: 1, blobsFailed: 0 });
+    expect(mockCleanupBlobs).toHaveBeenCalledWith(['org-logos/logo.png'], 'organization-delete', 'org-1');
+    expect(mockDeleteBlob).toHaveBeenCalledWith('org-logos/logo.png');
+  });
+
+  it('a failed storage delete is counted, not fatal: blobsFailed:1, still 200', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: 'org-logos/logo.png' });
+    mockDeleteBlob.mockResolvedValueOnce(false);
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ ok: true, blobsDeleted: 0, blobsFailed: 1 });
+  });
+
+  it('leaves a logo another row still references, and still deletes an unreferenced one — #285', async () => {
+    // Pre-bind-gate rows can share a logo path; deleting this org must not destroy
+    // the blob a surviving organization still points at. The second run — same
+    // shape, nobody referencing — is what keeps this test non-vacuous.
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: 'org-logos/shared.png' });
+    mockQuery.mockResolvedValueOnce([{ path: 'org-logos/shared.png' }]);
+    const shared = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    expect(shared.status).toBe(200);
+    expect(JSON.parse(shared.body as string)).toEqual({ ok: true, blobsDeleted: 0, blobsFailed: 0 });
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-2', logo_url: 'org-logos/sibling.png' });
+    mockQuery.mockResolvedValueOnce([]);
+    const sibling = await handler(baseReq({ orgId: 'org-2' }), {} as any);
+    expect(sibling.status).toBe(200);
+    expect(JSON.parse(sibling.body as string)).toEqual({ ok: true, blobsDeleted: 1, blobsFailed: 0 });
+    expect(mockDeleteBlob).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBlob).toHaveBeenCalledWith('org-logos/sibling.png');
+  });
+
+  it('release-check DB failure: nothing deleted, request still succeeds', async () => {
+    // The gate fails SAFE — an unanswered "is anyone else using this?" must never
+    // resolve to "delete it", and must never turn a completed row delete into a 500.
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: 'org-logos/logo.png' });
+    mockQuery.mockReset();
+    mockQuery.mockRejectedValue(new Error('connection refused'));
+    const res = await handler(baseReq({ orgId: 'org-1' }), { error: vi.fn() } as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ ok: true, blobsDeleted: 0, blobsFailed: 0 });
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+  });
+
+  it('leaves an absolute external logo_url alone — it names no blob we own', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: 'https://cdn.example.com/logo.png' });
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ ok: true, blobsDeleted: 0, blobsFailed: 0 });
+    expect(mockDeleteBlob).not.toHaveBeenCalled();
+    // Not even asked about — `classifyBlobPath` drops it before the reference query.
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 
   it('returns 500 on db error', async () => {

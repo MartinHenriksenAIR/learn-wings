@@ -77,7 +77,7 @@ describe('community-post-delete', () => {
   });
 
   it('returns 403 when non-author non-admin tries to delete', async () => {
-    mockQueryOne.mockResolvedValueOnce(orgPost); // another user's post
+    mockQueryOne.mockResolvedValueOnce(orgPost);
     mockIsOrgAdmin.mockResolvedValueOnce(false);
     const res = await handler(baseReq({ postId: 'post-1' }), {} as any);
     expect(res.status).toBe(403);
@@ -85,19 +85,19 @@ describe('community-post-delete', () => {
   });
 
   it('returns 403 when author tries to delete a post in restricted category', async () => {
-    mockQueryOne.mockResolvedValueOnce(myOrgPost); // author's post
+    mockQueryOne.mockResolvedValueOnce(myOrgPost);
     mockIsOrgAdmin.mockResolvedValueOnce(false);
-    mockQueryOne.mockResolvedValueOnce({ is_restricted: true }); // restricted category
+    mockQueryOne.mockResolvedValueOnce({ is_restricted: true });
     const res = await handler(baseReq({ postId: 'post-1' }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
   it('happy path: author deletes their own post in non-restricted category', async () => {
-    mockQueryOne.mockResolvedValueOnce(myOrgPost); // author's post
+    mockQueryOne.mockResolvedValueOnce(myOrgPost);
     mockIsOrgAdmin.mockResolvedValueOnce(false);
-    mockQueryOne.mockResolvedValueOnce({ is_restricted: false }); // non-restricted
-    mockQuery.mockResolvedValueOnce([]); // DELETE
+    mockQueryOne.mockResolvedValueOnce({ is_restricted: false });
+    mockQuery.mockResolvedValueOnce([]);
 
     const res = await handler(baseReq({ postId: 'post-1' }), {} as any);
 
@@ -110,7 +110,7 @@ describe('community-post-delete', () => {
   });
 
   it('org admin can delete any post in their org', async () => {
-    mockQueryOne.mockResolvedValueOnce(orgPost); // another user's post
+    mockQueryOne.mockResolvedValueOnce(orgPost);
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     mockQuery.mockResolvedValueOnce([]);
     const res = await handler(baseReq({ postId: 'post-1' }), {} as any);
@@ -120,7 +120,7 @@ describe('community-post-delete', () => {
 
   it('platform admin can delete any post without calling isOrgAdmin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    mockQueryOne.mockResolvedValueOnce(orgPost); // another user's post
+    mockQueryOne.mockResolvedValueOnce(orgPost);
     mockQuery.mockResolvedValueOnce([]);
     const res = await handler(baseReq({ postId: 'post-1' }), {} as any);
     expect(res.status).toBe(200);

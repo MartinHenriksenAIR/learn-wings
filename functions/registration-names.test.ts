@@ -1,5 +1,5 @@
 // Fleet-wide static guard over the registration trailer in every functions/*/index.ts
-// (endpoint / adminEndpoint / legacy app.http). Route names are load-time string
+// (endpoint / adminEndpoint / legacy app.http / app.timer). Route names are load-time string
 // literals: a typo'd, duplicated, or missing name passes every per-endpoint test
 // (those call the handler directly — registration runs unmocked at import, but its
 // route name is never asserted) and fails only at DEPLOY time, when the Functions
@@ -12,11 +12,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Folder name → registered route name, for deliberate deviations ONLY.
-const KNOWN_DEVIATIONS: Record<string, string> = {
-  // Route names may not start with the reserved prefixes admin/runtime/host
-  // (.claude/rules/functions.md), so this folder registers suffix-style.
-  'admin-user-actions': 'user-actions-admin',
-};
+// Empty now that admin-user-actions was deleted (callers died in bf1df3b).
+const KNOWN_DEVIATIONS: Record<string, string> = {};
 
 const RESERVED_PREFIXES = ['admin', 'runtime', 'host'] as const;
 const NON_ENDPOINT_DIRS = new Set(['shared', 'node_modules', 'dist']);
@@ -24,11 +21,15 @@ const FUNCTIONS_ROOT = dirname(fileURLToPath(import.meta.url));
 
 // First string argument of the registration statement, whichever form the file
 // uses. Line-anchored: registrations in this fleet are only ever
-// `export default endpoint(` / `export default adminEndpoint(` / `app.http(` at
-// line start — anchoring prevents false positives from comments/strings and
-// false negatives from aliased or re-exported forms (which would silently drop
-// a file from the scan).
-const REGISTRATION = /^(?:export default (?:adminEndpoint|endpoint)|app\.http)\(\s*['"]([^'"]+)['"]/gm;
+// `export default endpoint(` / `export default adminEndpoint(` / `app.http(` /
+// `app.timer(` at line start — anchoring prevents false positives from
+// comments/strings and false negatives from aliased or re-exported forms (which
+// would silently drop a file from the scan).
+// `app.timer(` is the non-HTTP form (#277, functions/orphan-sweep): a timer's
+// first argument is a function NAME rather than a route, but every assertion
+// below — folder parity, exactly-one, uniqueness, reserved prefixes — applies to
+// it for the same reason, since the host keys on that name too.
+const REGISTRATION = /^(?:export default (?:adminEndpoint|endpoint)|app\.(?:http|timer))\(\s*['"]([^'"]+)['"]/gm;
 
 // Exactly one barrel import per endpoint folder, `import './<folder>/index';`.
 const BARREL_IMPORT = /^import '\.\/([^/']+)\/index';$/gm;

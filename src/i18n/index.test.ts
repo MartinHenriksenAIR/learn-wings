@@ -12,7 +12,6 @@ describe('i18n default language (#226 — overrides #119)', () => {
 
   it('resolves a third browser language (e.g. Spanish) to English, never Danish', () => {
     const utils = i18n.services.languageUtils;
-    // getFallbackCodes computes what an unsupported code falls back to.
     expect(utils.getFallbackCodes(i18n.options.fallbackLng, 'es')).toEqual(['en']);
     expect(utils.getFallbackCodes(i18n.options.fallbackLng, 'fr-FR')).toEqual(['en']);
     expect(utils.getFallbackCodes(i18n.options.fallbackLng, 'de')).not.toContain('da');

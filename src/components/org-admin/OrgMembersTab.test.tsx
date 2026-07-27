@@ -4,9 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // --- mock react-i18next (no i18n provider needed) ---
-// `i18n.resolvedLanguage` is 'en' so the invite-language selector defaults to 'en'.
+// `language` feeds this tab's date formatters; `resolvedLanguage` is what the
+// invite-language selector defaults from — both are 'en'.
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k, i18n: { resolvedLanguage: 'en' } }),
+  useTranslation: () => ({
+    t: (k: string) => k,
+    i18n: { language: 'en', resolvedLanguage: 'en' },
+  }),
 }));
 
 // --- mock sonner toast ---

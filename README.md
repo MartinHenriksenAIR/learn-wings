@@ -41,7 +41,8 @@ callApi()  ───────────────────────
    ▼
 Azure Function  ─────────────────────────►  functions/<name>/index.ts  (×~100)
    │   the envelope is owned by endpoint()/adminEndpoint() in functions/shared/endpoint.ts
-   │   (ADR-0015; a handful of hand-rolled exceptions), leaning on 4 shared helpers:
+   │   (ADR-0015; a handful of hand-rolled exceptions), leaning on the core
+   │   request-path helpers among the ~25 modules in functions/shared/:
    │     authenticate()  verify the Entra JWT            functions/shared/auth.ts
    │     getProfile()    Entra identity → DB profile     functions/shared/profile.ts
    │                     + isActiveMember / isOrgAdmin    (authorization lives HERE)
@@ -58,12 +59,12 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | Path | What's there |
 |------|--------------|
 | `src/` | Frontend SPA — `pages/` (by role), `components/`, `hooks/useAuth.tsx`, `lib/` (api-client, types, msal-config) |
-| `functions/` | ~100 Azure Functions (one folder each) + `shared/` (auth, db, profile, cors) + `index.ts` barrel |
+| `functions/` | ~100 Azure Functions (one folder each) + `shared/` (~25 modules: `endpoint`, `auth`, `db`, `profile`, `cors`, `errors`, …) + `index.ts` barrel |
 | `migration/azure/` | The canonical Postgres schema (`01-schema.sql`), seed data (`02-seed.sql`), and apply guide |
 | `migration/` | `STATUS.html` (live ledger), `WORKLOG.md` (append-only history) |
-| `docs/adr/` | The 15 architecture decision records |
+| `docs/adr/` | The architecture decision records |
 | `.claude/` | Agent collaboration system — `rules/` (hard-won conventions), `skills/` (`pickup`/`handoff`), `collab.json` (branch topology), and the `guard-trunk` hook |
-| `supabase/` | **Dead** — the original Supabase Deno functions + migrations, kept only as authz-provenance reference. Deleted in the final migration slice (#13). |
+| `supabase/` | **Dead** — only the original Supabase SQL migrations, kept as provenance for the RLS policies the hand-written authz checks replaced. The Deno functions and the Supabase integration itself are long gone. |
 
 ## Local development
 
@@ -84,7 +85,7 @@ Environment variables (see [`.env.example`](.env.example)) — all `VITE_`-prefi
 | `VITE_ENTRA_CLIENT_ID` | Your Entra app-registration client id (drives MSAL config + API scope) |
 | `VITE_API_BASE_URL` | Base URL for the Functions API. Empty string `""` = same-origin `/api` |
 | `VITE_REDIRECT_URI` | Entra redirect URI (optional; defaults to `window.location.origin`) |
-| `VITE_STORAGE_BASE_URL` | Base URL for public blob assets (e.g. email logo) |
+| `VITE_PLATFORM_BASE_URL` | Public base URL for minting invite links (optional; set in prod at the domain cutover, otherwise falls back to the app's own origin) |
 
 ### Backend (Azure Functions)
 
@@ -98,6 +99,16 @@ npm test                    # vitest contract tests (mocked auth/db — never hi
 ```
 
 Every function must be imported in **`functions/index.ts`** or it silently never registers. See [`.claude/rules/functions.md`](.claude/rules/functions.md) for the full backend conventions.
+
+Optional app settings for the **orphan sweep** — the nightly timer (`functions/orphan-sweep`) that deletes blobs no database row references. All three have working defaults, so none has to be set; they exist so the job can be stopped, or its blast radius changed, **without a redeploy**:
+
+| App setting | Default | Purpose |
+|-------------|---------|---------|
+| `ORPHAN_SWEEP_DISABLED` | unset | Set to `1` to stop the sweep entirely. While it is set, orphaned blobs accrue and nothing is ever reclaimed |
+| `ORPHAN_SWEEP_MAX_SHARE` | `0.5` | Refuse the run if more than this fraction of the container — **or of any single top-level prefix, such as `avatars/`** — looks unreferenced. Treated as evidence that the match is broken, not as a big cleanup |
+| `ORPHAN_SWEEP_MAX_DELETIONS` | `500` | Refuse the run if it would delete more than this many blobs |
+
+Raising either ceiling is a deliberate, temporary act: confirm the sampled names in the refusal log really are referenced by nothing, then put the default back. The sweep refuses the whole run rather than deleting a subset, and every refusal logs what an operator should do about it.
 
 ### Database
 

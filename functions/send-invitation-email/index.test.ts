@@ -38,7 +38,6 @@ describe('send-invitation-email', () => {
   });
 
   it('returns 403 for users who are not admin or org admin', async () => {
-    // not platform admin, not org admin
     mockQueryOne.mockResolvedValueOnce({ is_platform_admin: false, is_org_admin: false });
 
     const res = await handler(makeReq(validBody) as any, {} as any);

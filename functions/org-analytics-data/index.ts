@@ -27,13 +27,13 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         // so totalUsers counts distinct people and the Team table has unique row keys.
         // department lives on profiles (not org_memberships), so it's per-user and
         // deterministic under DISTINCT ON (p.id) — cf. generate-compliance-report.
+        // om.role is included so callers can identify org_admin members and exclude them
+        // from learner-only computations (e.g. assessment level distribution). The
+        // deterministic ORDER BY p.id, om.role relies on enum sort order: 'org_admin'
+        // sorts before 'learner', so the org_admin row wins for users who hold both roles
+        // across organisations — ensuring the analytics consumer sees the admin role and
+        // correctly skips that user from the level-distribution count.
         query(
-          // om.role is included so callers can identify org_admin members and exclude them
-          // from learner-only computations (e.g. assessment level distribution). The
-          // deterministic ORDER BY p.id, om.role relies on enum sort order: 'org_admin'
-          // sorts before 'learner', so the org_admin row wins for users who hold both roles
-          // across organisations — ensuring the analytics consumer sees the admin role and
-          // correctly skips that user from the level-distribution count.
           `SELECT DISTINCT ON (p.id) om.user_id, om.role, p.full_name, p.email, p.department, p.assessment_level
              FROM org_memberships om JOIN profiles p ON p.id = om.user_id
             WHERE om.status = 'active'
@@ -46,8 +46,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return corsResponse(origin, 200, { members, enrollments, quizAttempts, org: null });
     }
 
-    // Auth check: platform admin OR org admin for this org
-    // Join through profiles so we match on entra_oid, not profiles.id
     const authCheck = await queryOne<{ can_access: boolean }>(
       `SELECT (
         EXISTS(SELECT 1 FROM profiles WHERE entra_oid = $1 AND is_platform_admin = TRUE)

@@ -5,17 +5,14 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
-// --- mock react-i18next (no i18n provider needed) ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
-// --- mock AppLayout as a simple passthrough ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- mock community-api ---
 vi.mock('@/lib/community-api', () => ({
   fetchReports: vi.fn(),
   updateReport: vi.fn(),
@@ -24,12 +21,11 @@ vi.mock('@/lib/community-api', () => ({
   togglePostLocked: vi.fn(),
 }));
 
-// --- mock api-client ---
 vi.mock('@/lib/api-client', () => ({
   callApi: vi.fn(),
 }));
 
-// --- stub the reported-content dialog (its internals are tested separately) ---
+// Stub the reported-content dialog — its internals are tested separately.
 vi.mock('@/components/community/ReportedContentDialog', () => ({
   ReportedContentDialog: ({
     open,
@@ -40,7 +36,6 @@ vi.mock('@/components/community/ReportedContentDialog', () => ({
   }) => (open ? <div data-testid="reported-content-dialog">{report?.target_id}</div> : null),
 }));
 
-// --- mock sonner ---
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
@@ -112,9 +107,7 @@ const mockOrgs = [
 describe('PlatformCommunityModeration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: return both reports
     mockFetchReports.mockResolvedValue([globalReport, orgReport]);
-    // Default: return mock orgs
     mockCallApi.mockResolvedValue({ organizations: mockOrgs });
   });
 
@@ -125,7 +118,6 @@ describe('PlatformCommunityModeration', () => {
       expect(mockFetchReports).toHaveBeenCalledWith(undefined, { status: 'pending' });
     });
 
-    // Must NOT have been called with scope: 'global'
     expect(mockFetchReports).not.toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ scope: 'global' })
@@ -141,11 +133,7 @@ describe('PlatformCommunityModeration', () => {
     });
 
     expect(screen.getByText('Offensive content')).toBeInTheDocument();
-
-    // Global report shows the Global badge i18n key
     expect(screen.getByText('platformModeration.scopeGlobal')).toBeInTheDocument();
-
-    // Org report shows the org name from the organizations response
     expect(screen.getByText('Acme Corp')).toBeInTheDocument();
   });
 
@@ -160,14 +148,11 @@ describe('PlatformCommunityModeration', () => {
       expect(screen.getByText('Offensive content')).toBeInTheDocument();
     });
 
-    // Dialog closed until the button is clicked
     expect(screen.queryByTestId('reported-content-dialog')).not.toBeInTheDocument();
 
-    // First button on the card is View content
     const firstButton = screen.getAllByRole('button')[0];
     firstButton.click();
 
-    // Opens the in-app dialog with the reported target — and does NOT open a new tab
     const dialog = await screen.findByTestId('reported-content-dialog');
     expect(dialog).toHaveTextContent('post-org-1');
     expect(openSpy).not.toHaveBeenCalled();

@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import React from 'react';
+import type { Exercise } from '@/lib/types';
 
 // react-i18next → key-returning t (the player uses t() for the completion-failure toast)
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
-// AppLayout → passthrough (skips breadcrumbs/i18n)
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -26,7 +26,6 @@ vi.mock('@/lib/api-client', () => ({
 }));
 vi.mock('@/lib/storage', () => ({ getSignedAssetUrl: vi.fn() }));
 
-// toast → assertable spy
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({ toast: (...args: unknown[]) => mockToast(...args) }));
 
@@ -37,6 +36,23 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
 const mockUsePlatformSettings = vi.fn();
 vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => mockUsePlatformSettings(),
+}));
+
+// useExerciseByLesson → configurable per-lessonId mock. Default returns a static
+// bucket_sort exercise (only rendered when the current lesson is of type
+// 'exercise', so it's inert for the non-exercise tests). The state-isolation test
+// overrides the implementation to return a DIFFERENT exercise per lessonId.
+// (Named `mock`-prefixed for vi.mock hoisting; vi.clearAllMocks clears call
+// history but keeps this default implementation.)
+const mockUseExerciseByLesson = vi.fn<(lessonId?: string) => { data: { exercise: Exercise } }>(() => ({
+  data: { exercise: {
+    id: 'ex1', lesson_id: 'l-ex', exercise_kind: 'bucket_sort',
+    config: { version: 1, buckets: [{ id: 'b1', label: 'Draft' }, { id: 'b2', label: 'Human' }],
+      items: [{ id: 'i1', text: 'Brainstorm', bucketId: 'b1' }] },
+  } },
+}));
+vi.mock('@/hooks/useExerciseByLesson', () => ({
+  useExerciseByLesson: (lessonId?: string) => mockUseExerciseByLesson(lessonId),
 }));
 
 import CoursePlayer from './CoursePlayer';
@@ -73,7 +89,6 @@ function makeProgress(completedIds: string[]) {
   return map;
 }
 
-// Configure the player payload + feature flag for a single test.
 function setup(opts: {
   reviewsEnabled: boolean;
   completed: string[];
@@ -87,6 +102,7 @@ function setup(opts: {
       analytics_enabled: true,
       course_reviews_enabled: opts.reviewsEnabled,
       community_enabled: true,
+      exercises_enabled: false,
     },
   });
   mockCallApi.mockImplementation(async (url: string) => {
@@ -200,7 +216,6 @@ describe('CoursePlayer — restyled sidebar and footer', () => {
     renderPlayer();
     await screen.findByText('Intro to AI');
 
-    // Complete l-1 in-session (auto-advances to l-2)
     fireEvent.click(screen.getByRole('button', { name: /markAsComplete/i }));
 
     // The just-completed l-1 sidebar dot animates...
@@ -234,6 +249,7 @@ describe('CoursePlayer — completion semantics (#18)', () => {
         analytics_enabled: true,
         course_reviews_enabled: false,
         community_enabled: true,
+        exercises_enabled: false,
       },
     });
   });
@@ -244,6 +260,7 @@ describe('CoursePlayer — completion semantics (#18)', () => {
   function setupCompletion(opts: {
     progressMap?: Record<string, { status: string; completed_at: string }>;
     enrollmentCompleteError?: Error;
+    lessonProgressError?: Error;
   }) {
     mockCallApi.mockImplementation(async (url: string) => {
       if (url === '/api/course-player-data') {
@@ -255,6 +272,9 @@ describe('CoursePlayer — completion semantics (#18)', () => {
         };
       }
       if (url === '/api/quiz-by-lesson') return { quiz: null, questions: [] };
+      if (url === '/api/lesson-progress' && opts.lessonProgressError) {
+        throw opts.lessonProgressError;
+      }
       if (url === '/api/enrollment-complete' && opts.enrollmentCompleteError) {
         throw opts.enrollmentCompleteError;
       }
@@ -318,7 +338,6 @@ describe('CoursePlayer — completion semantics (#18)', () => {
       });
     });
 
-    // The failure is surfaced and the congratulations dialog is withheld
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
         title: 'coursePlayer.completionSaveFailed',
@@ -326,5 +345,326 @@ describe('CoursePlayer — completion semantics (#18)', () => {
       }));
     });
     expect(screen.queryByText(/congratulations/i)).toBeNull();
+  });
+
+  it('surfaces a failed lesson-progress save and does not advance progress optimistically (#289)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setupCompletion({ lessonProgressError: new Error('boom') });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    fireEvent.click(await screen.findByRole('button', { name: /markAsComplete/i }));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'coursePlayer.progressSaveFailed',
+        description: 'coursePlayer.progressSaveFailedDescription',
+        variant: 'destructive',
+      }));
+    });
+
+    // Nothing optimistic survives the failure: the sidebar counter stays at 0/2,
+    // the lesson keeps its Mark-as-complete affordance, and no celebration plays.
+    expect(
+      screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '0/2 · 0%')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /markAsComplete/i })).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.completed')).toBeNull();
+    expect(document.querySelector('.animate-pop-in')).toBeNull();
+    expect(mockCallApi).not.toHaveBeenCalledWith('/api/enrollment-complete', expect.anything());
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+});
+
+describe('CoursePlayer — quiz load failure (#294)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(baseAuth);
+    mockUsePlatformSettings.mockReturnValue({
+      features: {
+        certificates_enabled: false,
+        quizzes_enabled: true,
+        analytics_enabled: true,
+        course_reviews_enabled: false,
+        community_enabled: true,
+      },
+    });
+  });
+
+  const quizPayload = {
+    quiz: { id: 'q-1', lesson_id: 'l-1', title: 'Quiz 1', passing_score: 70 },
+    questions: [
+      {
+        id: 'qq-1',
+        question_text: 'What is 2 + 2?',
+        sort_order: 0,
+        options: [
+          { id: 'o-1', option_text: '4' },
+          { id: 'o-2', option_text: '5' },
+        ],
+      },
+    ],
+  };
+
+  // Lesson 1 is the quiz (the initially selected lesson); lesson 2 defaults to a plain
+  // video so a test can navigate away, and becomes a second quiz for the interleaving test.
+  function courseData(secondLessonType: 'video' | 'quiz' = 'video') {
+    return {
+      course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+      modules: [
+        {
+          id: 'm-1',
+          title: 'Module 1',
+          sort_order: 0,
+          lessons: [
+            { id: 'l-1', title: 'Lesson 1', lesson_type: 'quiz', module_id: 'm-1', sort_order: 0 },
+            { id: 'l-2', title: 'Lesson 2', lesson_type: secondLessonType, module_id: 'm-1', sort_order: 1 },
+          ],
+        },
+      ],
+      progressMap: {},
+      review: null,
+    };
+  }
+
+  // `quizResults` is consumed one entry per quiz-by-lesson call — the last entry sticks —
+  // which is how the retry path gets a different outcome.
+  function setupQuizLesson(quizResults: Array<'fail' | 'empty' | 'ok'>) {
+    let call = 0;
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') return courseData();
+      if (url === '/api/quiz-by-lesson') {
+        const result = quizResults[Math.min(call, quizResults.length - 1)];
+        call += 1;
+        if (result === 'fail') throw new Error('boom');
+        if (result === 'empty') return { quiz: null, questions: [] };
+        return quizPayload;
+      }
+      return {};
+    });
+  }
+
+  // Each quiz-by-lesson call parks on its own deferred so a test can settle the requests
+  // out of order — the only way to reproduce two loads overlapping in flight.
+  function setupDeferredQuizLoads(secondLessonType: 'video' | 'quiz' = 'video') {
+    const pending: Array<{ resolve: (value: unknown) => void; reject: (error: unknown) => void }> = [];
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') return courseData(secondLessonType);
+      if (url === '/api/quiz-by-lesson') {
+        return new Promise((resolve, reject) => { pending.push({ resolve, reject }); });
+      }
+      return {};
+    });
+    return pending;
+  }
+
+  function quizCallCount() {
+    return mockCallApi.mock.calls.filter((args) => args[0] === '/api/quiz-by-lesson').length;
+  }
+
+  it('renders the error card with a retry instead of an empty pane when the quiz load fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setupQuizLesson(['fail']);
+    renderPlayer();
+
+    // The shared QueryErrorState: announced to screen readers and visually distinct
+    // from the "nothing uploaded" empty states, with the app-wide retry label.
+    const card = await screen.findByRole('alert');
+    expect(within(card).getByText('coursePlayer.quizLoadFailed')).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: /common\.retry/i })).toBeInTheDocument();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('re-issues the request on retry and renders the quiz once it succeeds', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setupQuizLesson(['fail', 'ok']);
+    renderPlayer();
+
+    fireEvent.click(await screen.findByRole('button', { name: /common\.retry/i }));
+
+    expect(await screen.findByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
+    expect(quizCallCount()).toBe(2);
+    expect(screen.queryByText('coursePlayer.quizLoadFailed')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    consoleError.mockRestore();
+  });
+
+  it('shows the loading spinner while the quiz request is in flight, then swaps it for the quiz', async () => {
+    const pending = setupDeferredQuizLoads();
+    renderPlayer();
+
+    expect(await screen.findByText('coursePlayer.loadingQuiz')).toBeInTheDocument();
+    expect(screen.queryByText(/What is 2 \+ 2\?/)).toBeNull();
+
+    pending[0].resolve(quizPayload);
+
+    expect(await screen.findByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.loadingQuiz')).toBeNull();
+  });
+
+  it('ignores a stale failed load that lands after the learner switched to a quiz that loads fine', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const pending = setupDeferredQuizLoads('quiz');
+    renderPlayer();
+
+    // Lesson 1's request is still in flight when the learner clicks lesson 2 — the
+    // sidebar stays mounted and clickable during a quiz load.
+    await screen.findByText('coursePlayer.loadingQuiz');
+    await waitFor(() => expect(pending).toHaveLength(1));
+    fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
+    await waitFor(() => expect(pending).toHaveLength(2));
+
+    // The abandoned lesson-1 request fails first; lesson 2 then succeeds.
+    pending[0].reject(new Error('boom'));
+    await waitFor(() => expect(consoleError).toHaveBeenCalled());
+    pending[1].resolve(quizPayload);
+
+    // The working quiz must not carry the dead lesson's error card on top of it.
+    expect(await screen.findByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.quizLoadFailed')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    consoleError.mockRestore();
+  });
+
+  it('does NOT show the error card on a quiz lesson that legitimately has no quiz', async () => {
+    setupQuizLesson(['empty']);
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/quiz-by-lesson', { lessonId: 'l-1' });
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('coursePlayer.loadingQuiz')).toBeNull();
+    });
+    expect(screen.queryByText('coursePlayer.quizLoadFailed')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('clears the error when the learner navigates to another lesson', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    setupQuizLesson(['fail']);
+    renderPlayer();
+
+    await screen.findByText('coursePlayer.quizLoadFailed');
+    fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('coursePlayer.quizLoadFailed')).toBeNull();
+    });
+    consoleError.mockRestore();
+  });
+});
+
+describe('CoursePlayer — exercise rendering (#227)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(baseAuth);
+    mockUsePlatformSettings.mockReturnValue({
+      features: {
+        certificates_enabled: false,
+        quizzes_enabled: true,
+        analytics_enabled: true,
+        course_reviews_enabled: false,
+        community_enabled: true,
+        exercises_enabled: true,
+      },
+    });
+  });
+
+  it('renders the ExercisePlayer for an exercise lesson and gives it no manual complete button', async () => {
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') {
+        return {
+          course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+          modules: [{
+            id: 'm-1', title: 'Module 1', sort_order: 0,
+            lessons: [{
+              id: 'l-ex', title: 'Sort the tasks', lesson_type: 'exercise',
+              module_id: 'm-1', sort_order: 0,
+            }],
+          }],
+          progressMap: {},
+          review: null,
+        };
+      }
+      if (url === '/api/quiz-by-lesson') return { quiz: null, questions: [] };
+      return {};
+    });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    // The bucket_sort exercise surfaces its bucket labels — proof the player rendered.
+    expect(await screen.findByText('Draft')).toBeInTheDocument();
+    expect(screen.getByText('Human')).toBeInTheDocument();
+    // Correctness-gated (ADR-0017): no manual "Mark complete" footer override for exercises.
+    expect(screen.queryByRole('button', { name: /markAsComplete/i })).toBeNull();
+  });
+
+  it('does not leak player state between two consecutive exercise lessons (key remount)', async () => {
+    // Two exercise lessons back-to-back. Completing A auto-advances to B; B must
+    // mount fresh — its Check button ENABLED, not latched-disabled from A's
+    // `completed` state. Without a per-exercise React key the player instance is
+    // reused and B can never be completed. Regression guard for #227 final review.
+    const exA: Exercise = {
+      id: 'ex-a', lesson_id: 'l-1', exercise_kind: 'quick_check',
+      config: { version: 1, questions: [{
+        id: 'qa', text: 'Question A',
+        options: [{ id: 'a1', text: 'Right A', correct: true }, { id: 'a2', text: 'Wrong A', correct: false }],
+      }] },
+    };
+    const exB: Exercise = {
+      id: 'ex-b', lesson_id: 'l-2', exercise_kind: 'quick_check',
+      config: { version: 1, questions: [{
+        id: 'qb', text: 'Question B',
+        options: [{ id: 'b1', text: 'Right B', correct: true }, { id: 'b2', text: 'Wrong B', correct: false }],
+      }] },
+    };
+    mockUseExerciseByLesson.mockImplementation((lessonId?: string) => ({
+      data: { exercise: lessonId === 'l-2' ? exB : exA },
+    }));
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') {
+        return {
+          course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+          modules: [{
+            id: 'm-1', title: 'Module 1', sort_order: 0,
+            lessons: [
+              { id: 'l-1', title: 'Exercise A', lesson_type: 'exercise', module_id: 'm-1', sort_order: 0 },
+              { id: 'l-2', title: 'Exercise B', lesson_type: 'exercise', module_id: 'm-1', sort_order: 1 },
+            ],
+          }],
+          progressMap: {},
+          review: null,
+        };
+      }
+      if (url === '/api/quiz-by-lesson') return { quiz: null, questions: [] };
+      return {};
+    });
+    renderPlayer();
+
+    await screen.findByText('Intro to AI');
+    // Exercise A is shown and completable.
+    await screen.findByText('Question A');
+    expect(screen.getByRole('button', { name: /exercise\.check/i })).toBeEnabled();
+
+    // Complete A → onComplete fires → auto-advance to lesson B.
+    fireEvent.click(screen.getByRole('radio', { name: /Right A/ }));
+    fireEvent.click(screen.getByRole('button', { name: /exercise\.check/i }));
+
+    // Lesson progress recorded for A, then advance renders B's content.
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/lesson-progress', {
+        orgId: 'org-1', lessonId: 'l-1', status: 'completed',
+      });
+    });
+    await screen.findByText('Question B');
+    // A's content is gone (single exercise renders at a time).
+    expect(screen.queryByText('Question A')).toBeNull();
+    // The decisive assertion: B's Check button is ENABLED (fresh state), not
+    // disabled by A's latched `completed`. Fails without the per-exercise key.
+    expect(screen.getByRole('button', { name: /exercise\.check/i })).toBeEnabled();
   });
 });

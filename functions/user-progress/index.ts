@@ -88,8 +88,6 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
   }
   const courseIds = enrollments.map((e) => e.course_id);
 
-  // 2–4 are mutually independent — one Promise.all saves two round trips (suite precedent:
-  // org-analytics-data). Query 5 stays conditional on the structure result.
   const [progressRows, attemptRows, structureRows] = await Promise.all([
     // 2. The user's lesson progress in this org. Parity: the old client fetched ALL of the
     //    user's progress in the org (not just enrolled courses) — filtered during assembly.
@@ -136,7 +134,6 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
     ),
   ]);
 
-  // 5. Quizzes for those lessons (quizzes.lesson_id is UNIQUE — one quiz per lesson).
   const lessonIds = structureRows
     .map((r) => r.lesson_id)
     .filter((id): id is string => id !== null);
@@ -144,7 +141,6 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
     ? await query<QuizRow>(`SELECT id, lesson_id FROM quizzes WHERE lesson_id = ANY($1)`, [lessonIds])
     : [];
 
-  // Assembly — mirrors UserProgressDialog.fetchUserProgress exactly.
   const progressMap = new Map(progressRows.map((p) => [p.lesson_id, p]));
   const quizByLesson = new Map(quizRows.map((q) => [q.lesson_id, q.id]));
   const lessonByQuiz = new Map(quizRows.map((q) => [q.id, q.lesson_id]));
