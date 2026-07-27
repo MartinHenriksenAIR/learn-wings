@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -33,6 +33,52 @@ import { CourseReviewDialog } from '@/components/course/CourseReviewDialog';
 
 // Minimum course progress (percent of lessons completed) before the review entry point appears.
 const REVIEW_MIN_PROGRESS = 20;
+
+// Previous / Next lesson navigation, shared by the content-lesson footer and the
+// quiz "not ready" state so a quiz lesson with no interactive quiz can never
+// dead-end the learner (#299). `children` fills the middle slot — the
+// Mark-as-complete button / Completed badge for content lessons, nothing for the
+// quiz empty state (a quiz is completed by passing, not by a manual mark).
+function LessonNav({
+  currentIndex,
+  total,
+  onPrevious,
+  onNext,
+  children,
+}: {
+  currentIndex: number;
+  total: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  children?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#eceef3] pt-[18px]">
+      <Button
+        variant="outline"
+        className="rounded-[10px] border-[#dcdee6] text-[13px] font-bold"
+        onClick={onPrevious}
+        disabled={currentIndex === 0}
+      >
+        <ArrowLeft aria-hidden="true" />
+        {t('common.previous')}
+      </Button>
+
+      {children}
+
+      <Button
+        variant="outline"
+        className="rounded-[10px] border-[#dcdee6] text-[13px] font-bold"
+        onClick={onNext}
+        disabled={currentIndex >= total - 1}
+      >
+        {t('common.next')}
+        <ArrowRight aria-hidden="true" />
+      </Button>
+    </div>
+  );
+}
 
 export default function CoursePlayer() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -573,7 +619,17 @@ export default function CoursePlayer() {
               />
             )}
 
-            {currentLesson.lesson_type === 'quiz' && quiz && !quizLoading && (
+            {/* Quiz lesson with no quiz row, or a quiz with zero questions: a neutral
+                "not ready yet" state, distinct from the #294 failure card (#299). */}
+            {currentLesson.lesson_type === 'quiz' && !quizLoading && !quizLoadFailed && (!quiz || questions.length === 0) && (
+              <div className="flex flex-col items-center justify-center rounded-[14px] border bg-muted/50 py-12 text-center">
+                <HelpCircle aria-hidden="true" className="mb-3 h-8 w-8 text-muted-foreground" />
+                <p className="font-semibold text-foreground">{t('coursePlayer.quizNotReady')}</p>
+                <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">{t('coursePlayer.quizNotReadyDescription')}</p>
+              </div>
+            )}
+
+            {currentLesson.lesson_type === 'quiz' && quiz && questions.length > 0 && !quizLoading && (
               <div className="space-y-6">
                 {quizSubmitted ? (
                   <div
@@ -726,7 +782,7 @@ export default function CoursePlayer() {
                     </div>
                     <Button
                       onClick={handleSubmitQuiz}
-                      disabled={Object.keys(answers).length !== questions.length}
+                      disabled={questions.length === 0 || Object.keys(answers).length !== questions.length}
                       className="h-auto rounded-[11px] px-5 py-[11px] text-[13.5px] font-bold"
                     >
                       {t('coursePlayer.submitAnswers')}
@@ -744,21 +800,12 @@ export default function CoursePlayer() {
 
             {/* Footer: Previous / Mark as complete · Completed badge / Next (non-quiz, non-exercise lessons) */}
             {currentLesson.lesson_type !== 'quiz' && currentLesson.lesson_type !== 'exercise' && (
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#eceef3] pt-[18px]">
-                <Button
-                  variant="outline"
-                  className="rounded-[10px] border-[#dcdee6] text-[13px] font-bold"
-                  onClick={() => {
-                    if (currentIndex > 0) {
-                      setCurrentLesson(allLessons[currentIndex - 1]);
-                    }
-                  }}
-                  disabled={currentIndex === 0}
-                >
-                  <ArrowLeft aria-hidden="true" />
-                  {t('common.previous')}
-                </Button>
-
+              <LessonNav
+                currentIndex={currentIndex}
+                total={allLessons.length}
+                onPrevious={() => { if (currentIndex > 0) setCurrentLesson(allLessons[currentIndex - 1]); }}
+                onNext={() => { if (currentIndex < allLessons.length - 1) setCurrentLesson(allLessons[currentIndex + 1]); }}
+              >
                 {progress[currentLesson.id]?.status === 'completed' ? (
                   <span
                     className={cn(
@@ -783,21 +830,20 @@ export default function CoursePlayer() {
                     {t('coursePlayer.markAsComplete')}
                   </Button>
                 )}
+              </LessonNav>
+            )}
 
-                <Button
-                  variant="outline"
-                  className="rounded-[10px] border-[#dcdee6] text-[13px] font-bold"
-                  onClick={() => {
-                    if (currentIndex < allLessons.length - 1) {
-                      setCurrentLesson(allLessons[currentIndex + 1]);
-                    }
-                  }}
-                  disabled={currentIndex >= allLessons.length - 1}
-                >
-                  {t('common.next')}
-                  <ArrowRight aria-hidden="true" />
-                </Button>
-              </div>
+            {/* A quiz lesson that isn't showing an interactive quiz (no quiz, zero
+                questions, or a load failure) still needs a way out — nav-only footer
+                so no quiz lesson can dead-end the learner (#299). A healthy quiz keeps
+                its own submit/next flow and gets no footer. */}
+            {currentLesson.lesson_type === 'quiz' && !quizLoading && !(quiz && questions.length > 0) && (
+              <LessonNav
+                currentIndex={currentIndex}
+                total={allLessons.length}
+                onPrevious={() => { if (currentIndex > 0) setCurrentLesson(allLessons[currentIndex - 1]); }}
+                onNext={() => { if (currentIndex < allLessons.length - 1) setCurrentLesson(allLessons[currentIndex + 1]); }}
+              />
             )}
           </div>
         ) : (

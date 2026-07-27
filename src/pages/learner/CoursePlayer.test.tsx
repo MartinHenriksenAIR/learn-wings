@@ -668,3 +668,98 @@ describe('CoursePlayer — exercise rendering (#227)', () => {
     expect(screen.getByRole('button', { name: /exercise\.check/i })).toBeEnabled();
   });
 });
+
+describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue(baseAuth);
+    mockUsePlatformSettings.mockReturnValue({
+      features: {
+        certificates_enabled: false,
+        quizzes_enabled: true,
+        analytics_enabled: true,
+        course_reviews_enabled: false,
+        community_enabled: true,
+        exercises_enabled: false,
+      },
+    });
+  });
+
+  const healthyQuiz = {
+    quiz: { id: 'q-1', lesson_id: 'l-1', title: 'Quiz 1', passing_score: 70 },
+    questions: [
+      {
+        id: 'qq-1',
+        question_text: 'What is 2 + 2?',
+        sort_order: 0,
+        options: [
+          { id: 'o-1', option_text: '4' },
+          { id: 'o-2', option_text: '5' },
+        ],
+      },
+    ],
+  };
+
+  // Course whose first (initially selected) lesson is a quiz, with a plain video
+  // lesson after it so the footer's Next has somewhere to go.
+  function courseData() {
+    return {
+      course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+      modules: [
+        {
+          id: 'm-1', title: 'Module 1', sort_order: 0,
+          lessons: [
+            { id: 'l-1', title: 'Lesson 1', lesson_type: 'quiz', module_id: 'm-1', sort_order: 0 },
+            { id: 'l-2', title: 'Lesson 2', lesson_type: 'video', module_id: 'm-1', sort_order: 1 },
+          ],
+        },
+      ],
+      progressMap: {},
+      review: null,
+    };
+  }
+
+  function setupQuiz(quizPayload: unknown) {
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') return courseData();
+      if (url === '/api/quiz-by-lesson') return quizPayload;
+      return {};
+    });
+  }
+
+  it('shows a neutral not-ready state (no alert, no Submit) with working nav when a quiz lesson has no quiz', async () => {
+    setupQuiz({ quiz: null, questions: [] });
+    renderPlayer();
+
+    expect(await screen.findByText('coursePlayer.quizNotReady')).toBeInTheDocument();
+    // Neutral empty state, NOT the #294 failure card (which is role="alert").
+    expect(screen.queryByRole('alert')).toBeNull();
+    // A lesson with no quiz must offer no Submit at all.
+    expect(screen.queryByRole('button', { name: /submitAnswers/i })).toBeNull();
+    // The durable fix: Previous/Next footer so the learner is never trapped.
+    expect(screen.getByRole('button', { name: /common\.previous/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /common\.next/ })).toBeEnabled();
+  });
+
+  it('shows the not-ready state and never renders Submit when a quiz has zero questions', async () => {
+    setupQuiz({ quiz: { id: 'q-1', lesson_id: 'l-1', title: 'Quiz 1', passing_score: 70 }, questions: [] });
+    renderPlayer();
+
+    expect(await screen.findByText('coursePlayer.quizNotReady')).toBeInTheDocument();
+    // The empty-quiz Submit bug: the button must not exist (was enabled on 0 === 0).
+    expect(screen.queryByRole('button', { name: /submitAnswers/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /common\.next/ })).toBeEnabled();
+  });
+
+  it('renders a healthy quiz normally with a disabled Submit and no not-ready state or footer nav', async () => {
+    setupQuiz(healthyQuiz);
+    renderPlayer();
+
+    expect(await screen.findByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.quizNotReady')).toBeNull();
+    // Submit exists but stays disabled until every question is answered.
+    expect(screen.getByRole('button', { name: /submitAnswers/i })).toBeDisabled();
+    // A healthy quiz keeps its own submit/next flow — no duplicated footer nav.
+    expect(screen.queryByRole('button', { name: /common\.next/ })).toBeNull();
+  });
+});
