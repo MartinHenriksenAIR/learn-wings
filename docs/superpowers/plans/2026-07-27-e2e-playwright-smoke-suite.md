@@ -23,6 +23,9 @@
 - **Every view mode lands on `/app/admin/platform/organizations` after sign-in**, because `Login.tsx:33` redirects on raw `isPlatformAdmin` regardless of `viewMode` (verified live in Task 3). So a learner- or org-admin-view spec must **navigate explicitly** to where it intends to be, and must never assert on "where sign-in left us".
 - **`Dashboard` is not learner-exclusive** — org-admin view renders it too, and a learner's sidebar links are a strict *subset* of org-admin's. It is sufficient to prove sign-in worked (an unseeded session lands in platform view, which has no Dashboard), but it cannot prove *which* non-platform view you are in. A spec that needs to prove it is specifically in learner view must add a negative assertion, e.g. `Platform Settings` absent.
 - **The org-admin `Organization` link is gated on `features.analytics_enabled`** (enabled in prod today). If an org-admin landmark assertion ever fails against a fenced org, check that flag before suspecting the sign-in path.
+- **You cannot switch view mid-spec with `sessionStorage.setItem` + `reload`.** `seedSession`'s `addInitScript` re-seeds the fixture's view on *every* navigation, so it overwrites the write and the reload lands back in the original view. Set the view once per spec with `test.use({ viewMode: '…' })` and stay there. Verified live in Task 4.
+- **A spec can stay in `org_admin` view and still perform platform-admin actions** (creating and deleting the fenced org), because `requirePlatformAdmin` reads the raw `isPlatformAdmin` flag, not `viewMode`. This is what makes the previous constraint workable rather than limiting.
+- **`currentOrg` is unpersisted React state, so the fence selection is lost on every `page.goto`.** Any write journey must re-select and re-assert the fence after navigating, not once at the start. Missing this is the most likely way a write escapes the fence.
 - **Every artefact the suite creates is named `e2e-<RUN_ID>-<kind>`** so anything left behind is identifiable. Cleanup runs in `finally`.
 - **Test file naming:** `e2e/specs/NN-name.spec.ts`. Fixtures in `e2e/fixtures/`. Nothing under `src/` — the vitest `include` glob is `src/**/*.{test,spec}.{ts,tsx}` and must not pick these up.
 - Node 20 (as used by the repo's other tooling).
@@ -887,12 +890,14 @@ test('an invitation can be sent, seen as pending, and revoked', async ({ page })
 
   let org: FencedOrg | undefined;
   try {
-    // Create the fence from the platform view, then return to org-admin view.
-    await page.evaluate(() => sessionStorage.setItem('viewMode', 'platform_admin'));
+    // Stay in org_admin view for the whole spec. Creating and deleting the fence
+    // still works from here because requirePlatformAdmin reads the raw
+    // isPlatformAdmin flag, not viewMode — and switching view mid-spec is not
+    // possible anyway (seedSession's addInitScript re-seeds on every navigation).
     org = await createFencedOrg(page);
-    await page.evaluate(() => sessionStorage.setItem('viewMode', 'org_admin'));
-    await page.reload();
 
+    // Re-select after navigating: currentOrg is unpersisted React state, so the
+    // fence selection does not survive a goto.
     await selectFencedOrg(page, org);
     await assertFenced(page, org);
 
@@ -908,10 +913,10 @@ test('an invitation can be sent, seen as pending, and revoked', async ({ page })
       .click();
     await expect(page.getByText(inviteTo)).toBeHidden();
   } finally {
-    if (org) {
-      await page.evaluate(() => sessionStorage.setItem('viewMode', 'platform_admin'));
-      await deleteFencedOrg(page, org);
-    }
+    // No view switch needed: deleteFencedOrg works from org_admin view because
+    // requirePlatformAdmin reads the raw flag. Must tolerate an already-deleted
+    // fence, since retries: 1 re-runs this whole spec.
+    if (org) await deleteFencedOrg(page, org);
   }
 });
 ```
