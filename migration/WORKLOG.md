@@ -1707,6 +1707,39 @@ Both `endpoint.ts` edits respect its documented **DEPENDENCY FREEZE**: one param
 **Deploy:** merged @`04c4d12`; all three workflows green (CI `30247751464`, SWA `30247751410`, functions `30247751406`). Unauth smoke on the regionalized host: `POST /api/send-invitation-email` 401 `Missing Bearer token`, `OPTIONS` 204, `organizations` + `platform-settings` 401, frontend root 200. The delivery-failure and escaping paths need an authenticated send to exercise end-to-end — unit-tested, not smoke-covered.
 
 **Still deferred, not yet filed:** `authz-2`, `dup-2`, `err-12` were all blocked on this branch owning `send-invitation-email`; that block is now lifted. Also left unfixed as out of scope: a null `orgName` renders literally as "hos **null**" in both body and subject (pre-existing).
+## 2026-07-27 — Login page rendered English "Sign in with Microsoft" on a Danish UI (#300, PR #303)
+
+**Who:** claude (Opus 5) + martin. Picked off the board as an `afk` card filed by round-8's prod `/ui-report`; verified pre-existing before touching anything (the call site is byte-identical at `619a30b`, and `git log -S` shows the key never existed in `da.json`).
+
+**What:** Two defects were stacked, and fixing either alone would have left the bug reachable.
+
+- `auth.signInWithMicrosoft` existed in **neither** `en.json` nor `da.json`.
+- `src/pages/Login.tsx` passed an inline i18next default — `t('auth.signInWithMicrosoft', 'Sign in with Microsoft')` — which rendered the English string **and** suppressed the missing-key warning that would otherwise have surfaced it. Danish is the primary user-facing language, so this was the first thing a Danish user saw; the invitation-accept screen one route away was already correct because `invitationAccept.signInWithMicrosoft` does exist in both locales.
+
+The key is now in both locales, with the Danish value matching the existing `invitationAccept` string verbatim ("Log ind med Microsoft") so the two auth screens read identically, and the inline default is gone.
+
+**Guards — the class, not the instance.** The existing `index.test.ts` / `assessment-keys.test.ts` drift guards caught neither half, so two complementary guards landed:
+
+- **`eslint.config.js`** — extends the existing `src/**` `no-restricted-syntax` block (alongside the #238 date-locale guard) to block the *masking mechanism*: a positional string or template-literal default, and an options `defaultValue`, on both `t()` and `i18n.t()`. Probed against all four offending shapes, with confirmed no false positives on `t(key)`, `t(key, { count })` or `t(key, { ns })`. Note for future selector work: `:nth-child(n)` does **not** match a CallExpression's positional argument under esquery — the attribute-path form `[arguments.1.type=/^(Literal|TemplateLiteral)$/]` is what works.
+- **`src/i18n/translation-keys.test.ts` + `translation-key-scanner.ts`** — asserts every statically-known `t()` key in `src/` resolves in **both** locales, i.e. the missing key itself, and a direct enforcement of `.claude/rules/frontend.md`'s "keys in BOTH `en` and `da`". Scanning uses the TypeScript compiler API, mirroring the #178 routes gate, so comments and runtime-assembled keys (`t(\`foo.${x}\`)`, `t(item.labelKey)`) are excluded by construction rather than by hand-rolled lexing. CLDR plural suffixes are accepted — without that, `ideaManagement.prioritize.count` (correctly stored as `count_one`/`count_other`) would have been a permanent false failure. A second assertion pins the scan population above 500 so a scanner regression cannot make the gate pass vacuously.
+
+**Sweep:** all **956** static `t()` keys across `src/` were checked — `auth.signInWithMicrosoft` was the **only** genuinely unresolved key in the app, and its call site was the **only** inline-default call site in the tree. The codebase was one key away from clean.
+
+**`Login.test.tsx` was complicit.** Its `react-i18next` stub was `t: (key, fallback) => fallback ?? key`, so the assertion in a test named *"renders the shared Microsoft sign-in button"* passed on a hard-coded English literal while the key was absent — the test encoded the very masking behaviour being removed. It now resolves against the real `en.json`, and was verified to fail when the key is deleted. It was the only test in the suite using that stub shape.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 109 files / 808 pass · `build` exit 0; functions `build` exit 0 · `test` 145 files / 2595 pass (3 skipped) — functions untouched, run for completeness. Guard test confirmed **RED** on the real bug before the fix and GREEN after.
+
+**Flake found, not fixed (filed as #305, `afk`).** The first CI run failed on `PlatformSettings.test.tsx` — a file this PR never touched. Diagnosed rather than re-run blindly: the component seeds local form state with `defaultBranding` (`'AIR Academy'`) at `:133` and copies `query.data` in via a `useEffect` at `:180`, leaving a one-render window in which the textbox exists holding the default; the tests `waitFor` element *existence* and then assert the *value* on the next synchronous line, so CPU contention on the runner wins the race. Confirmed pre-existing — `main` @ `960b835` failed the same file and the same `toHaveValue(Server Name)` assertion on 2026-07-25 (run 30175101531), on a *different* test within it — and confirmed a flake by re-running the identical commit with no code change, which went green. Fix is to move the value assertion inside `waitFor`; left out of this PR to keep it scoped to #300.
+
+**Deploy:** frontend-only change, so only the SWA workflow is load-bearing here. Announce on PR #303.
+
+## 2026-07-27 — Invite-email null-org fix + three review cards refiled (#309, #306–#308)
+
+**Who:** claude (Opus 5) + martin. Cleanup tail after #231: the one known bug it left, plus re-filing the review-board cards it had been blocking.
+
+**Fix (#225 follow-up, PR #309 @`7e828ee`, deployed + smoke ok):** an org invite renders the org name in its subject and body; a missing name printed the literal string **"null"** ("...hos null på AI Uddannelse"). The four invite screens only pass a null org name when their org context is broken (`currentOrg?.name ?? null`, `org?.name || null`), so the endpoint now **400s** a non-platform invite with no `orgName` — surfacing the broken state instead of mailing garbage. Platform-admin invites carry no org and stay exempt. Also hardened the `escapeHtml` guard I added in #231: `orgName === null ? …` only caught JSON null, so an *omitted* org name reached `escapeHtml(undefined)` and threw a 500 — now a truthy guard (`orgName ? escapeHtml(orgName) : null`). Only reachable off the typed client, but a real edge I introduced. Tests: null and omitted orgName on an org invite both 400 (no send); a platform-admin invite with no org still sends and contains neither "null" nor "undefined". Verify: functions `build` 0 · `test` 2598 (3 skip, +3 new); root unchanged (lint 0 / tsc 0 / test 806 / build 0). Smoke behind the auth gate → 401 unauth, 204 OPTIONS, frontend 200; the 400 is unit-tested (unreachable unauthenticated).
+
+**Cards refiled (#306–#308):** the three findings that had been deferred behind #231 owning `send-invitation-email` are back on the board as separate issues (project convention = one card per issue), cross-linked, all in the same file so they can be fixed in one PR. **#306 `authz-2`** (priority) — the endpoint authorizes "are you *an* admin?" but never binds the caller to the org named in the request or the role being granted, so an org admin can send an official-looking invite naming any org/role from the trusted no-reply address (spoofing surface; the send doesn't grant access, a separate flow does). **#307 `err-12`** — an invalid `role` silently falls back to "learner" instead of 400. **#308 `dup-2`** — email-scaffold duplication (low confidence on the exact target; two candidate readings noted). Each issue flags that its description is reconstructed from the slug + code and should be **confirmed against the 2026-07-24 `/review-suite` report** (`2026-07-24-review-main-codebase.html`), which is not tracked in the repo.
 
 ## 2026-07-27 — Quiz lessons with no quiz / zero questions no longer dead-end the learner (#299, PR #304)
 
@@ -1720,6 +1753,6 @@ Fix: a neutral **"not ready yet" empty state** for both shapes (distinct from #2
 
 **How:** TDD — 3 new `CoursePlayer.test.tsx` cases (no-quiz, zero-questions, healthy-quiz regression) written red first, then implemented green. The `LessonNav` extraction is behavior-preserving: the pre-existing #294 / #18 / footer suites are unchanged and green. Code review skipped at the owner's request.
 
-**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 108 files / 809 pass · `build` exit 0. `functions/` untouched (no functions test run needed). CI green on PR #304.
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 108 files / 809 pass · `build` exit 0. `functions/` untouched (no functions test run needed). Re-verified post-merge-of-trunk (branch merged #303/#309/#310 in; only WORKLOG/STATUS conflicted — both resolved by taking trunk and re-applying this entry + the checkpoint move).
 
 **Deploy:** frontend-only; merging auto-fires the SWA frontend workflow (and the functions workflow as a no-op redeploy). Deploy + smoke announced on PR #304.

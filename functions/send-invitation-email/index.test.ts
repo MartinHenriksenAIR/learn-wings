@@ -243,4 +243,49 @@ describe('send-invitation-email', () => {
     expect(subject).toContain('Acme & Co');
     expect(subject).not.toMatch(/[\r\n]/);
   });
+
+  // An org invite with no org name would otherwise render the literal "null"
+  // in the subject and body; the UI only sends null when its org context is
+  // broken, so a 400 surfaces that rather than mailing a malformed invite.
+  it('rejects an organization invite with a null orgName', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_platform_admin: true });
+
+    const res = await handler(
+      makeReq({ ...validBody, role: 'learner', orgName: null }) as any,
+      makeCtx() as any,
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockEmailSend).not.toHaveBeenCalled();
+  });
+
+  it('rejects an organization invite with orgName omitted entirely', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_platform_admin: true });
+    const { orgName: _omit, ...noOrg } = validBody;
+
+    const res = await handler(makeReq(noOrg) as any, makeCtx() as any);
+
+    expect(res.status).toBe(400);
+    expect(mockEmailSend).not.toHaveBeenCalled();
+  });
+
+  // Platform-admin invites carry no org, so a missing org name is fine and must
+  // not throw (the escape guard used to call escapeHtml(undefined)).
+  it('sends a platform-admin invite even with no orgName', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ is_platform_admin: true })
+      .mockResolvedValueOnce(undefined);
+    mockEmailSend.mockResolvedValueOnce({ id: 'e7' });
+    const { orgName: _omit, ...noOrg } = validBody;
+
+    const res = await handler(
+      makeReq({ ...noOrg, role: 'platform_admin' }) as any,
+      makeCtx() as any,
+    );
+    const html = mockEmailSend.mock.calls[0][0].html as string;
+
+    expect(res.status).toBe(200);
+    expect(html).not.toContain('null');
+    expect(html).not.toContain('undefined');
+  });
 });

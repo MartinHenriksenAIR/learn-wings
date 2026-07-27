@@ -12,9 +12,23 @@ vi.mock('react-router-dom', async (importOriginal) => ({
   useNavigate: () => mockNavigate,
 }));
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string, fallback?: string) => fallback ?? key }),
-}));
+// Resolve keys against the real en.json rather than echoing an inline default.
+// The previous stub returned `t()`'s second argument, which meant the button
+// assertion below passed on a hard-coded English literal even though
+// `auth.signInWithMicrosoft` was missing from both locale files (#300). Reading
+// the shipped copy makes a missing key render as the raw key and fail here.
+vi.mock('react-i18next', async () => {
+  const en = (await import('@/i18n/locales/en.json')).default;
+  const translate = (key: string): string => {
+    let node: unknown = en;
+    for (const part of key.split('.')) {
+      if (typeof node !== 'object' || node === null) return key;
+      node = (node as Record<string, unknown>)[part];
+    }
+    return typeof node === 'string' ? node : key;
+  };
+  return { useTranslation: () => ({ t: translate }) };
+});
 
 vi.mock('@/assets/logo-light.png', () => ({ default: 'logo-light.png' }));
 

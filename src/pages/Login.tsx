@@ -66,7 +66,7 @@ export default function Login() {
         <MicrosoftSignInButton
           className="h-auto w-full gap-2.5 rounded-xl px-4 py-[13px] text-[14.5px] font-semibold"
           onClick={signIn}
-          label={t('auth.signInWithMicrosoft', 'Sign in with Microsoft')}
+          label={t('auth.signInWithMicrosoft')}
         />
         <span className="text-xs text-[#9aa0af]">{t('auth.accessProvidedByOrg')}</span>
       </div>
