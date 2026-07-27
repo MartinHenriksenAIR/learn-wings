@@ -989,6 +989,18 @@ npm run build
 
 Expected: all exit 0, and `npm test` still reports 812 tests with no `e2e/` files. `tsconfig.app.json` may need `e2e` added to its `exclude` if it starts type-checking the specs — if so, add it rather than loosening any compiler option.
 
+- [ ] **Step 3b: Give `e2e/` type-check coverage**
+
+Task 1's review established that `e2e/` is type-checked by **nothing**: `tsconfig.app.json` includes only `src`, and Playwright's runner transpiles without checking types. That was acceptable for 23 hand-verified lines; it must not outlive this plan now that the suite has real volume.
+
+Add `e2e` and `playwright.config.ts` to the `include` array in `tsconfig.node.json` — that config is off the build path, so the specs get checked without touching what ships. Then run:
+
+```bash
+npx tsc --noEmit -p tsconfig.node.json
+```
+
+Expected: exit 0. Fix any error it surfaces by correcting the types, never by adding `any` or loosening a compiler option.
+
 - [ ] **Step 4: Write `e2e/README.md`**
 
 Cover, in prose: what the suite is, that it is on-demand and deliberately not a CI gate, how to fill `.env.e2e`, the MFA constraint on the account, that journey 06 sends real mail to `E2E_INVITE_TO`, that writes are confined to a self-created fenced org, and the known gap that a green run proves UI gating rather than API refusal.
