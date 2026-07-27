@@ -1,7 +1,11 @@
-// Hand-rolled (not shared/endpoint.ts): bespoke authz (org-admin in ANY org, oid-only lookup) and a custom 403 body.
+// Hand-rolled (not shared/endpoint.ts): bespoke authz that binds the caller to
+// the SPECIFIC invitation named in the request — the org, role and recipient in
+// the mail are read from that invitation row, never from the request body — plus
+// a custom 403 body.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
+import { getProfile } from '../shared/profile';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 import { escapeHtml, sendBestEffort } from '../shared/resend';
@@ -27,12 +31,21 @@ function allowedLinkDomains(): string[] {
   return ['ai-uddannelse.dk', ...originHosts];
 }
 
+// The frontend also posts email/orgName/role, but this endpoint deliberately
+// does NOT read them (#306): a caller must not be able to advertise an org they
+// do not administer, or hand out a platform-admin role, by lying in the body.
 interface InvitationEmailRequest {
-  email: string;
-  orgName: string | null;
-  role: string;
   inviteLink: string;
   inviterLanguage?: 'da' | 'en';
+}
+
+// The invitation this email is for, plus whether the caller may send it.
+interface InvitationRow {
+  org_id: string | null;
+  role: string;                 // org_role enum: 'org_admin' | 'learner'
+  invitee_email: string;
+  org_name: string | null;      // NULL only for a platform-admin invite (org_id NULL)
+  caller_is_org_admin: boolean; // caller is an active org_admin of org_id
 }
 
 function generateEmailHtml({
@@ -50,7 +63,7 @@ function generateEmailHtml({
   lang: EmailLanguage;
   s: typeof EMAIL_STRINGS[EmailLanguage];
 }): string {
-  // `orgName` is caller-supplied and `inviteLink` is only validated by hostname —
+  // `orgName` is org-supplied and `inviteLink` is only validated by hostname —
   // its path/query reach the body verbatim. Both are escaped before they touch
   // the markup so neither can break out of the attribute or inject a link (#195).
   // `roleLabel` comes from the EMAIL_STRINGS whitelist, so it needs no escaping.
@@ -129,54 +142,77 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
   try {
     const user = await authenticate(req);
 
-    const profile = await queryOne<{ is_platform_admin: boolean; is_org_admin: boolean }>(
-      `SELECT p.is_platform_admin,
-        EXISTS(
-          SELECT 1 FROM org_memberships om WHERE om.user_id = p.id AND om.role = 'org_admin' AND om.status = 'active'
-        ) AS is_org_admin
-       FROM profiles p WHERE p.entra_oid = $1`,
-      [user.id]
-    );
-    if (!profile?.is_platform_admin && !profile?.is_org_admin) {
-      return corsResponse(origin, 403, { error: 'Forbidden: Only admins can send invitations' });
+    const profile = await getProfile(user);
+    if (!profile) return corsResponse(origin, 403, { error: 'Forbidden' });
+
+    // orgName/role/email are intentionally NOT read from the body (see the
+    // interface note, #306). Only the invite link and the inviter's language
+    // pick are caller inputs; everything else comes from the invitation row.
+    const { inviteLink, inviterLanguage } = await req.json() as InvitationEmailRequest;
+
+    if (!inviteLink) {
+      return corsResponse(origin, 400, { error: 'Missing required field: inviteLink' });
     }
 
-    const { email, orgName, role, inviteLink, inviterLanguage } = await req.json() as InvitationEmailRequest;
-
-    if (!email || !inviteLink) {
-      return corsResponse(origin, 400, { error: 'Missing required fields: email and inviteLink' });
-    }
-
+    let linkUrl: URL;
     try {
-      const linkUrl = new URL(inviteLink);
-      if (!allowedLinkDomains().includes(linkUrl.hostname)) {
-        return corsResponse(origin, 400, { error: 'Invalid invite link domain' });
-      }
+      linkUrl = new URL(inviteLink);
     } catch {
       return corsResponse(origin, 400, { error: 'Invalid invite link format' });
     }
-
-    const isPlatformAdminInvite = role === 'platform_admin';
-
-    // An org invite names the org in its subject and body; without a name the
-    // template would render the literal string "null". The UI only ever passes
-    // a null org name when its org context is missing (a broken state), so a
-    // 400 surfaces that instead of sending a malformed email. Platform-admin
-    // invites carry no org and are exempt.
-    if (!isPlatformAdminInvite && !orgName) {
-      return corsResponse(origin, 400, { error: 'Missing required field: orgName for organization invitations' });
+    if (!allowedLinkDomains().includes(linkUrl.hostname)) {
+      return corsResponse(origin, 400, { error: 'Invalid invite link domain' });
+    }
+    // The link_id is the invitation's shareable id — getInviteLink mints
+    // `${base}/signup?invite=<link_id>`. It identifies WHICH invitation this
+    // email is for, and the caller is authorized against that invitation's org.
+    const linkId = linkUrl.searchParams.get('invite');
+    if (!linkId) {
+      return corsResponse(origin, 400, { error: 'Invalid invite link' });
     }
 
-    // Resolve email language (ADR-0016 cat.3): existing recipient's stored
-    // preference wins; else the inviter's dialog pick; else default 'da'.
-    // Best-effort — a lookup failure must not block the send.
+    // Load the invitation and, in the same query, whether the caller is an active
+    // org_admin of its org. A platform-admin invite has org_id NULL, so the
+    // EXISTS is always false there — such an invite requires an actual platform
+    // admin (checked below), never an org admin.
+    const invitation = await queryOne<InvitationRow>(
+      `SELECT i.org_id,
+              i.role,
+              i.email AS invitee_email,
+              o.name AS org_name,
+              EXISTS(
+                SELECT 1 FROM org_memberships om
+                WHERE om.user_id = $2 AND om.org_id = i.org_id
+                  AND om.role = 'org_admin' AND om.status = 'active'
+              ) AS caller_is_org_admin
+         FROM invitations i
+         LEFT JOIN organizations o ON o.id = i.org_id
+        WHERE i.link_id = $1`,
+      [linkId, profile.id],
+    );
+    // Uniform 403 for both "no such invitation" and "not your org" so a caller
+    // cannot probe which link_ids exist (they are 128-bit secrets regardless).
+    if (!invitation) return corsResponse(origin, 403, { error: 'Forbidden' });
+
+    // A platform-admin invite is the org_id-NULL case — the same signal
+    // convertInvitation branches on when it grants access (shared/invitation-convert.ts).
+    const isPlatformAdminInvite = invitation.org_id === null;
+    const authorized = profile.is_platform_admin || invitation.caller_is_org_admin;
+    if (!authorized) return corsResponse(origin, 403, { error: 'Forbidden' });
+
+    const orgName = invitation.org_name;
+
+    // Resolve email language (ADR-0016 cat.3): the recipient's stored preference
+    // wins; else the inviter's dialog pick; else default 'da'. Keyed on the
+    // invitation's own recipient, never a client-supplied address. Best-effort —
+    // a lookup failure must not block the send.
     let profileLang: string | null = null;
     try {
       const invitee = await queryOne<{ preferred_language: string }>(
         `SELECT preferred_language FROM profiles
          WHERE lower(email) = lower($1) AND preferred_language IS NOT NULL
          ORDER BY created_at ASC LIMIT 1`,
-        [email],
+        [invitation.invitee_email],
       );
       profileLang = invitee?.preferred_language ?? null;
     } catch (lookupErr) {
@@ -185,10 +221,14 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const lang = resolveEmailLanguage(inviterLanguage, profileLang);
     const s = EMAIL_STRINGS[lang];
 
-    const roleLabel =
-      role === 'org_admin' ? s.roleLabels.org_admin
-      : role === 'platform_admin' ? s.roleLabels.platform_admin
-      : s.roleLabels.learner;
+    // role is the org_role enum ('org_admin' | 'learner'); a platform-admin
+    // invite is flagged by org_id NULL and shows the platform label. Both enum
+    // values are handled explicitly, so no role silently renders as learner (#307).
+    const roleLabel = isPlatformAdminInvite
+      ? s.roleLabels.platform_admin
+      : invitation.role === 'org_admin'
+        ? s.roleLabels.org_admin
+        : s.roleLabels.learner;
     const subject = isPlatformAdminInvite ? s.subjectPlatformAdmin : s.subjectOrg(orgName);
     const html = generateEmailHtml({ orgName, roleLabel, inviteLink, isPlatformAdmin: isPlatformAdminInvite, lang, s });
 
@@ -197,10 +237,10 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     // return `success: true` and the admin was never told to share the link
     // manually. `sendBestEffort` is the shared path that reads `error`.
     const sent = await sendBestEffort(context, {
-      recipient: email,
+      recipient: invitation.invitee_email,
       subject,
       html,
-      skipLog: `send-invitation-email: no recipient address for invite to ${orgName ?? 'platform'}`,
+      skipLog: `send-invitation-email: no recipient address for invite ${linkId}`,
       failLog: 'send-invitation-email: Resend rejected the invitation email',
     });
     // 200, not 5xx: the invitation itself was already created by the caller and
