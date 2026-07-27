@@ -1707,3 +1707,19 @@ Both `endpoint.ts` edits respect its documented **DEPENDENCY FREEZE**: one param
 **Deploy:** merged @`04c4d12`; all three workflows green (CI `30247751464`, SWA `30247751410`, functions `30247751406`). Unauth smoke on the regionalized host: `POST /api/send-invitation-email` 401 `Missing Bearer token`, `OPTIONS` 204, `organizations` + `platform-settings` 401, frontend root 200. The delivery-failure and escaping paths need an authenticated send to exercise end-to-end — unit-tested, not smoke-covered.
 
 **Still deferred, not yet filed:** `authz-2`, `dup-2`, `err-12` were all blocked on this branch owning `send-invitation-email`; that block is now lifted. Also left unfixed as out of scope: a null `orgName` renders literally as "hos **null**" in both body and subject (pre-existing).
+
+## 2026-07-27 — Quiz lessons with no quiz / zero questions no longer dead-end the learner (#299, PR #304)
+
+**Who:** claude (Opus 4.8) + martin. Bug found by the adversarial review on PR #298 (round-8). Two quiz data-state shapes, both reachable *by construction* (a quiz lesson is created from one `CourseEditor` affordance, its quiz body authored from another; no publish-time completeness check), trapped the learner with no way forward.
+
+**What (frontend only):** In `src/pages/learner/CoursePlayer.tsx` — (1) a quiz lesson with no quiz row (`quiz-by-lesson` returns `200 { quiz: null, questions: [] }`) rendered none of the quiz blocks AND the footer nav was gated `lesson_type !== 'quiz'`, so the learner saw only the type chip + title (dead end); (2) a quiz with zero questions rendered an empty list and Submit's guard `answers.length !== questions.length` was `0 !== 0` = false, so **Submit was ENABLED on an empty quiz** and POSTed `{}` to `grade-quiz`.
+
+Fix: a neutral **"not ready yet" empty state** for both shapes (distinct from #294's `role="alert"` load-failure card); the working-quiz block now requires `questions.length > 0` so a zero-question quiz falls through to the empty state; a **nav-only Previous/Next footer** for any quiz lesson not showing an interactive quiz (empty / zero-question / load-failure) — the durable fix that makes the whole class non-blocking, while a healthy quiz keeps its own submit→next flow and gets no footer; the Submit guard now short-circuits on `questions.length === 0`. Extracted a shared `LessonNav` so the content-lesson footer and the new quiz footer share one implementation. New en+da `coursePlayer.quizNotReady` / `quizNotReadyDescription` keys.
+
+**Scope:** frontend only. Issue **item 4** (publish-time backend validation that a `quiz` lesson has a quiz with ≥1 question) was **declined by the owner** — it would block the common flow of publishing a course while a quiz is still being authored, and would not help already-published courses (which this player fix does). Left as a possible follow-up. The `quizzes_enabled` flag deliberately does NOT gate already-published content (ADR-0017); the nav footer is the durable answer to the "flag off → quiz still visible but unskippable" symptom the issue flagged.
+
+**How:** TDD — 3 new `CoursePlayer.test.tsx` cases (no-quiz, zero-questions, healthy-quiz regression) written red first, then implemented green. The `LessonNav` extraction is behavior-preserving: the pre-existing #294 / #18 / footer suites are unchanged and green. Code review skipped at the owner's request.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 108 files / 809 pass · `build` exit 0. `functions/` untouched (no functions test run needed). CI green on PR #304.
+
+**Deploy:** frontend-only; merging auto-fires the SWA frontend workflow (and the functions workflow as a no-op redeploy). Deploy + smoke announced on PR #304.
