@@ -17,7 +17,7 @@
 - **Language is pinned to English** by seeding `localStorage.preferred_language = 'en'` before app boot in every spec. Text-based locators depend on this; without it the app renders Danish and every locator breaks. (Verified live: the app honours this key.)
 - **Prefer stable locators in this order:** element `id` (`#name`, `#slug`), then `getByRole` with the English accessible name, then text. Never CSS class chains — the codebase uses generated Tailwind classes that change freely.
 - **`getByRole(..., { name })` matches the accessible name as a SUBSTRING by default.** Always pass `exact: true`, or scope the locator to a landmark, or both. This is not theoretical: a probe against the live app found `getByRole('link', { name: 'Organizations' })` resolving to **two** elements — the sidebar nav link and a data row whose org name also contains "organisation" — and failing on strict mode. `{ name: 'Delete' }` would likewise match `'Delete organization'`. Every locator in this plan is subject to this; treat a strict-mode violation as an ambiguity to resolve, never as a reason to add `.first()`.
-- **Nav assertions scope to the sidebar**, e.g. `page.getByRole('navigation').getByRole('link', { name: 'Organizations', exact: true })`, so page content can never satisfy a navigation assertion.
+- **Nav assertions scope to the sidebar via `sidebarNav(page)`** (exported from `e2e/fixtures/auth.ts`, which resolves `[data-sidebar="sidebar"]`), e.g. `sidebarNav(page).getByRole('link', { name: 'Organizations', exact: true })`. **Do NOT use `page.getByRole('navigation')`** — the shadcn sidebar renders no `<nav>` landmark, so that locator matches the **breadcrumb inside `<main>`** instead. Task 2 found this the hard way: the sign-in helper was passing only because the breadcrumb happened to read "Organizations", i.e. a page-content element was satisfying a navigation assertion. Exactly the false-green this constraint exists to prevent.
 - **No credentials exist anywhere.** Authentication is a human-captured browser session (see Task 2); `.env.e2e` holds only `E2E_BASE_URL` and `E2E_INVITE_TO`. Never add `E2E_USER`/`E2E_PASSWORD` back, and never type into the Microsoft login form.
 - **Radix components are not native HTML.** `Select` and `DropdownMenu` require clicking the trigger, then clicking an option with `role="option"` (Select) or `role="menuitemradio"` (DropdownMenu radio group). `selectOption()` does not work on them.
 - **Every artefact the suite creates is named `e2e-<RUN_ID>-<kind>`** so anything left behind is identifiable. Cleanup runs in `finally`.
@@ -223,7 +223,7 @@ export async function signInThroughSso(page: Page): Promise<void> {
   }
 
   // Nav is scoped to the sidebar: page content must never satisfy this.
-  const nav = page.getByRole('navigation');
+  const nav = sidebarNav(page);
   await expect(
     nav.getByRole('link', { name: 'Organizations', exact: true }),
     RECAPTURE_HINT,
@@ -300,7 +300,7 @@ Create `e2e/specs/01-auth.spec.ts`:
 
 ```ts
 import { test, expect } from '@playwright/test';
-import { signInThroughSso } from '../fixtures/auth';
+import { signInThroughSso, sidebarNav } from '../fixtures/auth';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -312,7 +312,7 @@ test.beforeEach(async ({ page }) => {
 test('the captured session reaches the platform-admin surface', async ({ page }) => {
   await signInThroughSso(page);
 
-  const nav = page.getByRole('navigation');
+  const nav = sidebarNav(page);
   await expect(nav.getByRole('link', { name: 'Platform Settings', exact: true })).toBeVisible();
   await expect(page).not.toHaveURL(/\/login/);
 });
