@@ -32,6 +32,15 @@ export default tseslint.config(
   // they honour the UI language (en/da via i18next) rather than the browser
   // locale. `toLocaleDateString()` (no locale arg) bypasses that helper and
   // re-introduces browser-locale drift — block it at the lint level.
+  //
+  // ── i18n inline-default guard (#300) ─────────────────────────────────────
+  // i18next treats a second string argument (or an options `defaultValue`) as a
+  // fallback to render when the key is missing. That silently masks a missing
+  // key: #300 shipped an English "Sign in with Microsoft" on the Danish login
+  // page for months because `auth.signInWithMicrosoft` was in neither locale
+  // file and the inline default rendered instead — with no missing-key warning.
+  // Block the masking mechanism so a missing key fails loudly; the drift gate in
+  // src/i18n/translation-keys.test.ts blocks the missing key itself.
   {
     files: ["src/**/*.{ts,tsx}"],
     rules: {
@@ -41,6 +50,19 @@ export default tseslint.config(
           selector: "MemberExpression[property.name='toLocaleDateString']",
           message:
             "Use formatDate(date, 'P', i18n.language) from src/lib/date-locale.ts instead of toLocaleDateString() — ensures dates follow the UI language (en/da), not the browser locale.",
+        },
+        {
+          // Covers both call shapes in use: bare `t(...)` and `i18n.t(...)`.
+          selector:
+            ":matches(CallExpression[callee.name='t'], CallExpression[callee.property.name='t'])[arguments.1.type=/^(Literal|TemplateLiteral)$/]",
+          message:
+            "Do not pass an inline default to t() — it masks a missing key (#300). Add the string to BOTH src/i18n/locales/en.json and da.json and call t('the.key') alone.",
+        },
+        {
+          selector:
+            ":matches(CallExpression[callee.name='t'], CallExpression[callee.property.name='t']) > ObjectExpression > Property[key.name='defaultValue']",
+          message:
+            "Do not pass defaultValue to t() — it masks a missing key (#300). Add the string to BOTH src/i18n/locales/en.json and da.json and call t('the.key') alone.",
         },
       ],
     },
