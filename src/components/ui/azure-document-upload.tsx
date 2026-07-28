@@ -26,6 +26,11 @@ interface AzureDocumentUploadProps {
    * promise something the save would 413 on. Defaults to the server cap.
    */
   maxSizeMB?: number;
+  /**
+   * Forwarded to the underlying file input so a `<Label htmlFor>` can name the
+   * control (#325). Clicking such a label opens the file picker.
+   */
+  id?: string;
 }
 
 export function AzureDocumentUpload({
@@ -34,6 +39,7 @@ export function AzureDocumentUpload({
   className,
   disabled = false,
   maxSizeMB,
+  id,
 }: AzureDocumentUploadProps) {
   const { t } = useTranslation();
   const capMB = effectiveMaxSizeMB('document', maxSizeMB);
@@ -150,6 +156,7 @@ export function AzureDocumentUpload({
     <div className={cn('space-y-2', className)}>
       <input
         ref={inputRef}
+        id={id}
         type="file"
         accept={UPLOAD_ACCEPT_ATTRIBUTE.document}
         onChange={handleFileChange}

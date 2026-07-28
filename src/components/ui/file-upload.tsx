@@ -38,6 +38,11 @@ interface FileUploadProps {
   maxSizeMB?: number;
   className?: string;
   disabled?: boolean;
+  /**
+   * Forwarded to the underlying file input so a `<Label htmlFor>` can name the
+   * control (#325). Clicking such a label opens the file picker.
+   */
+  id?: string;
 }
 
 const fileIcons: Record<UploadAccept, React.ReactNode> = {
@@ -61,6 +66,7 @@ export function FileUpload({
   maxSizeMB,
   className,
   disabled = false,
+  id,
 }: FileUploadProps) {
   const { t } = useTranslation();
   const capMB = effectiveMaxSizeMB(accept, maxSizeMB);
@@ -223,6 +229,7 @@ export function FileUpload({
     <div className={cn('space-y-2', className)}>
       <input
         ref={inputRef}
+        id={id}
         type="file"
         accept={UPLOAD_ACCEPT_ATTRIBUTE[accept]}
         onChange={handleFileChange}

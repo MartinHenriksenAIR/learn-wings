@@ -1827,3 +1827,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 110 files / 813 pass · `build` exit 0. `functions/` untouched (frontend-only); CI ran the functions gate green anyway.
 
 **Deploy:** frontend-only → the SWA workflow ships it; no functions deploy. Announce on PR #324.
+
+## 2026-07-28 — CourseEditor field labels not associated with their inputs (#325, PR #326)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Problem.** `CourseEditor.tsx` had **zero** `htmlFor` attributes — every `<Label>` was visually adjacent to its field but not programmatically tied to it. Screen readers announced each field with no name, clicking a label did not focus its input, and `page.getByLabel(...)` resolved to zero elements (which is how it surfaced, during the #316 e2e course-lifecycle work). WCAG 1.3.1 / 4.1.2. `afk`-labelled. The correct pattern already existed in `OrganizationsManager.tsx`'s org-create dialog; this file had simply diverged.
+
+**Fix.** Wired **every** labelled field in the course editor via `htmlFor`↔`id`, not just the six the issue enumerated — the course-details form (Title, Description, Thumbnail, Level, Language) *and* the module/lesson dialogs (Module Title, Lesson Title, Type, Duration, Document/Video File, content text; the three mutually-exclusive `lesson-content` branches share one id). The three shared upload components (`FileUpload`, `AzureDocumentUpload`, `AzureVideoUpload`) gained an optional `id?: string` prop forwarded to their hidden `<input type="file">`, so a `<Label htmlFor>` names the picker (label-click opens the dialog). The "editions" title labelled a *section* (a list + a link control), not a single field, so it became an `<h3>`; the link-target Radix select got its own `aria-label`. No new i18n strings (existing keys reused).
+
+**Test.** New guards in `CourseEditor.test.tsx` resolve each field **through its label** — `getByLabelText` for native inputs, name-scoped `getByRole('combobox', …)` for the Radix selects — across both the details form and the module/lesson dialogs. Stripping any `htmlFor` fails a matching assertion. (Also coordinates with #316: its title-field locator can now become `getByLabel('Title')`.)
+
+**Sweep (per AC).** Grepped the other authoring surfaces for the same divergence; found it in ~12 more files (`QuizEditorDialog` — which also hardcodes non-i18n label text — `CoursesManager`, several org-detail/enroll dialogs, settings). Filed as **#327** rather than folded in, to keep this PR reviewable.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 110 files / 815 pass (2 new) · `build` exit 0. `functions/` untouched (frontend-only).
+
+**Deploy:** frontend-only → the SWA workflow ships it; no functions deploy. Announce on PR #326.
