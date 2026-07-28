@@ -8,7 +8,9 @@ import { sidebarNav, signInThroughSso } from '../fixtures/auth';
  * (src/hooks/useAuth.tsx:99-101) — the token keeps full platform rights in every
  * view. So a green run proves the nav swaps and a view-gated route redirects; it
  * does NOT prove the API refuses a genuine org admin reaching across orgs.
- * Closing that gap needs a real org-admin account.
+ * Closing that gap needs a real org-admin account — the fuller explanation, and
+ * what closing it would take, is the "Known gap: this does not prove isolation"
+ * section of docs/superpowers/specs/2026-07-27-e2e-playwright-smoke-suite-design.md.
  *
  * Two of the app's three route guards are NOT view-gated at all, and this spec
  * must not be read as covering them: `requirePlatformAdmin` tests the raw
@@ -31,8 +33,12 @@ import { sidebarNav, signInThroughSso } from '../fixtures/auth';
  * would pin the spec to one account. `exact` is deliberately absent — impossible
  * here, since the accessible name concatenates the avatar initials and full name
  * ahead of this text ("MVmartin vladinovViewing as: Platform Admin"). The
- * substring is still unambiguous: the sidebar footer holds the page's only button,
- * and for a platform admin this label is always present, in all three views
+ * substring is still unambiguous, but it is the `sidebarNav` scope that makes it so
+ * — not scarcity of buttons on the page. The header renders its own
+ * `SidebarTrigger` button (AppLayout.tsx:62) and a chip carrying this very string
+ * (AppLayout.tsx:92-94); both sit in `SidebarInset`, outside `[data-sidebar]`.
+ * Within the sidebar exactly one element holds the string — the footer profile
+ * button — and for a platform admin its label is present in all three views
  * (AppSidebar.tsx:167-172).
  */
 function viewSwitcherTrigger(page: Page): Locator {
@@ -127,9 +133,14 @@ test('a learner-only route is refused in platform view and reached in learner vi
   await sidebarNav(page).getByRole('link', { name: 'Dashboard', exact: true }).click();
 
   await expect(page).toHaveURL(/\/app\/dashboard/);
-  // The h1 comes from AppLayout's `title`, which all of the page's forks pass —
-  // spinner, no-membership empty state, error and loaded alike
-  // (src/pages/learner/Dashboard.tsx:79,88,104) — so it proves the guard rendered
+  // The h1 is AppLayout's `title`, and it holds because of *this account*, not
+  // because every fork passes one: the loaded fork passes no title and renders
+  // "Welcome back, …" instead (src/pages/learner/Dashboard.tsx:153-156). That fork
+  // is unreachable here — `currentOrg` starts null and loading the user context
+  // skips the org auto-select for platform admins (src/hooks/useAuth.tsx:115),
+  // while this read-only spec never picks one — so the page always lands on the
+  // `!currentOrg` fork (Dashboard.tsx:85-88), which passes the title, as do the
+  // spinner and error forks (Dashboard.tsx:79,104). So it proves the guard rendered
   // the route without depending on this account having enrollments.
   await expect(page.getByRole('heading', { name: 'My Dashboard', exact: true })).toBeVisible();
 });
@@ -143,5 +154,13 @@ test('switching back to platform view restores the platform nav and drops the ch
   await switchViewTo(page, 'Platform Admin');
 
   await expect(nav.getByRole('link', { name: 'Platform Settings', exact: true })).toBeVisible();
-  await expect(pageHeader(page).getByText(/Viewing as:/)).toBeHidden();
+  // Anchor the negative before asserting it: `toBeHidden()` is also satisfied by an
+  // element that does not exist, so a missing `<header>` or a broken `pageHeader`
+  // locator would pass while proving nothing. The breadcrumb home link is
+  // unconditional in that header (AppLayout.tsx:65-69), so its presence establishes
+  // that the header resolved and is rendering — only then does the absence of the
+  // chip mean the chip was dropped.
+  const header = pageHeader(page);
+  await expect(header.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
+  await expect(header.getByText(/Viewing as:/)).toBeHidden();
 });
