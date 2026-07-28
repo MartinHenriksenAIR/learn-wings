@@ -419,9 +419,11 @@ export default function OrganizationDetail() {
       ? addUserMutation.error.message
       : null;
 
+  // OrgDetailHeader owns the page's single <h1> (the org name), so AppLayout's `title`
+  // is omitted here to avoid a duplicate <h1> (#320). The loading branch above keeps
+  // `title` since it has no in-page header — same split as OrganizationsManager / CoursesManager.
   return (
     <AppLayout
-      title={org.name}
       breadcrumbs={[
         { label: t('organizations.title'), href: routes.platformAdmin.organizations },
         { label: org.name },
