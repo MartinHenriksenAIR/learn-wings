@@ -1,0 +1,238 @@
+import type { Locator, Page } from '@playwright/test';
+import { test, expect } from '../fixtures/session';
+import { sidebarNav, signInThroughSso } from '../fixtures/auth';
+
+/**
+ * The learner journey: open a course, complete a lesson, and prove the progress reached
+ * the database rather than a component's `useState`.
+ *
+ * It writes to the production database, and unlike 04-course-lifecycle it is not fenced.
+ * The one write is `/api/lesson-progress`, which upserts a single row keyed
+ * `(org_id, user_id, lesson_id)` for the signed-in account, with `profile.id` taken from
+ * the token and never from the client (functions/lesson-progress/index.ts). So the
+ * artefact is this account's own progress, not an organization-scoped object a run can
+ * own and drop: there is no fenced organization here, no `fencedOrg` fixture and no
+ * teardown. `page.goto` is therefore fine, where in 04 it would silently unfence the run.
+ *
+ * The row is org-scoped all the same, and the journey does not choose the organization:
+ * in learner view `OrgSelector` renders and auto-selects `orgs[0]` once per mount when
+ * nothing is selected (OrgSelector.tsx:24-32), and `/api/organizations` orders
+ * `created_at DESC` for a platform admin (functions/organizations/index.ts:33) — so it is
+ * whichever organization was created most recently. Which one that is does not matter to
+ * this journey as long as that organization has access to the course, and the catalogue
+ * assertion below says so when it does not. The realistic way it stops being true is
+ * debris: a fenced organization stranded by a failed 02/04 teardown would be `orgs[0]` and
+ * its catalogue is empty — a course is visible to an organization only through an
+ * `org_course_access` row with `access = 'enabled'`
+ * (functions/shared/course-visibility.ts), and creating an organization writes none.
+ *
+ * `AI Fundamentals`, its `Welcome Video` lesson and this account's enrollment are all
+ * pre-existing platform data — the course and lesson are seeded
+ * (migration/azure/02-seed.sql:52,62) — not artefacts of this suite. Enrolling is
+ * deliberately not part of the journey: the card's play link exists only because the
+ * account is already enrolled (Courses.tsx:246-260), and the assertion on it says so.
+ *
+ * Re-running is safe but not symmetric, and the body says where. The endpoint upserts, so
+ * the *state* after every run is identical; the *journey* is not repeatable, because a
+ * completed lesson's footer replaces the button with a badge (CoursePlayer.tsx:809-832)
+ * and the app offers no way to un-complete a lesson. So the first run performs the write
+ * and later runs find it already done — see the branch below. Resetting the progress to
+ * make every run write would mean deleting a real person's progress, which this suite
+ * does not do.
+ */
+
+test.use({ viewMode: 'learner' });
+
+/** The learner catalogue (`routes.learner.courses`). */
+const COURSES_PATH = '/app/courses';
+
+/** `routes.learner.coursePlayerPattern` — `/app/learn/:courseId`, a uuid. */
+const PLAYER_URL = /\/app\/learn\/[0-9a-f-]{36}$/;
+
+/** The course this journey drives, by name — never "the first card in the list". */
+const COURSE = 'AI Fundamentals';
+
+/**
+ * The lesson this journey completes.
+ *
+ * The course's first lesson, which matters twice over: the player opens on
+ * `modules[0].lessons[0]` (CoursePlayer.tsx:148-150), so a reload lands back on this
+ * lesson without any navigation, and the same lesson is driven on every run — so runs do
+ * not eat through the course one lesson at a time.
+ */
+const LESSON = 'Welcome Video';
+
+/** `coursePlayer.markAsComplete` and `coursePlayer.completed` — one footer slot, two states. */
+const MARK_COMPLETE = 'Mark as complete';
+const COMPLETED = 'Completed';
+
+/**
+ * Budget for one lesson-progress write to land, or for the first read after a boot.
+ *
+ * Wider than the config's 15s `expect` default, which was sized for assertions on
+ * already-rendered state: a cold Azure Functions start alone can eat it. Sibling of
+ * `COURSE_WRITE_TIMEOUT` in e2e/fixtures/course.ts and deliberately not imported from
+ * it — that figure is about the course-admin endpoints, this one about
+ * `/api/lesson-progress` and `/api/course-player-data`.
+ */
+const LESSON_WRITE_TIMEOUT = 30_000;
+
+/**
+ * The body of one course's card on the learner catalogue.
+ *
+ * The card is a plain `div` with no test id and no accessible name, so it cannot be
+ * addressed directly: its title is an `<h3>` and its play link sits in a sibling row
+ * further down (Courses.tsx:232,256). What is addressable is the innermost `div` holding
+ * both — matched here as "contains this course's h3 *and* contains a link". Every
+ * ancestor of the h3 that also holds a link matches too (the grid holds every card), and
+ * ancestors precede descendants in document order, so `.last()` is the innermost one.
+ *
+ * `.last()` also keeps this single-valued if the same course is rendered twice: a
+ * level-matched course is repeated in the "For you" grid above the full catalogue
+ * (Courses.tsx:353), which happens once the account has an `assessment_level`. Both
+ * copies are the same course and link to the same player, so picking either is correct.
+ * Measured today: 1 — this account has no assessment level, so no recommended grid.
+ */
+function courseCardBody(page: Page, title: string): Locator {
+  return page
+    .locator('div')
+    .filter({ has: page.getByRole('heading', { level: 3, name: title, exact: true }) })
+    .filter({ has: page.getByRole('link') })
+    .last();
+}
+
+/**
+ * The open lesson's pane heading.
+ *
+ * `heading`, not text: the page renders the course title in its breadcrumb
+ * (AppLayout, via CoursePlayer.tsx:440-443), which is page chrome — measured, the
+ * header's own text on this page reads "Toggle Sidebar / Home / Course Overview / AI
+ * Fundamentals / Viewing as: Learner" — so a `getByText` on the course title matches
+ * whether or not the player ever loaded the course. The two headings this
+ * page does render at level 2 are the course card's title (CoursePlayer.tsx:448) and the
+ * open lesson's (CoursePlayer.tsx:534) — one element each, so a name picks between them.
+ */
+function heading2(page: Page, name: string): Locator {
+  return page.getByRole('heading', { level: 2, name, exact: true });
+}
+
+/**
+ * The course's completed-lesson counter in the player's sidebar card
+ * (CoursePlayer.tsx:451-453) — e.g. `1/4 · 25%`.
+ *
+ * Matched on its shape because the span carries no label and no test id. The enclosing
+ * row prefixes the `Progress` label, so its text does not match this anchored pattern and
+ * only the value span does (measured: 1 element). Counted per course, not platform-wide:
+ * the numbers come from this course's lessons only (CoursePlayer.tsx:402-405).
+ */
+function progressCounter(page: Page): Locator {
+  return page.getByText(/^\d+\/\d+\s*·\s*\d+%$/);
+}
+
+/**
+ * Assert the open lesson pane says the lesson is complete.
+ *
+ * Both halves are needed and neither is redundant. The badge is the positive claim, and
+ * it anchors the negative: `toBeHidden` is also satisfied by an element that does not
+ * exist, so the absent button alone would pass on a page that never rendered. The button
+ * is the other half of the same footer slot (CoursePlayer.tsx:809-832), so its absence is
+ * what rules out "the footer rendered, still offering to complete the lesson".
+ *
+ * Page-scoped rather than scoped to the pane: the player renders one lesson pane, the
+ * badge's own text is exactly `Completed` and nothing else on the page carries it
+ * (measured: 0 before completing, and the sidebar's per-lesson tick is an `aria-hidden`
+ * icon with no text). The caller pins which lesson the pane is showing.
+ */
+async function expectLessonComplete(page: Page, message: string): Promise<void> {
+  await expect(page.getByText(COMPLETED, { exact: true }), message).toBeVisible({
+    timeout: LESSON_WRITE_TIMEOUT,
+  });
+  await expect(page.getByRole('button', { name: MARK_COMPLETE, exact: true }), message).toBeHidden();
+}
+
+test('a completed lesson stays completed after a reload', async ({ page }) => {
+  await signInThroughSso(page, 'learner');
+
+  await page.goto(COURSES_PATH);
+
+  // Learner view specifically, not merely "signed in". `signInThroughSso` waited on the
+  // `Dashboard` link, which org-admin view renders too (see SIDEBAR_LANDMARK in
+  // e2e/fixtures/auth.ts), so the two negatives are what narrow it: no `Organizations`
+  // rules out the platform group — the view an unseeded `viewMode` falls back to
+  // (useAuth.tsx:53-57) — and no `Organization` rules out the org-admin analytics link,
+  // whose group a learner does not get (AppSidebar.tsx:193-203). `exact: true` is
+  // load-bearing on both: `Organization` is a substring of `Organizations`.
+  const nav = sidebarNav(page);
+  await expect(nav.getByRole('link', { name: 'Organizations', exact: true })).toBeHidden();
+  await expect(nav.getByRole('link', { name: 'Organization', exact: true })).toBeHidden();
+  await expect(page.locator('header').getByText('Viewing as: Learner')).toBeVisible();
+
+  // By name: a positional "first card" locator would drive whatever the catalogue
+  // happened to contain and still pass. The link inside the card is the play link —
+  // `Continue`, or `Review course` once the course is finished (Courses.tsx:258) — and
+  // matching the role alone survives both labels. It is also the enrollment check: an
+  // unenrolled card renders an `Enroll` *button* and no link at all (Courses.tsx:262-275).
+  const openCourse = courseCardBody(page, COURSE).getByRole('link');
+  await expect(
+    openCourse,
+    `no play link for a "${COURSE}" card on the learner catalogue. Either the course is ` +
+      'absent from the organization the sidebar selector auto-selected (the most recently ' +
+      'created one — check for a stranded e2e organization), or this account is no longer ' +
+      'enrolled in it. This journey drives pre-existing data and enrolls nobody.',
+  ).toHaveCount(1, { timeout: LESSON_WRITE_TIMEOUT });
+  await openCourse.click();
+
+  await expect(page).toHaveURL(PLAYER_URL);
+  // The player loaded *this* course from the server: the heading is `course.title` out of
+  // the `/api/course-player-data` response (CoursePlayer.tsx:143,448).
+  await expect(heading2(page, COURSE)).toBeVisible({ timeout: LESSON_WRITE_TIMEOUT });
+  await expect(heading2(page, LESSON)).toBeVisible();
+
+  // Either state is a valid starting point — the write only happens on the run that finds
+  // the lesson outstanding (see the file header). Settled with one wait so a slow first
+  // paint cannot be read as "already complete".
+  const markComplete = page.getByRole('button', { name: MARK_COMPLETE, exact: true });
+  await expect(markComplete.or(page.getByText(COMPLETED, { exact: true })).first()).toBeVisible();
+
+  if (await markComplete.isVisible()) {
+    await markComplete.click();
+
+    // The player advances to the next lesson, and only after `/api/lesson-progress` has
+    // resolved: a rejected write returns early with a toast and leaves this lesson open
+    // (CoursePlayer.tsx:302-311), so the pane moving is how "the endpoint accepted it"
+    // becomes visible without asserting on network traffic. It also fails, rather than
+    // hanging, in the one case where the app does not advance — this lesson completing the
+    // whole course, which opens the celebration dialog instead (CoursePlayer.tsx:334-351).
+    // That needs the course's other three lessons already done, which no run of this spec
+    // does.
+    await expect(
+      heading2(page, LESSON),
+      'completing the lesson never advanced the player, so the progress write did not succeed',
+    ).toBeHidden({ timeout: LESSON_WRITE_TIMEOUT });
+
+    // Back to the lesson to read its own state. `exact` is impossible here and its absence
+    // is not laziness: the sidebar button's accessible name concatenates the title and the
+    // duration ("Welcome Video 5 min" — CoursePlayer.tsx:513-518). The substring is
+    // unambiguous anyway (measured: 1 button).
+    await page.getByRole('button', { name: LESSON }).click();
+    await expectLessonComplete(page, `the player did not consider "${LESSON}" complete after saving`);
+  }
+
+  // The reload is the whole point of the test, and it is what the assertion above cannot
+  // do: it starts a new JS context, and the player holds `progress` in `useState` seeded
+  // from `/api/course-player-data` on mount (CoursePlayer.tsx:92,145) with nothing
+  // persisted client-side. So a badge here can only have come from the `lesson_progress`
+  // row. Verified by construction: with `/api/lesson-progress` stubbed to a fake 200 the
+  // pre-reload assertions still pass and this one fails.
+  await page.reload();
+  await expect(heading2(page, LESSON)).toBeVisible({ timeout: LESSON_WRITE_TIMEOUT });
+  await expectLessonComplete(
+    page,
+    `"${LESSON}" is not complete after a reload — the progress was never persisted server-side`,
+  );
+  // And the count the server sent back agrees that at least one lesson is done, so the
+  // badge is not a lone rendering fluke. Stated positively on purpose: a negated
+  // `not.toHaveText` is also satisfied by an element that never resolved, which is the
+  // same trap the `toBeHidden` above needs anchoring against.
+  await expect(progressCounter(page)).toHaveText(/^[1-9]\d*\//);
+});

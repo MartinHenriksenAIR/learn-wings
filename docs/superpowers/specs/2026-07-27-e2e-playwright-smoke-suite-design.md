@@ -110,13 +110,13 @@ Every artefact the suite creates is named with an `e2e-<timestamp>-` prefix, and
 | Spec | Covers | Key assertions |
 |---|---|---|
 | `01-auth` | Login and language | Real Entra login lands on the platform-admin home; `<html lang>` matches the rendered language on first load (guards #311 in a real browser, which unit tests cannot); a deep link before login is preserved and returned to afterwards. |
-| `02-role-views` | The switcher and UI gating | Driving the real profile-menu switcher into org-admin and learner views changes the visible nav and the "viewing as" chip; learner view cannot reach platform routes; returning to platform view restores full nav. |
-| `03-learner-course` | Learner journey (write) | In learner view, open a course, complete a lesson, and confirm progress survives a full reload. Writes only the account's own progress rows. |
+| `03-role-views` | The switcher and UI gating | Driving the real profile-menu switcher into org-admin and learner views changes the visible nav and the "viewing as" chip; learner view cannot reach platform routes; returning to platform view restores full nav. |
 | `04-course-lifecycle` | Platform-admin CRUD (write) | Create a course in the fenced org, edit its title, confirm it appears in the list, delete it, confirm it is gone. Full create→delete cycle, self-cleaning. |
-| `05-org-members` | Invitation lifecycle (write, sends mail) | In org-admin view **on the fenced org**, invite the account owner's own address, assert the invitation appears as pending, then revoke it. Exercises the real Resend path — the one that shipped the "null" org-name bug. |
-| `06-quiz-compliance-pdf` | Recently-broken surfaces | A quiz lesson renders either a working quiz or the "not ready" empty state, and **always** offers Previous/Next (the durable #299 fix); the AI Act compliance PDF downloads and is a structurally valid PDF with correct Danish characters (#71, #273). |
+| `05-learner-course` | Learner journey (write) | In learner view, open a course, complete a lesson, and confirm progress survives a full reload. Writes only the account's own progress rows. |
+| `06-org-members` | Invitation lifecycle (write, sends mail) | In org-admin view **on the fenced org**, invite the account owner's own address, assert the invitation appears as pending, then revoke it. Exercises the real Resend path — the one that shipped the "null" org-name bug. |
+| `07-quiz-compliance-pdf` | Recently-broken surfaces | A quiz lesson renders either a working quiz or the "not ready" empty state, and **always** offers Previous/Next (the durable #299 fix); the AI Act compliance PDF downloads and is a structurally valid PDF with correct Danish characters (#71, #273). |
 
-**Learner certificates are deliberately excluded** from `06`. They require a *completed course*, not just a completed lesson, and `generate-certificate` has a known latent corruption bug tracked separately — asserting on it would make the suite red for a reason unrelated to the change under test. The compliance PDF covers the "does PDF generation work at all" question without that entanglement.
+**Learner certificates are deliberately excluded** from `07-quiz-compliance-pdf`. They require a *completed course*, not just a completed lesson, and `generate-certificate` has a known latent corruption bug tracked separately — asserting on it would make the suite red for a reason unrelated to the change under test. The compliance PDF covers the "does PDF generation work at all" question without that entanglement.
 
 ### Learner journey prerequisite — resolved
 
@@ -126,7 +126,9 @@ This was the one place the design could have stalled: a platform-admin account h
 
 Both journeys locate the course **by name, never positionally** ("the first course in the list" would pass against whatever the list happened to contain — a green that asserts nothing). If the named course is absent, the failure message says exactly that.
 
-One consequence to accept: the lesson progress this writes belongs to the account's own enrollment in a **pre-existing** course, so it is not cleaned up by the fenced-org teardown. Re-completing an already-complete lesson is idempotent, so repeat runs stay green.
+One consequence to accept: the lesson progress this writes belongs to the account's own enrollment in a **pre-existing** course, so it is not cleaned up by the fenced-org teardown.
+
+Repeat runs do stay green, but not by repeating the write — the shipped spec had to be built around that (verified 2026-07-28). `/api/lesson-progress` upserts on `(org_id, user_id, lesson_id)`, so the *state* after every run is identical; the *journey* is not repeatable, because a completed lesson's footer replaces the Mark-as-complete button with a Completed badge (`CoursePlayer.tsx:809-832`) and the app offers no way to un-complete a lesson. So the first run performs the write and every later run asserts on the row that run left behind. `05-learner-course` branches on which of the two states it finds; resetting the progress to make every run write would mean deleting a real person's progress, which this suite does not do.
 
 ## Error handling and failure modes
 
