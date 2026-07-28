@@ -21,9 +21,12 @@ vi.mock('react-i18next', async () => {
   };
 });
 
+// Mock AppLayout faithfully: the real one renders its `title` prop as an <h1>
+// (see AppLayout.tsx). Modeling that here is what lets the #320 regression test
+// observe a duplicate heading if the page ever passes `title` AND renders its own <h1>.
 vi.mock('@/components/layout/AppLayout', () => ({
-  AppLayout: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', null, children),
+  AppLayout: ({ title, children }: { title?: string; children: React.ReactNode }) =>
+    React.createElement('div', null, title ? React.createElement('h1', null, title) : null, children),
 }));
 
 const mockToast = vi.fn();
@@ -254,5 +257,28 @@ describe('OrganizationDetail — invite forwards the language pick (#225)', () =
         expect.objectContaining({ inviterLanguage: 'en' }),
       ),
     );
+  });
+});
+
+describe('OrganizationDetail — heading (#320)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/organizations') return { organization };
+      if (path === '/api/org-memberships') return { memberships: [membershipRow] };
+      if (path === '/api/invitations') return { invitations: [] };
+      if (path === '/api/profiles') return { profiles: [] };
+      throw new Error(`Unexpected callApi path: ${path}`);
+    });
+  });
+
+  it('renders the org name as a heading exactly once on the loaded page', async () => {
+    renderPage();
+
+    // OrgDetailHeader owns the single <h1>; AppLayout's `title` is omitted on the
+    // main branch. Re-adding it would resurface the duplicate this test guards.
+    const headings = await screen.findAllByRole('heading', { name: 'Acme Corp' });
+    expect(headings).toHaveLength(1);
+    expect(headings[0].tagName).toBe('H1');
   });
 });
