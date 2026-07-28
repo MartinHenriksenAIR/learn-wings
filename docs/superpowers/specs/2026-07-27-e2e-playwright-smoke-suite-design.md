@@ -98,7 +98,12 @@ The `fencedOrg` fixture therefore:
 3. **Asserts the selected org is the e2e org, and fails the spec immediately if not.** This guard runs before any write, in every write-capable spec. A spec that cannot confirm its fence does not proceed.
 4. Deletes the org in teardown.
 
-Every artefact the suite creates is named with an `e2e-<timestamp>-` prefix, and cleanup runs in a `finally` so a mid-run failure leaves *identifiable* debris rather than anonymous debris.
+Every artefact the suite creates is named with an `e2e-<timestamp>-` prefix, and teardown is owned by the `fencedOrg` fixture rather than a `finally` block — a test timeout can outrun `finally`, which is how a stray org survived a run during #319.
+
+**What the fence does and does not cover.** It bounds **org-scoped** writes: anything the app derives from `currentOrg`. It does **not** bound courses — `functions/course-create` takes no organization id at all, so a course the suite creates is platform-global until deleted (verified while building the course journey). For those, the protection is create-then-delete plus the `e2e-` prefix, not confinement. Two consequences worth stating plainly rather than discovering later:
+
+- A course the suite creates is briefly visible to every organization, so a run leaves a short-lived platform-wide artefact.
+- If a course journey fails without cleaning up, the debris is platform-wide rather than tucked inside a disposable org.
 
 ## Journeys
 
