@@ -11,7 +11,7 @@ vi.mock('@/lib/api-client', () => ({
 import { usePlatformSettingsAdmin } from './usePlatformSettingsAdmin';
 
 const settings = [
-  { key: 'branding', value: { platform_name: 'Test Platform' } },
+  { key: 'user_access', value: { allow_self_registration: true } },
   { key: 'features', value: { certificates_enabled: true } },
 ];
 
@@ -36,7 +36,7 @@ describe('usePlatformSettingsAdmin', () => {
     renderWithClient(<Consumer testId="main" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('main')).toHaveTextContent('branding,features');
+      expect(screen.getByTestId('main')).toHaveTextContent('user_access,features');
     });
 
     expect(mockCallApi).toHaveBeenCalledTimes(1);
@@ -54,9 +54,9 @@ describe('usePlatformSettingsAdmin', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('first')).toHaveTextContent('branding,features');
+      expect(screen.getByTestId('first')).toHaveTextContent('user_access,features');
     });
-    expect(screen.getByTestId('second')).toHaveTextContent('branding,features');
+    expect(screen.getByTestId('second')).toHaveTextContent('user_access,features');
 
     expect(mockCallApi).toHaveBeenCalledTimes(1);
   });

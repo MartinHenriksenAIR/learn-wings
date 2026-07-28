@@ -780,20 +780,9 @@
     "retry": "Prøv igen",
     "saveFailed": "Kunne ikke gemme",
     "tabs": {
-      "branding": "Branding",
       "userAccess": "Brugere & adgang",
       "features": "Funktioner",
       "platformAdmins": "Platformadministratorer"
-    },
-    "branding": {
-      "platformName": "Platformnavn",
-      "primaryColor": "Primær farve",
-      "accentColor": "Accentfarve",
-      "sidebarPrimaryColor": "Sidebjælkens primære farve",
-      "sidebarAccentColor": "Sidebjælkens accentfarve",
-      "logoUrl": "Logo-URL",
-      "faviconUrl": "Favicon-URL",
-      "save": "Gem branding"
     },
     "userAccess": {
       "defaultRole": "Standardrolle for nye brugere",

@@ -7,11 +7,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
-// --- mock platform settings (branding for the preview footer) ---
-vi.mock('@/hooks/usePlatformSettings', () => ({
-  usePlatformSettings: () => ({ branding: { platform_name: 'AIR Academy' } }),
-}));
-
 import { CertificateCard } from './CertificateCard';
 import { Enrollment, Course, Profile } from '@/lib/types';
 

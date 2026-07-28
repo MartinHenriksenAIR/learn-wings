@@ -18,17 +18,7 @@ import { usePlatformSettingsAdmin } from '@/hooks/usePlatformSettingsAdmin';
 import { useProfiles } from '@/hooks/useProfiles';
 import { PlatformAdminsSection } from '@/components/platform-admin/PlatformAdminsSection';
 import { queryKeys } from '@/lib/query-keys';
-import { Loader2, Palette, Users, ToggleLeft, AlertTriangle, DollarSign, ShieldCheck } from 'lucide-react';
-
-interface BrandingSettings {
-  platform_name: string;
-  primary_color: string;
-  accent_color: string;
-  sidebar_primary_color: string;
-  sidebar_accent_color: string;
-  logo_url: string | null;
-  favicon_url: string | null;
-}
+import { Loader2, Users, ToggleLeft, AlertTriangle, DollarSign, ShieldCheck } from 'lucide-react';
 
 interface UserAccessSettings {
   default_role: 'learner' | 'org_admin';
@@ -51,18 +41,8 @@ interface SeatPricingSettings {
   notification_email: string;
 }
 
-type SettingsKey = 'branding' | 'user_access' | 'features' | 'seat_pricing' | 'platform_admins';
-type SettingsValue = BrandingSettings | UserAccessSettings | FeatureSettings | SeatPricingSettings;
-
-const defaultBranding: BrandingSettings = {
-  platform_name: 'AIR Academy',
-  primary_color: '#6366f1',
-  accent_color: '#10b981',
-  sidebar_primary_color: '#10b981',
-  sidebar_accent_color: '#1f2937',
-  logo_url: null,
-  favicon_url: null,
-};
+type SettingsKey = 'user_access' | 'features' | 'seat_pricing' | 'platform_admins';
+type SettingsValue = UserAccessSettings | FeatureSettings | SeatPricingSettings;
 
 const defaultUserAccess: UserAccessSettings = {
   default_role: 'learner',
@@ -97,9 +77,8 @@ const featureKeys: (keyof FeatureSettings)[] = [
 export default function PlatformSettings() {
   const { t } = useTranslation();
   const { flashed, flash } = useFlash();
-  const [activeTab, setActiveTab] = useState<SettingsKey>('branding');
+  const [activeTab, setActiveTab] = useState<SettingsKey>('user_access');
 
-  const [branding, setBranding] = useState<BrandingSettings>(defaultBranding);
   const [userAccess, setUserAccess] = useState<UserAccessSettings>(defaultUserAccess);
   const [features, setFeatures] = useState<FeatureSettings>(defaultFeatures);
   const [seatPricing, setSeatPricing] = useState<SeatPricingSettings>(defaultSeatPricing);
@@ -150,9 +129,6 @@ export default function PlatformSettings() {
     query.data.forEach((setting) => {
       const value = (setting.value as Record<string, unknown>) || {};
       switch (setting.key) {
-        case 'branding':
-          setBranding({ ...defaultBranding, ...(value as Partial<BrandingSettings>) });
-          break;
         case 'user_access':
           setUserAccess({ ...defaultUserAccess, ...(value as Partial<UserAccessSettings>) });
           break;
@@ -216,18 +192,10 @@ export default function PlatformSettings() {
   }
 
   const tabs = [
-    { key: 'branding', label: t('platformSettings.tabs.branding'), icon: <Palette className="h-4 w-4" /> },
     { key: 'user_access', label: t('platformSettings.tabs.userAccess'), icon: <Users className="h-4 w-4" /> },
     { key: 'features', label: t('platformSettings.tabs.features'), icon: <ToggleLeft className="h-4 w-4" /> },
     { key: 'seat_pricing', label: t('platformSettings.seatPricing.tab'), icon: <DollarSign className="h-4 w-4" /> },
     { key: 'platform_admins', label: t('platformSettings.tabs.platformAdmins'), icon: <ShieldCheck className="h-4 w-4" /> },
-  ];
-
-  const brandingColors: { key: keyof BrandingSettings; label: string; placeholder: string }[] = [
-    { key: 'primary_color', label: t('platformSettings.branding.primaryColor'), placeholder: '#6366f1' },
-    { key: 'accent_color', label: t('platformSettings.branding.accentColor'), placeholder: '#10b981' },
-    { key: 'sidebar_primary_color', label: t('platformSettings.branding.sidebarPrimaryColor'), placeholder: '#10b981' },
-    { key: 'sidebar_accent_color', label: t('platformSettings.branding.sidebarAccentColor'), placeholder: '#1f2937' },
   ];
 
   return (
@@ -244,79 +212,6 @@ export default function PlatformSettings() {
           onChange={(k) => setActiveTab(k as SettingsKey)}
           className="mb-5"
         />
-
-        {activeTab === 'branding' && (
-          <Card>
-            <CardContent className="space-y-[18px] px-[26px] py-6">
-              <div className="space-y-1.5">
-                <Label htmlFor="platform_name" className="text-xs font-bold text-[#4a4f60]">
-                  {t('platformSettings.branding.platformName')}
-                </Label>
-                <Input
-                  id="platform_name"
-                  value={branding.platform_name}
-                  onChange={(e) => setBranding({ ...branding, platform_name: e.target.value })}
-                  placeholder="AIR Academy"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                {brandingColors.map((c) => (
-                  <div key={c.key} className="space-y-1.5">
-                    <Label htmlFor={c.key} className="text-xs font-bold text-[#4a4f60]">
-                      {c.label}
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="h-[38px] w-[38px] shrink-0 rounded-[10px] border border-input"
-                        style={{ background: (branding[c.key] as string) || '#ffffff' }}
-                      />
-                      <Input
-                        id={c.key}
-                        value={(branding[c.key] as string) || ''}
-                        onChange={(e) => setBranding({ ...branding, [c.key]: e.target.value })}
-                        placeholder={c.placeholder}
-                        className="flex-1 font-mono text-[13px]"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="logo_url" className="text-xs font-bold text-[#4a4f60]">
-                    {t('platformSettings.branding.logoUrl')}
-                  </Label>
-                  <Input
-                    id="logo_url"
-                    value={branding.logo_url || ''}
-                    onChange={(e) => setBranding({ ...branding, logo_url: e.target.value || null })}
-                    placeholder="https://example.com/logo.png"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="favicon_url" className="text-xs font-bold text-[#4a4f60]">
-                    {t('platformSettings.branding.faviconUrl')}
-                  </Label>
-                  <Input
-                    id="favicon_url"
-                    value={branding.favicon_url || ''}
-                    onChange={(e) => setBranding({ ...branding, favicon_url: e.target.value || null })}
-                    placeholder="https://example.com/favicon.png"
-                  />
-                </div>
-              </div>
-
-              <SaveButton
-                done={flashed('branding')}
-                idleLabel={t('platformSettings.branding.save')}
-                onClick={() => saveSetting('branding', branding)}
-                disabled={isSaving('branding')}
-              />
-            </CardContent>
-          </Card>
-        )}
 
         {activeTab === 'user_access' && (
           <Card>
