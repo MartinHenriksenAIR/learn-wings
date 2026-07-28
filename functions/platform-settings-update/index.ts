@@ -1,7 +1,7 @@
 import { queryOne } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
 
-const ALLOWED_KEYS = ['branding', 'user_access', 'features', 'seat_pricing'] as const;
+const ALLOWED_KEYS = ['user_access', 'features', 'seat_pricing'] as const;
 type SettingKey = typeof ALLOWED_KEYS[number];
 
 // Field lists derive from the frontend's interfaces (src/pages/platform-admin/PlatformSettings.tsx)
@@ -15,15 +15,6 @@ const isNonNegativeNumberOrNull: FieldCheck = (v) =>
   v === null || (typeof v === 'number' && Number.isFinite(v) && v >= 0);
 
 const FIELD_SHAPES: Record<SettingKey, Record<string, FieldCheck>> = {
-  branding: {
-    platform_name: isString,
-    primary_color: isString,
-    accent_color: isString,
-    sidebar_primary_color: isString,
-    sidebar_accent_color: isString,
-    logo_url: isStringOrNull,
-    favicon_url: isStringOrNull,
-  },
   user_access: {
     default_role: isOneOf('learner', 'org_admin'),
     require_email_verification: isBoolean,
@@ -52,7 +43,7 @@ export default adminEndpoint('platform-settings-update', async ({ req, profile, 
   const body = await req.json() as PlatformSettingsUpdateBody;
 
   if (typeof body.key !== 'string' || !(ALLOWED_KEYS as readonly string[]).includes(body.key)) {
-    return reply(400, { error: 'key must be one of: branding, user_access, features, seat_pricing' });
+    return reply(400, { error: 'key must be one of: user_access, features, seat_pricing' });
   }
   const key = body.key as SettingKey;
 
@@ -81,7 +72,7 @@ export default adminEndpoint('platform-settings-update', async ({ req, profile, 
   // MERGE, never replace (issue #90): `value || $2::jsonb` only touches the
   // fields present in the body — absent fields keep their stored values, so a
   // partial write can no longer clobber the rest of the setting (e.g. blank out
-  // the stored branding colors). updated_at is managed by a DB trigger on
+  // the other feature flags). updated_at is managed by a DB trigger on
   // UPDATE; updated_by is the authenticated caller's profile id.
   const setting = await queryOne(
     `UPDATE platform_settings SET value = value || $2::jsonb, updated_by = $3 WHERE key = $1 RETURNING key, value`,

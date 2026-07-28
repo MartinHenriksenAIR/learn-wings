@@ -780,20 +780,9 @@
     "retry": "Try again",
     "saveFailed": "Failed to save",
     "tabs": {
-      "branding": "Branding",
       "userAccess": "User & Access",
       "features": "Features",
       "platformAdmins": "Platform Admins"
-    },
-    "branding": {
-      "platformName": "Platform name",
-      "primaryColor": "Primary color",
-      "accentColor": "Accent color",
-      "sidebarPrimaryColor": "Sidebar primary color",
-      "sidebarAccentColor": "Sidebar accent color",
-      "logoUrl": "Logo URL",
-      "faviconUrl": "Favicon URL",
-      "save": "Save branding"
     },
     "userAccess": {
       "defaultRole": "Default role for new users",

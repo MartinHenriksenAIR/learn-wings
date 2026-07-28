@@ -1827,3 +1827,26 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 110 files / 813 pass · `build` exit 0. `functions/` untouched (frontend-only); CI ran the functions gate green anyway.
 
 **Deploy:** frontend-only → the SWA workflow ships it; no functions deploy. Announce on PR #324.
+
+## 2026-07-28 — Remove platform Branding entirely from Platform Settings (#170)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Decision — remove branding entirely, owner-confirmed.** Issue #170 parked the "keep / rework / remove Branding & Email tabs" question. The Email half was settled by #317/PR #322 (removed). For the **Branding** half the owner chose the deepest of three options: remove not just the editing tab but the whole platform-branding concept, so the app falls back to its built-in navy theme. What made this bigger than the Email removal: branding was **not** dead — the stored `branding` platform-setting was read by the theming context and drove the live CSS theme (colors + favicon) plus the certificate footer name. So this removes a live reader, not merely dead config.
+
+**Done.**
+- **Frontend tab:** removed the Branding tab from `PlatformSettings.tsx` — the `BrandingSettings` type, `defaultBranding`, the `branding` state + load-effect case, `brandingColors`, the render block, the `Palette` import, and `branding` from the `SettingsKey`/`SettingsValue` unions + the tabs array; the default active tab moves `'branding'` → `'user_access'`.
+- **Theming reader:** removed branding from `usePlatformSettings.tsx` — the `BrandingSettings` interface, `defaultBranding`, `hexToHslValue`, the `branding` context field + state, the fetch-merge for the `'branding'` key, and the `useEffect` that pushed CSS vars (`--primary`/`--accent`/`--sidebar-*`) + the favicon href. The provider still owns `features`. All five CSS vars it set have matching navy `:root` defaults in `src/index.css` (identical to the effect's own fallbacks), so the app stays navy with no JS — and dark mode no longer has the light-navy values force-inlined over it. Favicon reverts to the static `/favicon.png` in `index.html` (`favicon_url` was always null).
+- **Certificate:** `CertificateCard`'s hover-preview footer used `branding.platform_name`; now a module const `PLATFORM_NAME = 'AIR Academy'` (the server-side `generate-certificate` PDF never read branding).
+- **Backend:** dropped the `branding` key + field shapes from `platform-settings-update` (`ALLOWED_KEYS`/`FIELD_SHAPES`/error message) — the write path was dead once the tab was gone. GET `platform-settings` is key-agnostic and untouched.
+- **Seed:** removed the `branding` row from `migration/azure/02-seed.sql`. **No prod DB migration** — an existing prod `branding` row is harmless orphaned JSONB (the frontend ignores unknown keys; the update endpoint now rejects `branding` at the allowlist), same posture as #322's email row.
+- **i18n:** swept `tabs.branding` + the `platformSettings.branding.*` block in `en` + `da`.
+- **Tests:** retargeted the branding-vehicled tests onto live keys — `PlatformSettings.test.tsx` drives the `user_access` panel's switches (round-trip / failed-read / retry / save-guard / morph); `usePlatformSettings.test.tsx` rewritten to cover the surviving `features` behavior; `platform-settings-update`/`platform-settings`/`usePlatformSettingsAdmin`/`CertificateCard` fixtures moved off the `branding` key.
+
+**Untouched (deliberately):** the unrelated **org/community branding-asset** system — `BrandingAvatar`, `useSignedBrandingUrl`, `functions/branding-asset-url`, org `logo_url` — is a different "branding" (signed org logos + user avatars, #162/#165/#180) and stays intact.
+
+**Review.** Independent code review (Opus 4.8, pr-review-toolkit): clean — one Minor (a merge-comment still using "stored branding colors" as its example → reworded to "the other feature flags"), fixed. Confirmed the navy-fallback reasoning, the untouched asset system, and that the retargeted tests still reach the checks they name.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 813 pass · `build` exit 0. functions `build` exit 0 · `test` 2527 pass (3 skip). CI green on both required checks.
+
+**Deploy:** functions changed (`platform-settings-update`) → both workflows load-bearing. Announce on PR #328.
