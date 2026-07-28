@@ -52,6 +52,14 @@ export default defineConfig({
     baseURL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    // Bounds a single click or fill, so a locator that never resolves is reported
+    // where it happened instead of eating the whole test budget and printing
+    // Playwright's generic "Test timeout exceeded" — which named neither the
+    // element nor the helper. Matched to the `expect` default because every action
+    // in this suite targets UI a preceding `expect` already found: the long waits
+    // (a list loading, a write landing) are explicit assertions carrying their own
+    // wider budget, never an action's auto-wait.
+    actionTimeout: 15_000,
   },
   projects: [
     // The guard needs the captured cookies too — it signs in for real, so a

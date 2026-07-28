@@ -44,6 +44,19 @@ function resolveRunId(): string {
 
 export const RUN_ID: string = resolveRunId();
 
+/**
+ * Name an artefact after this run.
+ *
+ * The result is not free-form: `createFencedOrg` submits it as an organization
+ * name and its lowercase form as the slug, so the id minted in
+ * e2e/global-setup.ts has to stay inside `ORG_SLUG_REGEX` — lowercase letters,
+ * digits and hyphens only — and inside the length bounds, both in
+ * src/lib/org-validation.ts. Today's id is an ISO timestamp with `:` and `.`
+ * replaced by `-`, which satisfies that only after the lowercasing; an id
+ * carrying `_`, `+` or `/` would not. `createFencedOrg` checks the derived name
+ * against the app's own schema and names this file if it fails, so a format
+ * change cannot turn into an unexplained inline slug error.
+ */
 export function e2eName(kind: string): string {
   return `e2e-${RUN_ID}-${kind}`;
 }
