@@ -36,18 +36,49 @@ const DUPLICATE_SLUG_ERROR = 'This slug is already taken';
 const WRITE_TIMEOUT = 30_000;
 
 /**
- * What the fence fixture may spend on its setup, and again on its teardown.
+ * What creating the fence may spend, and — out of a separate budget — deleting it.
  *
- * A fixture `timeout` is charged separately from the per-test cap in
- * playwright.config.ts, which is the point: that cap is sized for a test body, and
- * creating or deleting the fence can legitimately outlast it — the case that used
- * to leave an organization behind (#319). Derived from the waits actually in the
- * path rather than picked, so the work cannot silently outgrow the budget again:
- * sign-in's own worst case plus four write budgets, which is the widest either
- * phase can be (goto + list load + the create race + the row check on the way in;
- * the same shape again on the way out).
+ * Two constants because one would not buy two phases. Playwright charges a
+ * fixture's setup and its teardown to the **same** slot:
+ * `this._teardownDescription = { ...this._setupDescription, phase: "teardown" }` is a
+ * shallow spread, so both phases point at one `{ timeout, elapsed }` object;
+ * `withRunnable`'s `finally` accumulates `elapsed` across both; and `teardown()`
+ * skips the teardown outright once `isTimeExhaustedFor` sees
+ * `elapsed >= timeout - 1` (all in
+ * node_modules/playwright/lib/worker/workerProcessEntry.js — the spread at :144, the
+ * skip at :206, the check at :382, the accumulation at :411). A single fixture doing
+ * create-then-delete therefore has the property that a slow *create* cancels the
+ * delete — and create is where the organization comes into existence, so that is
+ * #319's stranded row again through a different door. The delete lives in its own
+ * fixture below for exactly this reason, and these are the two slots.
+ *
+ * Both are sized above the sum of the bounded waits on their path, so that the phase
+ * cap is never the thing that fires. Every wait inside `createFencedOrg` and
+ * `deleteFencedOrg` carries a message naming what it was waiting for; a fixture cap
+ * tripping first would replace one of those with Playwright's generic fixture-timeout
+ * text. Both figures therefore sit far above expected cost — the whole suite runs in
+ * well under a minute — which is the intent, not slack to be trimmed.
+ *
+ * Create: sign-in's own worst case, then seven write budgets (210s) over a path whose
+ * own caps sum to 195s — one `page.goto` at Playwright's 30s navigation default,
+ * three 30s `WRITE_TIMEOUT` waits (list loaded, the create race, the row check), and
+ * five 15s actions under the config's `actionTimeout` (two fills, the New-Organization
+ * and Create clicks, and the Cancel the duplicate-slug branch adds).
  */
-const FENCE_FIXTURE_TIMEOUT = SIGN_IN_WORST_CASE_TIMEOUT + 4 * WRITE_TIMEOUT;
+const FENCE_CREATE_TIMEOUT = SIGN_IN_WORST_CASE_TIMEOUT + 7 * WRITE_TIMEOUT;
+
+/**
+ * Delete: nine write budgets (270s) over a path whose own caps sum to 240s — two
+ * `page.goto`s, four `WRITE_TIMEOUT` waits (the list twice, the heading, the URL),
+ * three 15s clicks (the row, the delete trigger, the confirm) and the final absence
+ * check at the config's 15s `expect` default.
+ *
+ * The margin over 240s is not decoration: the delete fixture's own setup runs in the
+ * same slot as its teardown (see above — that is unavoidable, it is one fixture), and
+ * while that setup does no I/O it is not free. Sizing this tight against the sum
+ * would put the guarantee back at the mercy of the thing this split exists to remove.
+ */
+const FENCE_DELETE_TIMEOUT = 9 * WRITE_TIMEOUT;
 
 /**
  * The org list's row for `org`.
@@ -69,8 +100,14 @@ function orgRow(page: Page, org: FencedOrg): Locator {
  * Scoped to the sidebar rather than taken as the page's first combobox: page
  * content elsewhere in the app renders Radix selects too, and `.first()` would
  * silently prefer whichever mounted earlier in the DOM.
+ *
+ * Exported for the one claim `assertFenced` cannot make: that *some* organization is
+ * selected, without saying which. A spec proving a bare navigation lost the fence has
+ * to rule out "nothing was selected at all" first, and that is a statement about this
+ * trigger rather than about the fence. Exporting it keeps the fence's most important
+ * locator defined once instead of rebuilt in a spec, where the two copies would drift.
  */
-function orgSelector(page: Page): Locator {
+export function orgSelector(page: Page): Locator {
   return sidebarNav(page).getByRole('combobox');
 }
 
@@ -98,9 +135,14 @@ function newOrgButton(page: Page): Locator {
  * waiting out the full write budget on a validation error it never looked for.
  *
  * A class selector rather than a role: the errors are unlabelled `<p>`s with no
- * role of their own. Scoped to the dialog because the org list also styles a
- * `<span>` with `text-destructive` when a row is at its seat limit
- * (OrganizationsManager.tsx:448).
+ * role of their own.
+ *
+ * The `dialog` scope resolves no collision known to exist. `p.text-destructive`
+ * matches exactly those two slots on this page — the org list's own
+ * `text-destructive` element, a row at its seat limit (OrganizationsManager.tsx:448),
+ * is a `<span>`, which the selector's element part already excludes. The scope is
+ * there to keep this locator correct if a `<p>` is ever styled that way elsewhere on
+ * the page, not to tell two present candidates apart.
  */
 function createDialogErrors(page: Page): Locator {
   return page.getByRole('dialog').locator('p.text-destructive');
@@ -346,15 +388,40 @@ export async function deleteFencedOrg(page: Page, org: FencedOrg): Promise<void>
 }
 
 /**
+ * What the delete fixture is holding: the fence to remove, or nothing yet.
+ *
+ * A mutable box rather than a return value, because the two halves of the fence's
+ * life are two fixtures now and this is how the creating half tells the deleting half
+ * what it committed to. `null` means "nothing was created, so nothing to clean up" —
+ * the state a failed sign-in must leave behind.
+ */
+type PendingFence = { org: FencedOrg | null };
+
+/**
  * `test` with this run's fenced org created before the body and deleted after it.
  *
  * Teardown is Playwright's rather than a `finally` in the spec, and that is the
  * whole point. When the per-test cap trips, every await left in the test body
  * rejects at once — so a body `finally` cannot navigate or click its way through a
- * cleanup, and the org survives the run (#319). Fixture teardown runs on its own
- * budget (`FENCE_FIXTURE_TIMEOUT`), so the same cleanup completes. A stranded fence
- * is a live row in the production database, which is why this is the fixture's
- * responsibility and not the journey author's.
+ * cleanup, and the org survives the run (#319). A stranded fence is a live row in the
+ * production database, which is why this is the fixture's responsibility and not the
+ * journey author's.
+ *
+ * **The delete is a fixture of its own, `fenceDelete`, and that is load-bearing.**
+ * Playwright shares one time slot between a fixture's setup and its teardown (see
+ * `FENCE_CREATE_TIMEOUT`), so a single create-then-delete fixture would skip its own
+ * teardown whenever the create phase spent the budget — stranding the row the create
+ * had just made. Splitting them gives the delete a slot with its own `elapsed: 0`, and
+ * `isTimeExhaustedFor` reads the *fixture's* slot, so no amount of time spent creating
+ * can cancel the delete. Playwright's `teardownScope` also runs every fixture's
+ * teardown independently, catching each error separately, so the delete still runs
+ * when `fencedOrg` failed or timed out — including in setup, before the body ever ran.
+ *
+ * That split is also why a failing cleanup can no longer bury the failure that caused
+ * it: the create error propagates out of `fencedOrg`'s setup and is recorded as the
+ * test's error, while anything the delete throws is collected separately as an
+ * after-hooks error. A `finally` inside one fixture would have replaced the first with
+ * the second, and the first is the interesting one.
  *
  * The fence is named before it is created, so a `createFencedOrg` that dies
  * mid-write — after `organization-create` committed, before the row was seen — is
@@ -376,27 +443,49 @@ export async function deleteFencedOrg(page: Page, org: FencedOrg): Promise<void>
  * Specs that need a fence import `test` and `expect` from this module; specs that
  * do not import them from ./session, whose fixtures this one extends.
  */
-export const test = sessionTest.extend<{ fencedOrg: FencedOrg }>({
+export const test = sessionTest.extend<{ fenceDelete: PendingFence; fencedOrg: FencedOrg }>({
+  // The delete half. Its setup does no I/O on purpose: everything this fixture spends
+  // before `runTest` comes out of the same slot as the delete itself, so the box is
+  // built and handed over immediately, leaving the whole budget to the teardown.
+  //
+  // Playwright's second argument is called `use` in its own docs; it is named
+  // `runTest` here because `react-hooks/rules-of-hooks` reads `use(...)` inside a
+  // named non-component function as a misplaced React hook and fails the lint gate.
+  fenceDelete: [
+    async ({ page }, runTest) => {
+      const pending: PendingFence = { org: null };
+      try {
+        await runTest(pending);
+      } finally {
+        // Nothing to delete unless the create half got as far as committing to a name.
+        // `deleteFencedOrg` is itself idempotent, but calling it with no fence created
+        // would trade a real diagnosis (an expired capture, a refused view) for a
+        // timeout against a page that never signed in.
+        if (pending.org) {
+          await deleteFencedOrg(page, pending.org);
+        }
+      }
+    },
+    { timeout: FENCE_DELETE_TIMEOUT, title: "this run's fenced organization, removed" },
+  ],
+  // The create half. No `finally` here: cleanup belongs to `fenceDelete`, whose
+  // teardown Playwright runs whether this one returned, threw or timed out.
   fencedOrg: [
-    // Playwright's second argument is called `use` in its own docs; it is named
-    // `runTest` here because `react-hooks/rules-of-hooks` reads `use(...)` inside a
-    // named non-component function as a misplaced React hook and fails the lint gate.
-    async ({ page, viewMode }, runTest) => {
+    async ({ page, viewMode, fenceDelete }, runTest) => {
       assertViewCanFence(viewMode);
       await signInThroughSso(page, viewMode);
 
-      // `createFencedOrg` returns this same value — both come from `fenceIdentity()`,
-      // which is pure — so discarding its return costs nothing and naming the fence
-      // here is what puts it in `finally`'s reach.
+      // Handed over *before* the write, so a create that dies mid-flight is still
+      // cleaned up. `createFencedOrg` derives this same value — both come from
+      // `fenceIdentity()`, which is pure — so this is not a second identity, and
+      // discarding its return costs nothing.
       const org = fenceIdentity();
-      try {
-        await createFencedOrg(page);
-        await runTest(org);
-      } finally {
-        await deleteFencedOrg(page, org);
-      }
+      fenceDelete.org = org;
+
+      await createFencedOrg(page);
+      await runTest(org);
     },
-    { timeout: FENCE_FIXTURE_TIMEOUT, title: "this run's fenced organization" },
+    { timeout: FENCE_CREATE_TIMEOUT, title: "this run's fenced organization" },
   ],
 });
 

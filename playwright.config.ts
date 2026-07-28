@@ -34,7 +34,12 @@ export default defineConfig({
   testDir: './e2e',
   // Mints E2E_RUN_ID once for the whole invocation — see e2e/run-id.ts.
   globalSetup: './e2e/global-setup.ts',
-  // Writes land in one shared fenced org, so specs must not race each other.
+  // Not a throughput setting — a data-loss one. Every fenced test derives its
+  // organization's name and slug from the same RUN_ID (e2e/run-id.ts), so with two
+  // workers one test's fixture teardown would delete the organization another test is
+  // actively writing into, or its create would land on the duplicate-slug branch and
+  // silently adopt the other test's fence. Serial execution is what makes
+  // "create, own, delete" true per test.
   workers: 1,
   fullyParallel: false,
   // A real network and a real database: one retry absorbs a cold Functions start.
