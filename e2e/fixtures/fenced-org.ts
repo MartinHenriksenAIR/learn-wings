@@ -441,7 +441,9 @@ type PendingFence = { org: FencedOrg | null };
  * is what lets a single view both create the fence and write inside it.
  *
  * Specs that need a fence import `test` and `expect` from this module; specs that
- * do not import them from ./session, whose fixtures this one extends.
+ * do not import them from ./session, whose fixtures this one extends. A spec that
+ * needs a fence *and* a further fixture takes both from the module that extends this
+ * one — ./course is the example — since each layer re-exports the `test` it built on.
  */
 export const test = sessionTest.extend<{ fenceDelete: PendingFence; fencedOrg: FencedOrg }>({
   // The delete half. Its setup does no I/O on purpose: everything this fixture spends

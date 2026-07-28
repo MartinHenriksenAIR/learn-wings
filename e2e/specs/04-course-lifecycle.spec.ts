@@ -1,21 +1,34 @@
 import type { Locator, Page } from '@playwright/test';
-import { assertFenced, expect, gotoFenced, test } from '../fixtures/fenced-org';
-import { courseRowTitle, createCourse, deleteCourse } from '../fixtures/course';
+import { assertFenced, gotoFenced } from '../fixtures/fenced-org';
+import {
+  COURSES_PATH,
+  COURSE_WRITE_TIMEOUT,
+  courseRowTitle,
+  createCourse,
+  deleteCourse,
+  expect,
+  test,
+} from '../fixtures/course';
 import { e2eName } from '../run-id';
 
 /**
  * The first journey in this suite that writes to the production database.
  *
- * Two things keep that acceptable, and they are different things. The organization
- * this run creates is bounded by the `fencedOrg` fixture, which deletes it in
- * Playwright's teardown rather than in a body `finally` — a test timeout rejects every
- * await left in the body, so a `finally` cannot click its way through a cleanup and
- * the row survives the run (#319). The *course* is not bounded that way and cannot be:
- * `course-create` takes no org id (functions/course-create/index.ts) and
- * `courses-admin` returns the whole platform list, so a course belongs to no
- * organization. What bounds the course is that its title carries this run's id
- * (e2e/run-id.ts) and this body deletes it — and, if the body dies before it can, the
- * name is what makes the leftover attributable.
+ * Neither write is cleaned up by this body, and that is deliberate. The organization is
+ * bounded by the `fencedOrg` fixture and the course by `courseCleanup`, both of which
+ * delete in Playwright's teardown rather than in a body `finally` — a test timeout
+ * rejects every await left in the body, so a `finally` cannot click its way through a
+ * cleanup and the row survives the run (#319). The `deleteCourse` call below is the
+ * journey's own assertion that deleting works, not the safety net; the fixture is the
+ * safety net, and it is idempotent so that the two do not collide.
+ *
+ * The two writes are bounded in different ways, though. The organization is contained:
+ * it is a disposable object this run owns, and everything scoped to it goes with it. The
+ * course is not and cannot be — `course-create` takes no org id
+ * (functions/course-create/index.ts) and `courses-admin` returns the whole platform
+ * list, so a course belongs to no organization and a stranded one is visible to every
+ * organization on the platform. What makes it attributable is the run id in its title
+ * (e2e/run-id.ts); what makes it short-lived is the fixture.
  *
  * Every navigation here goes through `gotoFenced`, never `page.goto`. `currentOrg` is
  * plain component state (useAuth.tsx:49) that nothing persists, so a bare navigation
@@ -31,23 +44,12 @@ import { e2eName } from '../run-id';
 // `requirePlatformAdmin` reads the raw `isPlatformAdmin` (ProtectedRoute.tsx:80).
 test.use({ viewMode: 'org_admin' });
 
-const COURSES_PATH = '/app/admin/platform/courses';
-
 /** `/app/admin/platform/courses/:courseId` — a uuid (routes.ts:64). */
 const COURSE_EDITOR_URL = /\/app\/admin\/platform\/courses\/[0-9a-f-]{36}$/;
 
 /** `courseEditor.saveChanges` and `courseEditor.saved` — one button, two labels. */
 const SAVE_CHANGES = 'Save changes';
 const SAVED = 'Saved';
-
-/**
- * Budget for a course write to land, matching the helpers' own.
- *
- * Wider than the config's 15s `expect` default because a cold Azure Functions start
- * alone can eat it, and every wait it guards here is on a round-trip rather than on
- * already-rendered state.
- */
-const WRITE_TIMEOUT = 30_000;
 
 /**
  * The course editor's title field.
@@ -76,9 +78,15 @@ function saveButton(page: Page, label: string): Locator {
   return page.getByRole('button', { name: label, exact: true });
 }
 
-test('a course can be created, edited, found and deleted', async ({ page, fencedOrg }) => {
+test('a course can be created, edited, found and deleted', async ({ page, fencedOrg, courseCleanup }) => {
   const title = e2eName('course');
   const editedTitle = `${title}-edited`;
+
+  // Registered before the first write, and both names at once, because the rename below
+  // means either can be the one left behind. This is what gives the course a teardown
+  // owner: the fixture deletes whatever of these is still listed, whether this body
+  // passed, failed or was cut off by the per-test cap.
+  courseCleanup.titles.push(title, editedTitle);
 
   await gotoFenced(page, fencedOrg, COURSES_PATH);
   // The row `createCourse` waits for is not an optimistic one: the create's success
@@ -100,7 +108,7 @@ test('a course can be created, edited, found and deleted', async ({ page, fenced
   // `course-structure-admin` response (CourseEditor.tsx:160-168), so its value is the
   // stored title rather than anything this test typed. It also pins the locator to the
   // editor page — on the list page the same locator resolves to the empty search box.
-  await expect(courseTitleField(page)).toHaveValue(title, { timeout: WRITE_TIMEOUT });
+  await expect(courseTitleField(page)).toHaveValue(title, { timeout: COURSE_WRITE_TIMEOUT });
 
   await courseTitleField(page).fill(editedTitle);
   await saveButton(page, SAVE_CHANGES).click();
@@ -109,11 +117,11 @@ test('a course can be created, edited, found and deleted', async ({ page, fenced
   // Waited for before navigating away, and that is load-bearing rather than tidy — a
   // navigation issued while the request is in flight aborts it, which is how an
   // earlier sweep of the organizations flow re-clicked the same undeleted row five
-  // times (see deleteFencedOrg). The morph reverts after 1600ms (useFlash.ts:12), so
+  // times (see deleteFencedOrg). The morph reverts after 1600ms (useFlash.ts:9), so
   // this is a window rather than a resting state; the wide timeout is for reaching it
   // through a cold start, not for the window itself.
   await expect(saveButton(page, SAVED), 'the course save never reported success').toBeVisible({
-    timeout: WRITE_TIMEOUT,
+    timeout: COURSE_WRITE_TIMEOUT,
   });
 
   // Back through the fence, which is a real navigation: it boots a fresh JS context
@@ -126,8 +134,14 @@ test('a course can be created, edited, found and deleted', async ({ page, fenced
   // (measured: 1 on the editor, versus 0 for the button) and would have gone on
   // passing with this navigation removed — proving that the title was typed, not that
   // it was stored.
+  //
+  // Counted rather than merely found, because "exactly one" is the stronger claim and
+  // the one that stays honest: a second row under this name — which a stranded course
+  // from an earlier attempt would produce — is reported here as a count, instead of
+  // becoming a strict-mode violation inside `deleteCourse` that names an ambiguity
+  // rather than a duplicate.
   await gotoFenced(page, fencedOrg, COURSES_PATH);
-  await expect(courseRowTitle(page, editedTitle)).toBeVisible({ timeout: WRITE_TIMEOUT });
+  await expect(courseRowTitle(page, editedTitle)).toHaveCount(1, { timeout: COURSE_WRITE_TIMEOUT });
   // And that the edit renamed the course rather than adding a second one.
   await expect(courseRowTitle(page, title)).toHaveCount(0);
 
@@ -141,5 +155,5 @@ test('a course can be created, edited, found and deleted', async ({ page, fenced
   await expect(
     courseRowTitle(page, editedTitle),
     `${editedTitle} survived its deletion — it is a live row in the production database, delete it by hand`,
-  ).toHaveCount(0, { timeout: WRITE_TIMEOUT });
+  ).toHaveCount(0, { timeout: COURSE_WRITE_TIMEOUT });
 });
