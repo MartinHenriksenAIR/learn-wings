@@ -25,7 +25,7 @@ import PlatformSettings from './PlatformSettings';
 
 const mockCallApi = callApi as ReturnType<typeof vi.fn>;
 
-// Fixture — obviously fake values; SMTP credentials are not realistic secrets
+// Fixture — obviously fake values
 const serverBrandingRow = {
   key: 'branding',
   value: {
@@ -39,22 +39,8 @@ const serverBrandingRow = {
   },
 };
 
-const serverEmailRow = {
-  key: 'email',
-  value: {
-    from_name: 'Test Sender',
-    from_email: 'sender@example.test',
-    smtp_configured: false,
-    smtp_host: 'smtp.example.test',
-    smtp_port: 587,
-    smtp_username: 'fixture-user',
-    smtp_password: 'fixture-not-a-secret',
-    smtp_encryption: 'starttls' as const,
-  },
-};
-
 const successResponse = {
-  settings: [serverBrandingRow, serverEmailRow],
+  settings: [serverBrandingRow],
 };
 
 function renderPage() {

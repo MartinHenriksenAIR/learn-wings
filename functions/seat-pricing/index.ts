@@ -8,7 +8,7 @@ interface SeatPricingValue {
 }
 
 // Public price read for the org-admin request dialog. Deliberately does NOT
-// use platform-settings (which returns [] to non-admins to protect SMTP creds);
+// use platform-settings (which returns [] to non-admins, hiding the settings rows);
 // this endpoint exposes ONLY the sales price + currency, never notification_email.
 export default endpoint('seat-pricing', async ({ reply }) => {
   const row = await queryOne<{ value: SeatPricingValue }>(

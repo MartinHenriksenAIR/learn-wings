@@ -49,7 +49,7 @@ describe('platform-settings', () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([
       { key: 'branding', value: { logo: 'x' } },
-      { key: 'email', value: { smtp_host: 'smtp.example.com' } },
+      { key: 'features', value: { certificates_enabled: true } },
     ]);
 
     const res = await handler(baseReq({}), {} as any);

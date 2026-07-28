@@ -782,7 +782,6 @@
     "tabs": {
       "branding": "Branding",
       "userAccess": "Brugere & adgang",
-      "email": "E-mail",
       "features": "Funktioner",
       "platformAdmins": "Platformadministratorer"
     },
@@ -804,26 +803,6 @@
       "allowSelfRegistration": "Tillad selvregistrering",
       "allowSelfRegistrationHint": "Tillad brugere at tilmelde sig uden en invitation.",
       "save": "Gem brugerindstillinger"
-    },
-    "email": {
-      "notConfiguredWarning": "SMTP er ikke konfigureret — invitations-e-mails sendes ikke.",
-      "fromName": "Afsendernavn",
-      "fromEmail": "Afsender-e-mail",
-      "smtpHost": "SMTP-vært",
-      "smtpPort": "SMTP-port",
-      "smtpUsername": "Brugernavn",
-      "smtpPassword": "Adgangskode",
-      "encryption": "Kryptering",
-      "encryptionStarttls": "STARTTLS",
-      "encryptionSslTls": "SSL/TLS",
-      "encryptionNone": "Ingen",
-      "testConnection": "Test forbindelse",
-      "save": "Gem e-mailindstillinger",
-      "testSuccessTitle": "SMTP-test lykkedes",
-      "testSuccessDescription": "Forbindelse og godkendelse lykkedes.",
-      "testFailedTitle": "SMTP-test mislykkedes",
-      "testFailedDescription": "Kunne ikke oprette forbindelse til SMTP-serveren.",
-      "testFailedFallback": "Forbindelsestesten mislykkedes"
     },
     "features": {
       "note": "Hvis du deaktiverer en funktion her, skjules den for alle organisationer, uanset deres tilsidesættelser.",
