@@ -40,6 +40,7 @@
 - **Every artefact the suite creates is named `e2e-<RUN_ID>-<kind>`** so anything left behind is identifiable. Cleanup is owned by the `fencedOrg` fixture's teardown, not by `finally` blocks (see above).
 - **Test file naming:** `e2e/specs/NN-name.spec.ts`. Fixtures in `e2e/fixtures/`. Nothing under `src/` — the vitest `include` glob is `src/**/*.{test,spec}.{ts,tsx}` and must not pick these up.
 - Node 20 (as used by the repo's other tooling).
+- **Do not transcribe this plan's stated *reasons* into code comments unless you have verified them against source.** Three false-reason comments have already been found in this tree by review — the `ViewMode` import-cycle claim, `assertFenced`'s `currentOrg` claim, and the `Dashboard` fork claim (issue #318 tracks the class). In each case the code was right and the justification was wrong, and in each case the wrong justification came from this plan's prose. Where a task explains *why* something works, treat that as a claim to check, not a fact to quote. If you cannot verify it, write what you observed instead.
 
 ---
 
@@ -605,97 +606,14 @@ git commit -m "test(e2e): fenced-org fixture with a proven write guard (#124)"
 
 ### Task 5: Journey — role views through the real switcher
 
-**Files:**
-- Create: `e2e/specs/03-role-views.spec.ts`
+**Landed as `4a7dd9a` — see `e2e/specs/03-role-views.spec.ts` for what shipped.**
 
-**Interfaces:**
-- Consumes: `test`/`expect` from `e2e/fixtures/session`.
-- Produces: nothing consumed later.
+The step-by-step code that was here has been removed rather than left to rot: two of its assertions were false against the live app and the implementation corrected them, so keeping the original text would mislead anyone reading this plan afterwards.
 
-- [ ] **Step 1: Write the spec**
+What changed from the original intent, and why:
 
-This is the one spec that drives the switcher UI rather than seeding `viewMode`, because the switcher is the mechanism a user actually uses. Labels come from `nav.roles.*`: `Platform Admin`, `Org. Admin`, `Learner` (note the period in `Org. Admin`).
-
-Create `e2e/specs/03-role-views.spec.ts`:
-
-```ts
-import { test, expect } from '../fixtures/session';
-
-async function switchViewTo(page: import('@playwright/test').Page, label: string) {
-  // The switcher lives in the sidebar footer profile menu (AppSidebar.tsx:246),
-  // a Radix DropdownMenu radio group — trigger first, then the radio item.
-  await page.getByRole('button', { name: /viewing as|platform admin/i }).last().click();
-  await page.getByRole('menuitemradio', { name: label }).click();
-}
-
-test('switching to learner view drops the admin nav and shows the viewing-as chip', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByRole('link', { name: 'Organizations' })).toBeVisible();
-
-  await switchViewTo(page, 'Learner');
-
-  await expect(page.getByText('Viewing as: Learner')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Platform Settings' })).toBeHidden();
-});
-
-test('learner view cannot reach a platform-admin route', async ({ page }) => {
-  await page.goto('/');
-  await switchViewTo(page, 'Learner');
-
-  await page.goto('/app/admin/platform/settings');
-
-  // ProtectedRoute requirePlatformAdmin must redirect away, not render the page.
-  await expect(page.getByRole('heading', { name: 'Platform Settings' })).toBeHidden();
-  await expect(page).not.toHaveURL(/\/app\/admin\/platform\/settings/);
-});
-
-test('returning to platform view restores the full nav', async ({ page }) => {
-  await page.goto('/');
-  await switchViewTo(page, 'Learner');
-  await expect(page.getByRole('link', { name: 'Platform Settings' })).toBeHidden();
-
-  await switchViewTo(page, 'Platform Admin');
-
-  await expect(page.getByRole('link', { name: 'Platform Settings' })).toBeVisible();
-  await expect(page.getByText(/Viewing as:/)).toBeHidden();
-});
-```
-
-- [ ] **Step 2: Run and correct the trigger locator**
-
-Run: `npm run e2e -- 03-role-views`
-
-The switcher trigger's accessible name is built from the profile button in `AppSidebar.tsx` and was not read exactly. If the locator misses, capture the real name:
-
-```bash
-npx playwright codegen --load-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/"
-```
-
-Click the sidebar-footer profile button, take the emitted locator, and replace the one in `switchViewTo`.
-
-Expected once corrected: all three PASS.
-
-- [ ] **Step 3: Add the honesty comment**
-
-At the top of the file, add:
-
-```ts
-/**
- * These assertions cover UI gating only. This account is a platform admin, and
- * effectiveIsOrgAdmin is granted by viewMode alone with no membership row
- * (src/hooks/useAuth.tsx:99-101) — the token keeps full platform rights in every
- * view. So a green run proves the nav hides and routes redirect; it does NOT
- * prove the API refuses a genuine org admin reaching across orgs. Closing that
- * gap needs a real org-admin account (see the spec's "Known gap").
- */
-```
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add e2e/specs/03-role-views.spec.ts
-git commit -m "test(e2e): role-view switcher and UI gating journey (#124)"
-```
+- The planned assertion "learner view cannot reach a platform-admin route" is **false**. `ProtectedRoute.tsx:80` gates `requirePlatformAdmin` on the raw `isPlatformAdmin`, not the view-aware flag, so a platform admin in learner view still renders platform-admin routes. The journey drives the one genuinely view-aware guard, `learnerOnly`, via `/app/dashboard`. Filed as #323 — and note this plan's own Global Constraints already stated the raw-flag behaviour, so the task text contradicted the document it lived in.
+- The sidebar footer's `Viewing as:` label is permanent for a platform admin (`AppSidebar.tsx:167-172`); only the `AppLayout` header chip is view-gated, so chip assertions scope to `<header>`.
 
 ---
 
@@ -706,40 +624,53 @@ git commit -m "test(e2e): role-view switcher and UI gating journey (#124)"
 - Create: `e2e/specs/04-course-lifecycle.spec.ts`
 
 **Interfaces:**
-- Consumes: `e2eName`, `createFencedOrg`/`deleteFencedOrg`, `test`/`expect`.
-- Produces: `createCourse(page: Page, opts: { title: string }): Promise<{ title: string }>` and `deleteCourse(page: Page, title: string): Promise<void>` from `e2e/fixtures/course.ts` — Task 7 consumes both.
+- Consumes: `test`, `expect`, `gotoFenced` and the `fencedOrg` fixture from `e2e/fixtures/fenced-org.ts`; `e2eName` from `e2e/run-id.ts`.
+- Produces: `createCourse(page: Page, opts: { title: string }): Promise<void>` and `deleteCourse(page: Page, title: string): Promise<void>` from `e2e/fixtures/course.ts`. **Both assume the caller has already navigated with `gotoFenced`** — they must never call `page.goto` themselves, or they would silently drop the fence.
 
-- [ ] **Step 1: Capture the course-manager locators**
+**This is the first journey that writes.** Everything below follows from that.
 
-The course create/edit flow was not read in detail. Capture it:
+- [ ] **Step 1: Capture the course-manager locators from the live app**
+
+The course create/edit/delete affordances were never read from source. Capture them rather than guessing:
 
 ```bash
 npx playwright codegen --load-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/app/admin/platform/courses"
 ```
 
-Note exactly: the create-course button's accessible name, the title field's id or label, the save control (`courseEditor.saveChanges` = `Save changes`), and the delete control plus its confirm.
+Record: the create-course control's accessible name, the title field's id or label, the save control (`courseEditor.saveChanges` = `Save changes`, `courseEditor.saved` = `Saved`), and the delete control plus its confirm. Note whether list rows are links or buttons — on the organizations list they turned out to be `<button>`s, and the same may hold here.
 
-- [ ] **Step 2: Write the course fixture**
+- [ ] **Step 2: Write the course helpers**
 
-Create `e2e/fixtures/course.ts` using the names captured in Step 1:
+Create `e2e/fixtures/course.ts`, substituting the names captured in Step 1:
 
 ```ts
 import { expect, type Page } from '@playwright/test';
 
-export async function createCourse(page: Page, opts: { title: string }): Promise<{ title: string }> {
-  await page.goto('/app/admin/platform/courses');
-  await page.getByRole('button', { name: 'New Course' }).click();
-  await page.getByLabel('Title').fill(opts.title);
-  await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText('Saved')).toBeVisible();
-  return { title: opts.title };
+/**
+ * Create a course from the course-manager page.
+ *
+ * The caller must already be on that page via gotoFenced — these helpers never
+ * navigate, because a bare page.goto resets OrgSelector to orgs[0] and the write
+ * would land outside the fence (#319, #321).
+ */
+export async function createCourse(page: Page, opts: { title: string }): Promise<void> {
+  await page.getByRole('button', { name: 'New Course', exact: true }).click();
+  await page.getByLabel('Title', { exact: true }).fill(opts.title);
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 }
 
 export async function deleteCourse(page: Page, title: string): Promise<void> {
-  await page.goto('/app/admin/platform/courses');
-  await page.getByRole('row', { name: new RegExp(title) }).getByRole('button', { name: /delete/i }).click();
-  await page.getByRole('button', { name: /^delete$/i }).click();
-  await expect(page.getByText(title)).toBeHidden();
+  const row = page.getByRole('row', { name: new RegExp(escapeForRegExp(title)) });
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
+  // The confirm may share its accessible name with the trigger, as the org
+  // delete affordance does — scope it to the dialog rather than relying on order.
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByText(title, { exact: true })).toBeHidden();
+}
+
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 ```
 
@@ -748,48 +679,57 @@ export async function deleteCourse(page: Page, title: string): Promise<void> {
 Create `e2e/specs/04-course-lifecycle.spec.ts`:
 
 ```ts
-import { test, expect } from '../fixtures/session';
-import { createFencedOrg, deleteFencedOrg, type FencedOrg } from '../fixtures/fenced-org';
+import { expect, gotoFenced, test } from '../fixtures/fenced-org';
 import { createCourse, deleteCourse } from '../fixtures/course';
 import { e2eName } from '../run-id';
 
-test('a course can be created, edited, found and deleted', async ({ page }) => {
-  let org: FencedOrg | undefined;
+// Mandatory — the fixture throws on platform view because OrgSelector renders
+// nothing there. org_admin view still creates and deletes courses and orgs,
+// because requirePlatformAdmin reads the raw isPlatformAdmin flag.
+test.use({ viewMode: 'org_admin' });
+
+const COURSES_PATH = '/app/admin/platform/courses';
+
+test('a course can be created, edited, found and deleted', async ({ page, fencedOrg }) => {
   const title = e2eName('course');
   const editedTitle = `${title}-edited`;
 
-  try {
-    org = await createFencedOrg(page);
+  // gotoFenced re-selects and re-asserts the fence on every navigation. There is
+  // no try/finally: the fencedOrg fixture owns teardown, which a test timeout
+  // cannot outrun (#319).
+  await gotoFenced(page, fencedOrg, COURSES_PATH);
+  await createCourse(page, { title });
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
 
-    await createCourse(page, { title });
-    await expect(page.getByText(title)).toBeVisible();
+  await page.getByRole('button', { name: title, exact: true }).click();
+  await page.getByLabel('Title', { exact: true }).fill(editedTitle);
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
-    await page.getByRole('link', { name: title }).click();
-    await page.getByLabel('Title').fill(editedTitle);
-    await page.getByRole('button', { name: 'Save changes' }).click();
-    await expect(page.getByText('Saved')).toBeVisible();
+  // Re-navigate through the fence, not page.goto — the edit must be readable
+  // back from the server, not just present in local component state.
+  await gotoFenced(page, fencedOrg, COURSES_PATH);
+  await expect(page.getByText(editedTitle, { exact: true })).toBeVisible();
 
-    await page.goto('/app/admin/platform/courses');
-    await expect(page.getByText(editedTitle)).toBeVisible();
-
-    await deleteCourse(page, editedTitle);
-    await expect(page.getByText(editedTitle)).toBeHidden();
-  } finally {
-    if (org) await deleteFencedOrg(page, org);
-  }
+  await deleteCourse(page, editedTitle);
+  await expect(page.getByText(editedTitle, { exact: true })).toBeHidden();
 });
 ```
 
-- [ ] **Step 4: Run**
+- [ ] **Step 4: Run it**
 
 Run: `npm run e2e -- 04-course-lifecycle`
-Expected: PASS. Correct any locator that misses using the names captured in Step 1.
+Expected: PASS. Correct any locator that misses using Step 1's captures — never by loosening an assertion or dropping `exact: true`.
 
-- [ ] **Step 5: Verify no debris**
+- [ ] **Step 5: Prove the assertions can fail**
 
-Confirm no `e2e-` course or organization remains in the UI.
+The suite has already shipped four assertions that could not fail. For this journey, demonstrate at least that the **edit is genuinely read back from the server**: with a throwaway mutant, skip the second `gotoFenced` so the assertion runs against the unreloaded page, and confirm it then passes for the wrong reason (or fails, if the page has already reset). Report what you observed, and delete the mutant.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Confirm no debris**
+
+After your runs, confirm no `e2e-` courses **and** no `e2e-` organizations remain. Say how you confirmed it — a fresh assertion, not a recollection.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add e2e/fixtures/course.ts e2e/specs/04-course-lifecycle.spec.ts
