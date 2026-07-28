@@ -24,7 +24,7 @@ Stated explicitly so a green run is not over-read:
 | Where writes land | A fenced test org in the prod DB | There is no staging tier — the SWA preview environments build against the *production* function app, so a preview env is just another frontend on prod data. Every org in the app is currently a test org, so the fence is about repeatable runs today and about customer safety after the #115 cutover. |
 | Identity | The owner's existing platform-admin account, using the role-view switcher | No new Entra accounts to provision. Accepted cost in "Known gap". |
 | Fence lifecycle | Suite creates and deletes its own org | `organization-create` and `organization-delete` are both `requirePlatformAdmin`, so the suite bootstraps its fence through the real API. No manual prod DML, no seed script. |
-| Invitation email | Sent to the account owner's own address | Exercises the real Resend path end to end. Cost: one e2e invitation lands in that inbox per run. |
+| Invitation email | Sent to the account owner's own address | Exercises the real Resend path end to end. Cost: one e2e invitation lands in that inbox per run — **and see the self-adoption note below, which this choice forces.** |
 | Trigger | `npm run e2e`, on demand | What was asked for: a suite you run in one go. |
 
 ## Architecture
@@ -75,6 +75,16 @@ The tradeoff accepted: the capture expires, so the suite is not unattended — a
 
 - **`03-role-views.spec.ts` drives the real switcher UI** through the bottom-left profile menu. That is the actual mechanism a user uses and the thing that can break, so at least one spec must exercise it rather than bypass it.
 - **Every other spec seeds `viewMode` via `page.addInitScript`** before app boot, for speed and to keep each spec independent of the switcher's markup.
+
+### Inviting your own address self-adopts — the invite journey had to change shape
+
+Discovered while building the journey, verified in source: `functions/user-context/index.ts:16-30` **auto-adopts every pending org invitation matching the caller's email, on every call** — not just at first provision (#176, so an invite created after self-signup is still honoured).
+
+`E2E_INVITE_TO` is the signed-in account's own address, so **any navigation converts the invitation into a membership.** Observed in a trace: the fence's `pending_invite_count` went 1→0 and `member_count` 0→1 across a single navigation.
+
+So the specced flow — invite, navigate, see it pending, revoke — is impossible with a self-addressed invite. The journey instead asserts the pending state on the writing page (still a server read: the mutation's own `invitations` refetch), and after revoking, asserts on a fresh boot that the members list is **still empty**. That second assertion is what distinguishes a genuinely revoked invitation from one that was silently adopted — without it, adoption and revocation look identical.
+
+**A stronger option exists, and it is a config decision rather than a code one:** invite a subaddress such as `owner+e2e@…`. The adoption filter matches on `lower(trim(email))` exactly, so a subaddress does not self-adopt, the mail still arrives in the same inbox, and the full pending→revoke lifecycle becomes testable across navigations. Worth taking if the owner's mail provider supports `+` subaddressing.
 
 ### Language is pinned to English
 
