@@ -25,8 +25,19 @@
 - **The org-admin `Organization` link is gated on `features.analytics_enabled`** (enabled in prod today). If an org-admin landmark assertion ever fails against a fenced org, check that flag before suspecting the sign-in path.
 - **You cannot switch view mid-spec with `sessionStorage.setItem` + `reload`.** `seedSession`'s `addInitScript` re-seeds the fixture's view on *every* navigation, so it overwrites the write and the reload lands back in the original view. Set the view once per spec with `test.use({ viewMode: '…' })` and stay there. Verified live in Task 4.
 - **A spec can stay in `org_admin` view and still perform platform-admin actions** (creating and deleting the fenced org), because `requirePlatformAdmin` reads the raw `isPlatformAdmin` flag, not `viewMode`. This is what makes the previous constraint workable rather than limiting.
-- **`currentOrg` is unpersisted React state, so the fence selection is lost on every `page.goto`.** Any write journey must re-select and re-assert the fence after navigating, not once at the start. Missing this is the most likely way a write escapes the fence.
-- **Every artefact the suite creates is named `e2e-<RUN_ID>-<kind>`** so anything left behind is identifiable. Cleanup runs in `finally`.
+- **`currentOrg` is unpersisted React state, so the fence selection is lost on every `page.goto`.** This is closed by construction (#319): write journeys use **`gotoFenced(page, org, path)`**, which navigates, re-selects and re-asserts in one call. **Never call `page.goto` in a write journey.**
+- **The fence API for journeys is:**
+  ```ts
+  import { expect, gotoFenced, test } from '../fixtures/fenced-org';
+
+  test.use({ viewMode: 'org_admin' });          // required — the fixture throws on platform view
+  test('…', async ({ page, fencedOrg }) => {    // fencedOrg is created, signed in and auto-deleted
+    await gotoFenced(page, fencedOrg, '/some/path');
+  });
+  ```
+  The `test.use` line is mandatory on every journey: Playwright will not let a derived test redefine an option default, so the fixture throws if it is missing rather than silently running in the wrong view. Teardown belongs to Playwright now — **do not write `try`/`finally` cleanup**, which is what a test-timeout could outrun (verified: a forced 20s timeout still deleted the org).
+  The primitives `createFencedOrg`, `selectFencedOrg`, `assertFenced`, `deleteFencedOrg` remain exported for the fence's own self-test, but journeys should not call them.
+- **Every artefact the suite creates is named `e2e-<RUN_ID>-<kind>`** so anything left behind is identifiable. Cleanup is owned by the `fencedOrg` fixture's teardown, not by `finally` blocks (see above).
 - **Test file naming:** `e2e/specs/NN-name.spec.ts`. Fixtures in `e2e/fixtures/`. Nothing under `src/` — the vitest `include` glob is `src/**/*.{test,spec}.{ts,tsx}` and must not pick these up.
 - Node 20 (as used by the repo's other tooling).
 
@@ -873,33 +884,21 @@ This journey **sends real email** through Resend to `E2E_INVITE_TO` (the account
 Create `e2e/specs/06-org-members.spec.ts`:
 
 ```ts
-import { test, expect } from '../fixtures/session';
-import {
-  assertFenced,
-  createFencedOrg,
-  deleteFencedOrg,
-  selectFencedOrg,
-  type FencedOrg,
-} from '../fixtures/fenced-org';
+import { expect, gotoFenced, test } from '../fixtures/fenced-org';
 
+// Mandatory: the fixture throws on platform view, because OrgSelector renders
+// nothing there. org_admin view can still create and delete the fence, since
+// requirePlatformAdmin reads the raw isPlatformAdmin flag rather than viewMode.
 test.use({ viewMode: 'org_admin' });
 
-test('an invitation can be sent, seen as pending, and revoked', async ({ page }) => {
+test('an invitation can be sent, seen as pending, and revoked', async ({ page, fencedOrg }) => {
   const inviteTo = process.env.E2E_INVITE_TO;
   if (!inviteTo) throw new Error('E2E_INVITE_TO missing from .env.e2e');
 
-  let org: FencedOrg | undefined;
-  try {
-    // Stay in org_admin view for the whole spec. Creating and deleting the fence
-    // still works from here because requirePlatformAdmin reads the raw
-    // isPlatformAdmin flag, not viewMode — and switching view mid-spec is not
-    // possible anyway (seedSession's addInitScript re-seeds on every navigation).
-    org = await createFencedOrg(page);
-
-    // Re-select after navigating: currentOrg is unpersisted React state, so the
-    // fence selection does not survive a goto.
-    await selectFencedOrg(page, org);
-    await assertFenced(page, org);
+  // No try/finally: the fencedOrg fixture owns creation and teardown, so a test
+  // timeout cannot outrun cleanup. gotoFenced navigates AND re-asserts the fence
+  // — a bare page.goto would silently reset the selection to orgs[0] (#319).
+  await gotoFenced(page, fencedOrg, ORG_MEMBERS_PATH);
 
     await page.getByRole('button', { name: 'Invite Member' }).click();
     await page.getByLabel(/email/i).fill(inviteTo);
@@ -912,13 +911,11 @@ test('an invitation can be sent, seen as pending, and revoked', async ({ page })
       .getByRole('button', { name: 'Revoke' })
       .click();
     await expect(page.getByText(inviteTo)).toBeHidden();
-  } finally {
-    // No view switch needed: deleteFencedOrg works from org_admin view because
-    // requirePlatformAdmin reads the raw flag. Must tolerate an already-deleted
-    // fence, since retries: 1 re-runs this whole spec.
-    if (org) await deleteFencedOrg(page, org);
-  }
 });
+
+// ORG_MEMBERS_PATH: capture the org-admin members surface path in Step 2. The
+// members list lives under the org-admin analytics area (its i18n keys are
+// analytics.members.*), so it is a tab rather than a top-level route.
 ```
 
 - [ ] **Step 2: Run**
