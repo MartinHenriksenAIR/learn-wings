@@ -1793,3 +1793,23 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** functions `build` exit 0 · `test` 145 files / 2607 pass (3 skip; 25 in `send-invitation-email`). root `lint` 0 errors · `tsc` exit 0 · `test` 109 files / 811 pass · `build` exit 0. CI green on both required checks.
 
 **Deploy:** functions changed → both workflows load-bearing. Announce on PR #314.
+
+## 2026-07-28 — Remove dead Email/SMTP tab from Platform Settings (#317)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Problem.** Platform Settings → Email showed a permanent, misleading "SMTP is not configured — invitation emails will not be sent" banner that was decoupled from reality. Transactional email is sent via **Resend** (ADR-0009), not SMTP; the banner gated on `!email.smtp_configured`, a flag that defaulted to `false` and only flipped `true` if an admin ran the "Test connection" probe — so it alarmed admins even though prod invite delivery was confirmed working (Closes #22; #225/PR #231). Worse, "testing" an unrelated SMTP server would *clear* the warning while telling the admin nothing true about delivery. The `smtp_*` fields, `from_name`/`from_email`, `smtp_configured`, and the `test-smtp-connection` endpoint were all dead Lovable/Supabase-era config that no send path reads.
+
+**Decision — Option A (remove the tab entirely), owner-confirmed.** `from_*` were dead too, so the whole tab was dead; email is a fixed system integration (Resend, hardcoded sender per ADR-0009), not an admin-configurable thing. Aligned with ADR-0009, so no new ADR. This also settles the **Email** half of the parked discussion #170 (recorded there; the Branding half stays open + `blocked`).
+
+**Done.**
+- **Frontend:** removed the Email tab, the `EmailSettings` type, `defaultEmail`, the `email`/`testingSmtp` state, the `email` effect case, `handleTestSmtpConnection`, the tab-nav entry, and now-unused imports (`Select*`, `toast`, `Mail`) from `PlatformSettings.tsx`; shrank the test fixture; swept the dead `platformSettings.email.*` + `tabs.email` i18n keys in `en` + `da`.
+- **Backend:** deleted `functions/test-smtp-connection/` (index + test) and the now-orphaned `functions/shared/net-guard` (index + test — its only consumer was the SMTP endpoint, added in #267); removed the barrel import; dropped the `email` key + its field shapes (and the now-unused `isFiniteNumber` helper) from `platform-settings-update`, reworking the affected validator tests onto live keys (`user_access.default_role` covers the `isOneOf` path). Reworded two comments in `platform-settings`/`seat-pricing` that referenced dead "SMTP credentials".
+- **Seed:** dropped the dead `email` row from `migration/azure/02-seed.sql` (surfaced by code review — a fresh DB no longer carries it). **No prod DB migration** — the existing prod `email` row is harmless orphaned JSONB.
+- **Docs:** dropped the `test-smtp-connection` row from `migration/azure/README.md`; removed the stale "Add `resend-api-key`" USER action in STATUS.html (set + verified end-to-end). ADR-0014/ADR-0015 mention the endpoint but are append-only history — left untouched.
+
+**Review.** Independent code review (Opus 4.8, pr-review-toolkit): **no findings at/above threshold, clean to merge**; its one optional observation (the dead seed row) was then fixed.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 812 pass · `build` exit 0. functions `build` exit 0 · `test` 2527 pass (3 skip) — incl. the `registration-names` fleet guard (226) confirming clean endpoint removal. CI green on all required checks.
+
+**Deploy:** functions changed → both workflows load-bearing. Announce on PR #322.
