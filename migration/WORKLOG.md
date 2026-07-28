@@ -1813,3 +1813,17 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 812 pass · `build` exit 0. functions `build` exit 0 · `test` 2527 pass (3 skip) — incl. the `registration-names` fleet guard (226) confirming clean endpoint removal. CI green on all required checks.
 
 **Deploy:** functions changed → both workflows load-bearing. Announce on PR #322.
+
+## 2026-07-28 — Org-detail page rendered the org name in two competing `<h1>`s (#320, PR #324)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Problem.** `/app/admin/platform/organizations/:id` rendered the org name as **two** `<h1>`s: `OrganizationDetail`'s main branch passed `AppLayout title={org.name}` (AppLayout renders `title` as the page `<h1>`) **and** rendered `OrgDetailHeader`, which carries its own `<h1>{org.name}`. Wrong document outline, a screen reader with no single "what page am I on", the name shown twice visibly, and an ambiguous `getByRole('heading', { level: 1 })` — the last is how it surfaced during the #316 e2e write-fence work. Low user-visible impact (both say the same thing); an a11y/semantics bug. `afk`-labelled.
+
+**Fix.** Dropped `title={org.name}` from the main-branch `AppLayout` so `OrgDetailHeader`'s `<h1>` is the page's single heading; the loading branch keeps its `title` (it has no in-page header). This is the convention the sibling platform-admin pages already use (`OrganizationsManager`, `CoursesManager`, #101 — same explanatory comment). Chosen over the issue's *suggested* demote-`OrgDetailHeader`-to-`<h2>` because it matches existing code **and** removes the visible name-shown-twice redundancy. `OrgDetailHeader`'s `<h1>` (org name) survives, so #316's `getByRole('heading', { level: 1 })` fence assertion still holds — against a different element. Audited the tree for the same double-`<h1>` shape (layout `title` + own header component): only these three pages qualify, and the other two were already correct.
+
+**Test.** Added a `#320` regression test to `OrganizationDetail.test.tsx`: upgraded the file's `AppLayout` mock to render `title` as `<h1>` (the faithful mock the #101 guards use), then asserted exactly one `Acme Corp` heading and that it is an `<h1>`. Mutation-checked — re-adding `title` makes it fail with "got 2".
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 110 files / 813 pass · `build` exit 0. `functions/` untouched (frontend-only); CI ran the functions gate green anyway.
+
+**Deploy:** frontend-only → the SWA workflow ships it; no functions deploy. Announce on PR #324.
