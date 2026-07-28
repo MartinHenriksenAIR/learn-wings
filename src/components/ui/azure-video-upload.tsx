@@ -20,6 +20,11 @@ interface AzureVideoUploadProps {
   onChange: (blobPath: string | null) => void;
   className?: string;
   disabled?: boolean;
+  /**
+   * Forwarded to the underlying file input so a `<Label htmlFor>` can name the
+   * control (#325). Clicking such a label opens the file picker.
+   */
+  id?: string;
 }
 
 export function AzureVideoUpload({
@@ -27,6 +32,7 @@ export function AzureVideoUpload({
   onChange,
   className,
   disabled = false,
+  id,
 }: AzureVideoUploadProps) {
   const { t } = useTranslation();
   // Via the clamp helper rather than UPLOAD_MAX_MB directly, so every call site
@@ -168,6 +174,7 @@ export function AzureVideoUpload({
     <div className={cn('space-y-2', className)}>
       <input
         ref={inputRef}
+        id={id}
         type="file"
         accept={UPLOAD_ACCEPT_ATTRIBUTE.video}
         onChange={handleFileChange}

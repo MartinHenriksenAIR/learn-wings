@@ -551,20 +551,21 @@ export default function CourseEditor() {
           <div className="mb-4 flex flex-col gap-5 md:flex-row">
             <div className="flex-1 space-y-3.5">
               <div className="space-y-1.5">
-                <Label>{t('courseEditor.titleLabel')}</Label>
-                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                <Label htmlFor="course-title">{t('courseEditor.titleLabel')}</Label>
+                <Input id="course-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>{t('courseEditor.descriptionLabel')}</Label>
-                <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
+                <Label htmlFor="course-description">{t('courseEditor.descriptionLabel')}</Label>
+                <Textarea id="course-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} />
               </div>
             </div>
             <div className="w-full shrink-0 space-y-3.5 md:w-[220px]">
               <div className="space-y-1.5">
-                <Label>{t('courseEditor.thumbnail')}</Label>
+                <Label htmlFor="course-thumbnail">{t('courseEditor.thumbnail')}</Label>
                 {/* No maxSizeMB: the image cap is the server's, and FileUpload
                     defaults to it (src/lib/upload-limits.ts). */}
                 <FileUpload
+                  id="course-thumbnail"
                   folder="thumbnails"
                   accept="image"
                   value={thumbnailDisplayUrl}
@@ -582,9 +583,9 @@ export default function CourseEditor() {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label>{t('courseEditor.levelLabel')}</Label>
+                <Label htmlFor="course-level">{t('courseEditor.levelLabel')}</Label>
                 <Select value={editLevel} onValueChange={(v) => setEditLevel(v as CourseLevel)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="course-level"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="basic">{t('courses.levels.basic')}</SelectItem>
                     <SelectItem value="intermediate">{t('courses.levels.intermediate')}</SelectItem>
@@ -593,9 +594,9 @@ export default function CourseEditor() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>{t('courseEditor.languageLabel')}</Label>
+                <Label htmlFor="course-language">{t('courseEditor.languageLabel')}</Label>
                 <Select value={editLanguage} onValueChange={(v) => setEditLanguage(v as 'en' | 'da')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="course-language"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="da">{t('languages.da')}</SelectItem>
                     <SelectItem value="en">{t('languages.en')}</SelectItem>
@@ -606,7 +607,10 @@ export default function CourseEditor() {
           </div>
 
           <div className="mb-[18px] space-y-2 border-t border-border pt-[18px]">
-            <Label>{t('courseEditor.editions.title')}</Label>
+            {/* A section heading, not a field label: this titles the editions
+                group (a list + a link control), so it takes no htmlFor — the
+                link-target select below carries its own accessible name (#325). */}
+            <h3 className="text-sm font-medium leading-none">{t('courseEditor.editions.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('courseEditor.editions.description')}</p>
 
             {siblings.length > 0 ? (
@@ -638,7 +642,7 @@ export default function CourseEditor() {
             {candidates.length > 0 ? (
               <div className="flex items-center gap-2 pt-1">
                 <Select value={linkTargetId} onValueChange={setLinkTargetId}>
-                  <SelectTrigger className="w-64">
+                  <SelectTrigger className="w-64" aria-label={t('courseEditor.editions.linkPlaceholder')}>
                     <SelectValue placeholder={t('courseEditor.editions.linkPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
@@ -839,8 +843,8 @@ export default function CourseEditor() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>{t('courseEditor.moduleTitleLabel')}</Label>
-              <Input value={moduleTitle} onChange={(e) => setModuleTitle(e.target.value)} placeholder={t('courseEditor.moduleTitlePlaceholder')} />
+              <Label htmlFor="module-title">{t('courseEditor.moduleTitleLabel')}</Label>
+              <Input id="module-title" value={moduleTitle} onChange={(e) => setModuleTitle(e.target.value)} placeholder={t('courseEditor.moduleTitlePlaceholder')} />
             </div>
           </div>
           <DialogFooter>
@@ -863,14 +867,14 @@ export default function CourseEditor() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>{t('courseEditor.lessonTitleLabel')}</Label>
-              <Input value={lessonTitle} onChange={(e) => setLessonTitle(e.target.value)} placeholder={t('courseEditor.lessonTitlePlaceholder')} />
+              <Label htmlFor="lesson-title">{t('courseEditor.lessonTitleLabel')}</Label>
+              <Input id="lesson-title" value={lessonTitle} onChange={(e) => setLessonTitle(e.target.value)} placeholder={t('courseEditor.lessonTitlePlaceholder')} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t('courseEditor.lessonTypeLabel')}</Label>
+                <Label htmlFor="lesson-type">{t('courseEditor.lessonTypeLabel')}</Label>
                 <Select value={lessonType} onValueChange={(v) => setLessonType(v as LessonType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="lesson-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="video">{t('courseEditor.lessonTypeVideo')}</SelectItem>
                     <SelectItem value="document">{t('courseEditor.lessonTypeDocument')}</SelectItem>
@@ -880,8 +884,9 @@ export default function CourseEditor() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>{t('courseEditor.lessonDurationLabel')}</Label>
+                <Label htmlFor="lesson-duration">{t('courseEditor.lessonDurationLabel')}</Label>
                 <Input
+                  id="lesson-duration"
                   type="number"
                   value={lessonDuration ?? ''}
                   onChange={(e) => setLessonDuration(e.target.value ? parseInt(e.target.value) : null)}
@@ -892,17 +897,19 @@ export default function CourseEditor() {
             {lessonType === 'document' && (
               <>
                 <div className="space-y-2">
-                  <Label>{t('courseEditor.documentFileLabel')}</Label>
+                  <Label htmlFor="lesson-document">{t('courseEditor.documentFileLabel')}</Label>
                   {/* No maxSizeMB: the document cap is the server's, and
                       AzureDocumentUpload defaults to it (src/lib/upload-limits.ts). */}
                   <AzureDocumentUpload
+                    id="lesson-document"
                     value={lessonDocPath}
                     onChange={setLessonDocPath}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t('courseEditor.contentTextLabel')}</Label>
+                  <Label htmlFor="lesson-content">{t('courseEditor.contentTextLabel')}</Label>
                   <Textarea
+                    id="lesson-content"
                     value={lessonContent}
                     onChange={(e) => setLessonContent(e.target.value)}
                     rows={5}
@@ -914,8 +921,9 @@ export default function CourseEditor() {
             {lessonType === 'video' && (
               <>
                 <div className="space-y-2">
-                  <Label>{t('courseEditor.videoFileLabel')}</Label>
+                  <Label htmlFor="lesson-video">{t('courseEditor.videoFileLabel')}</Label>
                   <AzureVideoUpload
+                    id="lesson-video"
                     value={lessonAzureBlobPath}
                     onChange={setLessonAzureBlobPath}
                   />
@@ -924,8 +932,9 @@ export default function CourseEditor() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t('courseEditor.contentTextLabel')}</Label>
+                  <Label htmlFor="lesson-content">{t('courseEditor.contentTextLabel')}</Label>
                   <Textarea
+                    id="lesson-content"
                     value={lessonContent}
                     onChange={(e) => setLessonContent(e.target.value)}
                     rows={5}
@@ -948,8 +957,9 @@ export default function CourseEditor() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t('courseEditor.contentTextLabel')}</Label>
+                  <Label htmlFor="lesson-content">{t('courseEditor.contentTextLabel')}</Label>
                   <Textarea
+                    id="lesson-content"
                     value={lessonContent}
                     onChange={(e) => setLessonContent(e.target.value)}
                     rows={5}

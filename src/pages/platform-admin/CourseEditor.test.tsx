@@ -457,3 +457,57 @@ describe('CourseEditor — language field (#191)', () => {
     );
   });
 });
+
+// #325: every labelled field in the course-details form must be programmatically
+// associated with its control, so a screen reader announces the field name and
+// clicking the label focuses the input. Regression guard: these queries resolve
+// a control ONLY through the label→control association (htmlFor/id for the native
+// fields; the accessible name computed from that association for the Radix
+// selects). Strip an htmlFor and the matching assertion fails.
+describe('CourseEditor — form fields have programmatic labels (#325)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('associates each course-details label with its control', async () => {
+    mockCallApi.mockResolvedValueOnce(successResponse);
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByDisplayValue('Test Course')).toBeInTheDocument());
+
+    // Native inputs: getByLabelText resolves via htmlFor↔id, and the Title label
+    // points at the very input holding the course title (not some other field).
+    expect(screen.getByLabelText('Title')).toBe(screen.getByDisplayValue('Test Course'));
+    expect(screen.getByLabelText('Description')).toBe(screen.getByDisplayValue('A test course'));
+
+    // Radix Select triggers are labelable comboboxes; the accessible name comes
+    // from the associated label, so name-scoped role queries prove the wiring.
+    expect(screen.getByRole('combobox', { name: 'Level' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Language' })).toBeInTheDocument();
+  });
+
+  it('associates the module- and lesson-dialog field labels with their controls', async () => {
+    const moduleRow = { id: 'mod-1', course_id: 'course-1', title: 'Intro', sort_order: 0 };
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/course-structure-admin') {
+        return { ...successResponse, modules: [{ ...moduleRow, lessons: [] }] };
+      }
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+    await screen.findByText('Module 1: Intro');
+
+    // Module dialog: a single native title field.
+    fireEvent.click(screen.getByRole('button', { name: 'Add module' }));
+    expect(await screen.findByLabelText('Module Title')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    // Lesson dialog: native title + duration inputs, plus the Radix Type combobox.
+    fireEvent.click(screen.getByRole('button', { name: /\+\s*Lesson/i }));
+    expect(await screen.findByLabelText('Lesson Title')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Type' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Duration (minutes)')).toBeInTheDocument();
+  });
+});
