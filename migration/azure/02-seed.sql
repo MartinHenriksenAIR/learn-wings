@@ -137,16 +137,6 @@ INSERT INTO public.platform_settings (key, value) VALUES
      "require_email_verification": false,
      "allow_self_registration": true
    }'::jsonb),
-  ('email', '{
-     "from_name": "AIR Academy",
-     "from_email": null,
-     "smtp_configured": false,
-     "smtp_host": "",
-     "smtp_port": 587,
-     "smtp_username": "",
-     "smtp_password": "",
-     "smtp_encryption": "starttls"
-   }'::jsonb),
   ('features', '{
      "certificates_enabled": true,
      "quizzes_enabled": true,
