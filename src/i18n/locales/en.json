@@ -782,7 +782,6 @@
     "tabs": {
       "branding": "Branding",
       "userAccess": "User & Access",
-      "email": "Email",
       "features": "Features",
       "platformAdmins": "Platform Admins"
     },
@@ -804,26 +803,6 @@
       "allowSelfRegistration": "Allow self registration",
       "allowSelfRegistrationHint": "Allow users to sign up without an invitation.",
       "save": "Save user settings"
-    },
-    "email": {
-      "notConfiguredWarning": "SMTP is not configured — invitation emails will not be sent.",
-      "fromName": "From name",
-      "fromEmail": "From email",
-      "smtpHost": "SMTP host",
-      "smtpPort": "SMTP port",
-      "smtpUsername": "Username",
-      "smtpPassword": "Password",
-      "encryption": "Encryption",
-      "encryptionStarttls": "STARTTLS",
-      "encryptionSslTls": "SSL/TLS",
-      "encryptionNone": "None",
-      "testConnection": "Test connection",
-      "save": "Save email settings",
-      "testSuccessTitle": "SMTP test successful",
-      "testSuccessDescription": "Connection and authentication succeeded.",
-      "testFailedTitle": "SMTP test failed",
-      "testFailedDescription": "Unable to connect to SMTP server.",
-      "testFailedFallback": "Connection test failed"
     },
     "features": {
       "note": "Disabling a feature here hides it for every organization, regardless of their overrides.",

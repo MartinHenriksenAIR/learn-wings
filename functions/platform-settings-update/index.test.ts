@@ -109,23 +109,13 @@ describe('platform-settings-update', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when smtp_encryption is not a known mode', async () => {
+  it('returns 400 when default_role is not a known mode', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
-    const res = await handler(baseReq({ key: 'email', value: { smtp_encryption: 'tls' } }), {} as any);
+    const res = await handler(baseReq({ key: 'user_access', value: { default_role: 'superuser' } }), {} as any);
 
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "smtp_encryption"/);
-    expect(mockQueryOne).not.toHaveBeenCalled();
-  });
-
-  it('returns 400 when smtp_port is not a number', async () => {
-    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-
-    const res = await handler(baseReq({ key: 'email', value: { smtp_port: '587' } }), {} as any);
-
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "smtp_port"/);
+    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "default_role"/);
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
@@ -152,38 +142,37 @@ describe('platform-settings-update', () => {
     expect(params[2]).toBe('p1');
   });
 
-  it('a partial body merges only the fields present (stored SMTP config survives)', async () => {
+  it('a partial body merges only the fields present (stored config survives)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    const updatedRow = { key: 'email', value: { from_name: 'New Name', smtp_host: 'smtp.kept.example' } };
+    const updatedRow = { key: 'user_access', value: { require_email_verification: true, allow_self_registration: true } };
     mockQueryOne.mockResolvedValueOnce(updatedRow);
 
-    const res = await handler(baseReq({ key: 'email', value: { from_name: 'New Name' } }), {} as any);
+    const res = await handler(baseReq({ key: 'user_access', value: { require_email_verification: true } }), {} as any);
 
     expect(res.status).toBe(200);
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('value = value || $2::jsonb');
-    expect(params[1]).toBe(JSON.stringify({ from_name: 'New Name' }));
+    expect(params[1]).toBe(JSON.stringify({ require_email_verification: true }));
   });
 
   it('a full-body write passes validation and merges all fields', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    const fullEmail = {
-      from_name: 'AIR Academy',
-      from_email: 'noreply@example.com',
-      smtp_configured: true,
-      smtp_host: 'smtp.example.com',
-      smtp_port: 587,
-      smtp_username: 'smtp-user',
-      smtp_password: 'secret',
-      smtp_encryption: 'starttls',
+    const fullBranding = {
+      platform_name: 'AIR Academy',
+      primary_color: '#6366f1',
+      accent_color: '#10b981',
+      sidebar_primary_color: '#10b981',
+      sidebar_accent_color: '#1f2937',
+      logo_url: 'https://example.com/logo.png',
+      favicon_url: null,
     };
-    mockQueryOne.mockResolvedValueOnce({ key: 'email', value: fullEmail });
+    mockQueryOne.mockResolvedValueOnce({ key: 'branding', value: fullBranding });
 
-    const res = await handler(baseReq({ key: 'email', value: fullEmail }), {} as any);
+    const res = await handler(baseReq({ key: 'branding', value: fullBranding }), {} as any);
 
     expect(res.status).toBe(200);
     const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
-    expect(params[1]).toBe(JSON.stringify(fullEmail));
+    expect(params[1]).toBe(JSON.stringify(fullBranding));
   });
 
   it('returns 404 when the setting key does not exist in the DB', async () => {
@@ -200,7 +189,7 @@ describe('platform-settings-update', () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
 
-    const res = await handler(baseReq({ key: 'email', value: { smtp_host: 'x' } }), { error: vi.fn() } as any);
+    const res = await handler(baseReq({ key: 'branding', value: { logo_url: 'x' } }), { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });

@@ -121,7 +121,6 @@ against `01-schema.sql`.
 | `generate-compliance-report` | `profiles(entra_oid, is_platform_admin, id, department)`; `org_memberships(org_id, user_id, role, status)`; `organizations(id, name)`; `enrollments(status, org_id, user_id, course_id)`; `quiz_attempts(score, org_id, user_id)`; `org_course_access(course_id, org_id, access)`; `courses(id, title)` | ✅ |
 | `org-analytics-data` | `profiles(entra_oid, is_platform_admin, id, full_name, email)`; `org_memberships(*, org_id, user_id, role, status)`; `enrollments(*, org_id, user_id)`; `quiz_attempts(*, user_id)`; `organizations(*)` | ✅ |
 | `send-invitation-email` | `profiles(is_platform_admin, id, entra_oid)`; `org_memberships(user_id, role, status)` | ✅ |
-| `test-smtp-connection` | `profiles(is_platform_admin, entra_oid)` | ✅ |
 | `azure-upload-url` / `azure-document-upload-url` | `profiles(is_platform_admin, id)` (resolved by the `endpoint()` factory's `getProfile` from the caller's Entra oid) | ✅ |
 | `azure-view-url` | `profiles(id, is_platform_admin)`; `lessons(module_id, video_storage_path, document_storage_path)`; `course_modules(id, course_id)`; `courses(id, is_published)`; `org_course_access(course_id, access, org_id)`; `org_memberships(org_id, user_id, status)` | ✅ |
 
