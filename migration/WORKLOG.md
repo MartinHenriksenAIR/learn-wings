@@ -1951,3 +1951,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `npm test` **826 / 110** · `build` 0. functions untouched. PR CI all green (frontend + functions + build/deploy job).
 
 **Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.
+
+## 2026-07-29 — #338 learner catalog sorts enrolled courses to the top (PR #347)
+
+**Who:** claude (Opus 4.8) with martin. Frontend-only. First of three sequential learner-catalog issues (#338 → #340 → #339) worked in one worktree, each merged before the next so they stack cleanly.
+
+**What:** the "All courses" grid on `src/pages/learner/Courses.tsx` had no client-side sort — cards rendered in the backend's alphabetical-by-title order. Now courses the learner has an enrollment in (status `enrolled` OR `completed`) sort above not-enrolled ones, and within that enrolled group by `enrolled_at` DESC (an interim ordering until #339 replaces it with last-activity recency). Not-enrolled courses keep their alphabetical order.
+
+**How:** `filteredCourses` became a single `useMemo` (filter → enrolled-first sort) per the frontend convention that call-site derivation is memoized. The comparator keys on the *existence* of an enrollment row (the backend only emits rows for `enrolled`/`completed`, so row-exists ≡ enrolled-or-completed), sorts the enrolled group `enrolled_at` DESC, and returns `0` for two not-enrolled — `Array.prototype.sort` is stable (ES2019), so the alphabetical tail is preserved. It sorts a `.filter()` copy, never mutating `courses`. Module-level `NO_COURSES`/`NO_ENROLLMENTS` empty-array fallbacks keep the `?? …` reads referentially stable so the memo doesn't churn (this also cleared the two `react-hooks/exhaustive-deps` warnings the memo first introduced — surfaced by the task review and fixed in-loop).
+
+**Scope:** no backend or schema change. The "Recommended for you" section, search, and level/status filters are untouched.
+
+**Tests:** three new `Courses.test.tsx` cases assert rendered card order (read from the `<h3>` titles in DOM order): enrolled-first + `enrolled_at` DESC, a not-enrolled-only case that would catch an accidental reorder of the alphabetical tail, and filter-then-sort coexistence.
+
+**Verify:** root `lint` 0 errors (1968 warnings = baseline) · `tsc -p tsconfig.app.json` 0 · `npm test` **829 / 110** · `build` 0. Re-run by the controller from the worktree after the fix, not just the implementer.
+
+**Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.

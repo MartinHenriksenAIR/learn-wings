@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +31,11 @@ import { BookOpen, Check, CheckCircle2, Loader2, LogOut, Play, Search } from 'lu
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
 
+// Module-level stable empty fallbacks so the `?? …` reads keep a referentially
+// stable value across renders (avoids re-running the filter/sort useMemo every render).
+const NO_COURSES: Course[] = [];
+const NO_ENROLLMENTS: Enrollment[] = [];
+
 export default function LearnerCourses() {
   const { currentOrg, profile } = useAuth();
   const orgGuard = useOrgGuard();
@@ -50,8 +55,8 @@ export default function LearnerCourses() {
     enabled: orgGuard === 'ready' && !!currentOrg,
   });
 
-  const courses = query.data?.courses ?? [];
-  const enrollments = query.data?.enrollments ?? [];
+  const courses = query.data?.courses ?? NO_COURSES;
+  const enrollments = query.data?.enrollments ?? NO_ENROLLMENTS;
 
   const enrollMutation = useMutation({
     mutationFn: ({ orgId, courseId }: { orgId: string; courseId: string }) =>
@@ -125,25 +130,41 @@ export default function LearnerCourses() {
     ? courses.filter(c => c.level === profile.assessment_level)
     : [];
 
-  const filteredCourses = courses.filter(course => {
-    const matchesSearch = search === '' ||
-      course.title.toLowerCase().includes(search.toLowerCase()) ||
-      course.description?.toLowerCase().includes(search.toLowerCase());
+  // Filter, then order enrolled courses first (#338). Enrolled (status `enrolled`
+  // OR `completed`) sort above not-enrolled; within the enrolled group by
+  // `enrolled_at` DESC. Array.prototype.sort is stable (ES2019), so returning 0 for
+  // two not-enrolled courses preserves the backend's alphabetical (ORDER BY c.title)
+  // order. `.filter` returns a fresh array, so sorting it does not mutate `courses`.
+  const filteredCourses = useMemo(() => {
+    const matches = courses.filter(course => {
+      const matchesSearch = search === '' ||
+        course.title.toLowerCase().includes(search.toLowerCase()) ||
+        course.description?.toLowerCase().includes(search.toLowerCase());
 
-    const matchesLevel = levelFilter === 'all' || course.level === levelFilter;
+      const matchesLevel = levelFilter === 'all' || course.level === levelFilter;
 
-    const enrollment = getEnrollmentStatus(course.id);
-    let matchesStatus = true;
-    if (statusFilter === 'enrolled') {
-      matchesStatus = !!enrollment && enrollment.status !== 'completed';
-    } else if (statusFilter === 'completed') {
-      matchesStatus = enrollment?.status === 'completed';
-    } else if (statusFilter === 'not_enrolled') {
-      matchesStatus = !enrollment;
-    }
+      const enrollment = enrollments.find(e => e.course_id === course.id);
+      let matchesStatus = true;
+      if (statusFilter === 'enrolled') {
+        matchesStatus = !!enrollment && enrollment.status !== 'completed';
+      } else if (statusFilter === 'completed') {
+        matchesStatus = enrollment?.status === 'completed';
+      } else if (statusFilter === 'not_enrolled') {
+        matchesStatus = !enrollment;
+      }
 
-    return matchesSearch && matchesLevel && matchesStatus;
-  });
+      return matchesSearch && matchesLevel && matchesStatus;
+    });
+
+    return matches.sort((a, b) => {
+      const ea = enrollments.find(e => e.course_id === a.id);
+      const eb = enrollments.find(e => e.course_id === b.id);
+      if (ea && !eb) return -1;
+      if (!ea && eb) return 1;
+      if (ea && eb) return new Date(eb.enrolled_at).getTime() - new Date(ea.enrolled_at).getTime();
+      return 0;
+    });
+  }, [courses, enrollments, search, levelFilter, statusFilter]);
 
   if (orgGuard === 'loading' || query.isLoading) {
     return (
