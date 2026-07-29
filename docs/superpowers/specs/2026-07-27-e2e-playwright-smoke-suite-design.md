@@ -14,7 +14,7 @@ Stated explicitly so a green run is not over-read:
 
 - **Not a CI gate.** No cron, no PR trigger, no required check. Real login + real writes against the one shared database is not something to put on the merge path. Run it deliberately, before or after a deploy.
 - **Not an authorization test.** See "Known gap" below — with one platform-admin account, the suite tests UI gating, not API refusal.
-- **Not a replacement for the vitest suite.** The 812 unit tests stay hermetic and fast; `npm test` is unchanged. This is a separate, slower, deliberate instrument.
+- **Not a replacement for the vitest suite.** The vitest suite (824 tests across 110 files as of the trunk merge) stays hermetic and fast; `npm test` is unchanged by this work. This is a separate, slower, deliberate instrument.
 
 ## Decisions
 
