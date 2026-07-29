@@ -38,17 +38,28 @@ where every PR would run it.
 `vitest` cannot pick these files up even by accident: `vitest.config.ts` includes only
 `src/**/*.{test,spec}.{ts,tsx}`.
 
+CI does *type-check* this tree — see "Type-checking" below — which is a different thing from
+running it: no browser, no session, no writes.
+
 ## The captured session
 
 There is **no password anywhere in this repo**, and none in the environment. Authenticated
 specs replay Entra cookies that a human captured once:
 
 ```bash
-npx playwright open --save-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/login"
+npm run e2e:capture
 ```
 
 Sign in by hand in the window that opens, then close it. `e2e/.auth/platform-admin.json` is
 gitignored — **never commit it**.
+
+That script is `playwright open --save-storage=… "$E2E_BASE_URL/login"` with `.env.e2e`
+sourced first, and the sourcing is the whole reason it is a script. `E2E_BASE_URL` lives in
+that file, which only `playwright.config.ts` reads — through dotenv, inside the config — and
+nothing exports it to a shell, so the same command typed by hand opens `/login` on nothing.
+The script echoes the URL it resolved before the browser starts, and a missing `.env.e2e`
+fails the sourcing so nothing opens at all. It sources with `set -a`, so it wants a POSIX
+shell (bash or zsh).
 
 Captures expire. When one has, the `setup` project fails first and fast, before any spec
 runs, and prints the command above in its message. The two halves of that check are
@@ -157,11 +168,19 @@ memberships need none, since both cascade on the organization's delete.
 a client-side value in sessionStorage. Switching the view changes what the app renders and
 nothing else — the bearer token is the same one either way.
 
-The two layers read different flags, and that is the whole point. `ProtectedRoute`'s
-`learnerOnly` guard reads the *effective*, view-aware flag, so platform view really does
-bounce a learner route. The backend reads the *raw* one: `requireOrgAdmin` returns early on
-`profile.is_platform_admin` before it ever probes for a membership row. So the view a spec
-seeds cannot reduce what the API will accept.
+Which flag gets read does not split cleanly by layer, and the asymmetry is worth stating
+exactly. The **backend** always reads the *raw* one: `requireOrgAdmin` returns early on
+`profile.is_platform_admin` before it ever probes for a membership row
+(`functions/shared/endpoint.ts:91-95`), so the view a spec seeds cannot reduce what the API
+will accept. The **frontend reads both**. `AppSidebar` builds its nav groups from the
+*effective*, view-aware flags (`AppSidebar.tsx:193-203`), and `ProtectedRoute`'s `learnerOnly`
+guard reads `effectiveIsPlatformAdmin` (`ProtectedRoute.tsx:76`) — which is why platform view
+really does bounce a learner route, and it is the one guard `viewMode` moves. But the guard
+next to it, `requirePlatformAdmin`, reads the raw `isPlatformAdmin`
+(`ProtectedRoute.tsx:80`), so in learner or org-admin view the nav hides the platform links
+while the routes behind them still render. That is **#335** — found by this work, verified
+live against the deployed app, and documented in `03-role-views.spec.ts`'s header so no
+reader takes this suite as covering it.
 
 Concretely: when `03-role-views` shows a learner-only route refused in platform view, that is
 the router declining to render, not the API declining to answer. No spec here demonstrates
@@ -178,7 +197,11 @@ The specs are checked by `tsconfig.node.json`:
 npx tsc --noEmit -p tsconfig.node.json
 ```
 
-This is not redundant with the other gates and is easy to lose. Playwright's runner
+It is a verification gate of its own: `AGENTS.md` lists it and CI runs it on every PR
+(`.github/workflows/ci.yml`). Safe there, unlike the suite itself, because it is a pure
+type-check — no browser, no network, no database and no captured session.
+
+It is also not redundant with the other gates. Playwright's runner
 transpiles without checking types, and `tsconfig.app.json` includes only `src` — so before
 `e2e` and `playwright.config.ts` were added to this config's `include`, nothing type-checked
 this tree at all. Its `lib` is Node-only (no DOM), which is deliberate: most of what lives
@@ -189,6 +212,9 @@ here is Node-side code. Browser-side DOM access belongs in a locator rather than
 
 Open issues against this suite. They are real; do not assume they are handled:
 
+- **#318** — `fixtures/auth.ts:10-12` and `fixtures/session.ts:4-5` justify where `ViewMode`
+  lives by a runtime import cycle that does not exist (`session.ts` takes it as an
+  `import type`, which is erased). The arrangement is right; the stated reason is not.
 - **#321** — nothing structurally prevents a spec from bypassing the fence with `page.goto`.
   The rule above is kept by hand, not enforced.
 - **#329** — `05-learner-course`'s write only happens on the run that finds the lesson
@@ -218,3 +244,10 @@ e2e/
 Specs import `test` and `expect` from the fixture module they need — `./fixtures/session`,
 `./fixtures/fenced-org`, or `./fixtures/course`, each of which re-exports the `test` it
 extends. Importing them from `@playwright/test` instead silently drops the session seeding.
+
+`00-harness.spec.ts` is the one spec that imports both from `@playwright/test`, and that is
+correct rather than an oversight: it is unauthenticated, it never signs in, and it seeds
+`preferred_language` itself — once as `en` and once as `da`, which is the thing it tests. So
+there is no session to re-seed and no view to choose, and taking the fixture's `test` would
+only add a second `en` seed of that same key underneath its own. The rule above is about the
+authenticated specs, which is all of the others.

@@ -12,12 +12,17 @@ import { sidebarNav, signInThroughSso } from '../fixtures/auth';
  * what closing it would take, is the "Known gap: this does not prove isolation"
  * section of docs/superpowers/specs/2026-07-27-e2e-playwright-smoke-suite-design.md.
  *
- * Two of the app's three route guards are NOT view-gated at all, and this spec
- * must not be read as covering them: `requirePlatformAdmin` tests the raw
- * `isPlatformAdmin` (ProtectedRoute.tsx:80), so this account reaches
- * /app/admin/platform/settings from learner view with the page fully rendered —
- * verified live, not inferred. The one guard `viewMode` does move is `learnerOnly`
- * (ProtectedRoute.tsx:76), which is what the route test below drives.
+ * One of the app's three route guards is not view-gated at all, and this spec must
+ * not be read as covering it: `requirePlatformAdmin` tests the raw `isPlatformAdmin`
+ * (ProtectedRoute.tsx:80), so this account reaches /app/admin/platform/settings from
+ * learner view with the page fully rendered — verified live, not inferred, and filed
+ * as **#335**, since `AppSidebar` hides those links in that view from the *effective*
+ * flags (AppSidebar.tsx:193-203) while the routes behind them still render. The other
+ * two guards do read the view-aware flags: `learnerOnly` reads
+ * `effectiveIsPlatformAdmin` (ProtectedRoute.tsx:76), which is the guard the route
+ * test below drives, and `requireOrgAdmin` reads `effectiveIsOrgAdmin` (:84) — which
+ * learner view does switch off, though for a platform admin it stays on in both
+ * platform and org-admin view (useAuth.tsx:99-101).
  *
  * This is the only spec that operates the switcher instead of seeding `viewMode`,
  * because the switcher is the mechanism a user actually has. It also means every
@@ -86,7 +91,11 @@ function pageHeader(page: Page): Locator {
 test('the switcher swaps the platform nav for the learner nav', async ({ page }) => {
   await signInThroughSso(page);
   const nav = sidebarNav(page);
-  await expect(nav.getByRole('link', { name: 'Organizations', exact: true })).toBeVisible();
+  // No "the platform nav is up" assertion before the switch, deliberately:
+  // `signInThroughSso` already waited on this exact locator — the `Organizations` link,
+  // scoped to the sidebar, in the fixture's default platform view (e2e/fixtures/auth.ts)
+  // — so restating it here could not fail. What this test claims is the change, and the
+  // assertions after the switch are what carry it.
 
   await switchViewTo(page, 'Learner');
 
@@ -120,10 +129,11 @@ test('a learner-only route is refused in platform view and reached in learner vi
   // Platform view refuses the learner dashboard: `learnerOnly` bounces
   // `effectiveIsPlatformAdmin` to the platform home (ProtectedRoute.tsx:76-78).
   // Asserting the redirect target, not merely "not here", so a 404 or a stalled
-  // boot cannot pass as a refusal.
+  // boot cannot pass as a refusal — and that one assertion is the whole claim. A
+  // `toBeHidden` on the learner dashboard's heading beside it could not fail once the
+  // URL matched, because `<Navigate replace>` means the dashboard route never rendered.
   await page.goto('/app/dashboard');
   await expect(page).toHaveURL(/\/app\/admin\/platform\/organizations/);
-  await expect(page.getByRole('heading', { name: 'My Dashboard', exact: true })).toBeHidden();
 
   await switchViewTo(page, 'Learner');
 

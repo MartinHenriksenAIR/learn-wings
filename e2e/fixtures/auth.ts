@@ -38,9 +38,19 @@ const SIDEBAR_LANDMARK: Record<ViewMode, string> = {
   learner: 'Dashboard',
 };
 
+/**
+ * What to print when the capture is missing, unreadable or no longer accepted.
+ *
+ * The npm script rather than the `playwright open --save-storage=…` line it wraps:
+ * that command needs `"$E2E_BASE_URL/login"`, and `E2E_BASE_URL` lives in `.env.e2e`,
+ * which only playwright.config.ts reads (through dotenv, inside the config) and which
+ * nothing exports to a shell. Pasted into a terminal it therefore opens `/login` on
+ * nothing. `npm run e2e:capture` sources the file first (package.json), so the hint
+ * names a command that works.
+ */
 export const RECAPTURE_HINT =
   'Captured session is missing or expired. Re-capture it with:\n' +
-  '  npx playwright open --save-storage=e2e/.auth/platform-admin.json "$E2E_BASE_URL/login"\n' +
+  '  npm run e2e:capture\n' +
   'Sign in by hand, then close the browser window.';
 
 /**

@@ -10,8 +10,11 @@ test('the captured session reaches the platform-admin surface', async ({ page })
   await signInThroughSso(page);
 
   const nav = sidebarNav(page);
+  // The sidebar link is the whole claim, and a `not.toHaveURL(/\/login/)` beside it
+  // could not fail: `AppSidebar` renders only inside `AppLayout`
+  // (src/components/layout/AppLayout.tsx:59), and the login route renders `<Login />`
+  // on its own (src/App.tsx:45), so this link cannot resolve on /login.
   await expect(nav.getByRole('link', { name: 'Platform Settings', exact: true })).toBeVisible();
-  await expect(page).not.toHaveURL(/\/login/);
 });
 
 test('a deep link is honoured after signing in', async ({ page }) => {

@@ -48,8 +48,19 @@ export default defineConfig({
   // Derived from signInThroughSso's own budget rather than picked, so a later
   // change to one of its waits cannot silently outgrow this again: at 60s the
   // helper's 65s worst path was cut off mid-wait and the run reported Playwright's
-  // generic timeout instead of naming an expired capture or a wrong view mode. The
-  // headroom covers `page.goto` plus the assertions a spec makes after signing in.
+  // generic timeout instead of naming an expired capture or a wrong view mode.
+  //
+  // The 25s on top does not cover a spec's worst case, and the arithmetic is worth
+  // stating rather than implying: the `page.goto('/login')` inside signInThroughSso
+  // can spend 30s by itself at Playwright's navigation default, which
+  // SIGN_IN_WORST_CASE_TIMEOUT deliberately excludes (see its docblock in
+  // e2e/fixtures/auth.ts), before a spec has asserted anything at all. So this is a
+  // default sized for a warm run, not a ceiling above the sum of a spec's bounded
+  // waits. A spec whose own waits sum past it replaces it with
+  // `test.describe.configure({ timeout })` — 05, 06 and 08 each derive one and state
+  // their own arithmetic. The rest still run under this default, so a cold start on one
+  // of them can report Playwright's generic timeout in place of the message carried by
+  // the wait it interrupted.
   timeout: SIGN_IN_WORST_CASE_TIMEOUT + 25_000,
   expect: { timeout: 15_000 },
   reporter: [['list'], ['html', { open: 'never' }]],

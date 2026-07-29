@@ -447,17 +447,13 @@ type PendingFence = { org: FencedOrg | null };
  */
 export const test = sessionTest.extend<{ fenceDelete: PendingFence; fencedOrg: FencedOrg }>({
   // The delete half. Its setup does no I/O on purpose: everything this fixture spends
-  // before `runTest` comes out of the same slot as the delete itself, so the box is
+  // before it hands over comes out of the same slot as the delete itself, so the box is
   // built and handed over immediately, leaving the whole budget to the teardown.
-  //
-  // Playwright's second argument is called `use` in its own docs; it is named
-  // `runTest` here because `react-hooks/rules-of-hooks` reads `use(...)` inside a
-  // named non-component function as a misplaced React hook and fails the lint gate.
   fenceDelete: [
-    async ({ page }, runTest) => {
+    async ({ page }, use) => {
       const pending: PendingFence = { org: null };
       try {
-        await runTest(pending);
+        await use(pending);
       } finally {
         // Nothing to delete unless the create half got as far as committing to a name.
         // `deleteFencedOrg` is itself idempotent, but calling it with no fence created
@@ -473,7 +469,7 @@ export const test = sessionTest.extend<{ fenceDelete: PendingFence; fencedOrg: F
   // The create half. No `finally` here: cleanup belongs to `fenceDelete`, whose
   // teardown Playwright runs whether this one returned, threw or timed out.
   fencedOrg: [
-    async ({ page, viewMode, fenceDelete }, runTest) => {
+    async ({ page, viewMode, fenceDelete }, use) => {
       assertViewCanFence(viewMode);
       await signInThroughSso(page, viewMode);
 
@@ -485,7 +481,7 @@ export const test = sessionTest.extend<{ fenceDelete: PendingFence; fencedOrg: F
       fenceDelete.org = org;
 
       await createFencedOrg(page);
-      await runTest(org);
+      await use(org);
     },
     { timeout: FENCE_CREATE_TIMEOUT, title: "this run's fenced organization" },
   ],

@@ -21,6 +21,10 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit -p tsconfig.app.json
+      # The tooling tree: vite.config.ts, playwright.config.ts and e2e/. A pure
+      # type-check — it starts no browser and touches no network or database, so it
+      # is safe here where the e2e suite it covers deliberately is not (e2e/README.md).
+      - run: npx tsc --noEmit -p tsconfig.node.json
       - run: npm test
       - run: npm run build
 

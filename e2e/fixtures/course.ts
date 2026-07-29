@@ -405,7 +405,7 @@ export type PendingCourses = { titles: string[] };
  * **Teardown is Playwright's, not the body's, and that is the whole point.** A course
  * created in a test body and deleted at the end of it survives every failure in
  * between. The per-test cap makes that a routine outcome rather than a freak one:
- * `playwright.config.ts:53` sets it to `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` = 90s,
+ * `playwright.config.ts:64` sets it to `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` = 90s,
  * while the bounded waits along the course journey sum to several times that — so a run
  * that is slow rather than hung gets cut off mid-body. And when the cap trips, every
  * await left in the body rejects at once, which is why a `finally` in the spec could
@@ -434,17 +434,13 @@ export type PendingCourses = { titles: string[] };
  * because a pattern sweep would delete a concurrent run's course, and one process
  * having exclusive claim on its own artefacts is the same property `workers: 1` exists
  * to protect (playwright.config.ts:43).
- *
- * Playwright's second argument is called `use` in its own docs; it is named `runTest`
- * here because `react-hooks/rules-of-hooks` reads `use(...)` inside a named
- * non-component function as a misplaced React hook and fails the lint gate.
  */
 export const test = fencedOrgTest.extend<{ courseCleanup: PendingCourses }>({
   courseCleanup: [
-    async ({ page }, runTest) => {
+    async ({ page }, use) => {
       const pending: PendingCourses = { titles: [] };
       try {
-        await runTest(pending);
+        await use(pending);
       } finally {
         // Nothing registered means nothing was written — and navigating anyway would
         // trade a real diagnosis (an expired capture, a refused view) for a timeout

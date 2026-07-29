@@ -16,8 +16,10 @@ dist-ssr
 .env
 .env.*
 !.env.example
-# The Playwright suite's credentials live in .env.e2e; only the value-free
-# template is tracked, and the .env.* glob above would otherwise hide it.
+# .env.e2e holds no credentials — only the Playwright suite's target URL and the
+# address journey 06 mails (see e2e/README.md); the session it replays is captured by
+# hand into e2e/.auth/, ignored below. Only the value-free template is tracked, and
+# the .env.* glob above would otherwise hide it.
 .env.e2e
 !.env.e2e.example
 local.settings.json

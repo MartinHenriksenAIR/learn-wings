@@ -43,8 +43,15 @@ import { SIGN_IN_WORST_CASE_TIMEOUT, sidebarNav, signInThroughSso } from '../fix
 
 test.use({ viewMode: 'learner' });
 
-/** The learner catalogue (`routes.learner.courses`). */
-const COURSES_PATH = '/app/courses';
+/**
+ * The learner catalogue (`routes.learner.courses`).
+ *
+ * Not called `COURSES_PATH`: that name is taken, by a different page —
+ * e2e/fixtures/course.ts exports it for the *platform* course-manager route
+ * (/app/admin/platform/courses). One name for two routes is how a reader ends up
+ * expecting the wrong one.
+ */
+const CATALOGUE_PATH = '/app/courses';
 
 /** `routes.learner.coursePlayerPattern` — `/app/learn/:courseId`, a uuid. */
 const PLAYER_URL = /\/app\/learn\/[0-9a-f-]{36}$/;
@@ -181,7 +188,7 @@ test('a completed lesson stays completed after a reload', async ({ page, viewMod
   // budget with a message accusing a healthy capture (e2e/fixtures/auth.ts).
   await signInThroughSso(page, viewMode);
 
-  await page.goto(COURSES_PATH);
+  await page.goto(CATALOGUE_PATH);
 
   // Learner view specifically, not merely "signed in". `signInThroughSso` waited on the
   // `Dashboard` link, which org-admin view renders too (see SIDEBAR_LANDMARK in

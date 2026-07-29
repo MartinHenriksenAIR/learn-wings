@@ -45,8 +45,15 @@ import { signInThroughSso } from '../fixtures/auth';
 
 test.use({ viewMode: 'learner' });
 
-/** The learner catalogue (`routes.learner.courses`). */
-const COURSES_PATH = '/app/courses';
+/**
+ * The learner catalogue (`routes.learner.courses`).
+ *
+ * Not called `COURSES_PATH`: that name is taken, by a different page —
+ * e2e/fixtures/course.ts exports it for the *platform* course-manager route
+ * (/app/admin/platform/courses). One name for two routes is how a reader ends up
+ * expecting the wrong one.
+ */
+const CATALOGUE_PATH = '/app/courses';
 
 /** `routes.learner.coursePlayerPattern` — `/app/learn/:courseId`, a uuid. */
 const PLAYER_URL = /\/app\/learn\/[0-9a-f-]{36}$/;
@@ -102,6 +109,10 @@ function courseCardBody(page: Page, title: string): Locator {
 /**
  * The open lesson's pane heading.
  *
+ * A deliberate local copy of the identical helper in 05-learner-course.spec.ts, for the same
+ * reason `courseCardBody` above is one: a spec importing another spec's internals couples two
+ * journeys that are meant to fail independently, and this is a locator rather than logic.
+ *
  * `heading`, not text: the page renders the course title in its breadcrumb (AppLayout, via
  * CoursePlayer.tsx:440-443), so a `getByText` on it matches whether or not the player ever
  * loaded the course. The two level-2 headings this page renders are the course card's title
@@ -135,7 +146,7 @@ function exactButton(page: Page, name: string): Locator {
 test('a quiz lesson is never a dead end', async ({ page }) => {
   await signInThroughSso(page, 'learner');
 
-  await page.goto(COURSES_PATH);
+  await page.goto(CATALOGUE_PATH);
 
   // By name: a positional "first card" locator would drive whatever the catalogue happened
   // to contain and still pass. The link inside the card is the play link — `Continue`, or
@@ -238,6 +249,14 @@ test('a quiz lesson is never a dead end', async ({ page }) => {
     // question texts and the button unchanged and still leaves the learner nothing to click.
     // `toBeAttached`, not `toBeVisible`: the real input is `sr-only` and the visible control is
     // an `aria-hidden` span beside it (:756-775). Measured: 12 — 3 questions x 4 options.
+    //
+    // The locator is page-wide rather than scoped to the quiz pane, which makes the claim
+    // conditional on something outside this file: `CoursePlayer.tsx:757` is that file's only
+    // `type="radio"` (verified), so every radio the page can render is a quiz option and
+    // "some radio is attached" and "the questions have options" are the same statement today.
+    // If the player ever grows a radio elsewhere — a filter, a preference — they stop being
+    // the same statement, and this locator has to be scoped to the pane before it means
+    // anything again.
     await expect(
       page.getByRole('radio').first(),
       `the "${QUIZ_LESSON}" quiz rendered questions with no answer options, so there is nothing ` +
