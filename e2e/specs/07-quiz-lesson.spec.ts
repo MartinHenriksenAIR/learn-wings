@@ -6,8 +6,9 @@ import { signInThroughSso } from '../fixtures/auth';
  * The quiz journey: open the quiz lesson inside a real course and prove it is not a dead
  * end — the durable half of #299.
  *
- * **Read-only, so unfenced.** Nothing here submits the quiz: `handleSubmitQuiz` writes a
- * `quiz_attempts` row (CoursePlayer.tsx:387-388 and the endpoint behind it), and the
+ * **Read-only, so unfenced.** Nothing here submits the quiz: `handleSubmitQuiz` posts to
+ * `/api/grade-quiz` (CoursePlayer.tsx:372), which inserts the `quiz_attempts` row
+ * server-side (functions/grade-quiz/index.ts:57), and the
  * journey stops short of it. Opening a lesson writes nothing at all — `/api/quiz-by-lesson`
  * is a read (functions/quiz-by-lesson) and no lesson-progress call is made — so there is no
  * artefact to own, no `fencedOrg` fixture and no teardown, and `page.goto` is correct here
@@ -163,7 +164,7 @@ test('a quiz lesson is never a dead end', async ({ page }) => {
   await expect(
     openQuizLesson,
     `"${COURSE}" has no "${QUIZ_LESSON}" lesson in its lesson list, so this journey has no quiz ` +
-      'surface to drive. It is seeded content (migration/azure/02-seed.sql:71) — do not point this ' +
+      'surface to drive. It is seeded content (migration/azure/02-seed.sql:68) — do not point this ' +
       'spec at another course, work out why the lesson is gone.',
   ).toHaveCount(1);
 
@@ -198,8 +199,9 @@ test('a quiz lesson is never a dead end', async ({ page }) => {
   // three is already known visible.
   if (await loadFailed.isVisible()) {
     // Not a tolerated content state: the two acceptable outcomes are a quiz and an unauthored
-    // quiz, and this is neither. `callApiRaw`'s rejection is what sets the flag
-    // (CoursePlayer.tsx:206-215), so the endpoint itself answered badly.
+    // quiz, and this is neither. `callApi`'s rejection is what sets the flag — `loadQuiz`
+    // reads the endpoint through it (CoursePlayer.tsx:189) and its catch sets
+    // `quizLoadFailed` (:206-215) — so the endpoint itself answered badly.
     throw new Error(
       `${QUIZ_ENDPOINT} failed for "${QUIZ_LESSON}": the player showed "${QUIZ_LOAD_FAILED}". ` +
         'Check the run report for the failed request.',
@@ -209,18 +211,39 @@ test('a quiz lesson is never a dead end', async ({ page }) => {
   if (await submit.isVisible()) {
     // The healthy quiz. Its way forward is its own submit flow, so there is no nav footer to
     // look for (CoursePlayer.tsx:840 excludes a quiz that has questions; measured: 0 Previous
-    // and 0 Next on this pane). The submit button is disabled until every question is answered
-    // (:785), so this asserts it is offered, not that it is clickable — the journey does not
-    // answer the quiz, because submitting writes a `quiz_attempts` row.
-    await expect(submit, `the "${QUIZ_LESSON}" quiz rendered but offers no way to submit it`).toBeVisible();
-    // And the questions really are there, rather than a submit button over an empty pane: the
-    // intro line is rendered from `questions.length` (CoursePlayer.tsx:736), so a count of at
-    // least one is a claim about the payload. Measured: "Answer all 3 questions. You need 70%
-    // to pass."
+    // and 0 Next on this pane).
+    //
+    // Reaching here already establishes what the pane rendered, and that is why neither
+    // assertion below repeats it. The button is visible, and one guard renders the button, the
+    // questions and the intro line together (`quiz && questions.length > 0`, :632) — so
+    // `expect(submit).toBeVisible()` could not fail inside this branch, and neither could an
+    // assertion on the intro line's "Answer all N questions." (:736; measured: "Answer all 3
+    // questions. You need 70% to pass."). "A submit button over an empty pane" is not a state
+    // this render can produce.
+    //
+    // What can fail is the button's own state. It is disabled until every question is answered
+    // (:785) and this journey answers none — it stops short of `handleSubmitQuiz`, which posts
+    // to /api/grade-quiz and has the row inserted server-side — so an enabled button here
+    // means the gate that stops an empty submission is gone.
     await expect(
-      page.getByText(/^Answer all [1-9]\d* questions\./),
-      `the "${QUIZ_LESSON}" quiz offered a submit button but no questions`,
-    ).toBeVisible();
+      submit,
+      `the "${QUIZ_LESSON}" quiz offers a submit button that is already enabled, with no question ` +
+        'answered. The gate is `Object.keys(answers).length !== questions.length` ' +
+        '(CoursePlayer.tsx:785) — an unanswered quiz must not be submittable.',
+    ).toBeDisabled();
+
+    // And the questions have something to answer. This is the claim the intro line cannot
+    // make: the options come from a nested `question.options.map` inside each question
+    // (:746-778), so a payload carrying questions with no options renders the line, the
+    // question texts and the button unchanged and still leaves the learner nothing to click.
+    // `toBeAttached`, not `toBeVisible`: the real input is `sr-only` and the visible control is
+    // an `aria-hidden` span beside it (:756-775). Measured: 12 — 3 questions x 4 options.
+    await expect(
+      page.getByRole('radio').first(),
+      `the "${QUIZ_LESSON}" quiz rendered questions with no answer options, so there is nothing ` +
+        `to answer and the submit button can never enable. ${QUIZ_ENDPOINT} returned questions ` +
+        'without options.',
+    ).toBeAttached();
     return;
   }
 

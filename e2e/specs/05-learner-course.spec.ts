@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../fixtures/session';
-import { sidebarNav, signInThroughSso } from '../fixtures/auth';
+import { SIGN_IN_WORST_CASE_TIMEOUT, sidebarNav, signInThroughSso } from '../fixtures/auth';
 
 /**
  * The learner journey: open a course, complete a lesson, and prove the progress reached
@@ -78,6 +78,30 @@ const COMPLETED = 'Completed';
 const LESSON_WRITE_TIMEOUT = 30_000;
 
 /**
+ * What one run of this journey may spend, replacing the config's per-test cap.
+ *
+ * That cap is `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` — 90s, sized for a spec whose only long
+ * wait is sign-in itself (playwright.config.ts). The caps on this journey's path sum to 515s:
+ * sign-in's own worst case (65s) plus the `page.goto('/login')` inside it, which that figure
+ * deliberately excludes (30s); six `LESSON_WRITE_TIMEOUT` waits (180s); two more navigations
+ * at Playwright's 30s default, the catalogue `goto` and the reload (60s); and twelve
+ * assertions and clicks left on the config's 15s `expect`/`actionTimeout` defaults (180s).
+ *
+ * So at 90s a cold start trips the per-test cap while one of those waits is still running, and
+ * the run prints Playwright's generic "Test timeout exceeded" instead of the message that wait
+ * carries — which is the whole reason each of them carries one.
+ *
+ * Sixteen write budgets (480s) plus sign-in's own worst case comes to 545s, above that sum —
+ * sized the way the fence fixtures size their phase budgets (e2e/fixtures/fenced-org.ts), so
+ * that this cap is never the thing that fires and a failure is always diagnosed by the
+ * assertion it happened in. It is a ceiling on a pathological run where every wait spends its
+ * whole budget, not an expectation: measured warm, the journey finishes in seconds.
+ */
+const SPEC_TIMEOUT = SIGN_IN_WORST_CASE_TIMEOUT + 16 * LESSON_WRITE_TIMEOUT;
+
+test.describe.configure({ timeout: SPEC_TIMEOUT });
+
+/**
  * The body of one course's card on the learner catalogue.
  *
  * The card is a plain `div` with no test id and no accessible name, so it cannot be
@@ -150,22 +174,35 @@ async function expectLessonComplete(page: Page, message: string): Promise<void> 
   await expect(page.getByRole('button', { name: MARK_COMPLETE, exact: true }), message).toBeHidden();
 }
 
-test('a completed lesson stays completed after a reload', async ({ page }) => {
-  await signInThroughSso(page, 'learner');
+test('a completed lesson stays completed after a reload', async ({ page, viewMode }) => {
+  // The view comes from the fixture rather than being repeated as a literal, so
+  // `test.use({ viewMode })` above and the landmark this waits for cannot drift apart —
+  // seeding one view and waiting for another's sidebar link fails after the full sign-in
+  // budget with a message accusing a healthy capture (e2e/fixtures/auth.ts).
+  await signInThroughSso(page, viewMode);
 
   await page.goto(COURSES_PATH);
 
   // Learner view specifically, not merely "signed in". `signInThroughSso` waited on the
   // `Dashboard` link, which org-admin view renders too (see SIDEBAR_LANDMARK in
-  // e2e/fixtures/auth.ts), so the two negatives are what narrow it: no `Organizations`
-  // rules out the platform group — the view an unseeded `viewMode` falls back to
-  // (useAuth.tsx:53-57) — and no `Organization` rules out the org-admin analytics link,
-  // whose group a learner does not get (AppSidebar.tsx:193-203). `exact: true` is
-  // load-bearing on both: `Organization` is a substring of `Organizations`.
+  // e2e/fixtures/auth.ts), so this narrows it — and the positive comes first because
+  // `toBeHidden()` is also satisfied by an element that does not exist, so either negative
+  // below would pass on a page that never rendered.
+  //
+  // The chip is that anchor and the positive claim at once: it renders only for a platform
+  // admin outside platform view (AppLayout.tsx:54,91-96), so its presence establishes that
+  // AppLayout is up, and its text names the view — `viewModeLabels[viewMode]`, so "Learner"
+  // is `viewMode` itself rather than an inference from it.
+  //
+  // The negatives then say the same of the sidebar, which is a separate component reading
+  // the same state: no `Organizations` rules out the platform group — the view an unseeded
+  // `viewMode` falls back to (useAuth.tsx:53-57) — and no `Organization` rules out the
+  // org-admin analytics link, whose group a learner does not get (AppSidebar.tsx:193-203).
+  // `exact: true` is load-bearing on both: `Organization` is a substring of `Organizations`.
+  await expect(page.locator('header').getByText('Viewing as: Learner')).toBeVisible();
   const nav = sidebarNav(page);
   await expect(nav.getByRole('link', { name: 'Organizations', exact: true })).toBeHidden();
   await expect(nav.getByRole('link', { name: 'Organization', exact: true })).toBeHidden();
-  await expect(page.locator('header').getByText('Viewing as: Learner')).toBeVisible();
 
   // By name: a positional "first card" locator would drive whatever the catalogue
   // happened to contain and still pass. The link inside the card is the play link —
@@ -192,7 +229,12 @@ test('a completed lesson stays completed after a reload', async ({ page }) => {
   // the lesson outstanding (see the file header). Settled with one wait so a slow first
   // paint cannot be read as "already complete".
   const markComplete = page.getByRole('button', { name: MARK_COMPLETE, exact: true });
-  await expect(markComplete.or(page.getByText(COMPLETED, { exact: true })).first()).toBeVisible();
+  await expect(
+    markComplete.or(page.getByText(COMPLETED, { exact: true })).first(),
+    `the "${LESSON}" pane rendered neither the "${MARK_COMPLETE}" button nor a "${COMPLETED}" ` +
+      'badge, so its footer settled into neither state and the branch below would read the ' +
+      'absent button as "already complete" (CoursePlayer.tsx:809-832).',
+  ).toBeVisible();
 
   if (await markComplete.isVisible()) {
     await markComplete.click();
@@ -230,9 +272,14 @@ test('a completed lesson stays completed after a reload', async ({ page }) => {
     page,
     `"${LESSON}" is not complete after a reload — the progress was never persisted server-side`,
   );
-  // And the count the server sent back agrees that at least one lesson is done, so the
-  // badge is not a lone rendering fluke. Stated positively on purpose: a negated
-  // `not.toHaveText` is also satisfied by an element that never resolved, which is the
-  // same trap the `toBeHidden` above needs anchoring against.
+  // The counter agrees that at least one of this course's lessons is done. NOT independent
+  // evidence of the badge: both read the same `progress` map — the badge as a single-key
+  // lookup (CoursePlayer.tsx:809), the counter as a filter over the course's lessons
+  // (:404) — and the map is seeded once from the reload's `/api/course-player-data`
+  // response (:145). What it adds is the aggregate that lookup cannot make: the persisted
+  // row is counted among *this course's* lessons, where the map itself spans every course in
+  // the organization (#18). Stated positively on purpose: a negated `not.toHaveText` is also
+  // satisfied by an element that never resolved, which is the same trap the `toBeHidden`
+  // above needs anchoring against.
   await expect(progressCounter(page)).toHaveText(/^[1-9]\d*\//);
 });

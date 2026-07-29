@@ -87,6 +87,31 @@ const INVITE_READ_TIMEOUT = 30_000;
  */
 const INVITE_SUBMIT_TIMEOUT = 45_000;
 
+/**
+ * What one run of this journey may spend, replacing the config's per-test cap.
+ *
+ * That cap is `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` — 90s, sized for a spec whose only long
+ * wait is sign-in itself (playwright.config.ts). This body's own bounded waits sum to 585s:
+ * two `gotoFenced` calls at 105s each (a `page.goto` at Playwright's 30s navigation default,
+ * then `selectFencedOrg`'s 30s wait for `OrgSelector` and its three 15s actions —
+ * e2e/fixtures/fenced-org.ts), the 45s submit settle, five 30s `INVITE_READ_TIMEOUT` waits
+ * (150s), and twelve assertions and clicks left on the config's 15s `expect`/`actionTimeout`
+ * defaults (180s). Sign-in and the fence's create/delete are not in that sum: they happen in the
+ * `fencedOrg` and `fenceDelete` fixtures, which carry their own timeouts and do not draw on
+ * the per-test budget.
+ *
+ * At 90s a cold start therefore trips the cap while one of those waits is still running, and
+ * the run prints Playwright's generic "Test timeout exceeded" instead of the message that wait
+ * carries. Nothing about the email or the database turns on this — the invite is either sent
+ * or not, whatever the cap says — but it costs the diagnosis, so it is sized the same way as
+ * everything else here: twenty read budgets (600s), above the 585s the path can spend, so
+ * this cap is never the thing that fires. A ceiling on a pathological run where every wait
+ * spends its whole budget, not an expectation.
+ */
+const SPEC_TIMEOUT = 20 * INVITE_READ_TIMEOUT;
+
+test.describe.configure({ timeout: SPEC_TIMEOUT });
+
 /** `analytics.members.inviteMember` — the invite dialog's trigger. */
 const INVITE_MEMBER = 'Invite Member';
 
@@ -105,17 +130,29 @@ const REVOKE = 'Revoke';
 /** `analytics.members.noMembersTitle` — the members list's empty state. */
 const NO_MEMBERS = 'No team members yet';
 
-/** The invite mutation's two toast titles (OrgMembersTab.tsx:234,237). */
+/** The invite mutation's two toast titles (OrgMembersTab.tsx:237 and :234 respectively). */
 const INVITE_CREATED = 'Invitation created!';
 const INVITE_FAILED = 'Failed to create invitation';
 
 /**
- * The success toast's description when the mail went out (OrgMembersTab.tsx:238-240).
- * Its alternative, "Copy the invite link to share with the user.", is what a failed send
- * renders — which is what makes asserting on this string a claim about the email rather
- * than about the invitation.
+ * The success toast's two descriptions (OrgMembersTab.tsx:238-240): the mail went out, or it
+ * did not and the invite link has to be copied by hand.
+ *
+ * Which of the two renders is chosen by `sendInvitationEmail`'s result, so `EMAIL_SENT` is a
+ * claim about /api/send-invitation-email rather than about the invitation. Whether the message
+ * then reads correctly — naming the fenced org rather than the literal `null` of #309 — is an
+ * inbox check no assertion here can stand in for.
+ *
+ * These are what the settle below waits on, in place of the `INVITE_CREATED` title they sit
+ * under, and that is deliberate. Title and description come from one
+ * `toast({ title, description })` call, so the description is on screen in the same instant the
+ * title is — but the toast is a sonner toast on a 5s duration
+ * (src/components/ui/sonner.tsx:50), so a second `expect` made after a wait on the title had
+ * already resolved can find the whole toast gone and report a *successful* send as a failure.
+ * Waiting on the description instead observes both halves at once, and cannot be outlived.
  */
 const EMAIL_SENT = 'Invitation email sent successfully.';
+const EMAIL_NOT_SENT = 'Copy the invite link to share with the user.';
 
 /** The revoke mutation's failure toast title (OrgMembersTab.tsx:273). */
 const REVOKE_FAILED = 'Failed to cancel invitation';
@@ -254,35 +291,40 @@ test('an invitation can be sent, seen as pending, and revoked', async ({ page, f
   // selects it makes no claim about. The mail therefore arrives in English.
   await dialog.getByRole('button', { name: CREATE_INVITATION, exact: true }).click();
 
-  // One wait for both outcomes the dialog has. `setInviteOpen(false)` sits on the
-  // success path only (OrgMembersTab.tsx:242), so a failed create leaves the dialog open
-  // and never adds a row — and a bare wait for the row would then spend the whole budget
-  // on a write that had already reported why it failed.
-  const created = page.getByText(INVITE_CREATED, { exact: true });
+  // One wait for every outcome the mutation reports, the sent-email half included — see
+  // EMAIL_SENT for why that half cannot be left to a later `expect`. `setInviteOpen(false)`
+  // sits on the success path only (OrgMembersTab.tsx:242), so a failed create leaves the
+  // dialog open and never adds a row — and a bare wait for the row would then spend the
+  // whole budget on a write that had already reported why it failed.
+  const emailSent = page.getByText(EMAIL_SENT, { exact: true });
+  const emailNotSent = page.getByText(EMAIL_NOT_SENT, { exact: true });
   const failed = page.getByText(INVITE_FAILED, { exact: true });
   await expect(
-    created.or(failed).first(),
-    `inviting ${inviteTo} produced neither "${INVITE_CREATED}" nor "${INVITE_FAILED}", so ` +
-      'invitation-create neither succeeded nor said why — check the run report for a failed request.',
+    emailSent.or(emailNotSent).or(failed).first(),
+    `inviting ${inviteTo} produced neither an "${INVITE_CREATED}" toast — with either of its ` +
+      `two descriptions, "${EMAIL_SENT}" or "${EMAIL_NOT_SENT}" — nor "${INVITE_FAILED}", so ` +
+      'invitation-create neither succeeded nor said why. Check the run report for a failed request.',
   ).toBeVisible({ timeout: INVITE_SUBMIT_TIMEOUT });
 
   // Which one arrived is the diagnosis. isVisible() is a decision, not a wait — one of
-  // the two is already known visible.
+  // the three is already known visible.
   if (await failed.first().isVisible()) {
     throw new Error(`invitation-create failed for ${inviteTo}: the app showed "${INVITE_FAILED}".`);
   }
+  if (await emailNotSent.first().isVisible()) {
+    // The invitation exists — only the mail did not go out. Thrown rather than tolerated,
+    // because "the mail was sent" is half of what this journey is for; and thrown here rather
+    // than left to a failing assertion further down, so the diagnosis names the send instead
+    // of whatever the run went on to look for.
+    throw new Error(
+      `the invitation for ${inviteTo} was created but /api/send-invitation-email did not report ` +
+        `success: the app showed "${EMAIL_NOT_SENT}" instead of "${EMAIL_SENT}". Check the run report.`,
+    );
+  }
 
-  // The app's own report that the mail was dispatched, and the only evidence of it a test
-  // can have: the description is chosen by `sendInvitationEmail`'s result
-  // (OrgMembersTab.tsx:236-241), so this string means /api/send-invitation-email answered
-  // success. Whether the message then renders correctly — naming the fenced org rather
-  // than the literal `null` of #309 — is an inbox check no assertion here can stand in for.
-  await expect(
-    page.getByText(EMAIL_SENT, { exact: true }),
-    'the invitation was created but the app did not report the email as sent, so ' +
-      '/api/send-invitation-email failed — check the run report.',
-  ).toBeVisible();
-
+  // Past both throws, so `EMAIL_SENT` was the description on screen: the app reported the
+  // invitation created and /api/send-invitation-email answering success, which is the only
+  // evidence of the dispatch a test can have.
   await expect(dialog, 'the invite dialog stayed open after a create the app reported as successful').toBeHidden({
     timeout: INVITE_READ_TIMEOUT,
   });

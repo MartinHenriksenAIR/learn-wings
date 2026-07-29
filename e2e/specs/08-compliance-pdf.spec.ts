@@ -11,8 +11,12 @@ import { expect, gotoFenced, test } from '../fixtures/fenced-org';
  * (functions/generate-compliance-report/index.ts:48-157) — so the fence is not here to
  * contain a write. It is here because the report is *about* an organization, and the card
  * that generates it renders only when one is selected: `showComplianceReport` is
- * `!isGlobalView && !!currentOrg` (OrgAnalytics.tsx:344) and the endpoint refuses the `all`
- * aggregate outright (:144). Without the fence the org would be whichever
+ * `!isGlobalView && !!currentOrg` (OrgAnalytics.tsx:344), and the report is per-organization
+ * rather than an aggregate. The `all` selection is refused by the **client**, which returns
+ * early with a "Please select an organization" toast (OrgAnalytics.tsx:142-147) — not by the
+ * endpoint, which only requires that an `orgId` be present (400 without one,
+ * functions/generate-compliance-report/index.ts:42-44) and 404s when no organization carries
+ * the id it was handed (:61-64). Without the fence the org would be whichever
  * `OrgSelector` auto-selected — `orgs[0]`, the most recently created (OrgSelector.tsx:28,42
  * and functions/organizations/index.ts:33) — so the assertions would be about a real
  * customer's data, and a failure would be their problem to explain rather than this run's.
@@ -85,11 +89,32 @@ const REPORT_FILENAME = /^ai-act-compliance-report-\d+\.pdf$/;
  * Budget for the analytics page to load and for the report to be generated.
  *
  * Wider than the config's 15s `expect` default, which was sized for assertions on
- * already-rendered state — a cold Azure Functions start alone can eat it. Two of these plus
- * `gotoFenced`'s own waits still sit inside the per-test budget, which the fence fixtures do
- * not draw on (they carry their own timeouts). Generation itself measured 779ms warm.
+ * already-rendered state — a cold Azure Functions start alone can eat it. Generation itself
+ * measured 779ms warm.
  */
 const REPORT_TIMEOUT = 30_000;
+
+/**
+ * What one run of this journey may spend, replacing the config's per-test cap.
+ *
+ * That cap is `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` — 90s, sized for a spec whose only long
+ * wait is sign-in itself (playwright.config.ts). This body's own bounded waits sum to 210s:
+ * `gotoFenced` at 105s (a `page.goto` at Playwright's 30s navigation default, then
+ * `selectFencedOrg`'s 30s wait for `OrgSelector` and its three 15s actions —
+ * e2e/fixtures/fenced-org.ts), then three `REPORT_TIMEOUT` waits (the card, the success toast
+ * and the download event) and the 15s click between them. Sign-in and the fence's
+ * create/delete are not in that sum: they happen in the `fencedOrg` and `fenceDelete`
+ * fixtures, which carry their own timeouts and do not draw on the per-test budget.
+ *
+ * At 90s a cold start therefore trips the cap while one of those waits is still running, and
+ * the run prints Playwright's generic "Test timeout exceeded" instead of the message that wait
+ * carries. Eight report budgets (240s) sits above the 210s the path can spend, so this cap is
+ * never the thing that fires — a ceiling on a pathological run where every wait spends its
+ * whole budget, not an expectation.
+ */
+const SPEC_TIMEOUT = 8 * REPORT_TIMEOUT;
+
+test.describe.configure({ timeout: SPEC_TIMEOUT });
 
 /**
  * The compliance card's heading, which doubles as the overview tab's loaded signal.
