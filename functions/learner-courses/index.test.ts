@@ -117,6 +117,8 @@ describe('learner-courses', () => {
     const [enrollSql, enrollParams] = mockQuery.mock.calls[1] as [string, unknown[]];
     expect(enrollSql).toContain('user_id = $1');
     expect(enrollSql).not.toContain('SELECT *');
+    // last_accessed_at drives the catalog's recency ordering of enrolled courses (#339).
+    expect(enrollSql).toContain('last_accessed_at');
     expect(enrollParams).toEqual(['p1', 'org-1']);
   });
 

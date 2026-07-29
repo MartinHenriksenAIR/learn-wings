@@ -153,6 +153,7 @@ export interface Enrollment {
   status: EnrollmentStatus;
   enrolled_at: string;
   completed_at: string | null;
+  last_accessed_at: string | null;
   course?: Course;
   profile?: Profile;
 }

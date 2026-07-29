@@ -165,6 +165,18 @@ export default function CoursePlayer() {
     fetchData();
   }, [user, currentOrg, courseId]);
 
+  // Fire-and-forget "course opened" telemetry — stamps enrollments.last_accessed_at
+  // so the catalog can order the enrolled group by recent activity (#339). Kept off
+  // the awaited render path so a slow/failed touch never delays or breaks the player.
+  // Best-effort by design: a failed touch is logged, never surfaced (justified
+  // exception to the no-silent-swallow rule).
+  useEffect(() => {
+    if (!user || !currentOrg || !courseId) return;
+    callApi('/api/touch-course', { orgId: currentOrg.id, courseId }).catch((err) => {
+      console.error('touch-course failed', err);
+    });
+  }, [user, currentOrg, courseId]);
+
   // Load quiz when lesson changes - single endpoint, no is_correct exposed.
   // Kept as a callback (not inline in the effect) so the failure card's Retry button
   // can re-run the exact same load for the current lesson.

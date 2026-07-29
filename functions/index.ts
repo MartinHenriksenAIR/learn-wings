@@ -108,6 +108,7 @@ import './seat-request-create/index';
 import './seat-request-fulfill/index';
 import './seat-requests/index';
 import './send-invitation-email/index';
+import './touch-course/index';
 import './unenroll/index';
 import './user-context/index';
 import './user-progress/index';

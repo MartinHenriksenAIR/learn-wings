@@ -35,7 +35,7 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
 
   // Query 2: Caller's own enrollments in this org, scoped to profile.id (never a client-supplied user id).
   const enrollments = await query(
-    `SELECT id, org_id, user_id, course_id, status, enrolled_at, completed_at
+    `SELECT id, org_id, user_id, course_id, status, enrolled_at, completed_at, last_accessed_at
        FROM enrollments
       WHERE user_id = $1 AND org_id = $2
       ORDER BY enrolled_at DESC`,

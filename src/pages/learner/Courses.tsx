@@ -132,10 +132,12 @@ export default function LearnerCourses() {
     : [];
 
   // Filter, then order enrolled courses first (#338). Enrolled (status `enrolled`
-  // OR `completed`) sort above not-enrolled; within the enrolled group by
-  // `enrolled_at` DESC. Array.prototype.sort is stable (ES2019), so returning 0 for
-  // two not-enrolled courses preserves the backend's alphabetical (ORDER BY c.title)
-  // order. `.filter` returns a fresh array, so sorting it does not mutate `courses`.
+  // OR `completed`) sort above not-enrolled; within the enrolled group by recent
+  // activity — `last_accessed_at` DESC, falling back to `enrolled_at` when a course
+  // has no activity yet (#339). Array.prototype.sort is stable (ES2019), so returning
+  // 0 for two not-enrolled courses preserves the backend's alphabetical (ORDER BY
+  // c.title) order. `.filter` returns a fresh array, so sorting it does not mutate
+  // `courses`.
   const filteredCourses = useMemo(() => {
     const matches = courses.filter(course => {
       const matchesSearch = search === '' ||
@@ -162,7 +164,11 @@ export default function LearnerCourses() {
       const eb = enrollments.find(e => e.course_id === b.id);
       if (ea && !eb) return -1;
       if (!ea && eb) return 1;
-      if (ea && eb) return new Date(eb.enrolled_at).getTime() - new Date(ea.enrolled_at).getTime();
+      if (ea && eb) {
+        const ka = new Date(ea.last_accessed_at ?? ea.enrolled_at).getTime();
+        const kb = new Date(eb.last_accessed_at ?? eb.enrolled_at).getTime();
+        return kb - ka; // DESC — most recent activity first
+      }
       return 0;
     });
   }, [courses, enrollments, search, levelFilter, statusFilter]);
