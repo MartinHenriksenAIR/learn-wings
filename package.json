@@ -11,7 +11,10 @@
     "lint:community-i18n": "eslint src/pages/community src/components/community",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:capture": "set -a && . ./.env.e2e && set +a && echo \"Opening $E2E_BASE_URL/login — sign in by hand, then close the window to write e2e/.auth/platform-admin.json\" && playwright open --save-storage=e2e/.auth/platform-admin.json \"$E2E_BASE_URL/login\""
   },
   "dependencies": {
     "@azure/msal-browser": "^5.11.0",
@@ -60,6 +63,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "^1.62.0",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^22.16.5",
@@ -68,6 +72,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "dotenv": "^17.4.2",
     "eslint": "^9.32.0",
     "eslint-plugin-i18next": "^6.1.5",
     "eslint-plugin-react-hooks": "^5.2.0",

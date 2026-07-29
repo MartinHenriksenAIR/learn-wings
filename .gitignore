@@ -16,6 +16,12 @@ dist-ssr
 .env
 .env.*
 !.env.example
+# .env.e2e holds no credentials — only the Playwright suite's target URL and the
+# address journey 06 mails (see e2e/README.md); the session it replays is captured by
+# hand into e2e/.auth/, ignored below. Only the value-free template is tracked, and
+# the .env.* glob above would otherwise hide it.
+.env.e2e
+!.env.e2e.example
 local.settings.json
 
 # Editor directories and files
@@ -32,6 +38,11 @@ local.settings.json
 # Playwright MCP session artifacts
 .playwright-mcp/
 .claude/worktrees/
+
+# Playwright e2e suite artifacts (on-demand runs, never CI)
+playwright-report/
+test-results/
+e2e/.auth/
 
 # Claude Code local state (per-machine, never committed)
 .claude/settings.local.json
