@@ -87,8 +87,10 @@ describe('learner-courses', () => {
     ];
 
     mockQuery
-      .mockResolvedValueOnce(courseRows)      // courses query
-      .mockResolvedValueOnce(enrollmentRows); // enrollments query
+      .mockResolvedValueOnce(courseRows)                       // courses query
+      .mockResolvedValueOnce(enrollmentRows)                   // enrollments query
+      .mockResolvedValueOnce([{ course_id: 'c1', total: 4 }])  // totals query
+      .mockResolvedValueOnce([{ course_id: 'c1', completed: 1 }]); // completed query
 
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
 
@@ -96,6 +98,8 @@ describe('learner-courses', () => {
     const body = JSON.parse(res.body as string);
     expect(body.courses).toEqual(courseRows);
     expect(body.enrollments).toEqual(enrollmentRows);
+    // Progress is keyed by enrolled courseId with the lesson totals/completed counts.
+    expect(body.progress).toEqual({ c1: { total: 4, completed: 1 } });
 
     // Assert courses SQL — access = 'enabled', is_published = TRUE, language filter, no SELECT *
     const [coursesSql, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
@@ -114,6 +118,67 @@ describe('learner-courses', () => {
     expect(enrollSql).toContain('user_id = $1');
     expect(enrollSql).not.toContain('SELECT *');
     expect(enrollParams).toEqual(['p1', 'org-1']);
+  });
+
+  it('returns progress: {} and runs no count queries when the caller has no enrollments', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQuery
+      .mockResolvedValueOnce([]) // courses query
+      .mockResolvedValueOnce([]); // enrollments query (empty)
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+    expect(body.progress).toEqual({});
+    // Only the courses + enrollments queries ran — no totals/completed count queries.
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it('computes progress per enrolled course, zero-filling courses with no lessons/progress', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+
+    const enrollmentRows = [
+      { id: 'e1', org_id: 'org-1', user_id: 'p1', course_id: 'c1', status: 'enrolled', enrolled_at: '2024-01-10', completed_at: null },
+      { id: 'e2', org_id: 'org-1', user_id: 'p1', course_id: 'c2', status: 'completed', enrolled_at: '2024-01-11', completed_at: '2024-02-01' },
+    ];
+
+    mockQuery
+      .mockResolvedValueOnce([])                               // courses query
+      .mockResolvedValueOnce(enrollmentRows)                   // enrollments query
+      .mockResolvedValueOnce([{ course_id: 'c1', total: 5 }])  // totals: only c1 has lessons
+      .mockResolvedValueOnce([{ course_id: 'c1', completed: 3 }]); // completed: only c1 has progress
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+    // c2 is zero-filled to { total: 0, completed: 0 }.
+    expect(body.progress).toEqual({
+      c1: { total: 5, completed: 3 },
+      c2: { total: 0, completed: 0 },
+    });
+
+    // Count queries mirror learner-dashboard's batched SQL and params. Assert each
+    // query's distinguishing structure (aggregate, tables, joins, GROUP BY) so an
+    // accidental drift from the dashboard mirror is caught, not just the ANY(...) param.
+    const [totalsSql, totalsParams] = mockQuery.mock.calls[2] as [string, unknown[]];
+    expect(totalsSql).toContain('COUNT(l.id)::int AS total');
+    expect(totalsSql).toContain('FROM course_modules cm');
+    expect(totalsSql).toContain('JOIN lessons l ON l.module_id = cm.id');
+    expect(totalsSql).toContain('cm.course_id = ANY($1::uuid[])');
+    expect(totalsSql).toContain('GROUP BY cm.course_id');
+    expect(totalsParams).toEqual([['c1', 'c2']]);
+
+    const [completedSql, completedParams] = mockQuery.mock.calls[3] as [string, unknown[]];
+    expect(completedSql).toContain('COUNT(*)::int AS completed');
+    expect(completedSql).toContain('FROM lesson_progress lp');
+    expect(completedSql).toContain('JOIN lessons l ON l.id = lp.lesson_id');
+    expect(completedSql).toContain('JOIN course_modules cm ON cm.id = l.module_id');
+    expect(completedSql).toContain("lp.status = 'completed'");
+    expect(completedSql).toContain('cm.course_id = ANY($3::uuid[])');
+    expect(completedSql).toContain('GROUP BY cm.course_id');
+    expect(completedParams).toEqual(['p1', 'org-1', ['c1', 'c2']]);
   });
 
   it('passes language "en" through to the courses query param', async () => {

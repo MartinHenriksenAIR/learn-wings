@@ -57,6 +57,7 @@ export default function LearnerCourses() {
 
   const courses = query.data?.courses ?? NO_COURSES;
   const enrollments = query.data?.enrollments ?? NO_ENROLLMENTS;
+  const progressData: Record<string, { total: number; completed: number }> = query.data?.progress ?? {};
 
   const enrollMutation = useMutation({
     mutationFn: ({ orgId, courseId }: { orgId: string; courseId: string }) =>
@@ -208,6 +209,12 @@ export default function LearnerCourses() {
     const justEnrolled = flashed(`enr-${course.id}`);
     const isEnrolling = enrollMutation.isPending && enrollMutation.variables?.courseId === course.id;
 
+    // Lesson progress for the enrolled-card bar. Completed courses read 100%;
+    // otherwise guard divide-by-zero when the course has no lessons yet.
+    const total = progressData[course.id]?.total ?? 0;
+    const completed = progressData[course.id]?.completed ?? 0;
+    const percent = isCompleted ? 100 : total === 0 ? 0 : Math.round((completed / total) * 100);
+
     return (
       <div
         key={course.id}
@@ -257,7 +264,18 @@ export default function LearnerCourses() {
             {course.description}
           </p>
 
-          <div className="mt-auto flex items-center gap-2">
+          <div className="mt-auto flex flex-col gap-2.5">
+            {enrollment && (
+              // Progress bar + % on enrolled cards — same markup/classes as the
+              // dashboard's "Continue Learning" bar for visual consistency (#340).
+              <div data-testid={`course-progress-${course.id}`} className="flex items-center gap-2.5">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eceef3]">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
+                </div>
+                <span className="whitespace-nowrap text-xs font-semibold text-muted-foreground">{percent}%</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
             {justEnrolled ? (
               // Transient post-enroll morph; reverts to Continue when the flash expires
               <Button className="h-auto flex-1 rounded-[10px] border border-success bg-success px-3 py-[9px] text-[13px] font-bold text-success-foreground hover:bg-success">
@@ -307,6 +325,7 @@ export default function LearnerCourses() {
                 <LogOut aria-hidden="true" className="h-[15px] w-[15px]" />
               </Button>
             )}
+            </div>
           </div>
         </div>
       </div>

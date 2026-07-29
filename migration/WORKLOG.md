@@ -1967,3 +1967,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors (1968 warnings = baseline) · `tsc -p tsconfig.app.json` 0 · `npm test` **829 / 110** · `build` 0. Re-run by the controller from the worktree after the fix, not just the implementer.
 
 **Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.
+
+## 2026-07-29 — #340 progress bar + % on enrolled learner-catalog cards (PR #348)
+
+**Who:** claude (Opus 4.8) with martin. Backend + hook + frontend. Second of the three sequential catalog issues, built on #338.
+
+**What:** enrolled cards on `src/pages/learner/Courses.tsx` showed only an enrolled/completed badge — no progress. They now show a progress bar + percentage in the dashboard's "Continue Learning" bar style. Completed cards read 100%; not-enrolled cards show no bar (they keep the Enroll CTA).
+
+**How:** `functions/learner-courses` now returns a `progress: Record<courseId, {total, completed}>` map for the caller's enrolled courses, computed with the **same two batched `COUNT` queries** `functions/learner-dashboard` already uses (copied verbatim — totals over `course_modules`→`lessons`, completed over `lesson_progress`→`lessons`→`course_modules` scoped to the caller+org with `status='completed'`; both `GROUP BY cm.course_id` over `ANY($n::uuid[])`, so no N+1). Empty enrollments short-circuits to `progress: {}` before any count query runs. The existing course-visibility/language predicate and the enrollments query are untouched. `useLearnerCourses` widened its generic and passes `progress` through (thumbnail signing preserved). `renderCourseCard` reads `progress[course.id]`, renders the dashboard's exact bar markup/classes for enrolled cards, and computes `isCompleted ? 100 : total === 0 ? 0 : Math.round(completed/total*100)` (the `total === 0` guard prevents NaN). The #338 enrolled-first sort, the Recommended section, and the filters are unchanged.
+
+**Scope:** the catalog stays on a single data source (`learner-courses`) — it does not call `learner-dashboard`. A shared `<CourseProgressBar>` (dashboard + catalog + #341) is deliberately deferred to #341; `Dashboard.tsx` is untouched and the bar markup is replicated here, which the issue anticipated.
+
+**Tests:** `functions/learner-courses/index.test.ts` — the `progress` map with zero-fill, the `progress: {}` + exactly-two-queries (no count queries) empty case, and structural assertions that both count queries mirror the dashboard's SQL (aggregate/tables/joins/GROUP BY, not just the param). `Courses.test.tsx` — bar+% on an enrolled card (67% from 2/3, fill width asserted), 100% on a completed card, no bar on a not-enrolled card, and 0% (no `NaN%`) when `total === 0`.
+
+**Verify:** root `lint` 0 errors (**1970** warnings; the +2 vs the 1968 baseline are `@typescript-eslint/no-explicit-any` in the new **backend test** mocks, matching the pervasive functions-test mocking convention — the three `src/` files lint clean) · `tsc -p tsconfig.app.json` 0 · `npm test` **833 / 110** · `build` 0. functions: `build` 0 · `npm test` **2529 / 143** (3 skipped). Controller re-ran all gates from the worktree.
+
+**Deploy:** touches `functions/` + `src/`, so both the SWA and functions workflows ship on merge to `main`.
