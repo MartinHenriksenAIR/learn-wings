@@ -183,7 +183,14 @@
     "heroFirstTimeBadge": "Get started",
     "heroFirstTimeTitle": "Ready to start learning?",
     "heroFirstTimeDescription": "Pick your first course from the catalog and start building practical AI skills.",
-    "heroPickFirstCourse": "Pick your first course"
+    "heroPickFirstCourse": "Pick your first course",
+    "community": {
+      "title": "Community",
+      "viewAll": "View all",
+      "recentActivity": "Recent activity",
+      "noActivityTitle": "No recent activity yet",
+      "noActivityDescription": "Be the first to start a conversation in the community."
+    }
   },
   "courses": {
     "title": "Course Overview",

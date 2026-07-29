@@ -1983,3 +1983,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors (**1970** warnings; the +2 vs the 1968 baseline are `@typescript-eslint/no-explicit-any` in the new **backend test** mocks, matching the pervasive functions-test mocking convention — the three `src/` files lint clean) · `tsc -p tsconfig.app.json` 0 · `npm test` **833 / 110** · `build` 0. functions: `build` 0 · `npm test` **2529 / 143** (3 skipped). Controller re-ran all gates from the worktree.
 
 **Deploy:** touches `functions/` + `src/`, so both the SWA and functions workflows ship on merge to `main`.
+
+## 2026-07-29 — #343 learner dashboard community section (PR #349)
+
+**Who:** claude (Opus 4.8) with martin. Frontend-only. Run concurrently with two other sessions (e2e hardening #346, catalog recency #339) and deliberately kept disjoint from both.
+
+**What:** the learner dashboard (`src/pages/learner/Dashboard.tsx`) had no community content. It now shows a **Community** section — a preview of recent posts plus the shared `UpcomingEvents` card, with a "View all" link into the feed (`routes.community.feed`) — gated behind `useCommunityGate` so it only appears when community is enabled for the user's org. Placed after "Completed Courses", before Certificates.
+
+**How:** extracted a self-contained `src/components/learner/DashboardCommunitySection.tsx`; the dashboard renders it **only when the gate is `'allowed'`**, so its two `community-posts` queries stay idle when the feature is off (conditional mount, not a conditional hook). Both derivations reuse the existing `useCommunityEvents` reader (which returns every post for a scope): recent-activity = merged global+org sorted by `created_at` DESC, sliced to 4, each a reused `PostCard` navigating to `routes.community.postDetail(post.scope, post.id)`; events = the same merged posts handed to `UpcomingEvents` (it filters to future-dated internally and self-hides when empty). TanStack dedupes by query key, so events + recent-activity share one request per scope. Loading → spinner; error → `QueryErrorState` retrying both scopes. New i18n `dashboard.community.*` keys (en+da).
+
+**Tests:** `DashboardCommunitySection.test.tsx` — 7 cases (4-most-recent merge/sort/slice, View-all href, empty state, post click-through on the post's own scope, merged posts → UpcomingEvents + event click-through, loading spinner, retryable error refetching both scopes). `Dashboard.test.tsx` — 2 gating cases (section shown when `community_enabled`, hidden when not) via a marker mock + configurable `usePlatformSettings`.
+
+**Coordination:** verified none of the in-flight branches (338/339/340/e2e) touch `src/pages/learner/Dashboard.tsx` or `src/i18n/locales/*` — zero file overlap. Branched off `origin/main` @`1a85ec5` (already includes merged #338/#340).
+
+**Verify:** root `lint` 0 errors (1970 warnings = baseline; the three touched `src/` files add none) · `tsc -p tsconfig.app.json` 0 · `npm test` **842 / 111** · `build` 0. functions untouched.
+
+**Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.

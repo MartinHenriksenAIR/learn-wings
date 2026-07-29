@@ -183,7 +183,14 @@
     "heroFirstTimeBadge": "Kom i gang",
     "heroFirstTimeTitle": "Klar til at lære?",
     "heroFirstTimeDescription": "Vælg dit første kursus i kataloget og begynd at opbygge praktiske AI-færdigheder.",
-    "heroPickFirstCourse": "Vælg dit første kursus"
+    "heroPickFirstCourse": "Vælg dit første kursus",
+    "community": {
+      "title": "Fællesskab",
+      "viewAll": "Se alle",
+      "recentActivity": "Seneste aktivitet",
+      "noActivityTitle": "Ingen nylig aktivitet endnu",
+      "noActivityDescription": "Vær den første til at starte en samtale i fællesskabet."
+    }
   },
   "courses": {
     "title": "Kursuskatalog",
