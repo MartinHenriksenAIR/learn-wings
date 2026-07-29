@@ -255,7 +255,8 @@
     "loadingQuiz": "Loading quiz...",
     "quizLoadFailed": "Unable to load the quiz",
     "quizNotReady": "This quiz isn't ready yet",
-    "quizNotReadyDescription": "There are no questions to answer here yet. You can continue to the next lesson."
+    "quizNotReadyDescription": "There are no questions to answer here yet. You can continue to the next lesson.",
+    "quizNotReadyDescriptionLast": "There are no questions to answer here yet. This quiz will appear here once it's ready."
   },
   "community": {
     "title": "Community",

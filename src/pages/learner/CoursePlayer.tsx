@@ -625,7 +625,11 @@ export default function CoursePlayer() {
               <div className="flex flex-col items-center justify-center rounded-[14px] border bg-muted/50 py-12 text-center">
                 <HelpCircle aria-hidden="true" className="mb-3 h-8 w-8 text-muted-foreground" />
                 <p className="font-semibold text-foreground">{t('coursePlayer.quizNotReady')}</p>
-                <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">{t('coursePlayer.quizNotReadyDescription')}</p>
+                <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">
+                  {currentIndex >= allLessons.length - 1
+                    ? t('coursePlayer.quizNotReadyDescriptionLast')
+                    : t('coursePlayer.quizNotReadyDescription')}
+                </p>
               </div>
             )}
 
