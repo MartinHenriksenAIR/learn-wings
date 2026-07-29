@@ -488,3 +488,75 @@ describe('LearnerCourses — progress bar + % on enrolled cards (#340)', () => {
     expect(screen.queryByText('NaN%')).toBeNull();
   });
 });
+
+describe('LearnerCourses — recency ordering of the enrolled group (#339)', () => {
+  const currentOrg = { id: 'org-1', name: 'Org One' };
+
+  // Backend returns courses ORDER BY c.title (alphabetical); mirror that here.
+  const apple = {
+    id: 'c-apple', title: 'Apple', description: 'a course', level: 'basic',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+  const banana = {
+    id: 'c-banana', title: 'Banana', description: 'b course', level: 'basic',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+  const cherry = {
+    id: 'c-cherry', title: 'Cherry', description: 'c course', level: 'basic',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+
+  const titleOrder = () =>
+    screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // assessment_level null → no "Recommended for you" section, so h3 course titles
+    // appear exactly once (only in the "All courses" grid) and order is unambiguous.
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+    });
+  });
+
+  it('orders enrolled courses by last_accessed_at DESC, independent of enrolled_at', async () => {
+    // Banana enrolled first but was accessed most recently → it leads. Ordering
+    // is by activity recency, not enrollment recency.
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [apple, banana, cherry],
+      enrollments: [
+        { id: 'e-apple', course_id: 'c-apple', status: 'enrolled', enrolled_at: '2026-01-01T00:00:00Z', completed_at: null, last_accessed_at: '2026-03-01T00:00:00Z' },
+        { id: 'e-banana', course_id: 'c-banana', status: 'enrolled', enrolled_at: '2026-01-02T00:00:00Z', completed_at: null, last_accessed_at: '2026-03-05T00:00:00Z' },
+        { id: 'e-cherry', course_id: 'c-cherry', status: 'completed', enrolled_at: '2026-01-03T00:00:00Z', completed_at: '2026-02-01T00:00:00Z', last_accessed_at: '2026-03-03T00:00:00Z' },
+      ],
+    });
+
+    renderCourses();
+
+    await screen.findByText('Apple');
+    // Most recent activity first: Banana (03-05), Cherry (03-03), Apple (03-01).
+    expect(titleOrder()).toEqual(['Banana', 'Cherry', 'Apple']);
+  });
+
+  it('falls back to enrolled_at when last_accessed_at is null', async () => {
+    // Banana has recent activity; Apple/Cherry have no activity yet (null) and fall
+    // back to enrolled_at, so a null-activity course never outranks an active one and
+    // the two null courses order by their own enrolled_at DESC (Cherry before Apple).
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [apple, banana, cherry],
+      enrollments: [
+        { id: 'e-apple', course_id: 'c-apple', status: 'enrolled', enrolled_at: '2026-01-20T00:00:00Z', completed_at: null, last_accessed_at: null },
+        { id: 'e-banana', course_id: 'c-banana', status: 'enrolled', enrolled_at: '2026-01-10T00:00:00Z', completed_at: null, last_accessed_at: '2026-02-01T00:00:00Z' },
+        { id: 'e-cherry', course_id: 'c-cherry', status: 'completed', enrolled_at: '2026-01-30T00:00:00Z', completed_at: '2026-02-15T00:00:00Z', last_accessed_at: null },
+      ],
+    });
+
+    renderCourses();
+
+    await screen.findByText('Apple');
+    // Banana (activity 02-01) leads; then null-activity courses by enrolled_at DESC:
+    // Cherry (enrolled 01-30) before Apple (enrolled 01-20).
+    expect(titleOrder()).toEqual(['Banana', 'Cherry', 'Apple']);
+  });
+});
