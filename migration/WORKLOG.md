@@ -1983,3 +1983,21 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors (**1970** warnings; the +2 vs the 1968 baseline are `@typescript-eslint/no-explicit-any` in the new **backend test** mocks, matching the pervasive functions-test mocking convention — the three `src/` files lint clean) · `tsc -p tsconfig.app.json` 0 · `npm test` **833 / 110** · `build` 0. functions: `build` 0 · `npm test` **2529 / 143** (3 skipped). Controller re-ran all gates from the worktree.
 
 **Deploy:** touches `functions/` + `src/`, so both the SWA and functions workflows ship on merge to `main`.
+
+## 2026-07-29 — #339 order enrolled catalog courses by recent activity (PR #350)
+
+**Who:** claude (Opus 4.8) with martin. Schema + backend + frontend. Third and largest of the sequential catalog issues, built on #338 + #340. **Landed via the controller** after the implementer subagent was cut off mid-run by an org spend-limit API error — the implementation was complete but uncommitted; the controller reviewed the diff, applied one robustness fix, re-ran all gates, and committed.
+
+**What:** the enrolled group in the learner catalog now orders by how recently the learner was last active in each course (most-recent first), replacing #338's interim `enrolled_at DESC`. "Active" = opening the course player **or** recording lesson activity (grooming decision).
+
+**How:** new nullable `enrollments.last_accessed_at timestamptz`. Two write signals stamp it: (1) a new **fire-and-forget** `touch-course` endpoint (`endpoint()` factory, barrel-registered, `profile.id`-scoped `UPDATE`) that `CoursePlayer` fires on entry in a **separate, non-awaited** effect — kept off the awaited render path per the issue's "must not block the player" requirement, a failed touch logged not surfaced; (2) `lesson-progress`, which after its critical progress upsert also stamps the enrollment for the lesson's course (course resolved via a `lessons → course_modules` subquery). `learner-courses` returns the column; `useLearnerCourses` surfaces it purely via the widened `Enrollment` type (no hook change). `Courses.tsx`'s enrolled comparator sorts `last_accessed_at` DESC, falling back to `enrolled_at` when null; enrolled-first, the stable alphabetical tail, and #340's bar are unchanged.
+
+**Controller review fix:** the `lesson-progress` recency stamp was a second un-guarded `await query()` after the committed progress upsert — a transient failure there would have 500'd an already-saved progress write and tripped #289's optimistic-rollback (false "save failed"). Wrapped it best-effort (log + swallow) so the non-essential stamp can never fail the critical save; added a test proving a stamp failure still returns 200.
+
+**Prod DB:** `migration/azure/09-enrollment-last-accessed.sql` (idempotent `ADD COLUMN IF NOT EXISTS`, folded into `01-schema.sql`) **must be applied to prod by martin BEFORE this deploys** — the function code references the column unconditionally. PR held as draft until then.
+
+**Tests:** `touch-course` (happy/400×2 no-DB/401/403 no-DB/500); `lesson-progress` (stamp fires profile-scoped; stamp failure still 200); `learner-courses` (SQL selects `last_accessed_at`); `Courses.test.tsx` (enrolled sort by `last_accessed_at` DESC independent of `enrolled_at`; null falls back to `enrolled_at`).
+
+**Verify:** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `npm test` **835 / 110** · `build` 0. functions `build` 0 · `npm test` **2540 / 144** (3 skipped; `registration-names` fleet guard green for `touch-course`). New `src/` files lint warning-free; +warnings are `no-explicit-any` in the new backend test mocks (functions-test convention). All gates re-run by the controller from the worktree.
+
+**Deploy:** touches `functions/` + `src/` → both workflows ship on merge, **after** the prod migration.
