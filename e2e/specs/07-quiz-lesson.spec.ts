@@ -188,9 +188,25 @@ test('a quiz lesson is never a dead end', async ({ page }) => {
   // response passed on that flash and then measured zero of all three states a moment later.
   // `waitForResponse` resolves strictly after `setQuizLoading(true)` ran, so it closes that
   // window; from here on `quizLoading` only ever goes false again with the answer in hand.
-  const quizLoaded = page.waitForResponse((response) => response.url().includes(QUIZ_ENDPOINT));
+  //
+  // Given the file's 30s read budget explicitly, not left on the config's 15s `actionTimeout`
+  // (which is what `waitForResponse` inherits with no `timeout` — playwright.config.ts:78): a
+  // cold Azure Functions start alone can eat 15s, so this — the wait every assertion below
+  // rests on — was the one most likely to time out on a cold boot, with Playwright's generic
+  // message. The `expect(..., message).resolves` wrapper (the suite's promise idiom, see
+  // 02-fence.spec.ts:123) awaits this same 30s and names the read on timeout, so a cold start
+  // reads as a slow endpoint rather than a quiz defect. The status is not asserted — any
+  // response closes the flash window; a bad one is diagnosed by the `loadFailed` branch below.
+  const quizLoaded = page.waitForResponse((response) => response.url().includes(QUIZ_ENDPOINT), {
+    timeout: QUIZ_READ_TIMEOUT,
+  });
   await openQuizLesson.click();
-  await quizLoaded;
+  await expect(
+    quizLoaded,
+    `${QUIZ_ENDPOINT} did not answer within ${QUIZ_READ_TIMEOUT / 1000}s after the "${QUIZ_LESSON}" lesson ` +
+      'was opened. This is the quiz read every assertion below gates on; a timeout here is a cold ' +
+      'Azure Functions start or a down endpoint, not a quiz-content defect.',
+  ).resolves.toBeTruthy();
 
   await expect(heading2(page, QUIZ_LESSON)).toBeVisible();
 
