@@ -1935,3 +1935,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **One bookkeeping failure to record:** the switcher issue was reported as filed under #323 when no issue was created — `gh issue create` printed a URL for an issue that does not exist. Caught by the final review, re-filed as **#335**. Worth remembering that a printed URL is not proof an issue exists.
 
 **Deploy:** none — the suite is test-only and touches no shipped code. `tsconfig.node.json` gained an `include` entry and `AGENTS.md`/`ci.yml` gained the type-check gate.
+
+## 2026-07-29 — #333 quiz "not ready" copy no longer promises a disabled next lesson (PR #345)
+
+**Who:** claude (Opus 4.8) with martin. Frontend-only. First of the app defects the #316 e2e suite surfaced (it asserts exactly this not-ready state) to be fixed.
+
+**The defect:** the #299 empty state read *"There are no questions to answer here yet. You can continue to the next lesson."* On the **last** lesson of a course there is no next lesson and the footer's Next control is disabled, so the copy instructed the learner to do something the UI won't permit — a dead-end message on the screen built specifically to prevent dead ends. #299's whole purpose was that a quiz lesson must never trap the learner; the nav fix worked, the copy overstated it.
+
+**The fix:** `CoursePlayer.tsx` selects the description by position, reusing the footer's own `currentIndex >= allLessons.length - 1` last-lesson test (the same one line 662 already uses for the submitted-quiz button). A following lesson → the unchanged wording still points to it; the last lesson → a new `quizNotReadyDescriptionLast` string that says something true (the quiz appears here once ready) and promises nothing the UI can't deliver. New key added to **both** `en` and `da`. The ternary sits **outside** `t()` so both keys stay static `t('literal')` call sites the #300 translation-key parity gate protects.
+
+**No e2e change needed.** `07-quiz-lesson.spec.ts` (#316) asserts only the **title** (`quizNotReady` = "This quiz isn't ready yet"), which is untouched — never the description this fix changes. That let #333 land independently of the concurrent e2e-hardening work (incl. #334, also in that spec); disjoint trees (`src/` vs `e2e/`), so merge order was free.
+
+**Tests:** two new `CoursePlayer.test.tsx` cases, one per branch — the next-lesson copy when a lesson follows, and the last-lesson copy (with Next asserted disabled) when the quiz is the only lesson. The `t` mock returns the key, so the cases assert on `coursePlayer.quizNotReadyDescription` vs `…DescriptionLast` (exact-match, so the shared prefix doesn't cross-match).
+
+**Verify:** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `npm test` **826 / 110** · `build` 0. functions untouched. PR CI all green (frontend + functions + build/deploy job).
+
+**Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.

@@ -719,9 +719,35 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
     };
   }
 
+  // Course whose only (and therefore last) lesson is a quiz, so the not-ready
+  // state has no next lesson to point at — the #333 dead-end case.
+  function courseDataQuizLast() {
+    return {
+      course: { id: 'c-1', title: 'Intro to AI', is_published: true },
+      modules: [
+        {
+          id: 'm-1', title: 'Module 1', sort_order: 0,
+          lessons: [
+            { id: 'l-1', title: 'Lesson 1', lesson_type: 'quiz', module_id: 'm-1', sort_order: 0 },
+          ],
+        },
+      ],
+      progressMap: {},
+      review: null,
+    };
+  }
+
   function setupQuiz(quizPayload: unknown) {
     mockCallApi.mockImplementation(async (url: string) => {
       if (url === '/api/course-player-data') return courseData();
+      if (url === '/api/quiz-by-lesson') return quizPayload;
+      return {};
+    });
+  }
+
+  function setupQuizLastLesson(quizPayload: unknown) {
+    mockCallApi.mockImplementation(async (url: string) => {
+      if (url === '/api/course-player-data') return courseDataQuizLast();
       if (url === '/api/quiz-by-lesson') return quizPayload;
       return {};
     });
@@ -749,6 +775,25 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
     // The empty-quiz Submit bug: the button must not exist (was enabled on 0 === 0).
     expect(screen.queryByRole('button', { name: /submitAnswers/i })).toBeNull();
     expect(screen.getByRole('button', { name: /common\.next/ })).toBeEnabled();
+  });
+
+  it('points the not-ready copy at the next lesson when one exists', async () => {
+    setupQuiz({ quiz: null, questions: [] });
+    renderPlayer();
+
+    // courseData()'s quiz is followed by a video lesson, so the copy may promise it.
+    expect(await screen.findByText('coursePlayer.quizNotReadyDescription')).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.quizNotReadyDescriptionLast')).toBeNull();
+  });
+
+  it('does not promise a next lesson in the not-ready copy on the last lesson (#333)', async () => {
+    setupQuizLastLesson({ quiz: null, questions: [] });
+    renderPlayer();
+
+    // The quiz is the only lesson, so Next is disabled — the copy must not send the learner onward.
+    expect(await screen.findByText('coursePlayer.quizNotReadyDescriptionLast')).toBeInTheDocument();
+    expect(screen.queryByText('coursePlayer.quizNotReadyDescription')).toBeNull();
+    expect(screen.getByRole('button', { name: /common\.next/ })).toBeDisabled();
   });
 
   it('renders a healthy quiz normally with a disabled Submit and no not-ready state or footer nav', async () => {

@@ -255,7 +255,8 @@
     "loadingQuiz": "Indlæser quiz...",
     "quizLoadFailed": "Quizzen kunne ikke indlæses",
     "quizNotReady": "Denne quiz er ikke klar endnu",
-    "quizNotReadyDescription": "Der er endnu ingen spørgsmål at besvare her. Du kan fortsætte til næste lektion."
+    "quizNotReadyDescription": "Der er endnu ingen spørgsmål at besvare her. Du kan fortsætte til næste lektion.",
+    "quizNotReadyDescriptionLast": "Der er endnu ingen spørgsmål at besvare her. Quizzen vises her, når den er klar."
   },
   "community": {
     "title": "Fællesskab",
