@@ -772,6 +772,7 @@
     "failuresTitle": "Failed enrollments",
     "unknownError": "Unknown error",
     "selectMemberLabel": "Select organization member",
+    "selectMemberPlaceholder": "Choose an organization member...",
     "selectCoursesLabel": "Select courses"
   },
   "quizEditor": {

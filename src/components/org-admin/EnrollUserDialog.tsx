@@ -238,7 +238,7 @@ export function EnrollUserDialog({
                 }}
               >
                 <SelectTrigger id="enroll-member">
-                  <SelectValue placeholder="Choose a team member..." />
+                  <SelectValue placeholder={t('enrollDialog.selectMemberPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {activeLearners.map((member) => (

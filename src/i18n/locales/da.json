@@ -772,6 +772,7 @@
     "failuresTitle": "Mislykkede tilmeldinger",
     "unknownError": "Ukendt fejl",
     "selectMemberLabel": "Vælg organisationsmedlem",
+    "selectMemberPlaceholder": "Vælg et organisationsmedlem...",
     "selectCoursesLabel": "Vælg kurser"
   },
   "quizEditor": {
