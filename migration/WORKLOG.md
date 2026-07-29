@@ -1866,3 +1866,21 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 813 pass · `build` exit 0. functions `build` exit 0 · `test` 2527 pass (3 skip). CI green on both required checks.
 
 **Deploy:** functions changed (`platform-settings-update`) → both workflows load-bearing. Announce on PR #328.
+
+## 2026-07-29 — Wire label↔input associations across the remaining authoring/form surfaces (#327)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**What.** Follow-up sweep from #325/#326. A `<Label>` with no `htmlFor` (and a control with no matching `id`) leaves a screen reader announcing the field with no name and makes clicking the label a no-op (WCAG 1.3.1 / 4.1.2). Wired the remaining surfaces to the pattern `CourseEditor` already uses. Frontend-only.
+
+**Done.**
+- **Field labels (htmlFor ↔ control id):** CoursesManager create dialog (thumbnail/title/description/level/language), AddExistingUserDialog (user, role), InviteUserDialog (role), EditOrganizationDialog (logo), OrganizationsManager (logo), PlatformAdminsSection (grant), Settings (profile photo), BulkInviteDialog (CSV file → its hidden `<input>`), EnrollUserDialog (member), QuizEditorDialog (passing score). The three shared upload components already forward an optional `id` to their hidden file input (#326); Radix `SelectTrigger` takes an `id`.
+- **Heading, not label:** captions that titled a group or a fixed value (so labelled no single control) became `<h3>`/`<h4>`/`<p>`, matching the CourseEditor editions precedent — QuizEditor "Questions"/"Question N", EnrollUserDialog "Select courses" (checkbox group), OrganizationsManager "Initial admin" (Tabs group), PlatformSettings fixed "Default role" (value is always Learner, no control). The quiz answer-options radio group gets its name via `aria-labelledby` (unique per question id).
+- **i18n:** hardcoded English label text moved to en+da — new `quizEditor.*` and `bulkInvite.*` namespaces, plus `enrollDialog.selectMemberLabel/selectMemberPlaceholder/selectCoursesLabel`. Used the convention-correct "organization member" (not "Team Member"); QuizEditorDialog gained `useTranslation`. Non-label hardcoded English in those files (buttons, messages) is deliberately out of scope.
+- **Tests:** the shared `src/test/select-mock.tsx` now renders `SelectTrigger` as a labelable `<button>` forwarding props (notably `id`), so `getByLabelText` resolves a select; verified against all 6 consumers. Added a `getByLabel`-based guard per surface that has a test file (9 surfaces) — each fails if the `htmlFor`/`id` is removed.
+
+**Review.** Independent code review (Opus 4.8, pr-review-toolkit): clean — no Critical/Important. Two Minor: (1) the enroll member-picker placeholder still said "team member" after the label rename → i18n'd to `enrollDialog.selectMemberPlaceholder`, convention-correct wording; (2) `QuizEditorDialog`'s `new-${Date.now()}` id minting is a pre-existing, UI-unreachable collision risk (saved questions use DB uuids) → left as-is, out of the label-association scope.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 110 files / 824 pass · `build` exit 0. `functions/` untouched (frontend-only).
+
+**Deploy:** frontend-only → the SWA workflow ships it; no functions deploy. Announce on PR #330.
