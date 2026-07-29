@@ -330,6 +330,122 @@ export async function assertFenced(page: Page, org: FencedOrg): Promise<void> {
 }
 
 /**
+ * The request-body keys the app carries an organization id under.
+ *
+ * Every backend call goes through `callApi`/`callApiRaw`, which POST a JSON body to
+ * `/api/<name>` (src/lib/api-client.ts). The org-scoped ones name that field `orgId`
+ * almost everywhere — invitation-create (OrgMembersTab.tsx:212), organization-delete
+ * (OrganizationDetail.tsx:293), generate-compliance-report (OrgAnalytics.tsx:152) and the
+ * org-scoped read hooks all use it — but a handful use the snake-case `org_id` instead
+ * (CoursePlayer's lesson-progress write, some community writes). The guard reads both, so a
+ * write cannot escape through whichever spelling the endpoint it happened to reach uses.
+ */
+const ORG_ID_BODY_KEYS = ['orgId', 'org_id'] as const;
+
+/** Every backend call, whether the deployed app's API base is same-origin or a function host. */
+const API_REQUEST = /\/api\//;
+
+/**
+ * The responses the fence's id can be read out of: the org list (`{ organizations: [...] }`,
+ * functions/organizations/index.ts:35,48) and the create response (`{ organization: {...} }`,
+ * functions/organization-create/index.ts:70), whose rows carry `id` and `slug`. Narrowed to
+ * `/api/organization…` so the listener never buffers an unrelated body — notably the binary
+ * compliance PDF at `/api/generate-compliance-report`, which is not an organization endpoint.
+ */
+const FENCE_ID_SOURCE = /\/api\/organization/;
+
+/**
+ * Make a write that escaped the fence abort at the network layer — the structural half of
+ * the fence, and the answer to #321.
+ *
+ * `gotoFenced`/`assertFenced` protect a journey that *remembers* to call them. This closes
+ * the gap they leave open: a forgetful author who reaches a page with a bare `page.goto` and
+ * then writes lands on whatever `OrgSelector` auto-selected — `orgs[0]`, the most recently
+ * created organization (OrgSelector.tsx:28,42; functions/organizations/index.ts:33) — and
+ * writes there silently. Installed on the page before the fixture hands it to the body, the
+ * guard turns that silent escape into an aborted request, which fails the journey's own
+ * write-success assertion instead of committing a row to another organization.
+ *
+ * **It can never abort a legitimate write, and that is the load-bearing property.** The
+ * fence's id is learned only by matching this run's unique, RUN_ID-derived slug against the
+ * organization endpoints' responses, so the stored id is either the fence's real id or
+ * not-yet-known — never another org's. A fenced journey's writes carry `currentOrg.id`, which
+ * is the fence, so each is allowed whether the id is known (`orgId === fenced`) or not-yet-
+ * known (nothing to compare against — fail open). A request with no orgId at all — org
+ * creation carries none — is always allowed. Only a *foreign* id, with the fence's own id
+ * already learned, is aborted.
+ *
+ * The id is learned through a passive `response` listener rather than by intercepting reads:
+ * GETs are never rewritten, no round-trip is added, and 02-fence's `pinFenceLast` — which
+ * reorders the org list — does not collide with it, because the listener reads the fulfilled
+ * response and keys on the slug a reorder leaves untouched. A non-GET that is a read behind a
+ * POST (many hooks are) carrying a foreign id is aborted too, deliberately: it only ever does
+ * so when the app is pointed at a foreign org, which is exactly the state to fail — and the
+ * one such call on any page the fence machinery reaches, `/api/org-settings`, defaults itself
+ * on rejection (usePlatformSettings.tsx), so a wrongly-fenced boot degrades rather than errors.
+ */
+async function installWriteFenceGuard(page: Page, org: FencedOrg): Promise<void> {
+  // A mutable box, like `PendingFence` below: the response listener fills it and the route
+  // handler reads it, two callbacks sharing one page's worth of state.
+  const fence: { id: string | null } = { id: null };
+
+  // Keyed on the slug, never on position or name, so the id stored is the fence's real id or
+  // nothing — the guard can never mistake another organization for the fence.
+  const rememberFenceId = (record: unknown): void => {
+    const candidate = record as { slug?: unknown; id?: unknown } | null;
+    if (candidate?.slug === org.slug && typeof candidate.id === 'string') {
+      fence.id = candidate.id;
+    }
+  };
+
+  page.on('response', async (response) => {
+    if (!FENCE_ID_SOURCE.test(response.url())) return;
+    let body: { organizations?: unknown; organization?: unknown };
+    try {
+      body = (await response.json()) as { organizations?: unknown; organization?: unknown };
+    } catch {
+      return; // not JSON (an error page, a redirect) — nothing to learn from it
+    }
+    if (Array.isArray(body.organizations)) {
+      body.organizations.forEach(rememberFenceId);
+    }
+    rememberFenceId(body.organization);
+  });
+
+  await page.route(API_REQUEST, async (route) => {
+    const request = route.request();
+    // Reads are not the escape #321 is about, and rewriting them would add a round-trip and
+    // collide with a spec that fulfils one itself (02-fence's pinFenceLast).
+    if (request.method() === 'GET') {
+      return route.fallback();
+    }
+
+    let orgId: string | undefined;
+    try {
+      const body = request.postDataJSON() as Record<string, unknown> | null;
+      for (const key of ORG_ID_BODY_KEYS) {
+        const value = body?.[key];
+        if (typeof value === 'string' && value.length > 0) {
+          orgId = value;
+          break;
+        }
+      }
+    } catch {
+      orgId = undefined; // a body callApi did not send as JSON carries no id to act on
+    }
+
+    // Present, and a known-different organization than the fence: the write escaped. Abort it,
+    // so the journey's own success assertion fails rather than the write landing in orgs[0]. No
+    // orgId (org creation), or an id equal to — or not yet distinguishable from — the fence, is
+    // allowed through.
+    if (orgId && fence.id && orgId !== fence.id) {
+      return route.abort('failed');
+    }
+    return route.fallback();
+  });
+}
+
+/**
  * Remove the fence, and confirm it is gone.
  *
  * Safe to run twice for the same RUN_ID, in either order with a failed attempt:
@@ -479,6 +595,14 @@ export const test = sessionTest.extend<{ fenceDelete: PendingFence; fencedOrg: F
       // discarding its return costs nothing.
       const org = fenceIdentity();
       fenceDelete.org = org;
+
+      // Installed before the first write and before the body ever runs, so every non-GET this
+      // page makes — the create below, the journey's writes, the delete in teardown — passes
+      // through it. Org creation carries no orgId and is allowed; the create response is where
+      // it first learns the fence's id. This is the structural backstop for #321: a journey
+      // that reaches a page with a bare `page.goto` and writes without re-fencing now aborts
+      // instead of writing into orgs[0].
+      await installWriteFenceGuard(page, org);
 
       await createFencedOrg(page);
       await use(org);
