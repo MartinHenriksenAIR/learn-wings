@@ -410,3 +410,81 @@ describe('LearnerCourses — enrolled-first ordering of the "All courses" grid (
     expect(titleOrder()).toEqual(['Cherry', 'Banana', 'Apple']);
   });
 });
+
+describe('LearnerCourses — progress bar + % on enrolled cards (#340)', () => {
+  const currentOrg = { id: 'org-1', name: 'Org One' };
+
+  const course = {
+    id: 'c-1', title: 'Intro to AI', description: 'Learn the basics', level: 'basic',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+    });
+  });
+
+  it('renders a progress bar with the rounded percentage on an in-progress enrolled card', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [course],
+      enrollments: [{ id: 'e-1', course_id: 'c-1', status: 'enrolled', enrolled_at: '2026-01-10T00:00:00Z', completed_at: null }],
+      progress: { 'c-1': { total: 3, completed: 2 } }, // 2/3 → 67%
+    });
+
+    renderCourses();
+
+    const bar = await screen.findByTestId('course-progress-c-1');
+    expect(bar).toBeInTheDocument();
+    // 2/3 rounds to 67%
+    expect(screen.getByText('67%')).toBeInTheDocument();
+    const fill = bar.querySelector('.bg-primary') as HTMLElement | null;
+    expect(fill).not.toBeNull();
+    expect(fill!.style.width).toBe('67%');
+  });
+
+  it('reads 100% on a completed card regardless of the raw counts', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [course],
+      enrollments: [{ id: 'e-1', course_id: 'c-1', status: 'completed', enrolled_at: '2026-01-10T00:00:00Z', completed_at: '2026-02-01T00:00:00Z' }],
+      progress: { 'c-1': { total: 5, completed: 2 } }, // completed status overrides → 100%
+    });
+
+    renderCourses();
+
+    expect(await screen.findByTestId('course-progress-c-1')).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
+  });
+
+  it('renders no progress bar on a not-enrolled card', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [course],
+      enrollments: [],
+      progress: {},
+    });
+
+    renderCourses();
+
+    // The Enroll CTA is present, but no progress bar is rendered.
+    expect(await screen.findByRole('button', { name: 'common.enroll' })).toBeInTheDocument();
+    expect(screen.queryByTestId('course-progress-c-1')).toBeNull();
+    expect(screen.queryByText('0%')).toBeNull();
+  });
+
+  it('shows 0% (no NaN) when an enrolled course has no lessons (total 0)', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [course],
+      enrollments: [{ id: 'e-1', course_id: 'c-1', status: 'enrolled', enrolled_at: '2026-01-10T00:00:00Z', completed_at: null }],
+      progress: { 'c-1': { total: 0, completed: 0 } },
+    });
+
+    renderCourses();
+
+    expect(await screen.findByTestId('course-progress-c-1')).toBeInTheDocument();
+    expect(screen.getByText('0%')).toBeInTheDocument();
+    expect(screen.queryByText('NaN%')).toBeNull();
+  });
+});
