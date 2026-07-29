@@ -1,8 +1,8 @@
 import { test as base, expect, type Page } from '@playwright/test';
 import type { ViewMode } from './auth';
 
-// Re-exported so specs get the view type from the fixture they already import.
-// Its home is ./auth, which needs it to pick the sidebar landmark to wait for.
+// Re-exported so specs have one import site for the fixture and its types.
+// Owned by ./auth, which needs it for its per-view sidebar-landmark table.
 export type { ViewMode };
 
 /**
