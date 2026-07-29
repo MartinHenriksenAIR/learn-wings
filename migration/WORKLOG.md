@@ -1867,6 +1867,27 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 
 **Deploy:** functions changed (`platform-settings-update`) → both workflows load-bearing. Announce on PR #328.
 
+## 2026-07-29 — Bind production domain www.ai-uddannelse.dk + ai-u.dk alias (#115, PR #331)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Goal.** Serve the app on a real domain instead of the default `black-forest-0d7f96c03.7.azurestaticapps.net`. Owner-chosen **Option B**: `www.ai-uddannelse.dk` is canonical; the bare apex `ai-uddannelse.dk` 301-forwards to it (GoDaddy can't ALIAS/ANAME an apex onto an SWA, and we deliberately did **not** migrate DNS to Azure). Mid-cutover the owner added a second short domain **`ai-u.dk`** as a pure redirect alias — apex + `www` both 301 → `https://www.ai-uddannelse.dk` (no serving, no code, no email).
+
+**Code — one line (PR #331).** Pinned `VITE_PLATFORM_BASE_URL=https://www.ai-uddannelse.dk` in the SWA workflow, but **only for the production `push` build** via a `github.event_name == 'push'` guard — PR preview builds keep `""` and fall back to `window.location.origin`, preserving #80 (previews mint invite links on their own host). The issue's original plan also called for adding `www` to a static `ALLOWED_LINK_DOMAINS` array in `send-invitation-email`, but that file had since been refactored to derive allowed link hosts dynamically from `ALLOWED_ORIGINS` (`allowedLinkDomains()`), so `www` is trusted automatically once CORS includes it — **no source edit needed there**. `STATIC_ASSETS_BASE_URL` left at the apex default (the optional www flip was skipped — one harmless apex→www hop for the email logo).
+
+**Owner-run cutover** (agent can't mutate prod Azure/DNS/Entra):
+1. `ALLOWED_ORIGINS` += `https://www.ai-uddannelse.dk` on `func-ai-education-migration` — feeds **both** CORS and the invite-link allowlist. Idempotent read-modify-write script; ran **first**.
+2. GoDaddy `ai-uddannelse.dk`: `www` CNAME → the SWA host; apex domain-forwarding → `https://www.ai-uddannelse.dk` (301, no masking). Email records (MX / SPF / DKIM / Resend TXT) left untouched.
+3. `az staticwebapp hostname set … www.ai-uddannelse.dk` — validated via the CNAME, managed DigiCert cert issued (status `Ready`).
+4. Entra `learn-wings`: added redirect URI `https://www.ai-uddannelse.dk` under the **Single-page application** platform (apex was already registered). SPA, not Web — the MSAL browser client redeems its token cross-origin with PKCE, which Entra only permits for the SPA client type (else `AADSTS9002326`).
+5. GoDaddy `ai-u.dk`: apex + `www` subdomain forwarding → `https://www.ai-uddannelse.dk` (301). GoDaddy auto-provisions the redirect's TLS cert (took ~tens of minutes).
+
+**Ordering gotcha.** Step 1 had to precede the merge/deploy: merging pins prod links to `www`, and if `www` weren't yet in `ALLOWED_ORIGINS`, the invite-email POST would 400. Sequenced accordingly.
+
+**Verify (post-deploy).** `www` serves HTTP 200 behind a valid `CN=www.ai-uddannelse.dk` DigiCert cert; the deployed JS bundle contains the pinned base URL (confirming the prod pin, not the empty preview fallback); apex + both `ai-u.dk` hosts 301 → www (GoDaddy emits an `http://www` Location that the SWA upgrades to https — one cosmetic extra hop). Owner smoke: Entra login on `www` OK; invitation email end-to-end OK.
+
+**Deploy:** merged @`8441d37`; SWA + functions workflows both green; smoke ok (announced on PR #331). Residual **optional** optimization (not part of #115): re-link the SWA backend + `VITE_API_BASE_URL=""` for same-origin `/api` — cross-origin works fine as-is.
+
 ## 2026-07-29 — Wire label↔input associations across the remaining authoring/form surfaces (#327)
 
 **Who:** claude (Opus 4.8) + martin.
