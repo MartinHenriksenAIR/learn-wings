@@ -770,7 +770,18 @@
     "failedTitle": "Tilmelding mislykkedes",
     "failedDescription": "Ingen kurser kunne tilmeldes. Se årsagerne nedenfor.",
     "failuresTitle": "Mislykkede tilmeldinger",
-    "unknownError": "Ukendt fejl"
+    "unknownError": "Ukendt fejl",
+    "selectMemberLabel": "Vælg organisationsmedlem",
+    "selectCoursesLabel": "Vælg kurser"
+  },
+  "quizEditor": {
+    "passingScoreLabel": "Beståelsesgrænse (%)",
+    "questionsHeading": "Spørgsmål",
+    "questionHeading": "Spørgsmål {{number}}",
+    "answerOptionsLabel": "Svarmuligheder (vælg det rigtige svar)"
+  },
+  "bulkInvite": {
+    "uploadCsvLabel": "Upload CSV-fil"
   },
   "platformSettings": {
     "title": "Platformindstillinger",

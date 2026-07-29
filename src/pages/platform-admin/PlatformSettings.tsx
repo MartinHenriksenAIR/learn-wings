@@ -217,7 +217,10 @@ export default function PlatformSettings() {
           <Card>
             <CardContent className="space-y-[18px] px-[26px] py-6">
               <div className="rounded-xl border border-[#eceef3] bg-muted/50 p-4">
-                <Label className="text-[13.5px] font-bold">{t('platformSettings.userAccess.defaultRole')}</Label>
+                {/* Not a field label: the default role is fixed to Learner (see
+                    the note), so there is no control to associate — a heading,
+                    not a <Label>. (#327) */}
+                <p className="text-[13.5px] font-bold leading-none">{t('platformSettings.userAccess.defaultRole')}</p>
                 <p className="mt-1 text-[11.5px] text-muted-foreground">
                   {t('platformSettings.userAccess.defaultRoleNote')}
                 </p>

@@ -304,9 +304,10 @@ export function BulkInviteDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Upload CSV File</Label>
+            <Label htmlFor="bulk-invite-csv">{t('bulkInvite.uploadCsvLabel')}</Label>
             <input
               ref={fileInputRef}
+              id="bulk-invite-csv"
               type="file"
               accept=".csv"
               onChange={handleFileChange}

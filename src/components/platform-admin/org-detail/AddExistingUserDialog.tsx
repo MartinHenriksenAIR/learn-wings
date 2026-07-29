@@ -71,9 +71,9 @@ export function AddExistingUserDialog({
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>{t('orgDetail.user')}</Label>
+            <Label htmlFor="add-existing-user">{t('orgDetail.user')}</Label>
             <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-              <SelectTrigger>
+              <SelectTrigger id="add-existing-user">
                 <SelectValue placeholder={t('orgDetail.selectUser')} />
               </SelectTrigger>
               <SelectContent>
@@ -92,9 +92,9 @@ export function AddExistingUserDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>{t('orgDetail.role')}</Label>
+            <Label htmlFor="add-existing-role">{t('orgDetail.role')}</Label>
             <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as OrgRole)}>
-              <SelectTrigger>
+              <SelectTrigger id="add-existing-role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

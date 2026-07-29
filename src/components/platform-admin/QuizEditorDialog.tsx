@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -62,6 +63,7 @@ export function QuizEditorDialog({
   onOpenChange,
   onQuizSaved,
 }: QuizEditorDialogProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [passingScore, setPassingScore] = useState(70);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -266,8 +268,9 @@ export function QuizEditorDialog({
         ) : (
           <div className="space-y-6 py-4">
             <div className="flex items-center gap-4">
-              <Label className="whitespace-nowrap">Passing Score (%)</Label>
+              <Label htmlFor="quiz-passing-score" className="whitespace-nowrap">{t('quizEditor.passingScoreLabel')}</Label>
               <Input
+                id="quiz-passing-score"
                 type="number"
                 min={0}
                 max={100}
@@ -282,7 +285,9 @@ export function QuizEditorDialog({
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Questions</Label>
+                {/* A section heading over the questions list, not a field
+                    label — a heading, not a <Label>. (#327) */}
+                <h3 className="text-base font-semibold">{t('quizEditor.questionsHeading')}</h3>
                 <Badge variant="outline">{questions.length} question(s)</Badge>
               </div>
 
@@ -306,7 +311,7 @@ export function QuizEditorDialog({
                           <GripVertical className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center justify-between">
-                              <Label className="text-sm font-medium">Question {qIndex + 1}</Label>
+                              <h4 className="text-sm font-medium">{t('quizEditor.questionHeading', { number: qIndex + 1 })}</h4>
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -328,10 +333,14 @@ export function QuizEditorDialog({
                       </CardHeader>
                       <CardContent className="pt-0">
                         <div className="pl-8 space-y-3">
-                          <Label className="text-sm text-muted-foreground">
-                            Answer Options (select the correct answer)
-                          </Label>
+                          {/* Names the radio group as a whole (not one input),
+                              so it titles the group via aria-labelledby rather
+                              than a <Label htmlFor>. (#327) */}
+                          <p id={`quiz-options-label-${question.id}`} className="text-sm text-muted-foreground">
+                            {t('quizEditor.answerOptionsLabel')}
+                          </p>
                           <RadioGroup
+                            aria-labelledby={`quiz-options-label-${question.id}`}
                             value={question.options.find((o) => o.is_correct)?.id || ''}
                             onValueChange={(value) => setCorrectOption(qIndex, value)}
                           >

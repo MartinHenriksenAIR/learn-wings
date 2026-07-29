@@ -85,6 +85,13 @@ describe('Settings — profile save feedback (#20)', () => {
     });
     expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }));
   });
+
+  it('associates the profile-photo label with its upload input (#327)', () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+    const input = screen.getByLabelText('settings.profilePhoto');
+    expect(input).toHaveAttribute('id', 'profile-photo');
+    expect(input).toHaveAttribute('type', 'file');
+  });
 });
 
 describe('Settings — assessment card (#117)', () => {

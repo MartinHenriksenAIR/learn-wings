@@ -204,4 +204,15 @@ describe('PlatformSettings', () => {
     expect(screen.getByRole('button', { name: 'common.saved' }).className).toMatch(/bg-success/);
     expect(screen.queryByRole('button', { name: 'platformSettings.userAccess.save' })).not.toBeInTheDocument();
   });
+
+  it('the fixed default-role caption is a heading, not a form label (#327)', async () => {
+    mockCallApi.mockResolvedValueOnce(successResponse);
+
+    renderPage();
+
+    // The caption renders (the default role is fixed to Learner)...
+    expect(await screen.findByText('platformSettings.userAccess.defaultRole')).toBeInTheDocument();
+    // ...but it labels no control, so it must not masquerade as a form label.
+    expect(screen.queryByLabelText('platformSettings.userAccess.defaultRole')).toBeNull();
+  });
 });
