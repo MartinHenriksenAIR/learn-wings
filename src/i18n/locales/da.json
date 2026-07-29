@@ -770,7 +770,19 @@
     "failedTitle": "Tilmelding mislykkedes",
     "failedDescription": "Ingen kurser kunne tilmeldes. Se årsagerne nedenfor.",
     "failuresTitle": "Mislykkede tilmeldinger",
-    "unknownError": "Ukendt fejl"
+    "unknownError": "Ukendt fejl",
+    "selectMemberLabel": "Vælg organisationsmedlem",
+    "selectMemberPlaceholder": "Vælg et organisationsmedlem...",
+    "selectCoursesLabel": "Vælg kurser"
+  },
+  "quizEditor": {
+    "passingScoreLabel": "Beståelsesgrænse (%)",
+    "questionsHeading": "Spørgsmål",
+    "questionHeading": "Spørgsmål {{number}}",
+    "answerOptionsLabel": "Svarmuligheder (vælg det rigtige svar)"
+  },
+  "bulkInvite": {
+    "uploadCsvLabel": "Upload CSV-fil"
   },
   "platformSettings": {
     "title": "Platformindstillinger",
@@ -780,21 +792,9 @@
     "retry": "Prøv igen",
     "saveFailed": "Kunne ikke gemme",
     "tabs": {
-      "branding": "Branding",
       "userAccess": "Brugere & adgang",
-      "email": "E-mail",
       "features": "Funktioner",
       "platformAdmins": "Platformadministratorer"
-    },
-    "branding": {
-      "platformName": "Platformnavn",
-      "primaryColor": "Primær farve",
-      "accentColor": "Accentfarve",
-      "sidebarPrimaryColor": "Sidebjælkens primære farve",
-      "sidebarAccentColor": "Sidebjælkens accentfarve",
-      "logoUrl": "Logo-URL",
-      "faviconUrl": "Favicon-URL",
-      "save": "Gem branding"
     },
     "userAccess": {
       "defaultRole": "Standardrolle for nye brugere",
@@ -804,26 +804,6 @@
       "allowSelfRegistration": "Tillad selvregistrering",
       "allowSelfRegistrationHint": "Tillad brugere at tilmelde sig uden en invitation.",
       "save": "Gem brugerindstillinger"
-    },
-    "email": {
-      "notConfiguredWarning": "SMTP er ikke konfigureret — invitations-e-mails sendes ikke.",
-      "fromName": "Afsendernavn",
-      "fromEmail": "Afsender-e-mail",
-      "smtpHost": "SMTP-vært",
-      "smtpPort": "SMTP-port",
-      "smtpUsername": "Brugernavn",
-      "smtpPassword": "Adgangskode",
-      "encryption": "Kryptering",
-      "encryptionStarttls": "STARTTLS",
-      "encryptionSslTls": "SSL/TLS",
-      "encryptionNone": "Ingen",
-      "testConnection": "Test forbindelse",
-      "save": "Gem e-mailindstillinger",
-      "testSuccessTitle": "SMTP-test lykkedes",
-      "testSuccessDescription": "Forbindelse og godkendelse lykkedes.",
-      "testFailedTitle": "SMTP-test mislykkedes",
-      "testFailedDescription": "Kunne ikke oprette forbindelse til SMTP-serveren.",
-      "testFailedFallback": "Forbindelsestesten mislykkedes"
     },
     "features": {
       "note": "Hvis du deaktiverer en funktion her, skjules den for alle organisationer, uanset deres tilsidesættelser.",

@@ -66,7 +66,7 @@ export function EditOrganizationDialog({
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>{t('orgDetail.logo')}</Label>
+            <Label htmlFor="edit-org-logo">{t('orgDetail.logo')}</Label>
             <div className="border-2 border-dashed rounded-lg p-4 mb-3">
               <div className="flex flex-col items-center gap-2 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
@@ -82,6 +82,7 @@ export function EditOrganizationDialog({
               </div>
             </div>
             <FileUpload
+              id="edit-org-logo"
               assetType="org-logo"
               folder={orgId}
               accept="image"

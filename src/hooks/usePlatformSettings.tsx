@@ -11,21 +11,10 @@ interface FeatureSettings {
   exercises_enabled: boolean;
 }
 
-interface BrandingSettings {
-  platform_name: string;
-  primary_color: string;
-  accent_color: string;
-  sidebar_primary_color: string;
-  sidebar_accent_color: string;
-  logo_url: string | null;
-  favicon_url: string | null;
-}
-
 interface PlatformSettingsContextType {
   features: FeatureSettings;
   platformFeatures: FeatureSettings;
   orgFeatures: Partial<FeatureSettings> | null;
-  branding: BrandingSettings;
   isLoading: boolean;
   refetch: () => Promise<void>;
 }
@@ -39,49 +28,10 @@ const defaultFeatures: FeatureSettings = {
   exercises_enabled: false,
 };
 
-const defaultBranding: BrandingSettings = {
-  platform_name: 'AIR Academy',
-  primary_color: '#10298f',
-  accent_color: '#eef1fb',
-  sidebar_primary_color: '#10298f',
-  sidebar_accent_color: '#eef1fb',
-  logo_url: null,
-  favicon_url: null,
-};
-
-const hexToHslValue = (hex: string, fallback: string) => {
-  const cleanHex = hex.replace('#', '').trim();
-  const valid = /^[0-9A-Fa-f]{6}$/.test(cleanHex);
-  if (!valid) return fallback;
-
-  const r = parseInt(cleanHex.slice(0, 2), 16) / 255;
-  const g = parseInt(cleanHex.slice(2, 4), 16) / 255;
-  const b = parseInt(cleanHex.slice(4, 6), 16) / 255;
-
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-
-  let h = 0;
-  if (delta !== 0) {
-    if (max === r) h = ((g - b) / delta) % 6;
-    else if (max === g) h = (b - r) / delta + 2;
-    else h = (r - g) / delta + 4;
-  }
-  h = Math.round(h * 60);
-  if (h < 0) h += 360;
-
-  const l = (max + min) / 2;
-  const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
-
-  return `${h} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-};
-
 const PlatformSettingsContext = createContext<PlatformSettingsContextType>({
   features: defaultFeatures,
   platformFeatures: defaultFeatures,
   orgFeatures: null,
-  branding: defaultBranding,
   isLoading: true,
   refetch: async () => {},
 });
@@ -90,13 +40,11 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
   const { user, currentOrg } = useAuth();
   const [platformFeatures, setPlatformFeatures] = useState<FeatureSettings>(defaultFeatures);
   const [orgFeatures, setOrgFeatures] = useState<Partial<FeatureSettings> | null>(null);
-  const [branding, setBranding] = useState<BrandingSettings>(defaultBranding);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = async () => {
     if (!user) {
       setPlatformFeatures(defaultFeatures);
-      setBranding(defaultBranding);
       setOrgFeatures(null);
       setIsLoading(false);
       return;
@@ -115,17 +63,13 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
 
       const data = platformResult.settings;
       let nextFeatures = defaultFeatures;
-      let nextBranding = defaultBranding;
       data.forEach((setting) => {
         const value = setting.value as Record<string, unknown>;
         if (setting.key === 'features') {
           nextFeatures = { ...nextFeatures, ...(value as Partial<FeatureSettings>) };
-        } else if (setting.key === 'branding') {
-          nextBranding = { ...nextBranding, ...(value as Partial<BrandingSettings>) };
         }
       });
       setPlatformFeatures(nextFeatures);
-      setBranding(nextBranding);
 
       const nextOrgFeatures = (orgResult.settings?.features as Partial<FeatureSettings> | undefined) ?? null;
       setOrgFeatures(nextOrgFeatures);
@@ -134,7 +78,6 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       // catch only fires on a processing bug — don't swallow it silently.
       console.error('usePlatformSettings: failed to process settings', err);
       setPlatformFeatures(defaultFeatures);
-      setBranding(defaultBranding);
       setOrgFeatures(null);
     } finally {
       setIsLoading(false);
@@ -154,29 +97,12 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
     exercises_enabled: platformFeatures.exercises_enabled && (orgFeatures?.exercises_enabled ?? true),
   };
 
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty('--primary', hexToHslValue(branding.primary_color, '228 80% 31%'));
-    root.style.setProperty('--accent', hexToHslValue(branding.accent_color, '226 62% 96%'));
-    root.style.setProperty('--sidebar-primary', hexToHslValue(branding.sidebar_primary_color, '228 80% 31%'));
-    root.style.setProperty('--sidebar-ring', hexToHslValue(branding.sidebar_primary_color, '228 80% 31%'));
-    root.style.setProperty('--sidebar-accent', hexToHslValue(branding.sidebar_accent_color, '226 62% 96%'));
-
-    const faviconEl = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (faviconEl) {
-      const defaultHref = faviconEl.dataset.defaultHref || faviconEl.href;
-      faviconEl.dataset.defaultHref = defaultHref;
-      faviconEl.href = branding.favicon_url || defaultHref;
-    }
-  }, [branding]);
-
   return (
     <PlatformSettingsContext.Provider
       value={{
         features,
         platformFeatures,
         orgFeatures,
-        branding,
         isLoading,
         refetch: fetchSettings,
       }}

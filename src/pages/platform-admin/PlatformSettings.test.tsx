@@ -25,37 +25,24 @@ import PlatformSettings from './PlatformSettings';
 
 const mockCallApi = callApi as ReturnType<typeof vi.fn>;
 
-// Fixture — obviously fake values; SMTP credentials are not realistic secrets
-const serverBrandingRow = {
-  key: 'branding',
+// Fixture — the User & Access panel is the default tab. require_email_verification
+// defaults to false, so a server value of `true` is distinguishable from the
+// seed-default the component starts with.
+const serverUserAccessRow = {
+  key: 'user_access',
   value: {
-    platform_name: 'Server Name',
-    primary_color: '#111111',
-    accent_color: '#222222',
-    sidebar_primary_color: '#333333',
-    sidebar_accent_color: '#444444',
-    logo_url: null,
-    favicon_url: null,
-  },
-};
-
-const serverEmailRow = {
-  key: 'email',
-  value: {
-    from_name: 'Test Sender',
-    from_email: 'sender@example.test',
-    smtp_configured: false,
-    smtp_host: 'smtp.example.test',
-    smtp_port: 587,
-    smtp_username: 'fixture-user',
-    smtp_password: 'fixture-not-a-secret',
-    smtp_encryption: 'starttls' as const,
+    default_role: 'learner',
+    require_email_verification: true,
+    allow_self_registration: true,
   },
 };
 
 const successResponse = {
-  settings: [serverBrandingRow, serverEmailRow],
+  settings: [serverUserAccessRow],
 };
+
+const verificationSwitch = () =>
+  screen.getByRole('switch', { name: 'platformSettings.userAccess.requireEmailVerification' });
 
 function renderPage() {
   // `retry: false` so hook queries surface load errors immediately (matching
@@ -75,44 +62,34 @@ describe('PlatformSettings', () => {
     vi.clearAllMocks();
   });
 
-  it('round-trip: re-mount shows server value, not a locally-edited value or blank (#40 acceptance)', async () => {
+  it('round-trip: re-mount shows server value, not a locally-edited value (#40 acceptance)', async () => {
     mockCallApi.mockResolvedValue(successResponse);
 
     // First mount
     const { unmount } = renderPage();
 
-    // Wait for the server value, not merely for the textbox to exist (#305).
-    // The component seeds local state with defaults and copies query.data in via
-    // an effect, so there is a render in which the textbox exists and still
-    // holds 'AIR Academy'. Awaiting existence can resolve inside that window;
-    // awaiting the value cannot. Labels are i18n keys here (the mocked t returns
-    // the key).
+    // Wait for the server value, not merely for the control to exist (#305). The
+    // component seeds local state with defaults (require_email_verification:
+    // false) and copies query.data in via an effect, so there is a render in
+    // which the switch exists and is still unchecked. Awaiting existence can
+    // resolve inside that window; awaiting the checked state cannot.
     await waitFor(() => {
-      expect(
-        screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' }),
-      ).toHaveValue('Server Name');
+      expect(verificationSwitch()).toBeChecked();
     });
 
-    const input = screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' });
-    fireEvent.change(input, { target: { value: 'Edited Name' } });
-    expect(input).toHaveValue('Edited Name');
+    fireEvent.click(verificationSwitch());
+    expect(verificationSwitch()).not.toBeChecked();
 
     unmount();
 
     renderPage();
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' }),
-      ).toHaveValue('Server Name');
+      expect(verificationSwitch()).toBeChecked();
     });
-
-    const freshInput = screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' });
-    expect(freshInput).not.toHaveValue('Edited Name');
-    expect(freshInput).not.toHaveValue('');
   });
 
-  it('failed read: shows error EmptyState, no textboxes, no save buttons, no write call', async () => {
+  it('failed read: shows error EmptyState, no form controls, no save buttons, no write call', async () => {
     mockCallApi.mockRejectedValue(new Error('Network error'));
 
     renderPage();
@@ -123,7 +100,7 @@ describe('PlatformSettings', () => {
 
     expect(screen.getByText('platformSettings.loadFailedTitle')).toBeInTheDocument();
     expect(screen.getByText('platformSettings.loadFailedDescription')).toBeInTheDocument();
-    expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
 
     // Save labels are i18n keys (platformSettings.*.save); only the retry button should exist.
     const buttons = screen.getAllByRole('button');
@@ -153,9 +130,7 @@ describe('PlatformSettings', () => {
 
     // Await the value, not the element (#305) — see the round-trip test above.
     await waitFor(() => {
-      expect(
-        screen.getByRole('textbox', { name: 'platformSettings.branding.platformName' }),
-      ).toHaveValue('Server Name');
+      expect(verificationSwitch()).toBeChecked();
     });
   });
 
@@ -177,7 +152,7 @@ describe('PlatformSettings', () => {
       expect(screen.getByText('platformSettings.loadFailedTitle')).toBeInTheDocument();
     });
 
-    expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
 
     const updateCalls = mockCallApi.mock.calls.filter(
       (args: unknown[]) => args[0] === '/api/platform-settings-update'
@@ -185,48 +160,59 @@ describe('PlatformSettings', () => {
     expect(updateCalls).toHaveLength(0);
   });
 
-  it('save guarded: after successful load, Save Branding calls platform-settings-update with branding key', async () => {
+  it('save guarded: after successful load, Save calls platform-settings-update with the user_access key', async () => {
     mockCallApi.mockResolvedValue(successResponse);
 
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'platformSettings.branding.save' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'platformSettings.userAccess.save' })).toBeInTheDocument();
     });
 
     mockCallApi.mockClear();
     mockCallApi.mockResolvedValue({});
 
-    fireEvent.click(screen.getByRole('button', { name: 'platformSettings.branding.save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'platformSettings.userAccess.save' }));
 
-    // Sends only the branding panel's fields under `value` (#90 merge: the
-    // server never receives other keys, so it can't clobber them).
+    // Sends only the panel's fields under `value` (#90 merge: the server never
+    // receives other keys, so it can't clobber them).
     await waitFor(() => {
       expect(mockCallApi).toHaveBeenCalledWith(
         '/api/platform-settings-update',
-        expect.objectContaining({ key: 'branding' })
+        expect.objectContaining({ key: 'user_access' })
       );
     });
   });
 
-  it('per-panel morph: successful branding save morphs the button into the Saved state', async () => {
+  it('per-panel morph: a successful save morphs the button into the Saved state', async () => {
     mockCallApi.mockResolvedValue(successResponse);
 
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'platformSettings.branding.save' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'platformSettings.userAccess.save' })).toBeInTheDocument();
     });
 
     mockCallApi.mockClear();
     mockCallApi.mockResolvedValue({});
 
-    fireEvent.click(screen.getByRole('button', { name: 'platformSettings.branding.save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'platformSettings.userAccess.save' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'common.saved' })).toBeInTheDocument();
     });
     expect(screen.getByRole('button', { name: 'common.saved' }).className).toMatch(/bg-success/);
-    expect(screen.queryByRole('button', { name: 'platformSettings.branding.save' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'platformSettings.userAccess.save' })).not.toBeInTheDocument();
+  });
+
+  it('the fixed default-role caption is a heading, not a form label (#327)', async () => {
+    mockCallApi.mockResolvedValueOnce(successResponse);
+
+    renderPage();
+
+    // The caption renders (the default role is fixed to Learner)...
+    expect(await screen.findByText('platformSettings.userAccess.defaultRole')).toBeInTheDocument();
+    // ...but it labels no control, so it must not masquerade as a form label.
+    expect(screen.queryByLabelText('platformSettings.userAccess.defaultRole')).toBeNull();
   });
 });

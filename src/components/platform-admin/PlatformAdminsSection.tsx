@@ -109,11 +109,11 @@ export function PlatformAdminsSection({
       </div>
 
       <div className="space-y-2 border-t border-[#eceef3] pt-5">
-        <Label className="text-[13px] font-bold text-[#4a4f60]">{t('platformAdmins.grantLabel')}</Label>
+        <Label htmlFor="grant-admin-user" className="text-[13px] font-bold text-[#4a4f60]">{t('platformAdmins.grantLabel')}</Label>
         <p className="text-[11.5px] text-muted-foreground">{t('platformAdmins.grantHint')}</p>
         <div className="flex flex-wrap items-center gap-3 pt-1">
           <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-            <SelectTrigger className="w-[260px]">
+            <SelectTrigger id="grant-admin-user" className="w-[260px]">
               <SelectValue placeholder={t('platformAdmins.selectUser')} />
             </SelectTrigger>
             <SelectContent>

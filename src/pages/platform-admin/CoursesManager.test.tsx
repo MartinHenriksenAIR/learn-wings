@@ -281,4 +281,22 @@ describe('CoursesManager — language field (#191)', () => {
       }),
     );
   });
+
+  it('associates the create-dialog title label with its input (#327)', async () => {
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/courses-admin') return { courses: [existingCourse], accessRecords: [] };
+      if (path === '/api/organizations') return { organizations: [] };
+      throw new Error(`Unexpected call: ${path}`);
+    });
+
+    renderPage();
+
+    // Load one course so the empty-state "New Course" button is absent and the
+    // header trigger is the only one, then open the create dialog.
+    await screen.findByText('Existing Course');
+    fireEvent.click(screen.getByRole('button', { name: /new course/i }));
+
+    const title = await screen.findByLabelText('Title');
+    expect(title).toHaveAttribute('id', 'course-create-title');
+  });
 });

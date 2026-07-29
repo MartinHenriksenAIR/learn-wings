@@ -46,7 +46,7 @@ describe('platform-settings-update', () => {
   });
 
   it('returns 403 for non-admin without querying the DB', async () => {
-    const res = await handler(baseReq({ key: 'branding', value: {} }), {} as any);
+    const res = await handler(baseReq({ key: 'features', value: {} }), {} as any);
 
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
@@ -65,7 +65,7 @@ describe('platform-settings-update', () => {
   it('returns 400 when value is null', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
-    const res = await handler(baseReq({ key: 'branding', value: null }), {} as any);
+    const res = await handler(baseReq({ key: 'features', value: null }), {} as any);
 
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string).error).toMatch(/plain object/);
@@ -74,7 +74,7 @@ describe('platform-settings-update', () => {
   it('returns 400 when value is an array', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
-    const res = await handler(baseReq({ key: 'branding', value: ['a', 'b'] }), {} as any);
+    const res = await handler(baseReq({ key: 'features', value: ['a', 'b'] }), {} as any);
 
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string).error).toMatch(/plain object/);
@@ -83,7 +83,7 @@ describe('platform-settings-update', () => {
   it('returns 400 when value is a string', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
-    const res = await handler(baseReq({ key: 'branding', value: 'some string' }), {} as any);
+    const res = await handler(baseReq({ key: 'features', value: 'some string' }), {} as any);
 
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string).error).toMatch(/plain object/);
@@ -92,7 +92,7 @@ describe('platform-settings-update', () => {
   it('returns 400 when value contains an unknown field', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
-    const res = await handler(baseReq({ key: 'branding', value: { logo: 'new-logo.png' } }), {} as any);
+    const res = await handler(baseReq({ key: 'features', value: { logo: 'new-logo.png' } }), {} as any);
 
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string).error).toMatch(/unknown field "logo"/);
@@ -109,32 +109,22 @@ describe('platform-settings-update', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when smtp_encryption is not a known mode', async () => {
+  it('returns 400 when default_role is not a known mode', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
 
-    const res = await handler(baseReq({ key: 'email', value: { smtp_encryption: 'tls' } }), {} as any);
+    const res = await handler(baseReq({ key: 'user_access', value: { default_role: 'superuser' } }), {} as any);
 
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "smtp_encryption"/);
-    expect(mockQueryOne).not.toHaveBeenCalled();
-  });
-
-  it('returns 400 when smtp_port is not a number', async () => {
-    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-
-    const res = await handler(baseReq({ key: 'email', value: { smtp_port: '587' } }), {} as any);
-
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "smtp_port"/);
+    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "default_role"/);
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
   it('updates the setting via a jsonb merge and returns the updated row', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    const updatedRow = { key: 'branding', value: { logo_url: 'new-logo.png' } };
+    const updatedRow = { key: 'features', value: { quizzes_enabled: false } };
     mockQueryOne.mockResolvedValueOnce(updatedRow);
 
-    const res = await handler(baseReq({ key: 'branding', value: { logo_url: 'new-logo.png' } }), {} as any);
+    const res = await handler(baseReq({ key: 'features', value: { quizzes_enabled: false } }), {} as any);
 
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
@@ -147,43 +137,38 @@ describe('platform-settings-update', () => {
     // Merge semantics pinned: stored value is the base, body fields overlay it —
     // absent fields keep their stored values (no more blind replace).
     expect(sql).toContain('value = value || $2::jsonb');
-    expect(params[0]).toBe('branding');
-    expect(params[1]).toBe(JSON.stringify({ logo_url: 'new-logo.png' }));
+    expect(params[0]).toBe('features');
+    expect(params[1]).toBe(JSON.stringify({ quizzes_enabled: false }));
     expect(params[2]).toBe('p1');
   });
 
-  it('a partial body merges only the fields present (stored SMTP config survives)', async () => {
+  it('a partial body merges only the fields present (stored config survives)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    const updatedRow = { key: 'email', value: { from_name: 'New Name', smtp_host: 'smtp.kept.example' } };
+    const updatedRow = { key: 'user_access', value: { require_email_verification: true, allow_self_registration: true } };
     mockQueryOne.mockResolvedValueOnce(updatedRow);
 
-    const res = await handler(baseReq({ key: 'email', value: { from_name: 'New Name' } }), {} as any);
+    const res = await handler(baseReq({ key: 'user_access', value: { require_email_verification: true } }), {} as any);
 
     expect(res.status).toBe(200);
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('value = value || $2::jsonb');
-    expect(params[1]).toBe(JSON.stringify({ from_name: 'New Name' }));
+    expect(params[1]).toBe(JSON.stringify({ require_email_verification: true }));
   });
 
   it('a full-body write passes validation and merges all fields', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    const fullEmail = {
-      from_name: 'AIR Academy',
-      from_email: 'noreply@example.com',
-      smtp_configured: true,
-      smtp_host: 'smtp.example.com',
-      smtp_port: 587,
-      smtp_username: 'smtp-user',
-      smtp_password: 'secret',
-      smtp_encryption: 'starttls',
+    const fullUserAccess = {
+      default_role: 'learner',
+      require_email_verification: true,
+      allow_self_registration: false,
     };
-    mockQueryOne.mockResolvedValueOnce({ key: 'email', value: fullEmail });
+    mockQueryOne.mockResolvedValueOnce({ key: 'user_access', value: fullUserAccess });
 
-    const res = await handler(baseReq({ key: 'email', value: fullEmail }), {} as any);
+    const res = await handler(baseReq({ key: 'user_access', value: fullUserAccess }), {} as any);
 
     expect(res.status).toBe(200);
     const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
-    expect(params[1]).toBe(JSON.stringify(fullEmail));
+    expect(params[1]).toBe(JSON.stringify(fullUserAccess));
   });
 
   it('returns 404 when the setting key does not exist in the DB', async () => {
@@ -200,7 +185,7 @@ describe('platform-settings-update', () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockRejectedValueOnce(new Error('connection refused'));
 
-    const res = await handler(baseReq({ key: 'email', value: { smtp_host: 'x' } }), { error: vi.fn() } as any);
+    const res = await handler(baseReq({ key: 'features', value: { quizzes_enabled: true } }), { error: vi.fn() } as any);
 
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });

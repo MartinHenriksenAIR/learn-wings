@@ -206,8 +206,9 @@ export default function Settings() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-bold text-[#4a4f60]">{t('settings.profilePhoto')}</Label>
+              <Label htmlFor="profile-photo" className="text-xs font-bold text-[#4a4f60]">{t('settings.profilePhoto')}</Label>
               <FileUpload
+                id="profile-photo"
                 assetType="avatar"
                 accept="image"
                 onChange={handleAvatarChange}

@@ -6,7 +6,7 @@ export default endpoint('platform-settings', async ({ profile, reply }) => {
     // RLS parity: the original Supabase RLS restricted platform_settings SELECT to platform admins only.
     // Non-admins receive an empty array (not 403) because the frontend hook runs for every authenticated
     // user and treats empty settings as "use client-side defaults". A 403 would break normal users.
-    // This also prevents leaking SMTP credentials stored in the 'email' settings key to non-admins.
+    // This also keeps any sensitive values in the settings rows from leaking to non-admins.
     return reply(200, { settings: [] });
   }
 

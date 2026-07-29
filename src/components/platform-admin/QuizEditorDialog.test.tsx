@@ -12,6 +12,11 @@ vi.mock('@/lib/api-client', () => ({
 // --- mock sonner toast ---
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
+// --- i18n echo: t() returns the key (the dialog's labels are the only t() calls). ---
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
 // Radix Dialog uses a Portal — renders into document.body which is in scope in jsdom.
 
 import { QuizEditorDialog } from './QuizEditorDialog';
@@ -152,5 +157,22 @@ describe('QuizEditorDialog — passingScore', () => {
     const input2 = await screen.findByRole('spinbutton');
     // Should be reset to default 70, not carried over from lesson-a
     expect((input2 as HTMLInputElement).value).toBe('70');
+  });
+});
+
+describe('QuizEditorDialog — label associations (#327)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('associates the passing-score label with its input', async () => {
+    mockCallApi.mockResolvedValueOnce(emptyQuizResponse);
+
+    renderDialog();
+
+    // The label must resolve to exactly one control — the passing-score input.
+    const input = await screen.findByLabelText('quizEditor.passingScoreLabel');
+    expect(input).toHaveAttribute('id', 'quiz-passing-score');
+    expect(input).toBe(screen.getByRole('spinbutton'));
   });
 });

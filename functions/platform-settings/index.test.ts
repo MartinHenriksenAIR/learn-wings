@@ -48,8 +48,8 @@ describe('platform-settings', () => {
   it('returns all settings for platform admin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([
-      { key: 'branding', value: { logo: 'x' } },
-      { key: 'email', value: { smtp_host: 'smtp.example.com' } },
+      { key: 'user_access', value: { allow_self_registration: true } },
+      { key: 'features', value: { certificates_enabled: true } },
     ]);
 
     const res = await handler(baseReq({}), {} as any);

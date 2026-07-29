@@ -123,9 +123,9 @@ export function InviteUserDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label>{t('orgDetail.role')}</Label>
+            <Label htmlFor="invite-role">{t('orgDetail.role')}</Label>
             <Select value={role} onValueChange={(v) => setRole(v as OrgRole)}>
-              <SelectTrigger>
+              <SelectTrigger id="invite-role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

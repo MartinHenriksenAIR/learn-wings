@@ -3,8 +3,9 @@ import { Award, Check, Download, Loader2 } from 'lucide-react';
 import { Enrollment, Course, Profile } from '@/lib/types';
 import { useTranslation } from 'react-i18next';
 import { formatDate } from '@/lib/date-locale';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { cn } from '@/lib/utils';
+
+const PLATFORM_NAME = 'AIR Academy';
 
 interface CertificateCardProps {
   enrollment: Enrollment & { course: Course };
@@ -17,7 +18,6 @@ interface CertificateCardProps {
 
 export function CertificateCard({ enrollment, profile, downloading, saved, onDownload }: CertificateCardProps) {
   const { t, i18n } = useTranslation();
-  const { branding } = usePlatformSettings();
   const completedOn = formatDate(new Date(enrollment.completed_at!), 'P', i18n.language);
 
   return (
@@ -42,7 +42,7 @@ export function CertificateCard({ enrollment, profile, downloading, saved, onDow
           </span>
           <span className="mb-2 block text-xs font-bold">{enrollment.course?.title}</span>
           <span className="block text-[10px] text-[#9aa0af]">
-            {branding.platform_name} · {completedOn}
+            {PLATFORM_NAME} · {completedOn}
           </span>
         </div>
       </div>

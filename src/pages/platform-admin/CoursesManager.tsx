@@ -310,10 +310,11 @@ export default function CoursesManager() {
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>{t('coursesManager.thumbnail')}</Label>
+            <Label htmlFor="course-create-thumbnail">{t('coursesManager.thumbnail')}</Label>
             {/* No maxSizeMB: the image cap is the server's, and FileUpload
                 defaults to it (src/lib/upload-limits.ts). */}
             <FileUpload
+              id="course-create-thumbnail"
               folder="thumbnails"
               accept="image"
               value={thumbnailUrl}
@@ -321,17 +322,17 @@ export default function CoursesManager() {
             />
           </div>
           <div className="space-y-2">
-            <Label>{t('coursesManager.titleLabel')}</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('coursesManager.titlePlaceholder')} />
+            <Label htmlFor="course-create-title">{t('coursesManager.titleLabel')}</Label>
+            <Input id="course-create-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('coursesManager.titlePlaceholder')} />
           </div>
           <div className="space-y-2">
-            <Label>{t('coursesManager.descriptionLabel')}</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('coursesManager.descriptionPlaceholder')} />
+            <Label htmlFor="course-create-description">{t('coursesManager.descriptionLabel')}</Label>
+            <Textarea id="course-create-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('coursesManager.descriptionPlaceholder')} />
           </div>
           <div className="space-y-2">
-            <Label>{t('coursesManager.levelLabel')}</Label>
+            <Label htmlFor="course-create-level">{t('coursesManager.levelLabel')}</Label>
             <Select value={level} onValueChange={(v) => setLevel(v as CourseLevel)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="course-create-level"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="basic">{t('courses.levels.basic')}</SelectItem>
                 <SelectItem value="intermediate">{t('courses.levels.intermediate')}</SelectItem>
@@ -340,9 +341,9 @@ export default function CoursesManager() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>{t('coursesManager.languageLabel')}</Label>
+            <Label htmlFor="course-create-language">{t('coursesManager.languageLabel')}</Label>
             <Select value={language} onValueChange={(v) => setLanguage(v as 'en' | 'da')}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="course-create-language"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="da">{t('languages.da')}</SelectItem>
                 <SelectItem value="en">{t('languages.en')}</SelectItem>

@@ -88,6 +88,16 @@ describe('InviteUserDialog — seat cap', () => {
   });
 });
 
+describe('InviteUserDialog — label associations (#327)', () => {
+  it('associates the role label with its select control', () => {
+    const usage = getSeatUsage({ activeMembers: 2, pendingInvites: 1, seatLimit: 10 });
+    render(
+      <InviteUserDialog open onOpenChange={noop} orgName="Acme" seatUsage={usage} onSubmit={noop} pending={false} />,
+    );
+    expect(screen.getByLabelText('orgDetail.role')).toHaveAttribute('id', 'invite-role');
+  });
+});
+
 describe('InviteUserDialog — language pick', () => {
   it('includes the language in the submit payload, defaulting to the UI language', () => {
     const usage = getSeatUsage({ activeMembers: 2, pendingInvites: 1, seatLimit: 10 });

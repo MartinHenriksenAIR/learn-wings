@@ -1794,6 +1794,117 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 
 **Deploy:** functions changed → both workflows load-bearing. Announce on PR #314.
 
+## 2026-07-28 — Remove dead Email/SMTP tab from Platform Settings (#317)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Problem.** Platform Settings → Email showed a permanent, misleading "SMTP is not configured — invitation emails will not be sent" banner that was decoupled from reality. Transactional email is sent via **Resend** (ADR-0009), not SMTP; the banner gated on `!email.smtp_configured`, a flag that defaulted to `false` and only flipped `true` if an admin ran the "Test connection" probe — so it alarmed admins even though prod invite delivery was confirmed working (Closes #22; #225/PR #231). Worse, "testing" an unrelated SMTP server would *clear* the warning while telling the admin nothing true about delivery. The `smtp_*` fields, `from_name`/`from_email`, `smtp_configured`, and the `test-smtp-connection` endpoint were all dead Lovable/Supabase-era config that no send path reads.
+
+**Decision — Option A (remove the tab entirely), owner-confirmed.** `from_*` were dead too, so the whole tab was dead; email is a fixed system integration (Resend, hardcoded sender per ADR-0009), not an admin-configurable thing. Aligned with ADR-0009, so no new ADR. This also settles the **Email** half of the parked discussion #170 (recorded there; the Branding half stays open + `blocked`).
+
+**Done.**
+- **Frontend:** removed the Email tab, the `EmailSettings` type, `defaultEmail`, the `email`/`testingSmtp` state, the `email` effect case, `handleTestSmtpConnection`, the tab-nav entry, and now-unused imports (`Select*`, `toast`, `Mail`) from `PlatformSettings.tsx`; shrank the test fixture; swept the dead `platformSettings.email.*` + `tabs.email` i18n keys in `en` + `da`.
+- **Backend:** deleted `functions/test-smtp-connection/` (index + test) and the now-orphaned `functions/shared/net-guard` (index + test — its only consumer was the SMTP endpoint, added in #267); removed the barrel import; dropped the `email` key + its field shapes (and the now-unused `isFiniteNumber` helper) from `platform-settings-update`, reworking the affected validator tests onto live keys (`user_access.default_role` covers the `isOneOf` path). Reworded two comments in `platform-settings`/`seat-pricing` that referenced dead "SMTP credentials".
+- **Seed:** dropped the dead `email` row from `migration/azure/02-seed.sql` (surfaced by code review — a fresh DB no longer carries it). **No prod DB migration** — the existing prod `email` row is harmless orphaned JSONB.
+- **Docs:** dropped the `test-smtp-connection` row from `migration/azure/README.md`; removed the stale "Add `resend-api-key`" USER action in STATUS.html (set + verified end-to-end). ADR-0014/ADR-0015 mention the endpoint but are append-only history — left untouched.
+
+**Review.** Independent code review (Opus 4.8, pr-review-toolkit): **no findings at/above threshold, clean to merge**; its one optional observation (the dead seed row) was then fixed.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 812 pass · `build` exit 0. functions `build` exit 0 · `test` 2527 pass (3 skip) — incl. the `registration-names` fleet guard (226) confirming clean endpoint removal. CI green on all required checks.
+
+**Deploy:** functions changed → both workflows load-bearing. Announce on PR #322.
+
+## 2026-07-28 — Org-detail page rendered the org name in two competing `<h1>`s (#320, PR #324)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Problem.** `/app/admin/platform/organizations/:id` rendered the org name as **two** `<h1>`s: `OrganizationDetail`'s main branch passed `AppLayout title={org.name}` (AppLayout renders `title` as the page `<h1>`) **and** rendered `OrgDetailHeader`, which carries its own `<h1>{org.name}`. Wrong document outline, a screen reader with no single "what page am I on", the name shown twice visibly, and an ambiguous `getByRole('heading', { level: 1 })` — the last is how it surfaced during the #316 e2e write-fence work. Low user-visible impact (both say the same thing); an a11y/semantics bug. `afk`-labelled.
+
+**Fix.** Dropped `title={org.name}` from the main-branch `AppLayout` so `OrgDetailHeader`'s `<h1>` is the page's single heading; the loading branch keeps its `title` (it has no in-page header). This is the convention the sibling platform-admin pages already use (`OrganizationsManager`, `CoursesManager`, #101 — same explanatory comment). Chosen over the issue's *suggested* demote-`OrgDetailHeader`-to-`<h2>` because it matches existing code **and** removes the visible name-shown-twice redundancy. `OrgDetailHeader`'s `<h1>` (org name) survives, so #316's `getByRole('heading', { level: 1 })` fence assertion still holds — against a different element. Audited the tree for the same double-`<h1>` shape (layout `title` + own header component): only these three pages qualify, and the other two were already correct.
+
+**Test.** Added a `#320` regression test to `OrganizationDetail.test.tsx`: upgraded the file's `AppLayout` mock to render `title` as `<h1>` (the faithful mock the #101 guards use), then asserted exactly one `Acme Corp` heading and that it is an `<h1>`. Mutation-checked — re-adding `title` makes it fail with "got 2".
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 110 files / 813 pass · `build` exit 0. `functions/` untouched (frontend-only); CI ran the functions gate green anyway.
+
+**Deploy:** frontend-only → the SWA workflow ships it; no functions deploy. Announce on PR #324.
+
+## 2026-07-28 — CourseEditor field labels not associated with their inputs (#325, PR #326)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Problem.** `CourseEditor.tsx` had **zero** `htmlFor` attributes — every `<Label>` was visually adjacent to its field but not programmatically tied to it. Screen readers announced each field with no name, clicking a label did not focus its input, and `page.getByLabel(...)` resolved to zero elements (which is how it surfaced, during the #316 e2e course-lifecycle work). WCAG 1.3.1 / 4.1.2. `afk`-labelled. The correct pattern already existed in `OrganizationsManager.tsx`'s org-create dialog; this file had simply diverged.
+
+**Fix.** Wired **every** labelled field in the course editor via `htmlFor`↔`id`, not just the six the issue enumerated — the course-details form (Title, Description, Thumbnail, Level, Language) *and* the module/lesson dialogs (Module Title, Lesson Title, Type, Duration, Document/Video File, content text; the three mutually-exclusive `lesson-content` branches share one id). The three shared upload components (`FileUpload`, `AzureDocumentUpload`, `AzureVideoUpload`) gained an optional `id?: string` prop forwarded to their hidden `<input type="file">`, so a `<Label htmlFor>` names the picker (label-click opens the dialog). The "editions" title labelled a *section* (a list + a link control), not a single field, so it became an `<h3>`; the link-target Radix select got its own `aria-label`. No new i18n strings (existing keys reused).
+
+**Test.** New guards in `CourseEditor.test.tsx` resolve each field **through its label** — `getByLabelText` for native inputs, name-scoped `getByRole('combobox', …)` for the Radix selects — across both the details form and the module/lesson dialogs. Stripping any `htmlFor` fails a matching assertion. (Also coordinates with #316: its title-field locator can now become `getByLabel('Title')`.)
+
+**Sweep (per AC).** Grepped the other authoring surfaces for the same divergence; found it in ~12 more files (`QuizEditorDialog` — which also hardcodes non-i18n label text — `CoursesManager`, several org-detail/enroll dialogs, settings). Filed as **#327** rather than folded in, to keep this PR reviewable.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 110 files / 815 pass (2 new) · `build` exit 0. `functions/` untouched (frontend-only).
+
+**Deploy:** frontend-only → the SWA workflow ships it; no functions deploy. Announce on PR #326.
+
+## 2026-07-28 — Remove platform Branding entirely from Platform Settings (#170)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Decision — remove branding entirely, owner-confirmed.** Issue #170 parked the "keep / rework / remove Branding & Email tabs" question. The Email half was settled by #317/PR #322 (removed). For the **Branding** half the owner chose the deepest of three options: remove not just the editing tab but the whole platform-branding concept, so the app falls back to its built-in navy theme. What made this bigger than the Email removal: branding was **not** dead — the stored `branding` platform-setting was read by the theming context and drove the live CSS theme (colors + favicon) plus the certificate footer name. So this removes a live reader, not merely dead config.
+
+**Done.**
+- **Frontend tab:** removed the Branding tab from `PlatformSettings.tsx` — the `BrandingSettings` type, `defaultBranding`, the `branding` state + load-effect case, `brandingColors`, the render block, the `Palette` import, and `branding` from the `SettingsKey`/`SettingsValue` unions + the tabs array; the default active tab moves `'branding'` → `'user_access'`.
+- **Theming reader:** removed branding from `usePlatformSettings.tsx` — the `BrandingSettings` interface, `defaultBranding`, `hexToHslValue`, the `branding` context field + state, the fetch-merge for the `'branding'` key, and the `useEffect` that pushed CSS vars (`--primary`/`--accent`/`--sidebar-*`) + the favicon href. The provider still owns `features`. All five CSS vars it set have matching navy `:root` defaults in `src/index.css` (identical to the effect's own fallbacks), so the app stays navy with no JS — and dark mode no longer has the light-navy values force-inlined over it. Favicon reverts to the static `/favicon.png` in `index.html` (`favicon_url` was always null).
+- **Certificate:** `CertificateCard`'s hover-preview footer used `branding.platform_name`; now a module const `PLATFORM_NAME = 'AIR Academy'` (the server-side `generate-certificate` PDF never read branding).
+- **Backend:** dropped the `branding` key + field shapes from `platform-settings-update` (`ALLOWED_KEYS`/`FIELD_SHAPES`/error message) — the write path was dead once the tab was gone. GET `platform-settings` is key-agnostic and untouched.
+- **Seed:** removed the `branding` row from `migration/azure/02-seed.sql`. **No prod DB migration** — an existing prod `branding` row is harmless orphaned JSONB (the frontend ignores unknown keys; the update endpoint now rejects `branding` at the allowlist), same posture as #322's email row.
+- **i18n:** swept `tabs.branding` + the `platformSettings.branding.*` block in `en` + `da`.
+- **Tests:** retargeted the branding-vehicled tests onto live keys — `PlatformSettings.test.tsx` drives the `user_access` panel's switches (round-trip / failed-read / retry / save-guard / morph); `usePlatformSettings.test.tsx` rewritten to cover the surviving `features` behavior; `platform-settings-update`/`platform-settings`/`usePlatformSettingsAdmin`/`CertificateCard` fixtures moved off the `branding` key.
+
+**Untouched (deliberately):** the unrelated **org/community branding-asset** system — `BrandingAvatar`, `useSignedBrandingUrl`, `functions/branding-asset-url`, org `logo_url` — is a different "branding" (signed org logos + user avatars, #162/#165/#180) and stays intact.
+
+**Review.** Independent code review (Opus 4.8, pr-review-toolkit): clean — one Minor (a merge-comment still using "stored branding colors" as its example → reworded to "the other feature flags"), fixed. Confirmed the navy-fallback reasoning, the untouched asset system, and that the retargeted tests still reach the checks they name.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 813 pass · `build` exit 0. functions `build` exit 0 · `test` 2527 pass (3 skip). CI green on both required checks.
+
+**Deploy:** functions changed (`platform-settings-update`) → both workflows load-bearing. Announce on PR #328.
+
+## 2026-07-29 — Bind production domain www.ai-uddannelse.dk + ai-u.dk alias (#115, PR #331)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**Goal.** Serve the app on a real domain instead of the default `black-forest-0d7f96c03.7.azurestaticapps.net`. Owner-chosen **Option B**: `www.ai-uddannelse.dk` is canonical; the bare apex `ai-uddannelse.dk` 301-forwards to it (GoDaddy can't ALIAS/ANAME an apex onto an SWA, and we deliberately did **not** migrate DNS to Azure). Mid-cutover the owner added a second short domain **`ai-u.dk`** as a pure redirect alias — apex + `www` both 301 → `https://www.ai-uddannelse.dk` (no serving, no code, no email).
+
+**Code — one line (PR #331).** Pinned `VITE_PLATFORM_BASE_URL=https://www.ai-uddannelse.dk` in the SWA workflow, but **only for the production `push` build** via a `github.event_name == 'push'` guard — PR preview builds keep `""` and fall back to `window.location.origin`, preserving #80 (previews mint invite links on their own host). The issue's original plan also called for adding `www` to a static `ALLOWED_LINK_DOMAINS` array in `send-invitation-email`, but that file had since been refactored to derive allowed link hosts dynamically from `ALLOWED_ORIGINS` (`allowedLinkDomains()`), so `www` is trusted automatically once CORS includes it — **no source edit needed there**. `STATIC_ASSETS_BASE_URL` left at the apex default (the optional www flip was skipped — one harmless apex→www hop for the email logo).
+
+**Owner-run cutover** (agent can't mutate prod Azure/DNS/Entra):
+1. `ALLOWED_ORIGINS` += `https://www.ai-uddannelse.dk` on `func-ai-education-migration` — feeds **both** CORS and the invite-link allowlist. Idempotent read-modify-write script; ran **first**.
+2. GoDaddy `ai-uddannelse.dk`: `www` CNAME → the SWA host; apex domain-forwarding → `https://www.ai-uddannelse.dk` (301, no masking). Email records (MX / SPF / DKIM / Resend TXT) left untouched.
+3. `az staticwebapp hostname set … www.ai-uddannelse.dk` — validated via the CNAME, managed DigiCert cert issued (status `Ready`).
+4. Entra `learn-wings`: added redirect URI `https://www.ai-uddannelse.dk` under the **Single-page application** platform (apex was already registered). SPA, not Web — the MSAL browser client redeems its token cross-origin with PKCE, which Entra only permits for the SPA client type (else `AADSTS9002326`).
+5. GoDaddy `ai-u.dk`: apex + `www` subdomain forwarding → `https://www.ai-uddannelse.dk` (301). GoDaddy auto-provisions the redirect's TLS cert (took ~tens of minutes).
+
+**Ordering gotcha.** Step 1 had to precede the merge/deploy: merging pins prod links to `www`, and if `www` weren't yet in `ALLOWED_ORIGINS`, the invite-email POST would 400. Sequenced accordingly.
+
+**Verify (post-deploy).** `www` serves HTTP 200 behind a valid `CN=www.ai-uddannelse.dk` DigiCert cert; the deployed JS bundle contains the pinned base URL (confirming the prod pin, not the empty preview fallback); apex + both `ai-u.dk` hosts 301 → www (GoDaddy emits an `http://www` Location that the SWA upgrades to https — one cosmetic extra hop). Owner smoke: Entra login on `www` OK; invitation email end-to-end OK.
+
+**Deploy:** merged @`8441d37`; SWA + functions workflows both green; smoke ok (announced on PR #331). Residual **optional** optimization (not part of #115): re-link the SWA backend + `VITE_API_BASE_URL=""` for same-origin `/api` — cross-origin works fine as-is.
+
+## 2026-07-29 — Wire label↔input associations across the remaining authoring/form surfaces (#327)
+
+**Who:** claude (Opus 4.8) + martin.
+
+**What.** Follow-up sweep from #325/#326. A `<Label>` with no `htmlFor` (and a control with no matching `id`) leaves a screen reader announcing the field with no name and makes clicking the label a no-op (WCAG 1.3.1 / 4.1.2). Wired the remaining surfaces to the pattern `CourseEditor` already uses. Frontend-only.
+
+**Done.**
+- **Field labels (htmlFor ↔ control id):** CoursesManager create dialog (thumbnail/title/description/level/language), AddExistingUserDialog (user, role), InviteUserDialog (role), EditOrganizationDialog (logo), OrganizationsManager (logo), PlatformAdminsSection (grant), Settings (profile photo), BulkInviteDialog (CSV file → its hidden `<input>`), EnrollUserDialog (member), QuizEditorDialog (passing score). The three shared upload components already forward an optional `id` to their hidden file input (#326); Radix `SelectTrigger` takes an `id`.
+- **Heading, not label:** captions that titled a group or a fixed value (so labelled no single control) became `<h3>`/`<h4>`/`<p>`, matching the CourseEditor editions precedent — QuizEditor "Questions"/"Question N", EnrollUserDialog "Select courses" (checkbox group), OrganizationsManager "Initial admin" (Tabs group), PlatformSettings fixed "Default role" (value is always Learner, no control). The quiz answer-options radio group gets its name via `aria-labelledby` (unique per question id).
+- **i18n:** hardcoded English label text moved to en+da — new `quizEditor.*` and `bulkInvite.*` namespaces, plus `enrollDialog.selectMemberLabel/selectMemberPlaceholder/selectCoursesLabel`. Used the convention-correct "organization member" (not "Team Member"); QuizEditorDialog gained `useTranslation`. Non-label hardcoded English in those files (buttons, messages) is deliberately out of scope.
+- **Tests:** the shared `src/test/select-mock.tsx` now renders `SelectTrigger` as a labelable `<button>` forwarding props (notably `id`), so `getByLabelText` resolves a select; verified against all 6 consumers. Added a `getByLabel`-based guard per surface that has a test file (9 surfaces) — each fails if the `htmlFor`/`id` is removed.
+
+**Review.** Independent code review (Opus 4.8, pr-review-toolkit): clean — no Critical/Important. Two Minor: (1) the enroll member-picker placeholder still said "team member" after the label rename → i18n'd to `enrollDialog.selectMemberPlaceholder`, convention-correct wording; (2) `QuizEditorDialog`'s `new-${Date.now()}` id minting is a pre-existing, UI-unreachable collision risk (saved questions use DB uuids) → left as-is, out of the label-association scope.
+
+**Verify:** root `lint` 0 errors · `tsc` exit 0 · `test` 110 files / 824 pass · `build` exit 0. `functions/` untouched (frontend-only).
+
+**Deploy:** frontend-only → the SWA workflow ships it; no functions deploy. Announce on PR #330.
 ## 2026-07-27/29 — Playwright end-to-end suite, #124 rescoped and shipped (PR #316)
 
 **Who:** claude (Opus 5) as controller + ten implementer/reviewer subagent pairs, with martin deciding scope and policy. Rescopes **#124 "FULL End to End Testing"** — unbounded, past its April due date — into a concrete suite.

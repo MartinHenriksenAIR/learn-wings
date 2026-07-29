@@ -123,29 +123,10 @@ INSERT INTO public.quiz_attempts (id, org_id, user_id, quiz_id, score, passed, f
 -- migrations' original defaults).
 -- ---------------------------------------------------------------------
 INSERT INTO public.platform_settings (key, value) VALUES
-  ('branding', '{
-     "platform_name": "AIR Academy",
-     "primary_color": "#6366f1",
-     "accent_color": "#10b981",
-     "sidebar_primary_color": "#10b981",
-     "sidebar_accent_color": "#1f2937",
-     "logo_url": null,
-     "favicon_url": null
-   }'::jsonb),
   ('user_access', '{
      "default_role": "learner",
      "require_email_verification": false,
      "allow_self_registration": true
-   }'::jsonb),
-  ('email', '{
-     "from_name": "AIR Academy",
-     "from_email": null,
-     "smtp_configured": false,
-     "smtp_host": "",
-     "smtp_port": 587,
-     "smtp_username": "",
-     "smtp_password": "",
-     "smtp_encryption": "starttls"
    }'::jsonb),
   ('features', '{
      "certificates_enabled": true,
