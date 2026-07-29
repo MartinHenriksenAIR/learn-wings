@@ -28,6 +28,15 @@ for (const { seed, language, signInLabel } of cases) {
     // default, which is how two earlier locators here matched the wrong element.
     await expect(page.getByRole('button', { name: signInLabel, exact: true })).toBeVisible();
     // Guards #311 in a real browser: the document must declare the language it renders.
-    await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe(seed);
+    //
+    // Read through a locator rather than `page.evaluate(() => document.documentElement.lang)`.
+    // The two are equivalent at runtime — `lang` is a reflected attribute, so the property and
+    // the attribute are the same value — but the evaluate form needs the DOM lib in scope to
+    // typecheck, and this tree checks `e2e/` under tsconfig.node.json, whose `lib` is Node-only
+    // (ES2023). Adding DOM there to satisfy one browser-side callback would also hand `document`
+    // to the suite's genuinely Node-side files — the fixtures, the setup project, vite.config.ts
+    // — where referencing it typechecks and then fails at runtime. The locator keeps the check
+    // honest for the whole project, and `toHaveAttribute` retries where `poll` had to be told to.
+    await expect(page.locator('html')).toHaveAttribute('lang', seed);
   });
 }

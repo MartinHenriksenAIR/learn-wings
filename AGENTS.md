@@ -31,6 +31,7 @@ For genuinely tiny single-edit changes, do them inline; the skill itself signals
 - Root: `npm run lint` · `npm test` · `npx tsc --noEmit -p tsconfig.app.json` · `npm run build`
 - `functions/`: `npm run build` · `npm test`
 - CI (`.github/workflows/ci.yml`) runs the same gates on every PR.
+- `npm run e2e` — Playwright end-to-end suite against the **deployed** app with a real Entra login and real writes. **On-demand only; deliberately not a CI gate and not part of `npm test`.** See `e2e/README.md`.
 
 ## Conventions
 - `.claude/rules/frontend.md` and `.claude/rules/functions.md` hold the hard-won per-tree conventions — read them before touching either tree.
