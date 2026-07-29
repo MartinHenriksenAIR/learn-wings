@@ -326,3 +326,87 @@ describe('LearnerCourses — recommended section', () => {
     expect(enrolledBadges[0]).toHaveClass('left-3');
   });
 });
+
+describe('LearnerCourses — enrolled-first ordering of the "All courses" grid (#338)', () => {
+  const currentOrg = { id: 'org-1', name: 'Org One' };
+
+  // Backend returns courses ORDER BY c.title (alphabetical); mirror that here.
+  const apple = {
+    id: 'c-apple', title: 'Apple', description: 'a course', level: 'basic',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+  const banana = {
+    id: 'c-banana', title: 'Banana', description: 'b course', level: 'basic',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+  const cherry = {
+    id: 'c-cherry', title: 'Cherry', description: 'c course', level: 'basic',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+  const date = {
+    id: 'c-date', title: 'Date', description: 'd course', level: 'advanced',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+
+  // banana = enrolled (older), cherry = completed (newer) — both count as "enrolled".
+  const enrollments = [
+    { id: 'e-banana', course_id: 'c-banana', status: 'enrolled', enrolled_at: '2026-01-10T00:00:00Z', completed_at: null },
+    { id: 'e-cherry', course_id: 'c-cherry', status: 'completed', enrolled_at: '2026-01-20T00:00:00Z', completed_at: '2026-02-01T00:00:00Z' },
+  ];
+
+  const titleOrder = () =>
+    screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // assessment_level null → no "Recommended for you" section, so h3 course titles
+    // appear exactly once (only in the "All courses" grid) and order is unambiguous.
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+    });
+  });
+
+  it('sorts enrolled (enrolled OR completed) courses first, by enrolled_at DESC, non-enrolled after in alphabetical order', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [apple, banana, cherry, date],
+      enrollments,
+    });
+
+    renderCourses();
+
+    await screen.findByText('Apple');
+    // Enrolled first by enrolled_at DESC (Cherry 01-20, Banana 01-10),
+    // then non-enrolled preserving the backend's alphabetical order (Apple, Date).
+    expect(titleOrder()).toEqual(['Cherry', 'Banana', 'Apple', 'Date']);
+  });
+
+  it('keeps non-enrolled courses in their incoming alphabetical order when nothing is enrolled', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [apple, banana, cherry, date],
+      enrollments: [],
+    });
+
+    renderCourses();
+
+    await screen.findByText('Apple');
+    expect(titleOrder()).toEqual(['Apple', 'Banana', 'Cherry', 'Date']);
+  });
+
+  it('applies the enrolled-first sort after the level filter narrows the grid', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [apple, banana, cherry, date],
+      enrollments,
+    });
+
+    renderCourses();
+
+    await screen.findByText('Apple');
+    // Narrow to 'basic' — excludes Date (advanced); Apple/Banana/Cherry remain.
+    fireEvent.change(screen.getByLabelText('courses.level'), { target: { value: 'basic' } });
+
+    // Enrolled first (Cherry, Banana), then non-enrolled (Apple); Date filtered out.
+    expect(titleOrder()).toEqual(['Cherry', 'Banana', 'Apple']);
+  });
+});
