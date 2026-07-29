@@ -221,7 +221,7 @@ export function EnrollUserDialog({
 
         <div className="flex-1 overflow-y-auto space-y-4 py-4">
           <div className="space-y-2">
-            <Label>Select Team Member</Label>
+            <Label htmlFor="enroll-member">{t('enrollDialog.selectMemberLabel')}</Label>
             {activeLearners.length === 0 ? (
               <div className="p-4 rounded-lg border bg-muted/50 text-center">
                 <Users className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
@@ -237,8 +237,8 @@ export function EnrollUserDialog({
                   setFailures([]);
                 }}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a team member..." />
+                <SelectTrigger id="enroll-member">
+                  <SelectValue placeholder={t('enrollDialog.selectMemberPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {activeLearners.map((member) => (
@@ -253,7 +253,10 @@ export function EnrollUserDialog({
 
           {selectedUserId && (
             <div className="space-y-2">
-              <Label>Select Courses</Label>
+              {/* A section heading over the course checkbox list, not a field
+                  label: it titles a group of controls, not one input — so a
+                  heading, not a <Label>. (#327) */}
+              <p className="text-sm font-medium leading-none">{t('enrollDialog.selectCoursesLabel')}</p>
               {loading ? (
                 <div className="flex items-center justify-center p-8">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />

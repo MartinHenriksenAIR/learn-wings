@@ -269,8 +269,9 @@ export default function OrganizationsManager() {
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>{t('organizations.logoOptional')}</Label>
+            <Label htmlFor="org-create-logo">{t('organizations.logoOptional')}</Label>
             <FileUpload
+              id="org-create-logo"
               assetType="org-logo"
               accept="image"
               value={logoDisplaySrc ?? null}
@@ -325,7 +326,10 @@ export default function OrganizationsManager() {
           </div>
 
           <div className="space-y-2">
-            <Label>{t('organizations.initialAdminOptional')}</Label>
+            {/* A section heading over the existing/invite Tabs group, not a
+                field label: the controls live inside the tabs and carry their
+                own accessible names — so a heading, not a <Label>. (#327) */}
+            <p className="text-sm font-medium leading-none">{t('organizations.initialAdminOptional')}</p>
             <Tabs value={adminTab} onValueChange={(v) => setAdminTab(v as 'existing' | 'invite')}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="existing" className="flex items-center gap-1">

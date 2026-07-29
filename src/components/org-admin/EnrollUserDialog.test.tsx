@@ -84,6 +84,29 @@ const courseAccess = {
   ],
 };
 
+describe('EnrollUserDialog — label associations (#327)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCallApi.mockResolvedValue({ access: [], enrollments: [] });
+  });
+
+  it('associates the member label with its select control', () => {
+    render(
+      <EnrollUserDialog
+        open
+        onOpenChange={vi.fn()}
+        orgId="org-1"
+        orgName="Acme"
+        members={members}
+        onSuccess={vi.fn()}
+      />
+    );
+    // The member picker renders because there is an active learner; its label
+    // must resolve to the select trigger.
+    expect(screen.getByLabelText('enrollDialog.selectMemberLabel')).toHaveAttribute('id', 'enroll-member');
+  });
+});
+
 describe('EnrollUserDialog — per-row failure reasons (#62)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

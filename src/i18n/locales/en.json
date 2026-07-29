@@ -770,7 +770,19 @@
     "failedTitle": "Enrollment failed",
     "failedDescription": "No courses could be enrolled. See the reasons below.",
     "failuresTitle": "Failed enrollments",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "selectMemberLabel": "Select organization member",
+    "selectMemberPlaceholder": "Choose an organization member...",
+    "selectCoursesLabel": "Select courses"
+  },
+  "quizEditor": {
+    "passingScoreLabel": "Passing Score (%)",
+    "questionsHeading": "Questions",
+    "questionHeading": "Question {{number}}",
+    "answerOptionsLabel": "Answer Options (select the correct answer)"
+  },
+  "bulkInvite": {
+    "uploadCsvLabel": "Upload CSV File"
   },
   "platformSettings": {
     "title": "Platform Settings",

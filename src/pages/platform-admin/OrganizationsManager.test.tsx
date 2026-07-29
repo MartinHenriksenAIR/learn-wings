@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -31,8 +31,9 @@ vi.mock('@/hooks/useOrganizations', () => ({
 
 vi.mock('@/components/ui/sonner', () => ({ toast: vi.fn() }));
 
+// Forward `id` to a real file input so the logo label's association is testable (#327).
 vi.mock('@/components/ui/file-upload', () => ({
-  FileUpload: () => <div data-testid="file-upload" />,
+  FileUpload: ({ id }: { id?: string }) => <input type="file" id={id} data-testid="file-upload" />,
 }));
 
 import OrganizationsManager from './OrganizationsManager';
@@ -59,5 +60,21 @@ describe('OrganizationsManager — heading (#101)', () => {
 
     const headings = await screen.findAllByRole('heading', { name: 'Organizations' });
     expect(headings).toHaveLength(1);
+  });
+});
+
+describe('OrganizationsManager — label associations (#327)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCallApi.mockResolvedValue({ profiles: [] });
+  });
+
+  it('associates the create-dialog logo label with its upload input', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'New Organization' }));
+
+    const logo = await screen.findByLabelText('Logo (optional)');
+    expect(logo).toHaveAttribute('id', 'org-create-logo');
   });
 });

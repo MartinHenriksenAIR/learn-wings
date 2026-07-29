@@ -39,6 +39,25 @@ import { AddExistingUserDialog } from './AddExistingUserDialog';
 const noop = () => {};
 const submit = () => screen.getByRole('button', { name: 'orgDetail.addUser' });
 
+describe('AddExistingUserDialog — label associations (#327)', () => {
+  it('associates the user and role labels with their select controls', () => {
+    const usage = getSeatUsage({ activeMembers: 0, pendingInvites: 0, seatLimit: null });
+    render(
+      <AddExistingUserDialog
+        open
+        onOpenChange={noop}
+        orgName="Acme"
+        availableUsers={[]}
+        seatUsage={usage}
+        onSubmit={noop}
+        pending={false}
+      />,
+    );
+    expect(screen.getByLabelText('orgDetail.user')).toHaveAttribute('id', 'add-existing-user');
+    expect(screen.getByLabelText('orgDetail.role')).toHaveAttribute('id', 'add-existing-role');
+  });
+});
+
 describe('AddExistingUserDialog — seat cap', () => {
   it('shows the seats-used note and keeps submit enabled below the limit', () => {
     const usage = getSeatUsage({ activeMembers: 2, pendingInvites: 1, seatLimit: 10 });

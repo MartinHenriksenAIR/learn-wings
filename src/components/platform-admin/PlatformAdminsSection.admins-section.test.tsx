@@ -104,4 +104,17 @@ describe('PlatformAdminsSection (admins-section)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'platformAdmins.confirm' }));
     expect(onGrant).toHaveBeenCalledWith('p3');
   });
+
+  it('associates the grant label with its select control (#327)', () => {
+    render(
+      <PlatformAdminsSection
+        admins={admins}
+        availableUsers={candidates}
+        onGrant={vi.fn()}
+        onRevoke={vi.fn()}
+        pending={false}
+      />,
+    );
+    expect(screen.getByLabelText('platformAdmins.grantLabel')).toHaveAttribute('id', 'grant-admin-user');
+  });
 });
