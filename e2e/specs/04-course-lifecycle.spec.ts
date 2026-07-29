@@ -44,6 +44,33 @@ import { e2eName } from '../run-id';
 // `requirePlatformAdmin` reads the raw `isPlatformAdmin` (ProtectedRoute.tsx:80).
 test.use({ viewMode: 'org_admin' });
 
+/**
+ * What one run of this journey may spend, replacing the config's per-test cap.
+ *
+ * That cap is `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` — 90s, sized for a spec whose only long
+ * wait is sign-in itself (playwright.config.ts). This body's own bounded waits sum to 795s:
+ * three `gotoFenced` calls at 105s each (315s — a `page.goto` at Playwright's 30s navigation
+ * default, then `selectFencedOrg`'s 30s OrgSelector-visible wait and its three 15s
+ * actions/asserts, e2e/fixtures/fenced-org.ts); `createCourse` at 135s (a 30s list-loaded
+ * wait, three 15s actions and two 30s write waits, e2e/fixtures/course.ts); `deleteCourse`
+ * at 135s (two 15s clicks, a 15s dialog-open assert and three 30s waits); and 210s of the
+ * body's own inline waits — the row click, the editor-URL assert and `assertFenced` at 15s
+ * each, the title-field `toHaveValue` at 30s, the title fill and Save click at 15s each, the
+ * "Saved" morph at 30s, the post-edit count-1 at 30s and count-0 at 15s, and the post-delete
+ * count-0 at 30s. Sign-in and the fence's create/delete are not in that sum: they run in the
+ * `fencedOrg`/`fenceDelete` fixtures, which carry their own timeouts.
+ *
+ * At 90s a cold start therefore trips the cap while one of those waits is still running, and
+ * the run prints Playwright's generic "Test timeout exceeded" instead of the message that
+ * wait carries — and here that would also strand the course and the fence's diagnosis behind
+ * a generic message. Twenty-seven course-write budgets (810s) sits above the 795s the path
+ * can spend, so this cap is never the thing that fires — a ceiling on a pathological run
+ * where every wait spends its whole budget, not an expectation.
+ */
+const SPEC_TIMEOUT = 27 * COURSE_WRITE_TIMEOUT;
+
+test.describe.configure({ timeout: SPEC_TIMEOUT });
+
 /** `/app/admin/platform/courses/:courseId` — a uuid (routes.ts:64). */
 const COURSE_EDITOR_URL = /\/app\/admin\/platform\/courses\/[0-9a-f-]{36}$/;
 

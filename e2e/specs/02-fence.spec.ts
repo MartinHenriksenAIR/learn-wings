@@ -30,6 +30,43 @@ import {
  */
 test.use({ viewMode: 'org_admin' });
 
+/**
+ * The 30s cold Azure Functions round-trip budget the rest of this suite counts its
+ * per-test ceilings in — LESSON_WRITE_TIMEOUT, INVITE_READ_TIMEOUT, REPORT_TIMEOUT,
+ * COURSE_WRITE_TIMEOUT and QUIZ_READ_TIMEOUT are all this same figure. This spec issues no
+ * explicit-timeout wait of its own — its long waits are Playwright's 30s navigation default
+ * and the OrgSelector settle inside `gotoFenced`/`selectFencedOrg` (e2e/fixtures/fenced-org.ts)
+ * — so the constant appears only in SPEC_TIMEOUT below, as the currency the ceiling is
+ * expressed in. Kept a local copy rather than imported for the same reason 05/06/08 keep
+ * theirs local: a shared import would couple budgets that only agree by coincidence.
+ */
+const COLD_START_BUDGET = 30_000;
+
+/**
+ * What one run of either test here may spend, replacing the config's per-test cap.
+ *
+ * That cap is `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` — 90s, sized for a spec whose only long
+ * wait is sign-in itself (playwright.config.ts). The longer of this file's two tests — the
+ * one proving a bare `page.goto` drops the fence — sums to 180s: a `page.goto` at
+ * Playwright's 30s navigation default; the `not.toContainText` placeholder check and the
+ * `expect(assertFenced(...)).rejects` wait, each polling the config's 15s `expect` default
+ * before it settles (30s); a `gotoFenced` at 105s (a `page.goto` at the 30s nav default,
+ * then `selectFencedOrg`'s 30s OrgSelector-visible wait and its three 15s actions/asserts —
+ * e2e/fixtures/fenced-org.ts); and a closing 15s `assertFenced`. The first test is shorter
+ * (a `page.goto`, a 75s `selectFencedOrg` and a 15s assert = 120s). Sign-in and the fence's
+ * create/delete are not in that sum: they run in the `fencedOrg`/`fenceDelete` fixtures,
+ * which carry their own timeouts and do not draw on the per-test budget.
+ *
+ * At 90s a cold start therefore trips the cap while one of those waits is still running, and
+ * the run prints Playwright's generic "Test timeout exceeded" instead of the message that
+ * wait carries. Seven cold-start budgets (210s) sits above the 180s the longer path can
+ * spend, so this cap is never the thing that fires — a ceiling on a pathological run where
+ * every wait spends its whole budget, not an expectation.
+ */
+const SPEC_TIMEOUT = 7 * COLD_START_BUDGET;
+
+test.describe.configure({ timeout: SPEC_TIMEOUT });
+
 const ORG_LIST_PATH = '/app/admin/platform/organizations';
 
 /** The read both tests reorder, so that being fenced has to be *chosen*. */

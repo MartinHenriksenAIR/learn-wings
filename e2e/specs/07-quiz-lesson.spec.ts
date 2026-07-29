@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../fixtures/session';
-import { signInThroughSso } from '../fixtures/auth';
+import { SIGN_IN_WORST_CASE_TIMEOUT, signInThroughSso } from '../fixtures/auth';
 
 /**
  * The quiz journey: open the quiz lesson inside a real course and prove it is not a dead
@@ -86,6 +86,36 @@ const NEXT = 'Next';
  * assertions on already-rendered state — a cold Azure Functions start alone can eat it.
  */
 const QUIZ_READ_TIMEOUT = 30_000;
+
+/**
+ * What one run of this journey may spend, replacing the config's per-test cap.
+ *
+ * That cap is `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` — 90s, sized for a spec whose only long
+ * wait is sign-in itself (playwright.config.ts). This body's own bounded waits sum to 365s:
+ * sign-in's own worst case (65s) plus the `page.goto('/login')` inside it, which that figure
+ * deliberately excludes (30s); the catalogue `page.goto` at Playwright's 30s navigation
+ * default; four 30s reads on QUIZ_READ_TIMEOUT (120s — the play-link count, the
+ * course-heading render, the three-state settle, and the load-bearing `waitForResponse` on
+ * `/api/quiz-by-lesson` every assertion below gates on); two 15s actions (the open-course and
+ * open-quiz clicks, 30s); and, on the config's 15s `expect` default, the player-URL assert,
+ * the quiz-lesson-button count, the quiz-lesson heading and the not-ready branch's three
+ * closing asserts (the longer of the pane's two branches) — 90s of 15s assertions in all.
+ *
+ * The 30s `/api/quiz-by-lesson` read is in that sum on purpose: #334 gave that
+ * `waitForResponse` its own explicit QUIZ_READ_TIMEOUT (it previously inherited the config's
+ * 15s `actionTimeout`), and it is the wait most likely to be interrupted on a cold boot — so
+ * this budget has to clear a sum that includes it, or a cold start would still report
+ * Playwright's generic timeout in place of that read's own diagnostic.
+ *
+ * At 90s a cold start therefore trips the cap while one of those waits is still running, and
+ * the run prints Playwright's generic "Test timeout exceeded" instead of the message that
+ * wait carries. Eleven quiz-read budgets on top of sign-in's worst case (395s) sits above
+ * the 365s the path can spend, so this cap is never the thing that fires — a ceiling on a
+ * pathological run where every wait spends its whole budget, not an expectation.
+ */
+const SPEC_TIMEOUT = SIGN_IN_WORST_CASE_TIMEOUT + 11 * QUIZ_READ_TIMEOUT;
+
+test.describe.configure({ timeout: SPEC_TIMEOUT });
 
 /**
  * The body of one course's card on the learner catalogue.

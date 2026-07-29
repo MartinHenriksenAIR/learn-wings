@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../fixtures/session';
-import { sidebarNav, signInThroughSso } from '../fixtures/auth';
+import { SIGN_IN_WORST_CASE_TIMEOUT, sidebarNav, signInThroughSso } from '../fixtures/auth';
 
 /**
  * These assertions cover UI gating only. This account is a platform admin, and
@@ -30,6 +30,39 @@ import { sidebarNav, signInThroughSso } from '../fixtures/auth';
  * the session fixture's addInitScript re-seeds `viewMode` (e2e/fixtures/session.ts),
  * silently reverting the view mid-test.
  */
+
+/**
+ * The 30s cold Azure Functions round-trip budget the rest of this suite counts its
+ * per-test ceilings in — LESSON_WRITE_TIMEOUT, INVITE_READ_TIMEOUT, REPORT_TIMEOUT,
+ * COURSE_WRITE_TIMEOUT and QUIZ_READ_TIMEOUT are all this same figure. This spec issues no
+ * explicit-timeout wait of its own — its long waits are sign-in, Playwright's 30s navigation
+ * default and the switcher clicks — so the constant appears only in SPEC_TIMEOUT below, as
+ * the currency the ceiling is expressed in. Kept a local copy rather than imported for the
+ * same reason 05/06/08 keep theirs local: a shared import would couple budgets that only
+ * agree by coincidence.
+ */
+const COLD_START_BUDGET = 30_000;
+
+/**
+ * What one run of any test here may spend, replacing the config's per-test cap.
+ *
+ * That cap is `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` — 90s, sized for a spec whose only long
+ * wait is sign-in itself (playwright.config.ts). The longest of this file's four tests —
+ * switching to learner and back — sums to 245s: sign-in's own worst case (65s) plus the
+ * `page.goto('/login')` inside it, which that figure deliberately excludes (30s); two
+ * `switchViewTo` calls at 45s each (two 15s clicks and a 15s settle assert apiece — see
+ * switchViewTo, 90s); and four assertions on the config's 15s `expect` default (60s). The
+ * other three tests are shorter (200s, 185s, and the learner-route one at 230s).
+ *
+ * At 90s a cold start therefore trips the cap while one of those waits is still running, and
+ * the run prints Playwright's generic "Test timeout exceeded" instead of the message that
+ * wait carries. Seven cold-start budgets on top of sign-in's worst case (275s) sits above
+ * the 245s the longest path can spend, so this cap is never the thing that fires — a ceiling
+ * on a pathological run where every wait spends its whole budget, not an expectation.
+ */
+const SPEC_TIMEOUT = SIGN_IN_WORST_CASE_TIMEOUT + 7 * COLD_START_BUDGET;
+
+test.describe.configure({ timeout: SPEC_TIMEOUT });
 
 /**
  * The sidebar-footer profile button that opens the view switcher.
