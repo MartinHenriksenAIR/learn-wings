@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -34,8 +34,17 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+const platformDefault = () => ({
+  features: { certificates_enabled: false } as Record<string, boolean>,
+  isLoading: false,
+});
+const mockPlatformSettings = vi.fn(platformDefault);
 vi.mock('@/hooks/usePlatformSettings', () => ({
-  usePlatformSettings: () => ({ features: { certificates_enabled: false } }),
+  usePlatformSettings: () => mockPlatformSettings(),
+}));
+
+vi.mock('@/components/learner/DashboardCommunitySection', () => ({
+  DashboardCommunitySection: () => <div data-testid="community-section" />,
 }));
 
 import LearnerDashboard from './Dashboard';
@@ -320,5 +329,49 @@ describe('LearnerDashboard — hero variants', () => {
     expect(within(hero).getByText('0%')).toBeInTheDocument();
     const cta = within(hero).getByRole('link', { name: /dashboard\.browseCourses/ });
     expect(cta).toHaveAttribute('href', '/app/courses');
+  });
+});
+
+describe('LearnerDashboard — community section gating (#343)', () => {
+  const withOrg = {
+    memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
+    currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    mockPlatformSettings.mockImplementation(platformDefault);
+  });
+
+  it('renders the community section when community is enabled for the org', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
+    mockPlatformSettings.mockReturnValue({
+      features: { certificates_enabled: false, community_enabled: true },
+      isLoading: false,
+    });
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+
+    renderDashboard();
+
+    expect(await screen.findByTestId('community-section')).toBeInTheDocument();
+  });
+
+  it('hides the community section when community is disabled', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
+    mockPlatformSettings.mockReturnValue({
+      features: { certificates_enabled: false, community_enabled: false },
+      isLoading: false,
+    });
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+
+    renderDashboard();
+
+    await screen.findByTestId('dashboard-hero');
+    expect(screen.queryByTestId('community-section')).toBeNull();
   });
 });

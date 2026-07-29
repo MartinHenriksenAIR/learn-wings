@@ -13,18 +13,21 @@ import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useFlash } from '@/hooks/useFlash';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
+import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useLearnerDashboard } from '@/hooks/useLearnerDashboard';
 import { callApiRaw } from '@/lib/api-client';
 import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Clock, Award, Play, ArrowRight, TrendingUp, Sparkles } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
+import { DashboardCommunitySection } from '@/components/learner/DashboardCommunitySection';
 import { formatDate } from '@/lib/date-locale';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerDashboard() {
   const { currentOrg, profile, memberships, isPlatformAdmin, isOrgAdmin } = useAuth();
   const orgGuard = useOrgGuard();
+  const communityGate = useCommunityGate();
   const { features } = usePlatformSettings();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -353,6 +356,8 @@ export default function LearnerDashboard() {
           </div>
         </div>
       )}
+
+      {communityGate === 'allowed' && <DashboardCommunitySection orgId={currentOrg.id} />}
 
       {features.certificates_enabled && (
         <div id="certificates">
