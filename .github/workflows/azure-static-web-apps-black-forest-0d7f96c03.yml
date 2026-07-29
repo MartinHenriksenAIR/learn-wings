@@ -30,6 +30,12 @@ jobs:
           # support preview environments, so the backend is unlinked during the migration.
           # At merge time: re-link the SWA backend and set this back to "" (same-origin /api).
           VITE_API_BASE_URL: https://func-ai-education-migration-c0fgeqdnfvd6h0cf.swedencentral-01.azurewebsites.net
+          # Canonical production origin for minted links (invite/signup) — #115. Pinned ONLY for
+          # the production push build; PR previews get "" and fall back to window.location.origin
+          # so preview-minted links stay on the preview host (#80). Requires the www host to be in
+          # the function app's ALLOWED_ORIGINS (which also feeds the invite-link allowlist) before
+          # this deploys, or invite emails 400.
+          VITE_PLATFORM_BASE_URL: ${{ github.event_name == 'push' && 'https://www.ai-uddannelse.dk' || '' }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_BLACK_FOREST_0D7F96C03 }}
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments and preview environments)
