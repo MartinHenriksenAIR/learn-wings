@@ -183,7 +183,14 @@
     "heroFirstTimeBadge": "Kom i gang",
     "heroFirstTimeTitle": "Klar til at lære?",
     "heroFirstTimeDescription": "Vælg dit første kursus i kataloget og begynd at opbygge praktiske AI-færdigheder.",
-    "heroPickFirstCourse": "Vælg dit første kursus"
+    "heroPickFirstCourse": "Vælg dit første kursus",
+    "community": {
+      "title": "Fællesskab",
+      "viewAll": "Se alle",
+      "recentActivity": "Seneste aktivitet",
+      "noActivityTitle": "Ingen nylig aktivitet endnu",
+      "noActivityDescription": "Vær den første til at starte en samtale i fællesskabet."
+    }
   },
   "courses": {
     "title": "Kursuskatalog",
@@ -255,9 +262,30 @@
     "loadingQuiz": "Indlæser quiz...",
     "quizLoadFailed": "Quizzen kunne ikke indlæses",
     "quizNotReady": "Denne quiz er ikke klar endnu",
-    "quizNotReadyDescription": "Der er endnu ingen spørgsmål at besvare her. Du kan fortsætte til næste lektion."
+    "quizNotReadyDescription": "Der er endnu ingen spørgsmål at besvare her. Du kan fortsætte til næste lektion.",
+    "quizNotReadyDescriptionLast": "Der er endnu ingen spørgsmål at besvare her. Quizzen vises her, når den er klar."
   },
   "community": {
+    "categories": {
+      "challenges-obstacles": {
+        "name": "Udfordringer / Forhindringer"
+      },
+      "risks-mitigation": {
+        "name": "Risici & Håndtering"
+      },
+      "questions-help": {
+        "name": "Spørgsmål & Hjælp"
+      },
+      "wins-learnings": {
+        "name": "Sejre / Læring"
+      },
+      "announcements": {
+        "name": "Meddelelser"
+      },
+      "events": {
+        "name": "Events / Træffetid"
+      }
+    },
     "title": "Fællesskab",
     "ideaLibrary": "Idébibliotek",
     "idea": "Idé",

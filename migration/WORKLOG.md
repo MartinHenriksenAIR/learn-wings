@@ -1935,3 +1935,100 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **One bookkeeping failure to record:** the switcher issue was reported as filed under #323 when no issue was created — `gh issue create` printed a URL for an issue that does not exist. Caught by the final review, re-filed as **#335**. Worth remembering that a printed URL is not proof an issue exists.
 
 **Deploy:** none — the suite is test-only and touches no shipped code. `tsconfig.node.json` gained an `include` entry and `AGENTS.md`/`ci.yml` gained the type-check gate.
+
+## 2026-07-29 — #333 quiz "not ready" copy no longer promises a disabled next lesson (PR #345)
+
+**Who:** claude (Opus 4.8) with martin. Frontend-only. First of the app defects the #316 e2e suite surfaced (it asserts exactly this not-ready state) to be fixed.
+
+**The defect:** the #299 empty state read *"There are no questions to answer here yet. You can continue to the next lesson."* On the **last** lesson of a course there is no next lesson and the footer's Next control is disabled, so the copy instructed the learner to do something the UI won't permit — a dead-end message on the screen built specifically to prevent dead ends. #299's whole purpose was that a quiz lesson must never trap the learner; the nav fix worked, the copy overstated it.
+
+**The fix:** `CoursePlayer.tsx` selects the description by position, reusing the footer's own `currentIndex >= allLessons.length - 1` last-lesson test (the same one line 662 already uses for the submitted-quiz button). A following lesson → the unchanged wording still points to it; the last lesson → a new `quizNotReadyDescriptionLast` string that says something true (the quiz appears here once ready) and promises nothing the UI can't deliver. New key added to **both** `en` and `da`. The ternary sits **outside** `t()` so both keys stay static `t('literal')` call sites the #300 translation-key parity gate protects.
+
+**No e2e change needed.** `07-quiz-lesson.spec.ts` (#316) asserts only the **title** (`quizNotReady` = "This quiz isn't ready yet"), which is untouched — never the description this fix changes. That let #333 land independently of the concurrent e2e-hardening work (incl. #334, also in that spec); disjoint trees (`src/` vs `e2e/`), so merge order was free.
+
+**Tests:** two new `CoursePlayer.test.tsx` cases, one per branch — the next-lesson copy when a lesson follows, and the last-lesson copy (with Next asserted disabled) when the quiz is the only lesson. The `t` mock returns the key, so the cases assert on `coursePlayer.quizNotReadyDescription` vs `…DescriptionLast` (exact-match, so the shared prefix doesn't cross-match).
+
+**Verify:** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `npm test` **826 / 110** · `build` 0. functions untouched. PR CI all green (frontend + functions + build/deploy job).
+
+**Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.
+
+## 2026-07-29 — #338 learner catalog sorts enrolled courses to the top (PR #347)
+
+**Who:** claude (Opus 4.8) with martin. Frontend-only. First of three sequential learner-catalog issues (#338 → #340 → #339) worked in one worktree, each merged before the next so they stack cleanly.
+
+**What:** the "All courses" grid on `src/pages/learner/Courses.tsx` had no client-side sort — cards rendered in the backend's alphabetical-by-title order. Now courses the learner has an enrollment in (status `enrolled` OR `completed`) sort above not-enrolled ones, and within that enrolled group by `enrolled_at` DESC (an interim ordering until #339 replaces it with last-activity recency). Not-enrolled courses keep their alphabetical order.
+
+**How:** `filteredCourses` became a single `useMemo` (filter → enrolled-first sort) per the frontend convention that call-site derivation is memoized. The comparator keys on the *existence* of an enrollment row (the backend only emits rows for `enrolled`/`completed`, so row-exists ≡ enrolled-or-completed), sorts the enrolled group `enrolled_at` DESC, and returns `0` for two not-enrolled — `Array.prototype.sort` is stable (ES2019), so the alphabetical tail is preserved. It sorts a `.filter()` copy, never mutating `courses`. Module-level `NO_COURSES`/`NO_ENROLLMENTS` empty-array fallbacks keep the `?? …` reads referentially stable so the memo doesn't churn (this also cleared the two `react-hooks/exhaustive-deps` warnings the memo first introduced — surfaced by the task review and fixed in-loop).
+
+**Scope:** no backend or schema change. The "Recommended for you" section, search, and level/status filters are untouched.
+
+**Tests:** three new `Courses.test.tsx` cases assert rendered card order (read from the `<h3>` titles in DOM order): enrolled-first + `enrolled_at` DESC, a not-enrolled-only case that would catch an accidental reorder of the alphabetical tail, and filter-then-sort coexistence.
+
+**Verify:** root `lint` 0 errors (1968 warnings = baseline) · `tsc -p tsconfig.app.json` 0 · `npm test` **829 / 110** · `build` 0. Re-run by the controller from the worktree after the fix, not just the implementer.
+
+**Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.
+
+## 2026-07-29 — #340 progress bar + % on enrolled learner-catalog cards (PR #348)
+
+**Who:** claude (Opus 4.8) with martin. Backend + hook + frontend. Second of the three sequential catalog issues, built on #338.
+
+**What:** enrolled cards on `src/pages/learner/Courses.tsx` showed only an enrolled/completed badge — no progress. They now show a progress bar + percentage in the dashboard's "Continue Learning" bar style. Completed cards read 100%; not-enrolled cards show no bar (they keep the Enroll CTA).
+
+**How:** `functions/learner-courses` now returns a `progress: Record<courseId, {total, completed}>` map for the caller's enrolled courses, computed with the **same two batched `COUNT` queries** `functions/learner-dashboard` already uses (copied verbatim — totals over `course_modules`→`lessons`, completed over `lesson_progress`→`lessons`→`course_modules` scoped to the caller+org with `status='completed'`; both `GROUP BY cm.course_id` over `ANY($n::uuid[])`, so no N+1). Empty enrollments short-circuits to `progress: {}` before any count query runs. The existing course-visibility/language predicate and the enrollments query are untouched. `useLearnerCourses` widened its generic and passes `progress` through (thumbnail signing preserved). `renderCourseCard` reads `progress[course.id]`, renders the dashboard's exact bar markup/classes for enrolled cards, and computes `isCompleted ? 100 : total === 0 ? 0 : Math.round(completed/total*100)` (the `total === 0` guard prevents NaN). The #338 enrolled-first sort, the Recommended section, and the filters are unchanged.
+
+**Scope:** the catalog stays on a single data source (`learner-courses`) — it does not call `learner-dashboard`. A shared `<CourseProgressBar>` (dashboard + catalog + #341) is deliberately deferred to #341; `Dashboard.tsx` is untouched and the bar markup is replicated here, which the issue anticipated.
+
+**Tests:** `functions/learner-courses/index.test.ts` — the `progress` map with zero-fill, the `progress: {}` + exactly-two-queries (no count queries) empty case, and structural assertions that both count queries mirror the dashboard's SQL (aggregate/tables/joins/GROUP BY, not just the param). `Courses.test.tsx` — bar+% on an enrolled card (67% from 2/3, fill width asserted), 100% on a completed card, no bar on a not-enrolled card, and 0% (no `NaN%`) when `total === 0`.
+
+**Verify:** root `lint` 0 errors (**1970** warnings; the +2 vs the 1968 baseline are `@typescript-eslint/no-explicit-any` in the new **backend test** mocks, matching the pervasive functions-test mocking convention — the three `src/` files lint clean) · `tsc -p tsconfig.app.json` 0 · `npm test` **833 / 110** · `build` 0. functions: `build` 0 · `npm test` **2529 / 143** (3 skipped). Controller re-ran all gates from the worktree.
+
+**Deploy:** touches `functions/` + `src/`, so both the SWA and functions workflows ship on merge to `main`.
+
+## 2026-07-29 — #339 order enrolled catalog courses by recent activity (PR #350)
+
+**Who:** claude (Opus 4.8) with martin. Schema + backend + frontend. Third and largest of the sequential catalog issues, built on #338 + #340. **Landed via the controller** after the implementer subagent was cut off mid-run by an org spend-limit API error — the implementation was complete but uncommitted; the controller reviewed the diff, applied one robustness fix, re-ran all gates, and committed.
+
+**What:** the enrolled group in the learner catalog now orders by how recently the learner was last active in each course (most-recent first), replacing #338's interim `enrolled_at DESC`. "Active" = opening the course player **or** recording lesson activity (grooming decision).
+
+**How:** new nullable `enrollments.last_accessed_at timestamptz`. Two write signals stamp it: (1) a new **fire-and-forget** `touch-course` endpoint (`endpoint()` factory, barrel-registered, `profile.id`-scoped `UPDATE`) that `CoursePlayer` fires on entry in a **separate, non-awaited** effect — kept off the awaited render path per the issue's "must not block the player" requirement, a failed touch logged not surfaced; (2) `lesson-progress`, which after its critical progress upsert also stamps the enrollment for the lesson's course (course resolved via a `lessons → course_modules` subquery). `learner-courses` returns the column; `useLearnerCourses` surfaces it purely via the widened `Enrollment` type (no hook change). `Courses.tsx`'s enrolled comparator sorts `last_accessed_at` DESC, falling back to `enrolled_at` when null; enrolled-first, the stable alphabetical tail, and #340's bar are unchanged.
+
+**Controller review fix:** the `lesson-progress` recency stamp was a second un-guarded `await query()` after the committed progress upsert — a transient failure there would have 500'd an already-saved progress write and tripped #289's optimistic-rollback (false "save failed"). Wrapped it best-effort (log + swallow) so the non-essential stamp can never fail the critical save; added a test proving a stamp failure still returns 200.
+
+**Prod DB:** `migration/azure/09-enrollment-last-accessed.sql` (idempotent `ADD COLUMN IF NOT EXISTS`, folded into `01-schema.sql`) **must be applied to prod by martin BEFORE this deploys** — the function code references the column unconditionally. PR held as draft until then.
+
+**Tests:** `touch-course` (happy/400×2 no-DB/401/403 no-DB/500); `lesson-progress` (stamp fires profile-scoped; stamp failure still 200); `learner-courses` (SQL selects `last_accessed_at`); `Courses.test.tsx` (enrolled sort by `last_accessed_at` DESC independent of `enrolled_at`; null falls back to `enrolled_at`).
+
+**Verify:** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `npm test` **835 / 110** · `build` 0. functions `build` 0 · `npm test` **2540 / 144** (3 skipped; `registration-names` fleet guard green for `touch-course`). New `src/` files lint warning-free; +warnings are `no-explicit-any` in the new backend test mocks (functions-test convention). All gates re-run by the controller from the worktree.
+
+**Deploy:** touches `functions/` + `src/` → both workflows ship on merge, **after** the prod migration.
+## 2026-07-29 — #343 learner dashboard community section (PR #349)
+
+**Who:** claude (Opus 4.8) with martin. Frontend-only. Run concurrently with two other sessions (e2e hardening #346, catalog recency #339) and deliberately kept disjoint from both.
+
+**What:** the learner dashboard (`src/pages/learner/Dashboard.tsx`) had no community content. It now shows a **Community** section — a preview of recent posts plus the shared `UpcomingEvents` card, with a "View all" link into the feed (`routes.community.feed`) — gated behind `useCommunityGate` so it only appears when community is enabled for the user's org. Placed after "Completed Courses", before Certificates.
+
+**How:** extracted a self-contained `src/components/learner/DashboardCommunitySection.tsx`; the dashboard renders it **only when the gate is `'allowed'`**, so its two `community-posts` queries stay idle when the feature is off (conditional mount, not a conditional hook). Both derivations reuse the existing `useCommunityEvents` reader (which returns every post for a scope): recent-activity = merged global+org sorted by `created_at` DESC, sliced to 4, each a reused `PostCard` navigating to `routes.community.postDetail(post.scope, post.id)`; events = the same merged posts handed to `UpcomingEvents` (it filters to future-dated internally and self-hides when empty). TanStack dedupes by query key, so events + recent-activity share one request per scope. Loading → spinner; error → `QueryErrorState` retrying both scopes. New i18n `dashboard.community.*` keys (en+da).
+
+**Tests:** `DashboardCommunitySection.test.tsx` — 7 cases (4-most-recent merge/sort/slice, View-all href, empty state, post click-through on the post's own scope, merged posts → UpcomingEvents + event click-through, loading spinner, retryable error refetching both scopes). `Dashboard.test.tsx` — 2 gating cases (section shown when `community_enabled`, hidden when not) via a marker mock + configurable `usePlatformSettings`.
+
+**Coordination:** verified none of the in-flight branches (338/339/340/e2e) touch `src/pages/learner/Dashboard.tsx` or `src/i18n/locales/*` — zero file overlap. Branched off `origin/main` @`1a85ec5` (already includes merged #338/#340).
+
+**Verify:** root `lint` 0 errors (1970 warnings = baseline; the three touched `src/` files add none) · `tsc -p tsconfig.app.json` 0 · `npm test` **842 / 111** · `build` 0. functions untouched.
+
+**Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.
+
+## 2026-08-03 — #342 community category labels translate in Danish (PR #351)
+
+**Who:** claude (Opus 4.8) with martin. Frontend-only. Run concurrently with the e2e-hardening session (#346); branched off `origin/main` @`f874e9a`, which already includes merged #338/#339/#340/#343.
+
+**What:** community category names (the fixed seeded taxonomy — "Challenges / Obstacles", "Questions & Help", …) came straight from the DB (`cat.name`) and never passed through i18next, so they stayed English in Danish mode across four render sites: the feed filter chips, the post-card badge, the post-detail badge, and the composer category picker.
+
+**How:** one shared `categoryLabel(cat, t)` helper (`src/lib/community-category-label.ts`) is the single source of truth — it maps `community.categories.<slug>.name` for the six seeded slugs, keyed off the stable slug (not the display name). Per #300 it passes no `defaultValue`; the six keys were added to BOTH `en.json` and `da.json`. All four sites route through it. Separately, `CategoryBadge` used to derive its colour by slug-ifying the English `name` — translating the name would have turned every badge grey — so it now takes an explicit `slug` prop for the colour lookup (required; all three callers updated), and the two DB-deleted colourMap slugs (`ideas-opportunities`, `resources-templates`) were dropped as unreachable.
+
+**Tests:** `community-category-label.test.ts` — 5 cases: slug→translation resolution, slug-not-name keying, the #300 raw-key behaviour for an unmapped slug, plus two coverage guards asserting all six seeded slugs are keyed with non-empty names in both locales and that en/da expose exactly that set (catches a future category shipping without keys, or en/da drift).
+
+**Coordination:** the only file surface shared with any in-flight branch was `src/i18n/locales/{en,da}.json`; #342's keys sit under `community.categories.*` while #343's went under `dashboard.community.*` — disjoint namespaces, merged with no conflict. `CommunityFeed.tsx` (the main edit) is touched by no other active branch. #343's `DashboardCommunitySection` inherits the fix for free (it renders `PostCard`).
+
+**Verify:** root `lint` 0 errors (1981 warnings = baseline; the touched `src/` files add none) · `tsc -p tsconfig.app.json` 0 · `npm test` **849 / 112** · `build` 0. functions untouched. Opus code-review clean (no Critical/Important; both Minor findings fixed).
+
+**Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.

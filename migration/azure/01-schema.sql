@@ -271,6 +271,7 @@ CREATE TABLE public.enrollments (
   status       public.enrollment_status NOT NULL DEFAULT 'enrolled',
   enrolled_at  timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz,
+  last_accessed_at timestamptz,
   UNIQUE (org_id, user_id, course_id)
 );
 

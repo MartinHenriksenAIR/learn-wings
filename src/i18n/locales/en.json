@@ -183,7 +183,14 @@
     "heroFirstTimeBadge": "Get started",
     "heroFirstTimeTitle": "Ready to start learning?",
     "heroFirstTimeDescription": "Pick your first course from the catalog and start building practical AI skills.",
-    "heroPickFirstCourse": "Pick your first course"
+    "heroPickFirstCourse": "Pick your first course",
+    "community": {
+      "title": "Community",
+      "viewAll": "View all",
+      "recentActivity": "Recent activity",
+      "noActivityTitle": "No recent activity yet",
+      "noActivityDescription": "Be the first to start a conversation in the community."
+    }
   },
   "courses": {
     "title": "Course Overview",
@@ -255,9 +262,30 @@
     "loadingQuiz": "Loading quiz...",
     "quizLoadFailed": "Unable to load the quiz",
     "quizNotReady": "This quiz isn't ready yet",
-    "quizNotReadyDescription": "There are no questions to answer here yet. You can continue to the next lesson."
+    "quizNotReadyDescription": "There are no questions to answer here yet. You can continue to the next lesson.",
+    "quizNotReadyDescriptionLast": "There are no questions to answer here yet. This quiz will appear here once it's ready."
   },
   "community": {
+    "categories": {
+      "challenges-obstacles": {
+        "name": "Challenges / Obstacles"
+      },
+      "risks-mitigation": {
+        "name": "Risks & Mitigation"
+      },
+      "questions-help": {
+        "name": "Questions & Help"
+      },
+      "wins-learnings": {
+        "name": "Wins / Learnings"
+      },
+      "announcements": {
+        "name": "Announcements"
+      },
+      "events": {
+        "name": "Events / Office Hours"
+      }
+    },
     "title": "Community",
     "ideaLibrary": "Idea Library",
     "idea": "Idea",

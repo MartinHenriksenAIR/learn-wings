@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +31,11 @@ import { BookOpen, Check, CheckCircle2, Loader2, LogOut, Play, Search } from 'lu
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
 
+// Module-level stable empty fallbacks so the `?? …` reads keep a referentially
+// stable value across renders (avoids re-running the filter/sort useMemo every render).
+const NO_COURSES: Course[] = [];
+const NO_ENROLLMENTS: Enrollment[] = [];
+
 export default function LearnerCourses() {
   const { currentOrg, profile } = useAuth();
   const orgGuard = useOrgGuard();
@@ -50,8 +55,9 @@ export default function LearnerCourses() {
     enabled: orgGuard === 'ready' && !!currentOrg,
   });
 
-  const courses = query.data?.courses ?? [];
-  const enrollments = query.data?.enrollments ?? [];
+  const courses = query.data?.courses ?? NO_COURSES;
+  const enrollments = query.data?.enrollments ?? NO_ENROLLMENTS;
+  const progressData: Record<string, { total: number; completed: number }> = query.data?.progress ?? {};
 
   const enrollMutation = useMutation({
     mutationFn: ({ orgId, courseId }: { orgId: string; courseId: string }) =>
@@ -125,25 +131,47 @@ export default function LearnerCourses() {
     ? courses.filter(c => c.level === profile.assessment_level)
     : [];
 
-  const filteredCourses = courses.filter(course => {
-    const matchesSearch = search === '' ||
-      course.title.toLowerCase().includes(search.toLowerCase()) ||
-      course.description?.toLowerCase().includes(search.toLowerCase());
+  // Filter, then order enrolled courses first (#338). Enrolled (status `enrolled`
+  // OR `completed`) sort above not-enrolled; within the enrolled group by recent
+  // activity — `last_accessed_at` DESC, falling back to `enrolled_at` when a course
+  // has no activity yet (#339). Array.prototype.sort is stable (ES2019), so returning
+  // 0 for two not-enrolled courses preserves the backend's alphabetical (ORDER BY
+  // c.title) order. `.filter` returns a fresh array, so sorting it does not mutate
+  // `courses`.
+  const filteredCourses = useMemo(() => {
+    const matches = courses.filter(course => {
+      const matchesSearch = search === '' ||
+        course.title.toLowerCase().includes(search.toLowerCase()) ||
+        course.description?.toLowerCase().includes(search.toLowerCase());
 
-    const matchesLevel = levelFilter === 'all' || course.level === levelFilter;
+      const matchesLevel = levelFilter === 'all' || course.level === levelFilter;
 
-    const enrollment = getEnrollmentStatus(course.id);
-    let matchesStatus = true;
-    if (statusFilter === 'enrolled') {
-      matchesStatus = !!enrollment && enrollment.status !== 'completed';
-    } else if (statusFilter === 'completed') {
-      matchesStatus = enrollment?.status === 'completed';
-    } else if (statusFilter === 'not_enrolled') {
-      matchesStatus = !enrollment;
-    }
+      const enrollment = enrollments.find(e => e.course_id === course.id);
+      let matchesStatus = true;
+      if (statusFilter === 'enrolled') {
+        matchesStatus = !!enrollment && enrollment.status !== 'completed';
+      } else if (statusFilter === 'completed') {
+        matchesStatus = enrollment?.status === 'completed';
+      } else if (statusFilter === 'not_enrolled') {
+        matchesStatus = !enrollment;
+      }
 
-    return matchesSearch && matchesLevel && matchesStatus;
-  });
+      return matchesSearch && matchesLevel && matchesStatus;
+    });
+
+    return matches.sort((a, b) => {
+      const ea = enrollments.find(e => e.course_id === a.id);
+      const eb = enrollments.find(e => e.course_id === b.id);
+      if (ea && !eb) return -1;
+      if (!ea && eb) return 1;
+      if (ea && eb) {
+        const ka = new Date(ea.last_accessed_at ?? ea.enrolled_at).getTime();
+        const kb = new Date(eb.last_accessed_at ?? eb.enrolled_at).getTime();
+        return kb - ka; // DESC — most recent activity first
+      }
+      return 0;
+    });
+  }, [courses, enrollments, search, levelFilter, statusFilter]);
 
   if (orgGuard === 'loading' || query.isLoading) {
     return (
@@ -186,6 +214,12 @@ export default function LearnerCourses() {
     const isCompleted = enrollment?.status === 'completed';
     const justEnrolled = flashed(`enr-${course.id}`);
     const isEnrolling = enrollMutation.isPending && enrollMutation.variables?.courseId === course.id;
+
+    // Lesson progress for the enrolled-card bar. Completed courses read 100%;
+    // otherwise guard divide-by-zero when the course has no lessons yet.
+    const total = progressData[course.id]?.total ?? 0;
+    const completed = progressData[course.id]?.completed ?? 0;
+    const percent = isCompleted ? 100 : total === 0 ? 0 : Math.round((completed / total) * 100);
 
     return (
       <div
@@ -236,7 +270,18 @@ export default function LearnerCourses() {
             {course.description}
           </p>
 
-          <div className="mt-auto flex items-center gap-2">
+          <div className="mt-auto flex flex-col gap-2.5">
+            {enrollment && (
+              // Progress bar + % on enrolled cards — same markup/classes as the
+              // dashboard's "Continue Learning" bar for visual consistency (#340).
+              <div data-testid={`course-progress-${course.id}`} className="flex items-center gap-2.5">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eceef3]">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
+                </div>
+                <span className="whitespace-nowrap text-xs font-semibold text-muted-foreground">{percent}%</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
             {justEnrolled ? (
               // Transient post-enroll morph; reverts to Continue when the flash expires
               <Button className="h-auto flex-1 rounded-[10px] border border-success bg-success px-3 py-[9px] text-[13px] font-bold text-success-foreground hover:bg-success">
@@ -286,6 +331,7 @@ export default function LearnerCourses() {
                 <LogOut aria-hidden="true" className="h-[15px] w-[15px]" />
               </Button>
             )}
+            </div>
           </div>
         </div>
       </div>

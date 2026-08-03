@@ -32,7 +32,7 @@ describe('lesson-progress', () => {
 
   it('upserts lesson progress and returns success', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
-    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValue([]);
 
     const res = await handler(baseReq as any, {} as any);
     const body = JSON.parse(res.body as string);
@@ -44,6 +44,44 @@ describe('lesson-progress', () => {
     const upsertCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('lesson_progress'));
     expect(upsertCall).toBeDefined();
     expect(upsertCall![1]).toEqual(['org-1', 'p1', 'lesson-1', 'completed']);
+  });
+
+  it('stamps the enrollment last_accessed_at for the lesson course, scoped to profile.id', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQuery.mockResolvedValue([]);
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(200);
+
+    // SECURITY PIN: the enrollment touch must scope to profile.id ('p1'), never a raw oid.
+    // The course is resolved from the lessonId via a subquery, so the params carry the lessonId.
+    const touchCall = mockQuery.mock.calls.find(
+      c => (c[0] as string).includes('UPDATE enrollments'),
+    );
+    expect(touchCall).toBeDefined();
+    expect(touchCall![0]).toContain('last_accessed_at = now()');
+    expect(touchCall![1]).toEqual(['p1', 'org-1', 'lesson-1']);
+  });
+
+  it('still returns 200 when the last_accessed_at stamp fails (best-effort)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    // First query (progress upsert) commits; second query (recency stamp) throws.
+    mockQuery
+      .mockResolvedValueOnce([])                        // lesson_progress upsert
+      .mockRejectedValueOnce(new Error('stamp boom'));  // enrollments last_accessed_at stamp
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await handler(baseReq as any, {} as any);
+
+    // The committed progress save must not be reported as failed just because the
+    // non-essential recency stamp threw (protects #289's optimistic-rollback UX).
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ success: true });
+    const upsertCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('lesson_progress'));
+    expect(upsertCall![1]).toEqual(['org-1', 'p1', 'lesson-1', 'completed']);
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
   });
 
   it('returns 401 when getProfile returns null', async () => {

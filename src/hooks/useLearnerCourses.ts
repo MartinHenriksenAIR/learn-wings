@@ -23,10 +23,11 @@ export function useLearnerCourses(
   return useQuery({
     queryKey: [...queryKeys.learnerCourses.list(orgId), lang],
     queryFn: async () => {
-      const data = await callApi<{ courses: Course[]; enrollments: Enrollment[] }>(
-        '/api/learner-courses',
-        { orgId, language: lang },
-      );
+      const data = await callApi<{
+        courses: Course[];
+        enrollments: Enrollment[];
+        progress: Record<string, { total: number; completed: number }>;
+      }>('/api/learner-courses', { orgId, language: lang });
 
       const coursesWithFreshThumbnails = await Promise.all(
         data.courses.map(async (course) => ({
@@ -38,6 +39,7 @@ export function useLearnerCourses(
       return {
         courses: coursesWithFreshThumbnails,
         enrollments: data.enrollments,
+        progress: data.progress,
       };
     },
     staleTime: options.staleTime ?? 60 * 1000,
