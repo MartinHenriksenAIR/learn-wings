@@ -2016,3 +2016,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors (1970 warnings = baseline; the three touched `src/` files add none) · `tsc -p tsconfig.app.json` 0 · `npm test` **842 / 111** · `build` 0. functions untouched.
 
 **Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.
+
+## 2026-08-03 — #342 community category labels translate in Danish (PR #351)
+
+**Who:** claude (Opus 4.8) with martin. Frontend-only. Run concurrently with the e2e-hardening session (#346); branched off `origin/main` @`f874e9a`, which already includes merged #338/#339/#340/#343.
+
+**What:** community category names (the fixed seeded taxonomy — "Challenges / Obstacles", "Questions & Help", …) came straight from the DB (`cat.name`) and never passed through i18next, so they stayed English in Danish mode across four render sites: the feed filter chips, the post-card badge, the post-detail badge, and the composer category picker.
+
+**How:** one shared `categoryLabel(cat, t)` helper (`src/lib/community-category-label.ts`) is the single source of truth — it maps `community.categories.<slug>.name` for the six seeded slugs, keyed off the stable slug (not the display name). Per #300 it passes no `defaultValue`; the six keys were added to BOTH `en.json` and `da.json`. All four sites route through it. Separately, `CategoryBadge` used to derive its colour by slug-ifying the English `name` — translating the name would have turned every badge grey — so it now takes an explicit `slug` prop for the colour lookup (required; all three callers updated), and the two DB-deleted colourMap slugs (`ideas-opportunities`, `resources-templates`) were dropped as unreachable.
+
+**Tests:** `community-category-label.test.ts` — 5 cases: slug→translation resolution, slug-not-name keying, the #300 raw-key behaviour for an unmapped slug, plus two coverage guards asserting all six seeded slugs are keyed with non-empty names in both locales and that en/da expose exactly that set (catches a future category shipping without keys, or en/da drift).
+
+**Coordination:** the only file surface shared with any in-flight branch was `src/i18n/locales/{en,da}.json`; #342's keys sit under `community.categories.*` while #343's went under `dashboard.community.*` — disjoint namespaces, merged with no conflict. `CommunityFeed.tsx` (the main edit) is touched by no other active branch. #343's `DashboardCommunitySection` inherits the fix for free (it renders `PostCard`).
+
+**Verify:** root `lint` 0 errors (1981 warnings = baseline; the touched `src/` files add none) · `tsc -p tsconfig.app.json` 0 · `npm test` **849 / 112** · `build` 0. functions untouched. Opus code-review clean (no Critical/Important; both Minor findings fixed).
+
+**Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.
