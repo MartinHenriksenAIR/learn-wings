@@ -27,6 +27,7 @@ import {
   togglePostHidden,
   togglePostLocked,
 } from '@/lib/community-api';
+import { categoryLabel } from '@/lib/community-category-label';
 import {
   Plus,
   Search,
@@ -267,7 +268,7 @@ export default function CommunityFeed() {
                         : 'border-input bg-card text-[#4a4f60] hover:opacity-85'
                     )}
                   >
-                    {cat.name}
+                    {categoryLabel(cat, t)}
                     {cat.is_restricted && <Lock aria-label={t('community.locked')} className="h-[11px] w-[11px]" />}
                   </button>
                 );

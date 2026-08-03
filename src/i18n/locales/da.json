@@ -266,6 +266,26 @@
     "quizNotReadyDescriptionLast": "Der er endnu ingen spørgsmål at besvare her. Quizzen vises her, når den er klar."
   },
   "community": {
+    "categories": {
+      "challenges-obstacles": {
+        "name": "Udfordringer / Forhindringer"
+      },
+      "risks-mitigation": {
+        "name": "Risici & Håndtering"
+      },
+      "questions-help": {
+        "name": "Spørgsmål & Hjælp"
+      },
+      "wins-learnings": {
+        "name": "Sejre / Læring"
+      },
+      "announcements": {
+        "name": "Meddelelser"
+      },
+      "events": {
+        "name": "Events / Træffetid"
+      }
+    },
     "title": "Fællesskab",
     "ideaLibrary": "Idébibliotek",
     "idea": "Idé",

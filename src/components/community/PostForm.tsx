@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { CategoryBadge } from './CategoryBadge';
+import { categoryLabel } from '@/lib/community-category-label';
 import { Loader2, X, Calendar } from 'lucide-react';
 import type { CommunityCategory, CommunityScope, CreatePostInput } from '@/lib/community-types';
 
@@ -170,7 +171,8 @@ export function PostForm({
                         <SelectItem key={cat.id} value={cat.id}>
                           <div className="flex items-center gap-2">
                             <CategoryBadge
-                              name={cat.name}
+                              name={categoryLabel(cat, t)}
+                              slug={cat.slug}
                               icon={cat.icon}
                               size="sm"
                             />

@@ -15,6 +15,8 @@ import {
 
 interface CategoryBadgeProps {
   name: string;
+  /** Stable category slug — drives the color, independent of the (translatable) name. */
+  slug: string;
   icon?: string | null;
   isRestricted?: boolean;
   size?: 'sm' | 'md';
@@ -45,13 +47,13 @@ const colorMap: Record<string, string> = {
 
 export function CategoryBadge({
   name,
+  slug,
   icon,
   isRestricted = false,
   size = 'md',
   className,
 }: CategoryBadgeProps) {
   const Icon = icon ? iconMap[icon] : null;
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   const colorClass = colorMap[slug] || 'bg-muted text-muted-foreground';
 
   return (
