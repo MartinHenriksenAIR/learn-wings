@@ -15,6 +15,8 @@ import {
 
 interface CategoryBadgeProps {
   name: string;
+  /** Stable category slug — drives the color, independent of the (translatable) name. */
+  slug: string;
   icon?: string | null;
   isRestricted?: boolean;
   size?: 'sm' | 'md';
@@ -32,26 +34,25 @@ const iconMap: Record<string, LucideIcon> = {
   Calendar,
 };
 
+// Keyed by the seeded category slugs (migration/azure/02-seed.sql).
 const colorMap: Record<string, string> = {
-  'ideas-opportunities': 'bg-amber-100 text-amber-800',
   'challenges-obstacles': 'bg-orange-100 text-orange-800',
   'risks-mitigation': 'bg-red-100 text-red-800',
   'questions-help': 'bg-blue-100 text-blue-800',
   'wins-learnings': 'bg-green-100 text-green-800',
-  'resources-templates': 'bg-purple-100 text-purple-800',
   'announcements': 'bg-pink-100 text-pink-800',
   'events': 'bg-indigo-100 text-indigo-800',
 };
 
 export function CategoryBadge({
   name,
+  slug,
   icon,
   isRestricted = false,
   size = 'md',
   className,
 }: CategoryBadgeProps) {
   const Icon = icon ? iconMap[icon] : null;
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   const colorClass = colorMap[slug] || 'bg-muted text-muted-foreground';
 
   return (

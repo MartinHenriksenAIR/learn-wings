@@ -266,6 +266,26 @@
     "quizNotReadyDescriptionLast": "There are no questions to answer here yet. This quiz will appear here once it's ready."
   },
   "community": {
+    "categories": {
+      "challenges-obstacles": {
+        "name": "Challenges / Obstacles"
+      },
+      "risks-mitigation": {
+        "name": "Risks & Mitigation"
+      },
+      "questions-help": {
+        "name": "Questions & Help"
+      },
+      "wins-learnings": {
+        "name": "Wins / Learnings"
+      },
+      "announcements": {
+        "name": "Announcements"
+      },
+      "events": {
+        "name": "Events / Office Hours"
+      }
+    },
     "title": "Community",
     "ideaLibrary": "Idea Library",
     "idea": "Idea",

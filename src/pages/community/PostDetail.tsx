@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import { Badge } from '@/components/ui/badge';
 import { CategoryBadge } from '@/components/community/CategoryBadge';
+import { categoryLabel } from '@/lib/community-category-label';
 import { TagList } from '@/components/community/TagList';
 import { CommentThread } from '@/components/community/CommentThread';
 import { ReportDialog } from '@/components/community/ReportDialog';
@@ -279,7 +280,8 @@ export default function PostDetail() {
             <div className="flex shrink-0 items-center gap-2">
               {post.category && (
                 <CategoryBadge
-                  name={post.category.name}
+                  name={categoryLabel(post.category, t)}
+                  slug={post.category.slug}
                   icon={post.category.icon}
                   isRestricted={post.category.is_restricted}
                 />

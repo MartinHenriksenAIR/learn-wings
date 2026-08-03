@@ -3,6 +3,7 @@ import { BrandingAvatar } from '@/components/ui/branding-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CategoryBadge } from './CategoryBadge';
+import { categoryLabel } from '@/lib/community-category-label';
 import { TagList } from './TagList';
 import { MessageSquare, Pin, Lock, Calendar, MapPin, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { formatDate, formatDistanceToNowLocalized } from '@/lib/date-locale';
@@ -55,7 +56,8 @@ export function PostCard({
         <div className="flex shrink-0 items-center gap-2">
           {post.category && (
             <CategoryBadge
-              name={post.category.name}
+              name={categoryLabel(post.category, t)}
+              slug={post.category.slug}
               icon={post.category.icon}
               isRestricted={post.category.is_restricted}
               size="sm"
