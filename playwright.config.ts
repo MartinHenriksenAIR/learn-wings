@@ -57,10 +57,12 @@ export default defineConfig({
   // e2e/fixtures/auth.ts), before a spec has asserted anything at all. So this is a
   // default sized for a warm run, not a ceiling above the sum of a spec's bounded
   // waits. A spec whose own waits sum past it replaces it with
-  // `test.describe.configure({ timeout })` — 05, 06 and 08 each derive one and state
-  // their own arithmetic. The rest still run under this default, so a cold start on one
-  // of them can report Playwright's generic timeout in place of the message carried by
-  // the wait it interrupted.
+  // `test.describe.configure({ timeout })` — every authenticated spec in e2e/specs (01–08)
+  // now derives one and states its own arithmetic (#337, following 05/06/08), so a cold
+  // start reports the message carried by the wait it interrupted rather than Playwright's
+  // generic timeout. What still runs under this default is the unauthenticated 00-harness
+  // smoke, whose waits fit inside it, and the setup project, whose only long wait is the
+  // sign-in it performs.
   timeout: SIGN_IN_WORST_CASE_TIMEOUT + 25_000,
   expect: { timeout: 15_000 },
   reporter: [['list'], ['html', { open: 'never' }]],

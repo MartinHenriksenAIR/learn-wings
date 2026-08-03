@@ -73,6 +73,21 @@ test.describe.configure({ retries: 0 });
 const MEMBERS_PATH = '/app/admin/org?tab=members';
 
 /**
+ * The two members-tab reads the closing assertions' emptiness is read off.
+ *
+ * `useInvitations` posts to `/api/invitations` and `useOrgMemberships` to
+ * `/api/org-memberships` (src/hooks/useInvitations.ts, src/hooks/useOrgMemberships.ts).
+ * `OrgMembersTab` renders a *failed* query — `data === undefined` — as `[]`
+ * (OrgMembersTab.tsx:100-107,410-415), identical to a successful empty response, so the
+ * post-revoke `0 / 0 / no-members` reading holds just as well when the backend is down.
+ * The closing check waits on these two responses and asserts each answered ok before
+ * reading emptiness off them, so a 500, a 401 on an expired token, or an aborted request
+ * fails the run there instead of passing it green.
+ */
+const INVITATIONS_ENDPOINT = '/api/invitations';
+const MEMBERSHIPS_ENDPOINT = '/api/org-memberships';
+
+/**
  * Budget for a members-tab read: an Azure Functions call plus the render it feeds.
  * Wider than the config's 15s `expect` default, which was sized for assertions on
  * already-rendered state — a cold function start alone can eat it.
@@ -86,6 +101,20 @@ const INVITE_READ_TIMEOUT = 30_000;
  * so this figure has to cover two cold starts.
  */
 const INVITE_SUBMIT_TIMEOUT = 45_000;
+
+/**
+ * Budget for the two closing reads to *answer*, counted from when their `waitForResponse`
+ * listeners are attached — which is before the final `gotoFenced`, so it has to span that
+ * whole navigation as well as the read the members tab then issues. gotoFenced's own worst
+ * case is ~105s (see SPEC_TIMEOUT) and a read is 30s, so this is sized above that sum.
+ *
+ * It does not widen this spec's worst case, so SPEC_TIMEOUT need not grow: a response that
+ * arrives — any status — resolves the wait no later than the tab finishes loading, which
+ * the `inviteTrigger` read below already accounts for; and a response that never arrives
+ * fails the run here rather than continuing, so this wait and the reads after it are never
+ * both spent to the full in one run.
+ */
+const CLOSING_READ_TIMEOUT = 5 * INVITE_READ_TIMEOUT;
 
 /**
  * What one run of this journey may spend, replacing the config's per-test cap.
@@ -158,14 +187,24 @@ const EMAIL_NOT_SENT = 'Copy the invite link to share with the user.';
 const REVOKE_FAILED = 'Failed to cancel invitation';
 
 /**
- * The invite trigger, which doubles as the members tab's loaded signal.
+ * The invite trigger, which doubles as the members tab's *settled* signal — settled,
+ * not succeeded.
  *
  * `OrgMembersTab` returns a bare `PageSpinner` until its memberships, invitations and
  * AI-champion queries have all settled (OrgMembersTab.tsx:410-415), so this button
- * existing is what separates "the tab is loaded and holds no invitations" from "the
- * invitations request has not answered yet". Every count below turns on that
- * distinction: during the spinner they all read 0, so an unloaded tab would look
- * exactly like a fence with nothing in it.
+ * existing separates "the reads have come back" from "they have not answered yet":
+ * during the spinner every count below reads 0, so an unloaded tab would look exactly
+ * like a fence with nothing in it, and waiting for this button rules that out.
+ *
+ * What it does NOT establish is that those reads SUCCEEDED. A rejected query ends the
+ * spinner too, and `OrgMembersTab` renders its `undefined` data as `[]`
+ * (OrgMembersTab.tsx:100-107) — indistinguishable from a successful empty response. So
+ * this button being visible cannot tell a genuinely empty fence from one whose reads
+ * 500'd or hit an expired token: both show `0 / 0 / no-members`. Where that distinction
+ * is load-bearing — the post-revoke check, which reads emptiness as proof the revoke
+ * took effect — the responses themselves are awaited and asserted ok
+ * (INVITATIONS_ENDPOINT / MEMBERSHIPS_ENDPOINT) before any count is trusted. That
+ * verified-successful response is the mechanism ruling out the false pass, not this button.
  *
  * `.first()` because an organization with no members renders this label twice — the
  * header's `DialogTrigger` (OrgMembersTab.tsx:464-467) and the `EmptyState` action
@@ -378,7 +417,47 @@ test('an invitation can be sent, seen as pending, and revoked', async ({ page, f
   // keeps zero members. Adoption instead adds one and the empty state disappears. So
   // asserting the empty state still renders, alongside the empty pending list, is what
   // makes this the revoke's confirmation: it fails if the revoke silently did not happen.
+  //
+  // But all three of those readings are `0 / 0 / no-members`, and so is a members tab
+  // whose reads FAILED: `OrgMembersTab` renders `data === undefined` as `[]`
+  // (OrgMembersTab.tsx:100-107,410-415), so a 500, an expired token or a backend outage
+  // produces the identical empty page — and `inviteTrigger` being visible does not tell
+  // the two apart, because a rejected query ends the loading spinner just as a resolved
+  // one does (see inviteTrigger's note). So the two reads' responses are awaited and
+  // asserted ok BEFORE emptiness is read off them: an errored fetch cannot answer 2xx, so
+  // it can no longer masquerade as a clean fence. The listeners are attached before the
+  // navigation that fires the reads, so the fresh boot's responses cannot arrive and be
+  // missed before the wait that catches them exists.
+  const invitationsLoaded = page.waitForResponse(
+    (response) => response.url().includes(INVITATIONS_ENDPOINT),
+    { timeout: CLOSING_READ_TIMEOUT },
+  );
+  const membershipsLoaded = page.waitForResponse(
+    (response) => response.url().includes(MEMBERSHIPS_ENDPOINT),
+    { timeout: CLOSING_READ_TIMEOUT },
+  );
   await gotoFenced(page, fencedOrg, MEMBERS_PATH);
+
+  // Await both together so each promise has a handler attached before either .ok() can throw:
+  // asserting off `invitationsResponse` first and only then awaiting `membershipsLoaded` would
+  // leave the memberships promise handler-less if the first assertion failed, so a both-aborted
+  // forced-fail could reject it unhandled. The assertions still run in invitations-then-memberships
+  // order, and both still precede the emptiness reads below.
+  const [invitationsResponse, membershipsResponse] = await Promise.all([
+    invitationsLoaded,
+    membershipsLoaded,
+  ]);
+  expect(
+    invitationsResponse.ok(),
+    `${INVITATIONS_ENDPOINT} answered ${invitationsResponse.status()} on the post-revoke boot, so the ` +
+      'empty pending list below would be `undefined` rendered as `[]`, not a confirmed-empty read',
+  ).toBe(true);
+  expect(
+    membershipsResponse.ok(),
+    `${MEMBERSHIPS_ENDPOINT} answered ${membershipsResponse.status()} on the post-revoke boot, so the ` +
+      '"no members" state below would be a failed read rendered empty, not proof the revoke kept the fence clean',
+  ).toBe(true);
+
   await expect(inviteTrigger(page)).toBeVisible({ timeout: INVITE_READ_TIMEOUT });
   await expect(
     invitationEmail(page, inviteTo),

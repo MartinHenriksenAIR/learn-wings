@@ -1,10 +1,17 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../fixtures/session';
 import { SIGN_IN_WORST_CASE_TIMEOUT, sidebarNav, signInThroughSso } from '../fixtures/auth';
+import { orgSelector } from '../fixtures/fenced-org';
 
 /**
- * The learner journey: open a course, complete a lesson, and prove the progress reached
- * the database rather than a component's `useState`.
+ * The learner journey: open a course, complete a lesson if it is still outstanding, and
+ * prove the progress reached the database rather than a component's `useState`.
+ *
+ * It is a one-time write plus an ongoing persistence read, not a write exercised on every
+ * run: `/api/lesson-progress` upserts and the app offers no un-complete, so only the first
+ * run against a fresh account performs the write, and every later run re-reads the persisted
+ * row across a reload without writing again (see "Re-running is safe but not symmetric"
+ * below). The suite's design doc labels this row the same way — a write once, then a read.
  *
  * It writes to the production database, and unlike 04-course-lifecycle it is not fenced.
  * The one write is `/api/lesson-progress`, which upserts a single row keyed
@@ -74,6 +81,32 @@ const MARK_COMPLETE = 'Mark as complete';
 const COMPLETED = 'Completed';
 
 /**
+ * The `OrgSelector` trigger text this journey requires: a real organization's name.
+ *
+ * A regex rather than a fixed string, because the journey does not choose the org — in
+ * learner view `OrgSelector` auto-selects `orgs[0]`, the most recently created org
+ * (OrgSelector.tsx:24-32; functions/organizations/index.ts:33) — so which name it lands on
+ * is not fixed and cannot be asserted literally. What it *can* assert is that the trigger is
+ * neither of the two states that mean "wrong org", and this pattern matches only once it is
+ * neither:
+ *
+ *  - the `Platform-wide (no org)` placeholder (OrgSelector.tsx:86), shown until auto-select
+ *    commits and forever when the org list is empty. Excluded so a single retrying matcher
+ *    waits *past* that transient rather than passing on it — a bare `not.toContainText('e2e-')`
+ *    would pass on the placeholder before the org name lands, and miss the debris below.
+ *  - an `e2e-`-prefixed name (`e2eName`, e2e/run-id.ts), which is run debris: a fenced org
+ *    stranded by a failed 02/04 teardown is the newest org, so it becomes `orgs[0]`, and its
+ *    catalogue is empty — the one wrong org that turns this journey red against healthy code
+ *    with a message nobody would connect to a stray organization (#329).
+ *
+ * `toHaveText` also fails on a missing element, so this one assertion is its own anchor too:
+ * it covers the loading spinner (no combobox yet, OrgSelector.tsx:50), the placeholder
+ * transient and the debris case, and passes only once the trigger has settled on a real
+ * organization's name.
+ */
+const SELECTED_ORG = /^(?!Platform-wide \(no org\)$)(?!.*e2e-).+$/;
+
+/**
  * Budget for one lesson-progress write to land, or for the first read after a boot.
  *
  * Wider than the config's 15s `expect` default, which was sized for assertions on
@@ -88,23 +121,24 @@ const LESSON_WRITE_TIMEOUT = 30_000;
  * What one run of this journey may spend, replacing the config's per-test cap.
  *
  * That cap is `SIGN_IN_WORST_CASE_TIMEOUT + 25_000` — 90s, sized for a spec whose only long
- * wait is sign-in itself (playwright.config.ts). The caps on this journey's path sum to 515s:
+ * wait is sign-in itself (playwright.config.ts). The caps on this journey's path sum to 545s:
  * sign-in's own worst case (65s) plus the `page.goto('/login')` inside it, which that figure
- * deliberately excludes (30s); six `LESSON_WRITE_TIMEOUT` waits (180s); two more navigations
- * at Playwright's 30s default, the catalogue `goto` and the reload (60s); and twelve
- * assertions and clicks left on the config's 15s `expect`/`actionTimeout` defaults (180s).
+ * deliberately excludes (30s); seven `LESSON_WRITE_TIMEOUT` waits (210s) — the six on the
+ * lesson path plus the org-selection assertion below; two more navigations at Playwright's 30s
+ * default, the catalogue `goto` and the reload (60s); and twelve assertions and clicks left on
+ * the config's 15s `expect`/`actionTimeout` defaults (180s).
  *
  * So at 90s a cold start trips the per-test cap while one of those waits is still running, and
  * the run prints Playwright's generic "Test timeout exceeded" instead of the message that wait
  * carries — which is the whole reason each of them carries one.
  *
- * Sixteen write budgets (480s) plus sign-in's own worst case comes to 545s, above that sum —
+ * Seventeen write budgets (510s) plus sign-in's own worst case comes to 575s, above that sum —
  * sized the way the fence fixtures size their phase budgets (e2e/fixtures/fenced-org.ts), so
  * that this cap is never the thing that fires and a failure is always diagnosed by the
  * assertion it happened in. It is a ceiling on a pathological run where every wait spends its
  * whole budget, not an expectation: measured warm, the journey finishes in seconds.
  */
-const SPEC_TIMEOUT = SIGN_IN_WORST_CASE_TIMEOUT + 16 * LESSON_WRITE_TIMEOUT;
+const SPEC_TIMEOUT = SIGN_IN_WORST_CASE_TIMEOUT + 17 * LESSON_WRITE_TIMEOUT;
 
 test.describe.configure({ timeout: SPEC_TIMEOUT });
 
@@ -210,6 +244,22 @@ test('a completed lesson stays completed after a reload', async ({ page, viewMod
   const nav = sidebarNav(page);
   await expect(nav.getByRole('link', { name: 'Organizations', exact: true })).toBeHidden();
   await expect(nav.getByRole('link', { name: 'Organization', exact: true })).toBeHidden();
+
+  // Which organization this journey is operating in. It does not choose it — `OrgSelector`
+  // auto-selects `orgs[0]` (see the file header and SELECTED_ORG) — so it asserts that
+  // auto-selection landed on a real org rather than run debris. Without this, leftover `e2e-`
+  // debris silently reroutes the journey to an empty catalogue and the play-link assertion
+  // below goes red against healthy code with a cause nobody would guess (#329). Reusing the
+  // exported `orgSelector` keeps that locator defined once, in the fence's own module.
+  await expect(
+    orgSelector(page),
+    'the sidebar OrgSelector never settled on a real organization this journey can drive. In ' +
+      'learner view it auto-selects orgs[0] — the most recently created org ' +
+      '(functions/organizations/index.ts:33) — so the usual cause is run debris: a fenced org ' +
+      'stranded by a failed 02/04 teardown is the newest org, becomes orgs[0], carries the ' +
+      'e2e- prefix and has an empty catalogue. Delete the stranded e2e- org and re-run. (It ' +
+      'also fails if no org is ever selected, or the org list never loaded.)',
+  ).toHaveText(SELECTED_ORG, { timeout: LESSON_WRITE_TIMEOUT });
 
   // By name: a positional "first card" locator would drive whatever the catalogue
   // happened to contain and still pass. The link inside the card is the play link —

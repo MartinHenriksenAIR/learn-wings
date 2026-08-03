@@ -7,9 +7,10 @@ export const AUTH_STATE_PATH = 'e2e/.auth/platform-admin.json';
  * The three role views the app can render, mirroring `ViewMode` in
  * src/hooks/useAuth.tsx.
  *
- * Declared here rather than in e2e/fixtures/session.ts — which re-exports it as
- * the fixture's public name — because `signInThroughSso` needs it and session.ts
- * imports this module at runtime. Owning it there would make the cycle a real one.
+ * Owned by this module because it needs the type for SIDEBAR_LANDMARK below —
+ * the per-view table mapping each view to the sidebar link `signInThroughSso`
+ * waits for. e2e/fixtures/session.ts re-exports it as the fixture's public name,
+ * so specs have a single import site for the fixture and its types.
  */
 export type ViewMode = 'platform_admin' | 'org_admin' | 'learner';
 

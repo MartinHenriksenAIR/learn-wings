@@ -2032,3 +2032,25 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors (1981 warnings = baseline; the touched `src/` files add none) · `tsc -p tsconfig.app.json` 0 · `npm test` **849 / 112** · `build` 0. functions untouched. Opus code-review clean (no Critical/Important; both Minor findings fixed).
 
 **Deploy:** frontend-only, so the SWA workflow ships it automatically on merge to `main`; no functions deploy.
+
+---
+
+## 2026-08-03 — e2e smoke-suite hardening: the six #124-review follow-ups (PR #346)
+
+**Who:** claude (Opus 4.8) as controller + per-task implementer/reviewer subagent pairs, subagent-driven-development, with martin deciding the merge. Closes the six `hardening` issues filed off #124's own review (#316): **#318 #321 #329 #332 #334 #337**. Test-only — no shipped app code changed.
+
+**What shipped (one commit per issue):**
+- **#332** — the invite journey's post-revoke assertions (`0 invitations / 0 members / no-members`) passed green even if the queries *failed*, because `OrgMembersTab` renders `undefined → []`. The closing block now awaits `/api/invitations` + `/api/org-memberships` and asserts `response.ok()` *before* the emptiness reads, so a 500/expired-token can no longer masquerade as a successful revoke.
+- **#321** — a fixture-installed route guard (`installWriteFenceGuard` in `fenced-org.ts`) aborts any non-GET `/api/*` carrying a *foreign* orgId. The fence id is learned only by exact match against the run's unique slug, so it is the fence's real id or null — a legitimate write can never be aborted (every write across 02/04/06/08 enumerated and confirmed allowed). A bare-`page.goto`-then-write now fails instead of silently writing into `orgs[0]`. Chosen over the eslint-rule option (which covers only one spelling of the mistake). The pre-existing `pinFenceLast` self-test already detects a gutted `gotoFenced`.
+- **#329** — the learner journey now asserts *which* org it operates in (`SELECTED_ORG` regex rejecting `e2e-` debris + the placeholder, with a diagnostic message), so cross-run debris that changes `orgs[0]` produces a named failure instead of an unexplained red; the one-time write is relabelled honestly in the design doc + spec (no unqualified "(write)"). Falsifiability of the persistence check preserved.
+- **#334** — the quiz journey's load-bearing `waitForResponse` was silently inheriting the 15s `actionTimeout` while its siblings got 30s. It now gets an explicit `QUIZ_READ_TIMEOUT` (30s) and a naming message. Verified against the installed Playwright 1.62 source that `expect(promise).resolves` awaits unbounded (no `Promise.race`/deadline), so the 30s genuinely governs rather than being clamped back to the config's 15s `expect` timeout.
+- **#337** — per-test timeout budgets (`test.describe.configure`) added to the five specs that lacked them (01/02/03/04/07), each derived from its own worst-case wait sum (margins +30/+30/+30/+15/+30), mirroring 05/06/08; the global cap is unchanged (only a stale comment corrected).
+- **#318** — corrected two fixture comments that justified the `ViewMode` split by a runtime import cycle that doesn't exist (`import type` is compile-time erased).
+
+**Process worth noting:** each task got a fresh implementer then a spec+quality review before the next; a whole-branch review (Opus 4.8) returned APPROVE FOR MERGE with all five cross-task interactions (334×337 on 07, 332×337 on 06, 321×writing journeys, 329×321, constant coherence) confirmed sound. The controller couldn't run the live suite (no local deployed app/login), so every "red on a failed query / green on success" property was established structurally and against Playwright internals, not by executing `npm run e2e` — the PR preview environment (`...-346...`) is where the live run belongs.
+
+**One accepted residual (intentional):** the new route guard's own abort path has no committed regression test — a test would require a browser-context `fetch` (barred by the `e2e/README` convention) plus `@ts-expect-error`, and is beyond #321's acceptance criteria. Documented rather than bending two tree conventions.
+
+**Verify:** on the trunk-merged branch — root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **849 / 112** · `build` 0 · `playwright test --list` 16 tests / 10 files. Merged `origin/main` in cleanly first (trunk had moved by #342/#339/#343; disjoint files, no conflicts).
+
+**Deploy:** test-only — the SWA workflow ships the (unchanged) frontend on merge; no user-visible change and no functions deploy. A full live `npm run e2e` against the deployed app is the remaining real-world confirmation, and is martin's to run (needs a hand-captured Entra session).
