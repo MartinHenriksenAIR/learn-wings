@@ -438,13 +438,20 @@ test('an invitation can be sent, seen as pending, and revoked', async ({ page, f
   );
   await gotoFenced(page, fencedOrg, MEMBERS_PATH);
 
-  const invitationsResponse = await invitationsLoaded;
+  // Await both together so each promise has a handler attached before either .ok() can throw:
+  // asserting off `invitationsResponse` first and only then awaiting `membershipsLoaded` would
+  // leave the memberships promise handler-less if the first assertion failed, so a both-aborted
+  // forced-fail could reject it unhandled. The assertions still run in invitations-then-memberships
+  // order, and both still precede the emptiness reads below.
+  const [invitationsResponse, membershipsResponse] = await Promise.all([
+    invitationsLoaded,
+    membershipsLoaded,
+  ]);
   expect(
     invitationsResponse.ok(),
     `${INVITATIONS_ENDPOINT} answered ${invitationsResponse.status()} on the post-revoke boot, so the ` +
       'empty pending list below would be `undefined` rendered as `[]`, not a confirmed-empty read',
   ).toBe(true);
-  const membershipsResponse = await membershipsLoaded;
   expect(
     membershipsResponse.ok(),
     `${MEMBERSHIPS_ENDPOINT} answered ${membershipsResponse.status()} on the post-revoke boot, so the ` +

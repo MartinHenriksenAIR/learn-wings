@@ -414,8 +414,11 @@ async function installWriteFenceGuard(page: Page, org: FencedOrg): Promise<void>
 
   await page.route(API_REQUEST, async (route) => {
     const request = route.request();
-    // Reads are not the escape #321 is about, and rewriting them would add a round-trip and
-    // collide with a spec that fulfils one itself (02-fence's pinFenceLast).
+    // callApi/callApiRaw are always POST (src/lib/api-client.ts:32,49), so the app issues no
+    // GET /api reads — this branch is a defensive fallthrough for any non-callApi GET traffic.
+    // The app's real reads are POSTs, handled below like any write: a foreign-org one is aborted,
+    // and the only such read the fence reaches (/api/org-settings) degrades via its own .catch
+    // (usePlatformSettings.tsx:60) instead of erroring.
     if (request.method() === 'GET') {
       return route.fallback();
     }
