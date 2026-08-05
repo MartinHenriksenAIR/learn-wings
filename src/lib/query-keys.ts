@@ -231,6 +231,10 @@ export const queryKeys = {
     detail: (orgId: string | undefined) => ['learner-dashboard', orgId] as const,
   },
 
+  learnerTraining: {
+    detail: (orgId: string | undefined) => ['learner-training', orgId] as const,
+  },
+
   assessment: {
     /** No params; fixed content with a long staleTime. */
     questions: ['assessment-questions'] as const,

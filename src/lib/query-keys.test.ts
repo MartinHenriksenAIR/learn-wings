@@ -198,6 +198,13 @@ describe('queryKeys', () => {
     expect(queryKeys.learnerDashboard.detail(undefined)).toEqual(['learner-dashboard', undefined]);
   });
 
+  it('learnerTraining.detail returns the parameterized key', () => {
+    expect(queryKeys.learnerTraining.detail('org-1')).toEqual(['learner-training', 'org-1']);
+  });
+  it('learnerTraining.detail with undefined orgId', () => {
+    expect(queryKeys.learnerTraining.detail(undefined)).toEqual(['learner-training', undefined]);
+  });
+
   it('seatPricing.all is stable', () => {
     expect(queryKeys.seatPricing.all).toEqual(['seat-pricing']);
   });
