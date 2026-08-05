@@ -13,6 +13,7 @@ import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import LearnerDashboard from "./pages/learner/Dashboard";
+import LearnerTraining from "./pages/learner/Training";
 import LearnerCourses from "./pages/learner/Courses";
 import Assessment from "./pages/learner/Assessment";
 import CoursePlayer from "./pages/learner/CoursePlayer";
@@ -48,6 +49,7 @@ function AppRoutes() {
       <Route path={routes.auth.resetPassword} element={<ResetPassword />} />
 
       <Route path={routes.learner.dashboard} element={<ProtectedRoute learnerOnly><LearnerDashboard /></ProtectedRoute>} />
+      <Route path={routes.learner.training} element={<ProtectedRoute learnerOnly><LearnerTraining /></ProtectedRoute>} />
       <Route path={routes.learner.courses} element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
       <Route path={routes.learner.assessment} element={<ProtectedRoute learnerOnly><Assessment /></ProtectedRoute>} />
       <Route path={routes.learner.coursePlayerPattern} element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />

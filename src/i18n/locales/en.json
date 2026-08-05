@@ -187,6 +187,29 @@
       "noActivityDescription": "Be the first to start a conversation in the community."
     }
   },
+  "training": {
+    "title": "My Training",
+    "subtitle": "Your learning, all in one place.",
+    "comingSoon": "Coming soon.",
+    "progress": {
+      "summary": "{{done}} of {{total}} lessons complete",
+      "empty": "No lessons yet — start a course to see your progress here."
+    },
+    "mandatory": {
+      "title": "Mandatory"
+    },
+    "continue": {
+      "title": "Continue",
+      "empty": "Nothing in progress right now. Browse the catalog to start a course."
+    },
+    "favorites": {
+      "title": "Favorites"
+    },
+    "completed": {
+      "title": "Completed",
+      "empty": "You haven't completed any courses yet. Finished courses appear here."
+    }
+  },
   "courses": {
     "title": "Course Catalog",
     "progress": "Progress",

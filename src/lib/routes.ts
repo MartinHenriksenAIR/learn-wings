@@ -28,6 +28,8 @@ export const routes = {
   },
   learner: {
     dashboard: '/app/dashboard',
+    /** Personal learning home — "My Training" / "Min Træning" (#364). */
+    training: '/app/training',
     courses: '/app/courses',
     assessment: '/app/assessment',
     coursePlayerPattern: '/app/learn/:courseId',

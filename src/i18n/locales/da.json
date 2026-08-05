@@ -187,6 +187,29 @@
       "noActivityDescription": "Vær den første til at starte en samtale i fællesskabet."
     }
   },
+  "training": {
+    "title": "Min Træning",
+    "subtitle": "Din læring — samlet ét sted.",
+    "comingSoon": "Kommer snart.",
+    "progress": {
+      "summary": "{{done}} af {{total}} lektioner gennemført",
+      "empty": "Ingen lektioner endnu — start et kursus for at se din fremgang her."
+    },
+    "mandatory": {
+      "title": "Obligatorisk"
+    },
+    "continue": {
+      "title": "Fortsæt",
+      "empty": "Intet i gang lige nu. Gennemse Kursuskatalog for at starte et kursus."
+    },
+    "favorites": {
+      "title": "Favoritter"
+    },
+    "completed": {
+      "title": "Afsluttet",
+      "empty": "Du har endnu ikke afsluttet nogen kurser. Afsluttede kurser vises her."
+    }
+  },
   "courses": {
     "title": "Kursuskatalog",
     "progress": "Fremgang",
