@@ -16,9 +16,10 @@ export default adminEndpoint('course-create', async ({ req, profile, reply }) =>
     level?: unknown;
     language?: unknown;
     thumbnailUrl?: unknown;
+    categoryId?: unknown;
   };
 
-  const { title, description, level, language, thumbnailUrl } = body;
+  const { title, description, level, language, thumbnailUrl, categoryId } = body;
 
   if (!title || typeof title !== 'string' || title.trim() === '') {
     return reply(400, { error: 'title is required' });
@@ -39,6 +40,18 @@ export default adminEndpoint('course-create', async ({ req, profile, reply }) =>
 
   if (thumbnailUrl !== undefined && thumbnailUrl !== null && typeof thumbnailUrl !== 'string') {
     return reply(400, { error: 'thumbnailUrl must be a string or null' });
+  }
+
+  // categoryId: null/undefined leaves the course uncategorized; a non-null value
+  // must be a string that references an existing course_categories row.
+  if (categoryId !== undefined && categoryId !== null && typeof categoryId !== 'string') {
+    return reply(400, { error: 'categoryId must be a string or null' });
+  }
+  if (typeof categoryId === 'string') {
+    const category = await queryOne('SELECT 1 FROM course_categories WHERE id = $1', [categoryId]);
+    if (!category) {
+      return reply(400, { error: 'category not found' });
+    }
   }
 
   // One candidate list, handed to both gates in order. There is no previous row,
@@ -65,8 +78,8 @@ export default adminEndpoint('course-create', async ({ req, profile, reply }) =>
   }
 
   const course = await queryOne(
-    `INSERT INTO courses (title, description, level, language, thumbnail_url, created_by_user_id, is_published)
-     VALUES ($1, $2, $3, $4, $5, $6, false)
+    `INSERT INTO courses (title, description, level, language, thumbnail_url, created_by_user_id, category_id, is_published)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, false)
      RETURNING *`,
     [
       title,
@@ -75,6 +88,7 @@ export default adminEndpoint('course-create', async ({ req, profile, reply }) =>
       language,
       thumbnailUrl ?? null,
       profile.id,  // server-set — never from client body
+      categoryId ?? null,
     ],
   );
 

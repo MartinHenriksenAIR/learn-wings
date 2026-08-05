@@ -19,6 +19,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import { DeleteCourseDialog } from '@/components/platform-admin/DeleteCourseDialog';
+import { CategoryManager } from '@/components/platform-admin/CategoryManager';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -28,6 +29,7 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { callApi } from '@/lib/api-client';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { useCoursesAdmin, type CoursesAdminData } from '@/hooks/useCoursesAdmin';
+import { useCourseCategories } from '@/hooks/useCourseCategories';
 import { useToastMutation } from '@/hooks/useToastMutation';
 import { extractLmsAssetPath } from '@/lib/storage';
 import { Course, CourseLevel, OrgCourseAccess } from '@/lib/types';
@@ -41,6 +43,13 @@ import { cn } from '@/lib/utils';
  */
 export const coursesAdminQueryKey = queryKeys.coursesAdmin.all;
 
+/**
+ * Radix Select can't hold an empty-string value, so the create dialog's
+ * "Uncategorized" option uses this sentinel; it maps to/from `categoryId: null`
+ * at the state boundary — mirroring CourseEditor's picker.
+ */
+const UNCATEGORIZED = '__none__';
+
 /** RETURNING'd access rows replace any prior row for the same org+course pair. */
 function upsertAccessRecords(existing: OrgCourseAccess[], incoming: OrgCourseAccess[]): OrgCourseAccess[] {
   const kept = existing.filter(
@@ -51,7 +60,7 @@ function upsertAccessRecords(existing: OrgCourseAccess[], incoming: OrgCourseAcc
 
 export default function CoursesManager() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -65,6 +74,7 @@ export default function CoursesManager() {
   const [description, setDescription] = useState('');
   const [level, setLevel] = useState<CourseLevel>('basic');
   const [language, setLanguage] = useState<'en' | 'da'>('da');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -96,6 +106,10 @@ export default function CoursesManager() {
   const courses = coursesData?.courses ?? [];
   const accessRecords = coursesData?.accessRecords ?? [];
 
+  // Only fetch categories once the create dialog is opened — they're only used by
+  // its picker (the management tab mounts CategoryManager, which fetches its own).
+  const { data: categories = [] } = useCourseCategories({ enabled: createOpen });
+
   useEffect(() => {
     if (coursesError) {
       toast({ title: 'Failed to load courses', description: coursesError.message, variant: 'destructive' });
@@ -112,12 +126,12 @@ export default function CoursesManager() {
   };
 
   const createCourseMutation = useToastMutation({
-    mutationFn: (input: { title: string; description: string; level: CourseLevel; language: 'en' | 'da'; thumbnailUrl: string | null }) =>
+    mutationFn: (input: { title: string; description: string; level: CourseLevel; language: 'en' | 'da'; categoryId: string | null; thumbnailUrl: string | null }) =>
       callApi<{ course: Course }>('/api/course-create', input),
     errorTitle: 'Failed to create course',
     onSuccess: () => {
       toast({ title: t('coursesManager.courseCreated') });
-      setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic'); setLanguage('da'); setThumbnailUrl(null);
+      setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic'); setLanguage('da'); setCategoryId(null); setThumbnailUrl(null);
       // KEEP the refetch here: the new course's thumbnail path needs re-signing.
       queryClient.invalidateQueries({ queryKey: coursesAdminQueryKey });
     },
@@ -127,7 +141,7 @@ export default function CoursesManager() {
   const handleCreate = () => {
     if (!title.trim()) return;
     const thumbnailToPersist = extractLmsAssetPath(thumbnailUrl) ?? thumbnailUrl;
-    createCourseMutation.mutate({ title, description, level, language, thumbnailUrl: thumbnailToPersist });
+    createCourseMutation.mutate({ title, description, level, language, categoryId, thumbnailUrl: thumbnailToPersist });
   };
 
   const togglePublishMutation = useToastMutation({
@@ -350,6 +364,23 @@ export default function CoursesManager() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="course-create-category">{t('coursesManager.categoryLabel')}</Label>
+            <Select
+              value={categoryId ?? UNCATEGORIZED}
+              onValueChange={(v) => setCategoryId(v === UNCATEGORIZED ? null : v)}
+            >
+              <SelectTrigger id="course-create-category"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNCATEGORIZED}>{t('coursesManager.uncategorized')}</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {i18n.resolvedLanguage === 'en' ? c.name_en : c.name_da}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setCreateOpen(false)}>{t('common.cancel')}</Button>
@@ -379,6 +410,7 @@ export default function CoursesManager() {
         <SlidingTabs
           tabs={[
             { key: 'courses', label: t('coursesManager.tabCourses') },
+            { key: 'categories', label: t('coursesManager.tabCategories') },
             { key: 'access', label: t('coursesManager.tabAccess') },
           ]}
           active={activeTab}
@@ -515,6 +547,8 @@ export default function CoursesManager() {
           )}
         </div>
       )}
+
+      {activeTab === 'categories' && <CategoryManager />}
 
       {activeTab === 'access' && (
         <div className="space-y-6">

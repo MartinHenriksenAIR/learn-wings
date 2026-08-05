@@ -1,32 +1,32 @@
 {
   "seats": {
-    "usage": "{{used}} af {{limit}} pladser brugt · {{remaining}} tilbage",
-    "unlimited": "Ubegrænset antal pladser",
-    "limitReached": "Pladsgrænse nået"
+    "usage": "{{used}} af {{limit}} medlemmer · {{remaining}} tilbage",
+    "unlimited": "Ubegrænset antal medlemmer",
+    "limitReached": "Medlemsgrænse nået"
   },
   "seatRequests": {
-    "requestMore": "Anmod om flere pladser",
-    "dialogTitle": "Anmod om flere pladser",
-    "dialogDescription": "Bed AI Rådgivning om at tilføje flere pladser til din organisation. Du modtager en faktura.",
-    "additionalSeats": "Ekstra pladser",
+    "requestMore": "Anmod om flere medlemmer",
+    "dialogTitle": "Anmod om flere medlemmer",
+    "dialogDescription": "Bed AI Rådgivning om at tilføje flere medlemmer til din organisation. Du modtager en faktura.",
+    "additionalSeats": "Ekstra medlemmer",
     "estimate": "{{seats}} × {{price}} {{currency}}/år = {{total}} {{currency}}/år ekskl. moms",
     "vatNote": "+ 25% moms tilføjes på fakturaen.",
     "notConfigured": "Priser er ikke tilgængelige online endnu — kontakt venligst AI Rådgivning.",
     "submit": "Send anmodning",
-    "submitted": "Anmodning om pladser sendt",
-    "pending": "Anmodning afventer — {{seats}} pladser, sendt {{date}}",
+    "submitted": "Anmodning om medlemmer sendt",
+    "pending": "Anmodning afventer — {{seats}} medlemmer, sendt {{date}}",
     "cancel": "Annullér anmodning",
-    "cancelled": "Anmodning om pladser annulleret",
-    "atCap": "Du har brugt alle dine pladser. Anmod om flere for at tilføje medlemmer.",
-    "sectionTitle": "Anmodninger om pladser",
+    "cancelled": "Anmodning om medlemmer annulleret",
+    "atCap": "Du har nået din medlemsgrænse. Anmod om flere for at tilføje medlemmer.",
+    "sectionTitle": "Anmodninger om medlemmer",
     "fulfil": "Markér som opfyldt",
-    "fulfilled": "Anmodning opfyldt — pladsgrænsen er forhøjet",
+    "fulfilled": "Anmodning opfyldt — medlemsgrænsen er forhøjet",
     "colRequester": "Anmodet af",
-    "colSeats": "Pladser",
+    "colSeats": "Medlemmer",
     "colPrice": "Pris/år (ekskl. moms)",
     "colStatus": "Status",
     "colDate": "Anmodet",
-    "empty": "Ingen anmodninger om pladser."
+    "empty": "Ingen anmodninger om medlemmer."
   },
   "common": {
     "save": "Gem",
@@ -76,7 +76,7 @@
   "nav": {
     "home": "Hjem",
     "dashboard": "Dashboard",
-    "courses": "Kursusoversigt",
+    "courses": "Kursuskatalog",
     "community": "Fællesskab",
     "settings": "Indstillinger",
     "signOut": "Log ud",
@@ -151,7 +151,7 @@
     "da": "Dansk"
   },
   "dashboard": {
-    "title": "Mit dashboard",
+    "title": "Dashboard",
     "welcome": "Velkommen tilbage",
     "coursesEnrolled": "Tilmeldte kurser",
     "inProgress": "I gang",
@@ -160,7 +160,7 @@
     "continueLearning": "Fortsæt læring",
     "viewAllCourses": "Se alle kurser",
     "noCoursesInProgress": "Ingen kurser i gang",
-    "startLearning": "Start din læring ved at åbne et kursus fra Kursusoversigt.",
+    "startLearning": "Start din læring ved at åbne et kursus fra Kursuskatalog.",
     "browseCourses": "Gennemse kurser",
     "completedCourses": "Afsluttede kurser",
     "noMembershipTitle": "Endnu intet organisationsmedlemskab",
@@ -218,6 +218,11 @@
     "openCourse": "Åbn kursus",
     "addToFavorites": "Tilføj til favoritter",
     "removeFromFavorites": "Fjern fra favoritter"
+  },
+  "tipsAndTricks": {
+    "title": "Tips & Tricks",
+    "comingSoon": "Kommer snart",
+    "comingSoonBody": "Vi samler tips og tricks, der hjælper dig med at få mere ud af AI. Kig forbi snart."
   },
   "coursePlayer": {
     "completionSaveFailed": "Kursusgennemførelsen kunne ikke registreres",
@@ -570,7 +575,7 @@
     "scopeNoResults": "Ingen organisationer fundet"
   },
   "ideaManagement": {
-    "title": "Idéoversigt",
+    "title": "Idéhåndtering",
     "subtitle": "Gennemgå og administrer indsendte idéer fra {{orgName}}. Træk et kort mellem kolonner for at ændre status — klik på et kort for at åbne det.",
     "noOrgDescription": "Vælg en organisation for at administrere idéer.",
     "allBusinessAreas": "Alle forretningsområder",
@@ -697,12 +702,12 @@
     "loadingBreadcrumb": "Indlæser...",
     "backToOrganizations": "Tilbage til organisationer",
     "allOrganizations": "Alle organisationer",
-    "editSeatLimit": "Rediger pladsgrænse",
+    "editSeatLimit": "Rediger medlemsgrænse",
     "deleteOrganization": "Slet organisation",
-    "seatsUsed": "Pladser brugt",
+    "seatsUsed": "Medlemmer brugt",
     "activeMembers": "Aktive medlemmer",
-    "seatLimit": "Pladsgrænse",
-    "seatLimitReached": "Pladsgrænse nået",
+    "seatLimit": "Medlemsgrænse",
+    "seatLimitReached": "Medlemsgrænse nået",
     "admins": "Administratorer",
     "learners": "Kursister",
     "pendingInvites": "Afventende invitationer",
@@ -757,8 +762,14 @@
     "organizationName": "Organisationsnavn",
     "slug": "Slug",
     "slugHint": "Bruges i URL'er. Kun små bogstaver, tal og bindestreger.",
-    "seatLimitLabel": "Pladsgrænse",
-    "seatLimitHint": "Maksimalt antal tilladte brugere. Lad feltet være tomt for ubegrænset."
+    "seatLimitLabel": "Medlemsgrænse",
+    "seatLimitHint": "Maksimalt antal tilladte brugere. Lad feltet være tomt for ubegrænset.",
+    "ssoBindingLabel": "SSO-automatisk tilmelding (Microsoft-tenant)",
+    "ssoBindingHint": "Personer fra denne Microsoft-tenant logger ind og tilmeldes automatisk som kursister — uden invitation. Sættes normalt automatisk ud fra den første administrator; redigér kun for at rette den.",
+    "ssoDomainLabel": "Domæne",
+    "ssoDomainHint": "Læsevenlig etiket, f.eks. acme.com.",
+    "ssoTenantIdLabel": "Microsoft-tenant-ID",
+    "ssoTenantIdHint": "Det verificerede Entra-tenant-ID (GUID), der bruges til at matche logins. Lad feltet være tomt for at slå automatisk tilmelding fra for denne organisation."
   },
   "organizations": {
     "title": "Organisationer",
@@ -773,14 +784,14 @@
     "colOrganization": "Organisation",
     "colSlug": "Slug",
     "colMembers": "Medlemmer",
-    "colSeats": "Pladser",
+    "colSeats": "Medlemsgrænse",
     "colCreated": "Oprettet",
     "seatsUnlimited": "Ubegrænset",
     "createDialogDescription": "Tilføj en ny virksomhed til platformen.",
     "logoOptional": "Logo (valgfrit)",
     "organizationName": "Organisationsnavn",
     "slug": "Slug (URL-id)",
-    "seatLimitOptional": "Pladsgrænse (valgfrit)",
+    "seatLimitOptional": "Medlemsgrænse (valgfrit)",
     "seatLimitPlaceholder": "Ubegrænset",
     "seatLimitHint": "Maksimalt antal tilladte brugere. Lad feltet være tomt for ubegrænset.",
     "initialAdminOptional": "Indledende administrator (valgfrit)",
@@ -848,11 +859,11 @@
       "save": "Gem funktionsindstillinger"
     },
     "seatPricing": {
-      "tab": "Pladspriser",
-      "annualPrice": "Årlig pris pr. plads (DKK, ekskl. moms)",
+      "tab": "Medlemspriser",
+      "annualPrice": "Årlig pris pr. medlem (DKK, ekskl. moms)",
       "currency": "Valuta",
       "notificationEmail": "Anmodninger sendes til",
-      "save": "Gem pladspriser"
+      "save": "Gem medlemspriser"
     }
   },
   "platformAdmins": {
@@ -959,6 +970,7 @@
     "newCourse": "Nyt kursus",
     "tabCourses": "Kurser",
     "tabAccess": "Organisationsadgang",
+    "tabCategories": "Kategorier",
     "searchPlaceholder": "Søg kurser…",
     "colCourse": "Kursus",
     "colLevel": "Niveau",
@@ -981,6 +993,8 @@
     "descriptionPlaceholder": "Kursusbeskrivelse",
     "levelLabel": "Niveau",
     "languageLabel": "Sprog",
+    "categoryLabel": "Kategori",
+    "uncategorized": "Uden kategori",
     "create": "Opret",
     "courseCreated": "Kursus oprettet!",
     "courseDeleted": "Kursus slettet",
@@ -1001,6 +1015,38 @@
     "failedToLoad": "Kunne ikke indlæse kurser",
     "retry": "Prøv igen"
   },
+  "categoryManager": {
+    "title": "Kategorier",
+    "description": "Organisér kurser i kategorier. Opret og administrér dine kategorier her.",
+    "addNameEnLabel": "Engelsk navn",
+    "addNameDaLabel": "Dansk navn",
+    "addNameEnPlaceholder": "f.eks. Leadership",
+    "addNameDaPlaceholder": "f.eks. Ledelse",
+    "addButton": "Tilføj kategori",
+    "nameEnHeader": "Engelsk navn",
+    "nameDaHeader": "Dansk navn",
+    "actionsHeader": "Handlinger",
+    "rename": "Omdøb kategori",
+    "renameTitle": "Omdøb kategori",
+    "renameDescription": "Opdatér kategoriens navne på begge sprog.",
+    "save": "Gem",
+    "delete": "Slet kategori",
+    "deleteTitle": "Slet kategori",
+    "deleteConfirm": "Kurser i denne kategori bliver uden kategori. Denne handling kan ikke fortrydes.",
+    "deleteButton": "Slet",
+    "moveUp": "Flyt op",
+    "moveDown": "Flyt ned",
+    "empty": "Ingen kategorier endnu",
+    "emptyDescription": "Tilføj din første kategori for at organisere kurser.",
+    "loadError": "Kunne ikke indlæse kategorier",
+    "created": "Kategori oprettet",
+    "renamed": "Kategori opdateret",
+    "deleted": "Kategori slettet",
+    "createFailed": "Kunne ikke oprette kategori",
+    "renameFailed": "Kunne ikke opdatere kategori",
+    "deleteFailed": "Kunne ikke slette kategori",
+    "reorderFailed": "Kunne ikke ændre rækkefølge på kategorier"
+  },
   "courseEditor": {
     "title": "Kursusredigering",
     "backToCourses": "Tilbage til kurser",
@@ -1013,6 +1059,8 @@
     "descriptionLabel": "Beskrivelse",
     "levelLabel": "Niveau",
     "languageLabel": "Sprog",
+    "categoryLabel": "Kategori",
+    "uncategorized": "Uden kategori",
     "editions": {
       "title": "Sprogudgaver",
       "description": "Sammenkæd dette kursus med dets versioner på andre sprog, så analyser tæller dem som ét kursus.",

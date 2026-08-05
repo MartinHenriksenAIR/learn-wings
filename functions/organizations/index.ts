@@ -7,8 +7,8 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
   if (orgId) {
     await requireActiveMember(orgId);
 
-    const organization = await queryOne(
-      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at,
+    const organization = await queryOne<Record<string, unknown>>(
+      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.entra_tid, o.entra_tid_label, o.created_at,
         (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count,
         (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
        FROM organizations o
@@ -16,6 +16,13 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
       [orgId],
     );
     if (!organization) return reply(404, { error: 'Organization not found' });
+
+    // The SSO tenant binding (#353) is platform-admin config — org admins reach
+    // this same fetch (OrgMembersTab), so strip it for non-platform-admins.
+    if (!profile.is_platform_admin) {
+      delete organization.entra_tid;
+      delete organization.entra_tid_label;
+    }
 
     return reply(200, { organization });
   }
@@ -26,7 +33,7 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
   // cast keeps callers seeing a number.
   if (profile.is_platform_admin) {
     const organizations = await query(
-      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.created_at,
+      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.entra_tid, o.entra_tid_label, o.created_at,
         (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count,
         (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
        FROM organizations o

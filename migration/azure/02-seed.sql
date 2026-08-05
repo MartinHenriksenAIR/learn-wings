@@ -46,6 +46,15 @@ INSERT INTO public.org_settings (org_id, features) VALUES
   ('11111111-1111-1111-1111-111111111111', '{}'::jsonb);
 
 -- ---------------------------------------------------------------------
+-- Course categories (#361) — default admin-managed set; idempotent by slug.
+-- ---------------------------------------------------------------------
+INSERT INTO public.course_categories (name_en, name_da, slug, sort_order) VALUES
+  ('AI Basics',     'AI Basics',      'ai-basics',   0),
+  ('Data & Ethics', 'Data & etik',    'data-ethics', 1),
+  ('Automation',    'Automatisering', 'automation',  2)
+ON CONFLICT (slug) DO NOTHING;
+
+-- ---------------------------------------------------------------------
 -- Course -> 2 modules -> 4 lessons (video / document / quiz / text)
 -- ---------------------------------------------------------------------
 INSERT INTO public.courses (id, title, description, level, language, is_published, created_by_user_id) VALUES

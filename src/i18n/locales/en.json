@@ -1,32 +1,32 @@
 {
   "seats": {
-    "usage": "{{used}} of {{limit}} seats used · {{remaining}} remaining",
-    "unlimited": "Unlimited seats",
-    "limitReached": "Seat limit reached"
+    "usage": "{{used}} of {{limit}} members · {{remaining}} remaining",
+    "unlimited": "Unlimited members",
+    "limitReached": "Member limit reached"
   },
   "seatRequests": {
-    "requestMore": "Request more seats",
-    "dialogTitle": "Request more seats",
-    "dialogDescription": "Ask AI Rådgivning to add more seats to your organization. You will receive an invoice.",
-    "additionalSeats": "Additional seats",
+    "requestMore": "Request more members",
+    "dialogTitle": "Request more members",
+    "dialogDescription": "Ask AI Rådgivning to add more members to your organization. You will receive an invoice.",
+    "additionalSeats": "Additional members",
     "estimate": "{{seats}} × {{price}} {{currency}}/yr = {{total}} {{currency}}/yr excl. VAT",
     "vatNote": "+ 25% VAT is added on the invoice.",
-    "notConfigured": "Seat pricing isn’t available online yet — please contact AI Rådgivning.",
+    "notConfigured": "Member pricing isn’t available online yet — please contact AI Rådgivning.",
     "submit": "Send request",
-    "submitted": "Seat request sent",
-    "pending": "Request pending — {{seats}} seats, submitted {{date}}",
+    "submitted": "Member request sent",
+    "pending": "Request pending — {{seats}} members, submitted {{date}}",
     "cancel": "Cancel request",
-    "cancelled": "Seat request cancelled",
-    "atCap": "You’ve used all your seats. Request more to keep adding members.",
-    "sectionTitle": "Seat requests",
+    "cancelled": "Member request cancelled",
+    "atCap": "You’ve reached your member limit. Request more to keep adding members.",
+    "sectionTitle": "Member requests",
     "fulfil": "Mark fulfilled",
-    "fulfilled": "Seat request fulfilled — seat limit increased",
+    "fulfilled": "Member request fulfilled — member limit increased",
     "colRequester": "Requested by",
-    "colSeats": "Seats",
+    "colSeats": "Members",
     "colPrice": "Price/yr (excl. VAT)",
     "colStatus": "Status",
     "colDate": "Requested",
-    "empty": "No seat requests."
+    "empty": "No member requests."
   },
   "common": {
     "save": "Save",
@@ -76,7 +76,7 @@
   "nav": {
     "home": "Home",
     "dashboard": "Dashboard",
-    "courses": "Course Overview",
+    "courses": "Course Catalog",
     "community": "Community",
     "settings": "Settings",
     "signOut": "Sign out",
@@ -151,7 +151,7 @@
     "da": "Danish"
   },
   "dashboard": {
-    "title": "My Dashboard",
+    "title": "Dashboard",
     "welcome": "Welcome back",
     "coursesEnrolled": "Courses Enrolled",
     "inProgress": "In Progress",
@@ -160,7 +160,7 @@
     "continueLearning": "Continue Learning",
     "viewAllCourses": "View all courses",
     "noCoursesInProgress": "No courses in progress",
-    "startLearning": "Start learning by opening a course from the Course Overview.",
+    "startLearning": "Start learning by opening a course from the Course Catalog.",
     "browseCourses": "Browse Courses",
     "completedCourses": "Completed Courses",
     "noMembershipTitle": "No organization membership yet",
@@ -191,7 +191,7 @@
     }
   },
   "courses": {
-    "title": "Course Overview",
+    "title": "Course Catalog",
     "progress": "Progress",
     "level": "Level",
     "levels": {
@@ -218,6 +218,11 @@
     "openCourse": "Open course",
     "addToFavorites": "Add to favorites",
     "removeFromFavorites": "Remove from favorites"
+  },
+  "tipsAndTricks": {
+    "title": "Tips & Tricks",
+    "comingSoon": "Coming soon",
+    "comingSoonBody": "We're putting together tips and tricks to help you get more out of AI. Check back soon."
   },
   "coursePlayer": {
     "completionSaveFailed": "Couldn't record course completion",
@@ -570,7 +575,7 @@
     "scopeNoResults": "No organizations found"
   },
   "ideaManagement": {
-    "title": "Ideas Overview",
+    "title": "Ideas Management",
     "subtitle": "Review and manage submitted ideas from {{orgName}}. Drag a card between columns to change its status — click a card to open it.",
     "noOrgDescription": "Please select an organization to manage ideas.",
     "allBusinessAreas": "All business areas",
@@ -697,12 +702,12 @@
     "loadingBreadcrumb": "Loading...",
     "backToOrganizations": "Back to Organizations",
     "allOrganizations": "All organizations",
-    "editSeatLimit": "Edit seat limit",
+    "editSeatLimit": "Edit member limit",
     "deleteOrganization": "Delete organization",
-    "seatsUsed": "Seats Used",
+    "seatsUsed": "Members Used",
     "activeMembers": "Active Members",
-    "seatLimit": "Seat limit",
-    "seatLimitReached": "Seat limit reached",
+    "seatLimit": "Member limit",
+    "seatLimitReached": "Member limit reached",
     "admins": "Admins",
     "learners": "Learners",
     "pendingInvites": "Pending Invites",
@@ -757,8 +762,14 @@
     "organizationName": "Organization Name",
     "slug": "Slug",
     "slugHint": "Used in URLs. Only lowercase letters, numbers, and hyphens.",
-    "seatLimitLabel": "Seat Limit",
-    "seatLimitHint": "Maximum number of users allowed. Leave empty for unlimited."
+    "seatLimitLabel": "Member Limit",
+    "seatLimitHint": "Maximum number of users allowed. Leave empty for unlimited.",
+    "ssoBindingLabel": "SSO auto-join (Microsoft tenant)",
+    "ssoBindingHint": "People from this Microsoft tenant sign in and join automatically as learners — no invite needed. Normally set automatically from the first admin; edit only to correct it.",
+    "ssoDomainLabel": "Domain",
+    "ssoDomainHint": "Human-friendly label, e.g. acme.com.",
+    "ssoTenantIdLabel": "Microsoft tenant ID",
+    "ssoTenantIdHint": "The verified Entra tenant ID (GUID) used to match sign-ins. Leave empty to turn auto-join off for this organization."
   },
   "organizations": {
     "title": "Organizations",
@@ -773,14 +784,14 @@
     "colOrganization": "Organization",
     "colSlug": "Slug",
     "colMembers": "Members",
-    "colSeats": "Seats",
+    "colSeats": "Member limit",
     "colCreated": "Created",
     "seatsUnlimited": "Unlimited",
     "createDialogDescription": "Add a new company to the platform.",
     "logoOptional": "Logo (optional)",
     "organizationName": "Organization Name",
     "slug": "Slug (URL identifier)",
-    "seatLimitOptional": "Seat Limit (optional)",
+    "seatLimitOptional": "Member Limit (optional)",
     "seatLimitPlaceholder": "Unlimited",
     "seatLimitHint": "Maximum number of users allowed. Leave empty for unlimited.",
     "initialAdminOptional": "Initial Admin (optional)",
@@ -848,11 +859,11 @@
       "save": "Save feature settings"
     },
     "seatPricing": {
-      "tab": "Seat pricing",
-      "annualPrice": "Annual price per seat (DKK, excl. VAT)",
+      "tab": "Member pricing",
+      "annualPrice": "Annual price per member (DKK, excl. VAT)",
       "currency": "Currency",
       "notificationEmail": "Requests are emailed to",
-      "save": "Save seat pricing"
+      "save": "Save member pricing"
     }
   },
   "platformAdmins": {
@@ -959,6 +970,7 @@
     "newCourse": "New Course",
     "tabCourses": "Courses",
     "tabAccess": "Organization Access",
+    "tabCategories": "Categories",
     "searchPlaceholder": "Search courses…",
     "colCourse": "Course",
     "colLevel": "Level",
@@ -981,6 +993,8 @@
     "descriptionPlaceholder": "Course description",
     "levelLabel": "Level",
     "languageLabel": "Language",
+    "categoryLabel": "Category",
+    "uncategorized": "Uncategorized",
     "create": "Create",
     "courseCreated": "Course created!",
     "courseDeleted": "Course deleted",
@@ -1001,6 +1015,38 @@
     "failedToLoad": "Failed to load courses",
     "retry": "Retry"
   },
+  "categoryManager": {
+    "title": "Categories",
+    "description": "Organize courses into categories. Create and manage your categories here.",
+    "addNameEnLabel": "English name",
+    "addNameDaLabel": "Danish name",
+    "addNameEnPlaceholder": "e.g., Leadership",
+    "addNameDaPlaceholder": "e.g., Ledelse",
+    "addButton": "Add category",
+    "nameEnHeader": "English name",
+    "nameDaHeader": "Danish name",
+    "actionsHeader": "Actions",
+    "rename": "Rename category",
+    "renameTitle": "Rename category",
+    "renameDescription": "Update the category names in both languages.",
+    "save": "Save",
+    "delete": "Delete category",
+    "deleteTitle": "Delete category",
+    "deleteConfirm": "Courses in this category will become uncategorized. This action cannot be undone.",
+    "deleteButton": "Delete",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "empty": "No categories yet",
+    "emptyDescription": "Add your first category to organize courses.",
+    "loadError": "Failed to load categories",
+    "created": "Category created",
+    "renamed": "Category updated",
+    "deleted": "Category deleted",
+    "createFailed": "Failed to create category",
+    "renameFailed": "Failed to update category",
+    "deleteFailed": "Failed to delete category",
+    "reorderFailed": "Failed to reorder categories"
+  },
   "courseEditor": {
     "title": "Course Editor",
     "backToCourses": "Back to Courses",
@@ -1013,6 +1059,8 @@
     "descriptionLabel": "Description",
     "levelLabel": "Level",
     "languageLabel": "Language",
+    "categoryLabel": "Category",
+    "uncategorized": "Uncategorized",
     "editions": {
       "title": "Language editions",
       "description": "Link this course to its versions in other languages so analytics count them as one course.",

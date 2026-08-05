@@ -224,6 +224,52 @@ describe('course-update', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when categoryId is not a string or null', async () => {
+    const res = await handler(baseReq({ courseId: 'c1', updates: { categoryId: 123 } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'categoryId must be a string or null' });
+  });
+
+  it('returns 400 when categoryId does not exist (no UPDATE issued)', async () => {
+    mockQueryOne.mockResolvedValueOnce(null); // existence lookup misses
+    const res = await handler(baseReq({ courseId: 'c1', updates: { categoryId: 'ghost' } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'category not found' });
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE courses');
+  });
+
+  it('allows a valid categoryId and sets category_id (existence checked first)', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ '?column?': 1 })                        // category exists
+      .mockResolvedValueOnce({ ...fakeCourse, category_id: 'cat-1' }); // UPDATE
+    const res = await handler(baseReq({ courseId: 'c1', updates: { categoryId: 'cat-1' } }), {} as any);
+    expect(res.status).toBe(200);
+
+    const [existsSql, existsParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(existsSql).toMatch(/FROM course_categories WHERE id = \$1/i);
+    expect(existsParams).toEqual(['cat-1']);
+
+    const [updateSql, updateParams] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(updateSql).toContain('UPDATE courses');
+    expect(updateSql).toContain('category_id');
+    expect(updateParams[0]).toBe('cat-1');                     // first (only) SET param
+    expect(updateParams[updateParams.length - 1]).toBe('c1');  // WHERE id = $n
+  });
+
+  it('allows categoryId as null (clears the category) without an existence check', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ...fakeCourse, category_id: null }); // UPDATE only
+    const res = await handler(baseReq({ courseId: 'c1', updates: { categoryId: null } }), {} as any);
+    expect(res.status).toBe(200);
+    // null is allowed straight through — no existence lookup, only the UPDATE
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('UPDATE courses');
+    expect(sql).toContain('category_id');
+    expect(params[0]).toBeNull();                 // category_id set to null
+    expect(params[params.length - 1]).toBe('c1'); // WHERE id = $n
+  });
+
   it('returns 404 when course not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq(validBody), {} as any);

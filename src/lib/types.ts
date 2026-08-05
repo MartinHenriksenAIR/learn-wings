@@ -32,6 +32,11 @@ export interface Organization {
   created_at: string;
   member_count?: number;
   pending_invite_count?: number;
+  // SSO tenant binding (#353) — only present for platform admins (the
+  // `organizations` endpoint strips it for org admins). entra_tid = the bound
+  // Entra tenant id; entra_tid_label = its human-friendly domain hint.
+  entra_tid?: string | null;
+  entra_tid_label?: string | null;
 }
 
 export interface OrgMembership {
@@ -66,6 +71,7 @@ export interface Course {
   level: CourseLevel;
   language: 'en' | 'da' | null;
   course_group_id: string | null;
+  category_id: string | null;
   is_published: boolean;
   thumbnail_url: string | null;
   created_by_user_id: string | null;
@@ -75,6 +81,15 @@ export interface Course {
 export interface CourseFavorite {
   user_id: string;
   course_id: string;
+  created_at: string;
+}
+
+export interface CourseCategory {
+  id: string;
+  name_en: string;
+  name_da: string;
+  slug: string;
+  sort_order: number;
   created_at: string;
 }
 

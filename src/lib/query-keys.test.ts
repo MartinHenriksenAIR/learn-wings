@@ -14,6 +14,10 @@ describe('queryKeys', () => {
     expect(queryKeys.communityCategories.all).toEqual(['community-categories']);
   });
 
+  it('courseCategories.all returns the root key', () => {
+    expect(queryKeys.courseCategories.all).toEqual(['course-categories']);
+  });
+
   it('communityPosts.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.communityPosts.all).toEqual(['community-posts']);
   });

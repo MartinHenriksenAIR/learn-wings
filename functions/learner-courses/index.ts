@@ -19,7 +19,7 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
   // The language filter is relaxed (never the org-visibility/publish predicate) for
   // courses the learner is already enrolled in, so a language switch never hides them.
   const courses = await query(
-    `SELECT c.id, c.title, c.description, c.level, c.language, c.is_published, c.thumbnail_url, c.created_by_user_id, c.created_at
+    `SELECT c.id, c.title, c.description, c.level, c.language, c.is_published, c.thumbnail_url, c.category_id, c.created_by_user_id, c.created_at
        FROM courses c
       WHERE ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}
             AND (

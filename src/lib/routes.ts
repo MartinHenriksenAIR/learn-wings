@@ -32,6 +32,8 @@ export const routes = {
     assessment: '/app/assessment',
     coursePlayerPattern: '/app/learn/:courseId',
     coursePlayer: (courseId: string) => `/app/learn/${courseId}`,
+    /** Tips & Tricks — coming-soon placeholder (#366). Nav entry wired by #363. */
+    tips: '/app/tips',
     /** Legacy redirect target -> dashboard. */
     certificates: '/app/certificates',
   },

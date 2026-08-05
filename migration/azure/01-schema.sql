@@ -85,14 +85,18 @@ CREATE TYPE public.idea_status AS ENUM (
 
 -- ---- organizations ----
 CREATE TABLE public.organizations (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       text NOT NULL,
-  slug       text UNIQUE NOT NULL,
-  logo_url   text,
-  seat_limit integer DEFAULT NULL,   -- NULL = unlimited
-  created_at timestamptz NOT NULL DEFAULT now()
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name            text NOT NULL,
+  slug            text UNIQUE NOT NULL,
+  logo_url        text,
+  seat_limit      integer DEFAULT NULL,   -- NULL = unlimited
+  entra_tid       text UNIQUE,            -- ADDED (#353): bound Entra tenant ID for SSO auto-join. UNIQUE (multiple NULLs allowed) = a tenant binds to at most one org.
+  entra_tid_label text,                   -- ADDED (#353): human-friendly domain label for the binding (e.g. 'acme.com'); cosmetic, editable by platform admin.
+  created_at      timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON COLUMN public.organizations.seat_limit IS 'Maximum number of users allowed in this organization. NULL means unlimited.';
+COMMENT ON COLUMN public.organizations.entra_tid IS 'Bound Entra tenant ID for SSO auto-join (#353). NULL = unbound. UNIQUE: a verified tenant binds to at most one org.';
+COMMENT ON COLUMN public.organizations.entra_tid_label IS 'Human-friendly domain label for the tenant binding, e.g. acme.com (#353). Cosmetic; editable by platform admin.';
 
 -- ---- profiles ----
 -- id was `REFERENCES auth.users` in Supabase; now a self-owned uuid PK.
@@ -171,6 +175,16 @@ CREATE TABLE public.invitations (
     CHECK (org_id IS NOT NULL OR is_platform_admin_invite = true)
 );
 
+-- ---- course_categories (#361) ----
+CREATE TABLE public.course_categories (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name_en    text NOT NULL,
+  name_da    text NOT NULL,
+  slug       text NOT NULL UNIQUE,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ---- courses ----
 CREATE TABLE public.courses (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -179,6 +193,7 @@ CREATE TABLE public.courses (
   level               public.course_level NOT NULL DEFAULT 'basic',
   language            text CHECK (language IN ('en', 'da')),
   course_group_id     uuid,   -- #213: shared tag linking language editions of one course; NULL = standalone
+  category_id         uuid REFERENCES public.course_categories(id) ON DELETE SET NULL,  -- #361: one category per course; NULL = uncategorized
   is_published        boolean NOT NULL DEFAULT false,
   thumbnail_url       text,
   created_by_user_id  uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
