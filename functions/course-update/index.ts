@@ -17,6 +17,7 @@ const COLUMN_MAP: Record<string, string> = {
   level: 'level',
   language: 'language',
   thumbnailUrl: 'thumbnail_url',
+  categoryId: 'category_id',
   isPublished: 'is_published',
 };
 
@@ -66,6 +67,12 @@ export default adminEndpoint('course-update', async ({ req, reply }) => {
       if (value !== null && typeof value !== 'string') {
         return reply(400, { error: 'thumbnailUrl must be a string or null' });
       }
+    } else if (clientKey === 'categoryId') {
+      // null clears the category (uncategorized); a string is checked for existence
+      // below, before the UPDATE. Anything else is rejected here.
+      if (value !== null && typeof value !== 'string') {
+        return reply(400, { error: 'categoryId must be a string or null' });
+      }
     } else if (clientKey === 'isPublished') {
       if (typeof value !== 'boolean') {
         return reply(400, { error: 'isPublished must be a boolean' });
@@ -78,6 +85,16 @@ export default adminEndpoint('course-update', async ({ req, reply }) => {
 
   if (setClauses.length === 0) {
     return reply(400, { error: 'No valid fields to update' });
+  }
+
+  // Category existence check — an independent lookup, run before the thumbnail
+  // SELECT/blob gates so an invalid category fails fast without touching storage.
+  // Only a non-null string needs checking; null (clear) was accepted in the loop.
+  if ('categoryId' in updatesObj && typeof updatesObj.categoryId === 'string') {
+    const category = await queryOne('SELECT 1 FROM course_categories WHERE id = $1', [updatesObj.categoryId]);
+    if (!category) {
+      return reply(400, { error: 'category not found' });
+    }
   }
 
   // The blob path this update will write to thumbnail_url — `undefined` when the
