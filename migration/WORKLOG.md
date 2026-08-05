@@ -2146,3 +2146,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (post-trunk-merge on the branch):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **861 / 114** · `build` 0. functions `build` 0 · `test` **2636 / 149** (3 skipped).
 
 **Deploy:** prod DB migration `11-org-entra-tenant.sql` **applied 2026-08-05** (martin ran it from his terminal — temp single-IP firewall rule + Node `pg` runner reusing the app's own CA-pinned `dist/shared/db.js`; `entra_tid`/`entra_tid_label` + the unique constraint verified present) — required migrate-then-merge ordering, since `organizations`/`organization-update` reference the columns unconditionally. Merged to `main` → auto-ships frontend (SWA) + backend (functions: `tenant-binding` + `user-context`/`invitation-accept`/`organization-update`/`organizations`/`org-analytics-data` changes). Deploy announced on PR #378.
+
+---
+
+## 2026-08-05 — #366 Tips & Tricks nav item + coming-soon page (PR #381)
+
+**Who:** claude (Opus 4.8) with martin. Part of the AIU platform-review batch (Aug 2026). Branched off `origin/main` @`c0d7833`. While in flight, #378 (org auto-join #353) merged to trunk; merged `origin/main` back in before landing — the two locale files **auto-merged clean** (disjoint sections: my `tipsAndTricks.*` in the `courses` region vs #378's `sso*` keys in `orgDetail`), only this WORKLOG tail conflicted (both entries appended; kept both). #380 (favorites #358) was still an empty draft.
+
+**What:** a coming-soon placeholder page for **Tips & Tricks** at `/app/tips` (en + da). Route + page + page copy only.
+
+**Scope call (martin): no sidebar change, issue kept OPEN.** #363 (learner-nav restructure) is *blocked by* this issue as "the page the new nav links to," and #363 explicitly owns `AppSidebar.tsx` — the Læring group plus the Tips & Tricks nav entry's icon/order/label styling. So this PR deliberately does **not** touch `AppSidebar.tsx`, keeping #366 out of #363's hot-file collision set (`#367/#370/#371/#372/#344`). Consequence: the page is not nav-reachable until #363 lands (reachable directly at `/app/tips` meanwhile), so **#366 stays open** — its "clicking Tips & Tricks shows the page" acceptance criterion completes with #363, not here. The `(#366)` in the PR title is a reference, not a closing keyword, so the merge does not auto-close it.
+
+**How:** `routes.ts` `learner.tips = /app/tips`; `App.tsx` route → new `TipsAndTricks` page (`learnerOnly`, matching its Læring-group siblings Courses/Dashboard/Assessment); `src/pages/learner/TipsAndTricks.tsx` = `AppLayout` + the shared `EmptyState` (Lightbulb icon, "Coming soon" + one line). `tipsAndTricks.*` keys in en + da; "Tips & Tricks" left untranslated in both locales per `docs/glossary.md`.
+
+**Verify (post-trunk-merge on the branch):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **861 / 114** · `build` 0. functions untouched.
+
+**Deploy:** frontend-only — merging to `main` auto-ships the static page via SWA; no functions deploy, no DB migration. Announced on PR #381.

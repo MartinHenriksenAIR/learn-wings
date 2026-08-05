@@ -213,6 +213,11 @@
     "startCourse": "Start kursus",
     "reviewCourse": "Gennemse kursus"
   },
+  "tipsAndTricks": {
+    "title": "Tips & Tricks",
+    "comingSoon": "Kommer snart",
+    "comingSoonBody": "Vi samler tips og tricks, der hjælper dig med at få mere ud af AI. Kig forbi snart."
+  },
   "coursePlayer": {
     "completionSaveFailed": "Kursusgennemførelsen kunne ikke registreres",
     "completionSaveFailedDescription": "Din lektionsfremgang er gemt, men kursusgennemførelsen blev ikke registreret. Prøv igen senere.",
