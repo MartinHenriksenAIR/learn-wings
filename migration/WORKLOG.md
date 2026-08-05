@@ -2076,3 +2076,25 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `npm test` **850 / 112** · `build` 0. functions `build` 0 · `test` **2516 / 142** (3 skipped). CI green (both jobs).
 
 **Deploy:** merging to `main` auto-ships frontend (SWA) + backend (functions, one changed endpoint). Announced on PR #376.
+
+---
+
+## 2026-08-05 — #367 terminology sweep: seat→member + en/da glossary + heading==label (PR #379)
+
+**Who:** claude (Opus 4.8) with martin. Part of the AIU platform-review batch (Aug 2026). Branched off `origin/main` @`9a322f2`; only PR in flight was #377 (course categories #361), disjoint files. Supersedes the abandoned draft #375 (empty seed on `feat/seat-to-member-367`, closed).
+
+**What:** collapsed the user-facing "seat" concept into **Member/Medlem** across en+da — capacity, limits, requests, and pricing/invoice copy — renamed **Course Overview → Course Catalog / Kursuskatalog**, fixed heading==menu-label mismatches, and published `docs/glossary.md` as the canonical en/da terminology source.
+
+**How:**
+- **Locales only, values not keys:** swept `seats.*`, `seatRequests.*`, and the scattered `seatLimit`/`seatsUsed`/`seatPricing`/`editSeatLimit` keys under `orgDetail`/`platformSettings`. Swap + light rephrase where a literal swap read wrong (dropped "used" in the usage line; DA coinages `medlemsgrænse`, `medlemspriser`; `atCap` reworded to "reached your member limit"). Column collision handled: the org-list `colSeats` (a used/limit+bar cell next to a "Members" count column) became **Member limit / Medlemsgrænse**, not a duplicate "Members"; the seat-requests table's `colSeats` has no such neighbour and became "Members / Medlemmer".
+- **Learning name:** `nav.courses` + `courses.title` (+ the `dashboard.startLearning` reference) → Course Catalog / Kursuskatalog. Learning/Læring + Community/Fællesskab were already correct.
+- **Heading==label:** `dashboard.title` "My Dashboard" → Dashboard (the page's identity heading; the loaded learner dashboard deliberately shows a "Welcome back" hero per #362); `ideaManagement.title` Ideas Overview → Ideas Management / Idéhåndtering (matches its nav label). Analytics + moderation headings already render `t('nav.*')`. Org-admin Settings ("Organization Settings" vs "Settings") left for #369.
+- **Glossary:** `docs/glossary.md` covers the seat→member decision, all learning names (incl. Min Træning + Tips & Tricks for #363/#364/#366), the carried-forward conventions, and the kept internal code names; `AGENTS.md` points at it.
+
+**Decisions (martin):** terminology-only scope (rename Course Catalog now, leave the nav restructure + Min Træning/Tips&Tricks pages to their sibling issues); swap + light rephrase over strict 1:1; glossary in-repo at `docs/glossary.md`, with the out-of-repo `AIEDU/CLAUDE.md` line applied locally + flagged (that file isn't in the learn-wings repo). The Ideas heading fix was an in-spirit extension flagged for veto.
+
+**Kept unchanged:** i18n keys, `SeatUsage*` components, `usedSeats`/`seatUsage` props, `seat-usage-bar` test IDs, `{{seats}}` placeholder, and the DB/SQL `seat_*` names — only rendered text follows the glossary, so the value-echo tests stay green.
+
+**Verify:** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **850 / 112** · `build` 0. Grep proof: zero user-facing `seat`/`plads` remain in locale values. functions untouched.
+
+**Deploy:** frontend-only — merging to `main` auto-ships the (text-only) frontend via SWA; no functions deploy. Announced on PR #379.
