@@ -1,5 +1,5 @@
 import type { InvocationContext } from '@azure/functions';
-import { query, queryOne, withTransaction } from './db';
+import { query, queryOne, withTransaction, isUniqueViolation } from './db';
 import { lockSeatUsage, isAtSeatLimit } from './seats';
 
 /**
@@ -92,7 +92,15 @@ export async function seedTenantBinding(
       );
     }
   } catch (err) {
-    context.error('tenant-binding: seed failed', err);
+    // The one path that slips past the NOT EXISTS guard is a concurrent seed of
+    // the same tid to two orgs at once, which trips the UNIQUE constraint (23505).
+    // That is the same first-bound-wins collision, just raced — log it as such,
+    // not as a fault. Any other error is a genuine failure.
+    if (isUniqueViolation(err)) {
+      context.warn(`tenant-binding: concurrent seed lost the race for org ${orgId} (first-bound-wins)`);
+    } else {
+      context.error('tenant-binding: seed failed', err);
+    }
   }
 }
 

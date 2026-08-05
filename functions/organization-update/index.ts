@@ -27,6 +27,15 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
     return reply(400, { error: 'orgId is required' });
   }
 
+  // #353: clearing the tenant binding must also clear its label — a label with
+  // no tid is a stale hint that misrepresents auto-join as active. Enforced here
+  // (authoritative) so it holds regardless of what the client sent, and BEFORE
+  // buildUpdateSet so the forced null lands in both validation and the SET.
+  if (updates && typeof updates === 'object' && !Array.isArray(updates)
+      && (updates as Record<string, unknown>).entra_tid === null) {
+    (updates as Record<string, unknown>).entra_tid_label = null;
+  }
+
   const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS, {
     transform: (key, value) => {
       if (key === 'name') return normalizeOrgName(value as string);
@@ -75,8 +84,9 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
         }
       }
     } else if (key === 'entra_tid_label') {
-      if (v !== null && typeof v !== 'string') {
-        return reply(400, { error: 'entra_tid_label must be a string or null' });
+      // A domain hint; bounded at the DNS max (253) so it can't be an abuse sink.
+      if (v !== null && (typeof v !== 'string' || v.length > 253)) {
+        return reply(400, { error: 'entra_tid_label must be a string (max 253 chars) or null' });
       }
     }
   }

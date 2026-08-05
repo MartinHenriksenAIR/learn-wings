@@ -19,6 +19,7 @@ vi.mock('./db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   withTransaction: mockWithTransaction,
+  isUniqueViolation: (err: unknown) => (err as { code?: string })?.code === '23505',
 }));
 vi.mock('./seats', () => ({
   lockSeatUsage: mockLockSeatUsage,
@@ -110,6 +111,14 @@ describe('seedTenantBinding', () => {
     const c = ctx();
     await expect(seedTenantBinding('org-1', TID, 'jane@acme.com', c as never)).resolves.toBeUndefined();
     expect(c.error).toHaveBeenCalled();
+  });
+
+  it('logs a raced unique-violation (23505) as first-bound-wins (warn), not an error', async () => {
+    mockQuery.mockRejectedValueOnce(Object.assign(new Error('duplicate key'), { code: '23505' }));
+    const c = ctx();
+    await seedTenantBinding('org-1', TID, 'jane@acme.com', c as never);
+    expect(c.warn).toHaveBeenCalledTimes(1);
+    expect(c.error).not.toHaveBeenCalled();
   });
 });
 

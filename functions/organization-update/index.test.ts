@@ -253,7 +253,7 @@ describe('organization-update', () => {
   it('returns 400 when entra_tid_label is the wrong type', async () => {
     const res = await handler(baseReq({ orgId: 'org-1', updates: { entra_tid_label: 42 } }), {} as any);
     expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string)).toEqual({ error: 'entra_tid_label must be a string or null' });
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'entra_tid_label must be a string (max 253 chars) or null' });
   });
 
   it('platform admin can set the binding; the tid is normalized to lowercase', async () => {
@@ -270,11 +270,22 @@ describe('organization-update', () => {
     expect(params).toEqual([TID, 'acme.com', 'org-1']); // lowercased
   });
 
-  it('platform admin can clear the binding (entra_tid: null)', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', entra_tid: null });
+  it('returns 400 when entra_tid_label exceeds the length bound', async () => {
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { entra_tid_label: 'a'.repeat(254) } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'entra_tid_label must be a string (max 253 chars) or null' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('clearing entra_tid also clears entra_tid_label (no orphan label)', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', entra_tid: null, entra_tid_label: null });
+    // Client sends only entra_tid: null (label unchanged, so change-detection omits it).
     const res = await handler(baseReq({ orgId: 'org-1', updates: { entra_tid: null } }), {} as any);
     expect(res.status).toBe(200);
-    expect((mockQueryOne.mock.calls[0][1] as unknown[])).toEqual([null, 'org-1']);
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('entra_tid = $1');
+    expect(sql).toContain('entra_tid_label = $2'); // forced in by the endpoint
+    expect(params).toEqual([null, null, 'org-1']);
   });
 
   it('returns a distinct 409 when the tenant is already linked to another org', async () => {
