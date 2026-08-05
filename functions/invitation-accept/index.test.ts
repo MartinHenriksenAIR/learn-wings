@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockClientQuery, mockWithTransaction } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQueryOne, mockClientQuery, mockWithTransaction, mockSeedTenantBinding } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   const mockClientQuery = vi.fn();
   return {
@@ -8,6 +8,7 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockClientQuery, mockWith
     mockQueryOne: vi.fn(),
     mockClientQuery,
     mockWithTransaction: vi.fn(async (cb: (client: { query: typeof mockClientQuery }) => unknown) => cb({ query: mockClientQuery })),
+    mockSeedTenantBinding: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -16,6 +17,9 @@ vi.mock('../shared/db', () => ({
   queryOne: mockQueryOne,
   withTransaction: mockWithTransaction,
 }));
+// Tenant binding (#353) is unit-tested in shared/tenant-binding.test.ts; here we
+// mock it and assert the accept path seeds a binding for org_admin acceptances.
+vi.mock('../shared/tenant-binding', () => ({ seedTenantBinding: mockSeedTenantBinding }));
 
 import handler from './index';
 
@@ -237,5 +241,30 @@ describe('invitation-accept', () => {
     const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+  });
+
+  it('#353: seeds the org↔tenant binding when an org_admin accepts via link', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows({ ...pendingOrgInvite, role: 'org_admin' })); // invitation lock
+    mockClientQuery.mockResolvedValueOnce(rows()); // no existing membership
+    const context = {};
+
+    const res = await handler(baseReq(validBody), context as any);
+
+    expect(res.status).toBe(200);
+    expect(mockSeedTenantBinding).toHaveBeenCalledTimes(1);
+    expect(mockSeedTenantBinding).toHaveBeenCalledWith('org-1', 'tid-1', 'user@x.com', context);
+  });
+
+  it('#353: does NOT seed a binding for a learner acceptance', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows(pendingOrgInvite)); // role: 'learner'
+    mockClientQuery.mockResolvedValueOnce(rows());
+    await handler(baseReq(validBody), {} as any);
+    expect(mockSeedTenantBinding).not.toHaveBeenCalled();
+  });
+
+  it('#353: does NOT seed a binding for a platform-admin acceptance', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows(pendingPlatformInvite));
+    await handler(baseReq(validBody), {} as any);
+    expect(mockSeedTenantBinding).not.toHaveBeenCalled();
   });
 });

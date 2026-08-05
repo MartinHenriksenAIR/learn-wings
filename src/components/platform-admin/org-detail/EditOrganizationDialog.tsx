@@ -21,6 +21,10 @@ export interface EditOrgPayload {
   slug: string;
   logoUrl: string | null;
   seatLimit: string;
+  // SSO tenant binding (#353). Empty string = clear/off. OrganizationDetail only
+  // forwards these to the backend when they actually change (see saveEditMutation).
+  entraTid: string;
+  entraTidLabel: string;
 }
 
 interface EditOrganizationDialogProps {
@@ -45,6 +49,8 @@ export function EditOrganizationDialog({
   const [slug, setSlug] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [seatLimit, setSeatLimit] = useState<string>('');
+  const [entraTid, setEntraTid] = useState<string>('');
+  const [entraTidLabel, setEntraTidLabel] = useState<string>('');
   // logoUrl holds the raw container-relative path (for save); sign it for display.
   const { data: logoDisplaySrc } = useSignedBrandingUrl(logoUrl);
 
@@ -54,6 +60,8 @@ export function EditOrganizationDialog({
       setSlug(org.slug);
       setLogoUrl(org.logo_url || null);
       setSeatLimit(org.seat_limit?.toString() || '');
+      setEntraTid(org.entra_tid ?? '');
+      setEntraTidLabel(org.entra_tid_label ?? '');
     }
   }, [open, org]);
 
@@ -127,12 +135,39 @@ export function EditOrganizationDialog({
             />
             <p className="text-xs text-muted-foreground">{t('orgDetail.seatLimitHint')}</p>
           </div>
+          <div className="space-y-3 rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">{t('orgDetail.ssoBindingLabel')}</p>
+              <p className="text-xs text-muted-foreground">{t('orgDetail.ssoBindingHint')}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-entra-label">{t('orgDetail.ssoDomainLabel')}</Label>
+              <Input
+                id="edit-entra-label"
+                value={entraTidLabel}
+                onChange={(e) => setEntraTidLabel(e.target.value)}
+                placeholder="acme.com"
+              />
+              <p className="text-xs text-muted-foreground">{t('orgDetail.ssoDomainHint')}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-entra-tid">{t('orgDetail.ssoTenantIdLabel')}</Label>
+              <Input
+                id="edit-entra-tid"
+                value={entraTid}
+                onChange={(e) => setEntraTid(e.target.value)}
+                placeholder="00000000-0000-0000-0000-000000000000"
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">{t('orgDetail.ssoTenantIdHint')}</p>
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={() => onSubmit({ name, slug, logoUrl, seatLimit })} disabled={pending}>
+          <Button onClick={() => onSubmit({ name, slug, logoUrl, seatLimit, entraTid, entraTidLabel })} disabled={pending}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             {t('common.save')}
           </Button>
