@@ -236,6 +236,11 @@
     "startCourse": "Start kursus",
     "reviewCourse": "Gennemse kursus"
   },
+  "tipsAndTricks": {
+    "title": "Tips & Tricks",
+    "comingSoon": "Kommer snart",
+    "comingSoonBody": "Vi samler tips og tricks, der hjælper dig med at få mere ud af AI. Kig forbi snart."
+  },
   "coursePlayer": {
     "completionSaveFailed": "Kursusgennemførelsen kunne ikke registreres",
     "completionSaveFailedDescription": "Din lektionsfremgang er gemt, men kursusgennemførelsen blev ikke registreret. Prøv igen senere.",
@@ -772,7 +777,13 @@
     "slug": "Slug",
     "slugHint": "Bruges i URL'er. Kun små bogstaver, tal og bindestreger.",
     "seatLimitLabel": "Medlemsgrænse",
-    "seatLimitHint": "Maksimalt antal tilladte brugere. Lad feltet være tomt for ubegrænset."
+    "seatLimitHint": "Maksimalt antal tilladte brugere. Lad feltet være tomt for ubegrænset.",
+    "ssoBindingLabel": "SSO-automatisk tilmelding (Microsoft-tenant)",
+    "ssoBindingHint": "Personer fra denne Microsoft-tenant logger ind og tilmeldes automatisk som kursister — uden invitation. Sættes normalt automatisk ud fra den første administrator; redigér kun for at rette den.",
+    "ssoDomainLabel": "Domæne",
+    "ssoDomainHint": "Læsevenlig etiket, f.eks. acme.com.",
+    "ssoTenantIdLabel": "Microsoft-tenant-ID",
+    "ssoTenantIdHint": "Det verificerede Entra-tenant-ID (GUID), der bruges til at matche logins. Lad feltet være tomt for at slå automatisk tilmelding fra for denne organisation."
   },
   "organizations": {
     "title": "Organisationer",

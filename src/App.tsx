@@ -17,6 +17,7 @@ import LearnerTraining from "./pages/learner/Training";
 import LearnerCourses from "./pages/learner/Courses";
 import Assessment from "./pages/learner/Assessment";
 import CoursePlayer from "./pages/learner/CoursePlayer";
+import TipsAndTricks from "./pages/learner/TipsAndTricks";
 
 import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
 import OrgSettings from "./pages/org-admin/OrgSettings";
@@ -53,6 +54,7 @@ function AppRoutes() {
       <Route path={routes.learner.courses} element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
       <Route path={routes.learner.assessment} element={<ProtectedRoute learnerOnly><Assessment /></ProtectedRoute>} />
       <Route path={routes.learner.coursePlayerPattern} element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
+      <Route path={routes.learner.tips} element={<ProtectedRoute learnerOnly><TipsAndTricks /></ProtectedRoute>} />
       <Route path={routes.learner.certificates} element={<Navigate to={routes.learner.dashboard} replace />} />
 
       <Route path={routes.community.feed} element={<ProtectedRoute><CommunityFeed /></ProtectedRoute>} />

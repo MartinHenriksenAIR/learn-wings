@@ -6,6 +6,7 @@ import { authenticate, AuthError } from '../shared/auth';
 import { queryOne, withTransaction } from '../shared/db';
 import { convertInvitation } from '../shared/invitation-convert';
 import type { ConvertResult } from '../shared/invitation-convert';
+import { seedTenantBinding } from '../shared/tenant-binding';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 
@@ -90,6 +91,14 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       const result = await convertInvitation(client, invitation, profileId);
       return { kind: 'converted', result, orgName: invitation.org_name };
     });
+
+    // #353: seed the org↔tenant binding when an org_admin accepts via link, so
+    // the binding is established through the link flow too — not only via
+    // user-context login adoption. Best-effort, own connection (seedTenantBinding),
+    // AFTER the accept transaction commits so it can never roll the accept back.
+    if (outcome.kind === 'converted' && outcome.result.kind === 'org' && outcome.result.role === 'org_admin') {
+      await seedTenantBinding(outcome.result.orgId, user.tid, user.email, context);
+    }
 
     if (outcome.kind === 'not_found') {
       return corsResponse(origin, 404, { error: 'Invitation not found', code: 'INVITE_NOT_FOUND' });

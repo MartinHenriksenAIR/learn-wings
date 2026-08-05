@@ -236,6 +236,11 @@
     "startCourse": "Start course",
     "reviewCourse": "Review course"
   },
+  "tipsAndTricks": {
+    "title": "Tips & Tricks",
+    "comingSoon": "Coming soon",
+    "comingSoonBody": "We're putting together tips and tricks to help you get more out of AI. Check back soon."
+  },
   "coursePlayer": {
     "completionSaveFailed": "Couldn't record course completion",
     "completionSaveFailedDescription": "Your lesson progress is saved, but the course completion wasn't recorded. Please try again later.",
@@ -772,7 +777,13 @@
     "slug": "Slug",
     "slugHint": "Used in URLs. Only lowercase letters, numbers, and hyphens.",
     "seatLimitLabel": "Member Limit",
-    "seatLimitHint": "Maximum number of users allowed. Leave empty for unlimited."
+    "seatLimitHint": "Maximum number of users allowed. Leave empty for unlimited.",
+    "ssoBindingLabel": "SSO auto-join (Microsoft tenant)",
+    "ssoBindingHint": "People from this Microsoft tenant sign in and join automatically as learners — no invite needed. Normally set automatically from the first admin; edit only to correct it.",
+    "ssoDomainLabel": "Domain",
+    "ssoDomainHint": "Human-friendly label, e.g. acme.com.",
+    "ssoTenantIdLabel": "Microsoft tenant ID",
+    "ssoTenantIdHint": "The verified Entra tenant ID (GUID) used to match sign-ins. Leave empty to turn auto-join off for this organization."
   },
   "organizations": {
     "title": "Organizations",

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockClientQuery, mockWithTransaction } =
+const {
+  mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockClientQuery, mockWithTransaction,
+  mockSeedTenantBinding, mockAutoJoinByTenant,
+} =
   vi.hoisted(() => {
     class MockAuthError extends Error {}
     const mockClientQuery = vi.fn();
@@ -14,6 +17,8 @@ const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockClientQuer
       mockWithTransaction: vi.fn(async (cb: (client: { query: typeof mockClientQuery }) => unknown) =>
         cb({ query: mockClientQuery }),
       ),
+      mockSeedTenantBinding: vi.fn(),
+      mockAutoJoinByTenant: vi.fn(),
     };
   });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -21,6 +26,12 @@ vi.mock('../shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   withTransaction: mockWithTransaction,
+}));
+// Tenant binding (#353) is unit-tested in shared/tenant-binding.test.ts; here we
+// mock it and assert the wiring (right args, right conditions).
+vi.mock('../shared/tenant-binding', () => ({
+  seedTenantBinding: mockSeedTenantBinding,
+  autoJoinByTenant: mockAutoJoinByTenant,
 }));
 
 import handler from './index';
@@ -305,5 +316,55 @@ describe('user-context', () => {
     expect(body.profile.id).toBe('profile-uuid');
     expect(body.memberships).toHaveLength(1);
     expect(context.error).toHaveBeenCalled();
+  });
+
+  describe('#353 tenant auto-join / binding wiring', () => {
+    it('attempts tenant auto-join on every login with the caller profile id and verified tid', async () => {
+      mockQueryOne.mockResolvedValueOnce(existingProfile);
+      const context = {};
+      await handler(baseReq as any, context as any);
+
+      expect(mockAutoJoinByTenant).toHaveBeenCalledTimes(1);
+      expect(mockAutoJoinByTenant).toHaveBeenCalledWith('profile-uuid', 'entra-tid-456', context);
+    });
+
+    it('seeds the org↔tenant binding after adopting an org_admin invite', async () => {
+      mockQueryOne.mockResolvedValueOnce(existingProfile);
+      mockQuery.mockResolvedValueOnce([{ id: 'inv-1' }]); // pre-check
+      mockClientQuery.mockResolvedValueOnce(rows({ id: 'inv-1', org_id: 'org-9', role: 'org_admin' })); // re-select
+      const context = {};
+
+      await handler(baseReq as any, context as any);
+
+      expect(mockSeedTenantBinding).toHaveBeenCalledTimes(1);
+      expect(mockSeedTenantBinding).toHaveBeenCalledWith('org-9', 'entra-tid-456', 'user@contoso.com', context);
+    });
+
+    it('does NOT seed a binding for a learner-only invite', async () => {
+      mockQueryOne.mockResolvedValueOnce(existingProfile);
+      mockQuery.mockResolvedValueOnce([{ id: 'inv-1' }]); // pre-check
+      mockClientQuery.mockResolvedValueOnce(rows({ id: 'inv-1', org_id: 'org-1', role: 'learner' })); // re-select
+
+      await handler(baseReq as any, {} as any);
+
+      expect(mockSeedTenantBinding).not.toHaveBeenCalled();
+      // Auto-join still runs — a learner from a bound tenant can still self-onboard.
+      expect(mockAutoJoinByTenant).toHaveBeenCalledTimes(1);
+    });
+
+    it('strips the tenant binding from the memberships payload (platform-admin-only invariant)', async () => {
+      mockQueryOne.mockResolvedValueOnce(existingProfile);
+      mockQuery.mockResolvedValueOnce([]); // pre-check: no pending invite
+      mockQuery.mockResolvedValueOnce([
+        { org_id: 'org-1', organization: { id: 'org-1', name: 'Org One', entra_tid: 'tid-x', entra_tid_label: 'acme.com' } },
+      ]); // memberships load — row_to_json(o.*) would include the binding
+
+      const res = await handler(baseReq as any, {} as any);
+      const body = JSON.parse(res.body);
+
+      expect(body.memberships[0].organization).not.toHaveProperty('entra_tid');
+      expect(body.memberships[0].organization).not.toHaveProperty('entra_tid_label');
+      expect(body.memberships[0].organization.name).toBe('Org One'); // other fields intact
+    });
   });
 });

@@ -2121,3 +2121,44 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (on the branch):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **861 / 114** · `build` 0. functions `build` 0 · `test` **2597 / 148** (3 skipped).
 
 **Deploy:** prod DB migration `10-course-categories.sql` **applied 2026-08-05** (martin ran it from his terminal via a temp single-IP firewall rule + Node `pg` runner; the 3 seed rows + `courses.category_id` verified present) — the required migrate-then-merge ordering (#191/#213/#286), since the new endpoints reference the table/column unconditionally. Merged to `main` → auto-ships frontend (SWA) + backend (functions: 5 new `course-category*` endpoints + `course-create`/`course-update`/`learner-courses` changes). Deploy announced on PR #377.
+
+---
+
+## 2026-08-05 — #353 org auto-join via verified Entra tenant (PR #378)
+
+**Who:** claude (Opus 4.8) with martin. Part of the AIU platform-review batch (Aug 2026). Branched off `origin/main`; requirements grilled with martin before any code (5 decisions, below). Merged trunk (#361/#367) in before merging — `01-schema.sql`/`types.ts` auto-merged clean; README migration table + both locale files conflicted (resolved: slots 10+11 ordered; kept #367's Seat→Member label + my SSO keys).
+
+**Status:** implemented; self-review (security-focused, org-isolation) + fixes; all gates green; merged via PR #378.
+
+**What:** members of a known org self-onboard via Entra SSO with **no invite**, matched to their org by their **server-verified token tenant id** (`tid` from `shared/auth.ts`) — never an unverifiable email domain, so strict org isolation holds. Auto-joined users get **learner**; org admins still come via explicit invite. Fallback (no match / seats full / switch off) = the caller stays an org-less account (the individual-tier #354 will formalize), never a dead-end.
+
+**How:**
+- **DB** — `organizations.entra_tid` (`UNIQUE`, NULLs allowed = a tenant binds ≤1 org) + `entra_tid_label` (cosmetic domain hint) in `01-schema.sql`; idempotent prod migration **`11-org-entra-tenant.sql`** (10 taken by #361) — `ADD COLUMN IF NOT EXISTS` + guarded `ADD CONSTRAINT`.
+- **`functions/shared/tenant-binding.ts`** (new) — `CONSUMER_TENANT_ID` guard (`9188040d-…-b66dad`, the shared personal-MSA tenant, must NEVER bind or it auto-joins every personal MS account on earth); `seedTenantBinding` (own connection, first-bound-wins via `NOT EXISTS`, never rolls back the invite txn); `selfRegistrationEnabled` (wires the previously-decorative platform-wide toggle as a real global kill-switch, default ON); `autoJoinByTenant` (seat-capped via `seats.ts` row-lock, non-destructive `ON CONFLICT DO NOTHING`, idempotent).
+- **`user-context`** — seeds the binding when an `org_admin` invite converts on login adoption; auto-joins learners on every login (after adoption, so a first admin isn't double-joined). **`invitation-accept`** — seeds on `org_admin` link acceptance.
+- **`organization-update`** — platform-admin override to set/correct/clear the binding (GUID-validated, consumer tenant refused, lowercased; distinct `409 DUPLICATE_TENANT`); org admins stay limited to `logo_url`. **`organizations`** — binding exposed to platform admins only. Self-review also closed two sibling leaks (`user-context` `row_to_json(o.*)`, `org-analytics-data` `SELECT *`) — own-org only, not cross-org, but they broke the platform-admin-only invariant.
+- **Frontend** — `Organization.entra_tid?/entra_tid_label?`; `EditOrganizationDialog` view/edit/clear section (en+da); `OrganizationDetail` sends the binding fields only when changed (never clobbers an auto-seeded binding).
+
+**Decisions (martin, grilled):** (1) learn-from-first-admin auto-seed, guarded against the consumer tenant + already-bound tids; (2) on-by-default gate + honor the existing platform-wide `allow_self_registration` as a global kill-switch; (3) domain **label** = the seeding admin's email domain (editable), `tid` stays the match source; (4) fallback = org-less account until #354; (5) full vertical (schema + backend + override UI) so #353 closes.
+
+**Tests:** `shared/tenant-binding.test.ts` (guard/seed/collision/master-switch/auto-join, all mocked); endpoint contract cases for the override (GUID/consumer/label-length validation, `DUPLICATE_TENANT`, org-admin 403, clear-also-clears-label), the `organizations` strip, and the seed/auto-join wiring in `user-context`/`invitation-accept`. Two review nits fixed on-branch: raced-`23505` logs `warn` not `error`; `entra_tid_label` bounded (253) + cleared when `entra_tid` is cleared (no orphan label).
+
+**Verify (post-trunk-merge on the branch):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **861 / 114** · `build` 0. functions `build` 0 · `test` **2636 / 149** (3 skipped).
+
+**Deploy:** prod DB migration `11-org-entra-tenant.sql` **applied 2026-08-05** (martin ran it from his terminal — temp single-IP firewall rule + Node `pg` runner reusing the app's own CA-pinned `dist/shared/db.js`; `entra_tid`/`entra_tid_label` + the unique constraint verified present) — required migrate-then-merge ordering, since `organizations`/`organization-update` reference the columns unconditionally. Merged to `main` → auto-ships frontend (SWA) + backend (functions: `tenant-binding` + `user-context`/`invitation-accept`/`organization-update`/`organizations`/`org-analytics-data` changes). Deploy announced on PR #378.
+
+---
+
+## 2026-08-05 — #366 Tips & Tricks nav item + coming-soon page (PR #381)
+
+**Who:** claude (Opus 4.8) with martin. Part of the AIU platform-review batch (Aug 2026). Branched off `origin/main` @`c0d7833`. While in flight, #378 (org auto-join #353) merged to trunk; merged `origin/main` back in before landing — the two locale files **auto-merged clean** (disjoint sections: my `tipsAndTricks.*` in the `courses` region vs #378's `sso*` keys in `orgDetail`), only this WORKLOG tail conflicted (both entries appended; kept both). #380 (favorites #358) was still an empty draft.
+
+**What:** a coming-soon placeholder page for **Tips & Tricks** at `/app/tips` (en + da). Route + page + page copy only.
+
+**Scope call (martin): no sidebar change, issue kept OPEN.** #363 (learner-nav restructure) is *blocked by* this issue as "the page the new nav links to," and #363 explicitly owns `AppSidebar.tsx` — the Læring group plus the Tips & Tricks nav entry's icon/order/label styling. So this PR deliberately does **not** touch `AppSidebar.tsx`, keeping #366 out of #363's hot-file collision set (`#367/#370/#371/#372/#344`). Consequence: the page is not nav-reachable until #363 lands (reachable directly at `/app/tips` meanwhile), so **#366 stays open** — its "clicking Tips & Tricks shows the page" acceptance criterion completes with #363, not here. The `(#366)` in the PR title is a reference, not a closing keyword, so the merge does not auto-close it.
+
+**How:** `routes.ts` `learner.tips = /app/tips`; `App.tsx` route → new `TipsAndTricks` page (`learnerOnly`, matching its Læring-group siblings Courses/Dashboard/Assessment); `src/pages/learner/TipsAndTricks.tsx` = `AppLayout` + the shared `EmptyState` (Lightbulb icon, "Coming soon" + one line). `tipsAndTricks.*` keys in en + da; "Tips & Tricks" left untranslated in both locales per `docs/glossary.md`.
+
+**Verify (post-trunk-merge on the branch):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **861 / 114** · `build` 0. functions untouched.
+
+**Deploy:** frontend-only — merging to `main` auto-ships the static page via SWA; no functions deploy, no DB migration. Announced on PR #381.
