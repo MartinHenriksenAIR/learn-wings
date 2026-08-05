@@ -2054,3 +2054,25 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** on the trunk-merged branch — root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **849 / 112** · `build` 0 · `playwright test --list` 16 tests / 10 files. Merged `origin/main` in cleanly first (trunk had moved by #342/#339/#343; disjoint files, no conflicts).
 
 **Deploy:** test-only — the SWA workflow ships the (unchanged) frontend on merge; no user-visible change and no functions deploy. A full live `npm run e2e` against the deployed app is the remaining real-world confirmation, and is martin's to run (needs a hand-captured Entra session).
+
+---
+
+## 2026-08-05 — #357 remove course enrollment step (implicit auto-enroll) (PR #376)
+
+**Who:** claude (Opus 4.8) with martin. Part of the AIU platform-review batch (Aug 2026). No PRs in flight at branch time; branched off `origin/main` @`045e857`.
+
+**What:** removed the user-facing enroll step — the confusing Enroll→Continue two-step (same button position, no real consequence today). Opening a course now starts it; enrollment becomes an invisible "has started" marker created implicitly server-side on first access, so `lesson_progress` and certificates (keyed on the enrollment) keep working unchanged.
+
+**How:**
+- **Auto-enroll** lives in `course-player-data` (the endpoint hit on course access), not the admin `enrollment-create` path the issue tentatively named. It upserts `INSERT … ON CONFLICT (org_id,user_id,course_id) DO NOTHING`, self-gated inside the SQL for org isolation — the row is written only when the caller is an **active member of the passed org**, the org has the course **enabled**, and the course is **published**, so a client can't fabricate an enrollment in an org it doesn't belong to (#373 territory). Skips a second language edition per #213; platform admins previewing without a membership create no row (matches the suite's no-side-effect convention).
+- **Deleted** the now-orphaned learner endpoints `functions/enroll` + `functions/unenroll` (+ their tests + barrel imports); the fleet registration guard confirms route↔folder parity still holds. `enrollment-create` (admin assign) and `enrollment-complete` untouched.
+- **Catalog** (`Courses.tsx`): one CTA that's always a `<Link>` into the player — Start course / Continue / Review course by state. Dropped the unenroll button + confirm dialog and the now-meaningless "Enrolled" thumbnail badge; relabelled the status filter Not started / In progress / Completed. `Assessment.tsx` recommendations open the player directly.
+- **i18n**: removed the `enroll`/`unenroll` keys (en+da), added `courses.startCourse`, reworded the dashboard empty state; event `register`/`Tilmeld` strings left alone.
+
+**Decisions (martin):** delete the dead endpoints (vs. leave them); remove the unenroll capability entirely — a started course stays in Min Træning until saved/favorites (#358) adds another axis; relabel the status filter + drop the "Enrolled" badge now rather than defer to #360/#367.
+
+**Tests:** a new `course-player-data` case pins the auto-enroll upsert's org-isolation gating by value + params. `Courses.test.tsx` reworked to the Start/Continue/Review link states (the old enroll-morph + enrolled-badge cases removed). Both learner e2e specs (05/07) had their stale "unenrolled card = Enroll button, no link" commentary refreshed — every card is a link now, so the journeys pass and no longer depend on prior enrollment.
+
+**Verify:** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `npm test` **850 / 112** · `build` 0. functions `build` 0 · `test` **2516 / 142** (3 skipped). CI green (both jobs).
+
+**Deploy:** merging to `main` auto-ships frontend (SWA) + backend (functions, one changed endpoint). Announced on PR #376.

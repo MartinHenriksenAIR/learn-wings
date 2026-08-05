@@ -14,9 +14,12 @@ import { orgSelector } from '../fixtures/fenced-org';
  * below). The suite's design doc labels this row the same way — a write once, then a read.
  *
  * It writes to the production database, and unlike 04-course-lifecycle it is not fenced.
- * The one write is `/api/lesson-progress`, which upserts a single row keyed
- * `(org_id, user_id, lesson_id)` for the signed-in account, with `profile.id` taken from
- * the token and never from the client (functions/lesson-progress/index.ts). So the
+ * The only write that changes a row is `/api/lesson-progress`, which upserts a single row
+ * keyed `(org_id, user_id, lesson_id)` for the signed-in account, with `profile.id` taken
+ * from the token and never from the client (functions/lesson-progress/index.ts). Opening
+ * the course also calls `/api/course-player-data`, which upserts this account's enrollment
+ * (implicit enrollment, #357) — but for the seeded, already-enrolled account that is
+ * `ON CONFLICT DO NOTHING`, so it adds no row. So the
  * artefact is this account's own progress, not an organization-scoped object a run can
  * own and drop: there is no fenced organization here, no `fencedOrg` fixture and no
  * teardown. `page.goto` is therefore fine, where in 04 it would silently unfence the run.
@@ -33,11 +36,11 @@ import { orgSelector } from '../fixtures/fenced-org';
  * `org_course_access` row with `access = 'enabled'`
  * (functions/shared/course-visibility.ts), and creating an organization writes none.
  *
- * `AI Fundamentals`, its `Welcome Video` lesson and this account's enrollment are all
- * pre-existing platform data — the course and lesson are seeded
- * (migration/azure/02-seed.sql:52,62) — not artefacts of this suite. Enrolling is
- * deliberately not part of the journey: the card's play link exists only because the
- * account is already enrolled (Courses.tsx:246-260), and the assertion on it says so.
+ * `AI Fundamentals` and its `Welcome Video` lesson are pre-existing seeded platform data
+ * (migration/azure/02-seed.sql:52,62), not artefacts of this suite. There is no enroll
+ * step: every catalogue card is a link into the player and opening a course auto-creates
+ * the enrollment server-side (implicit enrollment, #357), so the play link exists for
+ * every course and this journey needs no prior enrollment.
  *
  * Re-running is safe but not symmetric, and the body says where. The endpoint upserts, so
  * the *state* after every run is identical; the *journey* is not repeatable, because a
@@ -263,16 +266,16 @@ test('a completed lesson stays completed after a reload', async ({ page, viewMod
 
   // By name: a positional "first card" locator would drive whatever the catalogue
   // happened to contain and still pass. The link inside the card is the play link —
-  // `Continue`, or `Review course` once the course is finished (Courses.tsx:258) — and
-  // matching the role alone survives both labels. It is also the enrollment check: an
-  // unenrolled card renders an `Enroll` *button* and no link at all (Courses.tsx:262-275).
+  // `Start course`, `Continue`, or `Review course` depending on how far this account has
+  // got — and matching the role alone survives every label. Every card renders exactly one
+  // (opening a course starts it; enrollment is implicit, #357), so this asserts the course
+  // is present in the selected org, not that the account was enrolled beforehand.
   const openCourse = courseCardBody(page, COURSE).getByRole('link');
   await expect(
     openCourse,
-    `no play link for a "${COURSE}" card on the learner catalogue. Either the course is ` +
-      'absent from the organization the sidebar selector auto-selected (the most recently ' +
-      'created one — check for a stranded e2e organization), or this account is no longer ' +
-      'enrolled in it. This journey drives pre-existing data and enrolls nobody.',
+    `no play link for a "${COURSE}" card on the learner catalogue: the course is absent from ` +
+      'the organization the sidebar selector auto-selected (the most recently created one — ' +
+      'check for a stranded e2e organization). This journey drives pre-existing seeded data.',
   ).toHaveCount(1, { timeout: LESSON_WRITE_TIMEOUT });
   await openCourse.click();
 

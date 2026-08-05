@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -32,7 +32,6 @@ vi.mock('@/hooks/useAuth', () => ({
 
 import LearnerCourses from './Courses';
 import { callApi } from '@/lib/api-client';
-import { toast } from '@/components/ui/sonner';
 
 const baseAuthState = {
   user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
@@ -138,7 +137,7 @@ describe('LearnerCourses — profile-gated loading guard', () => {
   });
 });
 
-describe('LearnerCourses — enroll in-button morph (no success toast)', () => {
+describe('LearnerCourses — single Start/Continue/Review CTA (implicit enrollment #357)', () => {
   const currentOrg = { id: 'org-1', name: 'Org One' };
   const course = {
     id: 'c-1',
@@ -156,67 +155,43 @@ describe('LearnerCourses — enroll in-button morph (no success toast)', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg });
   });
 
-  it('morphs Enroll → "Enrolled" → Continue, with no success toast', async () => {
-    // Fake timers so the 1.6s flash window is fast-forwarded instead of waited out.
-    // shouldAdvanceTime keeps waitFor/findBy polling alive under vitest fake timers.
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      let enrolled = false;
-      vi.mocked(callApi).mockImplementation(async (url: unknown) => {
-        if (url === '/api/learner-courses') {
-          return {
-            courses: [course],
-            enrollments: enrolled
-              ? [{ id: 'e-1', course_id: 'c-1', status: 'enrolled' }]
-              : [],
-          };
-        }
-        if (url === '/api/enroll') {
-          enrolled = true;
-          return {};
-        }
-        return {};
-      });
+  it('a not-started course shows a "Start course" link to the player, and no enroll step happens', async () => {
+    vi.mocked(callApi).mockResolvedValue({ courses: [course], enrollments: [], progress: {} });
 
-      renderCourses();
-      fireEvent.click(await screen.findByRole('button', { name: 'common.enroll' }));
+    renderCourses();
 
-      // In-button success morph appears...
-      expect(await screen.findByRole('button', { name: /common\.enrolled/ })).toBeInTheDocument();
-      // ...without a success toast
-      expect(toast).not.toHaveBeenCalled();
-
-      // After the flash expires, the card settles on the normal Continue state
-      act(() => {
-        vi.advanceTimersByTime(1600);
-      });
-      await waitFor(() =>
-        expect(screen.getByRole('link', { name: /common\.continue/ })).toBeInTheDocument()
-      );
-      expect(screen.queryByRole('button', { name: /common\.enrolled/ })).toBeNull();
-    } finally {
-      vi.useRealTimers();
-    }
+    const start = await screen.findByRole('link', { name: /courses\.startCourse/ });
+    expect(start).toHaveAttribute('href', '/app/learn/c-1');
+    // No enroll button anywhere — opening the course is the only step.
+    expect(screen.queryByRole('button', { name: /common\.enroll/ })).toBeNull();
+    // The only backend call is the catalogue read; the page never calls /api/enroll.
+    expect(vi.mocked(callApi).mock.calls.every(([url]) => url === '/api/learner-courses')).toBe(true);
   });
 
-  it('keeps the destructive toast on enroll failure and does not morph', async () => {
-    vi.mocked(callApi).mockImplementation(async (url: unknown) => {
-      if (url === '/api/learner-courses') return { courses: [course], enrollments: [] };
-      if (url === '/api/enroll') throw new Error('boom');
-      return {};
+  it('a started (in-progress) course shows a Continue link to the player', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [course],
+      enrollments: [{ id: 'e-1', course_id: 'c-1', status: 'enrolled', enrolled_at: '2026-01-10T00:00:00Z', completed_at: null }],
+      progress: { 'c-1': { total: 4, completed: 1 } },
     });
 
     renderCourses();
-    fireEvent.click(await screen.findByRole('button', { name: 'common.enroll' }));
 
-    await waitFor(() => {
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-        title: 'courses.enrollmentFailed',
-        variant: 'destructive',
-      }));
+    const cont = await screen.findByRole('link', { name: /common\.continue/ });
+    expect(cont).toHaveAttribute('href', '/app/learn/c-1');
+  });
+
+  it('a completed course shows a "Review course" link to the player', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      courses: [course],
+      enrollments: [{ id: 'e-1', course_id: 'c-1', status: 'completed', enrolled_at: '2026-01-10T00:00:00Z', completed_at: '2026-02-01T00:00:00Z' }],
+      progress: { 'c-1': { total: 4, completed: 4 } },
     });
-    expect(screen.queryByRole('button', { name: /common\.enrolled/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'common.enroll' })).toBeInTheDocument();
+
+    renderCourses();
+
+    const review = await screen.findByRole('link', { name: /courses\.reviewCourse/ });
+    expect(review).toHaveAttribute('href', '/app/learn/c-1');
   });
 });
 
@@ -306,10 +281,11 @@ describe('LearnerCourses — recommended section', () => {
     expect(screen.queryByTestId('recommended-section')).toBeNull();
   });
 
-  it('shows both the chip and the enrolled badge on a recommended card for an enrolled course', async () => {
+  it('shows the chip and a Continue link (no "Enrolled" badge) on a recommended started course', async () => {
     vi.mocked(callApi).mockResolvedValue({
       courses: [basicCourse, advancedCourse],
-      enrollments: [{ id: 'e-1', course_id: 'c-basic', status: 'enrolled' }],
+      enrollments: [{ id: 'e-1', course_id: 'c-basic', status: 'enrolled', enrolled_at: '2026-01-10T00:00:00Z', completed_at: null }],
+      progress: {},
     });
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
@@ -321,9 +297,13 @@ describe('LearnerCourses — recommended section', () => {
 
     expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
     expect(screen.getByTestId('recommended-chip')).toBeInTheDocument();
-    const enrolledBadges = screen.getAllByTestId('status-badge-enrolled');
-    expect(enrolledBadges.length).toBeGreaterThanOrEqual(1);
-    expect(enrolledBadges[0]).toHaveClass('left-3');
+    // c-basic matches the assessment level, so it renders in both the recommended grid
+    // and the full catalogue — each copy exposes a Continue link to the player.
+    const continueLinks = screen.getAllByRole('link', { name: /common\.continue/ });
+    expect(continueLinks.length).toBeGreaterThanOrEqual(1);
+    continueLinks.forEach((l) => expect(l).toHaveAttribute('href', '/app/learn/c-basic'));
+    // The old "Enrolled" badge is gone with the enroll step (#357).
+    expect(screen.queryByTestId('status-badge-enrolled')).toBeNull();
   });
 });
 
@@ -459,7 +439,7 @@ describe('LearnerCourses — progress bar + % on enrolled cards (#340)', () => {
     expect(screen.getByText('100%')).toBeInTheDocument();
   });
 
-  it('renders no progress bar on a not-enrolled card', async () => {
+  it('renders no progress bar on a not-started card', async () => {
     vi.mocked(callApi).mockResolvedValue({
       courses: [course],
       enrollments: [],
@@ -468,8 +448,8 @@ describe('LearnerCourses — progress bar + % on enrolled cards (#340)', () => {
 
     renderCourses();
 
-    // The Enroll CTA is present, but no progress bar is rendered.
-    expect(await screen.findByRole('button', { name: 'common.enroll' })).toBeInTheDocument();
+    // The "Start course" CTA is present, but no progress bar is rendered.
+    expect(await screen.findByRole('link', { name: /courses\.startCourse/ })).toBeInTheDocument();
     expect(screen.queryByTestId('course-progress-c-1')).toBeNull();
     expect(screen.queryByText('0%')).toBeNull();
   });

@@ -179,17 +179,17 @@ test('a quiz lesson is never a dead end', async ({ page }) => {
   await page.goto(CATALOGUE_PATH);
 
   // By name: a positional "first card" locator would drive whatever the catalogue happened
-  // to contain and still pass. The link inside the card is the play link — `Continue`, or
-  // `Review course` once the course is finished (Courses.tsx:258) — and matching the role
-  // alone survives both labels. It is also the enrollment check: an unenrolled card renders
-  // an `Enroll` *button* and no link at all (Courses.tsx:262-275).
+  // to contain and still pass. The link inside the card is the play link — `Start course`,
+  // `Continue`, or `Review course` depending on how far this account has got — and matching
+  // the role alone survives every label. Every card renders exactly one (opening a course
+  // starts it; enrollment is implicit, #357), so this asserts the course is present in the
+  // selected org, not that the account was enrolled beforehand.
   const openCourse = courseCardBody(page, COURSE).getByRole('link');
   await expect(
     openCourse,
-    `no play link for a "${COURSE}" card on the learner catalogue. Either the course is absent ` +
-      'from the organization the sidebar selector auto-selected (the most recently created one — ' +
-      'check for a stranded e2e organization), or this account is no longer enrolled in it. This ' +
-      'journey drives pre-existing data and enrolls nobody.',
+    `no play link for a "${COURSE}" card on the learner catalogue: the course is absent from ` +
+      'the organization the sidebar selector auto-selected (the most recently created one — ' +
+      'check for a stranded e2e organization). This journey drives pre-existing seeded data.',
   ).toHaveCount(1, { timeout: QUIZ_READ_TIMEOUT });
   await openCourse.click();
 
