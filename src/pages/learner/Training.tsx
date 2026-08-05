@@ -15,7 +15,6 @@ import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useLearnerTraining } from '@/hooks/useLearnerTraining';
 import { callApiRaw } from '@/lib/api-client';
-import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Award, Play } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
 import { ComingSoonSection } from '@/components/learner/ComingSoonSection';
@@ -35,7 +34,6 @@ export default function LearnerTraining() {
   });
 
   const data = query.data;
-  const enrollments: (Enrollment & { course: Course })[] = data?.enrollments ?? [];
   const progressData: Record<string, { total: number; completed: number }> = data?.progress ?? {};
   const thumbnailUrls: Record<string, string> = data?.thumbnailUrls ?? {};
 
