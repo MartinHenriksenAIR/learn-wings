@@ -17,12 +17,17 @@ vi.mock('@/lib/api-client', () => ({ callApi: vi.fn() }));
 
 vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
-// The assignable-courses hook is exercised in its own layer; here we stub it.
-vi.mock('@/hooks/useOrgCourseAccess', () => ({
-  useOrgCourseAccess: () => ({
-    data: [{ id: 'c-1', title: 'Course One', language: null }],
+// The assignable-courses hook is exercised in its own layer; here we stub it with
+// a mutable state so individual tests can flip loading/error.
+const courseAccessState = vi.hoisted(() => ({
+  value: {
+    data: [{ id: 'c-1', title: 'Course One', language: null }] as unknown[],
     isLoading: false,
-  }),
+    isError: false,
+  },
+}));
+vi.mock('@/hooks/useOrgCourseAccess', () => ({
+  useOrgCourseAccess: () => courseAccessState.value,
 }));
 
 import { callApi } from '@/lib/api-client';
@@ -60,6 +65,11 @@ describe('AssignCourseDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCallApi.mockResolvedValue({});
+    courseAccessState.value = {
+      data: [{ id: 'c-1', title: 'Course One', language: null }],
+      isLoading: false,
+      isError: false,
+    };
   });
 
   it('hides the whole-org option and locks the target when presetUserId is set', () => {
@@ -112,5 +122,12 @@ describe('AssignCourseDialog', () => {
   it('disables Assign until a course (and member) are chosen', () => {
     renderDialog(); // member target, nothing selected
     expect(screen.getByRole('button', { name: 'assignments.assign' })).toBeDisabled();
+  });
+
+  it('shows a load error (not the empty-catalogue message) when the course fetch fails', () => {
+    courseAccessState.value = { data: [], isLoading: false, isError: true };
+    renderDialog({ presetUserId: 'u-1' });
+    expect(screen.getByText('common.loadErrorDescription')).toBeInTheDocument();
+    expect(screen.queryByText('assignments.noCourses')).toBeNull();
   });
 });

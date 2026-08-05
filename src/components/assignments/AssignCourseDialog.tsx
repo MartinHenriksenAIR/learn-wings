@@ -64,7 +64,11 @@ export function AssignCourseDialog({
     [members],
   );
 
-  const { data: courses = [], isLoading: coursesLoading } = useOrgCourseAccess(open ? orgId : undefined);
+  const {
+    data: courses = [],
+    isLoading: coursesLoading,
+    isError: coursesError,
+  } = useOrgCourseAccess(open ? orgId : undefined);
 
   // Reset the form each time the dialog opens.
   useEffect(() => {
@@ -101,7 +105,9 @@ export function AssignCourseDialog({
     },
   });
 
-  const noCourses = !coursesLoading && courses.length === 0;
+  // Distinguish a genuinely empty catalogue from a failed fetch — otherwise a
+  // transient load error reads as "enable a course first", which is misleading.
+  const noCourses = !coursesLoading && !coursesError && courses.length === 0;
   const canSubmit =
     !!courseId &&
     (target === 'org' || !!userId) &&
@@ -185,6 +191,9 @@ export function AssignCourseDialog({
             </Select>
             {noCourses && (
               <p className="text-sm text-muted-foreground">{t('assignments.noCourses')}</p>
+            )}
+            {coursesError && (
+              <p className="text-sm text-destructive">{t('common.loadErrorDescription')}</p>
             )}
           </div>
 
