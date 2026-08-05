@@ -3,7 +3,8 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne, withTransaction } from '../shared/db';
 import { convertInvitation } from '../shared/invitation-convert';
-import type { ConvertibleInvitation } from '../shared/invitation-convert';
+import type { ConvertibleInvitation, ConvertResult } from '../shared/invitation-convert';
+import { seedTenantBinding, autoJoinByTenant } from '../shared/tenant-binding';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 
@@ -29,7 +30,7 @@ const PROFILE_SELECT = `id, full_name, first_name, last_name, department, email,
 const PENDING_ORG_INVITE_FILTER =
   `status = 'pending' AND org_id IS NOT NULL AND expires_at > now() AND lower(trim(email)) = $1`;
 
-async function adoptPendingInvites(profileId: string, rawEmail: string, context: InvocationContext): Promise<void> {
+async function adoptPendingInvites(profileId: string, rawEmail: string, tid: string, context: InvocationContext): Promise<void> {
   const email = rawEmail.trim().toLowerCase();
   if (!email) return; // never match a blank/absent email claim against invitations
 
@@ -44,6 +45,7 @@ async function adoptPendingInvites(profileId: string, rawEmail: string, context:
     );
     if (pending.length === 0) return;
 
+    const converted: ConvertResult[] = [];
     await withTransaction(async (client) => {
       // Re-select under FOR UPDATE inside the transaction so the conversion
       // locks each invite against a concurrent accept-link flow and sees fresh
@@ -53,9 +55,19 @@ async function adoptPendingInvites(profileId: string, rawEmail: string, context:
         [email],
       );
       for (const invitation of rows) {
-        await convertInvitation(client, invitation, profileId);
+        converted.push(await convertInvitation(client, invitation, profileId));
       }
     });
+
+    // #353: auto-seed the org↔tenant binding from the first org_admin to adopt
+    // an invite. Runs AFTER the conversion commits and on its own connection
+    // (see seedTenantBinding), so a binding collision can never roll back the
+    // membership. Uses the caller's VERIFIED token tid — this login IS that admin.
+    for (const result of converted) {
+      if (result.kind === 'org' && result.role === 'org_admin') {
+        await seedTenantBinding(result.orgId, tid, rawEmail, context);
+      }
+    }
   } catch (err) {
     context.error('user-context: pending-invite adoption failed', err);
   }
@@ -117,7 +129,15 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
 
     // #176: adopt pending org invites BEFORE loading memberships, so a freshly
     // adopted org shows up in this same response (no client refresh needed).
-    await adoptPendingInvites(profile!.id, user.email, context);
+    // Adoption also seeds an org's tenant binding when it converts an org_admin
+    // invite (#353).
+    await adoptPendingInvites(profile!.id, user.email, user.tid, context);
+
+    // #353: invite-less SSO onboarding — if the caller's verified tenant is
+    // bound to an org (self-reg on + free seat), join them as a learner. Runs
+    // AFTER adoption so a first-admin login (who just got an org_admin
+    // membership above) is skipped as an existing member, never double-joined.
+    await autoJoinByTenant(profile!.id, user.tid, context);
 
     const memberships = await query(
       `SELECT om.*, row_to_json(o.*) AS organization

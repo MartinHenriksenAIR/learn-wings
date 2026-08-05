@@ -128,6 +128,38 @@ describe('organizations', () => {
     expect(params).toEqual(['org-1']);
   });
 
+  it('#353: strips the SSO tenant binding from a non-platform-admin single-org fetch', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true); // org admin / member of their own org
+    mockQueryOne.mockResolvedValueOnce({
+      id: 'org-1', name: 'X', member_count: 4, pending_invite_count: 2,
+      entra_tid: '72f988bf-86f1-41af-91ab-2d7cd011db47', entra_tid_label: 'acme.com',
+    });
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+    expect(body.organization).not.toHaveProperty('entra_tid');
+    expect(body.organization).not.toHaveProperty('entra_tid_label');
+    // The column is still SELECTed — the strip is in code, not SQL.
+    expect(mockQueryOne.mock.calls[0][0]).toContain('o.entra_tid');
+  });
+
+  it('#353: exposes the SSO tenant binding to a platform admin single-org fetch', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQueryOne.mockResolvedValueOnce({
+      id: 'org-1', name: 'X',
+      entra_tid: '72f988bf-86f1-41af-91ab-2d7cd011db47', entra_tid_label: 'acme.com',
+    });
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+    expect(body.organization.entra_tid).toBe('72f988bf-86f1-41af-91ab-2d7cd011db47');
+    expect(body.organization.entra_tid_label).toBe('acme.com');
+  });
+
   it('returns 403 when requester is non-member non-admin', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
 

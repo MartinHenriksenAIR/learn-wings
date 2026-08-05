@@ -189,7 +189,7 @@ describe('organization-update', () => {
     expect(sql).toContain('UPDATE organizations SET');
     expect(sql).toContain('name = $1');
     expect(sql).toContain('WHERE id = $2');
-    expect(sql).toContain('RETURNING id, name, slug, logo_url, seat_limit, created_at');
+    expect(sql).toContain('RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, created_at');
     expect(params).toEqual(['New Name', 'org-1']);
   });
 
@@ -225,6 +225,77 @@ describe('organization-update', () => {
     const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+  });
+
+  // ---- #353 SSO tenant binding (platform-admin override) ----
+  const TID = '72f988bf-86f1-41af-91ab-2d7cd011db47';
+
+  it('returns 400 when entra_tid is not a GUID', async () => {
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { entra_tid: 'not-a-guid' } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'entra_tid must be a tenant GUID or null' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('refuses the shared consumer/MSA tenant (400)', async () => {
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { entra_tid: '9188040d-6c67-4c5b-b112-36a304b66dad' } }),
+      {} as any,
+    );
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'That is the shared personal-Microsoft-account tenant and cannot be linked to an organization',
+      code: 'CONSUMER_TENANT',
+    });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when entra_tid_label is the wrong type', async () => {
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { entra_tid_label: 42 } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'entra_tid_label must be a string or null' });
+  });
+
+  it('platform admin can set the binding; the tid is normalized to lowercase', async () => {
+    const updated = { id: 'org-1', name: 'Acme', slug: 'acme', logo_url: null, seat_limit: null, entra_tid: TID, entra_tid_label: 'acme.com', created_at: 'x' };
+    mockQueryOne.mockResolvedValueOnce(updated);
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { entra_tid: TID.toUpperCase(), entra_tid_label: 'acme.com' } }),
+      {} as any,
+    );
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('entra_tid = $1');
+    expect(sql).toContain('entra_tid_label = $2');
+    expect(params).toEqual([TID, 'acme.com', 'org-1']); // lowercased
+  });
+
+  it('platform admin can clear the binding (entra_tid: null)', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', entra_tid: null });
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { entra_tid: null } }), {} as any);
+    expect(res.status).toBe(200);
+    expect((mockQueryOne.mock.calls[0][1] as unknown[])).toEqual([null, 'org-1']);
+  });
+
+  it('returns a distinct 409 when the tenant is already linked to another org', async () => {
+    mockQueryOne.mockRejectedValueOnce(
+      Object.assign(new Error('duplicate key'), { code: '23505', constraint: 'organizations_entra_tid_key' }),
+    );
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { entra_tid: TID } }), {} as any);
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body as string)).toEqual({
+      error: 'This Microsoft tenant is already linked to another organization',
+      code: 'DUPLICATE_TENANT',
+    });
+  });
+
+  it('an org admin cannot set the tenant binding (403, no DB touch)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValue(true);
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { entra_tid: TID } }), {} as any);
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
   it('org admin of the target org can update logo_url only', async () => {

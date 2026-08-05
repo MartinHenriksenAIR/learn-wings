@@ -85,14 +85,18 @@ CREATE TYPE public.idea_status AS ENUM (
 
 -- ---- organizations ----
 CREATE TABLE public.organizations (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       text NOT NULL,
-  slug       text UNIQUE NOT NULL,
-  logo_url   text,
-  seat_limit integer DEFAULT NULL,   -- NULL = unlimited
-  created_at timestamptz NOT NULL DEFAULT now()
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name            text NOT NULL,
+  slug            text UNIQUE NOT NULL,
+  logo_url        text,
+  seat_limit      integer DEFAULT NULL,   -- NULL = unlimited
+  entra_tid       text UNIQUE,            -- ADDED (#353): bound Entra tenant ID for SSO auto-join. UNIQUE (multiple NULLs allowed) = a tenant binds to at most one org.
+  entra_tid_label text,                   -- ADDED (#353): human-friendly domain label for the binding (e.g. 'acme.com'); cosmetic, editable by platform admin.
+  created_at      timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON COLUMN public.organizations.seat_limit IS 'Maximum number of users allowed in this organization. NULL means unlimited.';
+COMMENT ON COLUMN public.organizations.entra_tid IS 'Bound Entra tenant ID for SSO auto-join (#353). NULL = unbound. UNIQUE: a verified tenant binds to at most one org.';
+COMMENT ON COLUMN public.organizations.entra_tid_label IS 'Human-friendly domain label for the tenant binding, e.g. acme.com (#353). Cosmetic; editable by platform admin.';
 
 -- ---- profiles ----
 -- id was `REFERENCES auth.users` in Supabase; now a self-owned uuid PK.

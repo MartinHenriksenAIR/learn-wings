@@ -6,8 +6,18 @@ import { buildUpdateSet } from '../shared/update-builder';
 import { deleteBlob } from '../shared/blob';
 import { enforceUploadLimits, type UploadCandidate } from '../shared/upload-limits';
 import { assertBindablePaths, isBlobReleasable } from '../shared/blob-ownership';
+import { CONSUMER_TENANT_ID } from '../shared/tenant-binding';
 
-const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit']);
+// entra_tid / entra_tid_label are the SSO tenant binding (#353). They are NOT in
+// the org-admin-writable set below: an org admin may only write logo_url, so
+// adding them here keeps them platform-admin-only automatically (see the authz
+// gate). The binding is normally auto-seeded (functions/shared/tenant-binding);
+// this endpoint is the platform-admin set/correct/clear override.
+const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit', 'entra_tid', 'entra_tid_label']);
+
+// Entra tenant ids are lowercase GUIDs. Stored lowercased (see the transform) so
+// they match the verified token `tid` exactly.
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default endpoint('organization-update', async ({ req, profile, reply }) => {
   const body = await req.json() as { orgId?: unknown; updates?: unknown };
@@ -18,7 +28,13 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
   }
 
   const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS, {
-    transform: (key, value) => (key === 'name' ? normalizeOrgName(value as string) : value),
+    transform: (key, value) => {
+      if (key === 'name') return normalizeOrgName(value as string);
+      // Normalize a tenant id to a lowercased/trimmed GUID so it matches the
+      // verified token tid exactly; leave null (clear) and non-strings alone.
+      if (key === 'entra_tid' && typeof value === 'string') return value.trim().toLowerCase();
+      return value;
+    },
   });
   if (!built.ok) {
     return reply(400, { error: built.error });
@@ -46,6 +62,21 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
     } else if (key === 'seat_limit') {
       if (v !== null && (typeof v !== 'number' || !Number.isInteger(v) || v < 1)) {
         return reply(400, { error: 'seat_limit must be a positive integer or null' });
+      }
+    } else if (key === 'entra_tid') {
+      // null clears the binding; otherwise a GUID that is NOT the shared
+      // consumer/MSA tenant (which would auto-join every personal MS account).
+      if (v !== null) {
+        if (typeof v !== 'string' || !GUID_RE.test(v.trim())) {
+          return reply(400, { error: 'entra_tid must be a tenant GUID or null' });
+        }
+        if (v.trim().toLowerCase() === CONSUMER_TENANT_ID) {
+          return reply(400, { error: 'That is the shared personal-Microsoft-account tenant and cannot be linked to an organization', code: 'CONSUMER_TENANT' });
+        }
+      }
+    } else if (key === 'entra_tid_label') {
+      if (v !== null && typeof v !== 'string') {
+        return reply(400, { error: 'entra_tid_label must be a string or null' });
       }
     }
   }
@@ -125,7 +156,7 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
     const organization = await queryOne(
       `UPDATE organizations SET ${setClauses.join(', ')}
        WHERE id = $${idIndex}
-       RETURNING id, name, slug, logo_url, seat_limit, created_at`,
+       RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, created_at`,
       params,
     );
 
@@ -150,6 +181,10 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
     return reply(200, { organization });
   } catch (dbErr: unknown) {
     if (isUniqueViolation(dbErr)) {
+      // The org has two UNIQUE columns now — distinguish so the caller sees which.
+      if ((dbErr as { constraint?: string }).constraint === 'organizations_entra_tid_key') {
+        return reply(409, { error: 'This Microsoft tenant is already linked to another organization', code: 'DUPLICATE_TENANT' });
+      }
       return reply(409, { error: 'Slug already in use', code: 'DUPLICATE_SLUG' });
     }
     throw dbErr;
