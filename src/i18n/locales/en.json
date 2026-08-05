@@ -213,6 +213,11 @@
     "startCourse": "Start course",
     "reviewCourse": "Review course"
   },
+  "tipsAndTricks": {
+    "title": "Tips & Tricks",
+    "comingSoon": "Coming soon",
+    "comingSoonBody": "We're putting together tips and tricks to help you get more out of AI. Check back soon."
+  },
   "coursePlayer": {
     "completionSaveFailed": "Couldn't record course completion",
     "completionSaveFailedDescription": "Your lesson progress is saved, but the course completion wasn't recorded. Please try again later.",
