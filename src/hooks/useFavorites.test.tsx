@@ -22,7 +22,10 @@ vi.mock('react-i18next', () => ({
 const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
 vi.mock('@/components/ui/sonner', () => ({ toast: (...args: unknown[]) => mockToast(...args) }));
 
-import { useFavorites, useToggleFavorite } from './useFavorites';
+import { queryKeys } from '@/lib/query-keys';
+import { useFavorites, useToggleFavorite, type ToggleFavoriteInput } from './useFavorites';
+
+type CachedFavorites = { courses: Array<{ id: string }> };
 
 const course = {
   id: 'c-1',
@@ -52,6 +55,8 @@ function FavoritesConsumer({ orgId, enabled }: { orgId: string | undefined; enab
   );
 }
 
+const otherCourse = { ...course, id: 'c-0', title: 'Other course' };
+
 function ToggleConsumer({ orgId }: { orgId: string | undefined }) {
   const { toggleFavorite, togglingId } = useToggleFavorite(orgId);
   return (
@@ -64,9 +69,43 @@ function ToggleConsumer({ orgId }: { orgId: string | undefined }) {
   );
 }
 
+// Fires an arbitrary toggle input so a test can drive the onSuccess cache-patch
+// (add with/without a course object, dedup, remove) against a shared QueryClient.
+function ToggleInputConsumer({
+  orgId,
+  input,
+}: {
+  orgId: string | undefined;
+  input: ToggleFavoriteInput;
+}) {
+  const { toggleFavorite } = useToggleFavorite(orgId);
+  return (
+    <button type="button" onClick={() => toggleFavorite(input)}>
+      toggle
+    </button>
+  );
+}
+
 function renderWithClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
+// Renders against a caller-owned client so the test can seed the favorites cache
+// beforehand and read it back after the mutation settles.
+function renderWithSeededClient(ui: React.ReactElement, queryClient: QueryClient) {
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
+function seededClient(courses: unknown[]) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(queryKeys.favorites.list('org-1'), { courses });
+  return queryClient;
+}
+
+function cachedIds(queryClient: QueryClient) {
+  const data = queryClient.getQueryData<CachedFavorites>(queryKeys.favorites.list('org-1'));
+  return (data?.courses ?? []).map((c) => c.id);
 }
 
 describe('useFavorites', () => {
@@ -151,6 +190,79 @@ describe('useToggleFavorite', () => {
     // onSettled clears the pending id once the mutation resolves.
     await waitFor(() => {
       expect(screen.getByTestId('togglingId')).toHaveTextContent('');
+    });
+  });
+
+  it('onSuccess add-patch prepends the course to the favorites cache', async () => {
+    mockCallApi.mockResolvedValue({ favorited: true });
+    const queryClient = seededClient([otherCourse]);
+
+    renderWithSeededClient(
+      <ToggleInputConsumer orgId="org-1" input={{ courseId: 'c-1', favorite: true, course }} />,
+      queryClient,
+    );
+    fireEvent.click(screen.getByText('toggle'));
+
+    // Prepended (newest first), matching the endpoint's ORDER BY created_at DESC.
+    await waitFor(() => {
+      expect(cachedIds(queryClient)).toEqual(['c-1', 'c-0']);
+    });
+  });
+
+  it('onSuccess add-patch does not duplicate a course already in the cache', async () => {
+    mockCallApi.mockResolvedValue({ favorited: true });
+    const queryClient = seededClient([course]);
+
+    renderWithSeededClient(
+      <ToggleInputConsumer orgId="org-1" input={{ courseId: 'c-1', favorite: true, course }} />,
+      queryClient,
+    );
+    fireEvent.click(screen.getByText('toggle'));
+
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/favorite-set', {
+        orgId: 'org-1',
+        courseId: 'c-1',
+        favorite: true,
+      });
+    });
+    // Dedup guard: still a single entry, not two.
+    expect(cachedIds(queryClient)).toEqual(['c-1']);
+  });
+
+  it('onSuccess add-patch no-ops when the caller supplies no course object', async () => {
+    mockCallApi.mockResolvedValue({ favorited: true });
+    const queryClient = seededClient([otherCourse]);
+
+    renderWithSeededClient(
+      <ToggleInputConsumer orgId="org-1" input={{ courseId: 'c-1', favorite: true }} />,
+      queryClient,
+    );
+    fireEvent.click(screen.getByText('toggle'));
+
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith('/api/favorite-set', {
+        orgId: 'org-1',
+        courseId: 'c-1',
+        favorite: true,
+      });
+    });
+    // No course to add and no throw: the cache is left untouched.
+    expect(cachedIds(queryClient)).toEqual(['c-0']);
+  });
+
+  it('onSuccess remove-patch drops the course from the favorites cache', async () => {
+    mockCallApi.mockResolvedValue({ favorited: false });
+    const queryClient = seededClient([course, otherCourse]);
+
+    renderWithSeededClient(
+      <ToggleInputConsumer orgId="org-1" input={{ courseId: 'c-1', favorite: false }} />,
+      queryClient,
+    );
+    fireEvent.click(screen.getByText('toggle'));
+
+    await waitFor(() => {
+      expect(cachedIds(queryClient)).toEqual(['c-0']);
     });
   });
 });

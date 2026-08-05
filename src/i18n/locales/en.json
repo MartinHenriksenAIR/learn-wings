@@ -215,6 +215,7 @@
     "anyStatus": "Any status",
     "startCourse": "Start course",
     "reviewCourse": "Review course",
+    "openCourse": "Open course",
     "addToFavorites": "Add to favorites",
     "removeFromFavorites": "Remove from favorites"
   },

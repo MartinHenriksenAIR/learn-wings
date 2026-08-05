@@ -57,8 +57,8 @@ vi.mock('@/hooks/useExerciseByLesson', () => ({
 
 // useFavorites/useToggleFavorite → inert factory mocks so the sidebar heart toggle
 // renders without needing a QueryClientProvider (mirrors the other hook mocks).
-const mockUseFavorites = vi.fn(() => ({ isFavorite: () => false, favoriteIds: new Set(), data: { courses: [] } }));
-const mockUseToggleFavorite = vi.fn(() => ({ toggleFavorite: vi.fn(), togglingId: null, isPending: false }));
+const mockUseFavorites = vi.fn((..._args: unknown[]) => ({ isFavorite: () => false, favoriteIds: new Set(), data: { courses: [] } }));
+const mockUseToggleFavorite = vi.fn((..._args: unknown[]) => ({ toggleFavorite: vi.fn(), togglingId: null, isPending: false }));
 vi.mock('@/hooks/useFavorites', () => ({
   useFavorites: (...args: unknown[]) => mockUseFavorites(...args),
   useToggleFavorite: (...args: unknown[]) => mockUseToggleFavorite(...args),

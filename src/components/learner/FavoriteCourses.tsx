@@ -67,7 +67,7 @@ export function FavoriteCourses({ orgId }: { orgId: string | undefined }) {
                 >
                   <Link to={routes.learner.coursePlayer(course.id)}>
                     <Play aria-hidden="true" className="h-3.5 w-3.5" />
-                    {t('common.continue')}
+                    {t('courses.openCourse')}
                   </Link>
                 </Button>
               </div>

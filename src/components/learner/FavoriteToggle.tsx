@@ -68,7 +68,7 @@ export function FavoriteToggle({
       disabled={pending}
       onClick={handleClick}
       className={cn(
-        'grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-primary disabled:opacity-50',
+        'grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50',
         isFavorite && 'text-primary',
         className,
       )}

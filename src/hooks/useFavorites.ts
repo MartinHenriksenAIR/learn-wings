@@ -94,8 +94,10 @@ export function useToggleFavorite(orgId: string | undefined) {
         }
         // Add: patchable only when the caller supplied the course; otherwise the
         // invalidateQueries backstop below refetches the authoritative list.
+        // Prepend so the just-favorited course leads, matching the endpoint's
+        // ORDER BY created_at DESC (newest first).
         if (!course || prev.courses.some((c) => c.id === courseId)) return prev;
-        return { ...prev, courses: [...prev.courses, course] };
+        return { ...prev, courses: [course, ...prev.courses] };
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.favorites.list(orgId) });
     },
