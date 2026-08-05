@@ -179,6 +179,9 @@
     "heroFirstTimeTitle": "Klar til at lære?",
     "heroFirstTimeDescription": "Vælg dit første kursus i kataloget og begynd at opbygge praktiske AI-færdigheder.",
     "heroPickFirstCourse": "Vælg dit første kursus",
+    "favoriteCourses": "Favoritter",
+    "noFavoritesTitle": "Ingen favoritter endnu",
+    "noFavoritesDescription": "Tryk på hjertet på et kursus for at gemme det her.",
     "community": {
       "title": "Fællesskab",
       "viewAll": "Se alle",
@@ -211,7 +214,9 @@
     "allLevels": "Alle niveauer",
     "anyStatus": "Enhver status",
     "startCourse": "Start kursus",
-    "reviewCourse": "Gennemse kursus"
+    "reviewCourse": "Gennemse kursus",
+    "addToFavorites": "Tilføj til favoritter",
+    "removeFromFavorites": "Fjern fra favoritter"
   },
   "coursePlayer": {
     "completionSaveFailed": "Kursusgennemførelsen kunne ikke registreres",

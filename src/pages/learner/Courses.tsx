@@ -12,6 +12,8 @@ import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { useLearnerCourses } from '@/hooks/useLearnerCourses';
+import { useFavorites, useToggleFavorite } from '@/hooks/useFavorites';
+import { FavoriteToggle } from '@/components/learner/FavoriteToggle';
 import { Course, Enrollment } from '@/lib/types';
 import { BookOpen, CheckCircle2, Play, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,6 +34,11 @@ export default function LearnerCourses() {
   const query = useLearnerCourses(currentOrg?.id, {
     enabled: orgGuard === 'ready' && !!currentOrg,
   });
+
+  const { isFavorite } = useFavorites(currentOrg?.id, {
+    enabled: orgGuard === 'ready' && !!currentOrg,
+  });
+  const { toggleFavorite, togglingId } = useToggleFavorite(currentOrg?.id);
 
   const courses = query.data?.courses ?? NO_COURSES;
   const enrollments = query.data?.enrollments ?? NO_ENROLLMENTS;
@@ -189,7 +196,15 @@ export default function LearnerCourses() {
         <div className="flex flex-1 flex-col gap-[9px] px-[18px] pb-[18px] pt-4">
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-[14.5px] font-bold leading-[1.35]">{course.title}</h3>
-            <LevelBadge level={course.level} className="shrink-0" />
+            <div className="flex shrink-0 items-center gap-1">
+              <LevelBadge level={course.level} />
+              <FavoriteToggle
+                isFavorite={isFavorite(course.id)}
+                pending={togglingId === course.id}
+                onToggle={(next) => toggleFavorite({ courseId: course.id, favorite: next, course })}
+                className="-my-1 -mr-1.5 h-7 w-7"
+              />
+            </div>
           </div>
           <p className="line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
             {course.description}
