@@ -2076,3 +2076,26 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `npm test` **850 / 112** · `build` 0. functions `build` 0 · `test` **2516 / 142** (3 skipped). CI green (both jobs).
 
 **Deploy:** merging to `main` auto-ships frontend (SWA) + backend (functions, one changed endpoint). Announced on PR #376.
+
+---
+
+## 2026-08-05 — #361 course categories (predefined admin-managed list + one per course) (PR #377, draft)
+
+**Who:** claude (Opus 4.8) with martin. Part of the AIU platform-review batch (Aug 2026). Branched off `origin/main` @`9a322f2`; subagent-driven development (fresh implementer per task + spec/quality review each + whole-branch review).
+
+**Status:** implemented; whole-branch review **APPROVE FOR MERGE**. **Draft, not merged** — merge is human-gated on the prod DB migration (see Deploy).
+
+**What:** a category dimension for courses — a platform-admin-managed, **bilingual (en/da)** category list, **exactly one** category per course (nullable = uncategorized). Management lives in the **Course Manager** as a new **Categories** tab (deliberately NOT Platform Settings, so no collision with the #368 console rebuild). The catalog *filter UI* is out of scope (that is #360); this PR only exposes the data.
+
+**How:**
+- **DB** — `course_categories (name_en, name_da, slug, sort_order)` created immediately before `courses` in `01-schema.sql` (FK ordering for a fresh build) + `courses.category_id uuid REFERENCES … ON DELETE SET NULL` (NULL = uncategorized). Seeded AI Basics / Data & Ethics (Data & etik) / Automation (Automatisering) in `02-seed.sql`. Idempotent prod migration **`10-course-categories.sql`** (09 was already taken by #339's enrollment-last-accessed) — `CREATE TABLE IF NOT EXISTS` + `ADD COLUMN IF NOT EXISTS` + `ON CONFLICT (slug) DO NOTHING`. Seed rows carry generated UUIDs; code resolves categories by slug/id, never a hardcoded UUID.
+- **Backend** — read endpoint `course-categories` (`endpoint()`, any authenticated user — the list is platform-global, no org data) + admin CRUD/reorder `course-category-create/-update/-delete/-reorder` (`adminEndpoint()`). `slugify` helper in `functions/shared/slug.ts` derives the slug from name_en on CREATE only (unique, collision-suffixed); slug is **stable** across renames. Reorder rewrites `sort_order` from an ordered id array in one `withTransaction`. `course-create`/`course-update` accept an optional `categoryId` (null allowed; a non-null id is existence-checked → 400 `category not found`). `learner-courses` Query 1 SELECT now returns `c.category_id` — this is what unblocks #360's filter.
+- **Frontend** — `CourseCategory` type + `category_id` on `Course`; `useCourseCategories` hook (`queryKeys.courseCategories.all`). Category `Select` (Uncategorized option, `'__none__'` sentinel ↔ null, labelled by `i18n.resolvedLanguage`) in both the CourseEditor detail form and the create-course dialog. New `CategoryManager` component (Course Manager → Categories tab, between Courses and Organization Access): add / rename (both names) / up-down reorder / delete-with-confirm (courses become uncategorized), all via `useToastMutation` + `invalidateQueries`. i18n en + da for every new string.
+
+**Decisions (martin):** management UI in a Course-Manager tab (not Platform Settings); bilingual category names; table `course_categories`; seed AI Basics / Data & Ethics / Automation; up/down-arrow reorder (not drag-and-drop).
+
+**Tests:** mock contract test per endpoint (happy + 401/403 + validation) + slug unit tests; `useCourseCategories` + `CategoryManager` component tests (reorder computes the exact `orderedIds`; delete gated behind confirm). Whole-branch review APPROVE FOR MERGE; two minors fixed on-branch — softened the category-tab description that had over-promised learner filtering (a #360 capability), and made the `/api/course-categories` mock explicit in the CourseEditor strict-mock tests.
+
+**Verify (on the branch, pre-merge):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **861 / 114** · `build` 0. functions `build` 0 · `test` **2597 / 148** (3 skipped).
+
+**Deploy:** **pending — human-gated.** `10-course-categories.sql` must be applied to prod **before** the code merges/deploys, or the new endpoints 500 on the missing table/column (same migrate-then-merge ordering as #191/#213/#286). Merge + deploy is martin's to trigger (handoff ritual).
