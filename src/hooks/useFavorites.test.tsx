@@ -34,6 +34,7 @@ const course = {
   level: 'basic' as const,
   language: 'en' as const,
   course_group_id: null,
+  category_id: null,
   is_published: true,
   thumbnail_url: 'raw-path/thumb.jpg',
   created_by_user_id: null,
