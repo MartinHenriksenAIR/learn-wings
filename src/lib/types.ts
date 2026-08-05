@@ -32,6 +32,11 @@ export interface Organization {
   created_at: string;
   member_count?: number;
   pending_invite_count?: number;
+  // SSO tenant binding (#353) — only present for platform admins (the
+  // `organizations` endpoint strips it for org admins). entra_tid = the bound
+  // Entra tenant id; entra_tid_label = its human-friendly domain hint.
+  entra_tid?: string | null;
+  entra_tid_label?: string | null;
 }
 
 export interface OrgMembership {

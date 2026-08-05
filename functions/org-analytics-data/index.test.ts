@@ -61,6 +61,11 @@ describe('org-analytics-data', () => {
     expect(body.members[0].assessment_level).toBe('basic');
     const [membersSql] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(membersSql).toContain('p.assessment_level');
+    // #353: the org row is fetched with explicit columns (not SELECT *), so the
+    // SSO tenant binding never leaks to an org admin through analytics.
+    const [orgSql] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(orgSql).not.toContain('SELECT *');
+    expect(orgSql).not.toContain('entra_tid');
   });
 
   it('returns 403 when an org admin requests a different org (tenant isolation)', async () => {

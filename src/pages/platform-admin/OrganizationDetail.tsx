@@ -273,6 +273,13 @@ export default function OrganizationDetail() {
         logo_url: payload.logoUrl,
         seat_limit: payload.seatLimit ? parseInt(payload.seatLimit, 10) : null,
       };
+      // #353: only send the SSO tenant binding when it actually changed, so an
+      // unrelated edit never clobbers a binding auto-seeded (or edited elsewhere)
+      // since this dialog opened. Empty string = clear (null).
+      const nextTid = payload.entraTid.trim() || null;
+      const nextLabel = payload.entraTidLabel.trim() || null;
+      if (nextTid !== (org?.entra_tid ?? null)) updates.entra_tid = nextTid;
+      if (nextLabel !== (org?.entra_tid_label ?? null)) updates.entra_tid_label = nextLabel;
       return callApi('/api/organization-update', { orgId, updates });
     },
     errorTitle: 'Failed to update organization',

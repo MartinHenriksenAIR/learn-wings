@@ -754,7 +754,13 @@
     "slug": "Slug",
     "slugHint": "Used in URLs. Only lowercase letters, numbers, and hyphens.",
     "seatLimitLabel": "Member Limit",
-    "seatLimitHint": "Maximum number of users allowed. Leave empty for unlimited."
+    "seatLimitHint": "Maximum number of users allowed. Leave empty for unlimited.",
+    "ssoBindingLabel": "SSO auto-join (Microsoft tenant)",
+    "ssoBindingHint": "People from this Microsoft tenant sign in and join automatically as learners — no invite needed. Normally set automatically from the first admin; edit only to correct it.",
+    "ssoDomainLabel": "Domain",
+    "ssoDomainHint": "Human-friendly label, e.g. acme.com.",
+    "ssoTenantIdLabel": "Microsoft tenant ID",
+    "ssoTenantIdHint": "The verified Entra tenant ID (GUID) used to match sign-ins. Leave empty to turn auto-join off for this organization."
   },
   "organizations": {
     "title": "Organizations",
