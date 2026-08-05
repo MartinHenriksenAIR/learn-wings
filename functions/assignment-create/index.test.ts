@@ -82,6 +82,13 @@ describe('assignment-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'dueDate must be an ISO date (YYYY-MM-DD)' });
   });
 
+  it('returns 400 for a regex-valid but impossible date (no 500 from the INSERT)', async () => {
+    const res = await handler(baseReq({ ...orgBody, dueDate: '2026-13-45' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'dueDate must be an ISO date (YYYY-MM-DD)' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
   it('returns 403 when caller is neither platform admin nor org admin', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValueOnce(false);

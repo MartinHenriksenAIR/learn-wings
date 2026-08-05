@@ -19,9 +19,9 @@ export default endpoint('learner-assignments', async ({ req, profile, reply, req
             c.thumbnail_url,
             bool_or(ca.mandatory)                                   AS mandatory,
             min(ca.due_date)                                        AS due_date,
-            bool_or(e.status = 'completed')                         AS completed,
+            COALESCE(bool_or(e.status = 'completed'), false)        AS completed,
             (min(ca.due_date) < CURRENT_DATE
-             AND NOT bool_or(e.status = 'completed'))               AS overdue
+             AND NOT COALESCE(bool_or(e.status = 'completed'), false)) AS overdue
        FROM course_assignments ca
        JOIN courses c ON c.id = ca.course_id
        LEFT JOIN enrollments e

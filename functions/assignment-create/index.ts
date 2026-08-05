@@ -4,6 +4,15 @@ import { orgCourseAccessEnabled } from '../shared/course-visibility';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// True only for a real calendar date in YYYY-MM-DD form. The regex alone accepts
+// impossible dates (2026-13-45); the round-trip rejects those (and rollovers like
+// 2026-02-30) so they 400 here instead of reaching the INSERT and 500ing on 22008.
+function isValidIsoDate(s: string): boolean {
+  if (!DATE_RE.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 // Assign a course to a learner (userId set) or a whole org (userId omitted/null,
 // applied dynamically to current + future active members). mandatory=false means
 // "recommended". due_date is optional and informational.
@@ -21,7 +30,7 @@ export default endpoint('assignment-create', async ({ req, profile, reply, requi
   if (mandatory !== undefined && typeof mandatory !== 'boolean') {
     return reply(400, { error: 'mandatory must be a boolean' });
   }
-  if (dueDate !== undefined && dueDate !== null && (typeof dueDate !== 'string' || !DATE_RE.test(dueDate))) {
+  if (dueDate !== undefined && dueDate !== null && (typeof dueDate !== 'string' || !isValidIsoDate(dueDate))) {
     return reply(400, { error: 'dueDate must be an ISO date (YYYY-MM-DD)' });
   }
 
