@@ -1004,6 +1004,8 @@
     "descriptionLabel": "Description",
     "levelLabel": "Level",
     "languageLabel": "Language",
+    "categoryLabel": "Category",
+    "uncategorized": "Uncategorized",
     "editions": {
       "title": "Language editions",
       "description": "Link this course to its versions in other languages so analytics count them as one course.",

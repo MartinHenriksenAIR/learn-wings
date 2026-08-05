@@ -1004,6 +1004,8 @@
     "descriptionLabel": "Beskrivelse",
     "levelLabel": "Niveau",
     "languageLabel": "Sprog",
+    "categoryLabel": "Kategori",
+    "uncategorized": "Uden kategori",
     "editions": {
       "title": "Sprogudgaver",
       "description": "Sammenkæd dette kursus med dets versioner på andre sprog, så analyser tæller dem som ét kursus.",
