@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Trans, useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { routes } from '@/lib/routes';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -9,27 +8,13 @@ import { QueryErrorState } from '@/components/ui/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LevelBadge } from '@/components/ui/level-badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
-import { useFlash } from '@/hooks/useFlash';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { useLearnerCourses } from '@/hooks/useLearnerCourses';
-import { callApi } from '@/lib/api-client';
-import { queryKeys } from '@/lib/query-keys';
 import { Course, Enrollment } from '@/lib/types';
-import { BookOpen, Check, CheckCircle2, Loader2, LogOut, Play, Search } from 'lucide-react';
+import { BookOpen, CheckCircle2, Play, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from '@/components/ui/sonner';
 
 // Module-level stable empty fallbacks so the `?? …` reads keep a referentially
 // stable value across renders (avoids re-running the filter/sort useMemo every render).
@@ -39,17 +24,10 @@ const NO_ENROLLMENTS: Enrollment[] = [];
 export default function LearnerCourses() {
   const { currentOrg, profile } = useAuth();
   const orgGuard = useOrgGuard();
-  const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { flashed, flash } = useFlash();
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [unenrollDialog, setUnenrollDialog] = useState<{ open: boolean; course: Course | null; enrollment: Enrollment | null }>({
-    open: false,
-    course: null,
-    enrollment: null,
-  });
 
   const query = useLearnerCourses(currentOrg?.id, {
     enabled: orgGuard === 'ready' && !!currentOrg,
@@ -58,60 +36,6 @@ export default function LearnerCourses() {
   const courses = query.data?.courses ?? NO_COURSES;
   const enrollments = query.data?.enrollments ?? NO_ENROLLMENTS;
   const progressData: Record<string, { total: number; completed: number }> = query.data?.progress ?? {};
-
-  const enrollMutation = useMutation({
-    mutationFn: ({ orgId, courseId }: { orgId: string; courseId: string }) =>
-      callApi('/api/enroll', { orgId, courseId }),
-    onSuccess: (_data, variables) => {
-      flash(`enr-${variables.courseId}`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.learnerCourses.list(currentOrg?.id) });
-      // Enrolling changes what the learner dashboard shows — keep its cache fresh.
-      queryClient.invalidateQueries({ queryKey: queryKeys.learnerDashboard.detail(currentOrg?.id) });
-    },
-    onError: (error) => {
-      toast({
-        title: t('courses.enrollmentFailed'),
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const unenrollMutation = useMutation({
-    mutationFn: ({ enrollmentId }: { enrollmentId: string }) =>
-      callApi('/api/unenroll', { enrollmentId }),
-    onSuccess: () => {
-      toast({
-        title: t('courses.unenrolledFromCourse'),
-        description: t('courses.unenrolledDescription', { courseTitle: unenrollDialog.course?.title }),
-      });
-      queryClient.invalidateQueries({ queryKey: queryKeys.learnerCourses.list(currentOrg?.id) });
-      // Unenrolling changes what the learner dashboard shows — keep its cache fresh.
-      queryClient.invalidateQueries({ queryKey: queryKeys.learnerDashboard.detail(currentOrg?.id) });
-    },
-    onError: (error) => {
-      toast({
-        title: t('courses.unenrollFailed'),
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    },
-    // Close the dialog whether or not the request succeeded, matching the
-    // pre-migration handler (which closed unconditionally after the request).
-    onSettled: () => setUnenrollDialog({ open: false, course: null, enrollment: null }),
-  });
-
-  const handleEnroll = (courseId: string) => {
-    if (!currentOrg) return;
-    enrollMutation.mutate({ orgId: currentOrg.id, courseId });
-  };
-
-  const handleUnenroll = () => {
-    if (!unenrollDialog.enrollment) return;
-    unenrollMutation.mutate({ enrollmentId: unenrollDialog.enrollment.id });
-  };
-
-  const unenrolling = unenrollMutation.isPending;
 
   const getEnrollmentStatus = (courseId: string) => {
     return enrollments.find(e => e.course_id === courseId);
@@ -131,13 +55,14 @@ export default function LearnerCourses() {
     ? courses.filter(c => c.level === profile.assessment_level)
     : [];
 
-  // Filter, then order enrolled courses first (#338). Enrolled (status `enrolled`
-  // OR `completed`) sort above not-enrolled; within the enrolled group by recent
-  // activity — `last_accessed_at` DESC, falling back to `enrolled_at` when a course
-  // has no activity yet (#339). Array.prototype.sort is stable (ES2019), so returning
-  // 0 for two not-enrolled courses preserves the backend's alphabetical (ORDER BY
-  // c.title) order. `.filter` returns a fresh array, so sorting it does not mutate
-  // `courses`.
+  // Filter, then order started courses first (#338). A course is "started" once it has
+  // an enrollment — now created implicitly on first open (#357) rather than by a manual
+  // enroll step. Started courses (status `enrolled` OR `completed`) sort above not-started
+  // ones; within the started group by recent activity — `last_accessed_at` DESC, falling
+  // back to `enrolled_at` when a course has no activity yet (#339). Array.prototype.sort is
+  // stable (ES2019), so returning 0 for two not-started courses preserves the backend's
+  // alphabetical (ORDER BY c.title) order. `.filter` returns a fresh array, so sorting it
+  // does not mutate `courses`.
   const filteredCourses = useMemo(() => {
     const matches = courses.filter(course => {
       const matchesSearch = search === '' ||
@@ -148,11 +73,11 @@ export default function LearnerCourses() {
 
       const enrollment = enrollments.find(e => e.course_id === course.id);
       let matchesStatus = true;
-      if (statusFilter === 'enrolled') {
+      if (statusFilter === 'in_progress') {
         matchesStatus = !!enrollment && enrollment.status !== 'completed';
       } else if (statusFilter === 'completed') {
         matchesStatus = enrollment?.status === 'completed';
-      } else if (statusFilter === 'not_enrolled') {
+      } else if (statusFilter === 'not_started') {
         matchesStatus = !enrollment;
       }
 
@@ -212,14 +137,21 @@ export default function LearnerCourses() {
   const renderCourseCard = (course: Course, showChip: boolean) => {
     const enrollment = getEnrollmentStatus(course.id);
     const isCompleted = enrollment?.status === 'completed';
-    const justEnrolled = flashed(`enr-${course.id}`);
-    const isEnrolling = enrollMutation.isPending && enrollMutation.variables?.courseId === course.id;
 
-    // Lesson progress for the enrolled-card bar. Completed courses read 100%;
+    // Lesson progress for the started-card bar. Completed courses read 100%;
     // otherwise guard divide-by-zero when the course has no lessons yet.
     const total = progressData[course.id]?.total ?? 0;
     const completed = progressData[course.id]?.completed ?? 0;
     const percent = isCompleted ? 100 : total === 0 ? 0 : Math.round((completed / total) * 100);
+
+    // One CTA in every state — opening the course starts it (enrollment is implicit,
+    // #357), so the button is always a link to the player. Its label reflects state:
+    // review a finished course, continue a started one, start a not-yet-opened one.
+    const ctaLabel = isCompleted
+      ? t('courses.reviewCourse')
+      : enrollment
+        ? t('common.continue')
+        : t('courses.startCourse');
 
     return (
       <div
@@ -243,7 +175,7 @@ export default function LearnerCourses() {
               {t('assessment.recommendations.chip')}
             </span>
           )}
-          {isCompleted ? (
+          {isCompleted && (
             <span
               data-testid="status-badge-completed"
               className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 inline-flex items-center gap-[5px] rounded-[7px] bg-success px-[11px] py-[5px] text-[11px] font-bold text-success-foreground`}
@@ -251,14 +183,7 @@ export default function LearnerCourses() {
               <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
               {t('dashboard.completed')}
             </span>
-          ) : enrollment ? (
-            <span
-              data-testid="status-badge-enrolled"
-              className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 inline-flex items-center rounded-[7px] bg-[rgba(13,21,60,0.45)] px-[11px] py-[5px] text-[11px] font-bold text-white`}
-            >
-              {t('common.enrolled')}
-            </span>
-          ) : null}
+          )}
         </div>
 
         <div className="flex flex-1 flex-col gap-[9px] px-[18px] pb-[18px] pt-4">
@@ -272,7 +197,7 @@ export default function LearnerCourses() {
 
           <div className="mt-auto flex flex-col gap-2.5">
             {enrollment && (
-              // Progress bar + % on enrolled cards — same markup/classes as the
+              // Progress bar + % on started cards — same markup/classes as the
               // dashboard's "Continue Learning" bar for visual consistency (#340).
               <div data-testid={`course-progress-${course.id}`} className="flex items-center gap-2.5">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eceef3]">
@@ -281,57 +206,20 @@ export default function LearnerCourses() {
                 <span className="whitespace-nowrap text-xs font-semibold text-muted-foreground">{percent}%</span>
               </div>
             )}
-            <div className="flex items-center gap-2">
-            {justEnrolled ? (
-              // Transient post-enroll morph; reverts to Continue when the flash expires
-              <Button className="h-auto flex-1 rounded-[10px] border border-success bg-success px-3 py-[9px] text-[13px] font-bold text-success-foreground hover:bg-success">
-                <Check aria-hidden="true" />
-                {t('common.enrolled')}
-              </Button>
-            ) : enrollment ? (
-              <Button
-                asChild
-                className={cn(
-                  'h-auto flex-1 rounded-[10px] px-3 py-[9px] text-[13px] font-bold',
-                  isCompleted
-                    ? 'border border-[#cfd6ef] bg-card text-primary hover:bg-accent'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                )}
-              >
-                <Link to={routes.learner.coursePlayer(course.id)}>
-                  <Play aria-hidden="true" />
-                  {isCompleted ? t('courses.reviewCourse') : t('common.continue')}
-                </Link>
-              </Button>
-            ) : (
-              <Button
-                onClick={() => handleEnroll(course.id)}
-                disabled={isEnrolling}
-                className="h-auto flex-1 rounded-[10px] border border-[#cfd6ef] bg-card px-3 py-[9px] text-[13px] font-bold text-primary hover:bg-accent"
-              >
-                {isEnrolling ? (
-                  <>
-                    <Loader2 className="animate-spin" />
-                    {t('common.enrolling')}
-                  </>
-                ) : (
-                  t('common.enroll')
-                )}
-              </Button>
-            )}
-            {enrollment && (
-              <Button
-                variant="outline"
-                size="icon"
-                title={t('courses.unenrollFromCourse')}
-                aria-label={t('courses.unenrollFromCourse')}
-                onClick={() => setUnenrollDialog({ open: true, course, enrollment })}
-                className="h-9 w-9 shrink-0 rounded-[10px] text-[#9aa0af] hover:border-[#f0c7c7] hover:bg-card hover:text-destructive"
-              >
-                <LogOut aria-hidden="true" className="h-[15px] w-[15px]" />
-              </Button>
-            )}
-            </div>
+            <Button
+              asChild
+              className={cn(
+                'h-auto w-full rounded-[10px] px-3 py-[9px] text-[13px] font-bold',
+                isCompleted
+                  ? 'border border-[#cfd6ef] bg-card text-primary hover:bg-accent'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              )}
+            >
+              <Link to={routes.learner.coursePlayer(course.id)}>
+                <Play aria-hidden="true" />
+                {ctaLabel}
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -373,9 +261,9 @@ export default function LearnerCourses() {
           className={selectClasses}
         >
           <option value="all">{t('courses.anyStatus')}</option>
-          <option value="enrolled">{t('courses.statusOptions.enrolled')}</option>
+          <option value="in_progress">{t('courses.statusOptions.inProgress')}</option>
           <option value="completed">{t('courses.statusOptions.completed')}</option>
-          <option value="not_enrolled">{t('courses.statusOptions.notEnrolled')}</option>
+          <option value="not_started">{t('courses.statusOptions.notStarted')}</option>
         </select>
         {hasActiveFilters && (
           <button
@@ -422,37 +310,6 @@ export default function LearnerCourses() {
           {filteredCourses.map((course) => renderCourseCard(course, false))}
         </div>
       )}
-
-      <AlertDialog
-        open={unenrollDialog.open}
-        onOpenChange={(open) => !open && setUnenrollDialog({ open: false, course: null, enrollment: null })}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('courses.unenrollConfirmTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              <Trans i18nKey="courses.unenrollConfirmDescription" values={{ courseTitle: unenrollDialog.course?.title }} />
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={unenrolling}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleUnenroll}
-              disabled={unenrolling}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {unenrolling ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('common.unenrolling')}
-                </>
-              ) : (
-                t('common.unenroll')
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </AppLayout>
   );
 }

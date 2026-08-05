@@ -72,6 +72,34 @@ describe('course-player-data', () => {
     expect(reviewCall[1]).toEqual(['p1', 'org-uuid', 'course-uuid']);
   });
 
+  it('auto-creates the enrollment on access, self-gated for org isolation (implicit enrollment #357)', async () => {
+    const course = { id: 'course-uuid', title: 'AI Basics', is_published: true };
+    mockQueryOne.mockResolvedValueOnce(course);       // course
+    mockQueryOne.mockResolvedValueOnce({ ok: true });  // access
+    mockQuery.mockResolvedValueOnce([{ id: 'mod-1', title: 'Module 1', sort_order: 1 }]); // modules
+    mockQuery.mockResolvedValueOnce([]);               // lessons for mod-1
+    mockQuery.mockResolvedValueOnce([]);               // lesson_progress
+    mockQueryOne.mockResolvedValueOnce(null);          // review
+    mockQuery.mockResolvedValueOnce([]);               // enrollment upsert
+
+    const res = await handler(baseReq as any, {} as any);
+    expect(res.status).toBe(200);
+
+    const insertCall = mockQuery.mock.calls.find(([sql]) => /INSERT INTO enrollments/i.test(sql as string));
+    expect(insertCall, 'course-player-data must upsert an enrollment on access').toBeDefined();
+    const [insertSql, insertParams] = insertCall as [string, unknown[]];
+    // SECURITY PIN: the upsert only writes for an active member of THIS org, with the
+    // course enabled + published — never an org the client merely named. Pinned by value
+    // so a regression that drops a gating clause fails here.
+    expect(insertSql).toContain('org_memberships');
+    expect(insertSql).toContain("om.status = 'active'");
+    expect(insertSql).toContain("oca.access = 'enabled'");
+    expect(insertSql).toContain('is_published = TRUE');
+    expect(insertSql).toContain('ON CONFLICT (org_id, user_id, course_id) DO NOTHING');
+    // profile.id ('p1'), not the raw token oid, and the passed org — org-scoped write.
+    expect(insertParams).toEqual(['org-uuid', 'p1', 'course-uuid']);
+  });
+
   it('returns 404 when course does not exist', async () => {
     mockQueryOne.mockResolvedValueOnce(null);
 

@@ -1,5 +1,6 @@
 import { query, queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
+import { siblingEnrollmentExists } from '../shared/course-groups';
 
 export default endpoint('course-player-data', async ({ req, profile, reply }) => {
   const { courseId, orgId } = await req.json() as { courseId: string; orgId: string };
@@ -43,6 +44,30 @@ export default endpoint('course-player-data', async ({ req, profile, reply }) =>
     'SELECT id, rating, comment FROM course_reviews WHERE user_id = $1 AND org_id = $2 AND course_id = $3',
     [profile.id, orgId, courseId]
   );
+
+  // Implicit enrollment (#357): opening a course auto-creates the enrollment so
+  // lesson progress and certificates work without a manual enroll step. The INSERT
+  // is self-gating for org isolation — it writes only when the caller is an active
+  // member of THIS org, the org has the course enabled, and the course is published,
+  // so a client can't fabricate an enrollment in an org it does not belong to.
+  // Platform admins previewing without a membership create no row (matches the
+  // suite's no-side-effect convention). #213: skipped when a sibling-language edition
+  // is already enrolled in this org, preserving one-edition-per-org.
+  if (orgId) {
+    await query(
+      `INSERT INTO enrollments (org_id, user_id, course_id, status)
+       SELECT $1, $2, $3, 'enrolled'
+        WHERE EXISTS (SELECT 1 FROM org_memberships om
+                       WHERE om.org_id = $1 AND om.user_id = $2 AND om.status = 'active')
+          AND EXISTS (SELECT 1 FROM org_course_access oca
+                       WHERE oca.org_id = $1 AND oca.course_id = $3 AND oca.access = 'enabled')
+          AND EXISTS (SELECT 1 FROM courses c
+                       WHERE c.id = $3 AND c.is_published = TRUE)
+          AND NOT ${siblingEnrollmentExists({ orgParam: 1, userParam: 2, courseParam: 3 })}
+       ON CONFLICT (org_id, user_id, course_id) DO NOTHING`,
+      [orgId, profile.id, courseId],
+    );
+  }
 
   return reply(200, { course, modules: modulesWithLessons, progressMap, review: review ?? null });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Loader2, Play } from 'lucide-react';
 import logoLightDa from '@/assets/logo-light.png';
 import logoLightEn from '@/assets/logo-light-en.png';
@@ -13,9 +13,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAssessmentQuestions } from '@/hooks/useAssessmentQuestions';
 import { useLearnerCourses } from '@/hooks/useLearnerCourses';
 import { callApi } from '@/lib/api-client';
-import { queryKeys } from '@/lib/query-keys';
 import { routes } from '@/lib/routes';
-import type { Course, CourseLevel, Enrollment } from '@/lib/types';
+import type { Course, CourseLevel } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const MAX_SCORE = 21;
@@ -282,45 +281,12 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
   );
 }
 
-function RecommendedRow({
-  course,
-  enrollment,
-  currentOrgId,
-}: {
-  course: Course;
-  enrollment: Enrollment | undefined;
-  currentOrgId: string | undefined;
-}) {
+function RecommendedRow({ course }: { course: Course }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
-  const enrollMutation = useMutation({
-    mutationFn: ({ orgId, courseId }: { orgId: string; courseId: string }) =>
-      callApi('/api/enroll', { orgId, courseId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.learnerCourses.list(currentOrgId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.learnerDashboard.detail(currentOrgId) });
-      navigate(routes.learner.coursePlayer(course.id));
-    },
-    onError: (error) => {
-      toast({
-        title: t('courses.enrollmentFailed'),
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const handleStart = () => {
-    if (enrollment) {
-      navigate(routes.learner.coursePlayer(course.id));
-      return;
-    }
-    if (!currentOrgId) return;
-    enrollMutation.mutate({ orgId: currentOrgId, courseId: course.id });
-  };
-
+  // Opening the course starts it — enrollment is created implicitly server-side on
+  // first access (#357), so there is no enroll step to perform here.
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
       <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/80 to-primary">
@@ -337,15 +303,10 @@ function RecommendedRow({
         <LevelBadge level={course.level} className="self-start" />
       </div>
       <Button
-        onClick={handleStart}
-        disabled={enrollMutation.isPending}
+        onClick={() => navigate(routes.learner.coursePlayer(course.id))}
         className="h-auto shrink-0 gap-1.5 rounded-xl px-4 py-2.5 text-[13px] font-bold"
       >
-        {enrollMutation.isPending ? (
-          <Loader2 className="animate-spin" />
-        ) : (
-          <Play aria-hidden="true" className="h-3.5 w-3.5" />
-        )}
+        <Play aria-hidden="true" className="h-3.5 w-3.5" />
         {t('assessment.result.startCourse')}
       </Button>
     </div>
@@ -359,7 +320,6 @@ function ResultView({ result }: { result: AssessmentResult }) {
   const coursesQuery = useLearnerCourses(currentOrg?.id);
 
   const courses = coursesQuery.data?.courses;
-  const enrollments = coursesQuery.data?.enrollments;
 
   // Level-matching courses first; if fewer than 3, fill with nearest-level
   // courses (by distance in the basic→intermediate→advanced order) so the
@@ -373,12 +333,6 @@ function ResultView({ result }: { result: AssessmentResult }) {
     });
     return sorted.slice(0, 3);
   }, [courses, result.level]);
-
-  const enrollmentByCourse = useMemo(() => {
-    const map = new Map<string, Enrollment>();
-    for (const e of enrollments ?? []) map.set(e.course_id, e);
-    return map;
-  }, [enrollments]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -419,12 +373,7 @@ function ResultView({ result }: { result: AssessmentResult }) {
           ) : (
             <div className="flex flex-col gap-3">
               {recommended.map((course) => (
-                <RecommendedRow
-                  key={course.id}
-                  course={course}
-                  enrollment={enrollmentByCourse.get(course.id)}
-                  currentOrgId={currentOrg?.id}
-                />
+                <RecommendedRow key={course.id} course={course} />
               ))}
             </div>
           )}
