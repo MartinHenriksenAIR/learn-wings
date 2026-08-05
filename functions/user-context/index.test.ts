@@ -351,5 +351,20 @@ describe('user-context', () => {
       // Auto-join still runs — a learner from a bound tenant can still self-onboard.
       expect(mockAutoJoinByTenant).toHaveBeenCalledTimes(1);
     });
+
+    it('strips the tenant binding from the memberships payload (platform-admin-only invariant)', async () => {
+      mockQueryOne.mockResolvedValueOnce(existingProfile);
+      mockQuery.mockResolvedValueOnce([]); // pre-check: no pending invite
+      mockQuery.mockResolvedValueOnce([
+        { org_id: 'org-1', organization: { id: 'org-1', name: 'Org One', entra_tid: 'tid-x', entra_tid_label: 'acme.com' } },
+      ]); // memberships load — row_to_json(o.*) would include the binding
+
+      const res = await handler(baseReq as any, {} as any);
+      const body = JSON.parse(res.body);
+
+      expect(body.memberships[0].organization).not.toHaveProperty('entra_tid');
+      expect(body.memberships[0].organization).not.toHaveProperty('entra_tid_label');
+      expect(body.memberships[0].organization.name).toBe('Org One'); // other fields intact
+    });
   });
 });

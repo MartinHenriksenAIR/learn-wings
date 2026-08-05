@@ -69,7 +69,10 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         'SELECT * FROM quiz_attempts qa JOIN enrollments e ON e.user_id = qa.user_id AND e.org_id = $1 WHERE e.org_id = $1',
         [orgId]
       ),
-      queryOne('SELECT * FROM organizations WHERE id = $1', [orgId]),
+      // Explicit columns, NOT SELECT * — the SSO tenant binding (entra_tid /
+      // entra_tid_label, #353) is platform-admin config and must never surface
+      // to an org admin here.
+      queryOne('SELECT id, name, slug, logo_url, seat_limit, created_at FROM organizations WHERE id = $1', [orgId]),
     ]);
 
     return corsResponse(origin, 200, { members, enrollments, quizAttempts, org });

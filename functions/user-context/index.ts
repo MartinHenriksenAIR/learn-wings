@@ -147,6 +147,18 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [profile!.id]
     );
 
+    // #353: row_to_json(o.*) serializes the WHOLE org row, including the SSO
+    // tenant binding — platform-admin config that has no place in a per-member
+    // login payload. Strip it so the "platform-admin-only" invariant holds here
+    // too (the organizations endpoint strips it the same way).
+    for (const m of memberships) {
+      const org = (m as { organization?: Record<string, unknown> | null }).organization;
+      if (org) {
+        delete org.entra_tid;
+        delete org.entra_tid_label;
+      }
+    }
+
     return corsResponse(origin, 200, { profile, memberships });
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
