@@ -1,4 +1,4 @@
--- 10-org-entra-tenant.sql
+-- 11-org-entra-tenant.sql
 -- #353 org auto-join via verified Entra tenant. Binds an organization to a
 -- verified Entra tenant ID so members of that tenant self-onboard via SSO with
 -- no invite (functions/user-context auto-join). entra_tid is auto-seeded from
