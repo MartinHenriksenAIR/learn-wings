@@ -179,6 +179,9 @@
     "heroFirstTimeTitle": "Klar til at lære?",
     "heroFirstTimeDescription": "Vælg dit første kursus i kataloget og begynd at opbygge praktiske AI-færdigheder.",
     "heroPickFirstCourse": "Vælg dit første kursus",
+    "favoriteCourses": "Favoritter",
+    "noFavoritesTitle": "Ingen favoritter endnu",
+    "noFavoritesDescription": "Tryk på hjertet på et kursus for at gemme det her.",
     "community": {
       "title": "Fællesskab",
       "viewAll": "Se alle",
@@ -211,7 +214,10 @@
     "allLevels": "Alle niveauer",
     "anyStatus": "Enhver status",
     "startCourse": "Start kursus",
-    "reviewCourse": "Gennemse kursus"
+    "reviewCourse": "Gennemse kursus",
+    "openCourse": "Åbn kursus",
+    "addToFavorites": "Tilføj til favoritter",
+    "removeFromFavorites": "Fjern fra favoritter"
   },
   "tipsAndTricks": {
     "title": "Tips & Tricks",
@@ -258,6 +264,9 @@
     "quizNotReady": "Denne quiz er ikke klar endnu",
     "quizNotReadyDescription": "Der er endnu ingen spørgsmål at besvare her. Du kan fortsætte til næste lektion.",
     "quizNotReadyDescriptionLast": "Der er endnu ingen spørgsmål at besvare her. Quizzen vises her, når den er klar."
+  },
+  "favorites": {
+    "toggleFailed": "Kunne ikke opdatere favoritter"
   },
   "community": {
     "categories": {

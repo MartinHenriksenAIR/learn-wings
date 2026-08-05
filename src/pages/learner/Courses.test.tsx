@@ -30,8 +30,21 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+const mockUseFavorites = vi.fn();
+const mockUseToggleFavorite = vi.fn();
+vi.mock('@/hooks/useFavorites', () => ({
+  useFavorites: (...args: unknown[]) => mockUseFavorites(...args),
+  useToggleFavorite: (...args: unknown[]) => mockUseToggleFavorite(...args),
+}));
+
 import LearnerCourses from './Courses';
 import { callApi } from '@/lib/api-client';
+
+// vi.clearAllMocks() only clears call history (not implementations), so these
+// module-scope defaults survive every describe's beforeEach; individual tests
+// override them when they exercise the heart toggle.
+mockUseFavorites.mockReturnValue({ isFavorite: () => false, favoriteIds: new Set(), data: { courses: [] } });
+mockUseToggleFavorite.mockReturnValue({ toggleFavorite: vi.fn(), togglingId: null, isPending: false });
 
 const baseAuthState = {
   user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
@@ -538,5 +551,68 @@ describe('LearnerCourses — recency ordering of the enrolled group (#339)', () 
     // Banana (activity 02-01) leads; then null-activity courses by enrolled_at DESC:
     // Cherry (enrolled 01-30) before Apple (enrolled 01-20).
     expect(titleOrder()).toEqual(['Banana', 'Cherry', 'Apple']);
+  });
+});
+
+describe('LearnerCourses — favorite heart toggle (#358)', () => {
+  const currentOrg = { id: 'org-1', name: 'Org One' };
+  const course = {
+    id: 'c-1', title: 'Intro to AI', description: 'Learn the basics', level: 'basic',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+    });
+    vi.mocked(callApi).mockResolvedValue({ courses: [course], enrollments: [], progress: {} });
+  });
+
+  it('renders the add-to-favorites heart on a not-favorited card and toggles it on when clicked', async () => {
+    const toggleFavorite = vi.fn();
+    mockUseFavorites.mockReturnValue({ isFavorite: () => false, favoriteIds: new Set(), data: { courses: [] } });
+    mockUseToggleFavorite.mockReturnValue({ toggleFavorite, togglingId: null, isPending: false });
+
+    renderCourses();
+
+    const heart = await screen.findByRole('button', { name: 'courses.addToFavorites' });
+    // Not favorited → outline heart (no fill-current).
+    expect(heart.querySelector('.fill-current')).toBeNull();
+
+    fireEvent.click(heart);
+    expect(toggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'c-1', favorite: true }));
+    expect(toggleFavorite.mock.calls[0][0].course).toMatchObject({ id: 'c-1' });
+  });
+
+  it('renders the remove-from-favorites heart (filled) on a favorited card and toggles it off', async () => {
+    const toggleFavorite = vi.fn();
+    mockUseFavorites.mockReturnValue({
+      isFavorite: (id: string) => id === 'c-1',
+      favoriteIds: new Set(['c-1']),
+      data: { courses: [course] },
+    });
+    mockUseToggleFavorite.mockReturnValue({ toggleFavorite, togglingId: null, isPending: false });
+
+    renderCourses();
+
+    const heart = await screen.findByRole('button', { name: 'courses.removeFromFavorites' });
+    // Favorited → filled heart.
+    expect(heart.querySelector('.fill-current')).not.toBeNull();
+
+    fireEvent.click(heart);
+    expect(toggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'c-1', favorite: false }));
+  });
+
+  it('disables the heart while a toggle for that course is in flight', async () => {
+    mockUseFavorites.mockReturnValue({ isFavorite: () => false, favoriteIds: new Set(), data: { courses: [] } });
+    mockUseToggleFavorite.mockReturnValue({ toggleFavorite: vi.fn(), togglingId: 'c-1', isPending: true });
+
+    renderCourses();
+
+    const heart = await screen.findByRole('button', { name: 'courses.addToFavorites' });
+    expect(heart).toBeDisabled();
   });
 });

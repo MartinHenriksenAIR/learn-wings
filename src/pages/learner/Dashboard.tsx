@@ -20,6 +20,7 @@ import { callApiRaw } from '@/lib/api-client';
 import { Enrollment, Course } from '@/lib/types';
 import { BookOpen, Clock, Award, Play, ArrowRight, TrendingUp, Sparkles } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
+import { FavoriteCourses } from '@/components/learner/FavoriteCourses';
 import { DashboardCommunitySection } from '@/components/learner/DashboardCommunitySection';
 import { formatDate } from '@/lib/date-locale';
 import { toast } from '@/components/ui/sonner';
@@ -332,6 +333,8 @@ export default function LearnerDashboard() {
           </div>
         )}
       </div>
+
+      <FavoriteCourses orgId={currentOrg.id} />
 
       {completedCourses.length > 0 && (
         <div className="mb-8">

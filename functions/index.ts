@@ -48,6 +48,8 @@ import './enrollments/index';
 import './exercise-admin/index';
 import './exercise-admin-save/index';
 import './exercise-by-lesson/index';
+import './favorite-set/index';
+import './favorites/index';
 import './generate-certificate/index';
 import './generate-compliance-report/index';
 import './grade-quiz/index';
