@@ -2083,7 +2083,7 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 
 **Who:** claude (Opus 4.8) with martin. Part of the AIU platform-review batch (Aug 2026). Branched off `origin/main` @`9a322f2`; subagent-driven development (fresh implementer per task + spec/quality review each + whole-branch review).
 
-**Status:** implemented; whole-branch review **APPROVE FOR MERGE**. **Draft, not merged** — merge is human-gated on the prod DB migration (see Deploy).
+**Status:** implemented; whole-branch review **APPROVE FOR MERGE**; merged via PR #377.
 
 **What:** a category dimension for courses — a platform-admin-managed, **bilingual (en/da)** category list, **exactly one** category per course (nullable = uncategorized). Management lives in the **Course Manager** as a new **Categories** tab (deliberately NOT Platform Settings, so no collision with the #368 console rebuild). The catalog *filter UI* is out of scope (that is #360); this PR only exposes the data.
 
@@ -2098,4 +2098,4 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 
 **Verify (on the branch, pre-merge):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **861 / 114** · `build` 0. functions `build` 0 · `test` **2597 / 148** (3 skipped).
 
-**Deploy:** **pending — human-gated.** `10-course-categories.sql` must be applied to prod **before** the code merges/deploys, or the new endpoints 500 on the missing table/column (same migrate-then-merge ordering as #191/#213/#286). Merge + deploy is martin's to trigger (handoff ritual).
+**Deploy:** prod DB migration `10-course-categories.sql` **applied 2026-08-05** (martin ran it from his terminal via a temp single-IP firewall rule + Node `pg` runner; the 3 seed rows + `courses.category_id` verified present) — the required migrate-then-merge ordering (#191/#213/#286), since the new endpoints reference the table/column unconditionally. Merged to `main` → auto-ships frontend (SWA) + backend (functions: 5 new `course-category*` endpoints + `course-create`/`course-update`/`learner-courses` changes). Deploy announced on PR #377.
