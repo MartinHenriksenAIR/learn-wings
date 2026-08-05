@@ -29,6 +29,10 @@ export const queryKeys = {
     all: ['community-categories'] as const,
   },
 
+  courseCategories: {
+    all: ['course-categories'] as const,
+  },
+
   communityPosts: {
     all: ['community-posts'] as const,
     list: (

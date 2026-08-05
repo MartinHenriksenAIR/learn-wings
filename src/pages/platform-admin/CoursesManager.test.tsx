@@ -257,6 +257,7 @@ describe('CoursesManager — language field (#191)', () => {
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/courses-admin') return { courses: [existingCourse], accessRecords: [] };
       if (path === '/api/organizations') return { organizations: [] };
+      if (path === '/api/course-categories') return { categories: [] };
       if (path === '/api/course-create') return { course: { ...existingCourse, id: 'new-1', title: 'New Course' } };
       throw new Error(`Unexpected call: ${path}`);
     });
@@ -277,6 +278,7 @@ describe('CoursesManager — language field (#191)', () => {
         description: '',
         level: 'basic',
         language: 'da',
+        categoryId: null,
         thumbnailUrl: null,
       }),
     );
@@ -286,6 +288,7 @@ describe('CoursesManager — language field (#191)', () => {
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/courses-admin') return { courses: [existingCourse], accessRecords: [] };
       if (path === '/api/organizations') return { organizations: [] };
+      if (path === '/api/course-categories') return { categories: [] };
       throw new Error(`Unexpected call: ${path}`);
     });
 

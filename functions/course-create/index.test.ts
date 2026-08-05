@@ -165,6 +165,49 @@ describe('course-create', () => {
     expect(res.status).toBe(200);
   });
 
+  it('returns 400 when categoryId is not a string or null', async () => {
+    const res = await handler(baseReq({ ...validBody, categoryId: 123 }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'categoryId must be a string or null' });
+  });
+
+  it('returns 400 when categoryId does not exist', async () => {
+    mockQueryOne.mockResolvedValueOnce(null); // existence lookup misses
+    const res = await handler(baseReq({ ...validBody, categoryId: 'ghost' }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'category not found' });
+    // only the existence check ran — no INSERT
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne.mock.calls[0][0]).not.toContain('INSERT INTO courses');
+  });
+
+  it('allows a valid categoryId and stores it (existence checked first)', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ '?column?': 1 })                       // category exists
+      .mockResolvedValueOnce({ ...fakeCourse, category_id: 'cat-1' }); // INSERT
+    const res = await handler(baseReq({ ...validBody, categoryId: 'cat-1' }), {} as any);
+    expect(res.status).toBe(200);
+
+    const [existsSql, existsParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(existsSql).toMatch(/FROM course_categories WHERE id = \$1/i);
+    expect(existsParams).toEqual(['cat-1']);
+
+    const [insertSql, insertParams] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(insertSql).toContain('INSERT INTO courses');
+    expect(insertSql).toContain('category_id');
+    expect(insertParams[6]).toBe('cat-1'); // category_id value
+  });
+
+  it('allows categoryId as null (uncategorized) without an existence check', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ...fakeCourse, category_id: null }); // INSERT only
+    const res = await handler(baseReq({ ...validBody, categoryId: null }), {} as any);
+    expect(res.status).toBe(200);
+    // no existence lookup — queryOne called once (the INSERT)
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params[6]).toBeNull(); // category_id stored as null
+  });
+
   it('happy path: creates course with required fields only', async () => {
     mockQueryOne.mockResolvedValueOnce(fakeCourse);
     const res = await handler(baseReq(validBody), {} as any);

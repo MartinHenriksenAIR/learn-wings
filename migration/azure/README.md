@@ -18,7 +18,8 @@ consumers).
 | _(`07-*.sql` — not in this folder)_ | Slot claimed by `07-exercises.sql` on the unmerged `feat/exercises-lesson-family-227` branch (#227). The gap is deliberate; do not reuse `07`. |
 | `08-orphan-sweep-runs.sql` | Additive, idempotent migration for #286 (orphan-sweep run records + the `ops_alerts` recipients row). |
 | `09-enrollment-last-accessed.sql` | Additive, idempotent migration for #339 (`enrollments.last_accessed_at` — catalog recency ordering). |
-| `11-org-entra-tenant.sql` | Additive, idempotent migration for #353 (`organizations.entra_tid` + `entra_tid_label` — SSO tenant auto-join binding). Slot `10` is `10-course-categories.sql` (#361), which merges first. |
+| `10-course-categories.sql` | Additive, idempotent migration for #361 (`course_categories` table + `courses.category_id`, admin-managed category list). |
+| `11-org-entra-tenant.sql` | Additive, idempotent migration for #353 (`organizations.entra_tid` + `entra_tid_label` — SSO tenant auto-join binding). |
 | `README.md`     | This file. |
 
 > **Standing rule:** additive prod migrations (the numbered `0N-*.sql` files) are folded into `01-schema.sql` after they are applied to prod, so a fresh DB stood up from `01`+`02` is always complete. The numbered files stay in this folder as the applied-migration record.

@@ -122,6 +122,36 @@ describe('learner-courses', () => {
     expect(enrollParams).toEqual(['p1', 'org-1']);
   });
 
+  it('exposes c.category_id in the courses SELECT and passes it through (set + null)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+
+    const courseRows = [
+      {
+        id: 'c1', title: 'Categorized', description: null, level: 'basic', language: 'da',
+        is_published: true, thumbnail_url: null, category_id: 'cat-1', created_by_user_id: 'p2', created_at: '2024-01-01',
+      },
+      {
+        id: 'c2', title: 'Uncategorized', description: null, level: 'basic', language: 'da',
+        is_published: true, thumbnail_url: null, category_id: null, created_by_user_id: 'p2', created_at: '2024-01-02',
+      },
+    ];
+
+    mockQuery
+      .mockResolvedValueOnce(courseRows) // courses query
+      .mockResolvedValueOnce([]);        // enrollments query (empty)
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [coursesSql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(coursesSql).toContain('c.category_id');
+
+    const body = JSON.parse(res.body as string);
+    expect(body.courses).toEqual(courseRows);
+    expect(body.courses[0].category_id).toBe('cat-1');
+    expect(body.courses[1].category_id).toBeNull();
+  });
+
   it('returns progress: {} and runs no count queries when the caller has no enrollments', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     mockQuery

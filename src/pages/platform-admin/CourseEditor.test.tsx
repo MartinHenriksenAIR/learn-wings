@@ -199,6 +199,7 @@ describe('CourseEditor — mutations patch the structure cache (#48)', () => {
       if (path === '/api/module-update') {
         return { module: { ...moduleRow, title: 'New Name' } };
       }
+      if (path === '/api/course-categories') return { categories: [] };
       throw new Error(`Unexpected call: ${path}`);
     });
 
@@ -234,6 +235,7 @@ describe('CourseEditor — publish toggle', () => {
       if (path === '/api/course-update') {
         return { course: { ...successResponse.course, is_published: true } };
       }
+      if (path === '/api/course-categories') return { categories: [] };
       throw new Error(`Unexpected call: ${path}`);
     });
 
@@ -287,6 +289,7 @@ describe('CourseEditor — Language editions (#213)', () => {
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/course-structure-admin') return { course: courseDa, modules: [] };
       if (path === '/api/courses-admin') return { courses: [courseDa, candidateEn] };
+      if (path === '/api/course-categories') return { categories: [] };
       throw new Error(`Unexpected call: ${path}`);
     });
 
@@ -312,6 +315,7 @@ describe('CourseEditor — Language editions (#213)', () => {
       if (path === '/api/course-structure-admin') return { course: courseDa, modules: [] };
       if (path === '/api/courses-admin') return { courses: [courseDa, siblingEn, standaloneDa] };
       if (path === '/api/course-translation-link') return { success: true };
+      if (path === '/api/course-categories') return { categories: [] };
       throw new Error(`Unexpected call: ${path}`);
     });
 
@@ -350,6 +354,7 @@ describe('CourseEditor — a failed thumbnail signing must not clear the column'
       if (path === '/api/course-structure-admin') return { course: courseWithThumbnail, modules: [] };
       if (path === '/api/course-update') return { course: courseWithThumbnail };
       if (path === '/api/courses-admin') return { courses: [courseWithThumbnail] };
+      if (path === '/api/course-categories') return { categories: [] };
       throw new Error(`Unexpected call: ${path}`);
     });
   }
@@ -440,6 +445,7 @@ describe('CourseEditor — language field (#191)', () => {
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/course-structure-admin') return successResponse; // course.language: null
       if (path === '/api/course-update') return { course: successResponse.course };
+      if (path === '/api/course-categories') return { categories: [] };
       throw new Error(`Unexpected call: ${path}`);
     });
 
@@ -493,6 +499,7 @@ describe('CourseEditor — form fields have programmatic labels (#325)', () => {
       if (path === '/api/course-structure-admin') {
         return { ...successResponse, modules: [{ ...moduleRow, lessons: [] }] };
       }
+      if (path === '/api/course-categories') return { categories: [] };
       throw new Error(`Unexpected call: ${path}`);
     });
 

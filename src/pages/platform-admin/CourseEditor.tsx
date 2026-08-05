@@ -35,11 +35,18 @@ import { toast } from '@/components/ui/sonner';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useToastMutation } from '@/hooks/useToastMutation';
 import { useCoursesAdmin } from '@/hooks/useCoursesAdmin';
+import { useCourseCategories } from '@/hooks/useCourseCategories';
 import { cn } from '@/lib/utils';
 import { coursesAdminQueryKey } from './CoursesManager';
 
 /** Cache key for one course's full admin structure (course + modules + lessons). */
 const courseStructureQueryKey = (courseId: string) => queryKeys.courseStructureAdmin.detail(courseId);
+
+/**
+ * Radix Select cannot hold an empty-string value, so the "Uncategorized" option
+ * uses this sentinel; it maps to/from `category_id: null` at the state boundary.
+ */
+const UNCATEGORIZED = '__none__';
 
 interface CourseStructureData {
   course: Course | null;
@@ -68,7 +75,7 @@ interface SaveLessonInput {
 export default function CourseEditor() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { features } = usePlatformSettings();
 
@@ -79,6 +86,8 @@ export default function CourseEditor() {
   const [editDescription, setEditDescription] = useState('');
   const [editLevel, setEditLevel] = useState<CourseLevel>('basic');
   const [editLanguage, setEditLanguage] = useState<'en' | 'da'>('da');
+  /** null → uncategorized; a category id otherwise. */
+  const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   /**
    * The thumbnail value that will be PERSISTED — the raw storage path, seeded
    * from the course row and never from the signed display URL.
@@ -147,6 +156,10 @@ export default function CourseEditor() {
   const modules = structureData?.modules ?? [];
   const signedThumbnailUrl = structureData?.signedThumbnailUrl ?? null;
 
+  // Category options for the picker below — gated on `course` so we don't fetch
+  // before the editor has loaded. Labelled by the admin's UI language at render.
+  const { data: categories = [] } = useCourseCategories({ enabled: !!course });
+
   useEffect(() => {
     if (loadError) {
       toast({ title: t('courseEditor.failedToLoad'), description: loadError.message, variant: 'destructive' });
@@ -163,6 +176,7 @@ export default function CourseEditor() {
       setEditDescription(course.description || '');
       setEditLevel(course.level);
       setEditLanguage(course.language ?? 'da');
+      setEditCategoryId(course.category_id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course?.id]);
@@ -192,7 +206,7 @@ export default function CourseEditor() {
     editThumbnailPath === (course?.thumbnail_url || null) ? signedThumbnailUrl : editThumbnailPath;
 
   const saveCourseMutation = useToastMutation({
-    mutationFn: (updates: { title: string; description: string; level: CourseLevel; language: 'en' | 'da'; thumbnailUrl: string | null }) =>
+    mutationFn: (updates: { title: string; description: string; level: CourseLevel; language: 'en' | 'da'; categoryId: string | null; thumbnailUrl: string | null }) =>
       callApi<{ course: Course }>('/api/course-update', { courseId, updates }),
     errorTitle: 'Failed to save course',
     onSuccess: () => {
@@ -216,6 +230,7 @@ export default function CourseEditor() {
       description: editDescription,
       level: editLevel,
       language: editLanguage,
+      categoryId: editCategoryId,
       thumbnailUrl: thumbnailToPersist,
     });
   };
@@ -600,6 +615,23 @@ export default function CourseEditor() {
                   <SelectContent>
                     <SelectItem value="da">{t('languages.da')}</SelectItem>
                     <SelectItem value="en">{t('languages.en')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="course-category">{t('courseEditor.categoryLabel')}</Label>
+                <Select
+                  value={editCategoryId ?? UNCATEGORIZED}
+                  onValueChange={(v) => setEditCategoryId(v === UNCATEGORIZED ? null : v)}
+                >
+                  <SelectTrigger id="course-category"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNCATEGORIZED}>{t('courseEditor.uncategorized')}</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {i18n.resolvedLanguage === 'en' ? c.name_en : c.name_da}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
