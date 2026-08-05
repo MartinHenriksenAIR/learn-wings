@@ -9,6 +9,8 @@ import './assessment-skip/index';
 import './assessment-submit/index';
 import './asset-signed-url/index';
 import './assignment-create/index';
+import './assignment-delete/index';
+import './assignments/index';
 import './azure-document-upload-url/index';
 import './azure-upload-url/index';
 import './branding-asset-url/index';
