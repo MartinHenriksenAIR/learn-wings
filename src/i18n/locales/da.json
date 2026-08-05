@@ -254,6 +254,9 @@
     "quizNotReadyDescription": "Der er endnu ingen spørgsmål at besvare her. Du kan fortsætte til næste lektion.",
     "quizNotReadyDescriptionLast": "Der er endnu ingen spørgsmål at besvare her. Quizzen vises her, når den er klar."
   },
+  "favorites": {
+    "toggleFailed": "Kunne ikke opdatere favoritter"
+  },
   "community": {
     "categories": {
       "challenges-obstacles": {

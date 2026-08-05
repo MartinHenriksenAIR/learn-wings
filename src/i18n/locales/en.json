@@ -254,6 +254,9 @@
     "quizNotReadyDescription": "There are no questions to answer here yet. You can continue to the next lesson.",
     "quizNotReadyDescriptionLast": "There are no questions to answer here yet. This quiz will appear here once it's ready."
   },
+  "favorites": {
+    "toggleFailed": "Couldn't update favorites"
+  },
   "community": {
     "categories": {
       "challenges-obstacles": {
