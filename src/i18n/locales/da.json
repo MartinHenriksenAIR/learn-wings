@@ -997,7 +997,7 @@
   },
   "categoryManager": {
     "title": "Kategorier",
-    "description": "Organisér kurser i kategorier. Kursister kan filtrere efter dem.",
+    "description": "Organisér kurser i kategorier. Opret og administrér dine kategorier her.",
     "addNameEnLabel": "Engelsk navn",
     "addNameDaLabel": "Dansk navn",
     "addNameEnPlaceholder": "f.eks. Leadership",

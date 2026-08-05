@@ -997,7 +997,7 @@
   },
   "categoryManager": {
     "title": "Categories",
-    "description": "Organize courses into categories. Learners can filter by them.",
+    "description": "Organize courses into categories. Create and manage your categories here.",
     "addNameEnLabel": "English name",
     "addNameDaLabel": "Danish name",
     "addNameEnPlaceholder": "e.g., Leadership",
