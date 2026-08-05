@@ -1,4 +1,4 @@
-import { query } from '../shared/db';
+import { query } from './db';
 
 /**
  * Shared enrollment + per-course progress query for a learner in one org.
