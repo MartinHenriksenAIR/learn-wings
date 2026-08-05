@@ -2162,3 +2162,24 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (post-trunk-merge on the branch):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **861 / 114** · `build` 0. functions untouched.
 
 **Deploy:** frontend-only — merging to `main` auto-ships the static page via SWA; no functions deploy, no DB migration. Announced on PR #381.
+
+---
+
+## 2026-08-05 — #358 favorite / save a course (PR #380)
+
+**Who:** claude (Opus 4.8) with martin. Part of the AIU platform-review batch (Aug 2026). Requirements grilled with martin first (base branch, "Min Træning" ownership, toggle placement, org-scoping, term). Branched off `origin/main` @`9a322f2` (post-#376). Subagent-driven build (4 tasks, per-task spec+quality reviews, whole-branch review, fix wave + scoped re-review). Merged trunk (#361/#353/#367/#366) in before landing.
+
+**What:** the favorites **engine** — a per-user "favorite" heart on courses; favorited courses surface in a **Favorites / Favoritter** section. Scoped deliberately to the engine: does **not** build the Min Træning page (that's #364, which relocates the standalone `<FavoriteCourses>` component verbatim), the nav (#363), mandatory (#365), or naming (#367). Interim home for the section is the learner Dashboard.
+
+**How:**
+- **DB** — org-neutral `course_favorites (user_id, course_id, created_at)` (PK `(user_id, course_id)`, **no `org_id`** — a favorite is per-user, also supports org-less individual-tier #354) in `01-schema.sql`; idempotent prod migration **`12-course-favorites.sql`** (10/11 taken by #361/#353).
+- **Functions** — `favorites` (POST `{orgId}`→`{courses}`: caller's favorites narrowed to the org-visible catalog via the same `courseVisibilityPredicate` as `learner-courses`) and `favorite-set` (POST `{orgId,courseId,favorite}`→`{favorited}`: `true` gates published+org-enabled then upserts `ON CONFLICT DO NOTHING`; `false` deletes ungated so a learner can always remove). Both authorize with `requireActiveMember(orgId)` and key every query on `profile.id` — org isolation upheld (verified airtight in the whole-branch review).
+- **Frontend** — `useFavorites` hook (list query + `favoriteIds` Set/`isFavorite`, and `useToggleFavorite` via `useToastMutation` + `setQueryData` cache patch + invalidate; no `onMutate` — repo idiom); `CourseFavorite` type + `favorites` query-key family. Presentational `FavoriteToggle` (heart) on the catalog cards (`Courses.tsx`) + the CoursePlayer sidebar; standalone `FavoriteCourses` section on the Dashboard (between Continue Learning and Completed, empty state kept per owner). en+da (`courses.addToFavorites/removeFromFavorites/openCourse`, `dashboard.favoriteCourses/noFavorites*`, `favorites.toggleFailed`).
+
+**Decisions (martin, grilled):** (1) base off trunk post-#376, not stacked; (2) "B" a dedicated Min Træning page — but that page is #364's; #358 = engine + interim Dashboard section; (3) no course-detail page exists → second toggle in the CoursePlayer; (4) org-neutral storage · org-scoped display · validated writes; (5) term **Favoritter**, heart; (6) keep the empty-state section (don't hide).
+
+**Tests:** endpoint contract tests for both (OPTIONS/401/400/403/happy, favorite-set true-gate-403 + upsert-params + ungated-delete, favorites list + empty); `useFavorites.test.tsx` incl. direct `setQueryData` add/prepend/dedup/no-op/remove cache assertions; `FavoriteToggle`/`FavoriteCourses` + extended `Courses`/`Dashboard` component tests. Deferred minors (all triaged ship-as-is in the whole-branch review): favorites LIST intentionally language-agnostic (a favorite is a deliberate signal like enrollment); no platform-admin bypass on the add gate (strictly more restrictive).
+
+**Verify (post-trunk-merge on the branch, controller-run):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **886 / 117** · `build` 0. functions `build` 0 · `test` **2660 / 151** (3 skipped, incl. registration fleet guard). (Caught + closed a subagent false-green tsc during the run by re-running gates in the worktree.)
+
+**Deploy:** functions changed → **migrate-then-merge**: `favorites`/`favorite-set` reference `course_favorites` unconditionally, so prod migration **`12-course-favorites.sql` must be applied BEFORE merge/deploy**. _[to finalize: applied YYYY-MM-DD; merged → auto-ships frontend (SWA) + backend (functions); smoke ok; announced on PR #380]_
