@@ -779,4 +779,20 @@ CREATE TRIGGER trg_hash_invitation_token
   BEFORE INSERT OR UPDATE OF token ON public.invitations
   FOR EACH ROW EXECUTE FUNCTION public.hash_invitation_token();
 
+-- ---- course_favorites ----
+-- #358 per-user, org-neutral course favorites (folded in from
+-- 10-course-favorites.sql). No org_id — favorites belong to the user, not an
+-- org; the PK (user_id, course_id) makes a favorite idempotent and is the
+-- upsert conflict target.
+CREATE TABLE IF NOT EXISTS public.course_favorites (
+  user_id    uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  course_id  uuid NOT NULL REFERENCES public.courses(id)  ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, course_id)
+);
+
+-- List "my favorites for org X" filters favorites by the caller then joins the
+-- org-visible catalog; index the user_id lookup.
+CREATE INDEX IF NOT EXISTS idx_course_favorites_user ON public.course_favorites(user_id);
+
 COMMIT;
