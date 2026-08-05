@@ -1,4 +1,4 @@
--- 10-course-favorites.sql
+-- 12-course-favorites.sql
 -- #358 favorite a course: per-user, org-neutral course favorites. A favorite is
 -- the pair (user_id, course_id); the PK makes it idempotent and is the natural
 -- upsert conflict target. NO org_id — favorites belong to the user, not an org
