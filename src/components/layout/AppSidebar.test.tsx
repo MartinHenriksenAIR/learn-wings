@@ -84,20 +84,23 @@ describe('AppSidebar nav groups (#271)', () => {
   });
 
   describe('which groups render for a role', () => {
-    it('renders only the Learning group for a plain learner', () => {
+    it('renders the Dashboard item plus the Læring and Fællesskab groups for a plain learner', () => {
       mockUseAuth.mockReturnValue(baseAuth);
       renderSidebar();
 
-      expect(groupLabels()).toEqual([en.nav.learning]);
+      // Dashboard is a top-level item with no group label of its own (#363);
+      // only Læring and Fællesskab carry labels.
+      expect(groupLabels()).toEqual([en.nav.learning, en.nav.community]);
+      expect(navLink(routes.learner.dashboard)).not.toBeNull();
       expect(navLink(routes.orgAdmin.settings)).toBeNull();
       expect(navLink(routes.platformAdmin.organizations)).toBeNull();
     });
 
-    it('renders Learning + Organization for an org admin', () => {
+    it('renders the learner groups + Organization for an org admin', () => {
       mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
       renderSidebar();
 
-      expect(groupLabels()).toEqual([en.nav.learning, en.nav.organization]);
+      expect(groupLabels()).toEqual([en.nav.learning, en.nav.community, en.nav.organization]);
       expect(navLink(routes.orgAdmin.settings)).not.toBeNull();
       expect(navLink(routes.platformAdmin.organizations)).toBeNull();
     });
@@ -117,12 +120,13 @@ describe('AppSidebar nav groups (#271)', () => {
       expect(navLink(routes.orgAdmin.settings)).toBeNull();
     });
 
-    it('drops the community-gated items when community is disabled', () => {
+    it('drops the community items and the Fællesskab group when community is disabled', () => {
       mockFeatures.mockReturnValue({ ...allFeatures, community_enabled: false });
       mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
       renderSidebar();
 
-      // Groups themselves still render — only their gated items go away.
+      // The Fællesskab group is community-gated as a whole, so it drops out entirely
+      // (no lone header). The org-admin group stays; only its community-gated items go.
       expect(groupLabels()).toEqual([en.nav.learning, en.nav.organization]);
       expect(navLink(routes.community.feed)).toBeNull();
       expect(navLink(routes.orgAdmin.ideas)).toBeNull();
@@ -140,9 +144,17 @@ describe('AppSidebar nav groups (#271)', () => {
         'href',
         routes.learner.dashboard,
       );
+      expect(screen.getByRole('link', { name: en.nav.training })).toHaveAttribute(
+        'href',
+        routes.learner.training,
+      );
       expect(screen.getByRole('link', { name: en.nav.courses })).toHaveAttribute(
         'href',
         routes.learner.courses,
+      );
+      expect(screen.getByRole('link', { name: en.nav.tips })).toHaveAttribute(
+        'href',
+        routes.learner.tips,
       );
       expect(screen.getByRole('link', { name: en.nav.community })).toHaveAttribute(
         'href',
@@ -187,7 +199,7 @@ describe('AppSidebar nav groups (#271)', () => {
       renderSidebar();
 
       const da = i18n.getResourceBundle('da', 'translation');
-      expect(groupLabels()).toEqual([da.nav.learning]);
+      expect(groupLabels()).toEqual([da.nav.learning, da.nav.community]);
       expect(screen.getByRole('link', { name: da.nav.dashboard })).toHaveAttribute(
         'href',
         routes.learner.dashboard,

@@ -2226,3 +2226,42 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Deploy:** functions changed but **no schema change** → straight merge (no migration). Merged to `main` → auto-ships frontend (SWA) + backend (new `learner-training`, retrofitted `learner-dashboard`). Deploy + smoke announced on PR #382.
 
 **Follow-ups now unblocked on trunk:** #365 (`useLearnerAssignments`) and #358 (`useFavorites` + `FavoriteCourses`) both landed while this was in flight — wiring them into the two placeholder sections is a small follow-up; #363 adds the sidebar nav entry.
+
+---
+
+## 2026-08-06 — #363 learner navigation restructure (PR #385)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026). Requirements grilled with martin first (single-item Fællesskab presentation, header prominence, restyle scope, Min Træning icon; English-mode parity explicitly flagged by martin). Branched off `origin/main` @`a1dacc7` (post-#364), worktree-isolated. Draft PR opened at pickup start for cross-session visibility; small cohesive change → controller-implemented inline (no subagent fan-out). Ran alongside martin's parallel #356 / #359 / #362 sessions — only i18n-JSON overlap, kept to the `nav.*` block.
+
+**What:** rebuilt the learner sidebar from one flat "Læring" group into three sections — a top-level **Dashboard** (no header), a labelled **Læring** group (**Min Træning** · **Kursuskatalog** · **Tips & Tricks**) and a community-gated **Fællesskab** group (**Community**). Section headers made more prominent (sentence-case subheading, replacing the tiny grey uppercase eyebrow).
+
+**How:** `AppSidebar.tsx` — `NavSection.label` made optional (headerless Dashboard); `learnerItems` split into `dashboardItems` / `laeringItems` / `faellesskabItems`, the Fællesskab group rendered only when `community_enabled` (no lone header); `Min Træning`→`PlayCircle`, `Tips & Tricks`→`Lightbulb` (matches the page's own icon). Shared `GROUP_LABEL_CLASSES` restyled to `text-[12.5px] font-semibold normal-case text-[#3f4657]` — applied to **every** role's section header for consistency (an org-admin sees learner + org headers stacked). New i18n keys `nav.training` + `nav.tips` en+da; all other labels reuse existing keys. **Sidebar-only** — routes (`/app/training`, `/app/tips`), both pages, and the Kursuskatalog rename already shipped in #364/#366/#367.
+
+**Decisions (martin, grilled):** (1) build the **Fællesskab group now** with its single Community item, accepting the temporary header==item duplication until #344 splits it into Community/Events/Resources; (2) headers as a **sentence-case subheading**; (3) restyle **globally** (shared constant) for cross-role consistency over a learner-only variant; (4) Min Træning icon = **PlayCircle** ("continue" metaphor, echoes the page's own Play usage); (5) English parity explicitly required — every label is an i18n key, verified en+da.
+
+**Reviews:** none formal — a 54-line frontend restructure, fully unit-tested + visually verified; controller self-reviewed the diff.
+
+**Verify:** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **923 / 122** · `build` 0. `AppSidebar.test.tsx` updated to lock in the three-section shape + the new Min Træning / Tips links, asserted in **both en and da**. Real component rendered loginless in a throwaway Vite harness (hooks stubbed via `resolve.alias`, dep-scan scoped via `optimizeDeps.entries`, desktop viewport since shadcn `Sidebar` goes off-canvas <768px) and screenshotted in **English + Danish** — grouping, icons, header prominence confirmed; harness torn down before commit.
+
+**Deploy:** frontend-only, no functions/schema change → straight merge; SWA auto-ships the frontend on merge to `main`. Deploy + smoke announced on PR #385.
+
+---
+
+## 2026-08-06 — #356 per-org "Allow self-registration" toggle (PR #386)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026). Requirements grilled with martin first (scope vs #369's settings-area rebuild; override model; label/copy). Branched off `origin/main` @`a1dacc7` (post-#364), worktree-isolated; draft PR opened at pickup start. Blocked-by #353 (its tenant auto-join mechanism) — already merged, so unblocked. Ran alongside martin's parallel #363 / #359 / #362 sessions — merged #363 (PR #385) in on the way to merge; only i18n-JSON + append-only WORKLOG/STATUS overlap.
+
+**What:** a per-organization on/off switch governing #353's Entra tenant auto-join. Stacks with the platform-wide master switch and the member seat cap — auto-join fires only when global ON **and** per-org ON **and** a seat is free. Default `true` (existing orgs unchanged); toggling off blocks only *future* auto-joins, never removes or disables existing members.
+
+**How:**
+- **DB** — `organizations.allow_self_registration boolean NOT NULL DEFAULT true` folded into `01-schema.sql`; idempotent prod migration **`14-org-self-registration.sql`** (slots 11–13 already taken on trunk).
+- **Enforce** — one AND-gate in `autoJoinByTenant` (`functions/shared/tenant-binding.ts`), read off the org lookup itself so it short-circuits *before* the global master-switch query.
+- **Read** — added to the `organizations` single-org + platform-admin list SELECTs; org-owned, so (unlike the SSO binding) **not** stripped for org admins; reaches `currentOrg` for free via `user-context`'s `row_to_json`.
+- **Write** — both roles through `organization-update` (one validation path): platform admin via the field whitelist, org admin via a new `ORG_ADMIN_WRITABLE` subset (`logo_url`, `allow_self_registration`); boolean-only; org isolation via `isOrgAdmin(profile.id, orgId)`.
+- **Frontend** — `Organization.allow_self_registration?`; minimal org-admin toggle on `OrgSettings` (#369 absorbs it into the real settings area later; persisted via `organization-update`, change-only); platform-admin override in `EditOrganizationDialog` (sent only when changed, via `OrganizationDetail.saveEditMutation`); `orgSettings.selfReg*` + `orgDetail.selfReg*` i18n en+da.
+
+**Decisions (martin, grilled):** (1) minimal org-admin toggle now — #369 rebuilds the settings area later; (2) one shared column, both roles write it (no separate hard-override column), last-write-wins; (3) keep the "self-registration" term (matches the column + the platform-wide switch), a concise tenant-aware hint carries the disambiguation. Not in scope: individual-tier overflow (#354) — seats-full stays the current graceful org-less fallback.
+
+**Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **925 / 122** · `build` 0. functions `build` 0 · `test` **2733 / 157** (3 skipped, incl. registration fleet guard). Added tests: enforcement short-circuit, endpoint authz/validation (platform + org-admin paths, non-boolean 400, cross-field smuggle guard), read exposure/strip-parity, both UIs.
+
+**Deploy:** functions changed + new column → **migrate-then-merge**. Prod migration `14-org-self-registration.sql` must run before deploy — `user-context` (via `autoJoinByTenant`), `organizations`, and `organization-update` reference the column unconditionally, so a merge-first deploy would 500 the org read/update paths. Owner runs it from his terminal (temp single-IP firewall rule). Merged to `main` → auto-ships frontend (SWA) + backend. Deploy + smoke announced on PR #386.

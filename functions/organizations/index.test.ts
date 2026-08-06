@@ -145,6 +145,22 @@ describe('organizations', () => {
     expect(mockQueryOne.mock.calls[0][0]).toContain('o.entra_tid');
   });
 
+  it('#356: exposes allow_self_registration to a non-platform-admin (org-owned, not stripped)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true); // org admin of their own org
+    mockQueryOne.mockResolvedValueOnce({
+      id: 'org-1', name: 'X', allow_self_registration: false,
+      entra_tid: '72f988bf-86f1-41af-91ab-2d7cd011db47',
+    });
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+    expect(body.organization.allow_self_registration).toBe(false); // kept
+    expect(body.organization).not.toHaveProperty('entra_tid');     // still stripped
+    expect(mockQueryOne.mock.calls[0][0]).toContain('o.allow_self_registration');
+  });
+
   it('#353: exposes the SSO tenant binding to a platform admin single-org fetch', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce({

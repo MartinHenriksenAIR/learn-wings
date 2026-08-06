@@ -42,6 +42,7 @@ import {
   Lightbulb,
   Flag,
   MessageSquare,
+  PlayCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
@@ -60,7 +61,7 @@ const NAV_BUTTON_CLASSES =
   'data-[active=true]:hover:bg-primary data-[active=true]:hover:text-primary-foreground [&>svg]:size-[17px]';
 
 const GROUP_LABEL_CLASSES =
-  'h-auto px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.09em] text-[#9aa0af]';
+  'h-auto px-3 pb-1.5 text-[12.5px] font-semibold normal-case text-[#3f4657]';
 
 const MENU_ITEM_CLASSES = 'rounded-[9px] text-[13px] font-medium';
 
@@ -72,8 +73,11 @@ type NavItem = {
 };
 
 /**
- * One labelled nav group (label + pill menu). The three groups in AppSidebar were
+ * One nav group (optional label + pill menu). The three groups in AppSidebar were
  * byte-identical apart from label and items (#271).
+ *
+ * `label` is optional: omit it to render a bare, unlabelled group — used for the
+ * top-level Dashboard item that sits above the labelled Læring/Fællesskab groups (#363).
  *
  * Deliberately at module scope, not nested inside AppSidebar: a component declared
  * inside a render body gets a fresh identity every render, so React would unmount and
@@ -81,16 +85,18 @@ type NavItem = {
  * `collapsed` and `pathname` are read from context here rather than threaded as props,
  * exactly as the underlying sidebar primitives do.
  */
-function NavSection({ label, items }: { label: string; items: NavItem[] }) {
+function NavSection({ label, items }: { label?: string; items: NavItem[] }) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
 
   return (
     <SidebarGroup className="p-0">
-      <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
-        {label}
-      </SidebarGroupLabel>
+      {label && (
+        <SidebarGroupLabel className={GROUP_LABEL_CLASSES}>
+          {label}
+        </SidebarGroupLabel>
+      )}
       <SidebarGroupContent>
         <SidebarMenu className="gap-[3px]">
           {items.map((item) => (
@@ -137,10 +143,20 @@ export function AppSidebar() {
 
   const viewModeLabels = useViewModeLabels();
 
-  const learnerItems = [
+  // Learner nav is three sections (#363): a top-level Dashboard, then a labelled
+  // "Læring" group, then a "Fællesskab" group (rendered only when community is on).
+  const dashboardItems = [
     { title: t('nav.dashboard'), url: routes.learner.dashboard, icon: LayoutDashboard },
+  ];
+
+  const laeringItems = [
+    { title: t('nav.training'), url: routes.learner.training, icon: PlayCircle },
     { title: t('nav.courses'), url: routes.learner.courses, icon: BookOpen },
-    ...(features.community_enabled ? [{ title: t('nav.community'), url: routes.community.feed, icon: MessageSquare }] : []),
+    { title: t('nav.tips'), url: routes.learner.tips, icon: Lightbulb },
+  ];
+
+  const faellesskabItems = [
+    { title: t('nav.community'), url: routes.community.feed, icon: MessageSquare },
   ];
 
   const orgAdminItems = [
@@ -191,7 +207,13 @@ export function AppSidebar() {
 
       <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2">
         {!effectiveIsPlatformAdmin && (
-          <NavSection label={t('nav.learning')} items={learnerItems} />
+          <>
+            <NavSection items={dashboardItems} />
+            <NavSection label={t('nav.learning')} items={laeringItems} />
+            {features.community_enabled && (
+              <NavSection label={t('nav.community')} items={faellesskabItems} />
+            )}
+          </>
         )}
 
         {effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && (

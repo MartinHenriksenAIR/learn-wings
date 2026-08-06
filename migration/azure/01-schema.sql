@@ -92,11 +92,13 @@ CREATE TABLE public.organizations (
   seat_limit      integer DEFAULT NULL,   -- NULL = unlimited
   entra_tid       text UNIQUE,            -- ADDED (#353): bound Entra tenant ID for SSO auto-join. UNIQUE (multiple NULLs allowed) = a tenant binds to at most one org.
   entra_tid_label text,                   -- ADDED (#353): human-friendly domain label for the binding (e.g. 'acme.com'); cosmetic, editable by platform admin.
+  allow_self_registration boolean NOT NULL DEFAULT true,  -- ADDED (#356): per-org on/off switch for tenant auto-join. ON = tenant members auto-join without invite; OFF = invite required. Gates #353's autoJoinByTenant alongside the platform-wide master switch.
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON COLUMN public.organizations.seat_limit IS 'Maximum number of users allowed in this organization. NULL means unlimited.';
 COMMENT ON COLUMN public.organizations.entra_tid IS 'Bound Entra tenant ID for SSO auto-join (#353). NULL = unbound. UNIQUE: a verified tenant binds to at most one org.';
 COMMENT ON COLUMN public.organizations.entra_tid_label IS 'Human-friendly domain label for the tenant binding, e.g. acme.com (#353). Cosmetic; editable by platform admin.';
+COMMENT ON COLUMN public.organizations.allow_self_registration IS 'Per-org on/off switch for Entra tenant auto-join (#356). true = members of the bound tenant auto-join without an invite (still subject to the platform-wide master switch and the member seat cap); false = an invite is required. Default true. Toggling off blocks only future auto-joins; existing members are untouched.';
 
 -- ---- profiles ----
 -- id was `REFERENCES auth.users` in Supabase; now a self-owned uuid PK.

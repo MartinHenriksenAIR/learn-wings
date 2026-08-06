@@ -76,7 +76,9 @@
   "nav": {
     "home": "Hjem",
     "dashboard": "Dashboard",
+    "training": "Min Træning",
     "courses": "Kursuskatalog",
+    "tips": "Tips & Tricks",
     "community": "Fællesskab",
     "settings": "Indstillinger",
     "signOut": "Log ud",
@@ -730,6 +732,9 @@
     "disabled": "Deaktiveret",
     "saveButton": "Gem organisationsindstillinger",
     "saveFailed": "Kunne ikke gemme indstillinger",
+    "selfRegTitle": "Selvregistrering",
+    "selfRegLabel": "Tillad selvregistrering",
+    "selfRegHint": "Lad personer fra din organisations verificerede Microsoft-tenant blive medlemmer uden invitation.",
     "features": {
       "certificates_enabled": "Certifikater",
       "quizzes_enabled": "Quizzer",
@@ -810,6 +815,8 @@
     "slugHint": "Bruges i URL'er. Kun små bogstaver, tal og bindestreger.",
     "seatLimitLabel": "Medlemsgrænse",
     "seatLimitHint": "Maksimalt antal tilladte brugere. Lad feltet være tomt for ubegrænset.",
+    "selfRegLabel": "Tillad selvregistrering",
+    "selfRegHint": "Personer fra denne organisations verificerede Microsoft-tenant bliver medlemmer uden invitation.",
     "ssoBindingLabel": "SSO-automatisk tilmelding (Microsoft-tenant)",
     "ssoBindingHint": "Personer fra denne Microsoft-tenant logger ind og tilmeldes automatisk som kursister — uden invitation. Sættes normalt automatisk ud fra den første administrator; redigér kun for at rette den.",
     "ssoDomainLabel": "Domæne",

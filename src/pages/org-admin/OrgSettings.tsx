@@ -56,11 +56,29 @@ export default function OrgSettings() {
     });
   }, [orgFeatures]);
 
+  // #356: per-org self-registration switch (organizations column, not a feature
+  // flag). Key the effect on primitives so a fresh currentOrg object identity on
+  // re-render never resets a mid-edit toggle — only an org switch or a real
+  // server-value change reseeds it. Absent ⇒ true (the DB default).
+  const [allowSelfReg, setAllowSelfReg] = useState(true);
+  useEffect(() => {
+    setAllowSelfReg(currentOrg?.allow_self_registration ?? true);
+  }, [currentOrg?.id, currentOrg?.allow_self_registration]);
+
   const handleSave = async () => {
     if (!currentOrg) return;
     setSaving(true);
     try {
       await callApi('/api/org-settings-update', { orgId: currentOrg.id, features: localFeatures });
+      // #356: the self-registration switch is an organizations column, not a
+      // feature flag — persist it via organization-update, and only when it
+      // actually changed (last-write-wins; never rewrite it on an unrelated save).
+      if (allowSelfReg !== (currentOrg.allow_self_registration ?? true)) {
+        await callApi('/api/organization-update', {
+          orgId: currentOrg.id,
+          updates: { allow_self_registration: allowSelfReg },
+        });
+      }
       // Routine save: in-button "Saved" morph, no success toast (toast policy).
       flash('orgSettings');
       await refetch();
@@ -143,15 +161,38 @@ export default function OrgSettings() {
                 </div>
               ))}
             </div>
-
-            <SaveButton
-              done={flashed('orgSettings')}
-              idleLabel={t('orgSettings.saveButton')}
-              onClick={handleSave}
-              disabled={saving || !currentOrg}
-            />
           </CardContent>
         </Card>
+
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>{t('orgSettings.selfRegTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]">
+              <div className="flex flex-col gap-px pr-4">
+                <Label htmlFor="allow-self-registration" className="text-[13.5px] font-bold">
+                  {t('orgSettings.selfRegLabel')}
+                </Label>
+                <p className="text-[11.5px] text-muted-foreground">{t('orgSettings.selfRegHint')}</p>
+              </div>
+              <Switch
+                id="allow-self-registration"
+                checked={allowSelfReg}
+                onCheckedChange={setAllowSelfReg}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="mt-4">
+          <SaveButton
+            done={flashed('orgSettings')}
+            idleLabel={t('orgSettings.saveButton')}
+            onClick={handleSave}
+            disabled={saving || !currentOrg}
+          />
+        </div>
       </div>
     </AppLayout>
   );
