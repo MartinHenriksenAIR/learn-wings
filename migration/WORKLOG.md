@@ -2265,3 +2265,27 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **925 / 122** · `build` 0. functions `build` 0 · `test` **2733 / 157** (3 skipped, incl. registration fleet guard). Added tests: enforcement short-circuit, endpoint authz/validation (platform + org-admin paths, non-boolean 400, cross-field smuggle guard), read exposure/strip-parity, both UIs.
 
 **Deploy:** functions changed + new column → **migrate-then-merge**. Prod migration `14-org-self-registration.sql` must run before deploy — `user-context` (via `autoJoinByTenant`), `organizations`, and `organization-update` reference the column unconditionally, so a merge-first deploy would 500 the org read/update paths. Owner runs it from his terminal (temp single-IP firewall rule). Merged to `main` → auto-ships frontend (SWA) + backend. Deploy + smoke announced on PR #386.
+
+---
+
+## 2026-08-06 — #362 Dashboard as motivation + org-leaderboard hub (PR #384)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026). Requirements grilled with martin first (storage model, layout strip, XP scheme, streak semantics, leaderboard shape/privacy, Danish copy). Branched off `origin/main` @`a1dacc7` (post-#364), worktree-isolated; draft PR opened at pickup start. Ran alongside martin's parallel #356 / #359 / #363 sessions — merged trunk (#356 PR #386 + #363 PR #385) in on the way to merge; only the `01-schema.sql` append region, the i18n JSON, and append-only WORKLOG/STATUS overlapped — all auto-merged clean.
+
+**What:** repurposed the learner Dashboard from a continue-learning page (now owned by Min Træning #364) into a **motivation hub**: a compact progress **snapshot** (cards deep-link into Min Træning), the learner's **XP + level**, their **streak**, and an org-scoped **leaderboard** (all-time + this month), plus the existing community highlights + assessment banner. Removed the continue-learning hero, in-progress grid, favorites, completed list and certificates.
+
+**Architecture — derived-on-read:** there are **no** XP/streak/leaderboard tables. XP, streaks and both leaderboard windows are computed live in `functions/shared/gamification.ts` from the existing completion tables (`lesson_progress`, `quiz_attempts`, `enrollments`), backed by four additive read-indexes (`15-gamification-indexes.sql`, folded into `01-schema.sql`). No cron, no backfill, can't drift — the monthly window is a `WHERE … >= date_trunc('month', now() AT TIME ZONE 'Europe/Copenhagen')` clause, not a reset job.
+
+**How:**
+- **Backend** — `getLearnerDashboardData(orgId, callerId)` runs six parallel org-scoped queries and returns `{ snapshot, xp, level, streak, leaderboard }`; the `learner-dashboard` endpoint is folded to a single round-trip. XP = lesson 10 / distinct quiz passed 25 / course 100 (distinct-only → no farming); level ladder closed-form `50·L·(L+1)−100`; streak = distinct Copenhagen activity-days with a today-or-yesterday grace, **global/personal** (the only non-org-scoped query — self-data); leaderboard = active learners from `org_memberships` (never a client list), top 10 + caller's pinned rank, first-name+last-initial (only displayed rows' names leave the server).
+- **Frontend** — `useLearnerDashboard` fetches the derived payload (no more thumbnail signing); new `GamificationSummary` + `Leaderboard` components; `Dashboard.tsx` rebuilt to the hub stack; snapshot cards → `routes.learner.training`. en+da i18n for all new copy (Leaderboard kept in Danish too).
+
+**Decisions (martin, grilled):** (1) **derived-on-read** over a stored ledger — snappiness comes from one endpoint + TanStack cache + indexes, not materialisation; lower-regret, no cron/backfill; (2) **full** dashboard repurpose, no resume shortcut (the hub is glanceable; Min Træning is the launchpad); (3) XP 10/25/100 + lightweight level ladder; (4) streak Copenhagen boundary + global scope; (5) leaderboard first-name+initial, always-on now with the per-org **off-switch deferred to #369** (noted there; frontend seam ready).
+
+**Reviews:** independent whole-branch code review (Opus) — **no load-bearing issues**; org isolation verified end-to-end, no name leak of non-displayed members, level-math boundaries proven exact.
+
+**Verify (controller-run on the branch, after the trunk merge):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **921 / 122** · `build` 0. functions `build` 0 · `test` **2745 / 158** (3 skipped). New `gamification.test.ts` (level/streak/displayName/XP), rewritten `learner-dashboard` contract (org-scoping + query order + XP/level/streak), rewritten Dashboard + hook tests.
+
+**Deploy:** functions + schema changed → **migrate-then-merge**. Prod read-indexes `15-gamification-indexes.sql` applied 2026-08-06 before merge (additive/idempotent; temp single-IP firewall rule; verified 4/4). Delta renumbered 14→15 on the trunk-merge (#356 took slot 14). Merged to `main` → auto-ships frontend (SWA) + backend. Deploy + smoke announced on PR #384.
+
+**Follow-ups:** per-org leaderboard off-switch → #369 (noted on the issue); `FavoriteCourses.tsx` orphaned by the dashboard strip — left for #358's Min Træning favorites wiring.
