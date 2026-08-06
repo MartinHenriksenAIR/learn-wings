@@ -707,6 +707,9 @@
     "disabled": "Disabled",
     "saveButton": "Save organization settings",
     "saveFailed": "Failed to save settings",
+    "selfRegTitle": "Self-registration",
+    "selfRegLabel": "Allow self-registration",
+    "selfRegHint": "Let people from your organization's verified Microsoft tenant join as members without an invite.",
     "features": {
       "certificates_enabled": "Certificates",
       "quizzes_enabled": "Quizzes",
@@ -787,6 +790,8 @@
     "slugHint": "Used in URLs. Only lowercase letters, numbers, and hyphens.",
     "seatLimitLabel": "Member Limit",
     "seatLimitHint": "Maximum number of users allowed. Leave empty for unlimited.",
+    "selfRegLabel": "Allow self-registration",
+    "selfRegHint": "People from this organization's verified Microsoft tenant join as members without an invite.",
     "ssoBindingLabel": "SSO auto-join (Microsoft tenant)",
     "ssoBindingHint": "People from this Microsoft tenant sign in and join automatically as learners — no invite needed. Normally set automatically from the first admin; edit only to correct it.",
     "ssoDomainLabel": "Domain",

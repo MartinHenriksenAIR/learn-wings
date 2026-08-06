@@ -37,6 +37,11 @@ export interface Organization {
   // Entra tenant id; entra_tid_label = its human-friendly domain hint.
   entra_tid?: string | null;
   entra_tid_label?: string | null;
+  // Per-org "Allow self-registration" switch (#356) — governs #353 tenant
+  // auto-join. Optional because the org-admin org list omits it; present on the
+  // single-org fetch and in currentOrg (user-context). Absent ⇒ treat as true
+  // (the DB default).
+  allow_self_registration?: boolean;
 }
 
 export interface OrgMembership {

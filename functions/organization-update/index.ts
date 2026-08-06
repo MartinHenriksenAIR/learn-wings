@@ -8,12 +8,20 @@ import { enforceUploadLimits, type UploadCandidate } from '../shared/upload-limi
 import { assertBindablePaths, isBlobReleasable } from '../shared/blob-ownership';
 import { CONSUMER_TENANT_ID } from '../shared/tenant-binding';
 
-// entra_tid / entra_tid_label are the SSO tenant binding (#353). They are NOT in
-// the org-admin-writable set below: an org admin may only write logo_url, so
-// adding them here keeps them platform-admin-only automatically (see the authz
-// gate). The binding is normally auto-seeded (functions/shared/tenant-binding);
-// this endpoint is the platform-admin set/correct/clear override.
-const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit', 'entra_tid', 'entra_tid_label']);
+// The platform-admin-writable whitelist. Org admins are held to the narrower
+// ORG_ADMIN_WRITABLE subset by the authz gate below.
+//
+// entra_tid / entra_tid_label are the SSO tenant binding (#353) — platform-admin
+// only (absent from ORG_ADMIN_WRITABLE). Normally auto-seeded
+// (functions/shared/tenant-binding); this endpoint is the set/correct/clear
+// override. allow_self_registration (#356) is the per-org on/off switch for that
+// tenant auto-join: platform-admin overridable here AND org-admin writable, since
+// the issue puts it in the org's own hands day-to-day.
+const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit', 'entra_tid', 'entra_tid_label', 'allow_self_registration']);
+
+// The subset an org admin (not a platform admin) may write for their own org —
+// org-owned day-to-day settings. Every other field is platform-admin-only.
+const ORG_ADMIN_WRITABLE = new Set(['logo_url', 'allow_self_registration']);
 
 // Entra tenant ids are lowercase GUIDs. Stored lowercased (see the transform) so
 // they match the verified token `tid` exactly.
@@ -88,18 +96,24 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
       if (v !== null && (typeof v !== 'string' || v.length > 253)) {
         return reply(400, { error: 'entra_tid_label must be a string (max 253 chars) or null' });
       }
+    } else if (key === 'allow_self_registration') {
+      // #356: strictly boolean — the column is NOT NULL, so null is not a valid write.
+      if (typeof v !== 'boolean') {
+        return reply(400, { error: 'allow_self_registration must be a boolean' });
+      }
     }
   }
 
   // Authorization: platform admin → any whitelisted field; org admin of the target
-  // org → logo_url ONLY.
+  // org → the ORG_ADMIN_WRITABLE subset only (logo_url, allow_self_registration).
   // RLS provenance: supabase/migrations/20260127153401_*.sql:269-276 ("Platform admins
   // can do everything with orgs") + 20260128223657 ("Org admins can update their org
   // logo", FOR UPDATE is_org_admin(id)). The old policy was row-scoped (technically any
-  // column); we tighten to the migration's stated intent — logo_url only (deliberate).
+  // column); we tighten to the migration's stated intent — logo_url — plus
+  // allow_self_registration, which #356 hands to the org to own day-to-day.
   if (!profile.is_platform_admin) {
-    const onlyLogoUrl = updateKeys.every((key) => key === 'logo_url');
-    const allowed = onlyLogoUrl && await isOrgAdmin(profile.id, orgId);
+    const onlyOrgAdminFields = updateKeys.every((key) => ORG_ADMIN_WRITABLE.has(key));
+    const allowed = onlyOrgAdminFields && await isOrgAdmin(profile.id, orgId);
     if (!allowed) {
       return reply(403, { error: 'Forbidden' });
     }
@@ -166,7 +180,7 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
     const organization = await queryOne(
       `UPDATE organizations SET ${setClauses.join(', ')}
        WHERE id = $${idIndex}
-       RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, created_at`,
+       RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, allow_self_registration, created_at`,
       params,
     );
 

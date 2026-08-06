@@ -155,31 +155,43 @@ describe('autoJoinByTenant', () => {
   });
 
   it('no-ops (non-destructive) when the caller already has a membership row', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // org lookup
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', allow_self_registration: true }); // org lookup
     mockQueryOne.mockResolvedValueOnce({ id: 'm1' }); // existing membership (any status)
     await autoJoinByTenant('profile-1', TID, ctx() as never);
     expect(mockWithTransaction).not.toHaveBeenCalled();
-    // Master switch never even consulted once a membership exists.
+    // Neither switch is consulted once a membership exists (only org + membership lookups).
     expect(mockQueryOne).toHaveBeenCalledTimes(2);
   });
 
-  it('no-ops when the master switch is off', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // org lookup
+  it("no-ops when the org's own self-registration switch is off (#356), before the master switch is read", async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', allow_self_registration: false }); // org lookup, per-org OFF
     mockQueryOne.mockResolvedValueOnce(null); // no membership
-    mockQueryOne.mockResolvedValueOnce({ allow_self_registration: false }); // switch off
+    await autoJoinByTenant('profile-1', TID, ctx() as never);
+    expect(mockWithTransaction).not.toHaveBeenCalled();
+    // Short-circuits on the per-org flag carried by the org row — the global
+    // master-switch query is never issued (only org + membership lookups).
+    expect(mockQueryOne).toHaveBeenCalledTimes(2);
+  });
+
+  it('no-ops when the platform-wide master switch is off', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', allow_self_registration: true }); // org lookup, per-org ON
+    mockQueryOne.mockResolvedValueOnce(null); // no membership
+    mockQueryOne.mockResolvedValueOnce({ allow_self_registration: false }); // master switch off
     await autoJoinByTenant('profile-1', TID, ctx() as never);
     expect(mockWithTransaction).not.toHaveBeenCalled();
   });
 
-  it('joins as a learner when bound, self-reg on, and a seat is free', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' }); // org lookup
+  it('joins as a learner when bound, both switches on, and a seat is free', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', allow_self_registration: true }); // org lookup, per-org ON
     mockQueryOne.mockResolvedValueOnce(null); // no membership
-    mockQueryOne.mockResolvedValueOnce({ allow_self_registration: true }); // switch on
+    mockQueryOne.mockResolvedValueOnce({ allow_self_registration: true }); // master switch on
     mockLockSeatUsage.mockResolvedValueOnce({ exists: true, seatLimit: null, activeCount: 0, pendingCount: 0 });
     mockIsAtSeatLimit.mockReturnValueOnce(false);
 
     await autoJoinByTenant('profile-1', TID, ctx() as never);
 
+    // The per-org flag is read from the org lookup itself, not a separate query.
+    expect(mockQueryOne.mock.calls[0][0]).toContain('allow_self_registration');
     const insert = findClientCall('INSERT INTO org_memberships');
     expect(insert).toBeDefined();
     expect(insert![0]).toContain("'learner'");
@@ -189,7 +201,7 @@ describe('autoJoinByTenant', () => {
   });
 
   it('does NOT join when the org is at its seat limit (fallback to org-less)', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'org-1' });
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', allow_self_registration: true });
     mockQueryOne.mockResolvedValueOnce(null);
     mockQueryOne.mockResolvedValueOnce({ allow_self_registration: true });
     mockLockSeatUsage.mockResolvedValueOnce({ exists: true, seatLimit: 5, activeCount: 5, pendingCount: 0 });

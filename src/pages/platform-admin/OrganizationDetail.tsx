@@ -283,6 +283,11 @@ export default function OrganizationDetail() {
       const nextLabel = payload.entraTidLabel.trim() || null;
       if (nextTid !== (org?.entra_tid ?? null)) updates.entra_tid = nextTid;
       if (nextLabel !== (org?.entra_tid_label ?? null)) updates.entra_tid_label = nextLabel;
+      // #356: same change-only rule — an unrelated edit never rewrites the
+      // per-org self-registration switch. Default true mirrors the DB default.
+      if (payload.allowSelfRegistration !== (org?.allow_self_registration ?? true)) {
+        updates.allow_self_registration = payload.allowSelfRegistration;
+      }
       return callApi('/api/organization-update', { orgId, updates });
     },
     errorTitle: 'Failed to update organization',
