@@ -179,6 +179,9 @@
     "heroFirstTimeTitle": "Klar til at lære?",
     "heroFirstTimeDescription": "Vælg dit første kursus i kataloget og begynd at opbygge praktiske AI-færdigheder.",
     "heroPickFirstCourse": "Vælg dit første kursus",
+    "favoriteCourses": "Favoritter",
+    "noFavoritesTitle": "Ingen favoritter endnu",
+    "noFavoritesDescription": "Tryk på hjertet på et kursus for at gemme det her.",
     "community": {
       "title": "Fællesskab",
       "viewAll": "Se alle",
@@ -234,7 +237,10 @@
     "allLevels": "Alle niveauer",
     "anyStatus": "Enhver status",
     "startCourse": "Start kursus",
-    "reviewCourse": "Gennemse kursus"
+    "reviewCourse": "Gennemse kursus",
+    "openCourse": "Åbn kursus",
+    "addToFavorites": "Tilføj til favoritter",
+    "removeFromFavorites": "Fjern fra favoritter"
   },
   "tipsAndTricks": {
     "title": "Tips & Tricks",
@@ -281,6 +287,9 @@
     "quizNotReady": "Denne quiz er ikke klar endnu",
     "quizNotReadyDescription": "Der er endnu ingen spørgsmål at besvare her. Du kan fortsætte til næste lektion.",
     "quizNotReadyDescriptionLast": "Der er endnu ingen spørgsmål at besvare her. Quizzen vises her, når den er klar."
+  },
+  "favorites": {
+    "toggleFailed": "Kunne ikke opdatere favoritter"
   },
   "community": {
     "categories": {
@@ -825,6 +834,46 @@
     "selectMemberLabel": "Vælg organisationsmedlem",
     "selectMemberPlaceholder": "Vælg et organisationsmedlem...",
     "selectCoursesLabel": "Vælg kurser"
+  },
+  "assignments": {
+    "assignCourse": "Tildel kursus",
+    "description": "Tildel et kursus til et medlem eller hele organisationen.",
+    "targetLabel": "Tildel til",
+    "target": {
+      "member": "Et medlem",
+      "wholeOrg": "Hele organisationen"
+    },
+    "selectMember": "Medlem",
+    "selectMemberPlaceholder": "Vælg et medlem...",
+    "selectCourse": "Kursus",
+    "selectCoursePlaceholder": "Vælg et kursus...",
+    "typeLabel": "Type",
+    "type": {
+      "mandatory": "Obligatorisk",
+      "recommended": "Anbefalet"
+    },
+    "dueDateOptional": "Frist (valgfri)",
+    "assign": "Tildel",
+    "assigned": "Kursus tildelt",
+    "assignFailed": "Kunne ikke tildele kursus",
+    "noCourses": "Ingen tilgængelige kurser — aktivér et kursus for denne organisation først.",
+    "manageTitle": "Tildelinger",
+    "col": {
+      "course": "Kursus",
+      "target": "Modtager",
+      "type": "Type",
+      "dueDate": "Frist",
+      "assignedBy": "Tildelt af",
+      "actions": "Handlinger"
+    },
+    "wholeOrg": "Hele organisationen",
+    "remove": "Fjern",
+    "removeConfirmTitle": "Fjern tildeling?",
+    "removeConfirmBody": "Dette fjerner tildelingen. Handlingen kan ikke fortrydes.",
+    "removed": "Tildeling fjernet",
+    "removeFailed": "Kunne ikke fjerne tildeling",
+    "empty": "Ingen tildelinger endnu.",
+    "noDueDate": "—"
   },
   "quizEditor": {
     "passingScoreLabel": "Beståelsesgrænse (%)",

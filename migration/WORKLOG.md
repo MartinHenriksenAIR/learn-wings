@@ -2162,3 +2162,45 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (post-trunk-merge on the branch):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **861 / 114** · `build` 0. functions untouched.
 
 **Deploy:** frontend-only — merging to `main` auto-ships the static page via SWA; no functions deploy, no DB migration. Announced on PR #381.
+
+---
+
+## 2026-08-05 — #358 favorite / save a course (PR #380)
+
+**Who:** claude (Opus 4.8) with martin. Part of the AIU platform-review batch (Aug 2026). Requirements grilled with martin first (base branch, "Min Træning" ownership, toggle placement, org-scoping, term). Branched off `origin/main` @`9a322f2` (post-#376). Subagent-driven build (4 tasks, per-task spec+quality reviews, whole-branch review, fix wave + scoped re-review). Merged trunk (#361/#353/#367/#366) in before landing.
+
+**What:** the favorites **engine** — a per-user "favorite" heart on courses; favorited courses surface in a **Favorites / Favoritter** section. Scoped deliberately to the engine: does **not** build the Min Træning page (that's #364, which relocates the standalone `<FavoriteCourses>` component verbatim), the nav (#363), mandatory (#365), or naming (#367). Interim home for the section is the learner Dashboard.
+
+**How:**
+- **DB** — org-neutral `course_favorites (user_id, course_id, created_at)` (PK `(user_id, course_id)`, **no `org_id`** — a favorite is per-user, also supports org-less individual-tier #354) in `01-schema.sql`; idempotent prod migration **`12-course-favorites.sql`** (10/11 taken by #361/#353).
+- **Functions** — `favorites` (POST `{orgId}`→`{courses}`: caller's favorites narrowed to the org-visible catalog via the same `courseVisibilityPredicate` as `learner-courses`) and `favorite-set` (POST `{orgId,courseId,favorite}`→`{favorited}`: `true` gates published+org-enabled then upserts `ON CONFLICT DO NOTHING`; `false` deletes ungated so a learner can always remove). Both authorize with `requireActiveMember(orgId)` and key every query on `profile.id` — org isolation upheld (verified airtight in the whole-branch review).
+- **Frontend** — `useFavorites` hook (list query + `favoriteIds` Set/`isFavorite`, and `useToggleFavorite` via `useToastMutation` + `setQueryData` cache patch + invalidate; no `onMutate` — repo idiom); `CourseFavorite` type + `favorites` query-key family. Presentational `FavoriteToggle` (heart) on the catalog cards (`Courses.tsx`) + the CoursePlayer sidebar; standalone `FavoriteCourses` section on the Dashboard (between Continue Learning and Completed, empty state kept per owner). en+da (`courses.addToFavorites/removeFromFavorites/openCourse`, `dashboard.favoriteCourses/noFavorites*`, `favorites.toggleFailed`).
+
+**Decisions (martin, grilled):** (1) base off trunk post-#376, not stacked; (2) "B" a dedicated Min Træning page — but that page is #364's; #358 = engine + interim Dashboard section; (3) no course-detail page exists → second toggle in the CoursePlayer; (4) org-neutral storage · org-scoped display · validated writes; (5) term **Favoritter**, heart; (6) keep the empty-state section (don't hide).
+
+**Tests:** endpoint contract tests for both (OPTIONS/401/400/403/happy, favorite-set true-gate-403 + upsert-params + ungated-delete, favorites list + empty); `useFavorites.test.tsx` incl. direct `setQueryData` add/prepend/dedup/no-op/remove cache assertions; `FavoriteToggle`/`FavoriteCourses` + extended `Courses`/`Dashboard` component tests. Deferred minors (all triaged ship-as-is in the whole-branch review): favorites LIST intentionally language-agnostic (a favorite is a deliberate signal like enrollment); no platform-admin bypass on the add gate (strictly more restrictive).
+
+**Verify (post-trunk-merge on the branch, controller-run):** root `lint` 0 errors · `tsc -p tsconfig.app.json` 0 · `tsc -p tsconfig.node.json` 0 · `npm test` **886 / 117** · `build` 0. functions `build` 0 · `test` **2660 / 151** (3 skipped, incl. registration fleet guard). (Caught + closed a subagent false-green tsc during the run by re-running gates in the worktree.)
+
+**Deploy:** functions changed → migrate-then-merge. Prod migration **`12-course-favorites.sql` applied 2026-08-05** (owner ran it from his terminal — temp single-IP firewall rule + the Node `pg` runner reusing the app's CA-pinned `dist/shared/db.js`; `course_favorites` + `idx_course_favorites_user` verified present) BEFORE merge, since `favorites`/`favorite-set` reference the table unconditionally. Merged to `main` → auto-ships frontend (SWA) + backend (functions: `favorites` + `favorite-set`). Deploy + smoke announced on PR #380.
+
+---
+
+## 2026-08-06 — #365 mandatory training assignment (PR #383)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026). Requirements grilled with martin first (learner surfacing / #364 ownership, read contract, mandatory-vs-recommended, view+remove scope, platform reach, assignable-course set). Branched off `origin/main` @`e72af01` (post-#381), worktree-isolated. Controller-implemented in the worktree with independent Opus review subagents (a backend review + a whole-branch review) — dispatched implementers can't safely edit a worktree, so the controller owned the edits/commits and the subagents owned review. Merged trunk (#358 favorites) in before landing.
+
+**What:** admins assign a course to **one member or the whole org**, as **mandatory or recommended**, with an **optional due date**; a self-scoped learner read feeds the (separately-built #364) Min Træning page. Admins also **view + remove** assignments.
+
+**How:**
+- **DB** — `course_assignments (id, org_id, user_id NULL=whole-org, course_id, mandatory, due_date, assigned_by_user_id, created_at)` folded into `01-schema.sql`; idempotent prod migration **`13-course-assignments.sql`** (renumbered from `12-` on the trunk-merge — #358 took 12). Whole-org = `user_id NULL` (dynamic, resolved at read). Partial unique indexes: one individual per (org,user,course), one whole-org per (org,course).
+- **Functions** (all factory; org-isolation upheld) — `assignment-create` (`requireOrgAdmin`; course published+org-enabled; individual target must be an active member of that org; mandatory/dueDate validated incl. impossible-date reject; unique→409), `assignment-delete` (loads the row's org then `requireOrgAdmin(row.org_id)`), `assignments` (admin list, `requireOrgAdmin`), `learner-assignments` (self-scoped on `profile.id` + `requireActiveMember`; dedups individual+whole-org by course — mandatory wins, earliest due — with `COALESCE`d overdue so a never-started past-due course reads overdue=true).
+- **Frontend** — `LearnerAssignment`/`OrgAssignment`/`AssignableCourse` types; `learnerAssignments`/`assignments`/`orgCourseAccess` query-key families; `useLearnerAssignments` (signs thumbnails — the #364 hook), `useOrgAssignments`, `useOrgCourseAccess`; shared `AssignCourseDialog` + `AssignmentsManager` (table + confirm-remove), wired into org-admin `OrgMembersTab` and platform-admin `OrganizationDetail`/`MembersSection`/`MembersTable`. `assignments.*` i18n en+da (parity checked).
+
+**Decisions (martin, grilled):** (1) #364 in flight elsewhere → #365 ships model + admin UIs + a ready-made `useLearnerAssignments` hook for #364 to plug in, and touches none of #364's files; (2) mandatory **or** recommended per assignment; (3) assign **+ view + remove**; (4) platform admin assigns **one org at a time** (any org); (5) picker offers **only published+org-enabled** courses; (6) whole-org dynamic (current+future members); due date informational (overdue badge, nothing blocked).
+
+**Reviews:** backend review (Opus) — 1 Critical (overdue NULL-collapse) + 1 Minor (impossible-date 500), both fixed. Whole-branch review (Opus) — PASS / merge-READY, no Critical/Important, org-isolation confirmed end-to-end; 1 Minor fixed (empty-vs-load-error), 4 sub-threshold minors deferred (org_course_access not re-checked on read [mandatory persists by design]; no sibling-language guard [enroll backstops]; ghost assignment survives member removal; delete 404-vs-403 [UUIDs, no leak]).
+
+**Verify (post-trunk-merge on the branch, controller-run):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **906 / 120** · `build` 0. functions `build` 0 · `test` **2713 / 155** (3 skipped, incl. registration fleet guard).
+
+**Deploy:** functions changed → migrate-then-merge. Prod migration **applied 2026-08-06** (owner ran the Node `pg` runner from his terminal — temp single-IP firewall rule; `course_assignments` + all 6 indexes verified present) BEFORE merge, since the 4 endpoints reference the table unconditionally. Applied as `12-course-assignments.sql`, renumbered to `13-` on the trunk-merge (#358 took 12); prod already holds the table, so the rename is a repo-record fix only. Merged to `main` → auto-ships frontend (SWA) + backend (4 new functions). Deploy + smoke announced on PR #383.

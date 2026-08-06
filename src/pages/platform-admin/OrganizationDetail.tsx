@@ -27,6 +27,8 @@ import { OrgStatCards } from '@/components/platform-admin/org-detail/OrgStatCard
 import { OrgSeatLimitCard } from '@/components/platform-admin/org-detail/OrgSeatLimitCard';
 import { SeatRequestsSection } from '@/components/platform-admin/org-detail/SeatRequestsSection';
 import { MembersSection } from '@/components/platform-admin/org-detail/MembersSection';
+import { AssignCourseDialog } from '@/components/assignments/AssignCourseDialog';
+import { AssignmentsManager } from '@/components/assignments/AssignmentsManager';
 import { PendingInvitationsList } from '@/components/platform-admin/org-detail/PendingInvitationsList';
 import {
   InviteUserDialog,
@@ -122,6 +124,7 @@ export default function OrganizationDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [roleChangeDialog, setRoleChangeDialog] = useState<RoleChangeSelection | null>(null);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [assignDialog, setAssignDialog] = useState<{ open: boolean; presetUserId?: string }>({ open: false });
 
   // In-button "Copied!" morph for the invite link, keyed by link id (toast
   // policy: copy is routine — no toast).
@@ -480,6 +483,19 @@ export default function OrganizationDetail() {
         onRoleChange={(member, newRole) => setRoleChangeDialog({ open: true, member, newRole })}
         onDisable={(id) => disableMemberMutation.mutate(id)}
         onReactivate={(id) => reactivateMemberMutation.mutate(id)}
+        onAssignClick={() => setAssignDialog({ open: true })}
+        onAssignCourse={(member) => setAssignDialog({ open: true, presetUserId: member.user_id })}
+      />
+
+      <AssignmentsManager orgId={org.id} />
+
+      <AssignCourseDialog
+        open={assignDialog.open}
+        onOpenChange={(open) => setAssignDialog((s) => ({ ...s, open }))}
+        orgId={org.id}
+        orgName={org.name}
+        members={members}
+        presetUserId={assignDialog.presetUserId}
       />
 
       {invitations.length > 0 && (

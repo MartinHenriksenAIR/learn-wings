@@ -70,6 +70,7 @@ import {
   GraduationCap,
   Sparkles,
   Search,
+  ClipboardList,
 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { z } from 'zod';
@@ -79,6 +80,8 @@ import { InviteLanguageSelect } from '@/components/InviteLanguageSelect';
 import { uiLangToInvite, type InviteLanguage } from '@/lib/inviteLanguage';
 import { BulkInviteDialog } from '@/components/org-admin/BulkInviteDialog';
 import { EnrollUserDialog } from '@/components/org-admin/EnrollUserDialog';
+import { AssignCourseDialog } from '@/components/assignments/AssignCourseDialog';
+import { AssignmentsManager } from '@/components/assignments/AssignmentsManager';
 import { RequestSeatsDialog } from '@/components/org-admin/RequestSeatsDialog';
 import { useSeatRequests } from '@/hooks/useSeatRequests';
 
@@ -178,6 +181,7 @@ export function OrgMembersTab() {
   const [togglingChampion, setTogglingChampion] = useState<string | null>(null);
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [assignDialog, setAssignDialog] = useState<{ open: boolean; presetUserId?: string }>({ open: false });
   const [requestSeatsOpen, setRequestSeatsOpen] = useState(false);
   const [removeMemberDialog, setRemoveMemberDialog] = useState<{
     open: boolean;
@@ -449,6 +453,10 @@ export function OrgMembersTab() {
           <GraduationCap className="mr-2 h-4 w-4" aria-hidden="true" />
           {t('analytics.members.enrollInCourse')}
         </Button>
+        <Button variant="outline" onClick={() => setAssignDialog({ open: true })} className="shrink-0">
+          <ClipboardList className="mr-2 h-4 w-4" aria-hidden="true" />
+          {t('assignments.assignCourse')}
+        </Button>
         <Button variant="outline" onClick={() => setBulkInviteOpen(true)} className="shrink-0">
           <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
           {t('analytics.members.bulkInvite')}
@@ -602,6 +610,15 @@ export function OrgMembersTab() {
         onSuccess={refetchAll}
       />
 
+      <AssignCourseDialog
+        open={assignDialog.open}
+        onOpenChange={(open) => setAssignDialog((s) => ({ ...s, open }))}
+        orgId={currentOrg.id}
+        orgName={currentOrg.name}
+        members={members}
+        presetUserId={assignDialog.presetUserId}
+      />
+
       {currentOrg?.id && (
         <RequestSeatsDialog orgId={currentOrg.id} open={requestSeatsOpen} onOpenChange={setRequestSeatsOpen} />
       )}
@@ -732,6 +749,14 @@ export function OrgMembersTab() {
                             ? t('analytics.members.removeAiChampion')
                             : t('analytics.members.makeAiChampion')}
                         </DropdownMenuItem>
+                        {member.role === 'learner' && (
+                          <DropdownMenuItem
+                            onClick={() => setAssignDialog({ open: true, presetUserId: member.user_id })}
+                          >
+                            <ClipboardList className="mr-2 h-4 w-4" aria-hidden="true" />
+                            {t('assignments.assignCourse')}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => setRemoveMemberDialog({ open: true, member })}
@@ -749,6 +774,8 @@ export function OrgMembersTab() {
           })}
         </div>
       )}
+
+      <AssignmentsManager orgId={currentOrg.id} />
 
       {invitations.length > 0 && (
         <>

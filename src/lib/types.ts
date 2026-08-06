@@ -78,6 +78,12 @@ export interface Course {
   created_at: string;
 }
 
+export interface CourseFavorite {
+  user_id: string;
+  course_id: string;
+  created_at: string;
+}
+
 export interface CourseCategory {
   id: string;
   name_en: string;
@@ -171,6 +177,41 @@ export interface Enrollment {
   last_accessed_at: string | null;
   course?: Course;
   profile?: Profile;
+}
+
+/** A learner's own assigned course (from `useLearnerAssignments`) — the shape the
+ *  Min Træning view (#364) consumes. Deduped per course, mandatory wins. */
+export interface LearnerAssignment {
+  courseId: string;
+  courseTitle: string;
+  thumbnailUrl: string | null;   // signed by the hook
+  mandatory: boolean;            // false = recommended
+  dueDate: string | null;        // ISO 'YYYY-MM-DD'; null = no deadline
+  overdue: boolean;              // dueDate < today AND not completed
+  completed: boolean;            // learner already finished the course
+  assignedByOrgId: string;       // the org context of the assignment
+}
+
+/** An org's assignment row for the admin management view (`useOrgAssignments`). */
+export interface OrgAssignment {
+  id: string;
+  orgId: string;
+  courseId: string;
+  courseTitle: string;
+  userId: string | null;         // null = whole org
+  userFullName: string | null;
+  mandatory: boolean;
+  dueDate: string | null;
+  assignedByUserId: string | null;
+  assignedByName: string | null;
+  createdAt: string;
+}
+
+/** A course an admin may assign (published + enabled for the org). */
+export interface AssignableCourse {
+  id: string;
+  title: string;
+  language: 'en' | 'da' | null;
 }
 
 export interface LessonProgress {

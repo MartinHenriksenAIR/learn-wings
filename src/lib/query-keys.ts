@@ -235,6 +235,26 @@ export const queryKeys = {
     detail: (orgId: string | undefined) => ['learner-training', orgId] as const,
   },
 
+  learnerAssignments: {
+    /** The learner's own assigned/mandatory courses for an org (#365). */
+    list: (orgId: string | undefined) => ['learner-assignments', orgId] as const,
+  },
+
+  assignments: {
+    /** The admin management list of an org's course assignments (#365). */
+    list: (orgId: string | undefined) => ['assignments', orgId] as const,
+  },
+
+  orgCourseAccess: {
+    /** An org's published + enabled catalogue, for the assign picker (#365). */
+    list: (orgId: string | undefined) => ['org-course-access', orgId] as const,
+  },
+
+  favorites: {
+    /** Exposed as `list` because the toggle mutation invalidates by this key. */
+    list: (orgId: string | undefined) => ['favorites', orgId] as const,
+  },
+
   assessment: {
     /** No params; fixed content with a long staleTime. */
     questions: ['assessment-questions'] as const,
