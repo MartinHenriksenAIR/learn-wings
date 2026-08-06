@@ -22,6 +22,20 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
+// The six derived queries, in the order getLearnerDashboardData issues them.
+const seedHappyPath = () => {
+  mockQuery
+    .mockResolvedValueOnce([{ started: 3, in_progress: 1, completed: 2 }])                 // 1 snapshot
+    .mockResolvedValueOnce([{ user_id: 'p1', all_time: 5, month: 2 }, { user_id: 'p2', all_time: 10, month: 0 }]) // 2 lessons
+    .mockResolvedValueOnce([{ user_id: 'p1', all_time: 1, month: 1 }])                     // 3 quizzes (distinct passed)
+    .mockResolvedValueOnce([{ user_id: 'p2', all_time: 2, month: 0 }])                     // 4 courses
+    .mockResolvedValueOnce([                                                               // 5 members (learners only)
+      { user_id: 'p1', first_name: 'Martin', last_name: 'Henriksen', full_name: 'Martin Henriksen' },
+      { user_id: 'p2', first_name: 'Anna', last_name: 'Berg', full_name: 'Anna Berg' },
+    ])
+    .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06', '2026-08-05', '2026-08-04'] }]); // 6 streak
+};
+
 describe('learner-dashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -32,123 +46,104 @@ describe('learner-dashboard', () => {
 
   it('returns 401 when bearer token is invalid', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing Bearer token'));
-
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
-
     expect(res.status).toBe(401);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
   it('returns 401 when profile is not provisioned', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
-
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
-
     expect(res.status).toBe(401);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Profile not found' });
   });
 
   it('returns 400 when orgId is missing', async () => {
     const res = await handler(baseReq({}), {} as any);
-
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
   it('returns 403 for non-member and calls isActiveMember with correct args', async () => {
     mockIsActiveMember.mockResolvedValueOnce(false);
-
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
-
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
     expect(mockIsActiveMember).toHaveBeenCalledWith('p1', 'org-1');
   });
 
-  it('returns 200 with correct progress including zero-fill for missing courses', async () => {
+  it('returns 200 with derived snapshot, XP, level, streak and org-scoped leaderboard', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
-
-    const enrollmentRows = [
-      {
-        id: 'e1', org_id: 'org-1', user_id: 'p1', course_id: 'c1',
-        status: 'enrolled', enrolled_at: '2024-01-01', completed_at: null,
-        course: { id: 'c1', title: 'Course 1', description: null, level: 'beginner',
-                  is_published: true, thumbnail_url: null, created_by_user_id: 'p2', created_at: '2024-01-01' },
-      },
-      {
-        id: 'e2', org_id: 'org-1', user_id: 'p1', course_id: 'c2',
-        status: 'enrolled', enrolled_at: '2024-01-02', completed_at: null,
-        course: { id: 'c2', title: 'Course 2', description: null, level: 'intermediate',
-                  is_published: true, thumbnail_url: null, created_by_user_id: 'p2', created_at: '2024-01-02' },
-      },
-    ];
-
-    // totals: only c1 has lessons, c2 has none
-    const totalsRows = [{ course_id: 'c1', total: 5 }];
-    // completed: only c1 has progress, c2 has none
-    const completedRows = [{ course_id: 'c1', completed: 3 }];
-
-    mockQuery
-      .mockResolvedValueOnce(enrollmentRows) // enrollments query
-      .mockResolvedValueOnce(totalsRows)      // totals query
-      .mockResolvedValueOnce(completedRows);  // completed query
+    seedHappyPath();
 
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
 
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
 
-    expect(body.enrollments).toEqual(enrollmentRows);
-    // Zero-fill proven: c2 has 0/0
-    expect(body.progress).toEqual({
-      c1: { total: 5, completed: 3 },
-      c2: { total: 0, completed: 0 },
-    });
+    // Snapshot counts + overall %.
+    expect(body.snapshot).toEqual({ started: 3, inProgress: 1, completed: 2, overallPct: 67 });
 
-    // Assert enrollment SQL — user_id scoped to profile.id, not raw oid
-    const [enrollSql, enrollParams] = mockQuery.mock.calls[0] as [string, unknown[]];
-    expect(enrollSql).toContain('e.user_id = $1');
-    expect(enrollSql).toContain('e.org_id = $2');
-    expect(enrollSql).toContain('json_build_object');
-    expect(enrollParams).toEqual(['p1', 'org-1']);
+    // Caller (p1) XP: 5·10 + 1·25 + 0·100 = 75 all-time; 2·10 + 1·25 = 45 this month.
+    expect(body.xp).toEqual({ allTime: 75, month: 45 });
+    expect(body.level.level).toBe(1);
+    expect(body.level.xpToNext).toBe(125);
 
-    const [totalsSql, totalsParams] = mockQuery.mock.calls[1] as [string, unknown[]];
-    expect(totalsSql).toContain('ANY($1::uuid[])');
-    expect(totalsParams).toEqual([['c1', 'c2']]);
+    // Streak: three consecutive Copenhagen days ending today.
+    expect(body.streak).toEqual({ current: 3, activeToday: true });
 
-    const [completedSql, completedParams] = mockQuery.mock.calls[2] as [string, unknown[]];
-    expect(completedSql).toContain("lp.status = 'completed'");
-    expect(completedSql).toContain('ANY($3::uuid[])');
-    expect(completedParams).toEqual(['p1', 'org-1', ['c1', 'c2']]);
+    // Leaderboard all-time: p2 (300) ranks above p1 (75); names are first + initial.
+    expect(body.leaderboard.allTime.rows).toEqual([
+      { rank: 1, name: 'Anna B.', xp: 300, isSelf: false },
+      { rank: 2, name: 'Martin H.', xp: 75, isSelf: true },
+    ]);
+    expect(body.leaderboard.allTime.me).toEqual({ rank: 2, name: 'Martin H.', xp: 75, isSelf: true });
+    // This month: p1 leads.
+    expect(body.leaderboard.month.me.rank).toBe(1);
   });
 
-  it('returns 200 early with empty data when no enrollments', async () => {
+  it('scopes every org query to orgId and derives the board from learners only', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
-    mockQuery.mockResolvedValueOnce([]); // empty enrollments
+    seedHappyPath();
 
-    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    await handler(baseReq({ orgId: 'org-1' }), {} as any);
 
-    expect(res.status).toBe(200);
-    const body = JSON.parse(res.body as string);
-    expect(body).toEqual({ enrollments: [], progress: {} });
-
-    // Only the one enrollment query ran — no totals or completed queries
-    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const calls = mockQuery.mock.calls as [string, unknown[]][];
+    // snapshot: (orgId, callerId)
+    expect(calls[0][1]).toEqual(['org-1', 'p1']);
+    // lessons / quizzes / courses / members: all filtered by orgId
+    expect(calls[1][1]).toEqual(['org-1']);
+    expect(calls[2][1]).toEqual(['org-1']);
+    expect(calls[3][1]).toEqual(['org-1']);
+    expect(calls[4][1]).toEqual(['org-1']);
+    // members query: active learners only, joined from org_memberships (not client-supplied)
+    expect(calls[4][0]).toContain('org_memberships');
+    expect(calls[4][0]).toContain("m.status = 'active'");
+    expect(calls[4][0]).toContain("m.role = 'learner'");
+    // streak is global/personal — keyed by the caller, NOT by orgId (self-data)
+    expect(calls[5][1]).toEqual(['p1']);
+    expect(calls[5][0]).not.toContain('org_id');
   });
 
   it('returns 200 for platform admin without calling isActiveMember', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    mockQuery.mockResolvedValueOnce([]); // no enrollments
+    mockQuery.mockResolvedValue([]); // every derived query empty
 
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
 
     expect(res.status).toBe(200);
     expect(mockIsActiveMember).not.toHaveBeenCalled();
+    const body = JSON.parse(res.body as string);
+    expect(body.xp).toEqual({ allTime: 0, month: 0 });
+    expect(body.level.level).toBe(1);
+    expect(body.streak).toEqual({ current: 0, activeToday: false });
+    expect(body.leaderboard.allTime.rows).toEqual([]);
+    expect(body.leaderboard.allTime.me).toBeNull();
   });
 
   it('returns 500 on db error', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
-    mockQuery.mockRejectedValueOnce(new Error('connection refused'));
+    mockQuery.mockRejectedValue(new Error('connection refused'));
 
     const res = await handler(baseReq({ orgId: 'org-1' }), { error: vi.fn() } as any);
 
