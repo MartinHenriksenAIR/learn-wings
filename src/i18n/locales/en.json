@@ -179,6 +179,9 @@
     "heroFirstTimeTitle": "Ready to start learning?",
     "heroFirstTimeDescription": "Pick your first course from the catalog and start building practical AI skills.",
     "heroPickFirstCourse": "Pick your first course",
+    "favoriteCourses": "Favorites",
+    "noFavoritesTitle": "No favorites yet",
+    "noFavoritesDescription": "Tap the heart on a course to save it here.",
     "community": {
       "title": "Community",
       "viewAll": "View all",
@@ -211,7 +214,10 @@
     "allLevels": "All levels",
     "anyStatus": "Any status",
     "startCourse": "Start course",
-    "reviewCourse": "Review course"
+    "reviewCourse": "Review course",
+    "openCourse": "Open course",
+    "addToFavorites": "Add to favorites",
+    "removeFromFavorites": "Remove from favorites"
   },
   "tipsAndTricks": {
     "title": "Tips & Tricks",
@@ -258,6 +264,9 @@
     "quizNotReady": "This quiz isn't ready yet",
     "quizNotReadyDescription": "There are no questions to answer here yet. You can continue to the next lesson.",
     "quizNotReadyDescriptionLast": "There are no questions to answer here yet. This quiz will appear here once it's ready."
+  },
+  "favorites": {
+    "toggleFailed": "Couldn't update favorites"
   },
   "community": {
     "categories": {

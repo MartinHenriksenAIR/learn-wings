@@ -47,7 +47,19 @@ vi.mock('@/components/learner/DashboardCommunitySection', () => ({
   DashboardCommunitySection: () => <div data-testid="community-section" />,
 }));
 
+const mockUseFavorites = vi.fn();
+const mockUseToggleFavorite = vi.fn();
+vi.mock('@/hooks/useFavorites', () => ({
+  useFavorites: (...args: unknown[]) => mockUseFavorites(...args),
+  useToggleFavorite: (...args: unknown[]) => mockUseToggleFavorite(...args),
+}));
+
 import LearnerDashboard from './Dashboard';
+
+// Module-scope defaults survive each describe's vi.clearAllMocks() (which clears
+// only call history). Favorites-specific tests override these before rendering.
+mockUseFavorites.mockReturnValue({ data: { courses: [] }, isFavorite: () => false, isLoading: false });
+mockUseToggleFavorite.mockReturnValue({ toggleFavorite: vi.fn(), togglingId: null, isPending: false });
 
 const baseAuthState = {
   user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
@@ -373,5 +385,51 @@ describe('LearnerDashboard — community section gating (#343)', () => {
 
     await screen.findByTestId('dashboard-hero');
     expect(screen.queryByTestId('community-section')).toBeNull();
+  });
+});
+
+describe('LearnerDashboard — favorites section (#358)', () => {
+  const withOrg = {
+    memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
+    currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
+  };
+
+  const favorite = {
+    id: 'c-fav', title: 'Favorited Course', description: '', level: 'basic',
+    language: 'en', course_group_id: null, is_published: true, thumbnail_url: null,
+    created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseToggleFavorite.mockReturnValue({ toggleFavorite: vi.fn(), togglingId: null, isPending: false });
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+  });
+
+  it('renders favorited course cards in the favorites section', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
+    mockUseFavorites.mockReturnValue({
+      data: { courses: [favorite] },
+      isFavorite: (id: string) => id === 'c-fav',
+      isLoading: false,
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText('dashboard.favoriteCourses')).toBeInTheDocument();
+    expect(screen.getByText('Favorited Course')).toBeInTheDocument();
+    expect(screen.queryByText('dashboard.noFavoritesTitle')).toBeNull();
+  });
+
+  it('renders the favorites empty state when the learner has no favorites', async () => {
+    const { callApi } = await import('@/lib/api-client');
+    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
+    mockUseFavorites.mockReturnValue({ data: { courses: [] }, isFavorite: () => false, isLoading: false });
+
+    renderDashboard();
+
+    expect(await screen.findByText('dashboard.favoriteCourses')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.noFavoritesTitle')).toBeInTheDocument();
   });
 });

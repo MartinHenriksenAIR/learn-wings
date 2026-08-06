@@ -78,6 +78,12 @@ export interface Course {
   created_at: string;
 }
 
+export interface CourseFavorite {
+  user_id: string;
+  course_id: string;
+  created_at: string;
+}
+
 export interface CourseCategory {
   id: string;
   name_en: string;

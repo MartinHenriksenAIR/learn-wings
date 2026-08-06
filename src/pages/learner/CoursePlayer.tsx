@@ -10,6 +10,8 @@ import { PdfViewer } from '@/components/learner/PdfViewer';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useExerciseByLesson } from '@/hooks/useExerciseByLesson';
+import { useFavorites, useToggleFavorite } from '@/hooks/useFavorites';
+import { FavoriteToggle } from '@/components/learner/FavoriteToggle';
 import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
 import { callApi } from '@/lib/api-client';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
@@ -86,6 +88,9 @@ export default function CoursePlayer() {
   const { features } = usePlatformSettings();
   const { t } = useTranslation();
   const navigate = useNavigate();
+
+  const { isFavorite } = useFavorites(currentOrg?.id);
+  const { toggleFavorite, togglingId } = useToggleFavorite(currentOrg?.id);
 
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<(CourseModule & { lessons: Lesson[] })[]>([]);
@@ -470,6 +475,13 @@ export default function CoursePlayer() {
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
+            <FavoriteToggle
+              variant="button"
+              isFavorite={isFavorite(course.id)}
+              pending={togglingId === course.id}
+              onToggle={(next) => toggleFavorite({ courseId: course.id, favorite: next, course })}
+              className="mt-3.5 w-full"
+            />
             {features.course_reviews_enabled && progressPercent >= REVIEW_MIN_PROGRESS && (
               <Button
                 variant="outline"

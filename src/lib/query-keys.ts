@@ -246,6 +246,11 @@ export const queryKeys = {
     list: (orgId: string | undefined) => ['org-course-access', orgId] as const,
   },
 
+  favorites: {
+    /** Exposed as `list` because the toggle mutation invalidates by this key. */
+    list: (orgId: string | undefined) => ['favorites', orgId] as const,
+  },
+
   assessment: {
     /** No params; fixed content with a long staleTime. */
     questions: ['assessment-questions'] as const,
