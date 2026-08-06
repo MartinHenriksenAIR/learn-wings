@@ -56,6 +56,27 @@ vi.mock('@/components/org-admin/BulkInviteDialog', () => ({
 vi.mock('@/components/org-admin/EnrollUserDialog', () => ({
   EnrollUserDialog: () => null,
 }));
+// Stub the assignment components (their own tests cover behavior) so this test
+// stays focused and no '/api/assignments' call fires. Markers expose the props
+// this tab wires so the wiring block below can assert them.
+vi.mock('@/components/assignments/AssignCourseDialog', async () => {
+  const ReactActual = await import('react');
+  return {
+    AssignCourseDialog: ({ open, presetUserId }: { open: boolean; presetUserId?: string }) =>
+      ReactActual.createElement('div', {
+        'data-testid': 'assign-dialog',
+        'data-open': String(open),
+        'data-preset': presetUserId ?? '',
+      }),
+  };
+});
+vi.mock('@/components/assignments/AssignmentsManager', async () => {
+  const ReactActual = await import('react');
+  return {
+    AssignmentsManager: ({ orgId }: { orgId: string }) =>
+      ReactActual.createElement('div', { 'data-testid': 'assignments-manager', 'data-org': orgId }),
+  };
+});
 
 // --- render the Radix dropdown menu inline (jsdom can't drive the real one).
 // --- createElement (not JSX) because vi.mock factories are hoisted above the jsx-runtime import ---
@@ -315,5 +336,49 @@ describe('OrgMembersTab — seat usage uses the org-wide server aggregate (#126)
     await screen.findByRole('button', { name: 'Create Invitation' });
     expect(screen.queryByText('seats.limitReached')).toBeNull();
     expect(screen.getByRole('button', { name: 'Create Invitation' })).not.toBeDisabled();
+  });
+});
+
+describe('OrgMembersTab — assign course wiring (#365)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      user: { id: 'oid-1' },
+      profile: { id: 'admin-1', full_name: 'Org Admin', is_platform_admin: false },
+      currentOrg: { id: 'org-1', name: 'Acme' },
+    });
+    mockUseOrgDetail.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/org-memberships') return { memberships: [membershipRow] };
+      if (path === '/api/invitations') return { invitations: [] };
+      if (path === '/api/ai-champions') return { champions: [] };
+      throw new Error(`Unexpected callApi path: ${path}`);
+    });
+  });
+
+  it('mounts the AssignmentsManager for the current org', async () => {
+    renderTab();
+    const mgr = await screen.findByTestId('assignments-manager');
+    expect(mgr).toHaveAttribute('data-org', 'org-1');
+  });
+
+  it('header "Assign course" opens the dialog with no preset (whole-org allowed)', async () => {
+    renderTab();
+    await screen.findByText('Bob Member');
+    const buttons = screen.getAllByRole('button', { name: 'assignments.assignCourse' });
+    fireEvent.click(buttons[0]); // header button
+    const dialog = screen.getByTestId('assign-dialog');
+    expect(dialog).toHaveAttribute('data-open', 'true');
+    expect(dialog).toHaveAttribute('data-preset', '');
+  });
+
+  it('per-member "Assign course" opens the dialog preset to that member', async () => {
+    renderTab();
+    await screen.findByText('Bob Member');
+    const buttons = screen.getAllByRole('button', { name: 'assignments.assignCourse' });
+    fireEvent.click(buttons[buttons.length - 1]); // row dropdown item
+    const dialog = screen.getByTestId('assign-dialog');
+    expect(dialog).toHaveAttribute('data-open', 'true');
+    expect(dialog).toHaveAttribute('data-preset', 'u-2');
   });
 });

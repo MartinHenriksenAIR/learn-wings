@@ -6,6 +6,7 @@ import {
   UserX,
   ShieldCheck,
   User,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BrandingAvatar } from '@/components/ui/branding-avatar';
@@ -28,6 +29,7 @@ interface MembersTableProps {
   onRoleChange: (member: Member, newRole: OrgRole) => void;
   onDisable: (membershipId: string) => void;
   onReactivate: (membershipId: string) => void;
+  onAssignCourse: (member: Member) => void;
 }
 
 export function MembersTable({
@@ -36,6 +38,7 @@ export function MembersTable({
   onRoleChange,
   onDisable,
   onReactivate,
+  onAssignCourse,
 }: MembersTableProps) {
   const { t, i18n } = useTranslation();
 
@@ -118,6 +121,12 @@ export function MembersTable({
                         <DropdownMenuItem onClick={() => onRoleChange(member, 'learner')}>
                           <User className="mr-2 h-4 w-4" aria-hidden="true" />
                           {t('orgDetail.changeToLearner')}
+                        </DropdownMenuItem>
+                      )}
+                      {member.role === 'learner' && (
+                        <DropdownMenuItem onClick={() => onAssignCourse(member)}>
+                          <ClipboardList className="mr-2 h-4 w-4" aria-hidden="true" />
+                          {t('assignments.assignCourse')}
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />

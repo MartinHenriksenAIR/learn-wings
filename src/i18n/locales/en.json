@@ -812,6 +812,46 @@
     "selectMemberPlaceholder": "Choose an organization member...",
     "selectCoursesLabel": "Select courses"
   },
+  "assignments": {
+    "assignCourse": "Assign course",
+    "description": "Assign a course to a member or the whole organization.",
+    "targetLabel": "Assign to",
+    "target": {
+      "member": "A member",
+      "wholeOrg": "The whole organization"
+    },
+    "selectMember": "Member",
+    "selectMemberPlaceholder": "Choose a member...",
+    "selectCourse": "Course",
+    "selectCoursePlaceholder": "Choose a course...",
+    "typeLabel": "Type",
+    "type": {
+      "mandatory": "Mandatory",
+      "recommended": "Recommended"
+    },
+    "dueDateOptional": "Due date (optional)",
+    "assign": "Assign",
+    "assigned": "Course assigned",
+    "assignFailed": "Could not assign course",
+    "noCourses": "No assignable courses — enable a course for this organization first.",
+    "manageTitle": "Assignments",
+    "col": {
+      "course": "Course",
+      "target": "Recipient",
+      "type": "Type",
+      "dueDate": "Due date",
+      "assignedBy": "Assigned by",
+      "actions": "Actions"
+    },
+    "wholeOrg": "Whole organization",
+    "remove": "Remove",
+    "removeConfirmTitle": "Remove assignment?",
+    "removeConfirmBody": "This removes the assignment. This cannot be undone.",
+    "removed": "Assignment removed",
+    "removeFailed": "Could not remove assignment",
+    "empty": "No assignments yet.",
+    "noDueDate": "—"
+  },
   "quizEditor": {
     "passingScoreLabel": "Passing Score (%)",
     "questionsHeading": "Questions",
