@@ -231,6 +231,10 @@ export const queryKeys = {
     detail: (orgId: string | undefined) => ['learner-dashboard', orgId] as const,
   },
 
+  learnerTraining: {
+    detail: (orgId: string | undefined) => ['learner-training', orgId] as const,
+  },
+
   learnerAssignments: {
     /** The learner's own assigned/mandatory courses for an org (#365). */
     list: (orgId: string | undefined) => ['learner-assignments', orgId] as const,

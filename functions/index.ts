@@ -77,6 +77,7 @@ import './invitations/index';
 import './learner-assignments/index';
 import './learner-courses/index';
 import './learner-dashboard/index';
+import './learner-training/index';
 import './lesson-create/index';
 import './lesson-delete/index';
 import './lesson-progress/index';

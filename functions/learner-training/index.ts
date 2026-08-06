@@ -1,7 +1,7 @@
 import { endpoint } from '../shared/endpoint';
 import { getLearnerProgress } from '../shared/learner-progress';
 
-export default endpoint('learner-dashboard', async ({ req, profile, reply, requireActiveMember }) => {
+export default endpoint('learner-training', async ({ req, profile, reply, requireActiveMember }) => {
   const { orgId } = await req.json() as { orgId?: unknown };
 
   if (!orgId || typeof orgId !== 'string') {
