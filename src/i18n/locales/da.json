@@ -184,6 +184,29 @@
     "favoriteCourses": "Favoritter",
     "noFavoritesTitle": "Ingen favoritter endnu",
     "noFavoritesDescription": "Tryk på hjertet på et kursus for at gemme det her.",
+    "subtitle": "Følg dit momentum og se hvor du står.",
+    "started": "Startet",
+    "level": {
+      "label": "Niveau {{level}}",
+      "toNext": "{{xp}} XP til Niveau {{level}}"
+    },
+    "xp": {
+      "total": "{{xp}} XP i alt"
+    },
+    "streak": {
+      "days_one": "{{count}} dag i træk",
+      "days_other": "{{count}} dage i træk",
+      "activeToday": "Du har lært i dag — bliv ved!",
+      "keepItUp": "Lær noget i dag for at holde din streak i live.",
+      "none": "Fuldfør en lektion i dag for at starte en streak."
+    },
+    "leaderboard": {
+      "title": "Leaderboard",
+      "allTime": "Samlet",
+      "thisMonth": "Denne måned",
+      "yourRank": "Din placering",
+      "empty": "Ingen er på listen endnu — vær den første."
+    },
     "community": {
       "title": "Fællesskab",
       "viewAll": "Se alle",

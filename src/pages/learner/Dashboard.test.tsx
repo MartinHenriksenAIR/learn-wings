@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
+import type { LearnerDashboardData } from '@/hooks/useLearnerDashboard';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
@@ -14,52 +15,19 @@ vi.mock('@/components/layout/AppLayout', () => ({
 
 vi.mock('@/lib/api-client', () => ({
   callApi: vi.fn(),
-  callApiRaw: vi.fn(),
-}));
-
-vi.mock('@/lib/storage', () => ({
-  getSignedLmsAssetUrl: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('@/components/learner/CertificateCard', () => ({
-  CertificateCard: () => <div data-testid="cert-card" />,
-}));
-
-vi.mock('@/components/ui/sonner', () => ({
-  toast: vi.fn(),
 }));
 
 const mockUseAuth = vi.fn();
-vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => mockUseAuth(),
-}));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
 
-const platformDefault = () => ({
-  features: { certificates_enabled: false } as Record<string, boolean>,
-  isLoading: false,
-});
-const mockPlatformSettings = vi.fn(platformDefault);
-vi.mock('@/hooks/usePlatformSettings', () => ({
-  usePlatformSettings: () => mockPlatformSettings(),
-}));
+const mockCommunityGate = vi.fn(() => 'blocked');
+vi.mock('@/hooks/useCommunityGate', () => ({ useCommunityGate: () => mockCommunityGate() }));
 
 vi.mock('@/components/learner/DashboardCommunitySection', () => ({
   DashboardCommunitySection: () => <div data-testid="community-section" />,
 }));
 
-const mockUseFavorites = vi.fn();
-const mockUseToggleFavorite = vi.fn();
-vi.mock('@/hooks/useFavorites', () => ({
-  useFavorites: (...args: unknown[]) => mockUseFavorites(...args),
-  useToggleFavorite: (...args: unknown[]) => mockUseToggleFavorite(...args),
-}));
-
 import LearnerDashboard from './Dashboard';
-
-// Module-scope defaults survive each describe's vi.clearAllMocks() (which clears
-// only call history). Favorites-specific tests override these before rendering.
-mockUseFavorites.mockReturnValue({ data: { courses: [] }, isFavorite: () => false, isLoading: false });
-mockUseToggleFavorite.mockReturnValue({ toggleFavorite: vi.fn(), togglingId: null, isPending: false });
 
 const baseAuthState = {
   user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
@@ -79,36 +47,60 @@ const baseAuthState = {
   effectiveIsOrgAdmin: false,
 };
 
-function makeClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const withOrg = {
+  memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
+  currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
+};
+
+const dashData = (over: Partial<LearnerDashboardData> = {}): LearnerDashboardData => ({
+  snapshot: { started: 3, inProgress: 1, completed: 2, overallPct: 67 },
+  xp: { allTime: 75, month: 45 },
+  level: { level: 1, xp: 75, xpIntoLevel: 75, xpForLevel: 200, xpToNext: 125, nextThreshold: 200, progressPct: 38 },
+  streak: { current: 3, activeToday: true },
+  leaderboard: {
+    allTime: {
+      rows: [
+        { rank: 1, name: 'Anna B.', xp: 300, isSelf: false },
+        { rank: 2, name: 'Martin H.', xp: 75, isSelf: true },
+      ],
+      me: { rank: 2, name: 'Martin H.', xp: 75, isSelf: true },
+    },
+    month: {
+      rows: [{ rank: 1, name: 'Martin H.', xp: 45, isSelf: true }],
+      me: { rank: 1, name: 'Martin H.', xp: 45, isSelf: true },
+    },
+  },
+  ...over,
+});
+
+async function mockData(data: LearnerDashboardData | Error) {
+  const { callApi } = await import('@/lib/api-client');
+  if (data instanceof Error) vi.mocked(callApi).mockRejectedValue(data);
+  else vi.mocked(callApi).mockResolvedValue(data);
 }
 
 function renderDashboard() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={makeClient()}>
+    <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <LearnerDashboard />
       </MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
-describe('LearnerDashboard — no-membership empty state', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+describe('LearnerDashboard — guards', () => {
+  beforeEach(() => vi.clearAllMocks());
 
-  it('resolves loading and shows no-membership empty state when user has profile but no memberships', async () => {
+  it('shows the no-membership empty state when the user has no memberships', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, memberships: [], currentOrg: null });
-
     renderDashboard();
-
     expect(document.querySelector('.animate-spin')).toBeNull();
     expect(screen.getByText('dashboard.noMembershipTitle')).toBeInTheDocument();
-    expect(screen.getByText('dashboard.noMembershipDescription')).toBeInTheDocument();
   });
 
-  it('shows the platform-admin no-org-selected state when memberships exist but no org is selected', async () => {
+  it('shows the no-org-selected state when memberships exist but no org is selected', () => {
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
       memberships: [{ id: 'm-1', role: 'org_admin', status: 'active' }],
@@ -116,320 +108,126 @@ describe('LearnerDashboard — no-membership empty state', () => {
       isPlatformAdmin: true,
       effectiveIsPlatformAdmin: true,
     });
-
     renderDashboard();
-
-    expect(document.querySelector('.animate-spin')).toBeNull();
-
     expect(screen.getByText('common.noOrgSelected')).toBeInTheDocument();
   });
 
-  it('does NOT render the spinner when user is null (unauthenticated)', async () => {
+  it('does NOT render the spinner when user is null (unauthenticated)', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, user: null, profile: null });
-
     renderDashboard();
-
     expect(document.querySelector('.animate-spin')).toBeNull();
+  });
+
+  it('renders the retryable error fork (not an all-zero hub) when the fetch fails', async () => {
+    await mockData(new Error('boom'));
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+    renderDashboard();
+    expect(await screen.findByText('common.loadErrorTitle')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-snapshot')).toBeNull();
   });
 });
 
-describe('LearnerDashboard — completion count (#18)', () => {
+describe('LearnerDashboard — motivation hub', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
   });
 
-  it('counts an enrollment with status completed in the Completed stat and section', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({
-      enrollments: [
-        {
-          id: 'e-1', org_id: 'org-1', user_id: 'p-1', course_id: 'c-1',
-          status: 'completed', enrolled_at: '2026-06-01T00:00:00Z',
-          completed_at: '2026-06-10T00:00:00Z',
-          course: { id: 'c-1', title: 'Finished Course', level: 'basic', description: '' },
-        },
-        {
-          id: 'e-2', org_id: 'org-1', user_id: 'p-1', course_id: 'c-2',
-          status: 'enrolled', enrolled_at: '2026-06-02T00:00:00Z', completed_at: null,
-          course: { id: 'c-2', title: 'Ongoing Course', level: 'basic', description: '' },
-        },
-      ],
-      progress: { 'c-1': { total: 4, completed: 4 }, 'c-2': { total: 4, completed: 1 } },
-    });
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
-      currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
-    });
-
+  it('renders the progress snapshot with counts', async () => {
+    await mockData(dashData());
     renderDashboard();
+    const snapshot = await screen.findByTestId('dashboard-snapshot');
+    expect(within(snapshot).getByText('dashboard.started')).toBeInTheDocument();
+    expect(within(snapshot).getByText('67%')).toBeInTheDocument();
+  });
 
-    const completedTitle = await screen.findByText('dashboard.completed');
-    const completedCard = completedTitle.closest('.rounded-2xl') as HTMLElement;
-    expect(completedCard).not.toBeNull();
-    expect(within(completedCard).getByText('1')).toBeInTheDocument();
-    expect(screen.getByText('dashboard.completedCourses')).toBeInTheDocument();
-    expect(screen.getByText('Finished Course')).toBeInTheDocument();
-    // The ongoing course renders twice: as the hero card title and in the In-progress grid
-    expect(screen.getAllByText('Ongoing Course')).toHaveLength(2);
+  it('renders XP/level and streak', async () => {
+    await mockData(dashData());
+    renderDashboard();
+    await screen.findByTestId('dashboard-snapshot');
+    expect(screen.getByText('dashboard.level.label')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.level.toNext')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.streak.days')).toBeInTheDocument();
+  });
+
+  it('renders the org leaderboard with first-name+initial names and XP', async () => {
+    await mockData(dashData());
+    renderDashboard();
+    const board = await screen.findByTestId('dashboard-leaderboard');
+    expect(within(board).getByText('Anna B.')).toBeInTheDocument();
+    expect(within(board).getByText('300 XP')).toBeInTheDocument();
+    expect(within(board).getByText('Martin H.')).toBeInTheDocument();
+  });
+
+  it('switches the leaderboard window to this month', async () => {
+    await mockData(dashData());
+    renderDashboard();
+    const board = await screen.findByTestId('dashboard-leaderboard');
+    fireEvent.click(within(board).getByRole('button', { name: 'dashboard.leaderboard.thisMonth' }));
+    expect(within(board).getByText('45 XP')).toBeInTheDocument();
+  });
+
+  it('pins the caller row when they rank below the visible top', async () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, name: `User ${i}`, xp: 1000 - i, isSelf: false }));
+    await mockData(dashData({
+      leaderboard: {
+        allTime: { rows, me: { rank: 42, name: 'Martin H.', xp: 5, isSelf: true } },
+        month: { rows: [], me: null },
+      },
+    }));
+    renderDashboard();
+    const board = await screen.findByTestId('dashboard-leaderboard');
+    expect(within(board).getByText('dashboard.leaderboard.yourRank')).toBeInTheDocument();
+    expect(within(board).getByText('Martin H.')).toBeInTheDocument();
   });
 });
 
 describe('LearnerDashboard — assessment banner', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => vi.clearAllMocks());
 
-  const withOrg = {
-    memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
-    currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
-  };
-
-  it('shows the banner when the learner has no assessment level', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      ...withOrg,
-      profile: { ...baseAuthState.profile, assessment_level: null },
-    });
-
+  it('shows the banner when a learner has no assessment level', async () => {
+    await mockData(dashData());
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg, profile: { ...baseAuthState.profile, assessment_level: null } });
     renderDashboard();
-
     expect(await screen.findByTestId('assessment-banner')).toBeInTheDocument();
-    expect(screen.getByText('assessment.banner.title')).toBeInTheDocument();
-    expect(screen.getByText('assessment.banner.cta')).toBeInTheDocument();
   });
 
-  it('does NOT show the banner when the learner already has an assessment level', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      ...withOrg,
-      profile: { ...baseAuthState.profile, assessment_level: 'basic' },
-    });
-
+  it('hides the banner when the learner already has an assessment level', async () => {
+    await mockData(dashData());
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg, profile: { ...baseAuthState.profile, assessment_level: 'basic' } });
     renderDashboard();
-
-    await screen.findByTestId('dashboard-hero');
+    await screen.findByTestId('dashboard-snapshot');
     expect(screen.queryByTestId('assessment-banner')).toBeNull();
   });
 
-  it('does NOT show the banner for a platform admin even with no assessment level', async () => {
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      profile: { ...baseAuthState.profile, assessment_level: null },
-      isPlatformAdmin: true,
-      memberships: [],
-      currentOrg: null,
-    });
-
+  it('hides the banner for an org admin', async () => {
+    await mockData(dashData());
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg, profile: { ...baseAuthState.profile, assessment_level: null }, isOrgAdmin: true });
     renderDashboard();
-
-    // Platform admin with no org renders the no-membership state, not the dashboard
-    expect(screen.queryByTestId('assessment-banner')).toBeNull();
-  });
-
-  it('does NOT show the banner for an org admin even with no assessment level', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      ...withOrg,
-      profile: { ...baseAuthState.profile, assessment_level: null },
-      isOrgAdmin: true,
-    });
-
-    renderDashboard();
-
-    await screen.findByTestId('dashboard-hero');
+    await screen.findByTestId('dashboard-snapshot');
     expect(screen.queryByTestId('assessment-banner')).toBeNull();
   });
 });
 
-describe('LearnerDashboard — failed fetch shows error fork, not first-time hero', () => {
+describe('LearnerDashboard — community gating', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('renders the retryable error state (not the first-time hero) when the dashboard fetch fails', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockRejectedValue(new Error('boom'));
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
-      currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
-    });
-
-    renderDashboard();
-
-    expect(await screen.findByText('common.loadErrorTitle')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
-    expect(screen.queryByTestId('dashboard-hero')).toBeNull();
-    expect(screen.queryByText('dashboard.heroFirstTimeTitle')).toBeNull();
-  });
-});
-
-describe('LearnerDashboard — hero variants', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
-      currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
-    });
-  });
-
-  const enrolled = {
-    id: 'e-2', org_id: 'org-1', user_id: 'p-1', course_id: 'c-2',
-    status: 'enrolled', enrolled_at: '2026-06-02T00:00:00Z', completed_at: null,
-    course: { id: 'c-2', title: 'Ongoing Course', level: 'basic', description: '' },
-  };
-  const completed = {
-    id: 'e-1', org_id: 'org-1', user_id: 'p-1', course_id: 'c-1',
-    status: 'completed', enrolled_at: '2026-06-01T00:00:00Z',
-    completed_at: '2026-06-10T00:00:00Z',
-    course: { id: 'c-1', title: 'Finished Course', level: 'basic', description: '' },
-  };
-
-  it('shows the continue-learning variant when a course is in progress', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({
-      enrollments: [completed, enrolled],
-      progress: { 'c-1': { total: 4, completed: 4 }, 'c-2': { total: 4, completed: 1 } },
-    });
-
-    renderDashboard();
-
-    const hero = await screen.findByTestId('dashboard-hero');
-    expect(within(hero).getByText('dashboard.heroContinueBadge')).toBeInTheDocument();
-    expect(within(hero).getByText('Ongoing Course')).toBeInTheDocument();
-    expect(within(hero).getByText('dashboard.heroLessonsDone')).toBeInTheDocument();
-    // Ring reflects the in-progress course (1 of 4 lessons = 25%)
-    expect(within(hero).getByText('25%')).toBeInTheDocument();
-    const cta = within(hero).getByRole('link', { name: /dashboard\.heroResumeCta/ });
-    expect(cta).toHaveAttribute('href', '/app/learn/c-2');
-  });
-
-  it('shows the all-caught-up variant with a 100% ring when everything is completed', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({
-      enrollments: [completed],
-      progress: { 'c-1': { total: 4, completed: 4 } },
-    });
-
-    renderDashboard();
-
-    const hero = await screen.findByTestId('dashboard-hero');
-    expect(within(hero).getByText('dashboard.heroAllCaughtUpBadge')).toBeInTheDocument();
-    expect(within(hero).getByText('dashboard.heroAllDoneTitle')).toBeInTheDocument();
-    expect(within(hero).getByText('100%')).toBeInTheDocument();
-    const cta = within(hero).getByRole('link', { name: /dashboard\.heroStartNewCta/ });
-    expect(cta).toHaveAttribute('href', '/app/courses');
-  });
-
-  it('shows the first-time variant with a 0% ring when there are no enrollments', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
-
-    renderDashboard();
-
-    const hero = await screen.findByTestId('dashboard-hero');
-    expect(within(hero).getByText('dashboard.heroFirstTimeBadge')).toBeInTheDocument();
-    expect(within(hero).getByText('dashboard.heroFirstTimeTitle')).toBeInTheDocument();
-    expect(within(hero).getByText('0%')).toBeInTheDocument();
-    const cta = within(hero).getByRole('link', { name: /dashboard\.browseCourses/ });
-    expect(cta).toHaveAttribute('href', '/app/courses');
-  });
-});
-
-describe('LearnerDashboard — community section gating (#343)', () => {
-  const withOrg = {
-    memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
-    currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    mockPlatformSettings.mockImplementation(platformDefault);
-  });
-
-  it('renders the community section when community is enabled for the org', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
-    mockPlatformSettings.mockReturnValue({
-      features: { certificates_enabled: false, community_enabled: true },
-      isLoading: false,
-    });
     mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+  });
 
+  it('renders the community section when the gate allows it', async () => {
+    mockCommunityGate.mockReturnValue('allowed');
+    await mockData(dashData());
     renderDashboard();
-
     expect(await screen.findByTestId('community-section')).toBeInTheDocument();
   });
 
-  it('hides the community section when community is disabled', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
-    mockPlatformSettings.mockReturnValue({
-      features: { certificates_enabled: false, community_enabled: false },
-      isLoading: false,
-    });
-    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
-
+  it('hides the community section when the gate blocks it', async () => {
+    mockCommunityGate.mockReturnValue('blocked');
+    await mockData(dashData());
     renderDashboard();
-
-    await screen.findByTestId('dashboard-hero');
+    await screen.findByTestId('dashboard-snapshot');
     expect(screen.queryByTestId('community-section')).toBeNull();
-  });
-});
-
-describe('LearnerDashboard — favorites section (#358)', () => {
-  const withOrg = {
-    memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
-    currentOrg: { id: 'org-1', name: 'Org One', slug: 'org-one' },
-  };
-
-  const favorite = {
-    id: 'c-fav', title: 'Favorited Course', description: '', level: 'basic',
-    language: 'en', course_group_id: null, is_published: true, thumbnail_url: null,
-    created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUseToggleFavorite.mockReturnValue({ toggleFavorite: vi.fn(), togglingId: null, isPending: false });
-    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
-  });
-
-  it('renders favorited course cards in the favorites section', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
-    mockUseFavorites.mockReturnValue({
-      data: { courses: [favorite] },
-      isFavorite: (id: string) => id === 'c-fav',
-      isLoading: false,
-    });
-
-    renderDashboard();
-
-    expect(await screen.findByText('dashboard.favoriteCourses')).toBeInTheDocument();
-    expect(screen.getByText('Favorited Course')).toBeInTheDocument();
-    expect(screen.queryByText('dashboard.noFavoritesTitle')).toBeNull();
-  });
-
-  it('renders the favorites empty state when the learner has no favorites', async () => {
-    const { callApi } = await import('@/lib/api-client');
-    vi.mocked(callApi).mockResolvedValue({ enrollments: [], progress: {} });
-    mockUseFavorites.mockReturnValue({ data: { courses: [] }, isFavorite: () => false, isLoading: false });
-
-    renderDashboard();
-
-    expect(await screen.findByText('dashboard.favoriteCourses')).toBeInTheDocument();
-    expect(screen.getByText('dashboard.noFavoritesTitle')).toBeInTheDocument();
   });
 });

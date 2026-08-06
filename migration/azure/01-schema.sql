@@ -840,4 +840,34 @@ CREATE TABLE IF NOT EXISTS public.course_favorites (
 -- org-visible catalog; index the user_id lookup.
 CREATE INDEX IF NOT EXISTS idx_course_favorites_user ON public.course_favorites(user_id);
 
+-- ---- gamification read-indexes (issue #362) ----
+-- No XP / streak / leaderboard tables: XP, streaks, and both leaderboard
+-- windows are DERIVED live from the completion tables below. These indexes
+-- make those derived aggregates cheap. All additive/index-only.
+-- (Folded from 15-gamification-indexes.sql.)
+
+-- Org-scoped completed-lesson aggregation for a member's own XP and the org
+-- leaderboard (all-time scans the (org_id, status) slice; "this month"
+-- range-seeks completed_at; user_id trails for the per-member GROUP BY).
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_org_completed
+  ON public.lesson_progress (org_id, status, completed_at, user_id);
+
+-- Global personal streak: distinct Europe/Copenhagen activity-days for one
+-- user across ALL orgs. Partial (completed only) keeps it small.
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_user_completed
+  ON public.lesson_progress (user_id, completed_at)
+  WHERE status = 'completed';
+
+-- Org-scoped distinct-quiz-passed counting per member (+ finished_at for the
+-- monthly window). Partial on passed attempts only.
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_org_passed
+  ON public.quiz_attempts (org_id, user_id, quiz_id, finished_at)
+  WHERE passed;
+
+-- Org-scoped completed-course counting per member (+ completed_at for the
+-- monthly window). Partial on completed enrollments only.
+CREATE INDEX IF NOT EXISTS idx_enrollments_org_completed
+  ON public.enrollments (org_id, user_id, completed_at)
+  WHERE status = 'completed';
+
 COMMIT;

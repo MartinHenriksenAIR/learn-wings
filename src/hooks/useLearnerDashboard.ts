@@ -1,22 +1,53 @@
 import { useQuery } from '@tanstack/react-query';
 import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
-import { getSignedLmsAssetUrl } from '@/lib/storage';
-import type { Course, Enrollment } from '@/lib/types';
 
-type DashboardEnrollment = Enrollment & { course: Course };
+// Shape of the derived learner-dashboard payload (see functions/shared/gamification.ts).
+export interface DashboardSnapshot {
+  started: number;
+  inProgress: number;
+  completed: number;
+  overallPct: number;
+}
+
+export interface DashboardLevel {
+  level: number;
+  xp: number;
+  xpIntoLevel: number;
+  xpForLevel: number;
+  xpToNext: number;
+  nextThreshold: number;
+  progressPct: number;
+}
+
+export interface LeaderboardRow {
+  rank: number;
+  name: string;
+  xp: number;
+  isSelf: boolean;
+}
+
+export interface LeaderboardWindow {
+  rows: LeaderboardRow[];
+  me: LeaderboardRow | null;
+}
+
+export interface LearnerDashboardData {
+  snapshot: DashboardSnapshot;
+  xp: { allTime: number; month: number };
+  level: DashboardLevel;
+  streak: { current: number; activeToday: boolean };
+  leaderboard: { allTime: LeaderboardWindow; month: LeaderboardWindow };
+}
 
 /**
- * Fetch the learner's dashboard data (enrollments + lesson progress) for
- * `orgId`, with thumbnail signing baked in.
+ * Fetch the learner's motivation-hub dashboard data for `orgId`: a progress
+ * snapshot, org-scoped XP + level, the global personal streak, and the
+ * org-scoped leaderboard (all-time + this month). All derived server-side; one
+ * round-trip. Continue-learning now lives in Min Træning (useLearnerTraining).
  *
- * Returns:
- *  - `enrollments` — enriched with a required `course` shape (as the API returns)
- *  - `progress`    — map of courseId → { total, completed }
- *  - `thumbnailUrls` — map of courseId → signed thumbnail URL
- *
- * `enabled` defaults to `!!orgId` — pass it explicitly to gate on the
- * org-guard state (e.g. `enabled: orgGuard === 'ready' && !!currentOrg`).
+ * `enabled` defaults to `!!orgId` — pass it explicitly to gate on the org-guard
+ * state (e.g. `enabled: orgGuard === 'ready' && !!currentOrg`).
  */
 export function useLearnerDashboard(
   orgId: string | undefined,
@@ -24,28 +55,7 @@ export function useLearnerDashboard(
 ) {
   return useQuery({
     queryKey: queryKeys.learnerDashboard.detail(orgId),
-    queryFn: async () => {
-      const data = await callApi<{
-        enrollments: DashboardEnrollment[];
-        progress: Record<string, { total: number; completed: number }>;
-      }>('/api/learner-dashboard', { orgId });
-
-      const thumbMap: Record<string, string> = {};
-      await Promise.all(
-        data.enrollments.map(async (e) => {
-          if (e.course?.thumbnail_url) {
-            const url = await getSignedLmsAssetUrl(e.course.thumbnail_url);
-            if (url) thumbMap[e.course_id] = url;
-          }
-        }),
-      );
-
-      return {
-        enrollments: data.enrollments,
-        progress: data.progress,
-        thumbnailUrls: thumbMap,
-      };
-    },
+    queryFn: () => callApi<LearnerDashboardData>('/api/learner-dashboard', { orgId }),
     staleTime: options.staleTime ?? 60 * 1000,
     enabled: (options.enabled ?? true) && !!orgId,
   });

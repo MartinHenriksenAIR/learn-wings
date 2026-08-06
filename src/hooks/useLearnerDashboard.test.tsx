@@ -8,46 +8,27 @@ vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
 }));
 
-const { mockGetSignedLmsAssetUrl } = vi.hoisted(() => ({
-  mockGetSignedLmsAssetUrl: vi.fn(),
-}));
-vi.mock('@/lib/storage', () => ({
-  getSignedLmsAssetUrl: (...args: unknown[]) => mockGetSignedLmsAssetUrl(...args),
-}));
+import { useLearnerDashboard, type LearnerDashboardData } from './useLearnerDashboard';
 
-import { useLearnerDashboard } from './useLearnerDashboard';
-
-const course = {
-  id: 'c-1',
-  title: 'Intro to AI',
-  description: 'Learn the basics',
-  level: 'basic' as const,
-  is_published: true,
-  thumbnail_url: 'raw-path/thumb.jpg',
-  created_by_user_id: null,
-  created_at: '2026-01-01T00:00:00Z',
-};
-
-const enrollment = {
-  id: 'e-1',
-  org_id: 'org-1',
-  user_id: 'p-1',
-  course_id: 'c-1',
-  status: 'enrolled' as const,
-  enrolled_at: '2026-01-01T00:00:00Z',
-  completed_at: null,
-  course,
+const data: LearnerDashboardData = {
+  snapshot: { started: 3, inProgress: 1, completed: 2, overallPct: 67 },
+  xp: { allTime: 75, month: 45 },
+  level: { level: 1, xp: 75, xpIntoLevel: 75, xpForLevel: 200, xpToNext: 125, nextThreshold: 200, progressPct: 38 },
+  streak: { current: 3, activeToday: true },
+  leaderboard: {
+    allTime: { rows: [{ rank: 1, name: 'Anna B.', xp: 300, isSelf: false }], me: { rank: 2, name: 'Martin H.', xp: 75, isSelf: true } },
+    month: { rows: [{ rank: 1, name: 'Martin H.', xp: 45, isSelf: true }], me: { rank: 1, name: 'Martin H.', xp: 45, isSelf: true } },
+  },
 };
 
 function Consumer({ orgId, enabled }: { orgId: string | undefined; enabled?: boolean }) {
   const query = useLearnerDashboard(orgId, enabled !== undefined ? { enabled } : {});
   if (query.isLoading) return <div data-testid="loading">loading</div>;
-  const enrollments = query.data?.enrollments ?? [];
-  const thumbnailUrls = query.data?.thumbnailUrls ?? {};
   return (
     <div>
-      <div data-testid="enrollments">{enrollments.map((e) => e.id).join(',')}</div>
-      <div data-testid="thumbnails">{Object.entries(thumbnailUrls).map(([k, v]) => `${k}:${v}`).join(',')}</div>
+      <div data-testid="xp">{query.data?.xp.allTime}</div>
+      <div data-testid="streak">{query.data?.streak.current}</div>
+      <div data-testid="myrank">{query.data?.leaderboard.allTime.me?.rank}</div>
     </div>
   );
 }
@@ -63,8 +44,7 @@ describe('useLearnerDashboard', () => {
   });
 
   it('calls /api/learner-dashboard with the correct { orgId } body', async () => {
-    mockGetSignedLmsAssetUrl.mockResolvedValue('https://signed.example.com/thumb.jpg');
-    mockCallApi.mockResolvedValue({ enrollments: [enrollment], progress: {} });
+    mockCallApi.mockResolvedValue(data);
 
     renderWithClient(<Consumer orgId="org-1" />);
 
@@ -73,29 +53,16 @@ describe('useLearnerDashboard', () => {
     });
   });
 
-  it('builds thumbnailUrls map keyed by course_id with signed URLs', async () => {
-    const signedUrl = 'https://signed.example.com/thumb.jpg';
-    mockGetSignedLmsAssetUrl.mockResolvedValue(signedUrl);
-    mockCallApi.mockResolvedValue({ enrollments: [enrollment], progress: {} });
+  it('returns the derived gamification payload', async () => {
+    mockCallApi.mockResolvedValue(data);
 
     renderWithClient(<Consumer orgId="org-1" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('thumbnails')).toHaveTextContent('c-1:' + signedUrl);
+      expect(screen.getByTestId('xp')).toHaveTextContent('75');
     });
-    expect(mockGetSignedLmsAssetUrl).toHaveBeenCalledWith(course.thumbnail_url);
-  });
-
-  it('does not add an entry to thumbnailUrls when signed URL is null', async () => {
-    mockGetSignedLmsAssetUrl.mockResolvedValue(null);
-    mockCallApi.mockResolvedValue({ enrollments: [enrollment], progress: {} });
-
-    renderWithClient(<Consumer orgId="org-1" />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('enrollments')).toHaveTextContent('e-1');
-    });
-    expect(screen.getByTestId('thumbnails')).toHaveTextContent('');
+    expect(screen.getByTestId('streak')).toHaveTextContent('3');
+    expect(screen.getByTestId('myrank')).toHaveTextContent('2');
   });
 
   it('does not fetch when enabled is false', async () => {
@@ -110,19 +77,5 @@ describe('useLearnerDashboard', () => {
 
     await Promise.resolve();
     expect(mockCallApi).not.toHaveBeenCalled();
-  });
-
-  it('returns enrollments and progress from the API response', async () => {
-    mockGetSignedLmsAssetUrl.mockResolvedValue(null);
-    mockCallApi.mockResolvedValue({
-      enrollments: [enrollment],
-      progress: { 'c-1': { total: 4, completed: 2 } },
-    });
-
-    renderWithClient(<Consumer orgId="org-1" />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('enrollments')).toHaveTextContent('e-1');
-    });
   });
 });
