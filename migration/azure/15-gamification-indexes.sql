@@ -1,4 +1,4 @@
--- 14-gamification-indexes.sql
+-- 15-gamification-indexes.sql
 -- #362 dashboard motivation + org-leaderboard hub (XP + streaks).
 --
 -- There are NO XP / streak / leaderboard tables: XP, streaks, and both

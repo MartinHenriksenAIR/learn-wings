@@ -842,7 +842,7 @@ CREATE INDEX IF NOT EXISTS idx_course_favorites_user ON public.course_favorites(
 -- No XP / streak / leaderboard tables: XP, streaks, and both leaderboard
 -- windows are DERIVED live from the completion tables below. These indexes
 -- make those derived aggregates cheap. All additive/index-only.
--- (Folded from 14-gamification-indexes.sql.)
+-- (Folded from 15-gamification-indexes.sql.)
 
 -- Org-scoped completed-lesson aggregation for a member's own XP and the org
 -- leaderboard (all-time scans the (org_id, status) slice; "this month"
