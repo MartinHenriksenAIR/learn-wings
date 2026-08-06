@@ -76,7 +76,9 @@
   "nav": {
     "home": "Home",
     "dashboard": "Dashboard",
+    "training": "My Training",
     "courses": "Course Catalog",
+    "tips": "Tips & Tricks",
     "community": "Community",
     "settings": "Settings",
     "signOut": "Sign out",

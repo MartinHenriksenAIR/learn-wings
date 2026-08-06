@@ -76,7 +76,9 @@
   "nav": {
     "home": "Hjem",
     "dashboard": "Dashboard",
+    "training": "Min Træning",
     "courses": "Kursuskatalog",
+    "tips": "Tips & Tricks",
     "community": "Fællesskab",
     "settings": "Indstillinger",
     "signOut": "Log ud",
