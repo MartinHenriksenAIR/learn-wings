@@ -22,6 +22,7 @@ consumers).
 | `11-org-entra-tenant.sql` | Additive, idempotent migration for #353 (`organizations.entra_tid` + `entra_tid_label` — SSO tenant auto-join binding). |
 | `12-course-favorites.sql` | Additive, idempotent migration for #358 (`course_favorites` — per-user, org-neutral favorited courses). |
 | `13-course-assignments.sql` | Additive, idempotent migration for #365 (`course_assignments` — mandatory/recommended training assignment). |
+| `14-org-self-registration.sql` | Additive, idempotent migration for #356 (`organizations.allow_self_registration` — per-org on/off switch governing #353 tenant auto-join). |
 | `README.md`     | This file. |
 
 > **Standing rule:** additive prod migrations (the numbered `0N-*.sql` files) are folded into `01-schema.sql` after they are applied to prod, so a fresh DB stood up from `01`+`02` is always complete. The numbered files stay in this folder as the applied-migration record.

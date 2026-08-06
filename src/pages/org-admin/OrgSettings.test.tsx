@@ -127,7 +127,7 @@ describe('OrgSettings — three-way loading guard', () => {
     expect(screen.queryByText('common.noOrgSelected')).toBeNull();
 
     const switches = screen.queryAllByRole('switch');
-    expect(switches).toHaveLength(5);
+    expect(switches).toHaveLength(6); // 5 feature overrides + self-registration (#356)
     expect(
       screen.getByRole('button', { name: /orgSettings\.saveButton/i })
     ).toBeInTheDocument();
@@ -153,7 +153,7 @@ describe('OrgSettings — three-way loading guard', () => {
       </MemoryRouter>
     );
 
-    expect(screen.queryAllByRole('switch')).toHaveLength(5);
+    expect(screen.queryAllByRole('switch')).toHaveLength(6);
     expect(screen.getByRole('button', { name: /orgSettings\.saveButton/i })).toBeInTheDocument();
 
     await act(async () => {
@@ -190,5 +190,43 @@ describe('OrgSettings — three-way loading guard', () => {
       expect(screen.getByRole('button', { name: /common\.saved/i })).toBeInTheDocument();
     });
     expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('#356: toggling self-registration off persists it via organization-update on save', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg: { id: 'org-1', name: 'Test Org', allow_self_registration: true },
+    });
+    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
+    vi.mocked(callApi).mockResolvedValue({} as never);
+
+    renderOrgSettings();
+    fireEvent.click(screen.getByRole('switch', { name: 'orgSettings.selfRegLabel' }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
+    });
+
+    expect(callApi).toHaveBeenCalledWith('/api/organization-update', {
+      orgId: 'org-1',
+      updates: { allow_self_registration: false },
+    });
+  });
+
+  it('#356: does NOT call organization-update when self-registration is unchanged', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg: { id: 'org-1', name: 'Test Org', allow_self_registration: true },
+    });
+    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
+    vi.mocked(callApi).mockResolvedValue({} as never);
+
+    renderOrgSettings();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
+    });
+
+    expect(callApi).toHaveBeenCalledWith('/api/org-settings-update', expect.anything());
+    expect(callApi).not.toHaveBeenCalledWith('/api/organization-update', expect.anything());
   });
 });

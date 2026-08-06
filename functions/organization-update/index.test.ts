@@ -189,7 +189,7 @@ describe('organization-update', () => {
     expect(sql).toContain('UPDATE organizations SET');
     expect(sql).toContain('name = $1');
     expect(sql).toContain('WHERE id = $2');
-    expect(sql).toContain('RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, created_at');
+    expect(sql).toContain('RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, allow_self_registration, created_at');
     expect(params).toEqual(['New Name', 'org-1']);
   });
 
@@ -325,7 +325,8 @@ describe('organization-update', () => {
 
   it('org admin cannot update other fields', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
-    // isOrgAdmin is NOT called — onlyLogoUrl is false (name is not logo_url), so && short-circuits
+    // isOrgAdmin is NOT called — `name` is outside ORG_ADMIN_WRITABLE, so the
+    // `.every(...)` is false and the && short-circuits before the membership check.
     const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
@@ -362,6 +363,63 @@ describe('organization-update', () => {
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('logo_url = $1');
     expect(params).toEqual([null, 'org-1']);
+  });
+
+  // ---- #356 per-org allow_self_registration toggle ----
+
+  it('returns 400 when allow_self_registration is not a boolean (before authz/DB)', async () => {
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { allow_self_registration: 'yes' } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'allow_self_registration must be a boolean' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('platform admin can toggle allow_self_registration off', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', allow_self_registration: false });
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { allow_self_registration: false } }), {} as any);
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('allow_self_registration = $1');
+    expect(params).toEqual([false, 'org-1']);
+  });
+
+  it('org admin of the target org can toggle allow_self_registration (org-owned setting)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    // No logo_url in the update ⇒ no previous-logo SELECT ⇒ a single queryOne (the UPDATE).
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', allow_self_registration: true });
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { allow_self_registration: true } }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('UPDATE organizations SET');
+    expect(sql).toContain('allow_self_registration = $1');
+    expect(params).toEqual([true, 'org-1']);
+  });
+
+  it('org admin can update logo_url and allow_self_registration together', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockLogoDb(null, { id: 'org-1', logo_url: 'org-logos/new.png', allow_self_registration: false });
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { logo_url: 'org-logos/new.png', allow_self_registration: false } }),
+      {} as any,
+    );
+    expect(res.status).toBe(200);
+    const [sql] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain('logo_url = $1');
+    expect(sql).toContain('allow_self_registration = $2');
+  });
+
+  it('org admin cannot smuggle a platform-only field alongside allow_self_registration', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { allow_self_registration: true, seat_limit: 5 } }),
+      {} as any,
+    );
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
   const logoUpdate = (logo_url: string | null) => ({ orgId: 'org-1', updates: { logo_url } });

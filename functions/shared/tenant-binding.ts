@@ -134,7 +134,9 @@ export async function selfRegistrationEnabled(): Promise<boolean> {
  *   • the caller has NO membership row in that org (any status) — so a
  *     deliberately disabled member is never silently re-enabled and an admin is
  *     never downgraded (ON CONFLICT DO NOTHING backstops a race),
- *   • the master switch is on,
+ *   • the org's own allow_self_registration switch is on (#356 — the per-org
+ *     on/off toggle; false → tenant users need an invite),
+ *   • the platform-wide master switch is on,
  *   • the org has a free seat (lockSeatUsage row-locks so concurrent joins
  *     cannot overshoot the cap).
  *
@@ -148,8 +150,8 @@ export async function autoJoinByTenant(
 ): Promise<void> {
   if (!isBindableTenant(tid)) return;
   try {
-    const org = await queryOne<{ id: string }>(
-      `SELECT id FROM organizations WHERE entra_tid = $1`,
+    const org = await queryOne<{ id: string; allow_self_registration: boolean }>(
+      `SELECT id, allow_self_registration FROM organizations WHERE entra_tid = $1`,
       [tid],
     );
     if (!org) return; // no org bound to this tenant
@@ -160,7 +162,8 @@ export async function autoJoinByTenant(
     );
     if (existing) return; // already a member (any status) — leave it untouched
 
-    if (!(await selfRegistrationEnabled())) return; // global kill-switch
+    if (!org.allow_self_registration) return; // per-org switch off (#356) — invite required
+    if (!(await selfRegistrationEnabled())) return; // platform-wide master switch
 
     await withTransaction(async (client) => {
       const usage = await lockSeatUsage(client, org.id);

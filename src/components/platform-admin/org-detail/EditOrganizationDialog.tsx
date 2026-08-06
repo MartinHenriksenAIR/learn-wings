@@ -4,6 +4,7 @@ import { Building2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,9 @@ export interface EditOrgPayload {
   // forwards these to the backend when they actually change (see saveEditMutation).
   entraTid: string;
   entraTidLabel: string;
+  // Per-org self-registration switch (#356). OrganizationDetail forwards it only
+  // when it actually changed, so an unrelated edit never clobbers it.
+  allowSelfRegistration: boolean;
 }
 
 interface EditOrganizationDialogProps {
@@ -51,6 +55,7 @@ export function EditOrganizationDialog({
   const [seatLimit, setSeatLimit] = useState<string>('');
   const [entraTid, setEntraTid] = useState<string>('');
   const [entraTidLabel, setEntraTidLabel] = useState<string>('');
+  const [allowSelfRegistration, setAllowSelfRegistration] = useState(true);
   // logoUrl holds the raw container-relative path (for save); sign it for display.
   const { data: logoDisplaySrc } = useSignedBrandingUrl(logoUrl);
 
@@ -62,6 +67,7 @@ export function EditOrganizationDialog({
       setSeatLimit(org.seat_limit?.toString() || '');
       setEntraTid(org.entra_tid ?? '');
       setEntraTidLabel(org.entra_tid_label ?? '');
+      setAllowSelfRegistration(org.allow_self_registration ?? true);
     }
   }, [open, org]);
 
@@ -135,6 +141,19 @@ export function EditOrganizationDialog({
             />
             <p className="text-xs text-muted-foreground">{t('orgDetail.seatLimitHint')}</p>
           </div>
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5 pr-4">
+              <Label htmlFor="edit-allow-self-reg" className="text-sm font-medium">
+                {t('orgDetail.selfRegLabel')}
+              </Label>
+              <p className="text-xs text-muted-foreground">{t('orgDetail.selfRegHint')}</p>
+            </div>
+            <Switch
+              id="edit-allow-self-reg"
+              checked={allowSelfRegistration}
+              onCheckedChange={setAllowSelfRegistration}
+            />
+          </div>
           <div className="space-y-3 rounded-lg border p-3">
             <div className="space-y-0.5">
               <p className="text-sm font-medium">{t('orgDetail.ssoBindingLabel')}</p>
@@ -167,7 +186,7 @@ export function EditOrganizationDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={() => onSubmit({ name, slug, logoUrl, seatLimit, entraTid, entraTidLabel })} disabled={pending}>
+          <Button onClick={() => onSubmit({ name, slug, logoUrl, seatLimit, entraTid, entraTidLabel, allowSelfRegistration })} disabled={pending}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             {t('common.save')}
           </Button>
