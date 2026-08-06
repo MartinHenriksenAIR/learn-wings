@@ -182,6 +182,29 @@
     "favoriteCourses": "Favorites",
     "noFavoritesTitle": "No favorites yet",
     "noFavoritesDescription": "Tap the heart on a course to save it here.",
+    "subtitle": "Track your momentum and see where you stand.",
+    "started": "Started",
+    "level": {
+      "label": "Level {{level}}",
+      "toNext": "{{xp}} XP to Level {{level}}"
+    },
+    "xp": {
+      "total": "{{xp}} XP total"
+    },
+    "streak": {
+      "days_one": "{{count}}-day streak",
+      "days_other": "{{count}}-day streak",
+      "activeToday": "You've learned today — keep it going!",
+      "keepItUp": "Learn something today to keep your streak alive.",
+      "none": "Complete a lesson today to start a streak."
+    },
+    "leaderboard": {
+      "title": "Leaderboard",
+      "allTime": "All-time",
+      "thisMonth": "This month",
+      "yourRank": "Your rank",
+      "empty": "No one's on the board yet — be the first."
+    },
     "community": {
       "title": "Community",
       "viewAll": "View all",
