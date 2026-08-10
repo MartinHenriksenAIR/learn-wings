@@ -417,7 +417,7 @@ export default function CommunityFeed() {
         }}
         categories={categories}
         scope={isEventsView ? eventScope : scope}
-        orgId={currentOrg?.id}
+        orgId={orgForCommunity?.id}
         canPostRestricted={isEventsView ? canCreateEvent : canPostRestricted}
         initialData={eventInitialData}
       />

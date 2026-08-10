@@ -29,7 +29,7 @@ export function SidebarBrand() {
   // useTranslation() to re-render this subtree (frontend convention).
   const { i18n } = useTranslation();
 
-  const coBranded = !effectiveIsPlatformAdmin && !!currentOrg;
+  const coBranded = !effectiveIsPlatformAdmin && !!currentOrg && currentOrg.kind !== 'individual';
   // Only sign a logo we're actually going to display.
   const { data: orgLogoSrc } = useSignedBrandingUrl(coBranded ? currentOrg?.logo_url : null);
 
