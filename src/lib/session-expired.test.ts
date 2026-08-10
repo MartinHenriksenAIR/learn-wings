@@ -81,6 +81,17 @@ describe('session-expired', () => {
     expect(consumePostLoginRedirect()).toBeNull();
   });
 
+  it('does not stash any auth route (e.g. forgot-password) as the redirect target', async () => {
+    stubLocation('/forgot-password');
+    const { handleSessionExpired } = await loadModule();
+    const { consumePostLoginRedirect } = await import('./post-login-redirect');
+
+    handleSessionExpired();
+
+    await vi.waitFor(() => expect(window.location.assign).toHaveBeenCalledWith('/login'));
+    expect(consumePostLoginRedirect()).toBeNull();
+  });
+
   it('consumeSessionExpiredNotice returns false when no session expired', async () => {
     const { consumeSessionExpiredNotice } = await loadModule();
     expect(consumeSessionExpiredNotice()).toBe(false);

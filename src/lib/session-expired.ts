@@ -12,7 +12,9 @@ const NOTICE_KEY = 'sessionExpiredNotice';
 // own redirect. Resets naturally on the full-page reload to /login.
 let redirecting = false;
 
-const AUTH_PATHS: readonly string[] = [routes.auth.login, routes.auth.signup];
+// Every auth route (login, signup, forgot/reset password) — derived so a new
+// auth route can't silently become a valid post-login return target.
+const AUTH_PATHS: readonly string[] = Object.values(routes.auth);
 
 /**
  * The session is dead — an expired refresh token (MSAL
@@ -41,6 +43,8 @@ export function handleSessionExpired(): void {
   const go = () => window.location.assign(routes.auth.login);
   // clearCache is async; navigate only once the stale account is gone, so the
   // reloaded app doesn't see it, refetch, 401, and loop straight back here.
+  // clearCache() removes only MSAL's own sessionStorage keys (msal-prefixed /
+  // clientId-keyed), so the redirect target + notice set just above survive it.
   Promise.resolve(msalInstance.clearCache()).catch(() => {}).finally(go);
 }
 
