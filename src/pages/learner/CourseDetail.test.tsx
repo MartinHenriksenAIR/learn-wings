@@ -155,4 +155,14 @@ describe('CourseDetail', () => {
     await screen.findByTestId('course-detail-title');
     expect(screen.queryByTestId('module-outline')).toBeNull();
   });
+
+  it('shows the no-org state (and never fetches) when the learner has no current org', () => {
+    mockUseAuth.mockReturnValue({ currentOrg: null, profile: { id: 'p-1' } });
+
+    renderDetail();
+
+    expect(screen.getByText('common.noOrgSelected')).toBeInTheDocument();
+    expect(screen.getByText('courses.joinOrgToAccessCourses')).toBeInTheDocument();
+    expect(callApi).not.toHaveBeenCalled();
+  });
 });

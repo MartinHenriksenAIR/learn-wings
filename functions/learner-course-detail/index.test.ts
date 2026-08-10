@@ -121,6 +121,26 @@ describe('learner-course-detail', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  it('individual org: denies access (403) when the language gate fails — published, wrong language, not enrolled (#354)', async () => {
+    // The language gate is the individual tier's whole security boundary: an active member
+    // must still be blocked from a published course that is not in their saved language
+    // (and that they have not already started). Pin that 403 by value.
+    mockResolveVisibility.mockResolvedValueOnce({ isIndividual: true, language: 'en' });
+    mockQueryOne.mockResolvedValueOnce({ id: 'course-uuid', title: 'A', language: 'da' }); // course (wrong lang)
+    mockIsActiveMember.mockResolvedValueOnce(true);   // active member
+    mockQueryOne.mockResolvedValueOnce({ ok: false }); // language gate fails
+
+    const res = await handler(baseReq as any, {} as any);
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Course access denied' });
+    expect(mockQuery).not.toHaveBeenCalled();
+
+    const [accessSql, accessParams] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(accessSql).not.toContain('org_course_access');
+    expect(accessSql).toContain('c.language = $3');
+    expect(accessParams).toEqual(['p1', 'course-uuid', 'en', 'org-uuid']);
+  });
+
   it('returns 404 when the course does not exist', async () => {
     mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq as any, {} as any);
