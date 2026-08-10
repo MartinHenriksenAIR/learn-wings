@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
+
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 const { mockCallApi } = vi.hoisted(() => ({ mockCallApi: vi.fn() }));
 vi.mock('@/lib/api-client', () => ({ callApi: mockCallApi }));
@@ -43,11 +45,15 @@ const baseAuth = {
 };
 
 // useOrganizations needs a QueryClient; fresh per render so no cache leaks between tests.
-function renderSelector() {
+// OrgSelector reads useSidebar() (for the collapsed icon-rail rendering, #370), so it must
+// be wrapped in a SidebarProvider — `open` drives expanded vs collapsed.
+function renderSelector({ open = true }: { open?: boolean } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <OrgSelector />
+      <SidebarProvider defaultOpen={open}>
+        <OrgSelector />
+      </SidebarProvider>
     </QueryClientProvider>
   );
 }
@@ -117,5 +123,31 @@ describe('OrgSelector', () => {
     await waitFor(() => {
       expect(document.querySelector('.animate-spin')).toBeNull();
     });
+  });
+
+  it('collapses to an icon-only trigger labelled with the current org (#370)', async () => {
+    mockCallApi.mockResolvedValue({ organizations: [orgA, orgB] });
+    mockUseAuth.mockReturnValue({ ...baseAuth, currentOrg: orgB });
+
+    renderSelector({ open: false });
+
+    // In the rail the switcher is a square button whose accessible name carries the
+    // org (the tooltip mirror), and the org name is NOT rendered as visible trigger text.
+    await waitFor(() => {
+      expect(document.querySelector('button[aria-label="Beta Org"]')).not.toBeNull();
+    });
+    expect(screen.queryByText('Beta Org')).not.toBeInTheDocument();
+  });
+
+  it('renders the full-width trigger (no icon-only aria-label) when expanded (#370)', async () => {
+    mockCallApi.mockResolvedValue({ organizations: [orgA, orgB] });
+    mockUseAuth.mockReturnValue({ ...baseAuth, currentOrg: orgB });
+
+    renderSelector({ open: true });
+
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalled();
+    });
+    expect(document.querySelector('button[aria-label="Beta Org"]')).toBeNull();
   });
 });

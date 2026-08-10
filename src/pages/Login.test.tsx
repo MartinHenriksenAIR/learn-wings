@@ -32,7 +32,12 @@ vi.mock('react-i18next', async () => {
 
 vi.mock('@/assets/logo-light.png', () => ({ default: 'logo-light.png' }));
 
+// Mocked so importing Login doesn't pull in the real msal-config (which builds a
+// live MSAL client). The notice tests below drive consumeSessionExpiredNotice.
+vi.mock('@/lib/session-expired', () => ({ consumeSessionExpiredNotice: vi.fn() }));
+
 import Login from './Login';
+import { consumeSessionExpiredNotice } from '@/lib/session-expired';
 
 const baseAuth = {
   user: { id: 'u-1', tid: 't-1', email: 'user@x.test', name: 'User' },
@@ -145,5 +150,30 @@ describe('Login post-auth navigation', () => {
     render(<Login />);
 
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});
+
+describe('Login session-expired notice', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    // Signed out and settled so Login renders its card (no navigate effect).
+    mockUseAuth.mockReturnValue({ ...baseAuth, user: null, profile: null });
+  });
+
+  it('shows the warm notice when a dead session redirected here', () => {
+    vi.mocked(consumeSessionExpiredNotice).mockReturnValue(true);
+
+    render(<Login />);
+
+    expect(screen.getByText(/right back to where you left off/i)).toBeInTheDocument();
+  });
+
+  it('stays quiet on a normal visit to /login', () => {
+    vi.mocked(consumeSessionExpiredNotice).mockReturnValue(false);
+
+    render(<Login />);
+
+    expect(screen.queryByText(/right back to where you left off/i)).not.toBeInTheDocument();
   });
 });

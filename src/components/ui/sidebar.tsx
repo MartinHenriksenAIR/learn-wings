@@ -19,6 +19,18 @@ const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
+// This shadcn provider writes SIDEBAR_COOKIE_NAME on every toggle but — being built
+// for a Next.js server that reads the cookie and feeds it back as `defaultOpen` — never
+// rehydrates it client-side. In our Vite SPA there is no such server AND every page mounts
+// its own AppLayout, so the provider remounts on each navigation; without reading the
+// cookie back the sidebar would snap back to expanded on every nav (#370). Read it here so
+// the collapsed/expanded choice actually persists.
+function readSidebarStateCookie(): boolean | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${SIDEBAR_COOKIE_NAME}=(true|false)(?:;|$)`));
+  return match ? match[1] === "true" : undefined;
+}
+
 type SidebarContext = {
   state: "expanded" | "collapsed";
   open: boolean;
@@ -51,7 +63,7 @@ const SidebarProvider = React.forwardRef<
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
 
-  const [_open, _setOpen] = React.useState(defaultOpen);
+  const [_open, _setOpen] = React.useState(() => readSidebarStateCookie() ?? defaultOpen);
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {

@@ -9,10 +9,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useSidebar } from '@/components/ui/sidebar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { Building2, Loader2 } from 'lucide-react';
 
 export function OrgSelector() {
   const { currentOrg, setCurrentOrg, isPlatformAdmin, viewMode } = useAuth();
+  const { state } = useSidebar();
+  const collapsed = state === 'collapsed';
   const { data: orgs = [], isLoading: loading, error } = useOrganizations({
     enabled: isPlatformAdmin,
   });
@@ -49,17 +54,23 @@ export function OrgSelector() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+      <div
+        className={cn(
+          'flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground',
+          collapsed && 'justify-center px-2',
+        )}
+      >
         <Loader2 className="h-4 w-4 animate-spin" />
-        <span>Loading orgs...</span>
+        {!collapsed && <span>Loading orgs...</span>}
       </div>
     );
   }
 
   const isOrgAdminMode = viewMode === 'org_admin';
+  const orgLabel = currentOrg?.name ?? 'Select organization';
 
   return (
-    <div className="px-3 py-2">
+    <div className={cn('px-3 py-2', collapsed && 'flex justify-center px-2')}>
       <Select
         value={currentOrg?.id || 'none'}
         onValueChange={(value) => {
@@ -74,12 +85,32 @@ export function OrgSelector() {
           }
         }}
       >
-        <SelectTrigger className="w-full bg-sidebar-accent/50 border-sidebar-border text-sidebar-foreground">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 shrink-0" />
-            <SelectValue placeholder="Select organization" />
-          </div>
-        </SelectTrigger>
+        {collapsed ? (
+          // Icon rail (#370): a 32px square that still opens the full switcher; the org
+          // name moves to a tooltip (+ aria-label) as there is no room for it. [&>svg]:hidden
+          // drops the trigger's built-in chevron — the org mark survives because it is
+          // wrapped in a <span>, not a direct <svg> child.
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <SelectTrigger
+                aria-label={orgLabel}
+                className="h-8 w-8 justify-center p-0 bg-sidebar-accent/50 border-sidebar-border text-sidebar-foreground [&>svg]:hidden"
+              >
+                <span className="flex items-center justify-center">
+                  <Building2 className="h-4 w-4 shrink-0" />
+                </span>
+              </SelectTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right">{orgLabel}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <SelectTrigger className="w-full bg-sidebar-accent/50 border-sidebar-border text-sidebar-foreground">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 shrink-0" />
+              <SelectValue placeholder="Select organization" />
+            </div>
+          </SelectTrigger>
+        )}
         <SelectContent>
           {!isOrgAdminMode && (
             <SelectItem value="none">

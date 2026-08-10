@@ -2311,3 +2311,69 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **927 / 123** · `build` 0. New `SidebarBrand.test.tsx` (6): fallback (no org / platform view), co-brand w/ logo (signs the path), no-logo initials, collapsed org mark, collapsed fallback. **Visual:** real component rendered in a throwaway Vite+Playwright harness (stubbed auth) across all 5 states — caught + fixed a long-name overflow (`min-w-0`) and re-verified the Avatar variant.
 
 **Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #387.
+
+---
+
+## 2026-08-10 — #372 follow-up: drop the AI Uddannelse wordmark from the co-brand lockup (PR #390)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Same-day follow-up to #372 (PR #387) — martin didn't like how the small platform wordmark looked tucked under the org name. Worktree-isolated off `origin/main` @`1b06351` (the #372 merge); PR opened ready after verify.
+
+**What:** removed the smaller AI Uddannelse endorsing wordmark that sat beneath the org name in the sidebar header — in an org context the header now shows the **org logo + name only**. This reverses part of #372's co-branding intent (platform brand no longer in-chrome for org users), on martin's call. The platform logo is unchanged in the non-org fallback (platform view / org-less / individual-tier), so the AI Uddannelse brand still shows there.
+
+**How:** dropped the wordmark `<img>` from `SidebarBrand`'s expanded co-brand return and flattened the now-single-child name wrapper into a truncating `<span>` on the row (`min-w-0` preserved so long org names still ellipsize). `platformSrc`/`platformAlt` + the logo assets stay — still used by the fallback. TDD: flipped the two co-brand tests to assert the wordmark is *absent* (watched them fail, then removed it).
+
+**Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **927 / 123** · `build` 0. Real-component Playwright harness re-checked all 5 states — org logo + name (truncation intact), initials monogram, collapsed marks, platform fallback — no wordmark. `/code-review` (Opus, whole-diff) — 3 minor findings, **1 accepted** (label the collapsed org mark for the #370 icon-rail a11y path), **2 declined** with reasoning on the PR (reuse `BrandingAvatar` — its `getAvatarColor` default fights the intended `bg-primary`, and the sidebar-footer avatar hand-rolls the same idiom; `getInitials` "U" fallback — unreachable, `organizations.name` is NOT NULL).
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #390.
+
+---
+
+## 2026-08-10 — #370 Collapsible sidebar (collapse to icon rail) (PR #392)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026). Requirements grilled with martin first (4 decisions). Worktree-isolated off `origin/main` @`7ff44ad` (the #390 co-brand fix); draft PR opened at pickup start. Blocked-by #363 (restructured sidebar) — already merged, so unblocked. Ran alongside martin's parallel #354 / #368 / #360 sessions — none collide (#360 is the course catalog; this is sidebar/layout).
+
+**What:** the left sidebar now collapses to an **icon-only rail** (shadcn `collapsible="icon"`) instead of hiding offcanvas, toggled by the existing top-bar `SidebarTrigger`, with tooltips on the collapsed items and the collapsed/expanded choice **persisted**.
+
+**How:**
+- `AppSidebar`'s `<Sidebar>` flipped from the shadcn default `offcanvas` → `collapsible="icon"`. The nav-item tooltips, brand mark (`SidebarBrand`), footer profile button and top-bar trigger were already collapse-aware (groundwork from #363/#372) — this wired the flag and fixed the collapsed-state gaps that groundwork left: tightened header/content/footer padding + re-squared the custom nav pills (`group-data-[collapsible=icon]` overrides with `!`) so everything centres cleanly in the 48px rail.
+- `OrgSelector` (platform-admin org switcher, only shown when impersonating an org) made collapse-aware: a 32px square trigger that **still opens** the full switcher, org name → tooltip + `aria-label` (built-in chevron dropped via `[&>svg]:hidden`).
+- **Persistence bug found + fixed during the visual check** — shadcn's `SidebarProvider` *writes* the `sidebar:state` cookie but never *reads* it (it's built for a Next.js server to feed `defaultOpen`); since every page mounts its own `AppLayout`, the provider remounts per navigation and the rail snapped back to expanded on the first nav, failing the "persists across navigation" acceptance criterion. Fixed by rehydrating from the cookie in the `useState` initializer (a controlled `open` prop still wins). This is the one `ui/sidebar.tsx` touch the plan hoped to avoid (collision set #355/#371) — kept minimal + additive.
+
+**Decisions (martin, grilled):** (1) **surgical** scope — flip + fix the four collapsed gaps, no redesign; (2) OrgSelector collapsed = **icon-only trigger that still opens** (not hidden); (3) toggle = **existing top-bar button only** (no edge rail / in-sidebar trigger); (4) **expanded** on first visit.
+
+**Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **933 / 124** · `build` 0. New tests: `OrgSelector.test.tsx` (+2 — collapsed icon trigger vs expanded) and `ui/sidebar.test.tsx` (+4 — cookie rehydration incl. controlled-prop precedence). **Visual:** real `AppSidebar`/`OrgSelector`/`SidebarBrand`/`AppLayout` rendered in a throwaway Vite+Playwright harness (Entra-gated hooks faked, real Tailwind pipeline) across learner / org-admin / platform-impersonate / platform, expanded + collapsed — confirmed the rail centring, the collapsed OrgSelector opening its dropdown + showing its tooltip, and the persistence fix (seeded cookie → mounts collapsed).
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #392.
+
+---
+
+## 2026-08-10 — #389 Redirect to /login on a dead session (PR #393)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026). Picked up after #360 (the original target) turned out blocked-by the in-flight #354 — martin chose #389 instead after a collision check cleared it against the parallel #354/#368/#370 sessions (only shared file is the append-only i18n bundle). Requirements grilled first (handler location + notice tone). Worktree-isolated off `origin/main` @`7ff44ad`; draft PR opened at pickup, marked ready after verify + review.
+
+**What:** a dead session (Entra refresh token expired → MSAL `InteractionRequiredAuthError`, or a backend 401) used to leave the app *looking* active while every data call silently failed. It now redirects to `/login` with a warm, one-time notice ("You've been signed out. Log back in and we'll take you right back to where you left off." / da) and returns the user to where they were after re-login.
+
+**How:**
+- New `src/lib/session-expired.ts` — `handleSessionExpired()`: saves the current in-app URL via `post-login-redirect`, sets a one-time notice flag, clears the stale MSAL account (`msalInstance.clearCache()`) so the reloaded `/login` has no account → no `fetchUserContext` → **no redirect loop**, then hard-redirects. A module-level `redirecting` guard makes concurrent 401s fire once (QueryClient's default `retry:3` across many hooks would otherwise storm). `consumeSessionExpiredNotice()` reads the flag once. Auth routes are excluded from the return target, derived from `routes.auth`.
+- `src/lib/api-client.ts` — the choke point: `getAccessToken` catches `InteractionRequiredAuthError`; `callApi`/`callApiRaw` fire the handler on HTTP 401; `callApiRaw` normalized to throw `ApiError` (was a bare `Error`) so the certificate download + compliance export redirect too. 403 (authz) and 500/network are untouched — those keep the existing local retry cards.
+- `src/pages/Login.tsx` + i18n en/da — shows the notice only when the flag is set (a first-time visitor never sees it; no StrictMode, so the `useState` consume-on-mount fires exactly once).
+
+**Decisions (martin, grilled):** (1) single handler at the **api-client** choke point (covers every caller incl. raw downloads), not QueryClient (misses raw fetches); (2) **warm & reassuring** notice copy over neutral/minimal; (3) deliberately left `useAuth`'s #232 `contextError` cards intact — the global redirect supersedes them for dead sessions, and 500/network still use them.
+
+**Verify (controller-run on the branch):** root `lint` 0 · `tsc` app+node 0 · `npm test` **940 / 124** · `build` 0; functions untouched. 13 new tests (session-expired handler incl. loop/storm/save-URL; api-client detection of both vectors + the 500/network negatives; Login notice shown/hidden). Whole-diff **Opus review — clean, no Critical/Important**; it verified against the real msal-browser v5 source that (a) there's no redirect loop and (b) `clearCache()` clears only MSAL-prefixed keys so the saved URL + notice survive; 5 Minor findings, 2 fixed (auth-path exclusions derived from `routes.auth`; documented the clearCache invariant), 3 declined/optional. **Near-miss caught:** the first `Login.test.tsx` write clobbered an existing 7-test file (a truncated `find` had hidden it) — recovered from HEAD, folded the 2 notice tests in, diff vs HEAD additions-only.
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #393.
+
+---
+
+## 2026-08-10 — #370 follow-up: collapsed-rail icons showed an I-beam cursor / flickered (PR #395)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Same-day follow-up to #370 (PR #392) — martin reported the collapsed icon rail felt buggy: hovering an icon sometimes showed a text (I-beam) cursor instead of a pointer, with a flicker before a click landed. Branched off `origin/main` @`7e85335`, worktree-isolated.
+
+**Root cause (found via a real-browser hit-test probe, not guessed):** collapsed, the section labels (Learning/Community/Organization) were hidden only by the shadcn primitive's `opacity-0` + `-mt-8`. #370's `GROUP_LABEL_CLASSES` override sets `h-auto`, so `-mt-8` no longer cancels the label's height — the invisible label stayed in the layout AND (since `opacity:0` doesn't stop pointer events) in the hit-test layer, overlapping the icon buttons. `elementFromPoint` at several icon centres returned the group-label `<div>` (`cursor: auto` → I-beam over its text) instead of the icon's `<a>`; the overlap also swallowed clicks → the flicker / "eventually works".
+
+**Fix:** drop the labels from the rail entirely when collapsed — `group-data-[collapsible=icon]:hidden` (display:none) — removing them from both layout and hit-testing. One line on `GROUP_LABEL_CLASSES`.
+
+**Verify:** Playwright harness — before: 3/4 probed icon centres hit the group-label; after: all 11 collapsed controls (org selector, 9 nav icons, footer) hit their own link/button with `cursor:pointer`, labels `display:none`/height 0; expanded unchanged (labels `display:flex`, 25px). Gates: `tsc` app+node 0 · lint 0 errors · `npm test` **934 / 124** (+1 regression guard) · `build` 0.
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #395.
