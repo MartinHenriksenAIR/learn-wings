@@ -21,7 +21,10 @@ const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit',
 
 // The subset an org admin (not a platform admin) may write for their own org —
 // org-owned day-to-day settings. Every other field is platform-admin-only.
-const ORG_ADMIN_WRITABLE = new Set(['logo_url', 'allow_self_registration']);
+// name (#369): an org admin may rename their OWN org (within-tenant, validated by
+// validateOrgName below). slug stays platform-admin-only — it is URL-facing and
+// UNIQUE, so a rename there is a cross-cutting change, not a day-to-day setting.
+const ORG_ADMIN_WRITABLE = new Set(['name', 'logo_url', 'allow_self_registration']);
 
 // Entra tenant ids are lowercase GUIDs. Stored lowercased (see the transform) so
 // they match the verified token `tid` exactly.
@@ -105,12 +108,13 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
   }
 
   // Authorization: platform admin → any whitelisted field; org admin of the target
-  // org → the ORG_ADMIN_WRITABLE subset only (logo_url, allow_self_registration).
+  // org → the ORG_ADMIN_WRITABLE subset only (name, logo_url, allow_self_registration).
   // RLS provenance: supabase/migrations/20260127153401_*.sql:269-276 ("Platform admins
   // can do everything with orgs") + 20260128223657 ("Org admins can update their org
   // logo", FOR UPDATE is_org_admin(id)). The old policy was row-scoped (technically any
   // column); we tighten to the migration's stated intent — logo_url — plus
-  // allow_self_registration, which #356 hands to the org to own day-to-day.
+  // allow_self_registration (#356) and name (#369, the org's own display name), both
+  // handed to the org to own day-to-day.
   if (!profile.is_platform_admin) {
     const onlyOrgAdminFields = updateKeys.every((key) => ORG_ADMIN_WRITABLE.has(key));
     const allowed = onlyOrgAdminFields && await isOrgAdmin(profile.id, orgId);

@@ -169,6 +169,11 @@ export const queryKeys = {
     all: ['platform-settings'] as const,
   },
 
+  orgSettings: {
+    /** One org's raw feature-overrides jsonb (#369). Invalidated by the settings save. */
+    detail: (orgId: string | undefined) => ['org-settings', orgId] as const,
+  },
+
   orgAnalyticsData: {
     detail: (orgId: string | undefined) => ['org-analytics-data', orgId] as const,
   },
