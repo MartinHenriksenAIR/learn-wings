@@ -55,11 +55,15 @@ export function SidebarBrand() {
 
   // The org "mark": its logo, degrading to an initials monogram — same Avatar
   // idiom as the user avatar in the sidebar footer, so a failed/expired signed
-  // URL falls back to initials instead of a broken image. alt="" because the
-  // org name sits beside it in the expanded lockup (no double announcement).
+  // URL falls back to initials instead of a broken image. The logo img is
+  // decorative (alt="") in the expanded lockup, where the org name sits beside
+  // it, but carries the org name when collapsed so the lone mark stays labelled
+  // (the icon-rail #370 path).
   const orgMark = (
     <Avatar className="h-9 w-9 shrink-0 rounded-lg">
-      {orgLogoSrc && <AvatarImage src={orgLogoSrc} alt="" className="object-cover" />}
+      {orgLogoSrc && (
+        <AvatarImage src={orgLogoSrc} alt={collapsed ? currentOrg.name : ''} className="object-cover" />
+      )}
       <AvatarFallback className="rounded-lg bg-primary text-xs font-bold text-primary-foreground">
         {getInitials(currentOrg.name)}
       </AvatarFallback>
