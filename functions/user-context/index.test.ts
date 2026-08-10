@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockClientQuery, mockWithTransaction,
-  mockSeedTenantBinding, mockAutoJoinByTenant,
+  mockSeedTenantBinding, mockAutoJoinByTenant, mockIndividualTierEnabled,
 } =
   vi.hoisted(() => {
     class MockAuthError extends Error {}
@@ -19,6 +19,7 @@ const {
       ),
       mockSeedTenantBinding: vi.fn(),
       mockAutoJoinByTenant: vi.fn(),
+      mockIndividualTierEnabled: vi.fn(),
     };
   });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -28,10 +29,12 @@ vi.mock('../shared/db', () => ({
   withTransaction: mockWithTransaction,
 }));
 // Tenant binding (#353) is unit-tested in shared/tenant-binding.test.ts; here we
-// mock it and assert the wiring (right args, right conditions).
+// mock it and assert the wiring (right args, right conditions). individualTierEnabled
+// (#354) is likewise mocked so its DB read doesn't perturb the query sequences below.
 vi.mock('../shared/tenant-binding', () => ({
   seedTenantBinding: mockSeedTenantBinding,
   autoJoinByTenant: mockAutoJoinByTenant,
+  individualTierEnabled: mockIndividualTierEnabled,
 }));
 
 import handler from './index';
@@ -77,6 +80,11 @@ describe('user-context', () => {
     // Defaults: pre-check finds no pending invite (query), transaction writes return no rows.
     mockQuery.mockResolvedValue([]);
     mockClientQuery.mockResolvedValue(rows());
+    // #354: the individual-tier auto-join runs on EVERY login. Default the switch
+    // OFF here so the helper short-circuits before any extra query/queryOne — the
+    // existing suites' order-sensitive mock sequences stay untouched. The dedicated
+    // #354 cases below flip it on.
+    mockIndividualTierEnabled.mockResolvedValue(false);
   });
 
   it('returns existing profile and memberships', async () => {
@@ -365,6 +373,87 @@ describe('user-context', () => {
       expect(body.memberships[0].organization).not.toHaveProperty('entra_tid');
       expect(body.memberships[0].organization).not.toHaveProperty('entra_tid_label');
       expect(body.memberships[0].organization.name).toBe('Org One'); // other fields intact
+    });
+  });
+
+  describe('#354 individual-tier walk-in auto-join', () => {
+    const insertMembershipCall = () =>
+      mockQuery.mock.calls.find(
+        (c) => (c[0] as string).includes('INSERT INTO org_memberships') && (c[0] as string).includes("'learner'"),
+      );
+    const placeholderLookupCall = () =>
+      mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('WHERE kind = $1'));
+
+    it('auto-joins a walk-in with no active memberships to the Individuals placeholder', async () => {
+      mockIndividualTierEnabled.mockResolvedValue(true);
+      mockQueryOne
+        .mockResolvedValueOnce(existingProfile)     // profile lookup
+        .mockResolvedValueOnce({ id: 'ind-354' });  // placeholder lookup (kind='individual')
+      // mockQuery default [] covers: invite pre-check, active-membership check, INSERT, memberships load.
+
+      const res = await handler(baseReq as any, { error: vi.fn(), warn: vi.fn() } as any);
+      expect(res.status).toBe(200);
+
+      // The placeholder was found by kind (never a hard-coded id) and the membership
+      // INSERT targets it as a learner, keyed on (placeholder id, profile id).
+      const [placeholderSql, placeholderParams] = placeholderLookupCall()!;
+      expect(placeholderSql).toContain('FROM organizations');
+      expect(placeholderParams).toEqual(['individual']);
+      const insert = insertMembershipCall();
+      expect(insert).toBeDefined();
+      expect(insert![0]).toContain("'active'");
+      expect(insert![0]).toContain('ON CONFLICT');
+      expect(insert![1]).toEqual(['ind-354', 'profile-uuid']);
+    });
+
+    it('no-ops (no placeholder lookup, no INSERT) when the tier switch is off', async () => {
+      mockIndividualTierEnabled.mockResolvedValue(false);
+      mockQueryOne.mockResolvedValueOnce(existingProfile); // profile lookup only
+
+      const res = await handler(baseReq as any, { error: vi.fn() } as any);
+      expect(res.status).toBe(200);
+      expect(placeholderLookupCall()).toBeUndefined();
+      expect(insertMembershipCall()).toBeUndefined();
+    });
+
+    it('leaves an existing active member untouched (no placeholder lookup, no INSERT)', async () => {
+      mockIndividualTierEnabled.mockResolvedValue(true);
+      mockQueryOne.mockResolvedValueOnce(existingProfile); // profile lookup
+      mockQuery.mockResolvedValueOnce([]);                 // invite pre-check: none
+      mockQuery.mockResolvedValueOnce([{ '?column?': 1 }]); // active-membership check: already a member
+
+      const res = await handler(baseReq as any, { error: vi.fn() } as any);
+      expect(res.status).toBe(200);
+      expect(placeholderLookupCall()).toBeUndefined(); // short-circuits before the placeholder lookup
+      expect(insertMembershipCall()).toBeUndefined();
+    });
+
+    it('degrades gracefully (no INSERT) when the Individuals placeholder is not seeded', async () => {
+      mockIndividualTierEnabled.mockResolvedValue(true);
+      mockQueryOne
+        .mockResolvedValueOnce(existingProfile) // profile lookup
+        .mockResolvedValueOnce(null);           // placeholder lookup: not seeded yet
+
+      const res = await handler(baseReq as any, { error: vi.fn() } as any);
+      expect(res.status).toBe(200);
+      expect(placeholderLookupCall()).toBeDefined();
+      expect(insertMembershipCall()).toBeUndefined();
+    });
+
+    it('best-effort: an auto-join failure is logged and never breaks login', async () => {
+      mockIndividualTierEnabled.mockResolvedValue(true);
+      mockQueryOne.mockResolvedValueOnce(existingProfile);  // profile lookup
+      mockQuery.mockResolvedValueOnce([]);                  // invite pre-check: none
+      mockQuery.mockRejectedValueOnce(new Error('db down')); // active-membership check throws
+      const context = { error: vi.fn() };
+
+      const res = await handler(baseReq as any, context as any);
+      const body = JSON.parse(res.body);
+
+      expect(res.status).toBe(200);          // login still succeeds
+      expect(body.profile.id).toBe('profile-uuid');
+      expect(context.error).toHaveBeenCalled();
+      expect(insertMembershipCall()).toBeUndefined();
     });
   });
 });

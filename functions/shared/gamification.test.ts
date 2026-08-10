@@ -1,10 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { mockQuery } = vi.hoisted(() => ({ mockQuery: vi.fn() }));
+vi.mock('./db', () => ({ query: mockQuery, queryOne: vi.fn() }));
+
 import {
   levelThreshold,
   levelForXp,
   levelProgress,
   displayName,
   computeStreak,
+  getLearnerDashboardData,
   LESSON_XP,
   QUIZ_XP,
   COURSE_XP,
@@ -69,5 +74,55 @@ describe('computeStreak', () => {
 describe('XP rates', () => {
   it('are the agreed values', () => {
     expect([LESSON_XP, QUIZ_XP, COURSE_XP]).toEqual([10, 25, 100]);
+  });
+});
+
+describe('getLearnerDashboardData suppressLeaderboard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('skips the member query and returns empty windows, keeping personal XP/streak', async () => {
+    // Only five queries fire when suppressed — the leaderboard-membership query
+    // is not run, so no stranger names/XP are ever read.
+    mockQuery
+      .mockResolvedValueOnce([{ started: 2, in_progress: 1, completed: 1 }])   // snapshot
+      .mockResolvedValueOnce([{ user_id: 'me', all_time: 5, month: 2 }])        // lessons
+      .mockResolvedValueOnce([{ user_id: 'me', all_time: 1, month: 1 }])        // quizzes
+      .mockResolvedValueOnce([])                                               // courses
+      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06'] }]);  // streak
+
+    const data = await getLearnerDashboardData('org-solo', 'me', { suppressLeaderboard: true });
+
+    expect(mockQuery).toHaveBeenCalledTimes(5);
+    const memberQueried = (mockQuery.mock.calls as [string, unknown[]][]).some(([sql]) => sql.includes('org_memberships'));
+    expect(memberQueried).toBe(false);
+
+    expect(data.leaderboard).toEqual({
+      allTime: { rows: [], me: null },
+      month: { rows: [], me: null },
+    });
+
+    // Personal XP + streak are unchanged: 5·10 + 1·25 = 75 all-time; 2·10 + 1·25 = 45 month.
+    expect(data.xp).toEqual({ allTime: 75, month: 45 });
+    expect(data.level.level).toBe(1);
+    expect(data.streak).toEqual({ current: 1, activeToday: true });
+  });
+
+  it('runs the member query and ranks the board when not suppressed', async () => {
+    mockQuery
+      .mockResolvedValueOnce([{ started: 1, in_progress: 0, completed: 1 }])   // snapshot
+      .mockResolvedValueOnce([{ user_id: 'me', all_time: 5, month: 2 }])        // lessons
+      .mockResolvedValueOnce([])                                               // quizzes
+      .mockResolvedValueOnce([])                                               // courses
+      .mockResolvedValueOnce([{ user_id: 'me', first_name: 'Solo', last_name: 'Learner', full_name: 'Solo Learner' }]) // members
+      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06'] }]);  // streak
+
+    const data = await getLearnerDashboardData('org-1', 'me');
+
+    expect(mockQuery).toHaveBeenCalledTimes(6);
+    const memberQueried = (mockQuery.mock.calls as [string, unknown[]][]).some(([sql]) => sql.includes('org_memberships'));
+    expect(memberQueried).toBe(true);
+    expect(data.leaderboard.allTime.rows).toEqual([{ rank: 1, name: 'Solo L.', xp: 50, isSelf: true }]);
   });
 });

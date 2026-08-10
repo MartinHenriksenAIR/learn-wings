@@ -14,6 +14,9 @@
  * endpoint author — never user input. Values still travel as bind parameters.
  */
 
+import { queryOne } from './db';
+import { INDIVIDUAL_ORG_KIND } from './individual-tier';
+
 export interface OrgCourseAccessOpts {
   /** SQL reference to the course id — a column like 'c.id' or a bind like '$2'. */
   courseRef: string;
@@ -42,4 +45,42 @@ export interface CourseVisibilityOpts {
 export function courseVisibilityPredicate({ courseAlias, orgParam }: CourseVisibilityOpts): string {
   return `${courseAlias}.is_published = TRUE
           AND ${orgCourseAccessEnabled({ courseRef: `${courseAlias}.id`, orgParam })}`;
+}
+
+export interface IndividualVisibilityOpts {
+  /** Alias of the in-scope courses table (e.g. 'c'). */
+  courseAlias: string;
+  /** 1-based bind-parameter ordinal carrying the caller's language (rendered $n). */
+  langParam: number;
+}
+
+/**
+ * Visibility for the individual tier (#354): a published course in the caller's
+ * language, with org_course_access DELIBERATELY bypassed. NULL-language courses
+ * are excluded naturally by the equality. Never used for standard orgs.
+ */
+export function individualCourseVisibility({ courseAlias, langParam }: IndividualVisibilityOpts): string {
+  return `${courseAlias}.is_published = TRUE AND ${courseAlias}.language = $${langParam}`;
+}
+
+/**
+ * Resolve, in one round-trip, whether an org is the individual tier and the
+ * caller's server-authoritative catalogue language. Endpoints on the learner
+ * journey call this to pick the standard vs individual visibility branch. The
+ * client never supplies the language for individuals (they cannot widen their
+ * own catalogue). Defaults language to 'da' when the profile value is null.
+ */
+export async function resolveVisibilityContext(
+  orgId: string,
+  profileId: string,
+): Promise<{ isIndividual: boolean; language: string }> {
+  const row = await queryOne<{ kind: string | null; language: string | null }>(
+    `SELECT (SELECT kind FROM organizations WHERE id = $1) AS kind,
+            (SELECT preferred_language FROM profiles WHERE id = $2) AS language`,
+    [orgId, profileId],
+  );
+  return {
+    isIndividual: row?.kind === INDIVIDUAL_ORG_KIND,
+    language: row?.language === 'en' ? 'en' : 'da',
+  };
 }

@@ -24,12 +24,16 @@ const NO_COURSES: Course[] = [];
 const NO_ENROLLMENTS: Enrollment[] = [];
 
 export default function LearnerCourses() {
-  const { currentOrg, profile } = useAuth();
+  const { currentOrg, profile, isPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Solo learners render as normal learners against a hidden placeholder org — the
+  // catalogue chrome must stay org-name-free for them (never surface the placeholder).
+  const isIndividual = currentOrg?.kind === 'individual';
 
   const query = useLearnerCourses(currentOrg?.id, {
     enabled: orgGuard === 'ready' && !!currentOrg,
@@ -114,12 +118,19 @@ export default function LearnerCourses() {
   }
 
   if (!currentOrg) {
+    // A non-admin with no org here is a blocked walk-in (individual tier off, or the
+    // placeholder org is missing) — registration is invitation-only, so show that
+    // instead of "join an org". Platform admins land here via the no-org-selected edge.
     return (
       <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/50" />
-          <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
-          <p className="text-sm text-muted-foreground">{t('courses.joinOrgToAccessCourses')}</p>
+          <p className="text-muted-foreground">
+            {isPlatformAdmin ? t('common.noOrgSelected') : t('dashboard.invitationOnlyTitle')}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {isPlatformAdmin ? t('courses.joinOrgToAccessCourses') : t('dashboard.invitationOnlyDescription')}
+          </p>
         </div>
       </AppLayout>
     );
@@ -245,7 +256,9 @@ export default function LearnerCourses() {
     <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
       <div className="mb-[22px]">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('courses.title')}</h1>
-        <p className="text-sm text-muted-foreground">{t('courses.subtitle', { orgName: currentOrg.name })}</p>
+        <p className="text-sm text-muted-foreground">
+          {isIndividual ? t('courses.subtitleIndividual') : t('courses.subtitle', { orgName: currentOrg.name })}
+        </p>
       </div>
 
       <div className="mb-[22px] flex flex-wrap items-center gap-2.5">

@@ -144,8 +144,10 @@ describe('QuizEditorDialog — passingScore', () => {
 
     const { unmount } = renderDialog({ lessonId: 'lesson-a' });
 
-    const input1 = await screen.findByRole('spinbutton');
-    expect((input1 as HTMLInputElement).value).toBe('90');
+    // Wait for the async quiz load to apply before asserting. findByRole resolves
+    // as soon as the spinbutton exists — showing the useState(70) default — so a bare
+    // assertion here races the load and flakes under heavy parallel test load.
+    await waitFor(() => expect((getPassingScoreInput() as HTMLInputElement).value).toBe('90'));
 
     unmount();
 

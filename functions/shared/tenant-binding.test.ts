@@ -31,6 +31,7 @@ import {
   isBindableTenant,
   seedTenantBinding,
   selfRegistrationEnabled,
+  individualTierEnabled,
   autoJoinByTenant,
 } from './tenant-binding';
 
@@ -138,6 +139,15 @@ describe('selfRegistrationEnabled', () => {
   it('defaults to ON when the key is absent (null value)', async () => {
     mockQueryOne.mockResolvedValueOnce({ allow_self_registration: null });
     expect(await selfRegistrationEnabled()).toBe(true);
+  });
+});
+
+describe('individualTierEnabled', () => {
+  it('individualTierEnabled defaults true when the key is absent, false when set false', async () => {
+    mockQueryOne.mockResolvedValueOnce({ allow_individual_registration: null });
+    await expect(individualTierEnabled()).resolves.toBe(true);
+    mockQueryOne.mockResolvedValueOnce({ allow_individual_registration: false });
+    await expect(individualTierEnabled()).resolves.toBe(false);
   });
 });
 

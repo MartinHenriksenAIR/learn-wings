@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsActiveMember, mockResolveVisibilityContext } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
@@ -8,11 +8,13 @@ const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsActive
     mockQuery: vi.fn(),
     mockGetProfile: vi.fn(),
     mockIsActiveMember: vi.fn(),
+    mockResolveVisibilityContext: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: vi.fn() }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember }));
+vi.mock('../shared/course-visibility', () => ({ resolveVisibilityContext: mockResolveVisibilityContext }));
 
 import handler from './index';
 
@@ -42,6 +44,8 @@ describe('learner-dashboard', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockIsActiveMember.mockResolvedValue(false);
+    // Standard (non-individual) org by default so existing assertions hold.
+    mockResolveVisibilityContext.mockResolvedValue({ isIndividual: false, language: 'da' });
   });
 
   it('returns 401 when bearer token is invalid', async () => {
@@ -139,6 +143,43 @@ describe('learner-dashboard', () => {
     expect(body.streak).toEqual({ current: 0, activeToday: false });
     expect(body.leaderboard.allTime.rows).toEqual([]);
     expect(body.leaderboard.allTime.me).toBeNull();
+  });
+
+  it('suppresses the leaderboard for the individual tier but keeps personal XP/streak', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    // Individual (self-serve) placeholder org — the board would pool unrelated
+    // solo learners, so it must be suppressed at the backend (#373).
+    mockResolveVisibilityContext.mockResolvedValueOnce({ isIndividual: true, language: 'da' });
+    // Suppressed → the leaderboard-membership query (5) is NOT run, so only five
+    // queries fire: snapshot, lessons, quizzes, courses, then streak.
+    mockQuery
+      .mockResolvedValueOnce([{ started: 3, in_progress: 1, completed: 2 }])                              // 1 snapshot
+      .mockResolvedValueOnce([{ user_id: 'p1', all_time: 5, month: 2 }])                                  // 2 lessons
+      .mockResolvedValueOnce([{ user_id: 'p1', all_time: 1, month: 1 }])                                  // 3 quizzes
+      .mockResolvedValueOnce([])                                                                          // 4 courses
+      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06', '2026-08-05', '2026-08-04'] }]); // 5 streak (member query skipped)
+
+    const res = await handler(baseReq({ orgId: 'org-solo' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+
+    // No stranger data crosses the wire — both windows are empty, me is null.
+    expect(body.leaderboard).toEqual({
+      allTime: { rows: [], me: null },
+      month: { rows: [], me: null },
+    });
+
+    // The solo learner still gets their own XP, level and streak.
+    expect(body.xp).toEqual({ allTime: 75, month: 45 });
+    expect(body.level.level).toBe(1);
+    expect(body.streak).toEqual({ current: 3, activeToday: true });
+
+    // Detection is via the resolver (kind='individual'), never a hard-coded id.
+    expect(mockResolveVisibilityContext).toHaveBeenCalledWith('org-solo', 'p1');
+    // The org_memberships (leaderboard) query must never have run.
+    const memberQueried = (mockQuery.mock.calls as [string, unknown[]][]).some(([sql]) => sql.includes('org_memberships'));
+    expect(memberQueried).toBe(false);
   });
 
   it('returns 500 on db error', async () => {

@@ -62,6 +62,20 @@ describe('SidebarBrand co-branding (#372)', () => {
     expect(mockSigned).toHaveBeenCalledWith(null);
   });
 
+  it('shows only the platform logo for the individual-tier placeholder org (#354)', () => {
+    // #354 gives org-less walk-ins a hidden "Individuals" placeholder org; it
+    // must never present as a real co-branded org.
+    mockUseAuth.mockReturnValue(
+      orgMember({ id: 'org-ind', name: 'Individuals', kind: 'individual', logo_url: 'orgs/ind.png' }),
+    );
+    renderBrand();
+
+    expect(screen.getByAltText('AI Education')).toBeInTheDocument();
+    expect(screen.queryByText('Individuals')).not.toBeInTheDocument();
+    // Must not sign an org logo we're not going to show.
+    expect(mockSigned).toHaveBeenCalledWith(null);
+  });
+
   it('shows the org logo + name only — no AI Uddannelse wordmark — for an org member', () => {
     mockSigned.mockReturnValue({ data: 'https://signed/acme.png' });
     mockUseAuth.mockReturnValue(

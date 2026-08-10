@@ -101,6 +101,20 @@ describe('org-course-org-breakdown', () => {
     expect(params).toEqual(['c-1']);
   });
 
+  it('#354: excludes the Individuals placeholder org from the cross-org breakdown', async () => {
+    // Solo learners enroll with org_id = the placeholder org, so without an explicit
+    // kind filter the enrollment UNION would surface "AI Uddannelse" as a named org row
+    // in this platform-admin table. The placeholder must never appear, even to platform admins.
+    mockQuery.mockResolvedValueOnce([{ org_id: 'o1', org_name: 'Acme', enrolled: 3, completed: 1 }]);
+
+    const res = await handler(baseReq({ courseId: 'c-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    // Excludes only the hidden individual tier — future paid tiers stay in analytics.
+    expect(sql).toContain("o.kind <> 'individual'");
+  });
+
   it('returns 500 on db error', async () => {
     mockQuery.mockRejectedValueOnce(new Error('connection refused'));
 

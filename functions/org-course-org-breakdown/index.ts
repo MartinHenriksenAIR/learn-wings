@@ -47,6 +47,10 @@ export default adminEndpoint('org-course-org-breakdown', async ({ req, reply }) 
          SELECT e.org_id FROM enrollments e WHERE e.course_id IN (SELECT id FROM grp)
        ) rel ON rel.org_id = o.id
        LEFT JOIN enrollments e ON e.course_id IN (SELECT id FROM grp) AND e.org_id = o.id
+      -- #354: solo learners enroll under the hidden Individuals placeholder org, so the
+      -- enrollment UNION above would otherwise surface it as a named org row here — even
+      -- to platform admins. Exclude only the individual tier; future paid tiers stay in.
+      WHERE o.kind <> 'individual'
       GROUP BY o.id, o.name
       ORDER BY enrolled DESC, o.name`,
     [courseId],
