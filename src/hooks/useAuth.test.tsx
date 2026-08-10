@@ -270,6 +270,54 @@ describe('useAuth', () => {
     });
   });
 
+  describe('currentOrg selection prefers a real org over the Individuals placeholder (#354)', () => {
+    const msalWithAccount = () => {
+      mockUseMsal.mockReturnValue({
+        instance: { loginRedirect: mockLoginRedirect, logoutRedirect: mockLogoutRedirect },
+        accounts: [mockAccount],
+        inProgress: 'none',
+      });
+      mockUseAccount.mockReturnValue(mockAccount);
+    };
+
+    const individualMembership = {
+      id: 'm-ind', org_id: 'org-ind', user_id: 'p-1', role: 'member', status: 'active',
+      created_at: '2026-01-01T00:00:00Z',
+      organization: { id: 'org-ind', name: 'Individuals', kind: 'individual' },
+    };
+    const standardMembership = {
+      id: 'm-std', org_id: 'org-std', user_id: 'p-1', role: 'member', status: 'active',
+      created_at: '2026-01-01T00:00:00Z',
+      organization: { id: 'org-std', name: 'Contoso', kind: 'standard' },
+    };
+
+    it('a dual-member (Individuals placeholder listed first + a real company) lands in the real company', async () => {
+      msalWithAccount();
+      mockCallApi.mockResolvedValue({
+        profile: { id: 'p-1', is_platform_admin: false },
+        memberships: [individualMembership, standardMembership],
+      });
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.currentOrg?.id).toBe('org-std'));
+      expect(result.current.currentOrg?.kind).toBe('standard');
+    });
+
+    it('a solo-only learner lands in the Individuals placeholder', async () => {
+      msalWithAccount();
+      mockCallApi.mockResolvedValue({
+        profile: { id: 'p-1', is_platform_admin: false },
+        memberships: [individualMembership],
+      });
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.currentOrg?.id).toBe('org-ind'));
+      expect(result.current.currentOrg?.kind).toBe('individual');
+    });
+  });
+
   describe('viewMode persistence (#16)', () => {
     beforeEach(() => {
       mockUseMsal.mockReturnValue({
