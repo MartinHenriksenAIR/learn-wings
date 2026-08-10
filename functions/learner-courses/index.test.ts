@@ -297,6 +297,43 @@ describe('learner-courses', () => {
     expect(mockQuery.mock.calls[0][1]).toContain('en');
   });
 
+  it('individual org: enrolled-relaxation survives — a course in a non-saved language stays visible', async () => {
+    // Regression guard: the individual visibility fragment must be PUBLISHED-ONLY so the
+    // shared OR-group owns the language filter. If language=$2 were baked into the outer
+    // AND, boolean absorption (B AND (B OR D) ≡ B) would drop the enrolled-relaxation and
+    // hide a course the learner already started after they switch their saved language.
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ kind: 'individual', language: 'en' }); // saved lang = en
+    const daCourse = { id: 'c9', title: 'Dansk kursus', language: 'da', is_published: true };
+    mockQuery
+      .mockResolvedValueOnce([daCourse])                                                     // courses (row the SQL would return)
+      .mockResolvedValueOnce([{ id: 'e9', org_id: 'ind-354', user_id: 'p1', course_id: 'c9', status: 'enrolled', enrolled_at: '2024-01-10', completed_at: null }]) // enrollments
+      .mockResolvedValueOnce([{ course_id: 'c9', total: 3 }])                                 // totals
+      .mockResolvedValueOnce([{ course_id: 'c9', completed: 1 }]);                            // completed
+
+    const res = await handler(baseReq({ orgId: 'ind-354', language: 'da' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [coursesSql, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+    // Visibility fragment is published-only: no language equality baked into the outer AND,
+    // and org_course_access still bypassed. The language filter lives only in the OR-group.
+    expect(coursesSql).toContain('c.is_published = TRUE');
+    expect(coursesSql).not.toContain('org_course_access');
+    // The enrolled-relaxation OR-group is present and carries the language + enrollment escape.
+    expect(coursesSql).toContain('c.language = $2');
+    expect(coursesSql).toContain('OR EXISTS (');
+    expect(coursesSql).toContain('FROM enrollments e');
+    // The discriminating structural guard: `c.language = $2` must appear ONLY inside the
+    // OR-group (after its opening `AND (`), never in the outer visibility AND. A buggy
+    // published+language visibility fragment would place it before the OR-group and absorb
+    // the relaxation (B AND (B OR D) ≡ B); this ordering assertion fails in that case.
+    expect(coursesSql.indexOf('c.language = $2')).toBeGreaterThan(coursesSql.indexOf('AND ('));
+    // Saved language ('en') is bound as $2; the 'da' body language is ignored.
+    expect(coursesParams).toEqual(['ind-354', 'en', 'p1']);
+    // The da-language course the learner is enrolled in flows through unfiltered.
+    expect(JSON.parse(res.body as string).courses).toEqual([daCourse]);
+  });
+
   it('returns 200 for platform admin without calling isActiveMember', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery

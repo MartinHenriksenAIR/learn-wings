@@ -1,6 +1,6 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-import { courseVisibilityPredicate, individualCourseVisibility, resolveVisibilityContext } from '../shared/course-visibility';
+import { courseVisibilityPredicate, resolveVisibilityContext } from '../shared/course-visibility';
 
 export default endpoint('learner-courses', async ({ req, profile, reply, requireActiveMember }) => {
   const { orgId, language } = await req.json() as { orgId?: unknown; language?: unknown };
@@ -16,15 +16,18 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
   // server-authoritative saved language (the client cannot widen its catalogue).
   const lang = isIndividual ? savedLang : (language === 'en' || language === 'da' ? language : 'da');
 
+  // Individuals bypass org_course_access entirely — visibility is PUBLISHED-ONLY here,
+  // so the language filter lives solely in the shared OR-group below (otherwise a
+  // language=$2 baked into the outer AND would absorb the OR-group via B AND (B OR D) ≡ B,
+  // silently dropping the enrolled-relaxation). Standard orgs keep the published + 'enabled'
+  // org_course_access predicate.
   const visibility = isIndividual
-    ? individualCourseVisibility({ courseAlias: 'c', langParam: 2 })   // published + $2 language
+    ? 'c.is_published = TRUE'                                          // published; org access bypassed
     : courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 });    // published + org access
 
-  // Query 1: Available published courses. Standard orgs use the shared visibility
-  // predicate (published + 'enabled' org_course_access); individuals (#354) bypass
-  // org access entirely — published + saved language. In both branches the language
-  // filter is relaxed (never the visibility/publish predicate) for courses the
-  // learner is already enrolled in, so a language switch never hides them.
+  // Query 1: Available published courses. In both branches the language filter is
+  // relaxed (never the visibility/publish predicate) for courses the learner is
+  // already enrolled in, so a language switch never hides them.
   const courses = await query(
     `SELECT c.id, c.title, c.description, c.level, c.language, c.is_published, c.thumbnail_url, c.category_id, c.created_by_user_id, c.created_at
        FROM courses c
