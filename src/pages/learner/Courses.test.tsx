@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k, i18n: { resolvedLanguage: 'da' } }),
+  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'da', resolvedLanguage: 'da' } }),
   Trans: ({ i18nKey }: { i18nKey: string }) => <>{i18nKey}</>,
 }));
 
@@ -37,6 +37,11 @@ vi.mock('@/hooks/useFavorites', () => ({
   useToggleFavorite: (...args: unknown[]) => mockUseToggleFavorite(...args),
 }));
 
+const mockUseCourseCategories = vi.fn();
+vi.mock('@/hooks/useCourseCategories', () => ({
+  useCourseCategories: (...args: unknown[]) => mockUseCourseCategories(...args),
+}));
+
 import LearnerCourses from './Courses';
 import { callApi } from '@/lib/api-client';
 
@@ -45,6 +50,9 @@ import { callApi } from '@/lib/api-client';
 // override them when they exercise the heart toggle.
 mockUseFavorites.mockReturnValue({ isFavorite: () => false, favoriteIds: new Set(), data: { courses: [] } });
 mockUseToggleFavorite.mockReturnValue({ toggleFavorite: vi.fn(), togglingId: null, isPending: false });
+// Default: no categories (so useCourseCategories fires no callApi — keeps the "only /api/learner-courses
+// was called" assertions valid). Tests exercising the category filter override this with rows.
+mockUseCourseCategories.mockReturnValue({ data: [] });
 
 const baseAuthState = {
   user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
@@ -164,13 +172,13 @@ describe('LearnerCourses — profile-gated loading guard', () => {
   });
 });
 
-describe('LearnerCourses — individual tier (neutral, org-name-free subtitle)', () => {
+describe('LearnerCourses — warm, org-name-free subtitle (#360)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(callApi).mockResolvedValue({ courses: [], enrollments: [], progress: {} });
   });
 
-  it('shows the neutral individual subtitle (never the org-name subtitle) for an individual org', async () => {
+  it('shows the single warm subtitle for an individual org (never an org name / the old individual key)', async () => {
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
       currentOrg: { id: 'org-solo', name: 'Individuals', kind: 'individual' },
@@ -178,12 +186,12 @@ describe('LearnerCourses — individual tier (neutral, org-name-free subtitle)',
 
     renderCourses();
 
-    expect(await screen.findByText('courses.subtitleIndividual')).toBeInTheDocument();
-    // The org-name-bearing subtitle must NOT render for a solo learner.
-    expect(screen.queryByText('courses.subtitle')).toBeNull();
+    expect(await screen.findByText('courses.subtitle')).toBeInTheDocument();
+    // The old individual-only variant is gone now that the subtitle carries no org name.
+    expect(screen.queryByText('courses.subtitleIndividual')).toBeNull();
   });
 
-  it('shows the org-name subtitle for a standard org', async () => {
+  it('shows the same warm subtitle for a standard org (no org name interpolated)', async () => {
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
       currentOrg: { id: 'org-1', name: 'Org One', kind: 'standard' },
@@ -363,6 +371,22 @@ describe('LearnerCourses — recommended section', () => {
     continueLinks.forEach((l) => expect(l).toHaveAttribute('href', '/app/learn/c-basic'));
     // The old "Enrolled" badge is gone with the enroll step (#357).
     expect(screen.queryByTestId('status-badge-enrolled')).toBeNull();
+  });
+
+  it('hides the recommended section (and its "All courses" heading) once a filter is active (#360)', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: 'basic' },
+    });
+
+    renderCourses();
+
+    expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
+    // Applying any filter switches to "browsing results" — the recommended strip + its heading hide.
+    fireEvent.change(screen.getByLabelText('courses.level'), { target: { value: 'advanced' } });
+    expect(screen.queryByTestId('recommended-section')).toBeNull();
+    expect(screen.queryByText('assessment.recommendations.allCourses')).toBeNull();
   });
 });
 
@@ -660,5 +684,121 @@ describe('LearnerCourses — favorite heart toggle (#358)', () => {
 
     const heart = await screen.findByRole('button', { name: 'courses.addToFavorites' });
     expect(heart).toBeDisabled();
+  });
+});
+
+describe('LearnerCourses — catalog refinements: category filter, view toggle, card → detail (#360)', () => {
+  const currentOrg = { id: 'org-1', name: 'Org One' };
+  const aiCourse = {
+    id: 'c-ai', title: 'AI Course', description: 'about ai', level: 'basic', category_id: 'cat-ai',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+  const dataCourse = {
+    id: 'c-data', title: 'Data Course', description: 'about data', level: 'basic', category_id: 'cat-data',
+    is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+    });
+    vi.mocked(callApi).mockResolvedValue({ courses: [aiCourse, dataCourse], enrollments: [], progress: {} });
+    mockUseCourseCategories.mockReturnValue({
+      data: [
+        { id: 'cat-ai', name_en: 'AI', name_da: 'AI', slug: 'ai', sort_order: 1, created_at: '' },
+        { id: 'cat-data', name_en: 'Data', name_da: 'Data', slug: 'data', sort_order: 2, created_at: '' },
+      ],
+    });
+  });
+
+  it('makes the whole card a link to the course detail page (Start still points at the player)', async () => {
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    const detailHrefs = screen.getAllByRole('link', { name: 'courses.readAbout' }).map((l) => l.getAttribute('href'));
+    expect(detailHrefs).toContain('/app/courses/c-ai');
+    expect(detailHrefs).toContain('/app/courses/c-data');
+
+    // The thumbnail Start action opens the player, not the detail page.
+    screen.getAllByRole('link', { name: /courses\.startCourse/ }).forEach((s) =>
+      expect(s.getAttribute('href')).toMatch(/^\/app\/learn\//));
+  });
+
+  it('filters the grid by the selected category', async () => {
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    fireEvent.change(screen.getByLabelText('courses.category'), { target: { value: 'cat-ai' } });
+
+    expect(screen.getByText('AI Course')).toBeInTheDocument();
+    expect(screen.queryByText('Data Course')).toBeNull();
+  });
+
+  it('only lists categories that have a course in the catalogue', async () => {
+    mockUseCourseCategories.mockReturnValue({
+      data: [
+        { id: 'cat-ai', name_en: 'AI', name_da: 'AI', slug: 'ai', sort_order: 1, created_at: '' },
+        { id: 'cat-empty', name_en: 'Empty', name_da: 'Tom', slug: 'empty', sort_order: 2, created_at: '' },
+      ],
+    });
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    const select = screen.getByLabelText('courses.category') as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toContain('cat-ai');        // has a course
+    expect(values).not.toContain('cat-empty');  // no course → omitted
+  });
+
+  it('defaults to card view and toggles to list, persisting the choice', async () => {
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
+    expect(screen.queryByTestId('catalog-list')).toBeNull();
+    expect(screen.getByLabelText('courses.viewAsCards')).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByLabelText('courses.viewAsList'));
+
+    expect(screen.getByTestId('catalog-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('catalog-grid')).toBeNull();
+    expect(window.localStorage.getItem('kursuskatalog-view')).toBe('list');
+  });
+
+  it('restores the persisted list view on mount', async () => {
+    window.localStorage.setItem('kursuskatalog-view', 'list');
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    expect(screen.getByTestId('catalog-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('catalog-grid')).toBeNull();
+  });
+
+  it('list rows expose the detail-overlay link, the Start→player link, and the favorite toggle', async () => {
+    window.localStorage.setItem('kursuskatalog-view', 'list');
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    expect(screen.getByTestId('catalog-list')).toBeInTheDocument();
+    const detailHrefs = screen.getAllByRole('link', { name: 'courses.readAbout' }).map((l) => l.getAttribute('href'));
+    expect(detailHrefs).toContain('/app/courses/c-ai');
+    screen.getAllByRole('link', { name: /courses\.startCourse/ }).forEach((s) =>
+      expect(s.getAttribute('href')).toMatch(/^\/app\/learn\//));
+    expect(screen.getAllByRole('button', { name: 'courses.addToFavorites' }).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows the "no match" empty state (not the org empty state) when a non-search filter yields nothing', async () => {
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    // Narrow status to "completed" with nothing completed → empty grid via a non-search filter.
+    fireEvent.change(screen.getByLabelText('courses.status'), { target: { value: 'completed' } });
+
+    expect(screen.getByText('courses.noCoursesMatch')).toBeInTheDocument();
+    expect(screen.queryByText('courses.noCoursesForOrg')).toBeNull();
   });
 });
