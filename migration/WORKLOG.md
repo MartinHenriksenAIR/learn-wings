@@ -2363,3 +2363,40 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (controller-run on the branch):** root `lint` 0 · `tsc` app+node 0 · `npm test` **940 / 124** · `build` 0; functions untouched. 13 new tests (session-expired handler incl. loop/storm/save-URL; api-client detection of both vectors + the 500/network negatives; Login notice shown/hidden). Whole-diff **Opus review — clean, no Critical/Important**; it verified against the real msal-browser v5 source that (a) there's no redirect loop and (b) `clearCache()` clears only MSAL-prefixed keys so the saved URL + notice survive; 5 Minor findings, 2 fixed (auth-path exclusions derived from `routes.auth`; documented the clearCache invariant), 3 declined/optional. **Near-miss caught:** the first `Login.test.tsx` write clobbered an existing 7-test file (a truncated `find` had hidden it) — recovered from HEAD, folded the 2 notice tests in, diff vs HEAD additions-only.
 
 **Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #393.
+
+---
+
+## 2026-08-10 — #370 follow-up: collapsed-rail icons showed an I-beam cursor / flickered (PR #395)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Same-day follow-up to #370 (PR #392) — martin reported the collapsed icon rail felt buggy: hovering an icon sometimes showed a text (I-beam) cursor instead of a pointer, with a flicker before a click landed. Branched off `origin/main` @`7e85335`, worktree-isolated.
+
+**Root cause (found via a real-browser hit-test probe, not guessed):** collapsed, the section labels (Learning/Community/Organization) were hidden only by the shadcn primitive's `opacity-0` + `-mt-8`. #370's `GROUP_LABEL_CLASSES` override sets `h-auto`, so `-mt-8` no longer cancels the label's height — the invisible label stayed in the layout AND (since `opacity:0` doesn't stop pointer events) in the hit-test layer, overlapping the icon buttons. `elementFromPoint` at several icon centres returned the group-label `<div>` (`cursor: auto` → I-beam over its text) instead of the icon's `<a>`; the overlap also swallowed clicks → the flicker / "eventually works".
+
+**Fix:** drop the labels from the rail entirely when collapsed — `group-data-[collapsible=icon]:hidden` (display:none) — removing them from both layout and hit-testing. One line on `GROUP_LABEL_CLASSES`.
+
+**Verify:** Playwright harness — before: 3/4 probed icon centres hit the group-label; after: all 11 collapsed controls (org selector, 9 nav icons, footer) hit their own link/button with `cursor:pointer`, labels `display:none`/height 0; expanded unchanged (labels `display:flex`, 25px). Gates: `tsc` app+node 0 · lint 0 errors · `npm test` **934 / 124** (+1 regression guard) · `build` 0.
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #395.
+
+---
+
+## 2026-08-10 — #368 "Allow Walk-in Members" toggle in Platform Settings (PR #391)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026) and the #368 platform-admin-config epic. Requirements grilled with martin first. Worktree-isolated; draft PR opened at pickup start; ran alongside martin's parallel #354/#372 sessions.
+
+**Context — #368 reshaped:** an audit found most of #368's 8 knobs already shipped (categories #361, self-reg override #356, tenant binding #353, per-org feature flags via `org_settings`) or descoped (branding → #372, notifications dropped). Genuine remainder: **data export** (deferred) and **audit log**. This slice is a coordination knob added for #354.
+
+**What:** a platform-admin **"Allow Walk-in Members"** toggle in Platform Settings → User Access, controlling the individual / self-serve ("walk-in") learner tier from #354 — deliberately **separate** from the existing "Allow self-registration" (company Entra auto-join) toggle. Two distinct policies.
+
+**How:**
+- Frontend toggle in `PlatformSettings.tsx` (default ON), keyed `allow_individual_registration` in the `user_access` blob; en/da i18n.
+- **Persistence contract** (the write path rejects unknown fields, so a toggle alone can't save): `allow_individual_registration: isBoolean` in `platform-settings-update` `FIELD_SHAPES.user_access` + the `02-seed.sql` fresh-DB default (ON).
+- **Verified against #354's pushed code:** #354's `individualTierEnabled()` (`tenant-binding.ts`, read from `user-context`) reads the **same** key and returns `?? true`, so the existing prod `user_access` row lacking the key until first save is harmless (defaults ON) — no data migration needed. #354 owns that gate; untouched here.
+
+**Coordination:** heads-up on #388 (don't duplicate the validator/seed lines — #354 didn't). Merge order agreed with martin: this toggle first (off-switch in place before the tier goes live), then #354.
+
+**Reviews:** `/code-review` (Opus, high) — 3 findings: (1) a **pre-existing** Features-panel save bug (validator omits `exercises_enabled` → 400) filed separately as **#394** (not fixed here, per the review policy); (2) prod row not seeded — resolved (gate `?? true`); (3) copy-paste toggle rows — declined with reasoning (follows the panel's local pattern; the panel isn't uniformly toggle-based).
+
+**Verify (controller-run on the branch, after a clean trunk merge of #370/#389/#390):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **948 / 125** · `build` 0; functions `build` 0 · `npm test` **2747 / 158**. New tests: backend accept + type-reject of the new field; frontend default-on + distinct-from-self-reg + persisted-on-save.
+
+**Deploy:** functions changed (the validator) → backend auto-ships on merge. **#368 stays OPEN** (tracking epic — data export + audit log remain). Deploy + smoke announced on PR #391.

@@ -161,6 +161,7 @@ describe('platform-settings-update', () => {
       default_role: 'learner',
       require_email_verification: true,
       allow_self_registration: false,
+      allow_individual_registration: true,
     };
     mockQueryOne.mockResolvedValueOnce({ key: 'user_access', value: fullUserAccess });
 
@@ -169,6 +170,49 @@ describe('platform-settings-update', () => {
     expect(res.status).toBe(200);
     const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(params[1]).toBe(JSON.stringify(fullUserAccess));
+  });
+
+  it('accepts the allow_individual_registration toggle (#354 walk-in tier)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQueryOne.mockResolvedValueOnce({ key: 'user_access', value: { allow_individual_registration: false } });
+
+    const res = await handler(baseReq({ key: 'user_access', value: { allow_individual_registration: false } }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params[1]).toBe(JSON.stringify({ allow_individual_registration: false }));
+  });
+
+  it('rejects a non-boolean allow_individual_registration', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+
+    const res = await handler(baseReq({ key: 'user_access', value: { allow_individual_registration: 'yes' } }), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "allow_individual_registration"/);
+  });
+
+  // The Features panel saves the WHOLE object (PlatformSettings.tsx `saveSetting('features', features)`),
+  // so FIELD_SHAPES.features must cover every key in that file's `featureKeys` — a field added there and
+  // in the seed but not here 400s the entire panel (#394, missed because the full-body test above only
+  // covered user_access). Keep this list in sync with `featureKeys`.
+  it('a full features body passes validation and merges all fields', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    const fullFeatures = {
+      certificates_enabled: true,
+      quizzes_enabled: true,
+      analytics_enabled: true,
+      community_enabled: true,
+      course_reviews_enabled: false,
+      exercises_enabled: false,
+    };
+    mockQueryOne.mockResolvedValueOnce({ key: 'features', value: fullFeatures });
+
+    const res = await handler(baseReq({ key: 'features', value: fullFeatures }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params[1]).toBe(JSON.stringify(fullFeatures));
   });
 
   it('returns 404 when the setting key does not exist in the DB', async () => {
