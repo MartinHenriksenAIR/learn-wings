@@ -164,7 +164,11 @@ function rankWindow(
  * Runs the derived queries in parallel; the query order below is the contract
  * the endpoint test asserts against.
  */
-export async function getLearnerDashboardData(orgId: string, callerId: string): Promise<LearnerDashboardData> {
+export async function getLearnerDashboardData(
+  orgId: string,
+  callerId: string,
+  opts?: { suppressLeaderboard?: boolean },
+): Promise<LearnerDashboardData> {
   const [snapshotRows, lessonRows, quizRows, courseRows, memberRows, streakRows] = await Promise.all([
     // 1 · snapshot — course counts for the caller (deep-link cards → Min Træning)
     query<{ started: number; in_progress: number; completed: number }>(
@@ -207,13 +211,18 @@ export async function getLearnerDashboardData(orgId: string, callerId: string): 
     ),
     // 5 · leaderboard membership — active LEARNERS only, from org_memberships
     //     (never a client-supplied list). Admins are excluded from the board.
-    query<MemberRow>(
-      `SELECT m.user_id, p.first_name, p.last_name, p.full_name
-         FROM org_memberships m
-         JOIN profiles p ON p.id = m.user_id
-        WHERE m.org_id = $1 AND m.status = 'active' AND m.role = 'learner'`,
-      [orgId],
-    ),
+    //     Suppressed for the individual (self-serve) tier: the placeholder org
+    //     pools unrelated solo learners, so the query is not run at all and no
+    //     stranger names/XP ever cross the wire (#354/#373).
+    opts?.suppressLeaderboard
+      ? Promise.resolve([] as MemberRow[])
+      : query<MemberRow>(
+          `SELECT m.user_id, p.first_name, p.last_name, p.full_name
+             FROM org_memberships m
+             JOIN profiles p ON p.id = m.user_id
+            WHERE m.org_id = $1 AND m.status = 'active' AND m.role = 'learner'`,
+          [orgId],
+        ),
     // 6 · global personal streak — distinct Copenhagen activity-days for the
     //     caller across ALL orgs (a streak is a personal habit; self-data only).
     query<{ today: string; days: string[] | null }>(
@@ -259,9 +268,8 @@ export async function getLearnerDashboardData(orgId: string, callerId: string): 
     xp: { allTime: xpAllTime, month: xpMonth },
     level: levelProgress(xpAllTime),
     streak: computeStreak(streakRow?.today ?? '', streakRow?.days ?? []),
-    leaderboard: {
-      allTime: rankWindow(learnersAllTime, callerId),
-      month: rankWindow(learnersMonth, callerId),
-    },
+    leaderboard: opts?.suppressLeaderboard
+      ? { allTime: { rows: [], me: null }, month: { rows: [], me: null } }
+      : { allTime: rankWindow(learnersAllTime, callerId), month: rankWindow(learnersMonth, callerId) },
   };
 }
