@@ -101,6 +101,26 @@ export interface CourseCategory {
   created_at: string;
 }
 
+/** One row of the course-detail module outline (#403) — title + lesson count, no lesson bodies. */
+export interface CourseDetailModule {
+  id: string;
+  title: string;
+  sort_order: number;
+  lesson_count: number;
+}
+
+/**
+ * Response of `/api/learner-course-detail` (#403) — the read-only "read about a
+ * course" payload. `course` is a subset of {@link Course} (the fields the detail
+ * page needs); `enrollment` is the caller's own status for the state-aware CTA,
+ * null when the course is not started.
+ */
+export interface LearnerCourseDetail {
+  course: Pick<Course, 'id' | 'title' | 'description' | 'level' | 'language' | 'thumbnail_url' | 'category_id'>;
+  modules: CourseDetailModule[];
+  enrollment: { status: EnrollmentStatus } | null;
+}
+
 export interface CourseModule {
   id: string;
   course_id: string;

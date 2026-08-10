@@ -75,6 +75,7 @@ import './invitation-bulk-create/index';
 import './invitation-update/index';
 import './invitations/index';
 import './learner-assignments/index';
+import './learner-course-detail/index';
 import './learner-courses/index';
 import './learner-dashboard/index';
 import './learner-training/index';
