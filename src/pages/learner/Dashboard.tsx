@@ -134,7 +134,9 @@ export default function LearnerDashboard() {
 
       {!isIndividual && <Leaderboard leaderboard={leaderboard} />}
 
-      {communityGate === 'allowed' && <DashboardCommunitySection orgId={currentOrg.id} />}
+      {communityGate === 'allowed' && (
+        <DashboardCommunitySection orgId={isIndividual ? undefined : currentOrg.id} />
+      )}
     </AppLayout>
   );
 }

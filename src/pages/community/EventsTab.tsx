@@ -25,8 +25,12 @@ export function EventsTab({ canCreateEvent = false, onNewEvent }: EventsTabProps
   const { t } = useTranslation();
   const { currentOrg } = useAuth();
 
+  // #354: the hidden Individuals placeholder is not a real org, so its org
+  // events are skipped — the hook disables the 'org' query on a missing id.
+  const orgIdForEvents = currentOrg?.kind === 'individual' ? undefined : currentOrg?.id;
+
   const globalQuery = useCommunityEvents('global', currentOrg?.id);
-  const orgQuery = useCommunityEvents('org', currentOrg?.id);
+  const orgQuery = useCommunityEvents('org', orgIdForEvents);
 
   const isLoading = globalQuery.isLoading || orgQuery.isLoading;
 
