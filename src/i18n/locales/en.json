@@ -269,7 +269,15 @@
     "reviewCourse": "Review course",
     "openCourse": "Open course",
     "addToFavorites": "Add to favorites",
-    "removeFromFavorites": "Remove from favorites"
+    "removeFromFavorites": "Remove from favorites",
+    "detail": {
+      "contents": "Contents",
+      "lessonCount_one": "{{count}} lesson",
+      "lessonCount_other": "{{count}} lessons",
+      "notAvailable": "This course isn't available",
+      "notAvailableDescription": "The course doesn't exist, or you don't have access to it.",
+      "backToCatalog": "Back to Course Catalog"
+    }
   },
   "tipsAndTricks": {
     "title": "Tips & Tricks",

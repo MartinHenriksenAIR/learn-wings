@@ -232,6 +232,12 @@ export const queryKeys = {
     list: (orgId: string | undefined) => ['learner-courses', orgId] as const,
   },
 
+  learnerCourseDetail: {
+    /** Read-only "read about a course" data (#403). Detail-only — nothing invalidates by prefix. */
+    detail: (orgId: string | undefined, courseId: string | undefined) =>
+      ['learner-course-detail', orgId, courseId] as const,
+  },
+
   learnerDashboard: {
     detail: (orgId: string | undefined) => ['learner-dashboard', orgId] as const,
   },

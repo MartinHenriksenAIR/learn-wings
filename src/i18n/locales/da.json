@@ -269,7 +269,15 @@
     "reviewCourse": "Gennemse kursus",
     "openCourse": "Åbn kursus",
     "addToFavorites": "Tilføj til favoritter",
-    "removeFromFavorites": "Fjern fra favoritter"
+    "removeFromFavorites": "Fjern fra favoritter",
+    "detail": {
+      "contents": "Indhold",
+      "lessonCount_one": "{{count}} lektion",
+      "lessonCount_other": "{{count}} lektioner",
+      "notAvailable": "Kurset er ikke tilgængeligt",
+      "notAvailableDescription": "Kurset findes ikke, eller du har ikke adgang til det.",
+      "backToCatalog": "Tilbage til Kursuskatalog"
+    }
   },
   "tipsAndTricks": {
     "title": "Tips & Tricks",
