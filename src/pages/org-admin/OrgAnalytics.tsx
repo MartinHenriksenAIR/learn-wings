@@ -5,10 +5,6 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { QueryErrorState } from '@/components/ui/query-error-state';
 import { SlidingTabs } from '@/components/ui/sliding-tabs';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FileUpload } from '@/components/ui/file-upload';
 import {
   Select,
   SelectContent,
@@ -20,10 +16,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { useOrgAnalyticsData } from '@/hooks/useOrgAnalyticsData';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { callApi, callApiRaw } from '@/lib/api-client';
-import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
+import { callApiRaw } from '@/lib/api-client';
 import { routes } from '@/lib/routes';
-import { Users, BarChart3, BookOpen, Building2, Pencil, GraduationCap } from 'lucide-react';
+import { Users, BarChart3, BookOpen, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnalyticsOverview } from '@/components/org-admin/analytics/AnalyticsOverview';
 import { TeamPerformanceTab, type UserStats } from '@/components/org-admin/analytics/TeamPerformanceTab';
@@ -43,14 +38,11 @@ export default function OrgAnalytics() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isGlobalView = location.pathname === routes.platformAdmin.analytics;
-  const { currentOrg, isPlatformAdmin, refreshUserContext } = useAuth();
-  const { data: orgLogoSrc } = useSignedBrandingUrl(currentOrg?.logo_url);
+  const { currentOrg, isPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
   const [generatingReport, setGeneratingReport] = useState(false);
-  const [logoDialogOpen, setLogoDialogOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -169,27 +161,6 @@ export default function OrgAnalytics() {
     }
   };
 
-  const handleLogoUpload = async (_url: string | null, storagePath: string | null) => {
-    if (!currentOrg || !storagePath) return;
-
-    setUploading(true);
-    try {
-      await callApi('/api/organization-update', {
-        orgId: currentOrg.id,
-        updates: { logo_url: storagePath },
-      });
-
-      toast.success('Logo updated successfully');
-      setLogoDialogOpen(false);
-      await refreshUserContext();
-    } catch (error: any) {
-      console.error('Error updating logo:', error);
-      toast.error(error.message || 'Failed to update logo');
-    } finally {
-      setUploading(false);
-    }
-  };
-
   if (!settingsLoading && !features.analytics_enabled) {
     return <Navigate to={routes.learner.dashboard} replace />;
   }
@@ -270,68 +241,6 @@ export default function OrgAnalytics() {
           </Select>
         )}
       </div>
-
-      {!isGlobalView && currentOrg && (
-        <Card className="mb-6">
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="relative group shrink-0">
-              {orgLogoSrc ? (
-                <img
-                  src={orgLogoSrc}
-                  alt={`${currentOrg.name} logo`}
-                  className="h-16 w-16 rounded-xl object-contain bg-muted"
-                />
-              ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
-                  <Building2 className="h-8 w-8 text-primary" />
-                </div>
-              )}
-              <Dialog open={logoDialogOpen} onOpenChange={setLogoDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                </DialogTrigger>
-                {/* Explicit opt-out silences Radix's missing-Description a11y warning */}
-                <DialogContent aria-describedby={undefined}>
-                  <DialogHeader>
-                    <DialogTitle>{t('orgDetail.updateLogoTitle')}</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted">
-                          <Building2 className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium">{t('orgDetail.logoRecommended')}</p>
-                          <p className="text-xs text-muted-foreground">{t('orgDetail.logoSize')}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <FileUpload
-                      assetType="org-logo"
-                      folder={currentOrg.id}
-                      accept="image"
-                      maxSizeMB={2}
-                      onChange={handleLogoUpload}
-                      disabled={uploading}
-                    />
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div>
-              <h2 className="font-display text-xl font-bold">{currentOrg.name}</h2>
-              <p className="text-sm text-muted-foreground">Organization ID: {currentOrg.slug}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <SlidingTabs tabs={tabs} active={activeTab} onChange={handleTabChange} className="mb-6" />
 

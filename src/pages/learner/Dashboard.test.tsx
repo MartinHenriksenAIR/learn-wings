@@ -57,6 +57,7 @@ const dashData = (over: Partial<LearnerDashboardData> = {}): LearnerDashboardDat
   xp: { allTime: 75, month: 45 },
   level: { level: 1, xp: 75, xpIntoLevel: 75, xpForLevel: 200, xpToNext: 125, nextThreshold: 200, progressPct: 38 },
   streak: { current: 3, activeToday: true },
+  showLeaderboard: true,
   leaderboard: {
     allTime: {
       rows: [
@@ -169,8 +170,10 @@ describe('LearnerDashboard — motivation hub', () => {
     expect(within(board).getByText('45 XP')).toBeInTheDocument();
   });
 
-  it('hides the leaderboard for an individual-tier learner (org-scoped, meaningless solo)', async () => {
-    await mockData(dashData());
+  it('hides the leaderboard for an individual-tier learner (server sets showLeaderboard=false)', async () => {
+    // The individual placeholder org suppresses the board server-side (#354),
+    // surfaced to the client as showLeaderboard=false.
+    await mockData(dashData({ showLeaderboard: false }));
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
       memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
@@ -178,6 +181,16 @@ describe('LearnerDashboard — motivation hub', () => {
     });
     renderDashboard();
     // The hub still renders (snapshot present) but the org leaderboard is suppressed.
+    await screen.findByTestId('dashboard-snapshot');
+    expect(screen.queryByTestId('dashboard-leaderboard')).toBeNull();
+  });
+
+  it('hides the leaderboard when the org opted out (#369: showLeaderboard=false in a standard org)', async () => {
+    // A normal org that turned "Show leaderboard" off — the widget must be hidden,
+    // not rendered with an empty "be the first" state.
+    await mockData(dashData({ showLeaderboard: false }));
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+    renderDashboard();
     await screen.findByTestId('dashboard-snapshot');
     expect(screen.queryByTestId('dashboard-leaderboard')).toBeNull();
   });

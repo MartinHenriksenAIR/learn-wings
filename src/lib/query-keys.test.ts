@@ -121,6 +121,10 @@ describe('queryKeys', () => {
     expect(queryKeys.platformSettings.all).toEqual(['platform-settings']);
   });
 
+  it('orgSettings.detail returns the parameterized key', () => {
+    expect(queryKeys.orgSettings.detail('org-1')).toEqual(['org-settings', 'org-1']);
+  });
+
   it('profiles.all returns the root key (prefix for invalidation)', () => {
     expect(queryKeys.profiles.all).toEqual(['profiles']);
   });

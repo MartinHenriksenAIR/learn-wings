@@ -38,6 +38,9 @@ export interface LearnerDashboardData {
   level: DashboardLevel;
   streak: { current: number; activeToday: boolean };
   leaderboard: { allTime: LeaderboardWindow; month: LeaderboardWindow };
+  // False when the leaderboard is suppressed server-side (individual tier #354,
+  // or a per-org opt-out #369) — hide the widget rather than show an empty board.
+  showLeaderboard: boolean;
 }
 
 /**
