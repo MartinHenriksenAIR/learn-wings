@@ -744,7 +744,6 @@
     "noOrgDescription": "Vælg en organisation for at administrere dens indstillinger.",
     "combinedNote": "Funktionsadgang kombineres som: platformflag OG organisationstilsidesættelse.",
     "featureOverrides": "Funktionstilsidesættelser",
-    "orgFeaturesHeading": "Organisation",
     "platformDefault": "Platformstandard: {{state}}",
     "enabled": "Aktiveret",
     "disabled": "Deaktiveret",

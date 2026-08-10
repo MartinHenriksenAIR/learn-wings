@@ -744,7 +744,6 @@
     "noOrgDescription": "Select an organization to manage its settings.",
     "combinedNote": "Feature access is combined as: platform flag AND organization override.",
     "featureOverrides": "Feature overrides",
-    "orgFeaturesHeading": "Organization",
     "platformDefault": "Platform default: {{state}}",
     "enabled": "Enabled",
     "disabled": "Disabled",

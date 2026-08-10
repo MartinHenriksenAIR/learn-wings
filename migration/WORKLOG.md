@@ -2516,3 +2516,15 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Reviews/verify:** independent Opus code review — one Important finding (the leaderboard opt-out suppressed the data but the learner Dashboard still rendered an empty board) fixed with the `showLeaderboard` flag, plus a Minor `Promise.all`. **No schema/DDL change** (leaderboard rides in the existing `org_settings.features` jsonb). After a clean trunk merge of #403: frontend lint 0 / tsc app+node 0 / test **971** / build; functions build / test **2795** (3 skip).
 
 **Deploy:** functions + frontend changed (no schema) → auto-ships on merge (functions workflow + SWA). Deploy announced on PR #401.
+
+---
+
+## 2026-08-10 — #369 follow-up: leaderboard toggle in the feature-overrides card (PR #406)
+
+**Who:** claude (Opus 4.8, 1M) with martin, same worktree, right after #369 merged. Martin reviewed the shipped Funktioner tab (via a Playwright/Vite harness screenshot) and didn't want the leaderboard in its own card.
+
+**What:** moved the org-only **Show leaderboard** switch out of its separate "Organisation" card into the same **Funktioner** card as the five platform-overridable feature flags — as the last row, keeping its own descriptive hint (no "Platform default" line, since it has no platform gate). Removed the now-unused `orgFeaturesHeading` i18n key (en + da). Behavior unchanged (same switch, same `features.leaderboard_enabled` persistence).
+
+**Verify:** frontend-only, no schema/functions change. After a clean trunk merge of #360: lint 0 / tsc app+node 0 / test **979** / build. The existing OrgSettings test ("Features tab shows 6 switches" + leaderboard-by-name) passes unmodified.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Deploy announced on PR #406.
