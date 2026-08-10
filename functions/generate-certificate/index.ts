@@ -212,12 +212,15 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const [profile, course, org] = await Promise.all([
       queryOne<{ full_name: string }>('SELECT full_name FROM profiles WHERE entra_oid = $1', [user.id]),
       queryOne<{ title: string }>('SELECT title FROM courses WHERE id = $1', [enrollment.course_id]),
+      // Issuer = the org that OWNS this enrollment, not "any active membership":
+      // a solo course prints the placeholder org's name ("AI Uddannelse") with no
+      // special-casing, a company course prints the company, and the pre-existing
+      // multi-org wrong-issuer bug is fixed. (#354)
       queryOne<{ name: string }>(
         `SELECT o.name FROM organizations o
-         JOIN org_memberships om ON om.org_id = o.id
-         JOIN profiles p ON p.id = om.user_id
-         WHERE p.entra_oid = $1 AND om.status = 'active' LIMIT 1`,
-        [user.id]
+           JOIN enrollments e ON e.org_id = o.id
+          WHERE e.id = $1`,
+        [enrollmentId],
       ),
     ]);
 
