@@ -19,6 +19,9 @@ import { BookOpen, Clock, Award, TrendingUp, Sparkles } from 'lucide-react';
 export default function LearnerDashboard() {
   const { currentOrg, profile, memberships, isPlatformAdmin, isOrgAdmin } = useAuth();
   const orgGuard = useOrgGuard();
+  // Solo learners run against a hidden placeholder org; the leaderboard is org-scoped
+  // and meaningless for them, so it's suppressed for the individual tier.
+  const isIndividual = currentOrg?.kind === 'individual';
   const communityGate = useCommunityGate();
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -36,14 +39,17 @@ export default function LearnerDashboard() {
   }
 
   if (!currentOrg) {
-    const isNoMembership = memberships.length === 0;
+    // A non-admin with no membership is a blocked walk-in — registration is
+    // invitation-only. Platform admins (and anyone with memberships but no selection)
+    // keep the generic no-org-selected copy.
+    const showInvitationOnly = memberships.length === 0 && !isPlatformAdmin;
     return (
       <AppLayout title={t('dashboard.title')}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<BookOpen className="h-6 w-6" />}
-            title={isNoMembership ? t('dashboard.noMembershipTitle') : t('common.noOrgSelected')}
-            description={isNoMembership ? t('dashboard.noMembershipDescription') : t('common.joinOrgToContinue')}
+            title={showInvitationOnly ? t('dashboard.invitationOnlyTitle') : t('common.noOrgSelected')}
+            description={showInvitationOnly ? t('dashboard.invitationOnlyDescription') : t('common.joinOrgToContinue')}
           />
         </div>
       </AppLayout>
@@ -126,7 +132,7 @@ export default function LearnerDashboard() {
 
       <GamificationSummary xp={xp} level={level} streak={streak} />
 
-      <Leaderboard leaderboard={leaderboard} />
+      {!isIndividual && <Leaderboard leaderboard={leaderboard} />}
 
       {communityGate === 'allowed' && <DashboardCommunitySection orgId={currentOrg.id} />}
     </AppLayout>
