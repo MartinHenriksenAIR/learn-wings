@@ -2325,3 +2325,22 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **927 / 123** · `build` 0. Real-component Playwright harness re-checked all 5 states — org logo + name (truncation intact), initials monogram, collapsed marks, platform fallback — no wordmark. `/code-review` (Opus, whole-diff) — 3 minor findings, **1 accepted** (label the collapsed org mark for the #370 icon-rail a11y path), **2 declined** with reasoning on the PR (reuse `BrandingAvatar` — its `getAvatarColor` default fights the intended `bg-primary`, and the sidebar-footer avatar hand-rolls the same idiom; `getInitials` "U" fallback — unreachable, `organizations.name` is NOT NULL).
 
 **Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #390.
+
+---
+
+## 2026-08-10 — #370 Collapsible sidebar (collapse to icon rail) (PR #392)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026). Requirements grilled with martin first (4 decisions). Worktree-isolated off `origin/main` @`7ff44ad` (the #390 co-brand fix); draft PR opened at pickup start. Blocked-by #363 (restructured sidebar) — already merged, so unblocked. Ran alongside martin's parallel #354 / #368 / #360 sessions — none collide (#360 is the course catalog; this is sidebar/layout).
+
+**What:** the left sidebar now collapses to an **icon-only rail** (shadcn `collapsible="icon"`) instead of hiding offcanvas, toggled by the existing top-bar `SidebarTrigger`, with tooltips on the collapsed items and the collapsed/expanded choice **persisted**.
+
+**How:**
+- `AppSidebar`'s `<Sidebar>` flipped from the shadcn default `offcanvas` → `collapsible="icon"`. The nav-item tooltips, brand mark (`SidebarBrand`), footer profile button and top-bar trigger were already collapse-aware (groundwork from #363/#372) — this wired the flag and fixed the collapsed-state gaps that groundwork left: tightened header/content/footer padding + re-squared the custom nav pills (`group-data-[collapsible=icon]` overrides with `!`) so everything centres cleanly in the 48px rail.
+- `OrgSelector` (platform-admin org switcher, only shown when impersonating an org) made collapse-aware: a 32px square trigger that **still opens** the full switcher, org name → tooltip + `aria-label` (built-in chevron dropped via `[&>svg]:hidden`).
+- **Persistence bug found + fixed during the visual check** — shadcn's `SidebarProvider` *writes* the `sidebar:state` cookie but never *reads* it (it's built for a Next.js server to feed `defaultOpen`); since every page mounts its own `AppLayout`, the provider remounts per navigation and the rail snapped back to expanded on the first nav, failing the "persists across navigation" acceptance criterion. Fixed by rehydrating from the cookie in the `useState` initializer (a controlled `open` prop still wins). This is the one `ui/sidebar.tsx` touch the plan hoped to avoid (collision set #355/#371) — kept minimal + additive.
+
+**Decisions (martin, grilled):** (1) **surgical** scope — flip + fix the four collapsed gaps, no redesign; (2) OrgSelector collapsed = **icon-only trigger that still opens** (not hidden); (3) toggle = **existing top-bar button only** (no edge rail / in-sidebar trigger); (4) **expanded** on first visit.
+
+**Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **933 / 124** · `build` 0. New tests: `OrgSelector.test.tsx` (+2 — collapsed icon trigger vs expanded) and `ui/sidebar.test.tsx` (+4 — cookie rehydration incl. controlled-prop precedence). **Visual:** real `AppSidebar`/`OrgSelector`/`SidebarBrand`/`AppLayout` rendered in a throwaway Vite+Playwright harness (Entra-gated hooks faked, real Tailwind pipeline) across learner / org-admin / platform-impersonate / platform, expanded + collapsed — confirmed the rail centring, the collapsed OrgSelector opening its dropdown + showing its tooltip, and the persistence fix (seeded cookie → mounts collapsed).
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #392.
