@@ -1,6 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import i18n from '@/i18n';
 import {
   Sidebar,
   SidebarContent,
@@ -46,10 +45,9 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
+import { SidebarBrand } from '@/components/layout/SidebarBrand';
 import { getInitials } from '@/lib/utils';
 import { routes } from '@/lib/routes';
-import logoLightDa from '@/assets/logo-light.png';
-import logoLightEn from '@/assets/logo-light-en.png';
 
 // Pill nav item: navy bg + white text when active, muted slate otherwise.
 // data-[active=true]:font-semibold looks redundant next to the base font-semibold, but it is
@@ -191,15 +189,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="px-5 pb-4 pt-[22px]">
         <div className="flex items-center justify-start">
-          {collapsed ? (
-            <GraduationCap className="h-6 w-6 text-sidebar-primary" />
-          ) : (
-            <img
-              src={i18n.language === 'da' ? logoLightDa : logoLightEn}
-              alt={i18n.language === 'da' ? 'AI Uddannelse' : 'AI Education'}
-              className="block h-10 w-auto max-w-full object-contain"
-            />
-          )}
+          <SidebarBrand />
         </div>
       </SidebarHeader>
 
