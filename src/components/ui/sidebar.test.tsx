@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-import { SidebarProvider, useSidebar } from './sidebar';
+import { Sidebar, SidebarProvider, useSidebar } from './sidebar';
 
 function StateProbe() {
   const { state } = useSidebar();
@@ -46,5 +46,26 @@ describe('SidebarProvider cookie persistence (#370)', () => {
     document.cookie = 'sidebar:state=false; path=/';
     renderProvider({ open: true });
     expect(screen.getByTestId('state')).toHaveTextContent('expanded');
+  });
+});
+
+// The panel width animates over 200ms while the content swaps to its target layout
+// in a single frame — so mid-animation the (wider) expanded content is briefly painted
+// into the still-narrow rail and spills out ("warped/oversized" flash, #396). The fix is
+// overflow-hidden on the panel, masking the overflow into a clean reveal. jsdom applies no
+// layout, so this pins the class as a regression guard (e.g. against a shadcn re-sync
+// silently dropping it) rather than asserting the visual behaviour.
+describe('Sidebar panel clips overflow during the width animation (#396)', () => {
+  it('keeps overflow-hidden on the panel box', () => {
+    const { container } = render(
+      <SidebarProvider>
+        <Sidebar collapsible="icon">
+          <div>content</div>
+        </Sidebar>
+      </SidebarProvider>,
+    );
+    const panel = container.querySelector('[data-sidebar="sidebar"]');
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass('overflow-hidden');
   });
 });
