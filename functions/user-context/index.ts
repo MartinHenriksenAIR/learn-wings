@@ -4,7 +4,8 @@ import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne, withTransaction } from '../shared/db';
 import { convertInvitation } from '../shared/invitation-convert';
 import type { ConvertibleInvitation, ConvertResult } from '../shared/invitation-convert';
-import { seedTenantBinding, autoJoinByTenant } from '../shared/tenant-binding';
+import { seedTenantBinding, autoJoinByTenant, individualTierEnabled } from '../shared/tenant-binding';
+import { INDIVIDUAL_ORG_KIND } from '../shared/individual-tier';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 
@@ -88,6 +89,45 @@ function resolveProvisioningLanguage(raw: unknown): string {
     : 'en';
 }
 
+/**
+ * Final fallback (#354): a caller with NO active membership — no invite adopted,
+ * no tenant match — is joined to the hidden Individuals placeholder as a learner,
+ * so they get the self-serve tier instead of a dead-end. Runs LAST, after
+ * adoptPendingInvites + autoJoinByTenant. Best-effort and idempotent.
+ *
+ * No-op unless ALL hold: the tier switch is on; the caller has zero active
+ * memberships; and the placeholder row exists (kind='individual'). We never
+ * create the org from here (Task 15 seeds it) — a missing placeholder degrades
+ * to "the caller stays org-less", which the frontend renders as "registration
+ * unavailable / invitation only", never a crash.
+ */
+async function ensureIndividualMembership(profileId: string, context: InvocationContext): Promise<void> {
+  try {
+    if (!(await individualTierEnabled())) return;
+
+    const active = await query(
+      `SELECT 1 FROM org_memberships WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      [profileId],
+    );
+    if (active.length > 0) return; // already belongs somewhere — leave untouched
+
+    const placeholder = await queryOne<{ id: string }>(
+      `SELECT id FROM organizations WHERE kind = $1 LIMIT 1`,
+      [INDIVIDUAL_ORG_KIND],
+    );
+    if (!placeholder) return; // not seeded yet — graceful fallback
+
+    await query(
+      `INSERT INTO org_memberships (org_id, user_id, role, status)
+       VALUES ($1, $2, 'learner', 'active')
+       ON CONFLICT (org_id, user_id) DO NOTHING`,
+      [placeholder.id, profileId],
+    );
+  } catch (err) {
+    context.error('user-context: individual-tier auto-join failed', err);
+  }
+}
+
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
@@ -138,6 +178,10 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     // AFTER adoption so a first-admin login (who just got an org_admin
     // membership above) is skipped as an existing member, never double-joined.
     await autoJoinByTenant(profile!.id, user.tid, context);
+
+    // #354: last-resort — join true walk-ins to the Individuals tier so they are
+    // never an org-less dead-end. Runs AFTER the two org paths above.
+    await ensureIndividualMembership(profile!.id, context);
 
     const memberships = await query(
       `SELECT om.*, row_to_json(o.*) AS organization
