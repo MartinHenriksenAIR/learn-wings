@@ -247,7 +247,7 @@ export default function LearnerCourses() {
     return (
       <div
         key={course.id}
-        className="hover-lift-lg group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+        className="hover-lift-lg relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
       >
         {detailOverlay(course)}
 
@@ -263,7 +263,7 @@ export default function LearnerCourses() {
           {showChip && (
             <span
               data-testid="recommended-chip"
-              className="absolute right-3 top-3 z-20 inline-flex items-center rounded-[7px] bg-primary px-[11px] py-[5px] text-[11px] font-bold text-primary-foreground"
+              className="absolute right-3 top-3 inline-flex items-center rounded-[7px] bg-primary px-[11px] py-[5px] text-[11px] font-bold text-primary-foreground"
             >
               {t('assessment.recommendations.chip')}
             </span>
@@ -271,7 +271,7 @@ export default function LearnerCourses() {
           {isCompleted && (
             <span
               data-testid="status-badge-completed"
-              className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 z-20 inline-flex items-center gap-[5px] rounded-[7px] bg-success px-[11px] py-[5px] text-[11px] font-bold text-success-foreground`}
+              className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 inline-flex items-center gap-[5px] rounded-[7px] bg-success px-[11px] py-[5px] text-[11px] font-bold text-success-foreground`}
             >
               <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
               {t('dashboard.completed')}
@@ -312,7 +312,7 @@ export default function LearnerCourses() {
     return (
       <div
         key={course.id}
-        className="hover-lift-lg group relative flex items-center gap-4 rounded-xl border border-border bg-card p-3"
+        className="hover-lift-lg relative flex items-center gap-4 rounded-xl border border-border bg-card p-3"
       >
         {detailOverlay(course)}
 
@@ -321,7 +321,7 @@ export default function LearnerCourses() {
             <img src={course.thumbnail_url} alt={course.title} className="absolute inset-0 h-full w-full object-cover" />
           )}
           {isCompleted && (
-            <span className="absolute left-1.5 top-1.5 z-20 inline-flex items-center rounded-[6px] bg-success p-1 text-success-foreground">
+            <span className="absolute left-1.5 top-1.5 inline-flex items-center rounded-[6px] bg-success p-1 text-success-foreground">
               <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
             </span>
           )}
@@ -450,9 +450,11 @@ export default function LearnerCourses() {
         </div>
       </div>
 
-      {/* Recommended section — only shown when the learner has a known assessment level.
-          Always cards (a highlighted strip), independent of the list/card toggle. */}
-      {profile?.assessment_level != null && recommendedCourses.length > 0 && (
+      {/* Recommended section — a highlighted "For you" strip (always cards, independent of the
+          list/card toggle) shown only when the learner has a known assessment level AND is NOT
+          actively filtering: once you filter/search you're browsing results, so a level-matched
+          strip that ignores the filters (and can sit above a "no matches" empty state) is hidden. */}
+      {!hasActiveFilters && profile?.assessment_level != null && recommendedCourses.length > 0 && (
         <div className="mb-8" data-testid="recommended-section">
           <div className="mb-3.5 flex flex-wrap items-center gap-2">
             <h2 className="font-display text-[17px] font-bold">{t('assessment.recommendations.forYou')}</h2>
@@ -464,8 +466,9 @@ export default function LearnerCourses() {
         </div>
       )}
 
-      {/* All courses heading — shown when a recommended section is also visible */}
-      {recommendedCourses.length > 0 && (
+      {/* All courses heading — the separator under the recommended strip; shown only when that
+          strip is (i.e. no active filters + a recommended match). */}
+      {!hasActiveFilters && recommendedCourses.length > 0 && (
         <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('assessment.recommendations.allCourses')}</h2>
       )}
 

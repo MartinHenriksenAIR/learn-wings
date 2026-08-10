@@ -372,6 +372,22 @@ describe('LearnerCourses — recommended section', () => {
     // The old "Enrolled" badge is gone with the enroll step (#357).
     expect(screen.queryByTestId('status-badge-enrolled')).toBeNull();
   });
+
+  it('hides the recommended section (and its "All courses" heading) once a filter is active (#360)', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg,
+      profile: { ...baseAuthState.profile, assessment_level: 'basic' },
+    });
+
+    renderCourses();
+
+    expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
+    // Applying any filter switches to "browsing results" — the recommended strip + its heading hide.
+    fireEvent.change(screen.getByLabelText('courses.level'), { target: { value: 'advanced' } });
+    expect(screen.queryByTestId('recommended-section')).toBeNull();
+    expect(screen.queryByText('assessment.recommendations.allCourses')).toBeNull();
+  });
 });
 
 describe('LearnerCourses — enrolled-first ordering of the "All courses" grid (#338)', () => {
@@ -760,5 +776,29 @@ describe('LearnerCourses — catalog refinements: category filter, view toggle, 
 
     expect(screen.getByTestId('catalog-list')).toBeInTheDocument();
     expect(screen.queryByTestId('catalog-grid')).toBeNull();
+  });
+
+  it('list rows expose the detail-overlay link, the Start→player link, and the favorite toggle', async () => {
+    window.localStorage.setItem('kursuskatalog-view', 'list');
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    expect(screen.getByTestId('catalog-list')).toBeInTheDocument();
+    const detailHrefs = screen.getAllByRole('link', { name: 'courses.readAbout' }).map((l) => l.getAttribute('href'));
+    expect(detailHrefs).toContain('/app/courses/c-ai');
+    screen.getAllByRole('link', { name: /courses\.startCourse/ }).forEach((s) =>
+      expect(s.getAttribute('href')).toMatch(/^\/app\/learn\//));
+    expect(screen.getAllByRole('button', { name: 'courses.addToFavorites' }).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows the "no match" empty state (not the org empty state) when a non-search filter yields nothing', async () => {
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    // Narrow status to "completed" with nothing completed → empty grid via a non-search filter.
+    fireEvent.change(screen.getByLabelText('courses.status'), { target: { value: 'completed' } });
+
+    expect(screen.getByText('courses.noCoursesMatch')).toBeInTheDocument();
+    expect(screen.queryByText('courses.noCoursesForOrg')).toBeNull();
   });
 });
