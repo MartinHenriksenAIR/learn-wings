@@ -13,6 +13,7 @@ vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember, isOrgAdmin: mockIsOrgAdmin }));
 
 import handler from './index';
+import { INDIVIDUAL_ORG_ID } from '../shared/individual-tier';
 
 const baseReq = (body: unknown) => ({
   method: 'POST',
@@ -202,6 +203,45 @@ describe('organizations', () => {
 
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
+  });
+
+  it('#354: excludes the Individuals placeholder from the platform-admin list (kind=standard)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQuery.mockResolvedValueOnce([{ id: 'org-1', member_count: 1, pending_invite_count: 0 }]);
+
+    const res = await handler(baseReq({}), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    // Detection by kind, never the seeded id (schema comment / individual-tier.ts).
+    expect(sql).toContain("o.kind = 'standard'");
+    expect(sql).not.toContain(INDIVIDUAL_ORG_ID);
+    expect(params ?? []).toEqual([]);
+  });
+
+  it('#354: excludes the Individuals placeholder from a member list (kind=standard)', async () => {
+    mockQuery.mockResolvedValueOnce([{ id: 'org-1', member_count: 1, pending_invite_count: 0 }]);
+
+    const res = await handler(baseReq({}), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("o.kind = 'standard'");
+    expect(sql).not.toContain(INDIVIDUAL_ORG_ID);
+  });
+
+  it('#354: single-org fetch of the placeholder id returns 404 (filtered out by kind)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    // With `AND o.kind = 'standard'` the placeholder row is never returned by the DB,
+    // so the handler sees no row and 404s — the placeholder is not inspectable here.
+    mockQueryOne.mockResolvedValueOnce(null);
+
+    const res = await handler(baseReq({ orgId: INDIVIDUAL_ORG_ID }), {} as any);
+
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Organization not found' });
+    const [sql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("o.kind = 'standard'");
   });
 
   it('returns org for platform admin without calling isActiveMember', async () => {
