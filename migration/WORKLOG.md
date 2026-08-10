@@ -2466,6 +2466,36 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 
 ---
 
+## 2026-08-10 — #403 Learner course detail page (PR #404)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a worktree. AIU platform-review batch — extracted from #360 when the card redesign's "read about a course" grew into its own surface. Ran alongside martin's parallel #369 session; the detail-first half of a two-PR stack.
+
+**What:** a new learner-facing course detail page at `/app/courses/:courseId` ("read about a course") — the surface #360's card body links to. Cards jump straight to the player today, and the player's `course-player-data` auto-enrolls on open (#357), so it can't back a read-only "about" view.
+
+**How:**
+- **Read-only endpoint** `learner-course-detail`: returns the course + a module outline (`title` + `lesson_count`, no lesson bodies) + the caller's own enrollment status (drives the state-aware CTA). Access rule is a faithful mirror of `course-player-data` (standard org via `org_course_access` + individual tier #354 via `resolveVisibilityContext`) — but with the implicit-enroll INSERT deliberately omitted, so reading about a course never starts it. Every read keyed on `profile.id`; 404 not-found / 403 access-denied parity with the player.
+- **Frontend**: `useCourseDetail` hook + `queryKeys.learnerCourseDetail` + the `/app/courses/:courseId` route; page = breadcrumb → thumbnail → title/level/category → full description → "Indhold" module outline (title · N lektioner) → state-aware Start/Fortsæt/Gennemse CTA (→ player) + favorite toggle; en + da strings.
+
+**Reviews/verify:** independent Opus review — no Critical/Important; confirmed the read-only invariant (no enrollment write on any path), org-isolation, and access parity; added a review-driven individual-tier language-gate 403 test + a no-org page test. Root `lint` 0 · `tsc` app+node · `test` 964 · `build`; functions `build` · `test` 2787 (3 skip, incl. the registration-guard barrel cross-check).
+
+**Deploy:** frontend + functions (no schema) → auto-ships on merge. Deployed + smoked (POST `/api/learner-course-detail` → 405, identical to the healthy `learner-courses` sibling — this front door's unauth shape; a missing route would 404). Announced on PR #404.
+
+---
+
+## 2026-08-10 — #360 Kursuskatalog refinements (PR #402)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a worktree. AIU platform-review batch; the second half of the detail-first stack (rebased on #404). Requirements grilled first — martin decided the detail surface (full page), scope/slicing (two stacked PRs, detail-first), detail depth (modules + lesson counts), how "pure" the catalog is, and the filter layout. Ran alongside martin's parallel #369 session.
+
+**What:** turned the catalog into a warmer, more usable Kursuskatalog. Warmer, org-name-free subtitle (en+da; the old individual-tier subtitle variant removed since no org name is interpolated anymore); a **category filter** (from `useCourseCategories`, only categories that actually have a course offered) in a filters-left / search-right toolbar; a **card/list view toggle** (card default, persisted in `localStorage`); and a **card redesign** — the whole card/row opens the #403 detail page via a stretched overlay link, the Start action moved onto the thumbnail (state-aware → player), a stronger hover-lift, with the on-card description + level + favorite + started-progress bar retained; plus a new list-row layout.
+
+**How / decisions:** martin chose to **keep** the status filter, per-card progress, and started-first sort (this softens the issue's "pure catalog" wording — noted) and to keep the recommended "For you" strip, which now **hides whenever a filter/search is active** (a level-matched strip that ignores filters, sitting above a "no matches" empty state, was jarring once the category filter existed). Stretched-link layering: the overlay `<Link>` is a z-10 sibling (never a wrapper — no nested-`<a>` trap), the interactive Start/favorite controls carry z-20. Category options are derived from categories that actually have a course in the loaded catalogue.
+
+**Reviews/verify:** independent Opus review — no Critical/Important; verified the z-index layering, category derivation, localStorage guards, useMemo deps, and en/da parity. Minor findings applied (hide the recommended strip while filtering, drop the needless z-20 on decorative badges, remove a vestigial `group` class) + 3 added tests. Root `lint` 0 · `tsc` app+node · `test` 973 · `build`.
+
+**Deploy:** frontend-only (no schema/functions) → SWA auto-ships on merge. Announced on PR #402.
+
+---
+
 ## 2026-08-10 — #369 Org-admin settings rebuilt into a tabbed area (PR #401)
 
 **Who:** claude (Opus 4.8, 1M) with martin, in a worktree. Picked off the open board; ran alongside the #360 catalog session (no collision — #360 is catalog work). Trunk moved once mid-flight (#403 learner course detail, PR #404) — merged in cleanly; the only overlap was the i18n locales + the query-keys factory, both append-only additions.

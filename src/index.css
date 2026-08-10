@@ -188,6 +188,17 @@
     transform: translateY(-3px);
     box-shadow: 0 12px 30px rgba(20, 24, 46, 0.1);
   }
+
+  /* A stronger lift for the catalog cards/rows (#360) — the card should feel like
+     it rises "out of the screen" on hover, not a small hop. */
+  .hover-lift-lg {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .hover-lift-lg:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 22px 48px rgba(20, 24, 46, 0.18);
+  }
 }
 
 @layer utilities {
@@ -216,6 +227,10 @@
   }
 
   .hover-lift:hover {
+    transform: none;
+  }
+
+  .hover-lift-lg:hover {
     transform: none;
   }
 }
