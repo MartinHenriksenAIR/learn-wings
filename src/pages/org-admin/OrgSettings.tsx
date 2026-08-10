@@ -341,47 +341,40 @@ export default function OrgSettings() {
         )}
 
         {activeTab === 'features' && (
-          <div className="flex flex-col gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('orgSettings.featureOverrides')}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2.5">
-                <p className="mb-2 text-[11.5px] text-muted-foreground">{t('orgSettings.combinedNote')}</p>
-                <div className="flex flex-col gap-2.5">
-                  {featureKeys.map((key) => (
-                    <div key={key} className={rowClass}>
-                      <div className="flex flex-col gap-px">
-                        <Label htmlFor={`feature-${key}`} className="text-[13.5px] font-bold">
-                          {t(`orgSettings.features.${key}`)}
-                        </Label>
-                        <p className="text-[11.5px] text-muted-foreground">
-                          {t('orgSettings.platformDefault', {
-                            state: platformFeatures[key]
-                              ? t('orgSettings.enabled')
-                              : t('orgSettings.disabled'),
-                          })}
-                        </p>
-                      </div>
-                      <Switch
-                        id={`feature-${key}`}
-                        checked={localFeatures[key]}
-                        onCheckedChange={(checked) =>
-                          setLocalFeatures((prev) => ({ ...prev, [key]: checked }))
-                        }
-                        disabled={!platformFeatures[key]}
-                      />
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('orgSettings.featureOverrides')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2.5">
+              <p className="mb-2 text-[11.5px] text-muted-foreground">{t('orgSettings.combinedNote')}</p>
+              <div className="flex flex-col gap-2.5">
+                {featureKeys.map((key) => (
+                  <div key={key} className={rowClass}>
+                    <div className="flex flex-col gap-px">
+                      <Label htmlFor={`feature-${key}`} className="text-[13.5px] font-bold">
+                        {t(`orgSettings.features.${key}`)}
+                      </Label>
+                      <p className="text-[11.5px] text-muted-foreground">
+                        {t('orgSettings.platformDefault', {
+                          state: platformFeatures[key]
+                            ? t('orgSettings.enabled')
+                            : t('orgSettings.disabled'),
+                        })}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('orgSettings.orgFeaturesHeading')}</CardTitle>
-              </CardHeader>
-              <CardContent>
+                    <Switch
+                      id={`feature-${key}`}
+                      checked={localFeatures[key]}
+                      onCheckedChange={(checked) =>
+                        setLocalFeatures((prev) => ({ ...prev, [key]: checked }))
+                      }
+                      disabled={!platformFeatures[key]}
+                    />
+                  </div>
+                ))}
+                {/* Org-only leaderboard toggle (#369) — no platform gate, so it lives
+                    in the same list as the platform-overridable flags, with its own
+                    descriptive hint instead of a platform-default line. */}
                 <div className={rowClass}>
                   <div className="flex flex-col gap-px pr-4">
                     <Label htmlFor="leaderboard-enabled" className="text-[13.5px] font-bold">
@@ -395,9 +388,9 @@ export default function OrgSettings() {
                     onCheckedChange={setLeaderboardEnabled}
                   />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         <div className="sticky bottom-0 mt-6 flex justify-end border-t border-[#eceef3] bg-background/95 py-3 backdrop-blur">
