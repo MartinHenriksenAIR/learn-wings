@@ -2344,3 +2344,17 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **933 / 124** · `build` 0. New tests: `OrgSelector.test.tsx` (+2 — collapsed icon trigger vs expanded) and `ui/sidebar.test.tsx` (+4 — cookie rehydration incl. controlled-prop precedence). **Visual:** real `AppSidebar`/`OrgSelector`/`SidebarBrand`/`AppLayout` rendered in a throwaway Vite+Playwright harness (Entra-gated hooks faked, real Tailwind pipeline) across learner / org-admin / platform-impersonate / platform, expanded + collapsed — confirmed the rail centring, the collapsed OrgSelector opening its dropdown + showing its tooltip, and the persistence fix (seeded cookie → mounts collapsed).
 
 **Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #392.
+
+---
+
+## 2026-08-10 — #370 follow-up: collapsed-rail icons showed an I-beam cursor / flickered (PR #395)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Same-day follow-up to #370 (PR #392) — martin reported the collapsed icon rail felt buggy: hovering an icon sometimes showed a text (I-beam) cursor instead of a pointer, with a flicker before a click landed. Branched off `origin/main` @`7e85335`, worktree-isolated.
+
+**Root cause (found via a real-browser hit-test probe, not guessed):** collapsed, the section labels (Learning/Community/Organization) were hidden only by the shadcn primitive's `opacity-0` + `-mt-8`. #370's `GROUP_LABEL_CLASSES` override sets `h-auto`, so `-mt-8` no longer cancels the label's height — the invisible label stayed in the layout AND (since `opacity:0` doesn't stop pointer events) in the hit-test layer, overlapping the icon buttons. `elementFromPoint` at several icon centres returned the group-label `<div>` (`cursor: auto` → I-beam over its text) instead of the icon's `<a>`; the overlap also swallowed clicks → the flicker / "eventually works".
+
+**Fix:** drop the labels from the rail entirely when collapsed — `group-data-[collapsible=icon]:hidden` (display:none) — removing them from both layout and hit-testing. One line on `GROUP_LABEL_CLASSES`.
+
+**Verify:** Playwright harness — before: 3/4 probed icon centres hit the group-label; after: all 11 collapsed controls (org selector, 9 nav icons, footer) hit their own link/button with `cursor:pointer`, labels `display:none`/height 0; expanded unchanged (labels `display:flex`, 25px). Gates: `tsc` app+node 0 · lint 0 errors · `npm test` **934 / 124** (+1 regression guard) · `build` 0.
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #395.
