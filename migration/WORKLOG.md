@@ -2449,3 +2449,17 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Reviews/verify:** 15 tasks, per-task spec+quality + a whole-branch Opus review (org isolation verified end-to-end); a plan-SQL boolean-absorption bug (the enrolled-relaxation) was caught in review + fixed. After a clean trunk merge (#370/#391/#393/#398): frontend `npm test` **957 / 126** · functions **2771 / 159** · both builds · `tsc` app+node · lint 0 errors. The merge exposed a **pre-existing** `QuizEditorDialog` test flake (an async race, unrelated to #354 — main was green) which was stabilized with `waitFor`.
 
 **Deploy:** schema + functions + frontend all changed → auto-ships on merge; migration applied first. Deploy announced on PR #388; the walk-in end-to-end smoke is human-gated (real Entra login).
+
+---
+
+## 2026-08-10 — #396 Sidebar toggle flicker (PR #397)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a worktree. Follow-up to #370's collapsible sidebar (PRs #392, #395). Picked off the open board; ran alongside the #354 individual-tier session (which relayed a trunk-moved heads-up — no collision, #354 touched `SidebarBrand.tsx` only, this touched the `ui/sidebar.tsx` primitive).
+
+**What:** collapsing/expanding the sidebar briefly flashed a "warped/oversized" brand logo before settling. The panel `width` animates over 200ms (`transition-[width]` in `ui/sidebar.tsx`) but the content swaps to its target layout in a single frame — so for that ~200ms the full-size expanded content sat in a wrong-width rail. Most visibly the brand wordmark: a flex item pinned to its ~99px intrinsic width by `min-width:auto`, so it won't shrink into the narrow rail and spilled out.
+
+**Fix:** one Tailwind class — `overflow-hidden` on the panel box (the `data-sidebar="sidebar"` div). Keeps the width slide but clips the overflow, turning the toggle into a smooth left-to-right reveal in sync with the animation. This is **option 2** of the issue's three; chosen over option 3 (defer the content swap to `transitionend`, which reintroduces the same cramming on collapse and ends expand with an abrupt pop) and option 1 (drop the animation entirely — not "smooth", which is what martin asked for). Popovers/tooltips portal out, so clipping is safe. Added a regression guard in `sidebar.test.tsx` pinning the class (jsdom has no layout, so it guards against a shadcn re-sync silently dropping it).
+
+**Verify (on a clean trunk merge of #354/#391/#398/#400):** frontend `lint` 0 errors · `tsc` app+node 0 · `npm test` **958** · `build` 0; functions `npm test` **2774 / 159** (3 skip) · `build` 0. Smoothness is visual, so verified in a real browser: the app sidebar is Entra-gated, so a faithful DOM/CSS replica (real logo asset, the non-shrinking flex img, transition slowed to 2s) was frozen at the issue's 104px artifact width — before: nav content spills outside the rail; after: cleanly clipped. Resting expanded state unchanged.
+
+**Deploy:** frontend-only, no schema/functions change → SWA auto-ships the frontend on merge; no functions deploy. Deploy + smoke announced on PR #397.
