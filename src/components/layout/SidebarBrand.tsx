@@ -12,10 +12,9 @@ import logoLightEn from '@/assets/logo-light-en.png';
  * The sidebar header brand lockup (#372).
  *
  * In a real org context (an org member, or a platform admin impersonating an
- * org — i.e. NOT platform-admin view) it co-brands: the org's logo + name as
- * the hero, with a smaller AI Uddannelse wordmark beneath as the endorsing
- * mark. Everywhere else (platform view, org-less / individual tier) it shows
- * the platform logo alone, exactly as before.
+ * org — i.e. NOT platform-admin view) it shows the org's logo + name.
+ * Everywhere else (platform view, org-less / individual tier) it shows the
+ * AI Uddannelse platform logo.
  *
  * Collapsed to the icon rail there is only room for the org's square mark
  * (its logo, or an initials monogram when it has none); the fallback keeps the
@@ -56,11 +55,15 @@ export function SidebarBrand() {
 
   // The org "mark": its logo, degrading to an initials monogram — same Avatar
   // idiom as the user avatar in the sidebar footer, so a failed/expired signed
-  // URL falls back to initials instead of a broken image. alt="" because the
-  // org name sits beside it in the expanded lockup (no double announcement).
+  // URL falls back to initials instead of a broken image. The logo img is
+  // decorative (alt="") in the expanded lockup, where the org name sits beside
+  // it, but carries the org name when collapsed so the lone mark stays labelled
+  // (the icon-rail #370 path).
   const orgMark = (
     <Avatar className="h-9 w-9 shrink-0 rounded-lg">
-      {orgLogoSrc && <AvatarImage src={orgLogoSrc} alt="" className="object-cover" />}
+      {orgLogoSrc && (
+        <AvatarImage src={orgLogoSrc} alt={collapsed ? currentOrg.name : ''} className="object-cover" />
+      )}
       <AvatarFallback className="rounded-lg bg-primary text-xs font-bold text-primary-foreground">
         {getInitials(currentOrg.name)}
       </AvatarFallback>
@@ -72,21 +75,14 @@ export function SidebarBrand() {
   }
 
   return (
-    // min-w-0 on the row is load-bearing: without it this flex item keeps its
-    // auto min-width and grows to fit a long org name, so the name never
-    // truncates (it overflows the fixed-width sidebar instead).
+    // min-w-0 on the row + the name is load-bearing: without it the name keeps
+    // its auto min-width and overflows the fixed-width sidebar instead of
+    // truncating.
     <div className="flex min-w-0 items-center gap-2.5">
       {orgMark}
-      <div className="flex min-w-0 flex-col">
-        <span className="truncate text-[15px] font-bold leading-tight text-sidebar-foreground">
-          {currentOrg.name}
-        </span>
-        <img
-          src={platformSrc}
-          alt={platformAlt}
-          className="mt-1 block h-4 w-auto max-w-full object-contain opacity-60"
-        />
-      </div>
+      <span className="min-w-0 truncate text-[15px] font-bold leading-tight text-sidebar-foreground">
+        {currentOrg.name}
+      </span>
     </div>
   );
 }

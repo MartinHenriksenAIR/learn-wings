@@ -2311,3 +2311,17 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **927 / 123** · `build` 0. New `SidebarBrand.test.tsx` (6): fallback (no org / platform view), co-brand w/ logo (signs the path), no-logo initials, collapsed org mark, collapsed fallback. **Visual:** real component rendered in a throwaway Vite+Playwright harness (stubbed auth) across all 5 states — caught + fixed a long-name overflow (`min-w-0`) and re-verified the Avatar variant.
 
 **Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #387.
+
+---
+
+## 2026-08-10 — #372 follow-up: drop the AI Uddannelse wordmark from the co-brand lockup (PR #390)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Same-day follow-up to #372 (PR #387) — martin didn't like how the small platform wordmark looked tucked under the org name. Worktree-isolated off `origin/main` @`1b06351` (the #372 merge); PR opened ready after verify.
+
+**What:** removed the smaller AI Uddannelse endorsing wordmark that sat beneath the org name in the sidebar header — in an org context the header now shows the **org logo + name only**. This reverses part of #372's co-branding intent (platform brand no longer in-chrome for org users), on martin's call. The platform logo is unchanged in the non-org fallback (platform view / org-less / individual-tier), so the AI Uddannelse brand still shows there.
+
+**How:** dropped the wordmark `<img>` from `SidebarBrand`'s expanded co-brand return and flattened the now-single-child name wrapper into a truncating `<span>` on the row (`min-w-0` preserved so long org names still ellipsize). `platformSrc`/`platformAlt` + the logo assets stay — still used by the fallback. TDD: flipped the two co-brand tests to assert the wordmark is *absent* (watched them fail, then removed it).
+
+**Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **927 / 123** · `build` 0. Real-component Playwright harness re-checked all 5 states — org logo + name (truncation intact), initials monogram, collapsed marks, platform fallback — no wordmark. `/code-review` (Opus, whole-diff) — 3 minor findings, **1 accepted** (label the collapsed org mark for the #370 icon-rail a11y path), **2 declined** with reasoning on the PR (reuse `BrandingAvatar` — its `getAvatarColor` default fights the intended `bg-primary`, and the sidebar-footer avatar hand-rolls the same idiom; `getInitials` "U" fallback — unreachable, `organizations.name` is NOT NULL).
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #390.
