@@ -62,7 +62,12 @@ const NAV_BUTTON_CLASSES =
   'group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center';
 
 const GROUP_LABEL_CLASSES =
-  'h-auto px-3 pb-1.5 text-[12.5px] font-semibold normal-case text-[#3f4657]';
+  'h-auto px-3 pb-1.5 text-[12.5px] font-semibold normal-case text-[#3f4657] ' +
+  // Collapsed, the shadcn primitive only fades the label (opacity-0) but keeps it in the
+  // layout — and with our h-auto override its -mt-8 no longer cancels the label's height, so
+  // the invisible label overlapped the icon buttons and, still hit-testable, stole their
+  // hovers/clicks and showed a text (I-beam) cursor. Drop it from the rail entirely (#370).
+  'group-data-[collapsible=icon]:hidden';
 
 const MENU_ITEM_CLASSES = 'rounded-[9px] text-[13px] font-medium';
 
