@@ -2426,3 +2426,26 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Incidental observation (not acted on):** prod has `course_reviews_enabled: true`, while both the seed and `defaultFeatures` default it to `false` — someone enabled it deliberately at some point. Noted only so a future seed-vs-prod comparison doesn't read it as corruption.
 
 **Concurrency with #391 (entry above):** #391's `/code-review` is what filed #394 in the first place, and the two landed hours apart touching the same `FIELD_SHAPES` object — #391 added `allow_individual_registration` to `user_access`, this one added `exercises_enabled` to `features`. Different sub-objects, so trunk carries both and neither dropped the other; verified on `origin/main` after #391 merged. The only real collision was the expected hub-file append conflict in this file and `STATUS.html`, resolved by rebasing over the moved trunk and keeping both entries.
+
+---
+
+## 2026-08-10 — #354 Individual (self-serve) learner tier (PR #388)
+
+**Who:** claude (Opus 4.8, 1M) with martin. AIU platform-review batch. Requirements grilled first; spec → plan → subagent-driven execution in a worktree; ran alongside martin's parallel #368/#372/#370 sessions.
+
+**What:** org-less walk-ins (any Microsoft account, no invite, no tenant match) auto-join one hidden "Individuals" placeholder org (`organizations.kind='individual'`) and use the platform as normal learners — full published catalogue in their saved language, start/progress/complete, "AI Uddannelse"-issued certificates. The placeholder is hidden from every admin surface; leaderboard + org-community are suppressed for the tier; a real org always outranks the placeholder as `currentOrg`. Gated by a platform kill-switch (default ON).
+
+**How:**
+- **Detection** by a new `organizations.kind` classifier (`'standard' | 'individual'`) — never the seed id; the fixed id `00000000-…-354` exists only for idempotent seeding.
+- **Auto-join** last-resort in `user-context` (`ensureIndividualMembership`): fires only when the caller has zero active memberships AND the switch is on AND the placeholder is seeded; best-effort + idempotent, so it never breaks login and degrades gracefully to an "invitation only" screen if unseeded.
+- **Visibility, whole journey**: new `individualCourseVisibility` (published + saved language, `org_course_access` bypassed) + `resolveVisibilityContext`, applied in `learner-courses`, `course-player-data` (access gate + #357 implicit enroll), and `favorites`/`favorite-set`; standard-org SQL kept byte-identical.
+- **Certificate** issuer switched to the enrollment's own org (fixes a latent multi-org wrong-issuer bug); the placeholder's name "AI Uddannelse" prints for solo learners with no special-casing.
+- **Hiding**: `organizations` list (all 3 queries) + a real cross-org-breakdown leak fixed; leaderboard suppressed at the **backend** (`gamification`), not just the UI (#373-conscious).
+- **Kill-switch** `individualTierEnabled()` reads `user_access.allow_individual_registration` `?? true` — the exact key #391's toggle writes.
+- **Frontend**: real-org-wins `currentOrg` selection; neutral learner copy + hidden leaderboard + "invitation only" screen; community shows Global + Events (no org tab) for the tier; `SidebarBrand` no longer co-brands the placeholder.
+
+**Migration:** `migration/azure/2026-08-10-354-individual-tier.sql` (idempotent — `ADD COLUMN IF NOT EXISTS` + `ON CONFLICT DO NOTHING`) applied to prod + verified 2026-08-10 **before** merge (migrate-then-merge).
+
+**Reviews/verify:** 15 tasks, per-task spec+quality + a whole-branch Opus review (org isolation verified end-to-end); a plan-SQL boolean-absorption bug (the enrolled-relaxation) was caught in review + fixed. After a clean trunk merge (#370/#391/#393/#398): frontend `npm test` **957 / 126** · functions **2771 / 159** · both builds · `tsc` app+node · lint 0 errors. The merge exposed a **pre-existing** `QuizEditorDialog` test flake (an async race, unrelated to #354 — main was green) which was stabilized with `waitFor`.
+
+**Deploy:** schema + functions + frontend all changed → auto-ships on merge; migration applied first. Deploy announced on PR #388; the walk-in end-to-end smoke is human-gated (real Entra login).
