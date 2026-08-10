@@ -73,6 +73,28 @@ describe('org-settings-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'features must be a plain object' });
   });
 
+  it('returns 400 when features.leaderboard_enabled is not a boolean (before authz/DB) (#369)', async () => {
+    const res = await handler(baseReq({ orgId: 'org-1', features: { leaderboard_enabled: 'yes' } }), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'features.leaderboard_enabled must be a boolean' });
+    expect(mockIsOrgAdmin).not.toHaveBeenCalled();
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('accepts a boolean features.leaderboard_enabled (#369)', async () => {
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    const row = { org_id: 'org-1', features: { leaderboard_enabled: false } };
+    mockQueryOne.mockResolvedValueOnce(row);
+
+    const res = await handler(baseReq({ orgId: 'org-1', features: { leaderboard_enabled: false } }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ settings: row });
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params[1]).toBe(JSON.stringify({ leaderboard_enabled: false }));
+  });
+
   it('returns 403 for active member who is not org_admin and does not call queryOne', async () => {
     mockIsOrgAdmin.mockResolvedValueOnce(false);
 

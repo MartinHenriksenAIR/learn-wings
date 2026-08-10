@@ -323,21 +323,21 @@ describe('organization-update', () => {
     expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
   });
 
-  it('org admin cannot update other fields', async () => {
+  it('org admin cannot update platform-only fields', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
-    // isOrgAdmin is NOT called — `name` is outside ORG_ADMIN_WRITABLE, so the
+    // isOrgAdmin is NOT called — `seat_limit` is outside ORG_ADMIN_WRITABLE, so the
     // `.every(...)` is false and the && short-circuits before the membership check.
-    const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { seat_limit: 5 } }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  it('org admin cannot smuggle other fields alongside logo_url', async () => {
+  it('org admin cannot smuggle a platform-only field alongside logo_url', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     const res = await handler(
-      baseReq({ orgId: 'org-1', updates: { logo_url: 'https://x/logo.png', name: 'New Name' } }),
+      baseReq({ orgId: 'org-1', updates: { logo_url: 'https://x/logo.png', seat_limit: 5 } }),
       {} as any,
     );
     expect(res.status).toBe(403);
@@ -415,6 +415,47 @@ describe('organization-update', () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     const res = await handler(
       baseReq({ orgId: 'org-1', updates: { allow_self_registration: true, seat_limit: 5 } }),
+      {} as any,
+    );
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  // ---- #369 org admin may rename their OWN org (name is now org-writable) ----
+
+  it('org admin of the target org can rename their own org (name)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    // No logo_url in the update ⇒ a single queryOne (the UPDATE).
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', name: 'Renamed Co' });
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'Renamed Co' } }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('UPDATE organizations SET');
+    expect(sql).toContain('name = $1');
+    expect(params).toEqual(['Renamed Co', 'org-1']);
+  });
+
+  it('org admin can update name and logo_url together', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockLogoDb(null, { id: 'org-1', name: 'Renamed Co', logo_url: 'org-logos/new.png' });
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { name: 'Renamed Co', logo_url: 'org-logos/new.png' } }),
+      {} as any,
+    );
+    expect(res.status).toBe(200);
+    const [sql] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain('name = $1');
+    expect(sql).toContain('logo_url = $2');
+  });
+
+  it('org admin cannot smuggle slug alongside name (slug stays platform-only)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { name: 'Renamed Co', slug: 'renamed-co' } }),
       {} as any,
     );
     expect(res.status).toBe(403);

@@ -1,18 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsActiveMember, mockResolveVisibilityContext } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsActiveMember, mockResolveVisibilityContext } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
     MockAuthError,
     mockQuery: vi.fn(),
+    mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
     mockIsActiveMember: vi.fn(),
     mockResolveVisibilityContext: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: vi.fn() }));
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember }));
 vi.mock('../shared/course-visibility', () => ({ resolveVisibilityContext: mockResolveVisibilityContext }));
 
@@ -46,6 +47,8 @@ describe('learner-dashboard', () => {
     mockIsActiveMember.mockResolvedValue(false);
     // Standard (non-individual) org by default so existing assertions hold.
     mockResolveVisibilityContext.mockResolvedValue({ isIndividual: false, language: 'da' });
+    // No org_settings row by default ⇒ leaderboard enabled (the #369 default).
+    mockQueryOne.mockResolvedValue(null);
   });
 
   it('returns 401 when bearer token is invalid', async () => {
@@ -104,6 +107,8 @@ describe('learner-dashboard', () => {
     expect(body.leaderboard.allTime.me).toEqual({ rank: 2, name: 'Martin H.', xp: 75, isSelf: true });
     // This month: p1 leads.
     expect(body.leaderboard.month.me.rank).toBe(1);
+    // Visible by default (standard org, not suppressed).
+    expect(body.showLeaderboard).toBe(true);
   });
 
   it('scopes every org query to orgId and derives the board from learners only', async () => {
@@ -169,6 +174,8 @@ describe('learner-dashboard', () => {
       allTime: { rows: [], me: null },
       month: { rows: [], me: null },
     });
+    // …and the client is told to hide the widget entirely.
+    expect(body.showLeaderboard).toBe(false);
 
     // The solo learner still gets their own XP, level and streak.
     expect(body.xp).toEqual({ allTime: 75, month: 45 });
@@ -180,6 +187,50 @@ describe('learner-dashboard', () => {
     // The org_memberships (leaderboard) query must never have run.
     const memberQueried = (mockQuery.mock.calls as [string, unknown[]][]).some(([sql]) => sql.includes('org_memberships'));
     expect(memberQueried).toBe(false);
+  });
+
+  it('suppresses the leaderboard when the org opted out (leaderboard_enabled=false) (#369)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    // Standard org, but the leaderboard is turned off in org_settings.features.
+    mockQueryOne.mockResolvedValueOnce({ features: { leaderboard_enabled: false } });
+    // Suppressed → member query (5) skipped: snapshot, lessons, quizzes, courses, streak.
+    mockQuery
+      .mockResolvedValueOnce([{ started: 1, in_progress: 0, completed: 1 }])          // 1 snapshot
+      .mockResolvedValueOnce([{ user_id: 'p1', all_time: 5, month: 2 }])              // 2 lessons
+      .mockResolvedValueOnce([{ user_id: 'p1', all_time: 1, month: 1 }])              // 3 quizzes
+      .mockResolvedValueOnce([])                                                       // 4 courses
+      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06'] }]);        // 5 streak
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+    // No member data crosses the wire — both windows empty, me null.
+    expect(body.leaderboard).toEqual({
+      allTime: { rows: [], me: null },
+      month: { rows: [], me: null },
+    });
+    // …and the client hides the widget.
+    expect(body.showLeaderboard).toBe(false);
+    // Personal XP/streak are still derived.
+    expect(body.xp).toEqual({ allTime: 75, month: 45 });
+    // The org_settings feature read ran, scoped to the org.
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('org_settings'), ['org-1']);
+    // The org_memberships (leaderboard) query must never have run.
+    const memberQueried = (mockQuery.mock.calls as [string, unknown[]][]).some(([sql]) => sql.includes('org_memberships'));
+    expect(memberQueried).toBe(false);
+  });
+
+  it('keeps the leaderboard when leaderboard_enabled is absent (default on) (#369)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ features: {} }); // key absent ⇒ enabled
+    seedHappyPath();
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.body as string);
+    expect(body.leaderboard.allTime.rows.length).toBe(2);
   });
 
   it('returns 500 on db error', async () => {

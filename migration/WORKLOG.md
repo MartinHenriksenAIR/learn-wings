@@ -2463,3 +2463,26 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (on a clean trunk merge of #354/#391/#398/#400):** frontend `lint` 0 errors · `tsc` app+node 0 · `npm test` **958** · `build` 0; functions `npm test` **2774 / 159** (3 skip) · `build` 0. Smoothness is visual, so verified in a real browser: the app sidebar is Entra-gated, so a faithful DOM/CSS replica (real logo asset, the non-shrinking flex img, transition slowed to 2s) was frozen at the issue's 104px artifact width — before: nav content spills outside the rail; after: cleanly clipped. Resting expanded state unchanged.
 
 **Deploy:** frontend-only, no schema/functions change → SWA auto-ships the frontend on merge; no functions deploy. Deploy + smoke announced on PR #397.
+
+---
+
+## 2026-08-10 — #369 Org-admin settings rebuilt into a tabbed area (PR #401)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a worktree. Picked off the open board; ran alongside the #360 catalog session (no collision — #360 is catalog work). Trunk moved once mid-flight (#403 learner course detail, PR #404) — merged in cleanly; the only overlap was the i18n locales + the query-keys factory, both append-only additions.
+
+**What:** #369 asked to turn the single "Feature overrides" card into a real settings area. Grilled the scope first and cut it to what has a real backend consumer: rebuilt `OrgSettings.tsx` into three tabs — **Profil** / **Adgang** / **Funktioner** — with one global "Save all changes".
+- **Profil**: editable org **name** + **logo** (upload + remove, moved out of `OrgAnalytics` where it oddly lived) + read-only slug / member limit / members used / created date.
+- **Adgang**: the self-registration toggle (#356), kept.
+- **Funktioner**: the 5 platform-overridable feature flags (kept) + a new org-only **Show leaderboard** toggle.
+
+**How:**
+- **Save model:** one global sticky Save that fans out to only the *changed* fields — org columns via `organization-update`, the features jsonb via `org-settings-update`. The features write **merges onto the raw jsonb** (new `useOrgSettings` query hook returns it verbatim) so a key the form doesn't manage (`exercises_enabled`, or a future flag) survives the full-replace upsert — fixing a latent drop-bug in the old single-save. Logo upload/remove persists immediately (a file op, not a form field).
+- **Org rename:** `name` added to `ORG_ADMIN_WRITABLE` in `organization-update` (within-tenant, validated by `validateOrgName`); **slug stays platform-admin-only** (URL-facing + UNIQUE).
+- **Leaderboard off-switch** (deferred here from #362): an org-only key `org_settings.features.leaderboard_enabled` (default on, no platform gate, boolean-validated in `org-settings-update`). `learner-dashboard` reads it and suppresses the board server-side via the existing `suppressLeaderboard` seam; a new `showLeaderboard` payload flag hides the widget on the learner Dashboard.
+- **Branding move:** removed the logo upload UI + `handleLogoUpload` from `OrgAnalytics`; the #372 sidebar co-brand reads `currentOrg.logo_url`, unaffected.
+
+**Scoped out by decision (grilled):** notification preferences (no infra — email was deleted in #267) and a danger zone (org admins must not delete their own org; `organization-delete` stays platform-admin-only). Org-level **member defaults** (default role/language) deferred to **#405** — no consumer today; the Adgang tab is its future home.
+
+**Reviews/verify:** independent Opus code review — one Important finding (the leaderboard opt-out suppressed the data but the learner Dashboard still rendered an empty board) fixed with the `showLeaderboard` flag, plus a Minor `Promise.all`. **No schema/DDL change** (leaderboard rides in the existing `org_settings.features` jsonb). After a clean trunk merge of #403: frontend lint 0 / tsc app+node 0 / test **971** / build; functions build / test **2795** (3 skip).
+
+**Deploy:** functions + frontend changed (no schema) → auto-ships on merge (functions workflow + SWA). Deploy announced on PR #401.

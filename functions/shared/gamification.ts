@@ -58,6 +58,11 @@ export interface LearnerDashboardData {
   level: LevelInfo;
   streak: { current: number; activeToday: boolean };
   leaderboard: { allTime: LeaderboardWindow; month: LeaderboardWindow };
+  // Whether the client should render the leaderboard at all. False when the board
+  // is suppressed — individual tier (#354) OR a per-org opt-out (#369). The board
+  // windows are already empty when suppressed; this flag lets the UI HIDE the
+  // widget rather than show an empty "be the first" state for a disabled feature.
+  showLeaderboard: boolean;
 }
 
 const TOP_N = 10;
@@ -268,6 +273,7 @@ export async function getLearnerDashboardData(
     xp: { allTime: xpAllTime, month: xpMonth },
     level: levelProgress(xpAllTime),
     streak: computeStreak(streakRow?.today ?? '', streakRow?.days ?? []),
+    showLeaderboard: !opts?.suppressLeaderboard,
     leaderboard: opts?.suppressLeaderboard
       ? { allTime: { rows: [], me: null }, month: { rows: [], me: null } }
       : { allTime: rankWindow(learnersAllTime, callerId), month: rankWindow(learnersMonth, callerId) },
