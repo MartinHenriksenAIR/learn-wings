@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
     MockAuthError,
     mockQuery: vi.fn(),
+    mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
     mockIsActiveMember: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: vi.fn() }));
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember }));
 
 import handler from './index';
@@ -28,6 +29,9 @@ describe('learner-courses', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockIsActiveMember.mockResolvedValue(false);
+    // resolveVisibilityContext runs before the courses query — default a standard org
+    // so the existing (curated-catalogue) path is exercised unless a test overrides it.
+    mockQueryOne.mockResolvedValue({ kind: 'standard', language: 'da' });
   });
 
   it('returns 401 when bearer token is invalid', async () => {
@@ -276,6 +280,21 @@ describe('learner-courses', () => {
     expect(res.status).toBe(200);
     const [, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(coursesParams).toEqual(['org-1', 'da', 'p1']);
+  });
+
+  it('individual org: catalogue is published + saved language, org-access bypassed', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ kind: 'individual', language: 'en' }); // resolveVisibilityContext
+    mockQuery
+      .mockResolvedValueOnce([{ id: 'c1', title: 'A', language: 'en', is_published: true }]) // courses
+      .mockResolvedValueOnce([]);                                                            // enrollments
+    const res = await handler(baseReq({ orgId: 'ind-354', language: 'da' }), {} as any);
+    expect(res.status).toBe(200);
+    const coursesSql = mockQuery.mock.calls[0][0] as string;
+    expect(coursesSql).not.toContain('org_course_access');
+    expect(coursesSql).toContain('is_published = TRUE');
+    // server-authoritative language: 'en' from the profile, not 'da' from the body
+    expect(mockQuery.mock.calls[0][1]).toContain('en');
   });
 
   it('returns 200 for platform admin without calling isActiveMember', async () => {

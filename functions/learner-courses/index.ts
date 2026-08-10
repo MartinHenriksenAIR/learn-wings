@@ -1,6 +1,6 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-import { courseVisibilityPredicate } from '../shared/course-visibility';
+import { courseVisibilityPredicate, individualCourseVisibility, resolveVisibilityContext } from '../shared/course-visibility';
 
 export default endpoint('learner-courses', async ({ req, profile, reply, requireActiveMember }) => {
   const { orgId, language } = await req.json() as { orgId?: unknown; language?: unknown };
@@ -11,17 +11,24 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
 
   await requireActiveMember(orgId);
 
-  const lang = language === 'en' || language === 'da' ? language : 'da';
+  const { isIndividual, language: savedLang } = await resolveVisibilityContext(orgId, profile.id);
+  // Standard orgs keep the client-supplied UI language; individuals use the
+  // server-authoritative saved language (the client cannot widen its catalogue).
+  const lang = isIndividual ? savedLang : (language === 'en' || language === 'da' ? language : 'da');
 
-  // Query 1: Available published courses for the org (shared visibility predicate;
-  // equivalent to the old JOIN form — UNIQUE(org_id, course_id) on org_course_access
-  // guarantees one access row per course per org), filtered to the viewer's UI language.
-  // The language filter is relaxed (never the org-visibility/publish predicate) for
-  // courses the learner is already enrolled in, so a language switch never hides them.
+  const visibility = isIndividual
+    ? individualCourseVisibility({ courseAlias: 'c', langParam: 2 })   // published + $2 language
+    : courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 });    // published + org access
+
+  // Query 1: Available published courses. Standard orgs use the shared visibility
+  // predicate (published + 'enabled' org_course_access); individuals (#354) bypass
+  // org access entirely — published + saved language. In both branches the language
+  // filter is relaxed (never the visibility/publish predicate) for courses the
+  // learner is already enrolled in, so a language switch never hides them.
   const courses = await query(
     `SELECT c.id, c.title, c.description, c.level, c.language, c.is_published, c.thumbnail_url, c.category_id, c.created_by_user_id, c.created_at
        FROM courses c
-      WHERE ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}
+      WHERE ${visibility}
             AND (
                   c.language = $2
                   OR EXISTS (
