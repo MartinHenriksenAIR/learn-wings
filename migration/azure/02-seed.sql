@@ -135,7 +135,8 @@ INSERT INTO public.platform_settings (key, value) VALUES
   ('user_access', '{
      "default_role": "learner",
      "require_email_verification": false,
-     "allow_self_registration": true
+     "allow_self_registration": true,
+     "allow_individual_registration": true
    }'::jsonb),
   ('features', '{
      "certificates_enabled": true,
