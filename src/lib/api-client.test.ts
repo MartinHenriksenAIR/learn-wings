@@ -15,7 +15,11 @@ vi.mock('./msal-config', () => ({
   apiScopes: ['api://test-client-id/access_as_user'],
 }));
 
+vi.mock('./session-expired', () => ({ handleSessionExpired: vi.fn() }));
+
+import { InteractionRequiredAuthError } from '@azure/msal-browser';
 import { callApi, callApiRaw, ApiError } from './api-client';
+import { handleSessionExpired } from './session-expired';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -96,5 +100,60 @@ describe('api-client', () => {
     expect(res).toBe(fakeResponse);
     const [_url, init] = mockFetch.mock.calls[0];
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-token-abc');
+  });
+
+  it('callApi triggers the dead-session redirect and throws ApiError on a 401', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'Unauthorized' }),
+    });
+
+    const err = await callApi('/api/user-context', {}).catch((e: unknown) => e);
+
+    expect(handleSessionExpired).toHaveBeenCalledOnce();
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(401);
+  });
+
+  it('callApi does NOT redirect on a 500 — transient errors keep their local handling', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: 'Server error' }),
+    });
+
+    await expect(callApi('/api/user-context', {})).rejects.toBeInstanceOf(ApiError);
+    expect(handleSessionExpired).not.toHaveBeenCalled();
+  });
+
+  it('callApi redirects when the refresh token is dead (InteractionRequiredAuthError)', async () => {
+    mockAcquireTokenSilent.mockRejectedValueOnce(
+      new InteractionRequiredAuthError('interaction_required', 'silent renew failed'),
+    );
+
+    await expect(callApi('/api/user-context', {})).rejects.toBeInstanceOf(InteractionRequiredAuthError);
+    expect(handleSessionExpired).toHaveBeenCalledOnce();
+  });
+
+  it('getAccessToken lets a non-interactive (network) error propagate WITHOUT redirecting', async () => {
+    mockAcquireTokenSilent.mockRejectedValueOnce(new Error('network down'));
+
+    await expect(callApi('/api/user-context', {})).rejects.toThrow('network down');
+    expect(handleSessionExpired).not.toHaveBeenCalled();
+  });
+
+  it('callApiRaw throws ApiError (not a bare Error) with the status, and redirects on 401', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'Unauthorized' }),
+    });
+
+    const err = await callApiRaw('/api/generate-certificate', { enrollmentId: 'e-1' }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(401);
+    expect(handleSessionExpired).toHaveBeenCalledOnce();
   });
 });
