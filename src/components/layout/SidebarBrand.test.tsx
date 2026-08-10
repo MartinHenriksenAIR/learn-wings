@@ -62,7 +62,7 @@ describe('SidebarBrand co-branding (#372)', () => {
     expect(mockSigned).toHaveBeenCalledWith(null);
   });
 
-  it('co-brands the org logo + name with the AIU mark for an org member', () => {
+  it('shows the org logo + name only — no AI Uddannelse wordmark — for an org member', () => {
     mockSigned.mockReturnValue({ data: 'https://signed/acme.png' });
     mockUseAuth.mockReturnValue(
       orgMember({ id: 'o', name: 'Acme Corp', logo_url: 'orgs/acme.png' }),
@@ -74,8 +74,8 @@ describe('SidebarBrand co-branding (#372)', () => {
     // loads the image, so we assert the signing behaviour, not the rendered img.)
     expect(screen.getByText('Acme Corp')).toBeInTheDocument();
     expect(mockSigned).toHaveBeenCalledWith('orgs/acme.png');
-    // The AIU wordmark stays visible as the smaller endorsing mark.
-    expect(screen.getByAltText('AI Education')).toBeInTheDocument();
+    // The platform wordmark is NOT co-branded under the org name anymore.
+    expect(screen.queryByAltText('AI Education')).not.toBeInTheDocument();
   });
 
   it('falls back to an initials monogram when the org has no logo', () => {
@@ -87,7 +87,7 @@ describe('SidebarBrand co-branding (#372)', () => {
     expect(screen.getByText('Acme Corp')).toBeInTheDocument();
     expect(screen.getByText('AC')).toBeInTheDocument();
     expect(screen.queryByAltText('Acme Corp')).not.toBeInTheDocument();
-    expect(screen.getByAltText('AI Education')).toBeInTheDocument();
+    expect(screen.queryByAltText('AI Education')).not.toBeInTheDocument();
   });
 
   it('collapsed org context shows only the org mark (no name, no AIU wordmark)', () => {
