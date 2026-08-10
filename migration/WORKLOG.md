@@ -2289,3 +2289,39 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Deploy:** functions + schema changed → **migrate-then-merge**. Prod read-indexes `15-gamification-indexes.sql` applied 2026-08-06 before merge (additive/idempotent; temp single-IP firewall rule; verified 4/4). Delta renumbered 14→15 on the trunk-merge (#356 took slot 14). Merged to `main` → auto-ships frontend (SWA) + backend. Deploy + smoke announced on PR #384.
 
 **Follow-ups:** per-org leaderboard off-switch → #369 (noted on the issue); `FavoriteCourses.tsx` orphaned by the dashboard strip — left for #358's Min Træning favorites wiring.
+
+---
+
+## 2026-08-10 — #372 Per-org co-branding in the chrome (PR #387)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026). Requirements grilled with martin first (6 decisions). Branched off `origin/main` @`6b52d87`, worktree-isolated; draft PR opened at pickup start. Blocked-by #363 (restructured sidebar) — already merged (PR #385), so unblocked and rebased on top. Ran alongside martin's parallel #354 / #368 sessions — neither collides (#372's `AppSidebar.tsx`/`OrgAnalytics.tsx` collision set is #366/#367/#370/#371/#344 + #369).
+
+**What:** the sidebar header now co-brands each org's **logo + name** with a smaller **AI Uddannelse** wordmark, so the platform brand stays visible under the org's. Fallback (platform view / org-less / individual-tier #354) keeps the platform logo alone, unchanged.
+
+**How:**
+- New `src/components/layout/SidebarBrand.tsx` — the header brand lockup, extracted from `AppSidebar`'s inline header so its display states stay readable + independently testable. Wired into `SidebarHeader`.
+- **Gate:** co-brands when `!effectiveIsPlatformAdmin && currentOrg` — org members, plus platform admins impersonating an org; platform view / org-less fall back. Reads `currentOrg` (name + `logo_url`) straight off `useAuth`; signs the logo via the existing `useSignedBrandingUrl` (private container, signed URLs — no public-blob change).
+- **Org mark:** the org logo via the Radix `Avatar` idiom (same as the sidebar-footer user avatar), so a failed/expired signed URL degrades to an initials monogram (`getInitials`, `bg-primary` square) instead of a broken image. Long org names truncate (`min-w-0`); logo img is decorative (`alt=""`, name sits beside it). Collapsed rail shows the org square mark only; fallback keeps `GraduationCap` (forward-compat for the icon-rail #370).
+- **i18n/light-dark:** platform wordmark keyed on `i18n.resolvedLanguage` via `useTranslation()` (da-DK → da; matches the `<html lang>` convention); text/monogram via theme tokens; images render the same asset both themes (no dark-logo pipeline exists).
+
+**Decisions (martin, grilled):** (1) **display-only** — logo *upload* stays in `OrgAnalytics`, its relocation is #369; (2) co-brand gate incl. platform-admin-impersonating-an-org; (3) org hero + smaller AIU endorsing mark; (4) no-logo → initials monogram (never regress to platform-only for a missing logo); (5) collapsed → org square mark only; (6) light/dark token-driven, no new assets.
+
+**Reviews:** `/code-review` (Opus, whole-diff) raised 6 — accepted 4 (resolvedLanguage+`useTranslation` reactivity; Radix-Avatar graceful fallback + decorative `alt`), declined 2 with reasoning on the PR (`object-cover` is the small-mark convention per `BrandingAvatar`/footer, not the large-header `object-contain`; the collapsed branch is spec'd + forward-compat for #370, not dead).
+
+**Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **927 / 123** · `build` 0. New `SidebarBrand.test.tsx` (6): fallback (no org / platform view), co-brand w/ logo (signs the path), no-logo initials, collapsed org mark, collapsed fallback. **Visual:** real component rendered in a throwaway Vite+Playwright harness (stubbed auth) across all 5 states — caught + fixed a long-name overflow (`min-w-0`) and re-verified the Avatar variant.
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #387.
+
+---
+
+## 2026-08-10 — #372 follow-up: drop the AI Uddannelse wordmark from the co-brand lockup (PR #390)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Same-day follow-up to #372 (PR #387) — martin didn't like how the small platform wordmark looked tucked under the org name. Worktree-isolated off `origin/main` @`1b06351` (the #372 merge); PR opened ready after verify.
+
+**What:** removed the smaller AI Uddannelse endorsing wordmark that sat beneath the org name in the sidebar header — in an org context the header now shows the **org logo + name only**. This reverses part of #372's co-branding intent (platform brand no longer in-chrome for org users), on martin's call. The platform logo is unchanged in the non-org fallback (platform view / org-less / individual-tier), so the AI Uddannelse brand still shows there.
+
+**How:** dropped the wordmark `<img>` from `SidebarBrand`'s expanded co-brand return and flattened the now-single-child name wrapper into a truncating `<span>` on the row (`min-w-0` preserved so long org names still ellipsize). `platformSrc`/`platformAlt` + the logo assets stay — still used by the fallback. TDD: flipped the two co-brand tests to assert the wordmark is *absent* (watched them fail, then removed it).
+
+**Verify (controller-run on the branch):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **927 / 123** · `build` 0. Real-component Playwright harness re-checked all 5 states — org logo + name (truncation intact), initials monogram, collapsed marks, platform fallback — no wordmark. `/code-review` (Opus, whole-diff) — 3 minor findings, **1 accepted** (label the collapsed org mark for the #370 icon-rail a11y path), **2 declined** with reasoning on the PR (reuse `BrandingAvatar` — its `getAvatarColor` default fights the intended `bg-primary`, and the sidebar-footer avatar hand-rolls the same idiom; `getInitials` "U" fallback — unreachable, `organizations.name` is NOT NULL).
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #390.
