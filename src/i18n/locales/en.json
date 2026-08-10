@@ -933,6 +933,8 @@
       "requireEmailVerificationHint": "Users must verify their email before accessing the platform.",
       "allowSelfRegistration": "Allow self registration",
       "allowSelfRegistrationHint": "Allow users to sign up without an invitation.",
+      "allowIndividualRegistration": "Allow Walk-in Members",
+      "allowIndividualRegistrationHint": "Let individuals without an organization sign up on their own as self-serve learners.",
       "save": "Save user settings"
     },
     "features": {

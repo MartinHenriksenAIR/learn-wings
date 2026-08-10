@@ -933,6 +933,8 @@
       "requireEmailVerificationHint": "Brugere skal bekræfte deres e-mail, før de får adgang til platformen.",
       "allowSelfRegistration": "Tillad selvregistrering",
       "allowSelfRegistrationHint": "Tillad brugere at tilmelde sig uden en invitation.",
+      "allowIndividualRegistration": "Tillad walk-in-medlemmer",
+      "allowIndividualRegistrationHint": "Lad enkeltpersoner uden en organisation tilmelde sig på egen hånd som selvbetjente brugere.",
       "save": "Gem brugerindstillinger"
     },
     "features": {

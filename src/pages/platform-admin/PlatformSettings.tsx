@@ -24,6 +24,7 @@ interface UserAccessSettings {
   default_role: 'learner' | 'org_admin';
   require_email_verification: boolean;
   allow_self_registration: boolean;
+  allow_individual_registration: boolean;
 }
 
 interface FeatureSettings {
@@ -48,6 +49,7 @@ const defaultUserAccess: UserAccessSettings = {
   default_role: 'learner',
   require_email_verification: false,
   allow_self_registration: true,
+  allow_individual_registration: true,
 };
 
 const defaultFeatures: FeatureSettings = {
@@ -255,6 +257,24 @@ export default function PlatformSettings() {
                   id="allow_self_registration"
                   checked={userAccess.allow_self_registration}
                   onCheckedChange={(checked) => setUserAccess({ ...userAccess, allow_self_registration: checked })}
+                />
+              </div>
+
+              {/* #354: individual ("walk-in") self-serve tier. A DISTINCT policy from
+                  allow_self_registration (company Entra auto-join) — deliberately not merged. */}
+              <div className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]">
+                <div className="flex flex-col gap-px">
+                  <Label htmlFor="allow_individual_registration" className="text-[13.5px] font-bold">
+                    {t('platformSettings.userAccess.allowIndividualRegistration')}
+                  </Label>
+                  <p className="text-[11.5px] text-muted-foreground">
+                    {t('platformSettings.userAccess.allowIndividualRegistrationHint')}
+                  </p>
+                </div>
+                <Switch
+                  id="allow_individual_registration"
+                  checked={userAccess.allow_individual_registration}
+                  onCheckedChange={(checked) => setUserAccess({ ...userAccess, allow_individual_registration: checked })}
                 />
               </div>
 

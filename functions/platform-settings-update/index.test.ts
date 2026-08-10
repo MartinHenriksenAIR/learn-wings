@@ -161,6 +161,7 @@ describe('platform-settings-update', () => {
       default_role: 'learner',
       require_email_verification: true,
       allow_self_registration: false,
+      allow_individual_registration: true,
     };
     mockQueryOne.mockResolvedValueOnce({ key: 'user_access', value: fullUserAccess });
 
@@ -169,6 +170,26 @@ describe('platform-settings-update', () => {
     expect(res.status).toBe(200);
     const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(params[1]).toBe(JSON.stringify(fullUserAccess));
+  });
+
+  it('accepts the allow_individual_registration toggle (#354 walk-in tier)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQueryOne.mockResolvedValueOnce({ key: 'user_access', value: { allow_individual_registration: false } });
+
+    const res = await handler(baseReq({ key: 'user_access', value: { allow_individual_registration: false } }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params[1]).toBe(JSON.stringify({ allow_individual_registration: false }));
+  });
+
+  it('rejects a non-boolean allow_individual_registration', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+
+    const res = await handler(baseReq({ key: 'user_access', value: { allow_individual_registration: 'yes' } }), {} as any);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "allow_individual_registration"/);
   });
 
   it('returns 404 when the setting key does not exist in the DB', async () => {
