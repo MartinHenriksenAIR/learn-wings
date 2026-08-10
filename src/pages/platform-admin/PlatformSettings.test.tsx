@@ -184,6 +184,42 @@ describe('PlatformSettings', () => {
     });
   });
 
+  it('walk-in members toggle: default on, distinct from self-registration, persisted on save (#354)', async () => {
+    mockCallApi.mockResolvedValue(successResponse);
+
+    renderPage();
+
+    const walkInSwitch = () =>
+      screen.getByRole('switch', { name: 'platformSettings.userAccess.allowIndividualRegistration' });
+    const selfRegSwitch = () =>
+      screen.getByRole('switch', { name: 'platformSettings.userAccess.allowSelfRegistration' });
+
+    // Default ON (absent from the server row → seeded from defaults), and a
+    // genuinely separate control from company self-registration.
+    await waitFor(() => expect(walkInSwitch()).toBeChecked());
+    expect(walkInSwitch()).not.toBe(selfRegSwitch());
+
+    // Toggling walk-in off leaves self-registration untouched (distinct policies).
+    fireEvent.click(walkInSwitch());
+    expect(walkInSwitch()).not.toBeChecked();
+    expect(selfRegSwitch()).toBeChecked();
+
+    // Save persists the field through platform-settings-update.
+    mockCallApi.mockClear();
+    mockCallApi.mockResolvedValue({});
+    fireEvent.click(screen.getByRole('button', { name: 'platformSettings.userAccess.save' }));
+
+    await waitFor(() => {
+      expect(mockCallApi).toHaveBeenCalledWith(
+        '/api/platform-settings-update',
+        expect.objectContaining({
+          key: 'user_access',
+          value: expect.objectContaining({ allow_individual_registration: false }),
+        })
+      );
+    });
+  });
+
   it('per-panel morph: a successful save morphs the button into the Saved state', async () => {
     mockCallApi.mockResolvedValue(successResponse);
 

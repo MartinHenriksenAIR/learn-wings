@@ -19,6 +19,7 @@ const FIELD_SHAPES: Record<SettingKey, Record<string, FieldCheck>> = {
     default_role: isOneOf('learner', 'org_admin'),
     require_email_verification: isBoolean,
     allow_self_registration: isBoolean,
+    allow_individual_registration: isBoolean,
   },
   features: {
     certificates_enabled: isBoolean,
@@ -26,6 +27,7 @@ const FIELD_SHAPES: Record<SettingKey, Record<string, FieldCheck>> = {
     analytics_enabled: isBoolean,
     course_reviews_enabled: isBoolean,
     community_enabled: isBoolean,
+    exercises_enabled: isBoolean,
   },
   seat_pricing: {
     annual_price_per_seat: isNonNegativeNumberOrNull,

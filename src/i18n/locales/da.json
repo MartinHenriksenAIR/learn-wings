@@ -106,7 +106,8 @@
     "signInWithMicrosoft": "Log ind med Microsoft",
     "accessProvidedByOrg": "Adgang leveres af din organisation",
     "passwordResetInfo": "Nulstilling af adgangskode håndteres af din organisations IT-administrator via Microsoft Entra ID.",
-    "backToSignIn": "Tilbage til login"
+    "backToSignIn": "Tilbage til login",
+    "sessionExpiredNotice": "Du er blevet logget ud. Log ind igen, så fører vi dig tilbage til det, du var i gang med."
   },
   "contextError": {
     "title": "Vi kunne ikke indlæse din konto",
@@ -936,6 +937,8 @@
       "requireEmailVerificationHint": "Brugere skal bekræfte deres e-mail, før de får adgang til platformen.",
       "allowSelfRegistration": "Tillad selvregistrering",
       "allowSelfRegistrationHint": "Tillad brugere at tilmelde sig uden en invitation.",
+      "allowIndividualRegistration": "Tillad walk-in-medlemmer",
+      "allowIndividualRegistrationHint": "Lad enkeltpersoner uden en organisation tilmelde sig på egen hånd som selvbetjente brugere.",
       "save": "Gem brugerindstillinger"
     },
     "features": {

@@ -56,10 +56,18 @@ const NAV_BUTTON_CLASSES =
   'h-auto gap-[11px] rounded-[11px] px-3 py-2.5 text-[13.5px] font-semibold text-sidebar-foreground ' +
   'hover:bg-[#f3f4f8] hover:text-foreground active:bg-[#f3f4f8] active:text-foreground ' +
   'data-[active=true]:bg-primary data-[active=true]:font-semibold data-[active=true]:text-primary-foreground ' +
-  'data-[active=true]:hover:bg-primary data-[active=true]:hover:text-primary-foreground [&>svg]:size-[17px]';
+  'data-[active=true]:hover:bg-primary data-[active=true]:hover:text-primary-foreground [&>svg]:size-[17px] ' +
+  // Collapsed to the icon rail (#370): the custom pill sizing (h-auto/px-3/py-2.5) fights
+  // the primitive's own collapse squaring, so re-assert a clean centred 32px square with `!`.
+  'group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center';
 
 const GROUP_LABEL_CLASSES =
-  'h-auto px-3 pb-1.5 text-[12.5px] font-semibold normal-case text-[#3f4657]';
+  'h-auto px-3 pb-1.5 text-[12.5px] font-semibold normal-case text-[#3f4657] ' +
+  // Collapsed, the shadcn primitive only fades the label (opacity-0) but keeps it in the
+  // layout — and with our h-auto override its -mt-8 no longer cancels the label's height, so
+  // the invisible label overlapped the icon buttons and, still hit-testable, stole their
+  // hovers/clicks and showed a text (I-beam) cursor. Drop it from the rail entirely (#370).
+  'group-data-[collapsible=icon]:hidden';
 
 const MENU_ITEM_CLASSES = 'rounded-[9px] text-[13px] font-medium';
 
@@ -186,16 +194,16 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar>
-      <SidebarHeader className="px-5 pb-4 pt-[22px]">
-        <div className="flex items-center justify-start">
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="px-5 pb-4 pt-[22px] group-data-[collapsible=icon]:px-0">
+        <div className="flex items-center justify-start group-data-[collapsible=icon]:justify-center">
           <SidebarBrand />
         </div>
       </SidebarHeader>
 
       <OrgSelector />
 
-      <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2">
+      <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2 group-data-[collapsible=icon]:px-2">
         {!effectiveIsPlatformAdmin && (
           <>
             <NavSection items={dashboardItems} />
@@ -215,12 +223,12 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border p-3">
+      <SidebarFooter className="border-t border-border p-3 group-data-[collapsible=icon]:p-1.5">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="h-auto w-full justify-start gap-2.5 rounded-xl p-2 text-sidebar-foreground hover:bg-[#f3f4f8] hover:text-foreground"
+              className="h-auto w-full justify-start gap-2.5 rounded-xl p-2 text-sidebar-foreground hover:bg-[#f3f4f8] hover:text-foreground group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center"
             >
               <Avatar className="h-9 w-9">
                 {avatarSrc && (

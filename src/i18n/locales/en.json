@@ -106,7 +106,8 @@
     "signInWithMicrosoft": "Sign in with Microsoft",
     "accessProvidedByOrg": "Access is provided by your organization",
     "passwordResetInfo": "Password reset is managed by your organization's IT administrator via Microsoft Entra ID.",
-    "backToSignIn": "Back to sign in"
+    "backToSignIn": "Back to sign in",
+    "sessionExpiredNotice": "You've been signed out. Log back in and we'll take you right back to where you left off."
   },
   "contextError": {
     "title": "We couldn't load your account",
@@ -936,6 +937,8 @@
       "requireEmailVerificationHint": "Users must verify their email before accessing the platform.",
       "allowSelfRegistration": "Allow self registration",
       "allowSelfRegistrationHint": "Allow users to sign up without an invitation.",
+      "allowIndividualRegistration": "Allow Walk-in Members",
+      "allowIndividualRegistrationHint": "Let individuals without an organization sign up on their own as self-serve learners.",
       "save": "Save user settings"
     },
     "features": {

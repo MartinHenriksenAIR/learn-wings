@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { consumePostLoginRedirect } from '@/lib/post-login-redirect';
+import { consumeSessionExpiredNotice } from '@/lib/session-expired';
 import { routes } from '@/lib/routes';
 import { MicrosoftSignInButton } from '@/components/auth/MicrosoftSignInButton';
 import { Loader2 } from 'lucide-react';
@@ -18,6 +19,9 @@ export default function Login() {
   const { signIn, user, profile, isPlatformAdmin, isOrgAdmin, isLoading } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  // Read once on mount: true only when a dead session redirected here, so the
+  // notice shows this visit and a later manual visit to /login stays quiet.
+  const [sessionExpired] = useState(() => consumeSessionExpiredNotice());
 
   useEffect(() => {
     // `isLoading` covers the user-context fetch (useAuth), so once it clears
@@ -60,6 +64,14 @@ export default function Login() {
           alt="AI Uddannelse"
           className="h-[52px] w-auto object-contain"
         />
+        {sessionExpired && (
+          <p
+            role="status"
+            className="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm leading-[1.5] text-amber-900"
+          >
+            {t('auth.sessionExpiredNotice')}
+          </p>
+        )}
         <p className="text-balance text-center text-sm leading-[1.55] text-muted-foreground">
           {t('auth.platformDescription')}
         </p>
