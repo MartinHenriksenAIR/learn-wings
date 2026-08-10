@@ -2347,6 +2347,25 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 
 ---
 
+## 2026-08-10 — #389 Redirect to /login on a dead session (PR #393)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Part of the AIU platform-review batch (Aug 2026). Picked up after #360 (the original target) turned out blocked-by the in-flight #354 — martin chose #389 instead after a collision check cleared it against the parallel #354/#368/#370 sessions (only shared file is the append-only i18n bundle). Requirements grilled first (handler location + notice tone). Worktree-isolated off `origin/main` @`7ff44ad`; draft PR opened at pickup, marked ready after verify + review.
+
+**What:** a dead session (Entra refresh token expired → MSAL `InteractionRequiredAuthError`, or a backend 401) used to leave the app *looking* active while every data call silently failed. It now redirects to `/login` with a warm, one-time notice ("You've been signed out. Log back in and we'll take you right back to where you left off." / da) and returns the user to where they were after re-login.
+
+**How:**
+- New `src/lib/session-expired.ts` — `handleSessionExpired()`: saves the current in-app URL via `post-login-redirect`, sets a one-time notice flag, clears the stale MSAL account (`msalInstance.clearCache()`) so the reloaded `/login` has no account → no `fetchUserContext` → **no redirect loop**, then hard-redirects. A module-level `redirecting` guard makes concurrent 401s fire once (QueryClient's default `retry:3` across many hooks would otherwise storm). `consumeSessionExpiredNotice()` reads the flag once. Auth routes are excluded from the return target, derived from `routes.auth`.
+- `src/lib/api-client.ts` — the choke point: `getAccessToken` catches `InteractionRequiredAuthError`; `callApi`/`callApiRaw` fire the handler on HTTP 401; `callApiRaw` normalized to throw `ApiError` (was a bare `Error`) so the certificate download + compliance export redirect too. 403 (authz) and 500/network are untouched — those keep the existing local retry cards.
+- `src/pages/Login.tsx` + i18n en/da — shows the notice only when the flag is set (a first-time visitor never sees it; no StrictMode, so the `useState` consume-on-mount fires exactly once).
+
+**Decisions (martin, grilled):** (1) single handler at the **api-client** choke point (covers every caller incl. raw downloads), not QueryClient (misses raw fetches); (2) **warm & reassuring** notice copy over neutral/minimal; (3) deliberately left `useAuth`'s #232 `contextError` cards intact — the global redirect supersedes them for dead sessions, and 500/network still use them.
+
+**Verify (controller-run on the branch):** root `lint` 0 · `tsc` app+node 0 · `npm test` **940 / 124** · `build` 0; functions untouched. 13 new tests (session-expired handler incl. loop/storm/save-URL; api-client detection of both vectors + the 500/network negatives; Login notice shown/hidden). Whole-diff **Opus review — clean, no Critical/Important**; it verified against the real msal-browser v5 source that (a) there's no redirect loop and (b) `clearCache()` clears only MSAL-prefixed keys so the saved URL + notice survive; 5 Minor findings, 2 fixed (auth-path exclusions derived from `routes.auth`; documented the clearCache invariant), 3 declined/optional. **Near-miss caught:** the first `Login.test.tsx` write clobbered an existing 7-test file (a truncated `find` had hidden it) — recovered from HEAD, folded the 2 notice tests in, diff vs HEAD additions-only.
+
+**Deploy:** frontend-only, no schema/functions change → plain merge, SWA auto-ships. Deploy + smoke announced on PR #393.
+
+---
+
 ## 2026-08-10 — #370 follow-up: collapsed-rail icons showed an I-beam cursor / flickered (PR #395)
 
 **Who:** claude (Opus 4.8, 1M) with martin. Same-day follow-up to #370 (PR #392) — martin reported the collapsed icon rail felt buggy: hovering an icon sometimes showed a text (I-beam) cursor instead of a pointer, with a flicker before a click landed. Branched off `origin/main` @`7e85335`, worktree-isolated.
