@@ -121,6 +121,21 @@ export async function selfRegistrationEnabled(): Promise<boolean> {
 }
 
 /**
+ * The individual self-serve tier master switch (#354). Reads
+ * platform_settings.user_access.allow_individual_registration. Independent of
+ * allow_self_registration (which governs COMPANY tenant auto-join). Defaults ON
+ * when the row/key is absent — the tier ships on by default. The settings-screen
+ * toggle UI lands in #368; this is the behaviour + break-glass.
+ */
+export async function individualTierEnabled(): Promise<boolean> {
+  const row = await queryOne<{ allow_individual_registration: boolean | null }>(
+    `SELECT (value->>'allow_individual_registration')::boolean AS allow_individual_registration
+       FROM platform_settings WHERE key = 'user_access'`,
+  );
+  return row?.allow_individual_registration ?? true;
+}
+
+/**
  * Auto-join the caller to a bound org as a learner (#353) — the invite-less SSO
  * onboarding path, run on every user-context login. Non-destructive and
  * best-effort.
