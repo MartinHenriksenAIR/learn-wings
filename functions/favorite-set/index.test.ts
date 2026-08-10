@@ -1,16 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsActiveMember, mockResolveVisibility } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockQuery: vi.fn(), mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(), mockIsActiveMember: vi.fn(),
+    mockResolveVisibility: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember, isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
+// resolveVisibilityContext is mocked (fragment builders kept real via importOriginal) so it
+// consumes no queryOne slot — every existing order-sensitive queryOne sequence stays intact.
+vi.mock('../shared/course-visibility', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/course-visibility')>()),
+  resolveVisibilityContext: mockResolveVisibility,
+}));
 
 import handler from './index';
 
@@ -29,6 +36,8 @@ describe('favorite-set', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockIsActiveMember.mockResolvedValue(true);
+    // Default: standard (non-individual) tier — keeps every existing test on the org_course_access gate.
+    mockResolveVisibility.mockResolvedValue({ isIndividual: false, language: 'da' });
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -104,6 +113,38 @@ describe('favorite-set', () => {
     expect(sql).toContain('INSERT INTO course_favorites (user_id, course_id)');
     expect(sql).toContain('ON CONFLICT (user_id, course_id) DO NOTHING');
     expect(params).toEqual(['p1', 'course-1']); // profile.id, never a client user id
+  });
+
+  it('favorite=true (individual org): gates on published + language, bypassing org_course_access (#354)', async () => {
+    mockResolveVisibility.mockResolvedValueOnce({ isIndividual: true, language: 'en' });
+    mockQueryOne.mockResolvedValueOnce({ ok: true }); // individual access gate passes
+    mockQuery.mockResolvedValueOnce([]);              // INSERT ... ON CONFLICT DO NOTHING
+    const res = await handler(baseReq(addBody), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ favorited: true });
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    // Individual gate bypasses org_course_access and requires published + the caller's language.
+    expect(sql).not.toContain('org_course_access');
+    expect(sql).toContain('c.is_published = TRUE');
+    expect(sql).toContain('c.language = $3');
+    expect(params).toEqual(['org-1', 'course-1', 'en']);
+    // The upsert still runs on the individual path.
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const [insertSql, insertParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(insertSql).toContain('INSERT INTO course_favorites (user_id, course_id)');
+    expect(insertParams).toEqual(['p1', 'course-1']);
+  });
+
+  it('favorite=true (individual org): a course not in the caller\'s language returns 403 and does not insert (#354)', async () => {
+    mockResolveVisibility.mockResolvedValueOnce({ isIndividual: true, language: 'en' });
+    mockQueryOne.mockResolvedValueOnce({ ok: false }); // gate fails (unpublished or wrong language)
+    const res = await handler(baseReq(addBody), {} as any);
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Course access denied' });
+    const [sql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toContain('org_course_access');
+    expect(mockQuery).not.toHaveBeenCalled(); // INSERT never runs
   });
 
   it('favorite=false: deletes with no access gate, returns { favorited: false }', async () => {

@@ -1,6 +1,6 @@
 import { query, queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-import { orgCourseAccessEnabled } from '../shared/course-visibility';
+import { orgCourseAccessEnabled, individualCourseVisibility, resolveVisibilityContext } from '../shared/course-visibility';
 
 // #358 — toggle a course favorite for the caller. The table is org-neutral
 // (PK user_id, course_id), so writes are keyed on profile.id (never a client id).
@@ -21,17 +21,29 @@ export default endpoint('favorite-set', async ({ req, profile, reply, requireAct
   await requireActiveMember(orgId);
 
   if (favorite) {
-    // Gate the ADD on the same access rule as the catalog: the course must be
-    // published AND enabled for this org, or a client could favorite a course it
-    // can't see. orgId is $1 (the fragment's orgParam), courseId is $2.
-    const access = await queryOne<{ ok: boolean }>(
-      `SELECT EXISTS(
-         SELECT 1 FROM courses c
-          WHERE c.id = $2 AND c.is_published = TRUE
-            AND ${orgCourseAccessEnabled({ courseRef: 'c.id', orgParam: 1 })}
-       ) AS ok`,
-      [orgId, courseId],
-    );
+    // Gate the ADD on the same access rule as the catalog, or a client could favorite a
+    // course it can't see. #354 — the individual tier has no org_course_access rows: its
+    // rule is published + the caller's server-authoritative language. Standard orgs keep the
+    // published + org-enabled gate. Detection is by kind (via the resolver), never a fixed id.
+    const { isIndividual, language } = await resolveVisibilityContext(orgId, profile.id);
+    // courseId is $2 in both branches. Standard: orgId is $1 (the fragment's orgParam).
+    // Individual: language is $3 (the fragment's langParam); orgId stays $1 (unused there).
+    const access = isIndividual
+      ? await queryOne<{ ok: boolean }>(
+          `SELECT EXISTS(
+             SELECT 1 FROM courses c
+              WHERE c.id = $2 AND ${individualCourseVisibility({ courseAlias: 'c', langParam: 3 })}
+           ) AS ok`,
+          [orgId, courseId, language],
+        )
+      : await queryOne<{ ok: boolean }>(
+          `SELECT EXISTS(
+             SELECT 1 FROM courses c
+              WHERE c.id = $2 AND c.is_published = TRUE
+                AND ${orgCourseAccessEnabled({ courseRef: 'c.id', orgParam: 1 })}
+           ) AS ok`,
+          [orgId, courseId],
+        );
     if (!access?.ok) {
       return reply(403, { error: 'Course access denied' });
     }

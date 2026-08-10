@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQuery: vi.fn(),
+    mockQuery: vi.fn(), mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(), mockIsActiveMember: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: mockQuery, queryOne: vi.fn() }));
+vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember, isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -28,6 +28,10 @@ describe('favorites', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockIsActiveMember.mockResolvedValue(true);
+    // resolveVisibilityContext runs before the favorites query (its own queryOne slot).
+    // Default a standard org so the existing org_course_access path is exercised unless
+    // a test overrides it — keeps every order-sensitive existing test green.
+    mockQueryOne.mockResolvedValue({ kind: 'standard', language: 'da' });
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -100,5 +104,27 @@ describe('favorites', () => {
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ courses: [] });
+  });
+
+  it('individual org: filters favorites by published + saved language, bypassing org_course_access (#354)', async () => {
+    // resolveVisibilityContext yields the individual tier + the caller's server-authoritative language.
+    mockQueryOne.mockResolvedValueOnce({ kind: 'individual', language: 'en' });
+    const courses = [
+      { id: 'c1', title: 'Alpha', description: null, level: 'beginner', language: 'en', is_published: true, thumbnail_url: null, created_by_user_id: 'admin-1', created_at: '2026-08-01T00:00:00.000Z' },
+    ];
+    mockQuery.mockResolvedValueOnce(courses);
+
+    const res = await handler(baseReq({ orgId: 'ind-354' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ courses });
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    // Individual visibility bypasses org_course_access and gates on published + the caller's language.
+    expect(sql).not.toContain('org_course_access');
+    expect(sql).toContain('c.is_published = TRUE');
+    expect(sql).toContain('c.language = $2');
+    // profile.id ($1), server-authoritative language ($2) — no orgId bind on the individual path.
+    expect(params).toEqual(['p1', 'en']);
   });
 });
