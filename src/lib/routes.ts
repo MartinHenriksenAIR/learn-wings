@@ -31,6 +31,9 @@ export const routes = {
     /** Personal learning home — "My Training" / "Min Træning" (#364). */
     training: '/app/training',
     courses: '/app/courses',
+    /** Course detail — "read about a course" before starting (#403). */
+    courseDetailPattern: '/app/courses/:courseId',
+    courseDetail: (courseId: string) => `/app/courses/${courseId}`,
     assessment: '/app/assessment',
     coursePlayerPattern: '/app/learn/:courseId',
     coursePlayer: (courseId: string) => `/app/learn/${courseId}`,

@@ -15,6 +15,7 @@ import ResetPassword from "./pages/ResetPassword";
 import LearnerDashboard from "./pages/learner/Dashboard";
 import LearnerTraining from "./pages/learner/Training";
 import LearnerCourses from "./pages/learner/Courses";
+import CourseDetail from "./pages/learner/CourseDetail";
 import Assessment from "./pages/learner/Assessment";
 import CoursePlayer from "./pages/learner/CoursePlayer";
 import TipsAndTricks from "./pages/learner/TipsAndTricks";
@@ -52,6 +53,7 @@ function AppRoutes() {
       <Route path={routes.learner.dashboard} element={<ProtectedRoute learnerOnly><LearnerDashboard /></ProtectedRoute>} />
       <Route path={routes.learner.training} element={<ProtectedRoute learnerOnly><LearnerTraining /></ProtectedRoute>} />
       <Route path={routes.learner.courses} element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
+      <Route path={routes.learner.courseDetailPattern} element={<ProtectedRoute learnerOnly><CourseDetail /></ProtectedRoute>} />
       <Route path={routes.learner.assessment} element={<ProtectedRoute learnerOnly><Assessment /></ProtectedRoute>} />
       <Route path={routes.learner.coursePlayerPattern} element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
       <Route path={routes.learner.tips} element={<ProtectedRoute learnerOnly><TipsAndTricks /></ProtectedRoute>} />
