@@ -275,5 +275,23 @@ describe('AppSidebar nav groups (#271)', () => {
       expect(courses?.textContent).toBe('');
       expect(screen.queryByText(en.nav.courses)).not.toBeInTheDocument();
     });
+
+    // Regression: the section labels must leave the rail entirely when collapsed. The shadcn
+    // primitive only fades them (opacity-0) but keeps them in the layout, and our h-auto
+    // override defeats its -mt-8 height-cancel — so an invisible-but-hit-testable label
+    // overlapped the icon buttons, stealing hovers/clicks and showing an I-beam cursor.
+    // The `group-data-[collapsible=icon]:hidden` utility drops them (display:none), which the
+    // Playwright harness confirmed geometrically (every icon centre then hits its own link
+    // with cursor:pointer). jsdom can't do layout/cursor, so guard the wiring here.
+    it('drops the section labels from the rail so they cannot intercept the icons (#370)', () => {
+      mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
+      renderSidebar(routes.learner.dashboard, { open: false });
+
+      const labels = document.querySelectorAll('[data-sidebar="group-label"]');
+      expect(labels.length).toBeGreaterThan(0);
+      labels.forEach((label) => {
+        expect(label.className).toContain('group-data-[collapsible=icon]:hidden');
+      });
+    });
   });
 });
