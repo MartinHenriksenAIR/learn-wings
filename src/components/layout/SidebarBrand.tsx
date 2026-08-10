@@ -1,7 +1,8 @@
-import i18n from '@/i18n';
+import { useTranslation } from 'react-i18next';
 import { GraduationCap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/components/ui/sidebar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useSignedBrandingUrl } from '@/hooks/useSignedBrandingUrl';
 import { getInitials } from '@/lib/utils';
 import logoLightDa from '@/assets/logo-light.png';
@@ -18,19 +19,28 @@ import logoLightEn from '@/assets/logo-light-en.png';
  *
  * Collapsed to the icon rail there is only room for the org's square mark
  * (its logo, or an initials monogram when it has none); the fallback keeps the
- * platform GraduationCap.
+ * platform GraduationCap. (Collapse to an icon rail is #370; this keeps the
+ * mark ready for it, matching the pre-existing collapsed-header branch.)
  */
 export function SidebarBrand() {
   const { currentOrg, effectiveIsPlatformAdmin } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
+  // Subscribe to language changes here rather than relying on a parent's
+  // useTranslation() to re-render this subtree (frontend convention).
+  const { i18n } = useTranslation();
 
   const coBranded = !effectiveIsPlatformAdmin && !!currentOrg;
   // Only sign a logo we're actually going to display.
   const { data: orgLogoSrc } = useSignedBrandingUrl(coBranded ? currentOrg?.logo_url : null);
 
-  const platformSrc = i18n.language === 'da' ? logoLightDa : logoLightEn;
-  const platformAlt = i18n.language === 'da' ? 'AI Uddannelse' : 'AI Education';
+  // Key on resolvedLanguage, not the raw detected code: an unsupported browser
+  // language renders the English fallback (#226) and a region tag like 'da-DK'
+  // still resolves to 'da' — matching how the app syncs <html lang>
+  // (src/i18n/index.ts).
+  const isDanish = i18n.resolvedLanguage === 'da';
+  const platformSrc = isDanish ? logoLightDa : logoLightEn;
+  const platformAlt = isDanish ? 'AI Uddannelse' : 'AI Education';
 
   if (!coBranded || !currentOrg) {
     return collapsed ? (
@@ -44,18 +54,17 @@ export function SidebarBrand() {
     );
   }
 
-  // The org "mark": its logo when signed, else an initials monogram square
-  // (same idiom as the user avatar fallback).
-  const orgMark = orgLogoSrc ? (
-    <img
-      src={orgLogoSrc}
-      alt={currentOrg.name}
-      className="h-9 w-9 shrink-0 rounded-lg object-cover"
-    />
-  ) : (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">
-      {getInitials(currentOrg.name)}
-    </span>
+  // The org "mark": its logo, degrading to an initials monogram — same Avatar
+  // idiom as the user avatar in the sidebar footer, so a failed/expired signed
+  // URL falls back to initials instead of a broken image. alt="" because the
+  // org name sits beside it in the expanded lockup (no double announcement).
+  const orgMark = (
+    <Avatar className="h-9 w-9 shrink-0 rounded-lg">
+      {orgLogoSrc && <AvatarImage src={orgLogoSrc} alt="" className="object-cover" />}
+      <AvatarFallback className="rounded-lg bg-primary text-xs font-bold text-primary-foreground">
+        {getInitials(currentOrg.name)}
+      </AvatarFallback>
+    </Avatar>
   );
 
   if (collapsed) {

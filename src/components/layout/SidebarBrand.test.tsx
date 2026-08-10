@@ -69,11 +69,13 @@ describe('SidebarBrand co-branding (#372)', () => {
     );
     renderBrand();
 
+    // The org name shows, and we sign the org's stored logo path to display it.
+    // (The logo renders in a real browser via Radix AvatarImage — jsdom never
+    // loads the image, so we assert the signing behaviour, not the rendered img.)
     expect(screen.getByText('Acme Corp')).toBeInTheDocument();
-    expect(screen.getByAltText('Acme Corp')).toHaveAttribute('src', 'https://signed/acme.png');
+    expect(mockSigned).toHaveBeenCalledWith('orgs/acme.png');
     // The AIU wordmark stays visible as the smaller endorsing mark.
     expect(screen.getByAltText('AI Education')).toBeInTheDocument();
-    expect(mockSigned).toHaveBeenCalledWith('orgs/acme.png');
   });
 
   it('falls back to an initials monogram when the org has no logo', () => {
