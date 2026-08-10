@@ -56,6 +56,14 @@ describe('SidebarProvider cookie persistence (#370)', () => {
 // layout, so this pins the class as a regression guard (e.g. against a shadcn re-sync
 // silently dropping it) rather than asserting the visual behaviour.
 describe('Sidebar panel clips overflow during the width animation (#396)', () => {
+  // The #370 block leaks sidebar:state=false via document.cookie and only resets inside
+  // its own beforeEach; clear it here too so this block is hermetic regardless of order.
+  // (The assertion is state-independent — the class is unconditional — but the render
+  // shouldn't silently depend on a leaked cookie.)
+  beforeEach(() => {
+    document.cookie = 'sidebar:state=; path=/; max-age=0';
+  });
+
   it('keeps overflow-hidden on the panel box', () => {
     const { container } = render(
       <SidebarProvider>
