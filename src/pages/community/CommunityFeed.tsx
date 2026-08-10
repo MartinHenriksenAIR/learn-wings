@@ -57,6 +57,11 @@ export default function CommunityFeed() {
   // API calls keep the narrow scope; the events view reuses 'org' for chrome.
   const scope: CommunityScope = view === 'global' ? 'global' : 'org';
 
+  // #354: in the community area the hidden Individuals placeholder behaves as
+  // "no org" — global + events only, no org tab, no org-scoped extras. Identity/
+  // admin reads stay keyed on the real currentOrg.
+  const orgForCommunity = currentOrg?.kind === 'individual' ? null : currentOrg;
+
   const [showPostForm, setShowPostForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -65,10 +70,10 @@ export default function CommunityFeed() {
   // Redirect the org feed to global when the user has no org. The events view
   // always includes global scope, so it needs no org and is exempt.
   useEffect(() => {
-    if (view === 'org' && !currentOrg) {
+    if (view === 'org' && !orgForCommunity) {
       setSearchParams({ scope: 'global' });
     }
-  }, [view, currentOrg, setSearchParams]);
+  }, [view, orgForCommunity, setSearchParams]);
 
   // Fetch categories (secondary data — the chip row degrades gracefully; a
   // failure just toasts + logs rather than blocking the feed).
@@ -88,15 +93,15 @@ export default function CommunityFeed() {
   });
 
   const { data: posts = [], isLoading, isError: postsError, refetch: refetchPosts } = useQuery({
-    queryKey: queryKeys.communityPosts.list(scope, currentOrg?.id, selectedCategory, searchQuery, selectedTags),
+    queryKey: queryKeys.communityPosts.list(scope, orgForCommunity?.id, selectedCategory, searchQuery, selectedTags),
     queryFn: () => fetchPosts({
       scope,
-      org_id: scope === 'org' ? currentOrg?.id : undefined,
+      org_id: scope === 'org' ? orgForCommunity?.id : undefined,
       category_id: selectedCategory || undefined,
       search: searchQuery || undefined,
       tags: selectedTags.length > 0 ? selectedTags : undefined,
     }),
-    enabled: view !== 'events' && (scope === 'global' || !!currentOrg),
+    enabled: view !== 'events' && (scope === 'global' || !!orgForCommunity),
   });
 
   const createPostMutation = useMutation({
@@ -159,8 +164,8 @@ export default function CommunityFeed() {
   if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   const scopeTabs = [
-    ...(currentOrg
-      ? [{ key: 'org', label: currentOrg.name, icon: <Building2 aria-hidden="true" className="h-3.5 w-3.5" /> }]
+    ...(orgForCommunity
+      ? [{ key: 'org', label: orgForCommunity.name, icon: <Building2 aria-hidden="true" className="h-3.5 w-3.5" /> }]
       : []),
     { key: 'global', label: t('community.globalCommunity'), icon: <Globe aria-hidden="true" className="h-3.5 w-3.5" /> },
     {
@@ -179,7 +184,7 @@ export default function CommunityFeed() {
           </h1>
           <p className="text-sm text-muted-foreground">
             {scope === 'org'
-              ? t('community.subtitleOrg', { orgName: currentOrg?.name || t('nav.organization') })
+              ? t('community.subtitleOrg', { orgName: orgForCommunity?.name || t('nav.organization') })
               : t('community.subtitleGlobal')}
           </p>
         </div>
@@ -344,7 +349,7 @@ export default function CommunityFeed() {
             />
           )}
 
-          {scope === 'org' && currentOrg && (
+          {scope === 'org' && orgForCommunity && (
             <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card px-5 py-[18px]">
               <h3 className="mb-2 text-[13.5px] font-extrabold">{t('community.libraries')}</h3>
               <button
@@ -368,8 +373,8 @@ export default function CommunityFeed() {
             </div>
           )}
 
-          {scope === 'org' && currentOrg && (
-            <AIChampionsList orgId={currentOrg.id} />
+          {scope === 'org' && orgForCommunity && (
+            <AIChampionsList orgId={orgForCommunity.id} />
           )}
 
           {allTags.length > 0 && (
@@ -412,7 +417,7 @@ export default function CommunityFeed() {
         }}
         categories={categories}
         scope={isEventsView ? eventScope : scope}
-        orgId={currentOrg?.id}
+        orgId={orgForCommunity?.id}
         canPostRestricted={isEventsView ? canCreateEvent : canPostRestricted}
         initialData={eventInitialData}
       />

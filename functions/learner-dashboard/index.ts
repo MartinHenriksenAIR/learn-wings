@@ -1,5 +1,6 @@
 import { endpoint } from '../shared/endpoint';
 import { getLearnerDashboardData } from '../shared/gamification';
+import { resolveVisibilityContext } from '../shared/course-visibility';
 
 /**
  * Learner-dashboard data for the motivation hub (issue #362): a progress
@@ -9,6 +10,10 @@ import { getLearnerDashboardData } from '../shared/gamification';
  * All derived live — see shared/gamification.ts. Org isolation is enforced by
  * requireActiveMember before any org-scoped query runs; the leaderboard is
  * built from org_memberships, never a client-supplied user list (#373).
+ *
+ * For the individual (self-serve) tier the placeholder org pools unrelated solo
+ * learners, so the leaderboard is suppressed at the backend — detected by
+ * kind='individual' via resolveVisibilityContext, never a hard-coded id (#354).
  */
 export default endpoint('learner-dashboard', async ({ req, profile, reply, requireActiveMember }) => {
   const { orgId } = await req.json() as { orgId?: unknown };
@@ -19,6 +24,7 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
 
   await requireActiveMember(orgId);
 
-  const data = await getLearnerDashboardData(orgId, profile.id);
+  const { isIndividual } = await resolveVisibilityContext(orgId, profile.id);
+  const data = await getLearnerDashboardData(orgId, profile.id, { suppressLeaderboard: isIndividual });
   return reply(200, data);
 });

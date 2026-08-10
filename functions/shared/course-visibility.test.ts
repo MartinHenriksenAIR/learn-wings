@@ -1,6 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
-import { courseVisibilityPredicate, orgCourseAccessEnabled } from './course-visibility';
+vi.mock('./db', () => ({ queryOne: vi.fn() }));
+
+import { queryOne } from './db';
+import {
+  courseVisibilityPredicate,
+  individualCourseVisibility,
+  orgCourseAccessEnabled,
+  resolveVisibilityContext,
+} from './course-visibility';
 import { functionBody, tableBody } from './__fixtures__/schema';
 
 // Collapse whitespace so the pins assert SQL shape, not formatting.
@@ -42,6 +50,24 @@ describe('courseVisibilityPredicate', () => {
 
   it('hard-codes no ordinal: $1 appears only when asked for', () => {
     expect(courseVisibilityPredicate({ courseAlias: 'c', orgParam: 7 })).not.toContain('$1');
+  });
+});
+
+describe('individualCourseVisibility', () => {
+  it('is published + language, with no org-access clause', () => {
+    const sql = individualCourseVisibility({ courseAlias: 'c', langParam: 2 });
+    expect(sql).toContain('c.is_published = TRUE');
+    expect(sql).toContain('c.language = $2');
+    expect(sql).not.toContain('org_course_access');
+  });
+});
+
+describe('resolveVisibilityContext', () => {
+  it('flags individual orgs and reads saved language', async () => {
+    (queryOne as any).mockResolvedValueOnce({ kind: 'individual', language: 'en' });
+    await expect(resolveVisibilityContext('org-1', 'p1')).resolves.toEqual({ isIndividual: true, language: 'en' });
+    (queryOne as any).mockResolvedValueOnce({ kind: 'standard', language: null });
+    await expect(resolveVisibilityContext('org-2', 'p1')).resolves.toEqual({ isIndividual: false, language: 'da' });
   });
 });
 

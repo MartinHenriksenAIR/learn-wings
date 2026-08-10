@@ -92,15 +92,29 @@ describe('LearnerCourses — profile-gated loading guard', () => {
     expect(document.querySelector('.animate-spin')).toBeNull();
   });
 
-  it('resolves loading and shows no-org state when user has profile but no org', () => {
+  it('shows the invitation-only state for a non-admin with no org (blocked walk-in)', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, user: baseAuthState.user, profile: baseAuthState.profile, currentOrg: null });
 
     renderCourses();
 
     expect(document.querySelector('.animate-spin')).toBeNull();
 
-    // No-org branch text
+    // A non-admin with no org is a blocked walk-in — registration is invitation-only,
+    // not a "join an org" prompt.
+    expect(screen.getByText('dashboard.invitationOnlyTitle')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.invitationOnlyDescription')).toBeInTheDocument();
+    expect(screen.queryByText('common.noOrgSelected')).toBeNull();
+    expect(screen.queryByText('courses.joinOrgToAccessCourses')).toBeNull();
+  });
+
+  it('shows the generic no-org-selected state for a platform admin with no org', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: null, isPlatformAdmin: true });
+
+    renderCourses();
+
     expect(screen.getByText('common.noOrgSelected')).toBeInTheDocument();
+    expect(screen.getByText('courses.joinOrgToAccessCourses')).toBeInTheDocument();
+    expect(screen.queryByText('dashboard.invitationOnlyTitle')).toBeNull();
   });
 
   it('keeps spinner when user exists but profile not yet resolved (keep-waiting case)', () => {
@@ -147,6 +161,38 @@ describe('LearnerCourses — profile-gated loading guard', () => {
     await waitFor(() => {
       expect(document.querySelector('.animate-spin')).toBeNull();
     });
+  });
+});
+
+describe('LearnerCourses — individual tier (neutral, org-name-free subtitle)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(callApi).mockResolvedValue({ courses: [], enrollments: [], progress: {} });
+  });
+
+  it('shows the neutral individual subtitle (never the org-name subtitle) for an individual org', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg: { id: 'org-solo', name: 'Individuals', kind: 'individual' },
+    });
+
+    renderCourses();
+
+    expect(await screen.findByText('courses.subtitleIndividual')).toBeInTheDocument();
+    // The org-name-bearing subtitle must NOT render for a solo learner.
+    expect(screen.queryByText('courses.subtitle')).toBeNull();
+  });
+
+  it('shows the org-name subtitle for a standard org', async () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      currentOrg: { id: 'org-1', name: 'Org One', kind: 'standard' },
+    });
+
+    renderCourses();
+
+    expect(await screen.findByText('courses.subtitle')).toBeInTheDocument();
+    expect(screen.queryByText('courses.subtitleIndividual')).toBeNull();
   });
 });
 

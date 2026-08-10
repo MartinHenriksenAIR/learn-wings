@@ -2400,3 +2400,52 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify (controller-run on the branch, after a clean trunk merge of #370/#389/#390):** root `lint` 0 errors · `tsc` app+node 0 · `npm test` **948 / 125** · `build` 0; functions `build` 0 · `npm test` **2747 / 158**. New tests: backend accept + type-reject of the new field; frontend default-on + distinct-from-self-reg + persisted-on-save.
 
 **Deploy:** functions changed (the validator) → backend auto-ships on merge. **#368 stays OPEN** (tracking epic — data export + audit log remain). Deploy + smoke announced on PR #391.
+
+---
+
+## 2026-08-10 — #394 Platform Settings Features panel was unsaveable (PR #398)
+
+**Who:** claude (Opus 5, 1M) with emil. Picked as the lowest-resistance item on the open board — every other candidate was blocked (#371 by #370, #352 by #122), design-heavy (#369/#368/#360/#355), or already claimed by a draft PR (#396 by #397). Branched off `origin/main` @`00b3d16`.
+
+**What:** saving the **Funktioner** (Features) tab in Platform Settings returned HTTP 400, so no global feature flag could be changed in prod. Live since #227/#228 merged 2026-07-27 — three weeks unnoticed, because nothing surfaces the failure except an admin who tries to save.
+
+**Root cause:** `exercises_enabled` shipped in #227 into the frontend (`PlatformSettings.tsx` — the `FeatureSettings` interface, `defaultFeatures`, and **`featureKeys`**) and into the seed (`02-seed.sql`) + prod migration (`07-exercises.sql`), but never into `FIELD_SHAPES.features` in `functions/platform-settings-update/index.ts`. The panel saves the **whole** object (`saveSetting('features', features)`), so every request carried the unlisted field into the strict unknown-field check → `unknown field "exercises_enabled" for setting "features"`. The endpoint's own comment above that check — *"the frontend only ever sends the known field set"* — had silently become false, and that invariant is the entire reason the strict check is safe.
+
+**Fix:** one line — `exercises_enabled: isBoolean` added to `FIELD_SHAPES.features`. Backend stays strict; the frontend was not touched.
+
+**Why it slipped through:** a full-body write test already existed, but only for `user_access`. Every `features` test did a **partial** write (`{ quizzes_enabled: false }`), which never reaches the unknown-field path — so the suite structurally could not see a missing field. Added `a full features body passes validation and merges all fields`, mirroring the frontend's exact `featureKeys` set. Its guard value was demonstrated rather than assumed: reverting the one-line fix turns it red (`expected 400 to be 200`), restoring it turns it green. `user_access` and `seat_pricing` were checked against the frontend and the seed — no drift there.
+
+**Known gap, deliberately not closed here:** nothing ties `FIELD_SHAPES` to the frontend's key set or the seed, so the next flag added can repeat this exactly. The new test only pins the six keys that exist today. A real drift guard (assert `FIELD_SHAPES.features` against the seed's JSON keys, or share one key list) is the durable fix and is worth filing.
+
+**Gotcha worth remembering (cost real time):** the session's first diagnosis was wrong and confidently argued — it concluded #227 was unmerged and `exercises_enabled` didn't exist on trunk, and nearly shipped a "fix" for the wrong problem. Two compounding causes: (1) the local checkout was **42 commits behind** `origin/main`, so a working-tree grep found nothing; (2) PR #228 was **squash**-merged, so the branch's original commits are not ancestors of `main` and `git merge-base --is-ancestor <branch-sha> origin/main` correctly reports NO for work that *did* ship. In a squash-merge repo that check answers "was this exact commit replayed", not "did this work land". `git fetch` before reasoning about what's merged, and confirm content with `git grep <term> origin/main` rather than ancestry of a feature-branch SHA.
+
+**Verify:** root `lint` 0 · `tsc` app+node 0 · `npm test` **947 / 125** · `build` 0; functions `build` 0 · `test` **2746 / 158** (3 skip). CI green on all three checks. Note for anyone syncing a stale checkout: a root `npm install` is required after this range — the pulled commits added `@dnd-kit/*` and `@playwright/test`, and both `tsc` projects fail with module-resolution errors until it runs.
+
+**Deploy:** backend-only, no schema and no frontend change → squash-merged as `73bcc55`, functions + SWA workflows auto-shipped green. **Verified in the deployed app with Playwright**: signed in as platform admin, opened Funktioner, saved. Deliberately non-destructive — the panel PUTs the whole object regardless, so a no-op save exercises the exact failing path while writing back identical values. Request body carried `"exercises_enabled":false`; `POST /api/platform-settings-update` → **200 OK**; 0 console errors; all six toggles identical after a full reload. Deploy + smoke announced on PR #398 with the payload evidence.
+
+**Incidental observation (not acted on):** prod has `course_reviews_enabled: true`, while both the seed and `defaultFeatures` default it to `false` — someone enabled it deliberately at some point. Noted only so a future seed-vs-prod comparison doesn't read it as corruption.
+
+**Concurrency with #391 (entry above):** #391's `/code-review` is what filed #394 in the first place, and the two landed hours apart touching the same `FIELD_SHAPES` object — #391 added `allow_individual_registration` to `user_access`, this one added `exercises_enabled` to `features`. Different sub-objects, so trunk carries both and neither dropped the other; verified on `origin/main` after #391 merged. The only real collision was the expected hub-file append conflict in this file and `STATUS.html`, resolved by rebasing over the moved trunk and keeping both entries.
+
+---
+
+## 2026-08-10 — #354 Individual (self-serve) learner tier (PR #388)
+
+**Who:** claude (Opus 4.8, 1M) with martin. AIU platform-review batch. Requirements grilled first; spec → plan → subagent-driven execution in a worktree; ran alongside martin's parallel #368/#372/#370 sessions.
+
+**What:** org-less walk-ins (any Microsoft account, no invite, no tenant match) auto-join one hidden "Individuals" placeholder org (`organizations.kind='individual'`) and use the platform as normal learners — full published catalogue in their saved language, start/progress/complete, "AI Uddannelse"-issued certificates. The placeholder is hidden from every admin surface; leaderboard + org-community are suppressed for the tier; a real org always outranks the placeholder as `currentOrg`. Gated by a platform kill-switch (default ON).
+
+**How:**
+- **Detection** by a new `organizations.kind` classifier (`'standard' | 'individual'`) — never the seed id; the fixed id `00000000-…-354` exists only for idempotent seeding.
+- **Auto-join** last-resort in `user-context` (`ensureIndividualMembership`): fires only when the caller has zero active memberships AND the switch is on AND the placeholder is seeded; best-effort + idempotent, so it never breaks login and degrades gracefully to an "invitation only" screen if unseeded.
+- **Visibility, whole journey**: new `individualCourseVisibility` (published + saved language, `org_course_access` bypassed) + `resolveVisibilityContext`, applied in `learner-courses`, `course-player-data` (access gate + #357 implicit enroll), and `favorites`/`favorite-set`; standard-org SQL kept byte-identical.
+- **Certificate** issuer switched to the enrollment's own org (fixes a latent multi-org wrong-issuer bug); the placeholder's name "AI Uddannelse" prints for solo learners with no special-casing.
+- **Hiding**: `organizations` list (all 3 queries) + a real cross-org-breakdown leak fixed; leaderboard suppressed at the **backend** (`gamification`), not just the UI (#373-conscious).
+- **Kill-switch** `individualTierEnabled()` reads `user_access.allow_individual_registration` `?? true` — the exact key #391's toggle writes.
+- **Frontend**: real-org-wins `currentOrg` selection; neutral learner copy + hidden leaderboard + "invitation only" screen; community shows Global + Events (no org tab) for the tier; `SidebarBrand` no longer co-brands the placeholder.
+
+**Migration:** `migration/azure/2026-08-10-354-individual-tier.sql` (idempotent — `ADD COLUMN IF NOT EXISTS` + `ON CONFLICT DO NOTHING`) applied to prod + verified 2026-08-10 **before** merge (migrate-then-merge).
+
+**Reviews/verify:** 15 tasks, per-task spec+quality + a whole-branch Opus review (org isolation verified end-to-end); a plan-SQL boolean-absorption bug (the enrolled-relaxation) was caught in review + fixed. After a clean trunk merge (#370/#391/#393/#398): frontend `npm test` **957 / 126** · functions **2771 / 159** · both builds · `tsc` app+node · lint 0 errors. The merge exposed a **pre-existing** `QuizEditorDialog` test flake (an async race, unrelated to #354 — main was green) which was stabilized with `waitFor`.
+
+**Deploy:** schema + functions + frontend all changed → auto-ships on merge; migration applied first. Deploy announced on PR #388; the walk-in end-to-end smoke is human-gated (real Entra login).

@@ -223,3 +223,78 @@ describe('generate-certificate PDF byte accounting (#273)', () => {
     expect(createHash('sha256').update(pdf).digest('hex')).toBe('5993d1fd700836fe28ef3c6465a09049e76ab68dd48bb1764bc89947a2f3fb97');
   });
 });
+
+// ---------------------------------------------------------------------------
+// #354 — the printed issuer is the org that OWNS the completed enrollment, not
+// "any active membership LIMIT 1". The old query printed whichever active
+// membership sorted first (a latent multi-org wrong-issuer bug); the new one
+// joins the enrollment to its own org, so a solo course prints the placeholder
+// org's name ("AI Uddannelse") with no special-casing and a company course
+// prints the company.
+//
+// These tests key the mock off the SQL so the enrollment-org query and the
+// stale membership query return DIFFERENT names — the assertion then fails on
+// the old query (RED) and passes on the new one (GREEN).
+// ---------------------------------------------------------------------------
+
+/**
+ * Route each queryOne by its SQL. `enrollmentOrgName` is what the correct
+ * enrollment→org join returns; `membershipOrgName` is what the old
+ * "any active membership" query would have returned instead.
+ */
+function mockBySql(enrollmentOrgName: string, membershipOrgName: string): void {
+  mockQueryOne.mockImplementation(async (sql: string) => {
+    if (/FROM enrollments e\s+JOIN profiles p/.test(sql)) {
+      return { user_id: 'profile-uuid', status: 'completed', course_id: 'c-1', completed_at: '2026-05-01T00:00:00Z' };
+    }
+    if (/FROM profiles WHERE entra_oid/.test(sql)) return { full_name: 'Alice Smith' };
+    if (/FROM courses WHERE id/.test(sql)) return { title: 'AI Basics' };
+    if (/JOIN enrollments e ON e\.org_id = o\.id/.test(sql)) return { name: enrollmentOrgName };
+    if (/org_memberships/.test(sql)) return { name: membershipOrgName };
+    return null;
+  });
+}
+
+describe('generate-certificate issuer = enrollment org (#354)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('looks up the issuer org keyed by the enrollment id, not by active membership', async () => {
+    mockQueryOne.mockResolvedValueOnce({ user_id: 'profile-uuid', status: 'completed', course_id: 'c-1', completed_at: '2026-05-01T00:00:00Z' });
+    mockQueryOne.mockResolvedValueOnce({ full_name: 'Alice Smith' });
+    mockQueryOne.mockResolvedValueOnce({ title: 'AI Basics' });
+    mockQueryOne.mockResolvedValueOnce({ name: 'Acme Corp' });
+
+    await handler(baseReq as any, {} as any);
+
+    // The org lookup is the fourth queryOne call (enrollment, then the
+    // Promise.all of profile, course, org).
+    const [orgSql, orgParams] = mockQueryOne.mock.calls[3];
+    expect(orgSql).toMatch(/JOIN enrollments e ON e\.org_id = o\.id/);
+    expect(orgSql).not.toMatch(/org_memberships/);
+    expect(orgParams).toEqual(['enroll-uuid']);
+  });
+
+  it('prints "AI Uddannelse" for a solo (placeholder-org) enrollment', async () => {
+    mockBySql('AI Uddannelse', 'Some Other Company');
+
+    const res = await handler(baseReq as any, {} as any);
+    const text = (res.body as Buffer).toString('latin1');
+
+    expect(res.status).toBe(200);
+    expect(text).toContain('(Offered by AI Uddannelse) Tj');
+    expect(text).not.toContain('Some Other Company');
+  });
+
+  it('prints the company name for a company enrollment', async () => {
+    mockBySql('Globex Industries', 'Wrong Personal Org');
+
+    const res = await handler(baseReq as any, {} as any);
+    const text = (res.body as Buffer).toString('latin1');
+
+    expect(res.status).toBe(200);
+    expect(text).toContain('(Offered by Globex Industries) Tj');
+    expect(text).not.toContain('Wrong Personal Org');
+  });
+});

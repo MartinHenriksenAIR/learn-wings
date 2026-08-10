@@ -113,7 +113,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(p);
       setMemberships(m);
       if (m.length > 0 && !currentOrg && !p?.is_platform_admin) {
-        setCurrentOrg((m[0] as any).organization ?? null);
+        // #354: a real company outranks the hidden Individuals placeholder, so a
+        // dual-member (walk-in who later joined a company) lands in their company.
+        const preferred = m.find((x) => (x as any).organization?.kind !== 'individual') ?? m[0];
+        setCurrentOrg((preferred as any).organization ?? null);
       }
     } catch (err) {
       // The backend auto-provisions a profile on first login, so this is always

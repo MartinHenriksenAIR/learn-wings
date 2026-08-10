@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsActiveMember, mockResolveVisibility } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
@@ -8,11 +8,17 @@ const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile
     mockQuery: vi.fn(),
     mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
+    mockIsActiveMember: vi.fn(),
+    mockResolveVisibility: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
-vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile }));
+// isActiveMember backs the factory's requireActiveMember (used by the individual branch).
+vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember, isOrgAdmin: vi.fn() }));
+// resolveVisibilityContext is mocked (not left to hit the mocked queryOne) so it consumes
+// no query slot — keeping every existing order-sensitive queryOne sequence intact.
+vi.mock('../shared/course-visibility', () => ({ resolveVisibilityContext: mockResolveVisibility }));
 
 import handler from './index';
 
@@ -27,6 +33,9 @@ describe('course-player-data', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'learner-uuid', tid: 'tid-1', email: 'learner@test.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
+    // Default: standard (non-individual) tier — keeps every existing test on the org_course_access path.
+    mockResolveVisibility.mockResolvedValue({ isIndividual: false, language: 'da' });
+    mockIsActiveMember.mockResolvedValue(true);
   });
 
   it('returns course, modules with lessons, progressMap, and review', async () => {
@@ -98,6 +107,51 @@ describe('course-player-data', () => {
     expect(insertSql).toContain('ON CONFLICT (org_id, user_id, course_id) DO NOTHING');
     // profile.id ('p1'), not the raw token oid, and the passed org — org-scoped write.
     expect(insertParams).toEqual(['org-uuid', 'p1', 'course-uuid']);
+  });
+
+  it('individual org: grants access + implicit-enrolls with no org_course_access (#354)', async () => {
+    mockResolveVisibility.mockResolvedValueOnce({ isIndividual: true, language: 'en' });
+    const course = { id: 'course-uuid', title: 'A', language: 'en', is_published: true };
+    mockQueryOne.mockResolvedValueOnce(course);        // course
+    mockIsActiveMember.mockResolvedValueOnce(true);    // requireActiveMember
+    mockQueryOne.mockResolvedValueOnce({ ok: true });  // individual access check
+    mockQuery.mockResolvedValue([]);                   // modules / progress / enrollment INSERT
+    mockQueryOne.mockResolvedValueOnce(null);          // review
+
+    const res = await handler(baseReq as any, {} as any);
+    expect(res.status).toBe(200);
+
+    // Individual access check bypasses org_course_access and gates on the caller's language.
+    const [accessSql, accessParams] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(accessSql).not.toContain('org_course_access');
+    expect(accessSql).toContain('is_published = TRUE');
+    expect(accessSql).toContain('c.language = $3');
+    expect(accessParams).toEqual(['p1', 'course-uuid', 'en', 'org-uuid']);
+
+    // The implicit-enroll INSERT for individuals drops the org_course_access EXISTS,
+    // but keeps membership + publication + ON CONFLICT DO NOTHING.
+    const insertCall = mockQuery.mock.calls.find(([sql]) => /INSERT INTO enrollments/i.test(sql as string));
+    expect(insertCall, 'individual open must upsert an enrollment').toBeDefined();
+    const [insertSql, insertParams] = insertCall as [string, unknown[]];
+    expect(insertSql).not.toContain('org_course_access');
+    expect(insertSql).toContain('org_memberships');
+    expect(insertSql).toContain("om.status = 'active'");
+    expect(insertSql).toContain('is_published = TRUE');
+    expect(insertSql).toContain('ON CONFLICT (org_id, user_id, course_id) DO NOTHING');
+    expect(insertParams).toEqual(['org-uuid', 'p1', 'course-uuid']);
+  });
+
+  it('individual org: denies access (403) when caller is not an active member (#354)', async () => {
+    mockResolveVisibility.mockResolvedValueOnce({ isIndividual: true, language: 'en' });
+    const course = { id: 'course-uuid', title: 'A', language: 'en', is_published: true };
+    mockQueryOne.mockResolvedValueOnce(course);        // course
+    mockIsActiveMember.mockResolvedValueOnce(false);   // requireActiveMember → 403
+
+    const res = await handler(baseReq as any, {} as any);
+    expect(res.status).toBe(403);
+    // The individual gate runs through requireActiveMember, and no further work happens.
+    expect(mockIsActiveMember).toHaveBeenCalledWith('p1', 'org-uuid');
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 
   it('returns 404 when course does not exist', async () => {

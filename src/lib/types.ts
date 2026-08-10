@@ -42,6 +42,9 @@ export interface Organization {
   // single-org fetch and in currentOrg (user-context). Absent ⇒ treat as true
   // (the DB default).
   allow_self_registration?: boolean;
+  // Org classifier (#354). 'individual' marks the hidden self-serve placeholder;
+  // absent/'standard' is a normal org. Populated via user-context (row_to_json).
+  kind?: 'standard' | 'individual';
 }
 
 export interface OrgMembership {

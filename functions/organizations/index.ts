@@ -12,9 +12,12 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
         (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count,
         (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
        FROM organizations o
-       WHERE o.id = $1`,
+       WHERE o.id = $1 AND o.kind = 'standard'`,
       [orgId],
     );
+    // The `kind = 'standard'` filter also makes the Individuals placeholder (#354)
+    // return no row here, so a fetch of its id 404s — it is never inspectable via this
+    // endpoint. Solo learners get their currentOrg from user-context, not this fetch.
     if (!organization) return reply(404, { error: 'Organization not found' });
 
     // The SSO tenant binding (#353) is platform-admin config — org admins reach
@@ -39,6 +42,7 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
         (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count,
         (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
        FROM organizations o
+       WHERE o.kind = 'standard'
        ORDER BY o.created_at DESC`,
     );
     return reply(200, { organizations });
@@ -50,7 +54,7 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
       (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
      FROM organizations o
      JOIN org_memberships om ON om.org_id = o.id
-     WHERE om.user_id = $1 AND om.status = 'active'
+     WHERE om.user_id = $1 AND om.status = 'active' AND o.kind = 'standard'
      ORDER BY o.created_at DESC`,
     [profile.id],
   );
