@@ -63,7 +63,10 @@ export function SidebarBrand() {
   }
 
   return (
-    <div className="flex items-center gap-2.5">
+    // min-w-0 on the row is load-bearing: without it this flex item keeps its
+    // auto min-width and grows to fit a long org name, so the name never
+    // truncates (it overflows the fixed-width sidebar instead).
+    <div className="flex min-w-0 items-center gap-2.5">
       {orgMark}
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-[15px] font-bold leading-tight text-sidebar-foreground">
@@ -72,7 +75,7 @@ export function SidebarBrand() {
         <img
           src={platformSrc}
           alt={platformAlt}
-          className="mt-1 block h-3.5 w-auto max-w-full object-contain opacity-55"
+          className="mt-1 block h-4 w-auto max-w-full object-contain opacity-60"
         />
       </div>
     </div>
