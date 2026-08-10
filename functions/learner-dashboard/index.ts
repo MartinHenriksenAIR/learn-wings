@@ -30,14 +30,16 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
 
   await requireActiveMember(orgId);
 
-  const { isIndividual } = await resolveVisibilityContext(orgId, profile.id);
-
-  // #369 per-org opt-out. A missing row or a missing key ⇒ enabled (the default);
-  // only an explicit `false` turns it off.
-  const settingsRow = await queryOne<{ features: { leaderboard_enabled?: boolean } | null }>(
-    `SELECT features FROM org_settings WHERE org_id = $1`,
-    [orgId],
-  );
+  // Two independent reads: the visibility context (individual-tier detection) and
+  // the per-org leaderboard opt-out (#369). A missing settings row or missing key
+  // ⇒ enabled (the default); only an explicit `false` turns it off.
+  const [{ isIndividual }, settingsRow] = await Promise.all([
+    resolveVisibilityContext(orgId, profile.id),
+    queryOne<{ features: { leaderboard_enabled?: boolean } | null }>(
+      `SELECT features FROM org_settings WHERE org_id = $1`,
+      [orgId],
+    ),
+  ]);
   const leaderboardOff = settingsRow?.features?.leaderboard_enabled === false;
 
   const data = await getLearnerDashboardData(orgId, profile.id, {

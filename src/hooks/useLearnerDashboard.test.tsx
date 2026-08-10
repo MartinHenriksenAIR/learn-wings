@@ -15,6 +15,7 @@ const data: LearnerDashboardData = {
   xp: { allTime: 75, month: 45 },
   level: { level: 1, xp: 75, xpIntoLevel: 75, xpForLevel: 200, xpToNext: 125, nextThreshold: 200, progressPct: 38 },
   streak: { current: 3, activeToday: true },
+  showLeaderboard: true,
   leaderboard: {
     allTime: { rows: [{ rank: 1, name: 'Anna B.', xp: 300, isSelf: false }], me: { rank: 2, name: 'Martin H.', xp: 75, isSelf: true } },
     month: { rows: [{ rank: 1, name: 'Martin H.', xp: 45, isSelf: true }], me: { rank: 1, name: 'Martin H.', xp: 45, isSelf: true } },

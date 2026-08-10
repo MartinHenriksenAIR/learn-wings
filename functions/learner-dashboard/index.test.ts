@@ -107,6 +107,8 @@ describe('learner-dashboard', () => {
     expect(body.leaderboard.allTime.me).toEqual({ rank: 2, name: 'Martin H.', xp: 75, isSelf: true });
     // This month: p1 leads.
     expect(body.leaderboard.month.me.rank).toBe(1);
+    // Visible by default (standard org, not suppressed).
+    expect(body.showLeaderboard).toBe(true);
   });
 
   it('scopes every org query to orgId and derives the board from learners only', async () => {
@@ -172,6 +174,8 @@ describe('learner-dashboard', () => {
       allTime: { rows: [], me: null },
       month: { rows: [], me: null },
     });
+    // …and the client is told to hide the widget entirely.
+    expect(body.showLeaderboard).toBe(false);
 
     // The solo learner still gets their own XP, level and streak.
     expect(body.xp).toEqual({ allTime: 75, month: 45 });
@@ -206,6 +210,8 @@ describe('learner-dashboard', () => {
       allTime: { rows: [], me: null },
       month: { rows: [], me: null },
     });
+    // …and the client hides the widget.
+    expect(body.showLeaderboard).toBe(false);
     // Personal XP/streak are still derived.
     expect(body.xp).toEqual({ allTime: 75, month: 45 });
     // The org_settings feature read ran, scoped to the org.

@@ -68,7 +68,7 @@ export default function LearnerDashboard() {
     );
   }
 
-  const { snapshot, xp, level, streak, leaderboard } = query.data;
+  const { snapshot, xp, level, streak, leaderboard, showLeaderboard } = query.data;
   const firstName = profile?.first_name || profile?.full_name;
 
   return (
@@ -132,7 +132,10 @@ export default function LearnerDashboard() {
 
       <GamificationSummary xp={xp} level={level} streak={streak} />
 
-      {!isIndividual && <Leaderboard leaderboard={leaderboard} />}
+      {/* Server decides visibility: false for the individual tier (#354) and for a
+          per-org leaderboard opt-out (#369). Hides the widget entirely rather than
+          rendering an empty board for a disabled feature. */}
+      {showLeaderboard && <Leaderboard leaderboard={leaderboard} />}
 
       {communityGate === 'allowed' && (
         <DashboardCommunitySection orgId={isIndividual ? undefined : currentOrg.id} />
