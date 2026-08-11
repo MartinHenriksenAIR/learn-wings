@@ -6,7 +6,10 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+const { mockNavigate, mockChangeLanguage } = vi.hoisted(() => ({
+  mockNavigate: vi.fn(),
+  mockChangeLanguage: vi.fn(),
+}));
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
   useNavigate: () => mockNavigate,
@@ -27,7 +30,12 @@ vi.mock('react-i18next', async () => {
     }
     return typeof node === 'string' ? node : key;
   };
-  return { useTranslation: () => ({ t: translate }) };
+  return {
+    useTranslation: () => ({
+      t: translate,
+      i18n: { language: 'en', resolvedLanguage: 'en', changeLanguage: mockChangeLanguage },
+    }),
+  };
 });
 
 vi.mock('@/assets/logo-light.png', () => ({ default: 'logo-light.png' }));
@@ -61,6 +69,7 @@ describe('Login post-auth navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+    localStorage.clear();
   });
 
   it('navigates to the stashed deep link instead of the role home, and clears the stash', async () => {
@@ -131,17 +140,28 @@ describe('Login post-auth navigation', () => {
     });
   });
 
-  it('renders the shared Microsoft sign-in button (not a spinner) when signed out, wired to signIn', () => {
+  it('renders both front-door CTAs (not a spinner) when signed out; both fire signIn (#355)', () => {
     const signIn = vi.fn();
     mockUseAuth.mockReturnValue({ ...baseAuth, user: null, profile: null, signIn });
 
     render(<Login />);
 
-    const button = screen.getByRole('button', { name: /sign in with microsoft/i });
-    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: /start free/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
 
-    expect(signIn).toHaveBeenCalledTimes(1);
+    expect(signIn).toHaveBeenCalledTimes(2);
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('language toggle switches language and persists the choice past the Entra redirect (#355)', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuth, user: null, profile: null });
+
+    render(<Login />);
+
+    fireEvent.click(screen.getByRole('button', { name: /dansk/i }));
+
+    expect(mockChangeLanguage).toHaveBeenCalledWith('da');
+    expect(localStorage.getItem('preferred_language')).toBe('da');
   });
 
   it('does not navigate while auth is still resolving', () => {

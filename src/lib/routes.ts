@@ -14,7 +14,7 @@
  * literal appears outside this file — adopt these constants, never re-inline.
  */
 export const routes = {
-  /** Landing redirect: '/' -> login. */
+  /** Public front door (unauthenticated landing); authed users redirect into the app. */
   root: '/',
   /** Bare '/app' redirect -> learner dashboard. */
   appRoot: '/app',
