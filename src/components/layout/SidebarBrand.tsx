@@ -106,7 +106,9 @@ export function SidebarBrand() {
           className="block h-8 w-auto max-w-[120px] shrink-0 object-contain"
         />
       ) : (
-        <Avatar className="h-9 w-9 shrink-0 rounded-lg">{initialsFallback}</Avatar>
+        // h-8 to match the logo's height, so the row doesn't grow when a logo
+        // errors to the monogram (or an org has none).
+        <Avatar className="h-8 w-8 shrink-0 rounded-lg">{initialsFallback}</Avatar>
       )}
       <span className="min-w-0 truncate text-[15px] font-bold leading-tight text-sidebar-foreground">
         {currentOrg.name}

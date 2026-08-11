@@ -2565,3 +2565,22 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. After the clean trunk merge of #355: root lint 0 / tsc app+node 0 / test **980** / build ✓; `functions/` untouched. Events-tab tests retargeted to `EventsPage`; added `AppSidebar` coverage for the conditional Resources placement (both flag states).
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #407.
+
+---
+
+## 2026-08-11 — #411 sidebar org logo shown uncropped (PR #413)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`sidebar-logo-uncrop-411`). Requirements grilled first; independent Opus code-review before merge. Frontend-only, single component.
+
+**What:** The sidebar co-brand lockup (`SidebarBrand.tsx`, #372) rendered the org logo through a shadcn `Avatar` with `object-cover`, forcing every logo into a 36×36 square and clipping non-square logos — the only org-logo site using `object-cover` (the other three use `object-contain`).
+- **Expanded, has-logo** now renders a bare natural-aspect `<img>` (`block h-8 w-auto max-w-[120px] object-contain`, no frame): wide/tall logos show in full, capped at 120px so a wide logo can't crowd the org name (sidebar ~216px usable, shared with the truncating name); `object-contain` letterboxes anything past the cap.
+- **Failed/expired signed URL → initials monogram:** a bare `<img>` loses Radix Avatar's automatic broken-image fallback, so an `onError` handler makes the degrade explicit — keyed on the failed src (not a boolean) so switching orgs re-attempts the new logo without a reset effect.
+- **No-logo** path unchanged (square initials monogram). **Collapsed icon-rail** untouched — keeps its small square `object-cover` mark (a wide logo has nowhere to go in the rail; out of scope per the issue). The three other logo sites (already `object-contain`) untouched.
+
+**Decisions (grilled):** (1) keep the failed-load→monogram safety net (cheap insurance; the signed URL refreshes hourly inside its 2h life, so it's rarely seen) via a hand-rolled `onError`, rather than fighting Radix Avatar's forced square or dropping the fallback; (2) sizing = 32px tall, `max-w-[120px]`, `w-auto`; (3) verification = unit tests + code review + a local CSS harness screenshot, final visual confirm by Martin on prod (the per-PR SWA preview login is blocked by an unregistered Entra redirect URI); (4) truly-permanent "always show" would need public blob access — deliberately rejected for security (#182), out of scope.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **982** (+2: uncropped `<img>` render asserts `object-contain` not `object-cover`; `onError`→monogram degrade) / build ✓; `functions/` untouched. Local browser harness confirmed wide/tall/square logos render uncropped vs. the old `object-cover` crop. CI green on the PR.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #413.
+
+**Collision note:** touches only `SidebarBrand.tsx` — zero overlap with in-flight #409 (PR #410, learner course UX) or #412 (community breadcrumbs). The only cross-watch is #409↔#412 if both edit the i18n locale JSON.
