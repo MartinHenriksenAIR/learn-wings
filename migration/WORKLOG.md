@@ -2568,6 +2568,44 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 
 ---
 
+## 2026-08-11 — #411 sidebar org logo shown uncropped (PR #413)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`sidebar-logo-uncrop-411`). Requirements grilled first; independent Opus code-review before merge. Frontend-only, single component.
+
+**What:** The sidebar co-brand lockup (`SidebarBrand.tsx`, #372) rendered the org logo through a shadcn `Avatar` with `object-cover`, forcing every logo into a 36×36 square and clipping non-square logos — the only org-logo site using `object-cover` (the other three use `object-contain`).
+- **Expanded, has-logo** now renders a bare natural-aspect `<img>` (`block h-8 w-auto max-w-[120px] object-contain`, no frame): wide/tall logos show in full, capped at 120px so a wide logo can't crowd the org name (sidebar ~216px usable, shared with the truncating name); `object-contain` letterboxes anything past the cap.
+- **Failed/expired signed URL → initials monogram:** a bare `<img>` loses Radix Avatar's automatic broken-image fallback, so an `onError` handler makes the degrade explicit — keyed on the failed src (not a boolean) so switching orgs re-attempts the new logo without a reset effect.
+- **No-logo** path unchanged (square initials monogram). **Collapsed icon-rail** untouched — keeps its small square `object-cover` mark (a wide logo has nowhere to go in the rail; out of scope per the issue). The three other logo sites (already `object-contain`) untouched.
+
+**Decisions (grilled):** (1) keep the failed-load→monogram safety net (cheap insurance; the signed URL refreshes hourly inside its 2h life, so it's rarely seen) via a hand-rolled `onError`, rather than fighting Radix Avatar's forced square or dropping the fallback; (2) sizing = 32px tall, `max-w-[120px]`, `w-auto`; (3) verification = unit tests + code review + a local CSS harness screenshot, final visual confirm by Martin on prod (the per-PR SWA preview login is blocked by an unregistered Entra redirect URI); (4) truly-permanent "always show" would need public blob access — deliberately rejected for security (#182), out of scope.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **982** (+2: uncropped `<img>` render asserts `object-contain` not `object-cover`; `onError`→monogram degrade) / build ✓; `functions/` untouched. Local browser harness confirmed wide/tall/square logos render uncropped vs. the old `object-cover` crop. CI green on the PR.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #413.
+
+**Collision note:** touches only `SidebarBrand.tsx` — zero overlap with in-flight #409 (PR #410, learner course UX) or #412 (community breadcrumbs). The only cross-watch is #409↔#412 if both edit the i18n locale JSON.
+
+---
+
+## 2026-08-11 — #409 learner course UX: CTA under card title, detail-page Back + expandable modules (PR #410)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`feat/learner-course-ux-409`). Requirements grilled first (2 product decisions), built subagent-driven (4 implementer tasks, spec + quality review each; clean final whole-branch review). Branched fresh off `main` after #344 merged; merged trunk (#411) in before landing — clean auto-merge, disjoint files.
+
+**What:** Three learner-facing tweaks on the course surfaces shipped in #403/#404.
+- **Catalog cards (grid view only)** — `src/pages/learner/Courses.tsx`: the state-aware CTA (`Start course`/`Fortsæt`/`Gennemse` → player) moved from the thumbnail overlay to **directly under the course title** (card body order: title → CTA → description → progress). Label logic / three states / link target unchanged; the card-body → detail-page link intact; **list view (`renderCourseRow`) byte-for-byte untouched**.
+- **Detail page Back control** — `src/pages/learner/CourseDetail.tsx`: an explicit top-left **Back to Course Catalog** control (`ArrowLeft` + reused `courses.detail.backToCatalog`) above the course card, → the catalog; the header breadcrumb is kept.
+- **Expandable Contents** — backend `functions/learner-course-detail` now returns each module's `lessons: [{id,title,sort_order}]` (ordered by `(sort_order,id)`, `lesson_count` preserved, **read-only — no enrollment side-effect on view**, one `WHERE module_id = ANY(...)` query, no N+1); `src/lib/types.ts` gains `CourseDetailLesson` + `CourseDetailModule.lessons`, `useCourseDetail` passes it through; the static module `<ul>` becomes an `Accordion type="single" collapsible` (no `defaultValue` → all collapsed on load, one open at a time) revealing **lesson names only**. Zero-lesson modules render as a static, non-expandable row (no dead chevron).
+
+**Decisions (grilled):** (1) lesson rows show **names only** — no type icons, no duration; (2) CTA sits **directly under the title** (per the issue, vs. card bottom). **No new i18n strings** — `courses.detail.backToCatalog/contents/lessonCount` + `common.continue` reused.
+
+**Verify:** after the clean trunk merge of #411 — root lint 0 / tsc app+node 0 / test **983** (+ new `CourseDetail` cases: back href, expand-reveals-names, one-open-at-a-time, empty-module non-expandable) / build ✓; `functions/` build ✓ / test **2795** (3 skip; updated `learner-course-detail` test — per-module lessons + ordering, `lesson_count` preserved, no-enrollment pin). CI green on PR #410 (SWA build+deploy, frontend, functions all pass).
+
+**Deploy:** functions changed (`learner-course-detail`) → both SWA + functions workflows auto-ship on merge. Announce on PR #410.
+
+**Collision note:** disjoint from #344 (merged — community/sidebar/routes/nav-i18n) and #411 (sidebar logo). Only theoretical shared file is the i18n locale JSON; 409 added no keys, so no overlap.
+
+---
+
 ## 2026-08-11 — #414 Min Træning: wire up Mandatory + Favorites sections (PR #415)
 
 **Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`feat+min-traening-sections-414`). Requirements grilled first (6 decisions), implemented inline (small surface) with TDD.

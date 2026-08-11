@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -53,8 +53,23 @@ function detailResponse(enrollment: { status: string } | null) {
   return {
     course: baseCourse,
     modules: [
-      { id: 'm-1', title: 'Module 1', sort_order: 1, lesson_count: 4 },
-      { id: 'm-2', title: 'Module 2', sort_order: 2, lesson_count: 3 },
+      {
+        id: 'm-1',
+        title: 'Module 1',
+        sort_order: 1,
+        lesson_count: 2,
+        lessons: [
+          { id: 'l-1a', title: 'Intro lesson', sort_order: 1 },
+          { id: 'l-1b', title: 'Deep dive lesson', sort_order: 2 },
+        ],
+      },
+      {
+        id: 'm-2',
+        title: 'Module 2',
+        sort_order: 2,
+        lesson_count: 1,
+        lessons: [{ id: 'l-2a', title: 'Wrap-up lesson', sort_order: 1 }],
+      },
     ],
     enrollment,
   };
@@ -99,6 +114,71 @@ describe('CourseDetail', () => {
     const cta = screen.getByTestId('course-detail-cta');
     expect(cta).toHaveAttribute('href', '/app/learn/c-1');
     expect(cta).toHaveTextContent('courses.startCourse');
+  });
+
+  it('renders a top-left Back-to-catalog control above the card', async () => {
+    vi.mocked(callApi).mockResolvedValue(detailResponse(null));
+
+    renderDetail();
+    await screen.findByTestId('course-detail-title');
+
+    const back = screen.getByRole('link', { name: 'courses.detail.backToCatalog' });
+    expect(back).toHaveAttribute('href', '/app/courses');
+  });
+
+  it('Contents is an accordion — collapsed on load, expanding reveals lesson names, one open at a time', async () => {
+    vi.mocked(callApi).mockResolvedValue(detailResponse(null));
+
+    renderDetail();
+    await screen.findByTestId('course-detail-title');
+
+    // Collapsed on load: no lesson names visible yet.
+    expect(screen.queryByText('Intro lesson')).toBeNull();
+    expect(screen.queryByText('Wrap-up lesson')).toBeNull();
+
+    // Expand Module 1 → its lesson names appear.
+    fireEvent.click(screen.getByRole('button', { name: /Module 1/ }));
+    expect(await screen.findByText('Intro lesson')).toBeInTheDocument();
+    expect(screen.getByText('Deep dive lesson')).toBeInTheDocument();
+
+    // Expand Module 2 → its lesson appears and Module 1 collapses (single/collapsible).
+    fireEvent.click(screen.getByRole('button', { name: /Module 2/ }));
+    expect(await screen.findByText('Wrap-up lesson')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Intro lesson')).toBeNull());
+  });
+
+  it('renders a module with no lessons as a static row — not an expandable button, nothing to reveal', async () => {
+    vi.mocked(callApi).mockResolvedValue({
+      course: baseCourse,
+      modules: [
+        {
+          id: 'm-1',
+          title: 'Module 1',
+          sort_order: 1,
+          lesson_count: 2,
+          lessons: [
+            { id: 'l-1a', title: 'Intro lesson', sort_order: 1 },
+            { id: 'l-1b', title: 'Deep dive lesson', sort_order: 2 },
+          ],
+        },
+        { id: 'm-empty', title: 'Empty Module', sort_order: 2, lesson_count: 0, lessons: [] },
+      ],
+      enrollment: null,
+    });
+
+    renderDetail();
+    await screen.findByTestId('course-detail-title');
+
+    const outline = screen.getByTestId('module-outline');
+    // The empty module still shows its title + lesson count in the outline.
+    expect(outline).toHaveTextContent('Empty Module');
+    expect(screen.getAllByText('courses.detail.lessonCount')).toHaveLength(2);
+
+    // Only the module WITH lessons is an expandable trigger; the empty one is not clickable.
+    const triggers = screen.getAllByRole('button', { name: /Module/ });
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0]).toHaveTextContent('Module 1');
+    expect(screen.queryByRole('button', { name: /Empty Module/ })).toBeNull();
   });
 
   it('fetches the read-only detail endpoint — never the player or an enroll endpoint', async () => {
