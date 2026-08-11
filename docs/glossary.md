@@ -33,7 +33,10 @@ This extends the naming conventions in `AIEDU/CLAUDE.md` ("Organization Members"
 | Course browsing page | **Course Catalog** | **Kursuskatalog** | Supersedes "Course Overview" / "Kursusoversigt". Nav label and page heading. |
 | Personal learning home | **My Training** | **Min Træning** | Page delivered by #364; name reserved here. |
 | Learner nav group | **Learning** | **Læring** | Sidebar group label. |
-| Social area | **Community** | **Fællesskab** | |
+| Social area (nav group) | **Community** | **Fællesskab** | Sidebar **group label** — the umbrella over the destinations below. |
+| Discussion feed | **Discussions** | **Diskussioner** | Community post feed (org + global). Nav pill + page heading. Renamed from "Community/Fællesskab" in #344 so the feed isn't the same word as its own group. |
+| Events destination | **Events** | **Arrangementer** | Nav pill + page heading. Danish "Arrangementer" matches the "Nyt arrangement" create button; page covers events + office hours. Promoted from a community tab in #344. |
+| Resources destination | **Resources** | **Ressourcer** | Nav pill + page heading. Promoted to a top-level destination in #344; sits under Fællesskab when community is on, falls back into Læring when it's off. |
 | Tips area | **Tips & Tricks** | **Tips & Tricks** | Untranslated; page delivered by #366. |
 
 ## Existing conventions (carried forward)

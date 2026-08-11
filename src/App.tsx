@@ -36,6 +36,7 @@ import IdeaLibrary from "./pages/community/IdeaLibrary";
 import IdeaSubmit from "./pages/community/IdeaSubmit";
 import IdeaDetail from "./pages/community/IdeaDetail";
 import ResourceLibrary from "./pages/community/ResourceLibrary";
+import EventsPage from "./pages/community/EventsPage";
 import OrgIdeasManagement from "./pages/org-admin/OrgIdeasManagement";
 import OrgCommunityModeration from "./pages/org-admin/OrgCommunityModeration";
 import PlatformCommunityModeration from "./pages/platform-admin/PlatformCommunityModeration";
@@ -66,8 +67,11 @@ function AppRoutes() {
       <Route path={routes.community.ideaNew} element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
       <Route path={routes.community.ideaEditPattern} element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
       <Route path={routes.community.ideaDetailPattern} element={<ProtectedRoute><IdeaDetail /></ProtectedRoute>} />
+      <Route path={routes.community.events} element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
       <Route path={routes.community.resources} element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
-      
+      {/* #344: Resources moved off the old nested path — redirect stale links/bookmarks. */}
+      <Route path={routes.community.resourcesLegacy} element={<Navigate to={routes.community.resources} replace />} />
+
       <Route path={routes.orgAdmin.root} element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
       <Route path={routes.orgAdmin.settings} element={<ProtectedRoute requireOrgAdmin><OrgSettings /></ProtectedRoute>} />
       <Route path={routes.orgAdmin.ideas} element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />

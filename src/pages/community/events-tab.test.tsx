@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -8,15 +8,7 @@ vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('@/components/community/PostCard', () => ({
-  PostCard: ({ post }: { post: { title: string } }) => <div data-testid="post-card">{post.title}</div>,
-}));
 vi.mock('@/components/community/PostForm', () => ({ PostForm: () => null }));
-vi.mock('@/components/community/CommunityEmptyState', () => ({
-  CommunityEmptyState: () => <div data-testid="empty-state" />,
-}));
-vi.mock('@/components/community/AIChampionsList', () => ({ AIChampionsList: () => null }));
-vi.mock('@/components/community/UpcomingEvents', () => ({ UpcomingEvents: () => null }));
 
 const mockFetchPosts = vi.fn();
 vi.mock('@/lib/community-api', () => ({
@@ -42,7 +34,7 @@ vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => ({ features: { community_enabled: true }, isLoading: false }),
 }));
 
-import CommunityFeed from './CommunityFeed';
+import EventsPage from './EventsPage';
 
 const authState = {
   user: { id: 'oid-1', email: 'u@example.com', name: 'User' },
@@ -106,18 +98,18 @@ const orgPosts = [
   },
 ];
 
-function renderAt(path: string) {
+function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[path]}>
-        <CommunityFeed />
+      <MemoryRouter initialEntries={['/app/events']}>
+        <EventsPage />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-describe('Community Events tab (#125)', () => {
+describe('Events page — upcoming list (#344)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseAuth.mockReturnValue(authState);
@@ -126,15 +118,16 @@ describe('Community Events tab (#125)', () => {
     );
   });
 
-  it('renders the events view on the ?scope=events deep link', async () => {
-    renderAt('/community?scope=events');
+  it('renders the merged upcoming events', async () => {
+    renderPage();
 
     expect(await screen.findByText('Soon Global Event')).toBeInTheDocument();
+    // The events page has no post search box (that belongs to the feed).
     expect(screen.queryByPlaceholderText('community.searchPosts')).not.toBeInTheDocument();
   });
 
   it('excludes past-dated events and non-event posts', async () => {
-    renderAt('/community?scope=events');
+    renderPage();
 
     await screen.findByText('Soon Global Event');
     expect(screen.queryByText('Past Global Event')).not.toBeInTheDocument();
@@ -142,7 +135,7 @@ describe('Community Events tab (#125)', () => {
   });
 
   it('merges global + current-org events, soonest first', async () => {
-    renderAt('/community?scope=events');
+    renderPage();
 
     await screen.findByText('Soon Global Event');
     expect(screen.getByText('Mid Org Event')).toBeInTheDocument();
@@ -158,28 +151,12 @@ describe('Community Events tab (#125)', () => {
   });
 
   it('sources the Join href from event_registration_url and opens a new tab', async () => {
-    renderAt('/community?scope=events');
+    renderPage();
 
     await screen.findByText('Soon Global Event');
     const soonLink = screen.getAllByRole('link')[0];
     expect(soonLink).toHaveAttribute('href', 'https://example.com/soon');
     expect(soonLink).toHaveAttribute('target', '_blank');
     expect(soonLink).toHaveAttribute('rel', expect.stringContaining('noopener'));
-  });
-
-  it('switches to the events view when the tab is clicked', async () => {
-    renderAt('/community?scope=global');
-
-    // Feed view first — the events rows (and their Join links) are not shown.
-    // (The stubbed PostCard renders titles, so we key off the Join links, which
-    // only the events view emits.)
-    await waitFor(() => expect(mockFetchPosts).toHaveBeenCalled());
-    expect(screen.queryAllByRole('link')).toHaveLength(0);
-
-    const eventsTab = screen.getByRole('tab', { name: /community\.eventsOfficeHours/ });
-    fireEvent.click(eventsTab);
-
-    expect(await screen.findByText('Mid Org Event')).toBeInTheDocument();
-    expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
   });
 });

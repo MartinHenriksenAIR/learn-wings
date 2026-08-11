@@ -54,7 +54,12 @@ export const routes = {
     ideaEdit: (ideaId: string) => `/app/community/org/ideas/edit/${ideaId}`,
     ideaDetailPattern: '/app/community/org/ideas/:ideaId',
     ideaDetail: (ideaId: string) => `/app/community/org/ideas/${ideaId}`,
-    resources: '/app/community/org/resources',
+    /** Events & Office Hours — promoted to a top-level destination (#344). Community-gated; shown in the Fællesskab group. */
+    events: '/app/events',
+    /** Resource Library — promoted to a top-level destination (#344). Survives community being off (falls back into Læring). */
+    resources: '/app/resources',
+    /** Redirect source: the pre-#344 nested Resources path -> resources. */
+    resourcesLegacy: '/app/community/org/resources',
   },
   orgAdmin: {
     /** OrgAnalytics, org-scoped view */
