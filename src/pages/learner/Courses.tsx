@@ -198,7 +198,7 @@ export default function LearnerCourses() {
 
   /**
    * The whole card/row opens the course detail page ("read about a course", #360) via a
-   * stretched overlay link (z-10). The interactive controls — the thumbnail Start button
+   * stretched overlay link (z-10). The interactive controls — the Start/CTA button
    * (→ player) and the favorite toggle — carry z-20 so they sit above the overlay and keep
    * their own actions. Static content (title, description, thumbnail) sits under the overlay.
    */
@@ -210,10 +210,13 @@ export default function LearnerCourses() {
     />
   );
 
-  const thumbnailStart = (course: Course, enrollment: Enrollment | undefined, isCompleted: boolean) => (
+  // State-aware player CTA for a catalog card. It renders directly under the title (in the card
+  // body flow), so it carries `relative z-20` to stay clickable above the detail overlay and
+  // `self-start` to keep its natural width in the flex column.
+  const courseCta = (course: Course, enrollment: Enrollment | undefined, isCompleted: boolean) => (
     <Button
       asChild
-      className="absolute bottom-2.5 left-2.5 z-20 h-auto rounded-[9px] bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground shadow-md hover:bg-primary/90"
+      className="relative z-20 h-auto self-start rounded-[9px] bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground hover:bg-primary/90"
     >
       <Link to={routes.learner.coursePlayer(course.id)}>
         <Play aria-hidden="true" className="h-3.5 w-3.5" />
@@ -277,7 +280,6 @@ export default function LearnerCourses() {
               {t('dashboard.completed')}
             </span>
           )}
-          {thumbnailStart(course, enrollment, isCompleted)}
         </div>
 
         <div className="flex flex-1 flex-col gap-[9px] px-[18px] pb-[18px] pt-4">
@@ -293,6 +295,7 @@ export default function LearnerCourses() {
               />
             </div>
           </div>
+          {courseCta(course, enrollment, isCompleted)}
           <p className="line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
             {course.description}
           </p>
