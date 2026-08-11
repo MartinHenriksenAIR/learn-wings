@@ -21,6 +21,20 @@ vi.mock('@/components/learner/CertificateCard', () => ({
   CertificateCard: () => <div data-testid="cert-card" />,
 }));
 
+// The Mandatory + Favorites sections are self-contained components with their own
+// unit tests; here we stub them to verify the page wires them in with the org id.
+vi.mock('@/components/learner/MandatoryCourses', () => ({
+  MandatoryCourses: ({ orgId }: { orgId?: string }) => (
+    <div data-testid="mandatory-section" data-org={orgId} />
+  ),
+}));
+
+vi.mock('@/components/learner/FavoriteCourses', () => ({
+  FavoriteCourses: ({ orgId }: { orgId?: string }) => (
+    <div data-testid="favorites-section" data-org={orgId} />
+  ),
+}));
+
 vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
@@ -139,11 +153,11 @@ describe('LearnerTraining', () => {
     expect(resume).toHaveAttribute('href', '/app/learn/c-2');
   });
 
-  it('renders both "coming soon" placeholders (Mandatory + Favorites)', () => {
+  it('wires in the Mandatory and Favorites sections with the current org id (no coming-soon placeholders)', () => {
     renderTraining();
-    expect(screen.getByText('training.mandatory.title')).toBeInTheDocument();
-    expect(screen.getByText('training.favorites.title')).toBeInTheDocument();
-    expect(screen.getAllByText('training.comingSoon')).toHaveLength(2);
+    expect(screen.getByTestId('mandatory-section')).toHaveAttribute('data-org', 'org-1');
+    expect(screen.getByTestId('favorites-section')).toHaveAttribute('data-org', 'org-1');
+    expect(screen.queryByText('training.comingSoon')).toBeNull();
   });
 
   it('renders a plain completed card when the certificates feature is off', () => {

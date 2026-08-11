@@ -2603,3 +2603,20 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Deploy:** functions changed (`learner-course-detail`) → both SWA + functions workflows auto-ship on merge. Announce on PR #410.
 
 **Collision note:** disjoint from #344 (merged — community/sidebar/routes/nav-i18n) and #411 (sidebar logo). Only theoretical shared file is the i18n locale JSON; 409 added no keys, so no overlap.
+
+---
+
+## 2026-08-11 — #414 Min Træning: wire up Mandatory + Favorites sections (PR #415)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`feat+min-traening-sections-414`). Requirements grilled first (6 decisions), implemented inline (small surface) with TDD.
+
+**What:** Replaced the two `<ComingSoonSection>` placeholders on **Min Træning** (`src/pages/learner/Training.tsx`, from #364) with real sections now that both engines have merged.
+- **Mandatory** — new self-contained `MandatoryCourses` component driven by `useLearnerAssignments` (#365): grid cards (thumbnail, title, a due-date line, a red **Overdue** badge, a green **✓ Completed** state) matching the Continue/Favorites style; renders its own heading + empty state. **Filters to `mandatory === true`** — the endpoint also returns *recommended* (`mandatory:false`) assignments, deliberately excluded so the "Mandatory" heading stays honest (recommended-surfacing filed as **#416**).
+- **Favorites** — dropped in the previously-orphaned `FavoriteCourses` component (#358/#380); heading retargeted from `dashboard.favoriteCourses` to `training.favorites.title` and the duplicate label removed.
+- **Cleanup** — deleted the now-unused `ComingSoonSection` component + `training.comingSoon` strings; added en+da `training.mandatory.{empty,due,overdue,completed}`.
+
+**Decisions (grilled):** (1) grid-card style matching the page; (2) always-visible empty state (uniform with Continue/Favorites); (3) tidied the duplicate Favorites label; (4) deleted the placeholder component; (5) **mandatory-only** — recommended assignments out of scope (→ #416); (6) completed cards are informational (no link).
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **986** / build ✓; functions untouched. New `MandatoryCourses.test.tsx` (6 cases: due/overdue/completed/recommended-filtered/empty/loading) + Training (wiring) & FavoriteCourses (heading) test updates; real components rendered in a cache-seeded Vite/Playwright harness (page is Entra-gated) — all states confirmed. CI green.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #415.

@@ -189,7 +189,6 @@
     "heroFirstTimeTitle": "Ready to start learning?",
     "heroFirstTimeDescription": "Pick your first course from the catalog and start building practical AI skills.",
     "heroPickFirstCourse": "Pick your first course",
-    "favoriteCourses": "Favorites",
     "noFavoritesTitle": "No favorites yet",
     "noFavoritesDescription": "Tap the heart on a course to save it here.",
     "subtitle": "Track your momentum and see where you stand.",
@@ -226,13 +225,16 @@
   "training": {
     "title": "My Training",
     "subtitle": "Your learning, all in one place.",
-    "comingSoon": "Coming soon.",
     "progress": {
       "summary": "{{done}} of {{total}} lessons complete",
       "empty": "No lessons yet — start a course to see your progress here."
     },
     "mandatory": {
-      "title": "Mandatory"
+      "title": "Mandatory",
+      "empty": "No mandatory courses",
+      "due": "Due",
+      "overdue": "Overdue",
+      "completed": "Completed"
     },
     "continue": {
       "title": "Continue",
