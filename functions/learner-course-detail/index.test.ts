@@ -44,13 +44,23 @@ describe('learner-course-detail', () => {
     mockIsActiveMember.mockResolvedValue(true);
   });
 
-  it('returns course, module outline (title + lesson_count), and the caller enrollment — and NEVER enrolls', async () => {
+  it('returns course, module outline (title + lesson_count + lesson names), and the caller enrollment — and NEVER enrolls', async () => {
     const course = { id: 'course-uuid', title: 'AI Basics', description: 'Learn AI', level: 'basic', category_id: 'cat-1' };
-    const modules = [{ id: 'mod-1', title: 'Module 1', sort_order: 1, lesson_count: 4 }];
+    // Two modules: one with lessons, one empty. lesson rows come back pre-ordered by the
+    // query (sort_order, id) and out of module order to prove attach-by-module_id, not row order.
+    const modules = [
+      { id: 'mod-1', title: 'Module 1', sort_order: 1, lesson_count: 2 },
+      { id: 'mod-2', title: 'Module 2', sort_order: 2, lesson_count: 0 },
+    ];
+    const lessons = [
+      { id: 'les-1', module_id: 'mod-1', title: 'Intro', sort_order: 1 },
+      { id: 'les-2', module_id: 'mod-1', title: 'Deep dive', sort_order: 2 },
+    ];
 
     mockQueryOne.mockResolvedValueOnce(course);          // course
     mockQueryOne.mockResolvedValueOnce({ ok: true });     // access
     mockQuery.mockResolvedValueOnce(modules);             // module outline
+    mockQuery.mockResolvedValueOnce(lessons);             // lesson names for all modules
     mockQueryOne.mockResolvedValueOnce({ status: 'enrolled' }); // enrollment
 
     const res = await handler(baseReq as any, {} as any);
@@ -58,15 +68,35 @@ describe('learner-course-detail', () => {
 
     expect(res.status).toBe(200);
     expect(body.course.id).toBe('course-uuid');
-    expect(body.modules).toHaveLength(1);
-    expect(body.modules[0].lesson_count).toBe(4);
+    expect(body.modules).toHaveLength(2);
     expect(body.enrollment.status).toBe('enrolled');
+
+    // Module 1: lesson_count preserved, lessons attached in order as {id, title, sort_order}.
+    expect(body.modules[0].lesson_count).toBe(2);
+    expect(body.modules[0].lessons).toEqual([
+      { id: 'les-1', title: 'Intro', sort_order: 1 },
+      { id: 'les-2', title: 'Deep dive', sort_order: 2 },
+    ]);
+    // No lesson bodies leak into the summary response.
+    expect(body.modules[0].lessons[0]).not.toHaveProperty('content_text');
+    expect(body.modules[0].lessons[0]).not.toHaveProperty('module_id');
+    // Empty module → lessons: [] and lesson_count 0.
+    expect(body.modules[1].lesson_count).toBe(0);
+    expect(body.modules[1].lessons).toEqual([]);
 
     // Module outline uses a LEFT JOIN + count and the deterministic id tie-breaker (#46).
     const [modulesSql] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(modulesSql).toContain('LEFT JOIN lessons');
     expect(modulesSql).toContain('lesson_count');
     expect(modulesSql).toContain('ORDER BY cm.sort_order, cm.id');
+
+    // Lessons fetched in ONE query for all modules (no N+1): names only, ordered, keyed by module ids.
+    const [lessonsSql, lessonsParams] = mockQuery.mock.calls[1] as [string, unknown[]];
+    expect(lessonsSql).toContain('FROM lessons');
+    expect(lessonsSql).toContain('module_id = ANY($1)');
+    expect(lessonsSql).toContain('ORDER BY sort_order, id');
+    expect(lessonsSql).not.toContain('content_text');
+    expect(lessonsParams).toEqual([['mod-1', 'mod-2']]);
 
     // SECURITY PIN: enrollment lookup keyed on profile.id ('p1'), never the raw token oid.
     const enrollCall = mockQueryOne.mock.calls[2] as [string, unknown[]];

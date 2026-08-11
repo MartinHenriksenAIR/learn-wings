@@ -101,12 +101,20 @@ export interface CourseCategory {
   created_at: string;
 }
 
-/** One row of the course-detail module outline (#403) — title + lesson count, no lesson bodies. */
+/** One lesson within a course-detail module outline (#409) — title only, no lesson bodies. */
+export interface CourseDetailLesson {
+  id: string;
+  title: string;
+  sort_order: number;
+}
+
+/** One row of the course-detail module outline (#403) — title + lesson count + lesson titles, no lesson bodies. */
 export interface CourseDetailModule {
   id: string;
   title: string;
   sort_order: number;
   lesson_count: number;
+  lessons: CourseDetailLesson[];
 }
 
 /**
