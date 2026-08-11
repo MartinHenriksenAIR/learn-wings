@@ -82,7 +82,7 @@ function AppRoutes() {
       <Route path={routes.platformAdmin.moderation} element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
       <Route path={routes.settings} element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-      <Route path={routes.root} element={<Navigate to={routes.auth.login} replace />} />
+      <Route path={routes.root} element={<Login />} />
       <Route path={routes.appRoot} element={<Navigate to={routes.learner.dashboard} replace />} />
       
       <Route path="*" element={<NotFound />} />
