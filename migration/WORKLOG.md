@@ -2584,3 +2584,22 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #413.
 
 **Collision note:** touches only `SidebarBrand.tsx` — zero overlap with in-flight #409 (PR #410, learner course UX) or #412 (community breadcrumbs). The only cross-watch is #409↔#412 if both edit the i18n locale JSON.
+
+---
+
+## 2026-08-11 — #409 learner course UX: CTA under card title, detail-page Back + expandable modules (PR #410)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`feat/learner-course-ux-409`). Requirements grilled first (2 product decisions), built subagent-driven (4 implementer tasks, spec + quality review each; clean final whole-branch review). Branched fresh off `main` after #344 merged; merged trunk (#411) in before landing — clean auto-merge, disjoint files.
+
+**What:** Three learner-facing tweaks on the course surfaces shipped in #403/#404.
+- **Catalog cards (grid view only)** — `src/pages/learner/Courses.tsx`: the state-aware CTA (`Start course`/`Fortsæt`/`Gennemse` → player) moved from the thumbnail overlay to **directly under the course title** (card body order: title → CTA → description → progress). Label logic / three states / link target unchanged; the card-body → detail-page link intact; **list view (`renderCourseRow`) byte-for-byte untouched**.
+- **Detail page Back control** — `src/pages/learner/CourseDetail.tsx`: an explicit top-left **Back to Course Catalog** control (`ArrowLeft` + reused `courses.detail.backToCatalog`) above the course card, → the catalog; the header breadcrumb is kept.
+- **Expandable Contents** — backend `functions/learner-course-detail` now returns each module's `lessons: [{id,title,sort_order}]` (ordered by `(sort_order,id)`, `lesson_count` preserved, **read-only — no enrollment side-effect on view**, one `WHERE module_id = ANY(...)` query, no N+1); `src/lib/types.ts` gains `CourseDetailLesson` + `CourseDetailModule.lessons`, `useCourseDetail` passes it through; the static module `<ul>` becomes an `Accordion type="single" collapsible` (no `defaultValue` → all collapsed on load, one open at a time) revealing **lesson names only**. Zero-lesson modules render as a static, non-expandable row (no dead chevron).
+
+**Decisions (grilled):** (1) lesson rows show **names only** — no type icons, no duration; (2) CTA sits **directly under the title** (per the issue, vs. card bottom). **No new i18n strings** — `courses.detail.backToCatalog/contents/lessonCount` + `common.continue` reused.
+
+**Verify:** after the clean trunk merge of #411 — root lint 0 / tsc app+node 0 / test **983** (+ new `CourseDetail` cases: back href, expand-reveals-names, one-open-at-a-time, empty-module non-expandable) / build ✓; `functions/` build ✓ / test **2795** (3 skip; updated `learner-course-detail` test — per-module lessons + ordering, `lesson_count` preserved, no-enrollment pin). CI green on PR #410 (SWA build+deploy, frontend, functions all pass).
+
+**Deploy:** functions changed (`learner-course-detail`) → both SWA + functions workflows auto-ship on merge. Announce on PR #410.
+
+**Collision note:** disjoint from #344 (merged — community/sidebar/routes/nav-i18n) and #411 (sidebar logo). Only theoretical shared file is the i18n locale JSON; 409 added no keys, so no overlap.
