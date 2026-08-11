@@ -166,19 +166,19 @@ export default function CourseDetail() {
                   <h2 className="font-display text-[15px] font-bold">{t('courses.detail.contents')}</h2>
                 </div>
                 <Accordion type="single" collapsible className="flex flex-col gap-1.5">
-                  {modules.map((m) => (
-                    <AccordionItem
-                      key={m.id}
-                      value={m.id}
-                      className="rounded-xl border border-border bg-background"
-                    >
-                      <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline">
-                        <span className="text-[13.5px] font-semibold">{m.title}</span>
-                        <span className="ml-auto whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                          {t('courses.detail.lessonCount', { count: m.lesson_count })}
-                        </span>
-                      </AccordionTrigger>
-                      {m.lessons.length > 0 && (
+                  {modules.map((m) =>
+                    m.lessons.length > 0 ? (
+                      <AccordionItem
+                        key={m.id}
+                        value={m.id}
+                        className="rounded-xl border border-border bg-background"
+                      >
+                        <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline">
+                          <span className="text-[13.5px] font-semibold">{m.title}</span>
+                          <span className="ml-auto whitespace-nowrap text-xs font-semibold text-muted-foreground">
+                            {t('courses.detail.lessonCount', { count: m.lesson_count })}
+                          </span>
+                        </AccordionTrigger>
                         <AccordionContent className="px-4 pb-3 pt-0">
                           <ul className="flex flex-col gap-1.5 border-t border-border pt-3">
                             {m.lessons.map((lesson) => (
@@ -188,9 +188,20 @@ export default function CourseDetail() {
                             ))}
                           </ul>
                         </AccordionContent>
-                      )}
-                    </AccordionItem>
-                  ))}
+                      </AccordionItem>
+                    ) : (
+                      // Empty module: static, non-interactive row (no chevron, nothing to reveal).
+                      <div
+                        key={m.id}
+                        className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3"
+                      >
+                        <span className="text-[13.5px] font-semibold">{m.title}</span>
+                        <span className="ml-auto whitespace-nowrap text-xs font-semibold text-muted-foreground">
+                          {t('courses.detail.lessonCount', { count: m.lesson_count })}
+                        </span>
+                      </div>
+                    ),
+                  )}
                 </Accordion>
               </div>
             )}

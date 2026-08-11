@@ -254,7 +254,7 @@ export default function LearnerCourses() {
       >
         {detailOverlay(course)}
 
-        {/* Thumbnail with status badge + the Start action */}
+        {/* Thumbnail with status badge */}
         <div className="relative h-[118px] bg-gradient-to-br from-primary/80 to-primary">
           {course.thumbnail_url && (
             <img
