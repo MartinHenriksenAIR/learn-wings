@@ -105,9 +105,11 @@
   },
   "auth": {
     "email": "E-mail",
-    "platformDescription": "Enterprise læringsplatform",
+    "platformDescription": "Praktisk AI-træning — for organisationer og enkeltpersoner.",
     "signInWithMicrosoft": "Log ind med Microsoft",
-    "accessProvidedByOrg": "Adgang leveres af din organisation",
+    "startFree": "Start gratis",
+    "signIn": "Log ind",
+    "accessProvidedByOrg": "Begge muligheder bruger din Microsoft-konto.",
     "passwordResetInfo": "Nulstilling af adgangskode håndteres af din organisations IT-administrator via Microsoft Entra ID.",
     "backToSignIn": "Tilbage til login",
     "sessionExpiredNotice": "Du er blevet logget ud. Log ind igen, så fører vi dig tilbage til det, du var i gang med."

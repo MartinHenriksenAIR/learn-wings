@@ -2528,3 +2528,22 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. After a clean trunk merge of #360: lint 0 / tsc app+node 0 / test **979** / build. The existing OrgSettings test ("Features tab shows 6 switches" + leaderboard-by-name) passes unmodified.
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Deploy announced on PR #406.
+
+---
+
+## 2026-08-11 — #355 public front door: branded landing with dual sign-in / start-free CTAs (PR #408)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`public-front-door-355`). Requirements grilled first (6 decisions), implemented inline (small surface), independent Opus code-review clean.
+
+**What:** Replaced the bare `/login` sign-in card with a branded public **front door** served at both `/` and `/login` — `App.tsx`'s root route now renders `<Login/>` directly instead of `<Navigate to="/login">`. The card gained a one-line positioning statement and **dual CTAs**: primary **Start free**, secondary (outline) **Sign in**. Both fire the *same* Entra `signIn()` — org-vs-individual is decided server-side by tenant match (#353/#354), so this is presentation only, not a new auth flow. The existing session-expired notice, post-login redirect, and deep-link stashing (all keyed on `/login`) are untouched.
+
+- Fixed the now-false B2B-only copy in en+da: `auth.platformDescription` "Enterprise Learning Platform" → "Practical AI training — for organizations and individuals." (da "Praktisk AI-træning — for organisationer og enkeltpersoner."); `auth.accessProvidedByOrg` "Access is provided by your organization" → "Both options use your Microsoft account." (da "Begge muligheder bruger din Microsoft-konto."). New keys `auth.startFree`/`auth.signIn` (Start gratis / Log ind).
+- Added a small en/da **language toggle** on the front door: browser-detected default (i18next LanguageDetector, `navigator`) with a manual override persisted to `localStorage['preferred_language']` — the detector's own key — so the choice survives the full-page Entra redirect. No profile API call (visitor is unauthenticated).
+
+**Decisions (grilled):** (1) both CTAs are pure presentation, same `signIn()`; (2) front door lives at both `/` and `/login` as one component, redirect plumbing intact; (3) enhanced card, NOT a hero — the full marketing splash stays #374; (4) dropped `AppLayout.tsx` from the issue's file list (nothing front-door-related; avoids collision with in-flight #344/#370/#371); (5) copy as above, "Start free" primary; (6) toggle = browser default + manual override.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **980** / build ✓; `functions/` untouched. Live dev-server render + Playwright screenshots of both languages (toggle switches all copy, 0 console errors). CI green on the commit.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #408.
+
+**Collision note:** #344 (PR #407, draft) is in flight and also appends to `App.tsx`/`routes.ts`; #355 landed first, so #407 must rebase on the new trunk.

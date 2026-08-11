@@ -105,9 +105,11 @@
   },
   "auth": {
     "email": "Email",
-    "platformDescription": "Enterprise Learning Platform",
+    "platformDescription": "Practical AI training — for organizations and individuals.",
     "signInWithMicrosoft": "Sign in with Microsoft",
-    "accessProvidedByOrg": "Access is provided by your organization",
+    "startFree": "Start free",
+    "signIn": "Sign in",
+    "accessProvidedByOrg": "Both options use your Microsoft account.",
     "passwordResetInfo": "Password reset is managed by your organization's IT administrator via Microsoft Entra ID.",
     "backToSignIn": "Back to sign in",
     "sessionExpiredNotice": "You've been signed out. Log back in and we'll take you right back to where you left off."
