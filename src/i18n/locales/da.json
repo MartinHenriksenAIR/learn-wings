@@ -189,7 +189,6 @@
     "heroFirstTimeTitle": "Klar til at lære?",
     "heroFirstTimeDescription": "Vælg dit første kursus i kataloget og begynd at opbygge praktiske AI-færdigheder.",
     "heroPickFirstCourse": "Vælg dit første kursus",
-    "favoriteCourses": "Favoritter",
     "noFavoritesTitle": "Ingen favoritter endnu",
     "noFavoritesDescription": "Tryk på hjertet på et kursus for at gemme det her.",
     "subtitle": "Følg dit momentum og se hvor du står.",
@@ -226,13 +225,16 @@
   "training": {
     "title": "Min Træning",
     "subtitle": "Din læring — samlet ét sted.",
-    "comingSoon": "Kommer snart.",
     "progress": {
       "summary": "{{done}} af {{total}} lektioner gennemført",
       "empty": "Ingen lektioner endnu — start et kursus for at se din fremgang her."
     },
     "mandatory": {
-      "title": "Obligatorisk"
+      "title": "Obligatorisk",
+      "empty": "Ingen obligatoriske kurser",
+      "due": "Frist",
+      "overdue": "Overskredet",
+      "completed": "Gennemført"
     },
     "continue": {
       "title": "Fortsæt",

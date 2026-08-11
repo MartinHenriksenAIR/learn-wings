@@ -28,7 +28,7 @@ export function FavoriteCourses({ orgId }: { orgId: string | undefined }) {
 
   return (
     <div className="mb-8">
-      <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('dashboard.favoriteCourses')}</h2>
+      <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('training.favorites.title')}</h2>
 
       {courses.length === 0 ? (
         <EmptyState

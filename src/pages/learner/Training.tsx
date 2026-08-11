@@ -17,7 +17,8 @@ import { useLearnerTraining } from '@/hooks/useLearnerTraining';
 import { callApiRaw } from '@/lib/api-client';
 import { BookOpen, Award, Play } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
-import { ComingSoonSection } from '@/components/learner/ComingSoonSection';
+import { MandatoryCourses } from '@/components/learner/MandatoryCourses';
+import { FavoriteCourses } from '@/components/learner/FavoriteCourses';
 import { formatDate } from '@/lib/date-locale';
 import { toast } from '@/components/ui/sonner';
 
@@ -148,8 +149,8 @@ export default function LearnerTraining() {
         <Progress value={pct} className="h-1.5" />
       </div>
 
-      {/* 2 · Mandatory — placeholder until #365. */}
-      <ComingSoonSection title={t('training.mandatory.title')} />
+      {/* 2 · Mandatory — the learner's mandatory-assigned courses (#365). */}
+      <MandatoryCourses orgId={currentOrg.id} />
 
       {/* 3 · Continue (in-progress) — live resume cards. */}
       <section className="mb-8">
@@ -214,8 +215,8 @@ export default function LearnerTraining() {
         )}
       </section>
 
-      {/* 4 · Favorites — placeholder until #358/#380. */}
-      <ComingSoonSection title={t('training.favorites.title')} />
+      {/* 4 · Favorites — the learner's favorited courses (#358/#380). */}
+      <FavoriteCourses orgId={currentOrg.id} />
 
       {/* 5 · Completed (+ certificate). */}
       <section className="mb-8">
