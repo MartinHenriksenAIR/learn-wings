@@ -1,11 +1,9 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { OrgGate } from '@/components/layout/OrgGate';
-import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -31,7 +29,6 @@ import { CommunityEmptyState } from '@/components/community/CommunityEmptyState'
 import { useAuth } from '@/hooks/useAuth';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
-import { useCommunityGate } from '@/hooks/useCommunityGate';
 import { toast } from '@/components/ui/sonner';
 import {
   fetchResources,
@@ -43,18 +40,15 @@ import {
   type CommunityResource,
 } from '@/lib/resources-api';
 import {
-  ArrowLeft,
   Search,
   Plus,
   Loader2,
 } from 'lucide-react';
 
 export default function ResourceLibrary() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
-  const communityGate = useCommunityGate();
   const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);
@@ -133,27 +127,16 @@ export default function ResourceLibrary() {
     },
   });
 
-  if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
-
   if (orgGuard === 'loading' || !currentOrg) {
     return <OrgGate titleKey="community.noOrganizationTitle" descriptionKey="community.noOrgResources" />;
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.resources') }]}>
-      <Button
-        variant="ghost"
-        onClick={() => navigate(`${routes.community.feed}?scope=org`)}
-        className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
-      >
-        <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
-        {t('community.backToCommunity')}
-      </Button>
-
+    <AppLayout breadcrumbs={[{ label: t('community.resources') }]}>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
-            {t('community.resourceLibrary')}
+            {t('community.resources')}
           </h1>
           <p className="text-sm text-muted-foreground">
             {t('community.resourceLibrarySubtitle', { orgName: currentOrg.name })}

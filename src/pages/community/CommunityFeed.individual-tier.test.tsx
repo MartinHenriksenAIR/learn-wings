@@ -92,9 +92,8 @@ describe('CommunityFeed — individual tier treats the placeholder org as no-org
       expect(mockFetchPosts).toHaveBeenCalledWith(expect.objectContaining({ scope: 'global' })),
     );
 
-    // Exactly the Global + Events tabs — no tab bearing the placeholder org name.
+    // Exactly the Global tab — no tab bearing the placeholder org name.
     expect(screen.getByRole('tab', { name: /community\.globalCommunity/ })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /community\.eventsOfficeHours/ })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /Individuals/ })).not.toBeInTheDocument();
 
     // Org scope is never fetched for a placeholder learner.
@@ -102,7 +101,6 @@ describe('CommunityFeed — individual tier treats the placeholder org as no-org
 
     // Org-only sidebar extras are absent.
     expect(screen.queryByText('community.ideaLibrary')).not.toBeInTheDocument();
-    expect(screen.queryByText('community.resourceLibrary')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ai-champions')).not.toBeInTheDocument();
   });
 
@@ -121,7 +119,6 @@ describe('CommunityFeed — individual tier treats the placeholder org as no-org
 
     expect(screen.getByRole('tab', { name: /Contoso/ })).toBeInTheDocument();
     expect(screen.getByText('community.ideaLibrary')).toBeInTheDocument();
-    expect(screen.getByText('community.resourceLibrary')).toBeInTheDocument();
     expect(screen.getByTestId('ai-champions')).toBeInTheDocument();
   });
 });

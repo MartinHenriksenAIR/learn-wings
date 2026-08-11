@@ -133,6 +133,29 @@ describe('AppSidebar nav groups (#271)', () => {
       expect(navLink(routes.orgAdmin.moderation)).toBeNull();
       expect(navLink(routes.orgAdmin.settings)).not.toBeNull();
     });
+
+    it('keeps Resources in the Fællesskab group when community is on (#344)', () => {
+      mockUseAuth.mockReturnValue(baseAuth);
+      renderSidebar();
+
+      // Events + Resources live in Fællesskab; Læring holds only the learning items.
+      expect(navLink(routes.community.events)).not.toBeNull();
+      expect(navLink(routes.community.resources)).not.toBeNull();
+      expect(groupLabels()).toEqual([en.nav.learning, en.nav.community]);
+    });
+
+    it('keeps Resources reachable in Læring when community is off (#344)', () => {
+      mockFeatures.mockReturnValue({ ...allFeatures, community_enabled: false });
+      mockUseAuth.mockReturnValue(baseAuth);
+      renderSidebar();
+
+      // The Fællesskab group is gone — the feed and Events drop out with it...
+      expect(navLink(routes.community.feed)).toBeNull();
+      expect(navLink(routes.community.events)).toBeNull();
+      // ...but Resources survives, having fallen back into the (only) Læring group.
+      expect(groupLabels()).toEqual([en.nav.learning]);
+      expect(navLink(routes.community.resources)).not.toBeNull();
+    });
   });
 
   describe('item labels and hrefs', () => {
@@ -156,9 +179,17 @@ describe('AppSidebar nav groups (#271)', () => {
         'href',
         routes.learner.tips,
       );
-      expect(screen.getByRole('link', { name: en.nav.community })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: en.nav.discussions })).toHaveAttribute(
         'href',
         routes.community.feed,
+      );
+      expect(screen.getByRole('link', { name: en.nav.events })).toHaveAttribute(
+        'href',
+        routes.community.events,
+      );
+      expect(screen.getByRole('link', { name: en.nav.resources })).toHaveAttribute(
+        'href',
+        routes.community.resources,
       );
     });
 

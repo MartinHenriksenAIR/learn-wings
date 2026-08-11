@@ -42,6 +42,8 @@ import {
   Flag,
   MessageSquare,
   PlayCircle,
+  Calendar,
+  FolderOpen,
   type LucideIcon,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
@@ -155,14 +157,24 @@ export function AppSidebar() {
     { title: t('nav.dashboard'), url: routes.learner.dashboard, icon: LayoutDashboard },
   ];
 
+  // Resources survives community being off (#344): it lives in the Fællesskab
+  // group when community is on, and falls back into Læring when it's off — so it
+  // always has a home regardless of the per-org community flag.
+  const resourcesItem = { title: t('nav.resources'), url: routes.community.resources, icon: FolderOpen };
+
   const laeringItems = [
     { title: t('nav.training'), url: routes.learner.training, icon: PlayCircle },
     { title: t('nav.courses'), url: routes.learner.courses, icon: BookOpen },
     { title: t('nav.tips'), url: routes.learner.tips, icon: Lightbulb },
+    ...(features.community_enabled ? [] : [resourcesItem]),
   ];
 
+  // #344: the feed is now "Diskussioner"; Events + Resources are promoted to
+  // direct destinations in the community group.
   const faellesskabItems = [
-    { title: t('nav.community'), url: routes.community.feed, icon: MessageSquare },
+    { title: t('nav.discussions'), url: routes.community.feed, icon: MessageSquare },
+    { title: t('nav.events'), url: routes.community.events, icon: Calendar },
+    resourcesItem,
   ];
 
   const orgAdminItems = [

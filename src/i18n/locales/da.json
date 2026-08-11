@@ -80,6 +80,9 @@
     "courses": "Kursuskatalog",
     "tips": "Tips & Tricks",
     "community": "Fællesskab",
+    "discussions": "Diskussioner",
+    "events": "Arrangementer",
+    "resources": "Ressourcer",
     "settings": "Indstillinger",
     "signOut": "Log ud",
     "organization": "Organisation",
@@ -353,7 +356,10 @@
         "name": "Events / Træffetid"
       }
     },
-    "title": "Fællesskab",
+    "title": "Diskussioner",
+    "events": "Arrangementer",
+    "eventsSubtitle": "Kommende arrangementer og office hours i din organisation og det globale fællesskab.",
+    "viewAllEvents": "Se alle",
     "ideaLibrary": "Idébibliotek",
     "idea": "Idé",
     "post": "Indlæg",

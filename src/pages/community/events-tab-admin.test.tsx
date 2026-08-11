@@ -8,11 +8,6 @@ vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('@/components/community/PostCard', () => ({
-  PostCard: ({ post }: { post: { title: string } }) => <div>{post.title}</div>,
-}));
-vi.mock('@/components/community/AIChampionsList', () => ({ AIChampionsList: () => null }));
-vi.mock('@/components/community/UpcomingEvents', () => ({ UpcomingEvents: () => null }));
 vi.mock('@/components/community/EventCard', () => ({
   EventCard: ({ event }: { event: { title: string } }) => (
     <div data-testid="event-card">{event.title}</div>
@@ -63,7 +58,7 @@ vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => ({ features: { community_enabled: true }, isLoading: false }),
 }));
 
-import CommunityFeed from './CommunityFeed';
+import EventsPage from './EventsPage';
 
 const baseAuth = {
   user: { id: 'oid-1', email: 'u@example.com', name: 'User' },
@@ -95,18 +90,18 @@ const futureEvent = {
   event_registration_url: 'https://example.com/ev1',
 };
 
-function renderEventsTab() {
+function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/community?scope=events']}>
-        <CommunityFeed />
+      <MemoryRouter initialEntries={['/app/events']}>
+        <EventsPage />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-describe('Community Events tab — admin affordance + empty state (#125)', () => {
+describe('Events page — admin affordance + empty state (#344)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -120,7 +115,7 @@ describe('Community Events tab — admin affordance + empty state (#125)', () =>
 
     it('shows New Event for a platform admin and opens the form preselected to events, scope global', async () => {
       mockUseAuth.mockReturnValue(platformAdmin);
-      renderEventsTab();
+      renderPage();
 
       await screen.findByTestId('event-card');
       const newEvent = screen.getByRole('button', { name: 'community.newEvent' });
@@ -136,7 +131,7 @@ describe('Community Events tab — admin affordance + empty state (#125)', () =>
 
     it('shows New Event for an org admin and opens the form scoped to the org', async () => {
       mockUseAuth.mockReturnValue(orgAdmin);
-      renderEventsTab();
+      renderPage();
 
       await screen.findByTestId('event-card');
       const newEvent = screen.getByRole('button', { name: 'community.newEvent' });
@@ -149,18 +144,10 @@ describe('Community Events tab — admin affordance + empty state (#125)', () =>
 
     it('hides New Event from a learner', async () => {
       mockUseAuth.mockReturnValue(learner);
-      renderEventsTab();
+      renderPage();
 
       await screen.findByTestId('event-card');
       expect(screen.queryByRole('button', { name: 'community.newEvent' })).not.toBeInTheDocument();
-    });
-
-    it('hides the Submit Idea button on the events view', async () => {
-      mockUseAuth.mockReturnValue(orgAdmin);
-      renderEventsTab();
-
-      await screen.findByTestId('event-card');
-      expect(screen.queryByText('community.submitIdea')).not.toBeInTheDocument();
     });
   });
 
@@ -171,7 +158,7 @@ describe('Community Events tab — admin affordance + empty state (#125)', () =>
 
     it('renders the events empty-state variant with a CTA for an admin', async () => {
       mockUseAuth.mockReturnValue(platformAdmin);
-      renderEventsTab();
+      renderPage();
 
       const title = await screen.findByText('community.emptyState.eventsTitle');
       const emptyState = title.closest('div') as HTMLElement;
@@ -182,7 +169,7 @@ describe('Community Events tab — admin affordance + empty state (#125)', () =>
 
     it('renders the events empty-state variant with no CTA for a learner', async () => {
       mockUseAuth.mockReturnValue(learner);
-      renderEventsTab();
+      renderPage();
 
       const title = await screen.findByText('community.emptyState.eventsTitle');
       const emptyState = title.closest('div') as HTMLElement;

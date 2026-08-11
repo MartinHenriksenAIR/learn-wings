@@ -80,6 +80,9 @@
     "courses": "Course Catalog",
     "tips": "Tips & Tricks",
     "community": "Community",
+    "discussions": "Discussions",
+    "events": "Events",
+    "resources": "Resources",
     "settings": "Settings",
     "signOut": "Sign out",
     "organization": "Organization",
@@ -353,7 +356,10 @@
         "name": "Events / Office Hours"
       }
     },
-    "title": "Community",
+    "title": "Discussions",
+    "events": "Events",
+    "eventsSubtitle": "Upcoming events and office hours from your organization and the global community.",
+    "viewAllEvents": "View all",
     "ideaLibrary": "Idea Library",
     "idea": "Idea",
     "post": "Post",

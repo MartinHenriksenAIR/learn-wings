@@ -102,6 +102,7 @@ export function DashboardCommunitySection({ orgId }: { orgId?: string }) {
             <UpcomingEvents
               events={allPosts}
               onEventClick={(event) => navigate(routes.community.postDetail(event.scope, event.id))}
+              viewAllTo={routes.community.events}
             />
           </div>
         </div>
