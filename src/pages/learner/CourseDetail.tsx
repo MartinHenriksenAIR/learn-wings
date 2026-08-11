@@ -13,7 +13,13 @@ import { useCourseDetail } from '@/hooks/useCourseDetail';
 import { useCourseCategories } from '@/hooks/useCourseCategories';
 import { useFavorites, useToggleFavorite } from '@/hooks/useFavorites';
 import { FavoriteToggle } from '@/components/learner/FavoriteToggle';
-import { BookOpen, Layers, Play } from 'lucide-react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { ArrowLeft, BookOpen, Layers, Play } from 'lucide-react';
 
 export default function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -97,6 +103,17 @@ export default function CourseDetail() {
   return (
     <AppLayout breadcrumbs={[catalogCrumb, { label: course.title }]}>
       <div className="mx-auto max-w-[820px]">
+        <Button
+          asChild
+          variant="ghost"
+          className="mb-3 -ml-2 h-auto gap-1.5 px-2 py-1.5 text-[13px] font-semibold text-muted-foreground hover:text-foreground"
+        >
+          <Link to={routes.learner.courses}>
+            <ArrowLeft aria-hidden="true" />
+            {t('courses.detail.backToCatalog')}
+          </Link>
+        </Button>
+
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
           {/* Thumbnail banner — gradient fallback matches the catalog cards. */}
           <div className="relative h-[190px] bg-gradient-to-br from-primary/80 to-primary">
@@ -140,26 +157,41 @@ export default function CourseDetail() {
               </p>
             )}
 
-            {/* Module outline — title + lesson count, no lesson bodies (that's the player). */}
+            {/* Contents — expandable outline: module title + lesson count collapsed,
+                lesson names revealed on expand (no lesson bodies — that's the player). */}
             {modules.length > 0 && (
               <div className="mt-1" data-testid="module-outline">
                 <div className="mb-2.5 flex items-center gap-2">
                   <Layers aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
                   <h2 className="font-display text-[15px] font-bold">{t('courses.detail.contents')}</h2>
                 </div>
-                <ul className="flex flex-col gap-1.5">
+                <Accordion type="single" collapsible className="flex flex-col gap-1.5">
                   {modules.map((m) => (
-                    <li
+                    <AccordionItem
                       key={m.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3"
+                      value={m.id}
+                      className="rounded-xl border border-border bg-background"
                     >
-                      <span className="text-[13.5px] font-semibold">{m.title}</span>
-                      <span className="whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                        {t('courses.detail.lessonCount', { count: m.lesson_count })}
-                      </span>
-                    </li>
+                      <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline">
+                        <span className="text-[13.5px] font-semibold">{m.title}</span>
+                        <span className="ml-auto whitespace-nowrap text-xs font-semibold text-muted-foreground">
+                          {t('courses.detail.lessonCount', { count: m.lesson_count })}
+                        </span>
+                      </AccordionTrigger>
+                      {m.lessons.length > 0 && (
+                        <AccordionContent className="px-4 pb-3 pt-0">
+                          <ul className="flex flex-col gap-1.5 border-t border-border pt-3">
+                            {m.lessons.map((lesson) => (
+                              <li key={lesson.id} className="text-[13px] text-muted-foreground">
+                                {lesson.title}
+                              </li>
+                            ))}
+                          </ul>
+                        </AccordionContent>
+                      )}
+                    </AccordionItem>
                   ))}
-                </ul>
+                </Accordion>
               </div>
             )}
 
