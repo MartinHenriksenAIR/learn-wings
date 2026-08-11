@@ -2547,3 +2547,21 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #408.
 
 **Collision note:** #344 (PR #407, draft) is in flight and also appends to `App.tsx`/`routes.ts`; #355 landed first, so #407 must rebase on the new trunk.
+
+---
+
+## 2026-08-11 — #344 split community into Community / Events / Resources pages (PR #407)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`community-events-resources-344`). Requirements grilled first (6 decisions), implemented inline, independent Opus code-review clean. Landed after #355 (PR #408); rebased onto the new trunk via `git merge origin/main` (clean auto-merge on `App.tsx`/`routes.ts`/i18n).
+
+**What:** Promoted **Events** and **Resources** out of their nested/tabbed locations into first-class sidebar destinations, and renamed the community feed to **Diskussioner/Discussions** so the feed isn't the same word as its Fællesskab group.
+- **Events → `/app/events`** (was a `?scope=events` tab): the reusable `EventsTab` list body is now wrapped by a new `EventsPage`, community-gated, with the admin-only New Event creation moved off the feed header (platform admin → global, org admin → current org).
+- **Resources → `/app/resources`** (moved off `/app/community/org/resources`, redirect added). **Decoupled from the community flag:** it sits in the Fællesskab group when community is on and **falls back into the Læring group when community is off**, so it always has a home. `useCommunityGate` removed from `ResourceLibrary` (it must survive community-off); breadcrumb flattened + back-to-feed button dropped + h1 → `community.resources`.
+- Feed (`CommunityFeed`): Events tab removed from `SlidingTabs` (org + global remain); Resources link dropped from the Libraries panel (Ideas kept). Shared `UpcomingEvents` card gained an optional **View all → Events** link (feed sidebar + dashboard).
+- routes.ts: `community.events` + repointed `community.resources` + `community.resourcesLegacy` (redirect source). en/da `nav.discussions/events/resources` + `community.events/eventsSubtitle/viewAllEvents`; `community.title` → Diskussioner/Discussions. Glossary updated. Removed dead `community.eventsOfficeHours`/`resourceLibrary` keys + the `CommunityView` type.
+
+**Decisions (grilled):** (1) Events+Resources inside the Fællesskab group (not new top-level groups); (2) feed = Diskussioner/Discussions (plural); (3) `/app/events` + `/app/resources` (+ redirect); (4) Resources decoupled from `community_enabled` — conditional Fællesskab↔Læring placement; (5) Events = Arrangementer/Events; (6) Resources = Ressourcer/Resources. **Deferred:** the `community.title` rename also relabels the Ideas/Post breadcrumb parent crumb to "Diskussioner" — left as-is (Ideas out of scope), flagged for a follow-up.
+
+**Verify:** frontend-only, no schema/functions change. After the clean trunk merge of #355: root lint 0 / tsc app+node 0 / test **980** / build ✓; `functions/` untouched. Events-tab tests retargeted to `EventsPage`; added `AppSidebar` coverage for the conditional Resources placement (both flag states).
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #407.
