@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Users, UserPlus, ClipboardList } from 'lucide-react';
+import { Users, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MembersTable } from './MembersTable';
@@ -10,7 +10,6 @@ type Member = OrgMembership & { profile: Profile };
 interface MembersSectionProps {
   members: Member[];
   updatingRoleId: string | null;
-  onAddUserClick: () => void;
   onRoleChange: (member: Member, newRole: OrgRole) => void;
   onDisable: (membershipId: string) => void;
   onReactivate: (membershipId: string) => void;
@@ -21,7 +20,6 @@ interface MembersSectionProps {
 export function MembersSection({
   members,
   updatingRoleId,
-  onAddUserClick,
   onRoleChange,
   onDisable,
   onReactivate,
@@ -39,10 +37,6 @@ export function MembersSection({
             <ClipboardList className="mr-2 h-4 w-4" aria-hidden="true" />
             {t('assignments.assignCourse')}
           </Button>
-          <Button onClick={onAddUserClick}>
-            <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" />
-            {t('orgDetail.addMember')}
-          </Button>
         </div>
       </div>
 
@@ -51,12 +45,6 @@ export function MembersSection({
           icon={<Users className="h-6 w-6" />}
           title={t('orgDetail.noMembersTitle')}
           description={t('orgDetail.noMembersDescription')}
-          action={
-            <Button onClick={onAddUserClick}>
-              <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t('orgDetail.addUser')}
-            </Button>
-          }
         />
       ) : (
         <MembersTable

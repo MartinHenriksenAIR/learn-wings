@@ -3,9 +3,8 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// i18n echo — REPO CONVENTION (see AddExistingUserDialog.test.tsx): t returns
-// the key, with interpolation params appended. Component tests assert on keys,
-// NOT on English/Danish text.
+// i18n echo — REPO CONVENTION: t returns the key, with interpolation params
+// appended. Component tests assert on keys, NOT on English/Danish text.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) =>

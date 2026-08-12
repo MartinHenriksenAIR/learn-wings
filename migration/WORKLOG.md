@@ -2675,3 +2675,21 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app 0 / tsc node 0 / test **989** (128 files, incl. the new guard) / build ✓; functions untouched. CI green on the PR (Frontend + Functions jobs both pass). **Owner live-check on prod (www.ai-uddannelse.dk) still owed:** open a 2nd tab → no login screen; sign out → can't return without logging in.
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #436.
+
+---
+
+## 2026-08-12 — #434 Remove "Add member" from Platform view (PR #435)
+
+**Who:** claude (Opus 4.8, 1M) with martin, same worktree as #352 — a follow-on the user requested after #352 merged.
+
+**What:** Removed the platform org-detail page's **Add member** affordance (`AddExistingUserDialog` — a direct add of an already-registered platform user to an org via `/api/org-membership-create`: instant active membership, no email). After #352 removed email-invite from Platform view, this was the last member-adding path there. Decision: **Platform view exposes no member-adding at all** — a platform admin manages membership by switching to Org-admin view; adding an already-registered user is covered by email-invite there (the invite links to the existing account on accept, at the cost of one accept click). Reverses #352's "keep Add-existing-user" decision.
+- `OrganizationDetail.tsx` — removed `AddExistingUserDialog` + `addUserMutation` / `handleAddUser` / `addUserSchema` / `addUserOpen` / `addUserErrorMessage` / `availableUsers` / the `useProfiles` read + its error toast + loading term; dropped now-unused `z` and `ApiError` imports.
+- `MembersSection.tsx` — removed the "Add member" header button + the empty-state add action + `onAddUserClick` prop (+ unused `UserPlus` icon).
+- Deleted the orphaned `AddExistingUserDialog.tsx` + `.test.tsx`.
+- Dropped **12** orphaned `orgDetail.*` i18n keys (en+da): the add-existing set (`addMember`, `addUser`, `addDialogTitle`/`Description`, `user`, `selectUser`, `allUsersMembers`, `role`) plus `emailAddress`/`firstName`/`lastName`/`department` that #352's `InviteUserDialog` deletion had orphaned. Kept shared `learner` / `organizationAdmin`.
+
+**Why not replicate it into org-admin view:** an org admin has no legitimate pool of "existing users" to add — org isolation forbids seeing other orgs' users — so an "Add existing user" picker there would be empty or an isolation hole. Invite-by-email is the org admin's complete tool (it links to an existing account on accept). The capability is dropped, not moved.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **983** (988 − 5 from the deleted dialog test) / build ✓; functions untouched. Regression test updated to assert no member-adding affordance at all.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #435.
