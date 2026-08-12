@@ -1,14 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // `t` echoes the key so assertions pin i18n keys; `Trans` renders its key —
 // enough for the controlled-dialog test, which never inspects the interpolated
-// member name inside descriptions. `language` feeds the date formatters in this
-// tree; `resolvedLanguage` is what the invite dialog's language selector
-// defaults from (uiLangToInvite) — both are 'en'.
+// member name inside descriptions. `language`/`resolvedLanguage` feed the date
+// formatters in this tree — both are 'en'.
 vi.mock('react-i18next', async () => {
   const ReactActual = await import('react');
   return {
@@ -50,9 +49,6 @@ vi.mock('@/lib/api-client', () => {
 
 vi.mock('@/components/ui/file-upload', () => ({
   FileUpload: () => null,
-}));
-vi.mock('@/lib/sendInvitationEmail', () => ({
-  sendInvitationEmail: vi.fn(async () => ({ success: true })),
 }));
 
 // Stub the assignment components (their own tests cover behavior) so no
@@ -99,11 +95,9 @@ vi.mock('@/components/ui/dropdown-menu', async () => {
 });
 
 import { callApi } from '@/lib/api-client';
-import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import OrganizationDetail from './OrganizationDetail';
 
 const mockCallApi = vi.mocked(callApi);
-const sendInvitationEmailMock = vi.mocked(sendInvitationEmail);
 
 const organization = {
   id: 'org-1',
@@ -125,6 +119,19 @@ const membershipRow = {
   email: 'bob@example.com',
   avatar_url: null,
   department: null,
+};
+
+const invitationRow = {
+  id: 'inv-1',
+  org_id: 'org-1',
+  email: 'pending@example.com',
+  role: 'learner',
+  link_id: 'link-abc',
+  status: 'pending',
+  invited_by_user_id: 'u-1',
+  created_at: '2026-02-01T00:00:00Z',
+  expires_at: '2026-03-01T00:00:00Z',
+  is_platform_admin_invite: false,
 };
 
 function renderPage() {
@@ -244,43 +251,6 @@ describe('OrganizationDetail — load-failure retry (#53)', () => {
   });
 });
 
-describe('OrganizationDetail — invite forwards the language pick (#225)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockCallApi.mockImplementation(async (path: string) => {
-      if (path === '/api/organizations') return { organization };
-      if (path === '/api/org-memberships') return { memberships: [membershipRow] };
-      if (path === '/api/invitations') return { invitations: [] };
-      if (path === '/api/profiles') return { profiles: [] };
-      if (path === '/api/invitation-create')
-        return { invitation: { id: 'inv-1', link_id: 'link-1' } };
-      throw new Error(`Unexpected callApi path: ${path}`);
-    });
-    sendInvitationEmailMock.mockResolvedValue({ success: true });
-  });
-
-  it('passes the selected inviterLanguage through to sendInvitationEmail', async () => {
-    renderPage();
-
-    // Open the invite dialog from the members section.
-    fireEvent.click(await screen.findByRole('button', { name: 'orgDetail.inviteUser' }));
-
-    // A valid email is required for the invite (inviteSchema); language defaults
-    // to the UI language ('en' via the i18n mock).
-    fireEvent.change(await screen.findByPlaceholderText('colleague@company.com'), {
-      target: { value: 'new@example.com' },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'orgDetail.createInvitation' }));
-
-    await waitFor(() =>
-      expect(sendInvitationEmailMock).toHaveBeenCalledWith(
-        expect.objectContaining({ inviterLanguage: 'en' }),
-      ),
-    );
-  });
-});
-
 describe('OrganizationDetail — heading (#320)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -340,5 +310,37 @@ describe('OrganizationDetail — assign course wiring (#365)', () => {
     const dialog = screen.getByTestId('assign-dialog');
     expect(dialog).toHaveAttribute('data-open', 'true');
     expect(dialog).toHaveAttribute('data-preset', 'u-1');
+  });
+});
+
+describe('OrganizationDetail — no invite affordance in Platform view (#352)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/organizations') return { organization };
+      if (path === '/api/org-memberships') return { memberships: [membershipRow] };
+      if (path === '/api/invitations') return { invitations: [invitationRow] };
+      if (path === '/api/profiles') return { profiles: [] };
+      throw new Error(`Unexpected callApi path: ${path}`);
+    });
+  });
+
+  it('renders no email-invite affordance; the add-existing-user path stays', async () => {
+    renderPage();
+    await screen.findByText('Bob Member');
+
+    // Email-invite is gone — the only invite path is the org-admin flow.
+    expect(screen.queryByRole('button', { name: 'orgDetail.inviteUser' })).toBeNull();
+    // Add-existing-user is platform-admin-only (no org-admin equivalent) and stays.
+    expect(screen.getByRole('button', { name: 'orgDetail.addMember' })).toBeInTheDocument();
+  });
+
+  it('pending invitations can be viewed and cancelled, but not shared as a link', async () => {
+    renderPage();
+    await screen.findByText('pending@example.com');
+
+    // Copy-invite-link is an invite affordance — removed. Cancel (management) stays.
+    expect(screen.queryByRole('button', { name: 'orgDetail.copyLink' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'orgDetail.cancelInvite' })).toBeInTheDocument();
   });
 });

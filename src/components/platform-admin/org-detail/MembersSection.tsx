@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Users, Mail, UserPlus, ClipboardList } from 'lucide-react';
+import { Users, UserPlus, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MembersTable } from './MembersTable';
@@ -10,7 +10,6 @@ type Member = OrgMembership & { profile: Profile };
 interface MembersSectionProps {
   members: Member[];
   updatingRoleId: string | null;
-  onInviteClick: () => void;
   onAddUserClick: () => void;
   onRoleChange: (member: Member, newRole: OrgRole) => void;
   onDisable: (membershipId: string) => void;
@@ -22,7 +21,6 @@ interface MembersSectionProps {
 export function MembersSection({
   members,
   updatingRoleId,
-  onInviteClick,
   onAddUserClick,
   onRoleChange,
   onDisable,
@@ -40,10 +38,6 @@ export function MembersSection({
           <Button variant="outline" onClick={onAssignClick}>
             <ClipboardList className="mr-2 h-4 w-4" aria-hidden="true" />
             {t('assignments.assignCourse')}
-          </Button>
-          <Button variant="outline" onClick={onInviteClick}>
-            <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
-            {t('orgDetail.inviteUser')}
           </Button>
           <Button onClick={onAddUserClick}>
             <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" />

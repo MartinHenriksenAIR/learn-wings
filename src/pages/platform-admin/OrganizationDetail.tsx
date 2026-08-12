@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { Button } from '@/components/ui/button';
-import { useFlash } from '@/hooks/useFlash';
 import { useToastMutation } from '@/hooks/useToastMutation';
 import { useOrgDetail } from '@/hooks/useOrgDetail';
 import { useOrgMemberships } from '@/hooks/useOrgMemberships';
@@ -16,7 +15,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { getSeatUsage } from '@/lib/seats';
 import { routes } from '@/lib/routes';
 import { OrgMembership, Profile, OrgRole } from '@/lib/types';
-import { sendInvitationEmail } from '@/lib/sendInvitationEmail';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/sonner';
@@ -30,10 +28,6 @@ import { MembersSection } from '@/components/platform-admin/org-detail/MembersSe
 import { AssignCourseDialog } from '@/components/assignments/AssignCourseDialog';
 import { AssignmentsManager } from '@/components/assignments/AssignmentsManager';
 import { PendingInvitationsList } from '@/components/platform-admin/org-detail/PendingInvitationsList';
-import {
-  InviteUserDialog,
-  type InvitePayload,
-} from '@/components/platform-admin/org-detail/InviteUserDialog';
 import {
   AddExistingUserDialog,
   type AddUserPayload,
@@ -54,11 +48,6 @@ type Member = OrgMembership & { profile: Profile };
 
 const addUserSchema = z.object({
   userId: z.string().uuid('Please select a user'),
-  role: z.enum(['org_admin', 'learner']),
-});
-
-const inviteSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
   role: z.enum(['org_admin', 'learner']),
 });
 
@@ -118,17 +107,12 @@ export default function OrganizationDetail() {
     logLabel: 'OrganizationDetail: failed to load profiles',
   });
 
-  const [inviteOpen, setInviteOpen] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [roleChangeDialog, setRoleChangeDialog] = useState<RoleChangeSelection | null>(null);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
   const [assignDialog, setAssignDialog] = useState<{ open: boolean; presetUserId?: string }>({ open: false });
-
-  // In-button "Copied!" morph for the invite link, keyed by link id (toast
-  // policy: copy is routine — no toast).
-  const { flashed: copyFlashed, flash: flashCopy } = useFlash();
 
   const invalidateMemberships = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.orgMemberships.list(orgId) });
@@ -195,61 +179,6 @@ export default function OrganizationDetail() {
         description: 'The user can now access this organization again.',
       });
       invalidateMemberships();
-      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
-    },
-  });
-
-  const inviteMutation = useToastMutation({
-    mutationFn: async (payload: InvitePayload) => {
-      const { invitation } = await callApi<{ invitation: { id: string; link_id: string } }>(
-        '/api/invitation-create',
-        {
-          orgId,
-          email: payload.email,
-          role: payload.role,
-          firstName: payload.firstName.trim() || undefined,
-          lastName: payload.lastName.trim() || undefined,
-          department: payload.department.trim() || undefined,
-        },
-      );
-
-      if (invitation?.link_id) {
-        const emailResult = await sendInvitationEmail({
-          email: payload.email,
-          orgName: org?.name || null,
-          role: payload.role,
-          linkId: invitation.link_id,
-          inviterLanguage: payload.language,
-        });
-
-        if (emailResult.success) {
-          toast({
-            title: 'Invitation sent!',
-            description: 'An email has been sent to the invited user.',
-          });
-        } else {
-          console.error('Failed to send invitation email:', emailResult.error);
-          toast({
-            title: 'Invitation created',
-            description: 'The invitation was created but the email could not be sent. You can copy the invite link manually.',
-            variant: 'default',
-          });
-        }
-      } else {
-        toast({
-          title: 'Invitation created!',
-          description: 'Copy the invite link to share with the user.',
-        });
-      }
-    },
-    errorTitle: 'Failed to create invitation',
-    onSuccess: () => {
-      setInviteOpen(false);
-      invalidateInvitations();
-      // A new pending invite consumes a seat: refresh the org's server-computed
-      // pending_invite_count (detail + shared list) so "seats used / remaining"
-      // updates immediately.
-      queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(orgId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
     },
   });
@@ -341,19 +270,6 @@ export default function OrganizationDetail() {
     addUserMutation.mutate(payload);
   };
 
-  const handleInvite = (payload: InvitePayload) => {
-    const result = inviteSchema.safeParse({ email: payload.email, role: payload.role });
-    if (!result.success) {
-      toast({
-        title: 'Invalid input',
-        description: result.error.errors[0].message,
-        variant: 'destructive',
-      });
-      return;
-    }
-    inviteMutation.mutate(payload);
-  };
-
   const handleConfirmRoleChange = () => {
     if (!roleChangeDialog?.member) return;
     const { member, newRole } = roleChangeDialog;
@@ -373,13 +289,6 @@ export default function OrganizationDetail() {
       return;
     }
     saveEditMutation.mutate(payload);
-  };
-
-  const handleCopyInviteLink = async (linkId: string) => {
-    const link = `${window.location.origin}${routes.auth.signup}?invite=${linkId}`;
-    await navigator.clipboard.writeText(link);
-    // In-button "Copied!" morph instead of a toast (toast policy: copy is routine).
-    flashCopy(linkId);
   };
 
   const loading =
@@ -418,16 +327,9 @@ export default function OrganizationDetail() {
     seatLimit: org.seat_limit,
   });
 
-  // Surface the backend seat cap (409) inline in the invite dialog, in addition
-  // to the failure toast, so it doesn't read as a generic error.
-  const inviteErrorMessage =
-    inviteMutation.error instanceof ApiError &&
-    inviteMutation.error.code === 'SEAT_LIMIT_REACHED'
-      ? inviteMutation.error.message
-      : null;
-
-  // Same treatment for the add-existing-user dialog: adding a member consumes
-  // a seat too, so the same 409 can fire there.
+  // Surface the backend seat cap (409) inline in the add-existing-user dialog,
+  // in addition to the failure toast, so it doesn't read as a generic error.
+  // Adding a member consumes a seat, so the same 409 can fire there.
   const addUserErrorMessage =
     addUserMutation.error instanceof ApiError &&
     addUserMutation.error.code === 'SEAT_LIMIT_REACHED'
@@ -477,10 +379,6 @@ export default function OrganizationDetail() {
       <MembersSection
         members={members}
         updatingRoleId={updatingRoleId}
-        onInviteClick={() => {
-          inviteMutation.reset();
-          setInviteOpen(true);
-        }}
         onAddUserClick={() => {
           addUserMutation.reset();
           setAddUserOpen(true);
@@ -506,21 +404,9 @@ export default function OrganizationDetail() {
       {invitations.length > 0 && (
         <PendingInvitationsList
           invitations={invitations}
-          isCopied={copyFlashed}
-          onCopy={handleCopyInviteLink}
           onCancel={(id) => cancelInvitationMutation.mutate(id)}
         />
       )}
-
-      <InviteUserDialog
-        open={inviteOpen}
-        onOpenChange={setInviteOpen}
-        orgName={org.name}
-        seatUsage={seatUsage}
-        errorMessage={inviteErrorMessage}
-        onSubmit={handleInvite}
-        pending={inviteMutation.isPending}
-      />
 
       <AddExistingUserDialog
         open={addUserOpen}

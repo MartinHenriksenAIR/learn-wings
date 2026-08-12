@@ -92,7 +92,7 @@ const inviteSchema = z.object({
 
 export function OrgMembersTab() {
   const { t, i18n } = useTranslation();
-  const { user, profile, currentOrg } = useAuth();
+  const { user, profile, currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const queryClient = useQueryClient();
 
   const membershipsQuery = useOrgMemberships(currentOrg?.id);
@@ -138,6 +138,13 @@ export function OrgMembersTab() {
   const { data: seatRequests = [] } = useSeatRequests(currentOrg?.id);
   const pendingSeatRequest = seatRequests.find((r) => r.status === 'pending') ?? null;
   const hasFiniteSeatLimit = (orgDetail?.seat_limit ?? currentOrg?.seat_limit ?? null) !== null;
+
+  // Invite is an org-admin capability. A platform admin must NOT invite while in
+  // Platform view — the only invite path is the org-admin flow (switch to
+  // Org-admin view → pick the org → invite here). Real org admins always qualify:
+  // their viewMode defaults to platform_admin, but effectiveIsPlatformAdmin stays
+  // false because they aren't platform admins. Mirrors AppSidebar's role gating. (#352)
+  const canInvite = effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && !!currentOrg;
 
   useQueryErrorToast({
     isError: membershipsQuery.isError,
@@ -457,10 +464,13 @@ export function OrgMembersTab() {
           <ClipboardList className="mr-2 h-4 w-4" aria-hidden="true" />
           {t('assignments.assignCourse')}
         </Button>
-        <Button variant="outline" onClick={() => setBulkInviteOpen(true)} className="shrink-0">
-          <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
-          {t('analytics.members.bulkInvite')}
-        </Button>
+        {canInvite && (
+          <Button variant="outline" onClick={() => setBulkInviteOpen(true)} className="shrink-0">
+            <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
+            {t('analytics.members.bulkInvite')}
+          </Button>
+        )}
+        {canInvite && (
         <Dialog
           open={inviteOpen}
           onOpenChange={(open) => {
@@ -566,6 +576,7 @@ export function OrgMembersTab() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
         {hasFiniteSeatLimit && (
           pendingSeatRequest ? (
             <div className="flex items-center gap-2">
@@ -592,14 +603,16 @@ export function OrgMembersTab() {
         )}
       </div>
 
-      <BulkInviteDialog
-        open={bulkInviteOpen}
-        onOpenChange={setBulkInviteOpen}
-        orgId={currentOrg.id}
-        orgName={currentOrg.name}
-        seatUsage={seatUsage}
-        onSuccess={refetchAll}
-      />
+      {canInvite && (
+        <BulkInviteDialog
+          open={bulkInviteOpen}
+          onOpenChange={setBulkInviteOpen}
+          orgId={currentOrg.id}
+          orgName={currentOrg.name}
+          seatUsage={seatUsage}
+          onSuccess={refetchAll}
+        />
+      )}
 
       <EnrollUserDialog
         open={enrollDialogOpen}
@@ -633,7 +646,7 @@ export function OrgMembersTab() {
               : t('analytics.members.noMembersDescription')
           }
           action={
-            !hasFilters ? (
+            !hasFilters && canInvite ? (
               <Button
                 onClick={() => {
                   inviteMutation.reset();
@@ -777,7 +790,7 @@ export function OrgMembersTab() {
 
       <AssignmentsManager orgId={currentOrg.id} />
 
-      {invitations.length > 0 && (
+      {canInvite && invitations.length > 0 && (
         <>
           <h3 className="mb-3 text-[15px] font-extrabold">{t('analytics.members.pendingInvitations')}</h3>
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
