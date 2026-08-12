@@ -36,7 +36,14 @@ export const routes = {
     courseDetail: (courseId: string) => `/app/courses/${courseId}`,
     assessment: '/app/assessment',
     coursePlayerPattern: '/app/learn/:courseId',
-    coursePlayer: (courseId: string) => `/app/learn/${courseId}`,
+    /**
+     * `from` records where the learner opened the course from, so the player's
+     * breadcrumb can point its parent crumb back there (#438). Only 'training'
+     * is meaningful today; anything else (incl. omitted) falls back to the
+     * Course Catalog crumb.
+     */
+    coursePlayer: (courseId: string, from?: 'training') =>
+      `/app/learn/${courseId}${from ? `?from=${from}` : ''}`,
     /** Tips & Tricks — coming-soon placeholder (#366). Nav entry wired by #363. */
     tips: '/app/tips',
     /** Legacy redirect target -> dashboard. */

@@ -150,7 +150,8 @@ describe('LearnerTraining', () => {
     const card = screen.getByTestId('training-continue-card');
     expect(within(card).getByText('Ongoing Course')).toBeInTheDocument();
     const resume = within(card).getByRole('link', { name: /common\.continue/ });
-    expect(resume).toHaveAttribute('href', '/app/learn/c-2');
+    // The resume link tags its origin so the player's breadcrumb points back to Min Træning (#438).
+    expect(resume).toHaveAttribute('href', '/app/learn/c-2?from=training');
   });
 
   it('wires in the Mandatory and Favorites sections with the current org id (no coming-soon placeholders)', () => {

@@ -202,7 +202,7 @@ export default function LearnerTraining() {
                       asChild
                       className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
                     >
-                      <Link to={routes.learner.coursePlayer(enrollment.course_id)}>
+                      <Link to={routes.learner.coursePlayer(enrollment.course_id, 'training')}>
                         <Play aria-hidden="true" className="h-3.5 w-3.5" />
                         {t('common.continue')}
                       </Link>
