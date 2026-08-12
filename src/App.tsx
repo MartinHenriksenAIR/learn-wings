@@ -6,6 +6,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { PlatformSettingsProvider } from "@/hooks/usePlatformSettings";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { IdleTimeout } from "@/components/IdleTimeout";
 import { routes } from "@/lib/routes";
 
 import Login from "./pages/Login";
@@ -100,6 +101,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <IdleTimeout />
           <PlatformSettingsProvider>
             <ErrorBoundary>
               <AppRoutes />

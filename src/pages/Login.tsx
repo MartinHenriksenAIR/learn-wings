@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { consumePostLoginRedirect } from '@/lib/post-login-redirect';
-import { consumeSessionExpiredNotice } from '@/lib/session-expired';
+import { consumeSessionExpiredNotice, consumeIdleTimeoutNotice } from '@/lib/session-expired';
 import { routes } from '@/lib/routes';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -24,9 +24,14 @@ export default function Login() {
   const { signIn, user, profile, isPlatformAdmin, isOrgAdmin, isLoading } = useAuth();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
-  // Read once on mount: true only when a dead session redirected here, so the
-  // notice shows this visit and a later manual visit to /login stays quiet.
-  const [sessionExpired] = useState(() => consumeSessionExpiredNotice());
+  // Read once on mount: which (if any) notice sent us here, so the message fits
+  // the reason and a later manual visit to /login stays quiet. Only one flag is
+  // ever set; idle is checked first purely for determinism.
+  const [notice] = useState<'idle' | 'expired' | null>(() => {
+    if (consumeIdleTimeoutNotice()) return 'idle';
+    if (consumeSessionExpiredNotice()) return 'expired';
+    return null;
+  });
 
   useEffect(() => {
     // `isLoading` covers the user-context fetch (useAuth), so once it clears
@@ -83,12 +88,12 @@ export default function Login() {
           alt="AI Uddannelse"
           className="h-[52px] w-auto object-contain"
         />
-        {sessionExpired && (
+        {notice && (
           <p
             role="status"
             className="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm leading-[1.5] text-amber-900"
           >
-            {t('auth.sessionExpiredNotice')}
+            {notice === 'idle' ? t('auth.idleTimeoutNotice') : t('auth.sessionExpiredNotice')}
           </p>
         )}
         <p className="text-balance text-center text-sm leading-[1.55] text-muted-foreground">

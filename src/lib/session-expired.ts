@@ -4,12 +4,14 @@ import { routes } from './routes';
 
 // Set right before the redirect, read once on the /login render so the page can
 // explain why the user landed there. Distinct from the post-login redirect URL:
-// this only says "a session died", not "go back here".
+// these only say *why* the session ended, not "go back here". Two reasons, two
+// keys, so /login can show the right message: a dead session vs an idle timeout.
 const NOTICE_KEY = 'sessionExpiredNotice';
+const IDLE_NOTICE_KEY = 'idleTimeoutNotice';
 
-// A dead-session redirect is already under way for THIS page load. Guards
-// against a burst of concurrent 401s (or a re-entrant call) each firing their
-// own redirect. Resets naturally on the full-page reload to /login.
+// A login redirect is already under way for THIS page load. Guards against a
+// burst of concurrent 401s (or a re-entrant call) each firing their own
+// redirect. Resets naturally on the full-page reload to /login.
 let redirecting = false;
 
 // Every auth route (login, signup, forgot/reset password) — derived so a new
@@ -17,13 +19,12 @@ let redirecting = false;
 const AUTH_PATHS: readonly string[] = Object.values(routes.auth);
 
 /**
- * The session is dead — an expired refresh token (MSAL
- * `InteractionRequiredAuthError`) or a backend `401`. Remember where the user
- * was, flag the "you've been signed out" notice, drop the stale MSAL account so
- * the reloaded app starts cleanly logged-out (no redirect loop), then hard-
- * redirect to /login. Idempotent within a page load.
+ * Shared teardown for every "the session ended, go to /login" path: remember
+ * where the user was, flag the given notice, drop the stale MSAL account so the
+ * reloaded app starts cleanly logged-out (no redirect loop), then hard-redirect
+ * to /login. Idempotent within a page load.
  */
-export function handleSessionExpired(): void {
+function redirectToLogin(noticeKey: string): void {
   if (redirecting) return;
   redirecting = true;
 
@@ -35,7 +36,7 @@ export function handleSessionExpired(): void {
   }
 
   try {
-    sessionStorage.setItem(NOTICE_KEY, '1');
+    sessionStorage.setItem(noticeKey, '1');
   } catch {
     // Storage unavailable — the notice just won't show; the redirect still runs.
   }
@@ -50,15 +51,46 @@ export function handleSessionExpired(): void {
 }
 
 /**
- * True exactly once — on the /login render immediately after a dead-session
- * redirect. Consuming clears the flag so a later manual visit to /login is quiet.
+ * The session is dead — an expired refresh token (MSAL
+ * `InteractionRequiredAuthError`) or a backend `401`.
  */
-export function consumeSessionExpiredNotice(): boolean {
+export function handleSessionExpired(): void {
+  redirectToLogin(NOTICE_KEY);
+}
+
+/**
+ * The user was idle past the timeout window (#447). Clears the local session
+ * and redirects to /login exactly like a dead session, but flags a distinct
+ * "signed out for inactivity" notice. Note this only clears the *local* MSAL
+ * cache (no Entra logout), so a valid Entra SSO cookie can re-authenticate the
+ * next sign-in silently — a deliberate trade-off for a snappier flow.
+ */
+export function handleIdleTimeout(): void {
+  redirectToLogin(IDLE_NOTICE_KEY);
+}
+
+function consumeNotice(key: string): boolean {
   try {
-    const flagged = sessionStorage.getItem(NOTICE_KEY) === '1';
-    if (flagged) sessionStorage.removeItem(NOTICE_KEY);
+    const flagged = sessionStorage.getItem(key) === '1';
+    if (flagged) sessionStorage.removeItem(key);
     return flagged;
   } catch {
     return false;
   }
+}
+
+/**
+ * True exactly once — on the /login render immediately after a dead-session
+ * redirect. Consuming clears the flag so a later manual visit to /login is quiet.
+ */
+export function consumeSessionExpiredNotice(): boolean {
+  return consumeNotice(NOTICE_KEY);
+}
+
+/**
+ * True exactly once — on the /login render immediately after an idle-timeout
+ * redirect. Consuming clears the flag so a later manual visit to /login is quiet.
+ */
+export function consumeIdleTimeoutNotice(): boolean {
+  return consumeNotice(IDLE_NOTICE_KEY);
 }
