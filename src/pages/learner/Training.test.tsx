@@ -264,4 +264,14 @@ describe('LearnerTraining — card/list view toggle (#449)', () => {
     expect(screen.queryByTestId('training-continue-card')).toBeNull();
     expect(screen.getByLabelText('courses.viewAsList')).toHaveAttribute('aria-pressed', 'true');
   });
+
+  it('keeps certificate cards for completed courses in list view when certificates are enabled', () => {
+    mockPlatformSettings.mockReturnValue({ features: { certificates_enabled: true }, isLoading: false });
+    window.localStorage.setItem('min-traening-view', 'list');
+    renderTraining();
+    // In-progress reflects list view, and the certs-on completed branch still renders certificate cards.
+    expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
+    expect(screen.getByTestId('cert-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('training-completed-card')).toBeNull();
+  });
 });

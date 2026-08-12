@@ -291,7 +291,11 @@ export default function LearnerTraining() {
               <div
                 key={enrollment.id}
                 data-testid="training-completed-card"
-                className="hover-lift flex items-center gap-3.5 rounded-2xl border border-border bg-card px-[18px] py-4"
+                className={
+                  view === 'list'
+                    ? 'hover-lift flex items-center gap-3.5 rounded-xl border border-border bg-card p-3'
+                    : 'hover-lift flex items-center gap-3.5 rounded-2xl border border-border bg-card px-[18px] py-4'
+                }
               >
                 <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-success/10 text-success">
                   <Award className="h-5 w-5" />
