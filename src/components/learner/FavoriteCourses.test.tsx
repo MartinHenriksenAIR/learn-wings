@@ -21,10 +21,10 @@ const course = {
   created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
 };
 
-function renderSection() {
+function renderSection(view?: 'card' | 'list') {
   return render(
     <MemoryRouter>
-      <FavoriteCourses orgId="org-1" />
+      <FavoriteCourses orgId="org-1" view={view} />
     </MemoryRouter>,
   );
 }
@@ -86,6 +86,25 @@ describe('FavoriteCourses', () => {
     mockUseToggleFavorite.mockReturnValue({ toggleFavorite, togglingId: null, isPending: false });
 
     renderSection();
+
+    fireEvent.click(screen.getByRole('button', { name: 'courses.removeFromFavorites' }));
+    expect(toggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'c-1', favorite: false }));
+  });
+
+  it('renders rows (not cards) in list view, keeping the player link and unfavorite control', () => {
+    const toggleFavorite = vi.fn();
+    mockUseFavorites.mockReturnValue({
+      data: { courses: [course] },
+      isFavorite: (id: string) => id === 'c-1',
+      isLoading: false,
+    });
+    mockUseToggleFavorite.mockReturnValue({ toggleFavorite, togglingId: null, isPending: false });
+
+    renderSection('list');
+
+    expect(screen.getByTestId('training-favorite-row')).toBeInTheDocument();
+    expect(screen.getByText('Intro to AI')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
 
     fireEvent.click(screen.getByRole('button', { name: 'courses.removeFromFavorites' }));
     expect(toggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'c-1', favorite: false }));

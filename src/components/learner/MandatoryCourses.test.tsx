@@ -34,10 +34,10 @@ function setAssignments(data: LearnerAssignment[] | undefined, isLoading = false
   mockUseLearnerAssignments.mockReturnValue({ data, isLoading });
 }
 
-function renderSection() {
+function renderSection(view?: 'card' | 'list') {
   return render(
     <MemoryRouter>
-      <MandatoryCourses orgId="org-1" />
+      <MandatoryCourses orgId="org-1" view={view} />
     </MemoryRouter>,
   );
 }
@@ -103,5 +103,26 @@ describe('MandatoryCourses', () => {
 
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByText('training.mandatory.title')).toBeNull();
+  });
+
+  it('renders rows (not cards) in list view, keeping the player link, due date and overdue badge', () => {
+    setAssignments([overdue]);
+    renderSection('list');
+
+    const row = screen.getByTestId('training-mandatory-row');
+    expect(screen.queryByTestId('training-mandatory-card')).toBeNull();
+    expect(screen.getByText('Safety Basics')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-2?from=training');
+    expect(screen.getByTestId('mandatory-due')).toHaveTextContent(formatDate(new Date('2026-07-01'), 'P', 'en'));
+    expect(row.querySelector('[data-testid="mandatory-overdue"]')).not.toBeNull();
+  });
+
+  it('shows the completed state (no CTA) in list view for completed assignments', () => {
+    setAssignments([done]);
+    renderSection('list');
+
+    expect(screen.getByTestId('training-mandatory-row')).toBeInTheDocument();
+    expect(screen.getByTestId('mandatory-completed')).toHaveTextContent('training.mandatory.completed');
+    expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
   });
 });
