@@ -2720,3 +2720,22 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **987** (1 new Training breadcrumb case + the `AppLayout` test mock widened to render crumb labels) / build ✓; functions untouched.
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #442.
+
+---
+
+## 2026-08-12 — #368 org member CSV export (PR #441)
+
+**Who:** claude (Opus 4.8, 1M) with martin, isolated worktree `worktree-org-member-csv-export-368`.
+
+**What:** The **data-export** slice of the #368 platform-admin configuration epic (a tracking epic; most knobs already shipped — only data export + audit log were net-new). Adds an **Export CSV** button that downloads an org's member roster on both member surfaces:
+- **Org-admin** `OrgMembersTab.tsx` (own org) and **platform-admin** org-detail `MembersSection.tsx` (any org — `orgName` threaded through from `OrganizationDetail.tsx` for the filename). Both share one helper.
+- **New `src/lib/csv.ts`** (+ `csv.test.ts`, 12 tests): `membersToCsv` (header + rows, **RFC-4180 escaping** so commas/quotes/newlines in names and Danish org names don't corrupt the file), `downloadCsv` (prepends a **UTF-8 BOM** so Excel renders æøå correctly, `text/csv;charset=utf-8`), `membersCsvFilename` (`<org-slug>-members-<YYYY-MM-DD>.csv`, Danish-transliterated slug). BOM + combining-mark strip expressed via `String.fromCharCode` to keep the source ASCII-legible.
+- en + da label (`Export CSV` / `Eksportér CSV`) in both key blocks (`analytics.members`, `orgDetail`).
+
+**Decisions (grilled):** (1) **data export this session**, audit log deferred — the epic itself calls audit log "its own focused session" (new table + write instrumentation across ~100 endpoints + UI); feasibility check confirmed the `endpoint.ts` factory is a DEPENDENCY-FREEZE chokepoint that can't host a DB-writing hook, so real auditing stays per-endpoint. (2) **both surfaces** (platform-admin + org-admin), one shared helper. (3) **full roster** — the button ignores the on-screen search/role filter. (4) columns **Name/Email/Department/Role/Status/Joined** (email isn't in the table but is the point of an export). (5) **raw stable** role/status values + English headers + ISO dates (locale-independent), over localized labels. (6) proper escaping + BOM as engineering-quality defaults.
+
+**Out of scope:** audit log (only net-new slice left under #368; epic stays open), pending-invite export, any backend/schema change.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **996** (128 files, incl. the new 12 csv tests + i18n en/da parity) / build ✓; functions untouched. zero-`supabase.*` on touched files. CI green on the PR (Frontend + Functions jobs pass). Button click → file download not driveable here (needs a real browser + Entra login, no local DB) → owner post-merge check on prod.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #441.

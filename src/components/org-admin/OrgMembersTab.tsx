@@ -52,6 +52,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { callApi, ApiError } from '@/lib/api-client';
 import { getSeatUsage } from '@/lib/seats';
 import { formatDate } from '@/lib/date-locale';
+import { membersToCsv, downloadCsv, membersCsvFilename } from '@/lib/csv';
 import { cn } from '@/lib/utils';
 import { SeatUsageNote } from '@/components/SeatUsageNote';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
@@ -66,6 +67,7 @@ import {
   UserX,
   ShieldCheck,
   User,
+  Download,
   FileSpreadsheet,
   GraduationCap,
   Sparkles,
@@ -408,6 +410,10 @@ export function OrgMembersTab() {
     toggleChampionMutation.mutate({ member, isCurrentlyChampion });
   };
 
+  // Exports the full member roster (ignores the on-screen search/role filter).
+  const handleExportCsv = () =>
+    downloadCsv(membersCsvFilename(currentOrg?.name, new Date()), membersToCsv(members));
+
   const filteredMembers = members.filter((member) => {
     const matchesSearch =
       searchQuery === '' ||
@@ -463,6 +469,15 @@ export function OrgMembersTab() {
         <Button variant="outline" onClick={() => setAssignDialog({ open: true })} className="shrink-0">
           <ClipboardList className="mr-2 h-4 w-4" aria-hidden="true" />
           {t('assignments.assignCourse')}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleExportCsv}
+          disabled={members.length === 0}
+          className="shrink-0"
+        >
+          <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+          {t('analytics.members.exportCsv')}
         </Button>
         {canInvite && (
           <Button variant="outline" onClick={() => setBulkInviteOpen(true)} className="shrink-0">
