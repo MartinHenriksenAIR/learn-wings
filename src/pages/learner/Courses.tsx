@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -17,28 +17,15 @@ import { useFavorites, useToggleFavorite } from '@/hooks/useFavorites';
 import { FavoriteToggle } from '@/components/learner/FavoriteToggle';
 import { FilterSelect } from '@/components/FilterSelect';
 import { Course, CourseCategory, Enrollment } from '@/lib/types';
-import { BookOpen, CheckCircle2, LayoutGrid, List, Play, Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { BookOpen, CheckCircle2, Play, Search } from 'lucide-react';
+import { useListView } from '@/hooks/useListView';
+import { ListViewToggle } from '@/components/learner/ListViewToggle';
 
 // Module-level stable empty fallbacks so the `?? …` reads keep a referentially
 // stable value across renders (avoids re-running the filter/sort useMemo every render).
 const NO_COURSES: Course[] = [];
 const NO_ENROLLMENTS: Enrollment[] = [];
 const NO_CATEGORIES: CourseCategory[] = [];
-
-// The learner's list/card preference persists across visits (#360). List is the default;
-// an explicitly stored 'card' still wins, so learners who chose cards keep them (#443).
-const VIEW_STORAGE_KEY = 'kursuskatalog-view';
-type CatalogView = 'card' | 'list';
-
-function readStoredView(): CatalogView {
-  if (typeof window === 'undefined') return 'list';
-  try {
-    return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'card' ? 'card' : 'list';
-  } catch {
-    return 'list';
-  }
-}
 
 export default function LearnerCourses() {
   const { currentOrg, profile, isPlatformAdmin } = useAuth();
@@ -48,7 +35,9 @@ export default function LearnerCourses() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [levelFilter, setLevelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [view, setView] = useState<CatalogView>(readStoredView);
+  // The learner's list/card preference persists across visits (#360). List is the default;
+  // an explicitly stored 'card' still wins, so learners who chose cards keep them (#443).
+  const [view, setView] = useListView('kursuskatalog-view');
 
   const query = useLearnerCourses(currentOrg?.id, {
     enabled: orgGuard === 'ready' && !!currentOrg,
@@ -77,15 +66,6 @@ export default function LearnerCourses() {
     () => categories.filter((c) => courses.some((course) => course.category_id === c.id)),
     [categories, courses],
   );
-
-  const selectCatalogView = (next: CatalogView) => {
-    setView(next);
-    try {
-      window.localStorage.setItem(VIEW_STORAGE_KEY, next);
-    } catch {
-      /* private mode / storage disabled — the in-memory choice still applies this session */
-    }
-  };
 
   const getEnrollmentStatus = (courseId: string) => {
     return enrollments.find(e => e.course_id === courseId);
@@ -369,21 +349,6 @@ export default function LearnerCourses() {
       </div>
     );
 
-  const viewToggleButton = (value: CatalogView, label: string, icon: ReactNode) => (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={view === value}
-      onClick={() => selectCatalogView(value)}
-      className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-        view === value ? 'bg-accent text-primary' : 'text-muted-foreground hover:text-primary',
-      )}
-    >
-      {icon}
-    </button>
-  );
-
   return (
     <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
       <div className="mb-[22px]">
@@ -445,10 +410,7 @@ export default function LearnerCourses() {
           </button>
         )}
 
-        <div className="flex items-center gap-0.5 rounded-xl border border-input bg-card p-0.5">
-          {viewToggleButton('card', t('courses.viewAsCards'), <LayoutGrid aria-hidden="true" className="h-4 w-4" />)}
-          {viewToggleButton('list', t('courses.viewAsList'), <List aria-hidden="true" className="h-4 w-4" />)}
-        </div>
+        <ListViewToggle view={view} onChange={setView} />
       </div>
 
       {/* Recommended section — a highlighted "For you" strip (always cards, independent of the

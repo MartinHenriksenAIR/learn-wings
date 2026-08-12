@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -41,14 +41,14 @@ vi.mock('@/components/learner/CertificateCard', () => ({
 // The Mandatory + Favorites sections are self-contained components with their own
 // unit tests; here we stub them to verify the page wires them in with the org id.
 vi.mock('@/components/learner/MandatoryCourses', () => ({
-  MandatoryCourses: ({ orgId }: { orgId?: string }) => (
-    <div data-testid="mandatory-section" data-org={orgId} />
+  MandatoryCourses: ({ orgId, view }: { orgId?: string; view?: string }) => (
+    <div data-testid="mandatory-section" data-org={orgId} data-view={view} />
   ),
 }));
 
 vi.mock('@/components/learner/FavoriteCourses', () => ({
-  FavoriteCourses: ({ orgId }: { orgId?: string }) => (
-    <div data-testid="favorites-section" data-org={orgId} />
+  FavoriteCourses: ({ orgId, view }: { orgId?: string; view?: string }) => (
+    <div data-testid="favorites-section" data-org={orgId} data-view={view} />
   ),
 }));
 
@@ -144,6 +144,7 @@ function renderTraining() {
 describe('LearnerTraining', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mockPlatformSettings.mockImplementation(platformDefault);
     mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
     setTraining({ enrollments: [completedEnrollment, enrolled], progress });
@@ -221,5 +222,46 @@ describe('LearnerTraining', () => {
     setTraining({ enrollments: [], progress: {} });
     renderTraining();
     expect(screen.getByText('dashboard.noMembershipTitle')).toBeInTheDocument();
+  });
+});
+
+describe('LearnerTraining — card/list view toggle (#449)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    mockPlatformSettings.mockImplementation(platformDefault);
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+    setTraining({ enrollments: [completedEnrollment, enrolled], progress });
+  });
+
+  it('defaults to card view and threads it through to every listing', () => {
+    renderTraining();
+    expect(screen.getByTestId('training-continue-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('training-continue-row')).toBeNull();
+    expect(screen.getByLabelText('courses.viewAsCards')).toHaveAttribute('aria-pressed', 'true');
+    // The toggle drives the Mandatory + Favorites widgets too (all listings, #449).
+    expect(screen.getByTestId('mandatory-section')).toHaveAttribute('data-view', 'card');
+    expect(screen.getByTestId('favorites-section')).toHaveAttribute('data-view', 'card');
+  });
+
+  it('switches every listing to rows when List view is chosen, and persists the choice', () => {
+    renderTraining();
+    fireEvent.click(screen.getByLabelText('courses.viewAsList'));
+
+    expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
+    expect(screen.queryByTestId('training-continue-card')).toBeNull();
+    // Completed listing (certificates off) stays present in list view.
+    expect(screen.getByTestId('training-completed-card')).toBeInTheDocument();
+    expect(screen.getByTestId('mandatory-section')).toHaveAttribute('data-view', 'list');
+    expect(screen.getByTestId('favorites-section')).toHaveAttribute('data-view', 'list');
+    expect(window.localStorage.getItem('min-traening-view')).toBe('list');
+  });
+
+  it('restores the persisted list view on mount, under its own key (not the catalog key)', () => {
+    window.localStorage.setItem('min-traening-view', 'list');
+    renderTraining();
+    expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
+    expect(screen.queryByTestId('training-continue-card')).toBeNull();
+    expect(screen.getByLabelText('courses.viewAsList')).toHaveAttribute('aria-pressed', 'true');
   });
 });
