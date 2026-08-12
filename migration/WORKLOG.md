@@ -2620,3 +2620,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **986** / build ✓; functions untouched. New `MandatoryCourses.test.tsx` (6 cases: due/overdue/completed/recommended-filtered/empty/loading) + Training (wiring) & FavoriteCourses (heading) test updates; real components rendered in a cache-seeded Vite/Playwright harness (page is Entra-gated) — all states confirmed. CI green.
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #415.
+
+---
+
+## 2026-08-12 — #371 Top bar & logo: remove the divider so the top strip is one block (PR #430)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`topbar-remove-divider-371`). Requirements grilled first (blocked-by #370 confirmed closed; 3 decisions).
+
+**What:** Killed the vertical seam between the **logo area** (`SidebarHeader`) and the **top menu bar** (`AppLayout` header). Root cause: the seam was the sidebar panel's **full-height right border** (`ui/sidebar.tsx`) running up past the logo — in light mode both areas are already the same white (`--card` == `--sidebar-background` == `#fff`), so that border line was the *only* seam.
+- `ui/sidebar.tsx` — dropped the panel's `group-data-[side=left]:border-r` / `border-l` (safe: `AppSidebar` is the sole consumer).
+- `AppSidebar.tsx` — relocated the divider onto a wrapper `<div className="flex min-h-0 flex-1 flex-col border-r border-border">` around the sidebar body **below** the header, so the border resumes for the nav + footer while no line splits the logo from the top bar. `AppLayout.tsx` untouched (its `border-b bg-card` header doesn't create the vertical seam — trims the issue's file list).
+
+**Decisions (grilled):** (1) **Minimal** shape — just drop the line; the logo keeps its natural (taller) height and the border resumes below the logo area (vs. aligning heights into a true rectangle, or a full-width top-bar restructure that would risk #370 collapse regressions); (2) **leave dark-mode backgrounds** as-is (card 11% / sidebar 10% is imperceptible; unifying would introduce a new faint seam); (3) evidence = standard gates only — Martin verifies the visual himself on prod after deploy (the SWA PR-preview can't be logged into, AADSTS50011).
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **991** / build ✓; functions untouched.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #430.
