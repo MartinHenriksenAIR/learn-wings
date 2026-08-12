@@ -2792,3 +2792,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **1018** (131 files) / build ✓; functions untouched. Independent Opus code review: no Critical/Important bugs (cross-tab, throttle, stale-storage, StrictMode, i18n paths all traced), one Minor style fix applied (a module const wedged between imports in `CoursePlayer.tsx`).
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #448. **Auth-gated UI → verify on prod after merge, not the PR preview** (SWA preview login blocked, AADSTS50011).
+
+---
+
+## 2026-08-12 — #445 Course Catalog list view: equal-width CTA so favorite hearts align (PR #446)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`fix/catalog-cta-equal-width` off `main`).
+
+**What:** In the learner Course Catalog **list view** (`renderCourseRow`, `Courses.tsx`), each row's right-side cluster is `[heart] [CTA]` in a content-sized `flex shrink-0` box. The CTA label varies by enrollment state (`Continue` / `Review course` / `Start course`; DA `Fortsæt` / `Gennemse kursus` / `Start kursus`) and the button had no width constraint, so a wider label pushed the neighbouring heart to a different x — the favorite hearts didn't line up across rows. Added `min-w-[150px]` to the CTA `<Button>` so every state clamps to one width; the shadcn button base already centers content (`justify-center`), so the label centers within the fixed width and the hearts form a straight column. One presentational class (plus a rationale comment) — the grid-card variant was never affected (its heart/CTA sit on separate rows).
+- **Sizing:** measured the rendered button box against the app font (Hanken Grotesk 700 @12.5px, incl. the 14px `Play` icon + `gap-2` + `px-3`) — widest label is DA `Gennemse kursus` at 147.3px, so `min-w-[150px]` clears every EN+DA state with ~3px headroom. No mobile regression: the longest-label row already consumed ~147px, so this only widens the shorter rows to match.
+- **Scope:** owner explicitly wanted the equal-width fix only, keeping the current style — none of the 5-option visual mockup's restyling was adopted. No i18n, no backend change.
+
+**Why:** owner reported the hearts looking misaligned in list view; the varying CTA width was the root cause. Chosen as the minimal, style-preserving fix (Option 1 of a mockup of five).
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 errors / tsc app+node 0 / test **1002** (129 files) / build ✓; functions untouched. `min-w` value backed by real-font (Hanken Grotesk 700) measurement. Change is a single utility class + JSX comment — no logic/type/i18n surface.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #446.

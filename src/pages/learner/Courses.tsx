@@ -345,9 +345,10 @@ export default function LearnerCourses() {
             onToggle={(next) => toggleFavorite({ courseId: course.id, favorite: next, course })}
             className="h-8 w-8"
           />
+          {/* min-w keeps every CTA label (Continue / Review course / Start course) the same width so the favorite hearts stay aligned across rows (#445) */}
           <Button
             asChild
-            className="h-auto rounded-[9px] bg-primary px-3 py-2 text-[12.5px] font-bold text-primary-foreground hover:bg-primary/90"
+            className="h-auto min-w-[150px] rounded-[9px] bg-primary px-3 py-2 text-[12.5px] font-bold text-primary-foreground hover:bg-primary/90"
           >
             <Link to={routes.learner.coursePlayer(course.id)}>
               <Play aria-hidden="true" className="h-3.5 w-3.5" />
