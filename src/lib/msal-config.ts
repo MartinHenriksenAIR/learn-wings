@@ -10,7 +10,12 @@ const msalConfig: Configuration = {
     redirectUri: (import.meta.env.VITE_REDIRECT_URI as string) || window.location.origin,
   },
   cache: {
-    cacheLocation: 'sessionStorage',
+    // localStorage (not sessionStorage) so the token cache is shared across all
+    // tabs of the origin: opening the app in a new tab picks up the existing
+    // session silently instead of forcing a re-login (#431). Microsoft's
+    // recommended setting for cross-tab SSO. logoutRedirect() still clears this
+    // shared cache and ends the Entra session, so no usable session survives.
+    cacheLocation: 'localStorage',
   },
 };
 
