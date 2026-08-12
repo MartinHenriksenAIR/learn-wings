@@ -1,25 +1,21 @@
 import { useTranslation } from 'react-i18next';
 import { formatDate } from '@/lib/date-locale';
-import { Mail, Copy, Check } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Invitation } from '@/lib/types';
 
 interface PendingInvitationsListProps {
   invitations: Invitation[];
-  /** Returns whether the given link id is currently in its "Copied!" flash. */
-  isCopied: (linkId: string) => boolean;
-  onCopy: (linkId: string) => void;
   onCancel: (invitationId: string) => void;
 }
 
 /**
- * Pending-invitations list with the in-button "Copied!" morph (copy stays
- * toast-free per the existing policy) and a cancel action.
+ * Pending-invitations list with a cancel action. No invite-link sharing here:
+ * platform admins can view/cancel outstanding invites but cannot hand out an
+ * invite link — the only invite path is the org-admin flow (#352).
  */
 export function PendingInvitationsList({
   invitations,
-  isCopied,
-  onCopy,
   onCancel,
 }: PendingInvitationsListProps) {
   const { t, i18n } = useTranslation();
@@ -28,9 +24,7 @@ export function PendingInvitationsList({
     <>
       <h2 className="mb-3 text-[17px] font-extrabold">{t('orgDetail.pendingInvitations')}</h2>
       <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
-        {invitations.map((invitation) => {
-          const copied = isCopied(invitation.link_id);
-          return (
+        {invitations.map((invitation) => (
             <div
               key={invitation.id}
               className="flex items-center gap-3.5 border-b border-[#f3f4f8] px-5 py-3 last:border-b-0"
@@ -54,29 +48,13 @@ export function PendingInvitationsList({
               </span>
               <button
                 type="button"
-                onClick={() => onCopy(invitation.link_id)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-[9px] border px-3 py-[7px] text-xs font-bold transition-colors',
-                  copied
-                    ? 'border-[#bfe5d3] bg-success/10 text-success'
-                    : 'border-[#dcdee6] bg-card text-[#2a2d3a] hover:border-primary hover:text-primary',
-                )}
-              >
-                <span className={cn('inline-flex', copied && 'animate-pop-in')} aria-hidden="true">
-                  {copied ? <Check className="h-[13px] w-[13px]" /> : <Copy className="h-3 w-3" />}
-                </span>
-                {copied ? t('orgDetail.copied') : t('orgDetail.copyLink')}
-              </button>
-              <button
-                type="button"
                 onClick={() => onCancel(invitation.id)}
                 className="rounded-lg px-2.5 py-[7px] text-xs font-bold text-[#9aa0af] transition-colors hover:text-destructive"
               >
                 {t('orgDetail.cancelInvite')}
               </button>
             </div>
-          );
-        })}
+          ))}
       </div>
     </>
   );

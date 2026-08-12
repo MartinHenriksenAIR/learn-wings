@@ -137,6 +137,8 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
       user: { id: 'oid-1' },
       profile: { id: 'admin-1', full_name: 'Org Admin', is_platform_admin: false },
       currentOrg: { id: 'org-1', name: 'Acme' },
+      effectiveIsOrgAdmin: true,
+      effectiveIsPlatformAdmin: false,
     });
     // No org-detail aggregates yet loaded — seatUsage falls back to the
     // locally-fetched members/invitations lists (unrelated to this test).
@@ -220,6 +222,8 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
       user: { id: 'oid-1' },
       profile: { id: 'admin-1', full_name: 'Org Admin', is_platform_admin: false },
       currentOrg: { id: 'org-1', name: 'Acme' },
+      effectiveIsOrgAdmin: true,
+      effectiveIsPlatformAdmin: false,
     });
     mockUseOrgDetail.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
     Object.defineProperty(navigator, 'clipboard', {
@@ -283,6 +287,8 @@ describe('OrgMembersTab — seat usage uses the org-wide server aggregate (#126)
       user: { id: 'oid-1' },
       profile: { id: 'admin-1', full_name: 'Org Admin', is_platform_admin: false },
       currentOrg: { id: 'org-1', name: 'Acme' },
+      effectiveIsOrgAdmin: true,
+      effectiveIsPlatformAdmin: false,
     });
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/org-memberships') return { memberships: [membershipRow] };
@@ -346,6 +352,8 @@ describe('OrgMembersTab — assign course wiring (#365)', () => {
       user: { id: 'oid-1' },
       profile: { id: 'admin-1', full_name: 'Org Admin', is_platform_admin: false },
       currentOrg: { id: 'org-1', name: 'Acme' },
+      effectiveIsOrgAdmin: true,
+      effectiveIsPlatformAdmin: false,
     });
     mockUseOrgDetail.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
     mockCallApi.mockImplementation(async (path: string) => {
@@ -380,5 +388,58 @@ describe('OrgMembersTab — assign course wiring (#365)', () => {
     const dialog = screen.getByTestId('assign-dialog');
     expect(dialog).toHaveAttribute('data-open', 'true');
     expect(dialog).toHaveAttribute('data-preset', 'u-2');
+  });
+});
+
+describe('OrgMembersTab — invite gated to the org-admin flow (#352)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseOrgDetail.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
+    mockCallApi.mockImplementation(async (path: string) => {
+      if (path === '/api/org-memberships') return { memberships: [membershipRow] };
+      if (path === '/api/invitations') return { invitations: [invitationRow] };
+      if (path === '/api/ai-champions') return { champions: [] };
+      throw new Error(`Unexpected callApi path: ${path}`);
+    });
+  });
+
+  it('hides every invite affordance for a platform admin in Platform view', async () => {
+    // The leak this guards: a platform admin whose role switcher grants org-admin
+    // capability (effectiveIsOrgAdmin) while still IN Platform view
+    // (effectiveIsPlatformAdmin). Invite must not appear here.
+    mockUseAuth.mockReturnValue({
+      user: { id: 'oid-1' },
+      profile: { id: 'admin-1', full_name: 'Platform Admin', is_platform_admin: true },
+      currentOrg: { id: 'org-1', name: 'Acme' },
+      effectiveIsOrgAdmin: true,
+      effectiveIsPlatformAdmin: true,
+    });
+
+    renderTab();
+    await screen.findByText('Bob Member');
+
+    expect(screen.queryByRole('button', { name: 'analytics.members.inviteMember' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'analytics.members.bulkInvite' })).toBeNull();
+    // The pending-invite copy-link is an invite affordance too — gone here.
+    expect(screen.queryByRole('button', { name: 'analytics.members.copyLink' })).toBeNull();
+    // Non-invite member tools stay available (only invite is gated).
+    expect(screen.getByRole('button', { name: 'analytics.members.enrollInCourse' })).toBeInTheDocument();
+  });
+
+  it('shows invite once that platform admin switches to Org-admin view', async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'oid-1' },
+      profile: { id: 'admin-1', full_name: 'Platform Admin', is_platform_admin: true },
+      currentOrg: { id: 'org-1', name: 'Acme' },
+      effectiveIsOrgAdmin: true,
+      effectiveIsPlatformAdmin: false,
+    });
+
+    renderTab();
+
+    expect(
+      await screen.findByRole('button', { name: 'analytics.members.inviteMember' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'analytics.members.bulkInvite' })).toBeInTheDocument();
   });
 });
