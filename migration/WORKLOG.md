@@ -2694,6 +2694,33 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #435.
 
+## 2026-08-12 — #438 Course breadcrumb reflects origin, not always Course Catalog (PR #439)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Filed by martin from the live app, then picked up in the same session.
+
+**What:** The CoursePlayer breadcrumb hard-coded its parent crumb to the Course Catalog (`{ label: t('nav.courses'), href: routes.learner.courses }`), so opening a course from **Min Træning / My Training** showed `Home › Course Catalog › <Course>` and the back-crumb dropped the learner in the Catalog instead of the page they came from.
+- `src/lib/routes.ts` — `coursePlayer(courseId, from?: 'training')` now appends `?from=training` when an origin is passed (base path literal stays owned by routes.ts; the query suffix is invisible to the `routes-gate` scan).
+- `src/pages/learner/CoursePlayer.tsx` — reads `useSearchParams().get('from')`; `cameFromTraining` picks the parent crumb: **My Training** (`/app/training`, `nav.training`) when tagged, else the unchanged **Course Catalog** crumb.
+- The three Min Træning entry points now tag their player link with `'training'`: `Training.tsx` (Continue/in-progress cards), `MandatoryCourses.tsx`, `FavoriteCourses.tsx` (both rendered only inside Min Træning). Catalog / course-detail / assessment entry points deliberately omit it → Course Catalog crumb, unchanged.
+
+**Why a query param, not router state:** router `state` is lost on a hard refresh, which would revert the breadcrumb to the Catalog — the exact thing being fixed. `?from=training` survives refresh and matches the codebase's existing `useSearchParams` convention (OrgAnalytics, CommunityFeed). `nav.training` already has en+da copy, so no new i18n.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **986** (2 new CoursePlayer breadcrumb-origin cases; 3 existing entry-point href assertions updated to the tagged link + the `AppLayout` test mock widened to render href-bearing crumbs) / build ✓; functions untouched. Independent Opus code review clean (no Critical/Important; one Minor test-route-accuracy note applied).
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #439.
+
+## 2026-08-12 — #421 My Training page shows its breadcrumb (PR #442)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Reported live right after #438 shipped ("on My Training the breadcrumb only says Home").
+
+**What:** `Training.tsx` rendered `<AppLayout>` with no `breadcrumbs` prop in every state, so the header showed only *Home* — unlike other subpages. Added `breadcrumbs={[{ label: t('nav.training') }]}` to all four AppLayout usages (loading / no-org / error / main), so the header now reads *Home › My Training*. Mirrors the Course Catalog convention (`Courses.tsx` passes `[{ label: t('nav.courses') }]` in every state). The crumb is the current-page leaf (no `href`), rendered by AppLayout as a bold `BreadcrumbPage`. `nav.training` already has en+da copy (no new i18n).
+
+**Why:** the header breadcrumb (`AppLayout breadcrumbs`) and the in-content `<h1>` (`AppLayout title` / the page's own heading) are independent; the page had the h1 but never fed the breadcrumb, so its location never appeared in the trail.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **987** (1 new Training breadcrumb case + the `AppLayout` test mock widened to render crumb labels) / build ✓; functions untouched.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #442.
+
 ---
 
 ## 2026-08-12 — #368 org member CSV export (PR #441)
