@@ -9,8 +9,30 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
+// AppLayout → renders children plus any href-bearing breadcrumbs as links. Only
+// crumbs WITH an href are rendered (the parent crumb), so the last page crumb —
+// which duplicates the course title asserted elsewhere — never collides.
 vi.mock('@/components/layout/AppLayout', () => ({
-  AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppLayout: ({
+    children,
+    breadcrumbs = [],
+  }: {
+    children: React.ReactNode;
+    breadcrumbs?: { label: string; href?: string }[];
+  }) => (
+    <div>
+      <nav aria-label="breadcrumb">
+        {breadcrumbs
+          .filter((c) => c.href)
+          .map((c) => (
+            <a key={c.href} href={c.href}>
+              {c.label}
+            </a>
+          ))}
+      </nav>
+      {children}
+    </div>
+  ),
 }));
 
 // PdfViewer → stub (avoids pulling in the pdf.js worker at import time)
@@ -815,5 +837,41 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
     expect(screen.getByRole('button', { name: /submitAnswers/i })).toBeDisabled();
     // A healthy quiz keeps its own submit/next flow — no duplicated footer nav.
     expect(screen.queryByRole('button', { name: /common\.next/ })).toBeNull();
+  });
+});
+
+describe('CoursePlayer — breadcrumb origin (#438)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function renderPlayerAt(path: string) {
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/app/courses/:courseId" element={<CoursePlayer />} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  it('links the parent crumb to My Training when opened from ?from=training', async () => {
+    setup({ reviewsEnabled: false, completed: [] });
+    renderPlayerAt('/app/courses/c-1?from=training');
+    await screen.findByText('Intro to AI');
+
+    const crumb = screen.getByRole('link', { name: 'nav.training' });
+    expect(crumb).toHaveAttribute('href', '/app/training');
+    expect(screen.queryByRole('link', { name: 'nav.courses' })).toBeNull();
+  });
+
+  it('falls back to the Course Catalog crumb with no origin', async () => {
+    setup({ reviewsEnabled: false, completed: [] });
+    renderPlayerAt('/app/courses/c-1');
+    await screen.findByText('Intro to AI');
+
+    const crumb = screen.getByRole('link', { name: 'nav.courses' });
+    expect(crumb).toHaveAttribute('href', '/app/courses');
+    expect(screen.queryByRole('link', { name: 'nav.training' })).toBeNull();
   });
 });
