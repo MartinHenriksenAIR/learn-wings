@@ -845,11 +845,13 @@ describe('CoursePlayer — breadcrumb origin (#438)', () => {
     vi.clearAllMocks();
   });
 
+  // Mounts at the player's real route pattern (/app/learn/:courseId) so the
+  // harness matches production; only courseId + ?from are read, but keep it honest.
   function renderPlayerAt(path: string) {
     return render(
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/app/courses/:courseId" element={<CoursePlayer />} />
+          <Route path="/app/learn/:courseId" element={<CoursePlayer />} />
         </Routes>
       </MemoryRouter>
     );
@@ -857,7 +859,7 @@ describe('CoursePlayer — breadcrumb origin (#438)', () => {
 
   it('links the parent crumb to My Training when opened from ?from=training', async () => {
     setup({ reviewsEnabled: false, completed: [] });
-    renderPlayerAt('/app/courses/c-1?from=training');
+    renderPlayerAt('/app/learn/c-1?from=training');
     await screen.findByText('Intro to AI');
 
     const crumb = screen.getByRole('link', { name: 'nav.training' });
@@ -867,7 +869,7 @@ describe('CoursePlayer — breadcrumb origin (#438)', () => {
 
   it('falls back to the Course Catalog crumb with no origin', async () => {
     setup({ reviewsEnabled: false, completed: [] });
-    renderPlayerAt('/app/courses/c-1');
+    renderPlayerAt('/app/learn/c-1');
     await screen.findByText('Intro to AI');
 
     const crumb = screen.getByRole('link', { name: 'nav.courses' });
