@@ -2720,3 +2720,16 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **987** (1 new Training breadcrumb case + the `AppLayout` test mock widened to render crumb labels) / build ✓; functions untouched.
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #442.
+
+## 2026-08-12 — #443 Course Catalog defaults to list view (PR #444)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Filed + picked up in the same session (three parallel sessions in flight: #429 custom dropdowns, #368 CSV export, this).
+
+**What:** The Course Catalog (`/app/courses`, `Courses.tsx`) opened in **card** view by default; list is now the default. `readStoredView()`'s fallback flipped `'card'` → `'list'` — the SSR guard, the catch block, and the "nothing valid stored" branch all now return `'list'`.
+- Persistence unchanged: the localStorage read became `getItem(VIEW_STORAGE_KEY) === 'card' ? 'card' : 'list'`, so an **explicitly stored `'card'` still wins** — learners who chose cards keep them; only the absent (first-time / never-toggled) default changes. `selectCatalogView` still writes the chosen value verbatim, so a later toggle to card persists and is honored on the next visit.
+
+**Why:** owner wanted the denser list layout as the out-of-the-box view while respecting any explicit per-learner choice (localStorage, key `kursuskatalog-view`, from #360). Scoped as a fallback flip rather than a blanket override precisely so a saved card preference is never clobbered.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **988** (the "defaults to card" case inverted to "defaults to list, toggles to card, persists"; new "restores persisted card view, overriding the list default" case; `beforeEach` `localStorage.clear()` makes the default assertion a true empty-store guard) / build ✓; functions untouched. Independent Opus code review clean (no findings; logic, both-way persistence, and test guards confirmed).
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #444.
