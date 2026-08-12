@@ -96,4 +96,34 @@ describe('session-expired', () => {
     const { consumeSessionExpiredNotice } = await loadModule();
     expect(consumeSessionExpiredNotice()).toBe(false);
   });
+
+  it('handleIdleTimeout redirects, clears the cache, and flags the idle notice only', async () => {
+    stubLocation('/app/dashboard');
+    const { handleIdleTimeout, consumeIdleTimeoutNotice, consumeSessionExpiredNotice } =
+      await loadModule();
+
+    handleIdleTimeout();
+
+    await vi.waitFor(() => expect(window.location.assign).toHaveBeenCalledWith('/login'));
+    expect(clearCache).toHaveBeenCalledOnce();
+    expect(consumeIdleTimeoutNotice()).toBe(true);
+    // The idle path must not masquerade as a dead session.
+    expect(consumeSessionExpiredNotice()).toBe(false);
+  });
+
+  it('handleIdleTimeout stashes the current path so re-login returns the user', async () => {
+    stubLocation('/app/courses', '?tab=all');
+    const { handleIdleTimeout } = await loadModule();
+    const { consumePostLoginRedirect } = await import('./post-login-redirect');
+
+    handleIdleTimeout();
+
+    await vi.waitFor(() => expect(window.location.assign).toHaveBeenCalledWith('/login'));
+    expect(consumePostLoginRedirect()).toBe('/app/courses?tab=all');
+  });
+
+  it('consumeIdleTimeoutNotice returns false when no idle timeout occurred', async () => {
+    const { consumeIdleTimeoutNotice } = await loadModule();
+    expect(consumeIdleTimeoutNotice()).toBe(false);
+  });
 });

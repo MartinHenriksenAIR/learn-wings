@@ -14,8 +14,13 @@ import { useFavorites, useToggleFavorite } from '@/hooks/useFavorites';
 import { FavoriteToggle } from '@/components/learner/FavoriteToggle';
 import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
 import { callApi } from '@/lib/api-client';
+import { ACTIVITY_EVENT } from '@/hooks/useIdleTimeout';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
+
+// Playing video fires no mouse/keyboard events, so signal activity on each
+// timeupdate to keep the idle-timeout clock alive mid-lecture (#447).
+const markVideoActivity = () => window.dispatchEvent(new Event(ACTIVITY_EVENT));
 import {
   Check,
   CheckCircle2,
@@ -579,6 +584,7 @@ export default function CoursePlayer() {
                       controls
                       className="h-full w-full"
                       src={azureVideoUrl}
+                      onTimeUpdate={markVideoActivity}
                     />
                   ) : signedVideoUrl ? (
                     <video
@@ -586,6 +592,7 @@ export default function CoursePlayer() {
                       controls
                       className="h-full w-full"
                       src={signedVideoUrl}
+                      onTimeUpdate={markVideoActivity}
                     />
                   ) : currentLesson.azure_blob_path || currentLesson.video_storage_path ? (
                     <div className="text-center text-muted-foreground">
