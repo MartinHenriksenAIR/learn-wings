@@ -8,8 +8,25 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
+// AppLayout → renders children plus the breadcrumb crumb labels, so the page's
+// header breadcrumb (#421) is assertable.
 vi.mock('@/components/layout/AppLayout', () => ({
-  AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppLayout: ({
+    children,
+    breadcrumbs = [],
+  }: {
+    children: React.ReactNode;
+    breadcrumbs?: { label: string }[];
+  }) => (
+    <div>
+      <nav aria-label="breadcrumb">
+        {breadcrumbs.map((c) => (
+          <span key={c.label}>{c.label}</span>
+        ))}
+      </nav>
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock('@/lib/api-client', () => ({
@@ -135,6 +152,12 @@ describe('LearnerTraining', () => {
   it('renders the "My Training" h1', () => {
     renderTraining();
     expect(screen.getByRole('heading', { level: 1, name: 'training.title' })).toBeInTheDocument();
+  });
+
+  it('shows "My Training" in the header breadcrumb (#421)', () => {
+    renderTraining();
+    const crumbs = screen.getByRole('navigation', { name: 'breadcrumb' });
+    expect(within(crumbs).getByText('nav.training')).toBeInTheDocument();
   });
 
   it('shows the lesson-aggregate figure in the progress strip', () => {
