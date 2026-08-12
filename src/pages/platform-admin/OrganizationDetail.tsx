@@ -310,6 +310,7 @@ export default function OrganizationDetail() {
 
       <MembersSection
         members={members}
+        orgName={org.name}
         updatingRoleId={updatingRoleId}
         onRoleChange={(member, newRole) => setRoleChangeDialog({ open: true, member, newRole })}
         onDisable={(id) => disableMemberMutation.mutate(id)}

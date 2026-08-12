@@ -93,7 +93,7 @@ export default function LearnerTraining() {
 
   if (orgGuard === 'loading' || query.isLoading) {
     return (
-      <AppLayout title={t('training.title')}>
+      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
         <PageSpinner />
       </AppLayout>
     );
@@ -102,7 +102,7 @@ export default function LearnerTraining() {
   if (!currentOrg) {
     const isNoMembership = memberships.length === 0;
     return (
-      <AppLayout title={t('training.title')}>
+      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<BookOpen className="h-6 w-6" />}
@@ -116,7 +116,7 @@ export default function LearnerTraining() {
 
   if (query.isError) {
     return (
-      <AppLayout title={t('training.title')}>
+      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
         <div className="flex h-64 items-center justify-center">
           <QueryErrorState onRetry={() => query.refetch()} />
         </div>
@@ -125,7 +125,7 @@ export default function LearnerTraining() {
   }
 
   return (
-    <AppLayout>
+    <AppLayout breadcrumbs={[{ label: t('nav.training') }]}>
       <div className="mb-6">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('training.title')}
@@ -202,7 +202,7 @@ export default function LearnerTraining() {
                       asChild
                       className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
                     >
-                      <Link to={routes.learner.coursePlayer(enrollment.course_id)}>
+                      <Link to={routes.learner.coursePlayer(enrollment.course_id, 'training')}>
                         <Play aria-hidden="true" className="h-3.5 w-3.5" />
                         {t('common.continue')}
                       </Link>

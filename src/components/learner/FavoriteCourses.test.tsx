@@ -46,7 +46,8 @@ describe('FavoriteCourses', () => {
 
     expect(screen.getByText('training.favorites.title')).toBeInTheDocument();
     expect(screen.getByText('Intro to AI')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1');
+    // Opened from Min Træning → the link tags its origin for the player breadcrumb (#438).
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
     // No empty state when there are favorites.
     expect(screen.queryByText('dashboard.noFavoritesTitle')).toBeNull();
   });

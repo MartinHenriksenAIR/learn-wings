@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { routes } from '@/lib/routes';
@@ -88,6 +88,11 @@ export default function CoursePlayer() {
   const { features } = usePlatformSettings();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Where the learner opened this course from decides the breadcrumb's parent
+  // crumb: from Min Træning it points back there, otherwise the Course Catalog (#438).
+  const cameFromTraining = searchParams.get('from') === 'training';
 
   const { isFavorite } = useFavorites(currentOrg?.id);
   const { toggleFavorite, togglingId } = useToggleFavorite(currentOrg?.id);
@@ -455,7 +460,9 @@ export default function CoursePlayer() {
   return (
     <AppLayout
       breadcrumbs={[
-        { label: t('nav.courses'), href: routes.learner.courses },
+        cameFromTraining
+          ? { label: t('nav.training'), href: routes.learner.training }
+          : { label: t('nav.courses'), href: routes.learner.courses },
         { label: course.title },
       ]}
     >

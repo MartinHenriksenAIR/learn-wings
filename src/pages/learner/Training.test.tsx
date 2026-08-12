@@ -8,8 +8,25 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
+// AppLayout → renders children plus the breadcrumb crumb labels, so the page's
+// header breadcrumb (#421) is assertable.
 vi.mock('@/components/layout/AppLayout', () => ({
-  AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppLayout: ({
+    children,
+    breadcrumbs = [],
+  }: {
+    children: React.ReactNode;
+    breadcrumbs?: { label: string }[];
+  }) => (
+    <div>
+      <nav aria-label="breadcrumb">
+        {breadcrumbs.map((c) => (
+          <span key={c.label}>{c.label}</span>
+        ))}
+      </nav>
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock('@/lib/api-client', () => ({
@@ -137,6 +154,12 @@ describe('LearnerTraining', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'training.title' })).toBeInTheDocument();
   });
 
+  it('shows "My Training" in the header breadcrumb (#421)', () => {
+    renderTraining();
+    const crumbs = screen.getByRole('navigation', { name: 'breadcrumb' });
+    expect(within(crumbs).getByText('nav.training')).toBeInTheDocument();
+  });
+
   it('shows the lesson-aggregate figure in the progress strip', () => {
     renderTraining();
     const strip = screen.getByTestId('training-progress-strip');
@@ -150,7 +173,8 @@ describe('LearnerTraining', () => {
     const card = screen.getByTestId('training-continue-card');
     expect(within(card).getByText('Ongoing Course')).toBeInTheDocument();
     const resume = within(card).getByRole('link', { name: /common\.continue/ });
-    expect(resume).toHaveAttribute('href', '/app/learn/c-2');
+    // The resume link tags its origin so the player's breadcrumb points back to Min Træning (#438).
+    expect(resume).toHaveAttribute('href', '/app/learn/c-2?from=training');
   });
 
   it('wires in the Mandatory and Favorites sections with the current org id (no coming-soon placeholders)', () => {
