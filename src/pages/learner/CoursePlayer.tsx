@@ -17,10 +17,6 @@ import { callApi } from '@/lib/api-client';
 import { ACTIVITY_EVENT } from '@/hooks/useIdleTimeout';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
-
-// Playing video fires no mouse/keyboard events, so signal activity on each
-// timeupdate to keep the idle-timeout clock alive mid-lecture (#447).
-const markVideoActivity = () => window.dispatchEvent(new Event(ACTIVITY_EVENT));
 import {
   Check,
   CheckCircle2,
@@ -37,6 +33,10 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
 import { CourseCompletionDialog } from '@/components/course/CourseCompletionDialog';
 import { CourseReviewDialog } from '@/components/course/CourseReviewDialog';
+
+// Playing video fires no mouse/keyboard events, so signal activity on each
+// timeupdate to keep the idle-timeout clock alive mid-lecture (#447).
+const markVideoActivity = () => window.dispatchEvent(new Event(ACTIVITY_EVENT));
 
 // Minimum course progress (percent of lessons completed) before the review entry point appears.
 const REVIEW_MIN_PROGRESS = 20;
