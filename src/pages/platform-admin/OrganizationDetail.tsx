@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageSpinner } from '@/components/ui/page-spinner';
-import { Button } from '@/components/ui/button';
 import { useToastMutation } from '@/hooks/useToastMutation';
 import { useOrgDetail } from '@/hooks/useOrgDetail';
 import { useOrgMemberships } from '@/hooks/useOrgMemberships';
