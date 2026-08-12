@@ -15,6 +15,7 @@ import { useLearnerCourses } from '@/hooks/useLearnerCourses';
 import { useCourseCategories } from '@/hooks/useCourseCategories';
 import { useFavorites, useToggleFavorite } from '@/hooks/useFavorites';
 import { FavoriteToggle } from '@/components/learner/FavoriteToggle';
+import { FilterSelect } from '@/components/FilterSelect';
 import { Course, CourseCategory, Enrollment } from '@/lib/types';
 import { BookOpen, CheckCircle2, LayoutGrid, List, Play, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -189,9 +190,6 @@ export default function LearnerCourses() {
       </AppLayout>
     );
   }
-
-  const selectClasses =
-    'cursor-pointer rounded-xl border border-input bg-card py-[11px] pl-[13px] text-[13px] font-semibold text-[#2a2d3a] outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(16,41,143,0.10)]';
 
   /** State-aware player CTA label — review a finished course, continue a started one, start a fresh one. */
   const ctaLabelFor = (enrollment: Enrollment | undefined, isCompleted: boolean) =>
@@ -394,39 +392,37 @@ export default function LearnerCourses() {
 
       {/* Filters on the left, free-text search to their right, view toggle far right (#360). */}
       <div className="mb-[22px] flex flex-wrap items-center gap-2.5">
-        <select
+        <FilterSelect
+          label={t('courses.category')}
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          aria-label={t('courses.category')}
-          className={selectClasses}
-        >
-          <option value="all">{t('courses.allCategories')}</option>
-          {availableCategories.map((category) => (
-            <option key={category.id} value={category.id}>{categoryName(category)}</option>
-          ))}
-        </select>
-        <select
+          onValueChange={setCategoryFilter}
+          options={[
+            { value: 'all', label: t('courses.allCategories') },
+            ...availableCategories.map((category) => ({ value: category.id, label: categoryName(category) })),
+          ]}
+        />
+        <FilterSelect
+          label={t('courses.level')}
           value={levelFilter}
-          onChange={(e) => setLevelFilter(e.target.value)}
-          aria-label={t('courses.level')}
-          className={selectClasses}
-        >
-          <option value="all">{t('courses.allLevels')}</option>
-          <option value="basic">{t('courses.levels.basic')}</option>
-          <option value="intermediate">{t('courses.levels.intermediate')}</option>
-          <option value="advanced">{t('courses.levels.advanced')}</option>
-        </select>
-        <select
+          onValueChange={setLevelFilter}
+          options={[
+            { value: 'all', label: t('courses.allLevels') },
+            { value: 'basic', label: t('courses.levels.basic') },
+            { value: 'intermediate', label: t('courses.levels.intermediate') },
+            { value: 'advanced', label: t('courses.levels.advanced') },
+          ]}
+        />
+        <FilterSelect
+          label={t('courses.status')}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          aria-label={t('courses.status')}
-          className={selectClasses}
-        >
-          <option value="all">{t('courses.anyStatus')}</option>
-          <option value="in_progress">{t('courses.statusOptions.inProgress')}</option>
-          <option value="completed">{t('courses.statusOptions.completed')}</option>
-          <option value="not_started">{t('courses.statusOptions.notStarted')}</option>
-        </select>
+          onValueChange={setStatusFilter}
+          options={[
+            { value: 'all', label: t('courses.anyStatus') },
+            { value: 'in_progress', label: t('courses.statusOptions.inProgress') },
+            { value: 'completed', label: t('courses.statusOptions.completed') },
+            { value: 'not_started', label: t('courses.statusOptions.notStarted') },
+          ]}
+        />
 
         <div className="relative min-w-[200px] flex-1">
           <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />

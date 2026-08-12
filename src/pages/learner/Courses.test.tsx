@@ -25,6 +25,11 @@ vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
 
+// The filter dropdowns render via the shared shadcn Select (through FilterSelect),
+// which jsdom can't drive — swap in the shared test double so each option is a
+// clickable button.
+vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
+
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
@@ -384,7 +389,7 @@ describe('LearnerCourses — recommended section', () => {
 
     expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
     // Applying any filter switches to "browsing results" — the recommended strip + its heading hide.
-    fireEvent.change(screen.getByLabelText('courses.level'), { target: { value: 'advanced' } });
+    fireEvent.click(screen.getByRole('button', { name: 'courses.levels.advanced' }));
     expect(screen.queryByTestId('recommended-section')).toBeNull();
     expect(screen.queryByText('assessment.recommendations.allCourses')).toBeNull();
   });
@@ -467,7 +472,7 @@ describe('LearnerCourses — enrolled-first ordering of the "All courses" grid (
 
     await screen.findByText('Apple');
     // Narrow to 'basic' — excludes Date (advanced); Apple/Banana/Cherry remain.
-    fireEvent.change(screen.getByLabelText('courses.level'), { target: { value: 'basic' } });
+    fireEvent.click(screen.getByRole('button', { name: 'courses.levels.basic' }));
 
     // Enrolled first (Cherry, Banana), then non-enrolled (Apple); Date filtered out.
     expect(titleOrder()).toEqual(['Cherry', 'Banana', 'Apple']);
@@ -732,7 +737,7 @@ describe('LearnerCourses — catalog refinements: category filter, view toggle, 
     renderCourses();
     await screen.findByText('AI Course');
 
-    fireEvent.change(screen.getByLabelText('courses.category'), { target: { value: 'cat-ai' } });
+    fireEvent.click(screen.getByRole('button', { name: 'AI' }));
 
     expect(screen.getByText('AI Course')).toBeInTheDocument();
     expect(screen.queryByText('Data Course')).toBeNull();
@@ -748,10 +753,10 @@ describe('LearnerCourses — catalog refinements: category filter, view toggle, 
     renderCourses();
     await screen.findByText('AI Course');
 
-    const select = screen.getByLabelText('courses.category') as HTMLSelectElement;
-    const values = Array.from(select.options).map((o) => o.value);
-    expect(values).toContain('cat-ai');        // has a course
-    expect(values).not.toContain('cat-empty');  // no course → omitted
+    // The category dropdown offers only categories that have a course in the catalogue.
+    // Options render by their (Danish, here) display name: cat-ai → "AI", cat-empty → "Tom".
+    expect(screen.getByRole('button', { name: 'AI' })).toBeInTheDocument();  // has a course
+    expect(screen.queryByRole('button', { name: 'Tom' })).toBeNull();        // no course → omitted
   });
 
   it('defaults to list view and toggles to card, persisting the choice', async () => {
@@ -805,7 +810,7 @@ describe('LearnerCourses — catalog refinements: category filter, view toggle, 
     await screen.findByText('AI Course');
 
     // Narrow status to "completed" with nothing completed → empty grid via a non-search filter.
-    fireEvent.change(screen.getByLabelText('courses.status'), { target: { value: 'completed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'courses.statusOptions.completed' }));
 
     expect(screen.getByText('courses.noCoursesMatch')).toBeInTheDocument();
     expect(screen.queryByText('courses.noCoursesForOrg')).toBeNull();

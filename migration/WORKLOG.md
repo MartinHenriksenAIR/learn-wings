@@ -2721,15 +2721,53 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #442.
 
+---
+
+## 2026-08-12 — #368 org member CSV export (PR #441)
+
+**Who:** claude (Opus 4.8, 1M) with martin, isolated worktree `worktree-org-member-csv-export-368`.
+
+**What:** The **data-export** slice of the #368 platform-admin configuration epic (a tracking epic; most knobs already shipped — only data export + audit log were net-new). Adds an **Export CSV** button that downloads an org's member roster on both member surfaces:
+- **Org-admin** `OrgMembersTab.tsx` (own org) and **platform-admin** org-detail `MembersSection.tsx` (any org — `orgName` threaded through from `OrganizationDetail.tsx` for the filename). Both share one helper.
+- **New `src/lib/csv.ts`** (+ `csv.test.ts`, 12 tests): `membersToCsv` (header + rows, **RFC-4180 escaping** so commas/quotes/newlines in names and Danish org names don't corrupt the file), `downloadCsv` (prepends a **UTF-8 BOM** so Excel renders æøå correctly, `text/csv;charset=utf-8`), `membersCsvFilename` (`<org-slug>-members-<YYYY-MM-DD>.csv`, Danish-transliterated slug). BOM + combining-mark strip expressed via `String.fromCharCode` to keep the source ASCII-legible.
+- en + da label (`Export CSV` / `Eksportér CSV`) in both key blocks (`analytics.members`, `orgDetail`).
+
+**Decisions (grilled):** (1) **data export this session**, audit log deferred — the epic itself calls audit log "its own focused session" (new table + write instrumentation across ~100 endpoints + UI); feasibility check confirmed the `endpoint.ts` factory is a DEPENDENCY-FREEZE chokepoint that can't host a DB-writing hook, so real auditing stays per-endpoint. (2) **both surfaces** (platform-admin + org-admin), one shared helper. (3) **full roster** — the button ignores the on-screen search/role filter. (4) columns **Name/Email/Department/Role/Status/Joined** (email isn't in the table but is the point of an export). (5) **raw stable** role/status values + English headers + ISO dates (locale-independent), over localized labels. (6) proper escaping + BOM as engineering-quality defaults.
+
+**Out of scope:** audit log (only net-new slice left under #368; epic stays open), pending-invite export, any backend/schema change.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **996** (128 files, incl. the new 12 csv tests + i18n en/da parity) / build ✓; functions untouched. zero-`supabase.*` on touched files. CI green on the PR (Frontend + Functions jobs pass). Button click → file download not driveable here (needs a real browser + Entra login, no local DB) → owner post-merge check on prod.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #441.
+
+---
+
+## 2026-08-12 — #429 Custom dropdown component: Course Catalog filters use the shadcn Select, not the native OS dropdown (PR #440)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`fix+custom-dropdown-selects-429`). Classified bounded + planned before coding; TDD (FilterSelect test red first).
+
+**What:** The learner Course Catalog's three filter dropdowns (category / level / status) were the only native `<select>` elements left in the app, so they rendered as the browser/OS control instead of the app's own styling. Added `src/components/FilterSelect.tsx` — a thin wrapper over the shared shadcn `Select` — and swapped the three selects for it; removed the now-dead `selectClasses` const.
+- **API:** options-array (`{value,label}[]`) + `label` (→ trigger `aria-label`) + `value`/`onValueChange`, since the category list is data-driven (`availableCategories`). Behavioral parity with the old selects: same `"all"` sentinel, same aria-labels, same setters.
+- **Styling:** overrides on the shadcn `SelectTrigger` base resolve via tailwind-merge — `w-auto`/`h-auto` over `w-full`/`h-10` (the filter bar is `flex-wrap`, so `w-full` would break the compact layout), `rounded-xl`/`bg-card` to match the adjacent search field, focus ring suppressed (`ring-0`/`ring-offset-0`) for the old `focus:border-primary`+shadow look.
+- **Tests:** new `FilterSelect.test.tsx` (wrapper contract). `Courses.test.tsx` migrated to the shared Radix `select-mock` (`src/test/select-mock.tsx`): `fireEvent.change(getByLabelText)` → `fireEvent.click(getByRole('button',{name}))`; the `select.options` structural check became a presence/absence-of-option-button assertion (category labels resolve to `name_da` under the `da` test i18n, e.g. `cat-ai`→"AI", `cat-empty`→"Tom").
+- **No new i18n** (reuses the existing `courses.*` keys); no backend change.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **986** (128 files, +2 FilterSelect) / build ✓; functions untouched. Real-browser check via a throwaway Vite harness: the filters render as Radix `combobox`s (not native `<select>`), open a `listbox` of options, and selecting one updates the trigger + closes the menu. Independent Opus code review clean (behavioral parity, tailwind-merge overrides, and test correctness all validated).
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #440.
+
+---
+
 ## 2026-08-12 — #443 Course Catalog defaults to list view (PR #444)
 
 **Who:** claude (Opus 4.8, 1M) with martin. Filed + picked up in the same session (three parallel sessions in flight: #429 custom dropdowns, #368 CSV export, this).
 
 **What:** The Course Catalog (`/app/courses`, `Courses.tsx`) opened in **card** view by default; list is now the default. `readStoredView()`'s fallback flipped `'card'` → `'list'` — the SSR guard, the catch block, and the "nothing valid stored" branch all now return `'list'`.
 - Persistence unchanged: the localStorage read became `getItem(VIEW_STORAGE_KEY) === 'card' ? 'card' : 'list'`, so an **explicitly stored `'card'` still wins** — learners who chose cards keep them; only the absent (first-time / never-toggled) default changes. `selectCatalogView` still writes the chosen value verbatim, so a later toggle to card persists and is honored on the next visit.
+- **Merge note:** #429 (custom `FilterSelect` dropdowns) landed on the same `Courses.tsx`/`Courses.test.tsx` first; git auto-merged cleanly (my top-of-file `readStoredView` helper vs. #429's mid-file filter JSX / test select-mock — disjoint regions). Full suite re-run green after the merge.
 
 **Why:** owner wanted the denser list layout as the out-of-the-box view while respecting any explicit per-learner choice (localStorage, key `kursuskatalog-view`, from #360). Scoped as a fallback flip rather than a blanket override precisely so a saved card preference is never clobbered.
 
-**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **988** (the "defaults to card" case inverted to "defaults to list, toggles to card, persists"; new "restores persisted card view, overriding the list default" case; `beforeEach` `localStorage.clear()` makes the default assertion a true empty-store guard) / build ✓; functions untouched. Independent Opus code review clean (no findings; logic, both-way persistence, and test guards confirmed).
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **1002** post-merge (the "defaults to card" case inverted to "defaults to list, toggles to card, persists"; new "restores persisted card view, overriding the list default" case; `beforeEach` `localStorage.clear()` makes the default assertion a true empty-store guard) / build ✓; functions untouched. Independent Opus code review clean (no findings; logic, both-way persistence, and test guards confirmed).
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #444.
