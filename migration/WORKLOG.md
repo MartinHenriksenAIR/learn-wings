@@ -2657,3 +2657,21 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **988** / build ✓; functions untouched. Regression tests added for both the platform-page removal (`OrganizationDetail.test.tsx`) and the org-admin gating (`OrgMembersTab.test.tsx`, hidden-in-Platform-view + shown-in-Org-admin-view). Independent Opus code review clean (no high-confidence issues; gate logic validated against `useAuth`/`ProtectedRoute`).
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #433.
+
+---
+
+## 2026-08-12 — #431 New browser tab forced re-login: share the MSAL token cache across tabs (PR #436)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`fix-cross-tab-relogin-431`). Requirements grilled first (3 decisions).
+
+**What:** Logged in on one tab, opening the app in a **new browser tab** showed the login page instead of the signed-in session. Root cause: MSAL cached tokens in `sessionStorage`, which the browser scopes **per tab** — a new tab starts with an empty token cache, MSAL finds no account, and falls back to `loginRedirect`. One-line fix in `src/lib/msal-config.ts`: `cacheLocation` `'sessionStorage'` → `'localStorage'`, so the token cache is shared across all tabs of the origin and a new tab picks up the existing session silently. This is Microsoft's recommended setting for cross-tab SSO and — unlike the `ssoSilent()`+`sessionStorage` alternative — carries no dependency on the third-party-cookie / hidden-iframe behaviour that Chrome and Safari are phasing out.
+
+- **Logout is unchanged and still complete.** `signOut()` → `instance.logoutRedirect()` clears the shared MSAL cache **and** ends the Entra session, so no *usable* session survives a logout anywhere (AC #2). Accepted, per the grilled decision: a background tab left open may still *render* the signed-in UI until its next click/reload (the token is already gone, so it can't do anything) — cosmetic only, no active cross-tab logout listener added.
+- **`viewMode`'s own per-tab `sessionStorage`** (deliberate, #16 — a reload shouldn't snap an admin back to Platform view) is a *separate* store from the MSAL token cache and is left untouched; a new tab authenticates but still starts in the default view, exactly as a reload does today (no regression).
+- **Regression test** (`src/lib/msal-config.test.ts`, new): stubs `VITE_ENTRA_CLIENT_ID` (a non-empty clientId is required at import), dynamically imports the module, and asserts `msalInstance.getConfiguration().cache.cacheLocation === 'localStorage'`. Nothing guarded this before — `msal-config` is *mocked* in every other test — so a silent flip back to `sessionStorage` would have gone unnoticed. Written test-first (red on `sessionStorage`, green after the change).
+
+**Decisions (grilled):** (1) **`localStorage`** over `sessionStorage`+`ssoSilent()` — best-practice / future-proof / robust all point the same way; the XSS worry that makes `ssoSilent` sound safer is marginal for this app and buys it by leaning on the dying third-party-cookie path. (2) **MSAL-default logout** (token destroyed everywhere; tolerate the cosmetic lingering-UI on an untouched background tab) over a belt-and-suspenders active cross-tab logout — the AC's real concern is "no *usable* leftover session", which the default already satisfies. (3) **Confidence = regression test + verify on prod post-merge** (the SWA PR-preview origin isn't a registered Entra redirect URI → AADSTS50011, so login literally can't be exercised there); one-line revert if wrong.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app 0 / tsc node 0 / test **989** (128 files, incl. the new guard) / build ✓; functions untouched. CI green on the PR (Frontend + Functions jobs both pass). **Owner live-check on prod (www.ai-uddannelse.dk) still owed:** open a 2nd tab → no login screen; sign out → can't return without logging in.
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #436.
