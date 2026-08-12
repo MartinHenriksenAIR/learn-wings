@@ -2755,3 +2755,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **986** (128 files, +2 FilterSelect) / build ✓; functions untouched. Real-browser check via a throwaway Vite harness: the filters render as Radix `combobox`s (not native `<select>`), open a `listbox` of options, and selecting one updates the trigger + closes the menu. Independent Opus code review clean (behavioral parity, tailwind-merge overrides, and test correctness all validated).
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #440.
+
+---
+
+## 2026-08-12 — #443 Course Catalog defaults to list view (PR #444)
+
+**Who:** claude (Opus 4.8, 1M) with martin. Filed + picked up in the same session (three parallel sessions in flight: #429 custom dropdowns, #368 CSV export, this).
+
+**What:** The Course Catalog (`/app/courses`, `Courses.tsx`) opened in **card** view by default; list is now the default. `readStoredView()`'s fallback flipped `'card'` → `'list'` — the SSR guard, the catch block, and the "nothing valid stored" branch all now return `'list'`.
+- Persistence unchanged: the localStorage read became `getItem(VIEW_STORAGE_KEY) === 'card' ? 'card' : 'list'`, so an **explicitly stored `'card'` still wins** — learners who chose cards keep them; only the absent (first-time / never-toggled) default changes. `selectCatalogView` still writes the chosen value verbatim, so a later toggle to card persists and is honored on the next visit.
+- **Merge note:** #429 (custom `FilterSelect` dropdowns) landed on the same `Courses.tsx`/`Courses.test.tsx` first; git auto-merged cleanly (my top-of-file `readStoredView` helper vs. #429's mid-file filter JSX / test select-mock — disjoint regions). Full suite re-run green after the merge.
+
+**Why:** owner wanted the denser list layout as the out-of-the-box view while respecting any explicit per-learner choice (localStorage, key `kursuskatalog-view`, from #360). Scoped as a fallback flip rather than a blanket override precisely so a saved card preference is never clobbered.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **1002** post-merge (the "defaults to card" case inverted to "defaults to list, toggles to card, persists"; new "restores persisted card view, overriding the list default" case; `beforeEach` `localStorage.clear()` makes the default assertion a true empty-store guard) / build ✓; functions untouched. Independent Opus code review clean (no findings; logic, both-way persistence, and test guards confirmed).
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #444.
