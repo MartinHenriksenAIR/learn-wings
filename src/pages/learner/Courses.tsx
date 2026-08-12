@@ -25,16 +25,17 @@ const NO_COURSES: Course[] = [];
 const NO_ENROLLMENTS: Enrollment[] = [];
 const NO_CATEGORIES: CourseCategory[] = [];
 
-// The learner's list/card preference persists across visits (#360). Card is the default.
+// The learner's list/card preference persists across visits (#360). List is the default;
+// an explicitly stored 'card' still wins, so learners who chose cards keep them (#443).
 const VIEW_STORAGE_KEY = 'kursuskatalog-view';
 type CatalogView = 'card' | 'list';
 
 function readStoredView(): CatalogView {
-  if (typeof window === 'undefined') return 'card';
+  if (typeof window === 'undefined') return 'list';
   try {
-    return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'list' ? 'list' : 'card';
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'card' ? 'card' : 'list';
   } catch {
-    return 'card';
+    return 'list';
   }
 }
 

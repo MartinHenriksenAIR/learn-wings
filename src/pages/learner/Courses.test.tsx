@@ -754,19 +754,19 @@ describe('LearnerCourses — catalog refinements: category filter, view toggle, 
     expect(values).not.toContain('cat-empty');  // no course → omitted
   });
 
-  it('defaults to card view and toggles to list, persisting the choice', async () => {
+  it('defaults to list view and toggles to card, persisting the choice', async () => {
     renderCourses();
     await screen.findByText('AI Course');
 
-    expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
-    expect(screen.queryByTestId('catalog-list')).toBeNull();
-    expect(screen.getByLabelText('courses.viewAsCards')).toHaveAttribute('aria-pressed', 'true');
-
-    fireEvent.click(screen.getByLabelText('courses.viewAsList'));
-
     expect(screen.getByTestId('catalog-list')).toBeInTheDocument();
     expect(screen.queryByTestId('catalog-grid')).toBeNull();
-    expect(window.localStorage.getItem('kursuskatalog-view')).toBe('list');
+    expect(screen.getByLabelText('courses.viewAsList')).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByLabelText('courses.viewAsCards'));
+
+    expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
+    expect(screen.queryByTestId('catalog-list')).toBeNull();
+    expect(window.localStorage.getItem('kursuskatalog-view')).toBe('card');
   });
 
   it('restores the persisted list view on mount', async () => {
@@ -776,6 +776,15 @@ describe('LearnerCourses — catalog refinements: category filter, view toggle, 
 
     expect(screen.getByTestId('catalog-list')).toBeInTheDocument();
     expect(screen.queryByTestId('catalog-grid')).toBeNull();
+  });
+
+  it('restores the persisted card view on mount, overriding the list default', async () => {
+    window.localStorage.setItem('kursuskatalog-view', 'card');
+    renderCourses();
+    await screen.findByText('AI Course');
+
+    expect(screen.getByTestId('catalog-grid')).toBeInTheDocument();
+    expect(screen.queryByTestId('catalog-list')).toBeNull();
   });
 
   it('list rows expose the detail-overlay link, the Start→player link, and the favorite toggle', async () => {
