@@ -2636,3 +2636,24 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **991** / build ✓; functions untouched.
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #430.
+
+---
+
+## 2026-08-12 — #352 Platform-view invite leak: invite is org-admin-flow-only (PR #433)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`fix+platform-invite-org-admin-only-352`). Requirements grilled first (3 decisions) + one correctness catch on the issue's own instructions.
+
+**What:** A platform admin in **Platform view** (the bottom-left role switcher) could invite org members two ways that shouldn't exist there — the platform org-detail page rendered its own `InviteUserDialog`, and the org-admin invite UI leaked through because `effectiveIsOrgAdmin` is `true` in Platform view (`useAuth.tsx:99-101`). The only invite path should be the org-admin flow (switch to Org-admin view → pick org → invite). Fixed **surgically, invite-only** — `effectiveIsOrgAdmin`'s definition left untouched to avoid rippling into community moderation + route guards.
+- **`OrganizationDetail.tsx`** — removed `InviteUserDialog` (import + usage) and its `inviteMutation`/`handleInvite`/`inviteSchema`/`inviteErrorMessage`/state; stripped the **copy-invite-link** from `PendingInvitationsList` (kept the list view + **cancel**). Kept **`AddExistingUserDialog`** (platform-admin-only; no org-admin equivalent, since an org admin can't see other orgs' users) and `RoleChangeDialog` (role-change explicitly out of scope). Deleted the now-orphaned `InviteUserDialog.tsx` + `.test.tsx` so the path can't be silently re-wired.
+- **`OrgMembersTab.tsx`** — gated every invite affordance (single-invite dialog, bulk-invite button, `BulkInviteDialog`, empty-state invite action, and the pending-invite copy-link section) on **`canInvite = effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && !!currentOrg`** — the existing `AppSidebar.tsx:219` idiom. Enroll / assign-course / seat-request untouched.
+- Removed 6 now-orphaned `orgDetail.*` i18n keys (en+da): `inviteUser`, `createInvitation`, `inviteDialogTitle`/`Description`, `copyLink`, `copied` (parity test green).
+
+**Correctness catch (deviated from the issue text on purpose):** the issue said "gate on `viewMode === 'org_admin'`" — but `viewMode` **defaults to `'platform_admin'` for everyone** (`useAuth.tsx:51-57`) and the role switcher is platform-admin-only, so a real (non-platform) org admin keeps `viewMode === 'platform_admin'` forever. That literal gate would have hidden invite from **every real org admin** — a worse bug. `effectiveIsOrgAdmin && !effectiveIsPlatformAdmin` is correct across all four (isPlatformAdmin × viewMode) cases.
+
+**Decisions (grilled):** (1) proceed despite the mis-filed "Blocked by #122" (that issue is an ADR-only design task, not code that touches `useAuth.tsx`); (2) **surgical** vs. flipping `effectiveIsOrgAdmin` — surgical, to avoid the 8-consumer blast radius (route guard + community moderation, several without a platform fallback); (3) removal boundary — strip **email-invite + invite-link sharing**, but **keep Add-existing-user** and pending view/cancel.
+
+**Out of scope (flagged for confirmation, left as-is):** `OrganizationsManager.tsx` still lets a platform admin invite the **first org admin during org creation** in Platform view — a bootstrap exception (no org admin exists yet to use the org-admin flow), distinct from inviting members. Independent Opus review confirmed it's intended, not a missed leak.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **988** / build ✓; functions untouched. Regression tests added for both the platform-page removal (`OrganizationDetail.test.tsx`) and the org-admin gating (`OrgMembersTab.test.tsx`, hidden-in-Platform-view + shown-in-Org-admin-view). Independent Opus code review clean (no high-confidence issues; gate logic validated against `useAuth`/`ProtectedRoute`).
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #433.
