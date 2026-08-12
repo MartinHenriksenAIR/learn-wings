@@ -8,9 +8,8 @@ import { useToastMutation } from '@/hooks/useToastMutation';
 import { useOrgDetail } from '@/hooks/useOrgDetail';
 import { useOrgMemberships } from '@/hooks/useOrgMemberships';
 import { useInvitations } from '@/hooks/useInvitations';
-import { useProfiles } from '@/hooks/useProfiles';
 import { useSeatRequests } from '@/hooks/useSeatRequests';
-import { callApi, ApiError } from '@/lib/api-client';
+import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { getSeatUsage } from '@/lib/seats';
 import { routes } from '@/lib/routes';
@@ -18,7 +17,6 @@ import { OrgMembership, Profile, OrgRole } from '@/lib/types';
 import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/sonner';
-import { z } from 'zod';
 import { orgSchema } from '@/lib/org-validation';
 import { OrgDetailHeader } from '@/components/platform-admin/org-detail/OrgDetailHeader';
 import { OrgStatCards } from '@/components/platform-admin/org-detail/OrgStatCards';
@@ -28,10 +26,6 @@ import { MembersSection } from '@/components/platform-admin/org-detail/MembersSe
 import { AssignCourseDialog } from '@/components/assignments/AssignCourseDialog';
 import { AssignmentsManager } from '@/components/assignments/AssignmentsManager';
 import { PendingInvitationsList } from '@/components/platform-admin/org-detail/PendingInvitationsList';
-import {
-  AddExistingUserDialog,
-  type AddUserPayload,
-} from '@/components/platform-admin/org-detail/AddExistingUserDialog';
 import {
   RoleChangeDialog,
   type RoleChangeSelection,
@@ -46,11 +40,6 @@ import { useQueryErrorToast } from '@/components/platform-admin/org-detail/useQu
 
 type Member = OrgMembership & { profile: Profile };
 
-const addUserSchema = z.object({
-  userId: z.string().uuid('Please select a user'),
-  role: z.enum(['org_admin', 'learner']),
-});
-
 export default function OrganizationDetail() {
   const { orgId } = useParams<{ orgId: string }>();
   const navigate = useNavigate();
@@ -60,18 +49,11 @@ export default function OrganizationDetail() {
   const orgQuery = useOrgDetail(orgId);
   const membershipsQuery = useOrgMemberships(orgId);
   const invitationsQuery = useInvitations(orgId, 'platform');
-  const profilesQuery = useProfiles();
   const { data: seatRequests = [] } = useSeatRequests(orgId);
 
   const org = orgQuery.data ?? null;
   const members = useMemo<Member[]>(() => membershipsQuery.data ?? [], [membershipsQuery.data]);
   const invitations = useMemo(() => invitationsQuery.data ?? [], [invitationsQuery.data]);
-
-  const availableUsers = useMemo<Profile[]>(() => {
-    const profiles = profilesQuery.data ?? [];
-    const memberUserIds = new Set(members.map((m) => m.user_id));
-    return profiles.filter((p) => !memberUserIds.has(p.id));
-  }, [profilesQuery.data, members]);
 
   const activeMembers = useMemo(() => members.filter((m) => m.status === 'active'), [members]);
   const adminCount = useMemo(
@@ -101,13 +83,7 @@ export default function OrganizationDetail() {
     toastTitle: 'Failed to load organization',
     logLabel: 'OrganizationDetail: failed to load organization',
   });
-  useQueryErrorToast({
-    isError: profilesQuery.isError,
-    error: profilesQuery.error,
-    logLabel: 'OrganizationDetail: failed to load profiles',
-  });
 
-  const [addUserOpen, setAddUserOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [roleChangeDialog, setRoleChangeDialog] = useState<RoleChangeSelection | null>(null);
@@ -118,26 +94,6 @@ export default function OrganizationDetail() {
     queryClient.invalidateQueries({ queryKey: queryKeys.orgMemberships.list(orgId) });
   const invalidateInvitations = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.invitations.list(orgId, 'platform') });
-
-  const addUserMutation = useToastMutation({
-    mutationFn: (payload: AddUserPayload) =>
-      callApi('/api/org-membership-create', {
-        orgId,
-        userId: payload.userId,
-        role: payload.role,
-        status: 'active',
-      }),
-    errorTitle: 'Failed to add user',
-    onSuccess: () => {
-      toast({
-        title: 'User added!',
-        description: 'The user has been added to the organization.',
-      });
-      setAddUserOpen(false);
-      invalidateMemberships();
-      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
-    },
-  });
 
   const changeRoleMutation = useToastMutation({
     mutationFn: ({ member, newRole }: { member: Member; newRole: OrgRole }) =>
@@ -257,19 +213,6 @@ export default function OrganizationDetail() {
     },
   });
 
-  const handleAddUser = (payload: AddUserPayload) => {
-    const result = addUserSchema.safeParse({ userId: payload.userId, role: payload.role });
-    if (!result.success) {
-      toast({
-        title: 'Invalid input',
-        description: result.error.errors[0].message,
-        variant: 'destructive',
-      });
-      return;
-    }
-    addUserMutation.mutate(payload);
-  };
-
   const handleConfirmRoleChange = () => {
     if (!roleChangeDialog?.member) return;
     const { member, newRole } = roleChangeDialog;
@@ -294,8 +237,7 @@ export default function OrganizationDetail() {
   const loading =
     orgQuery.isLoading ||
     membershipsQuery.isLoading ||
-    invitationsQuery.isLoading ||
-    profilesQuery.isLoading;
+    invitationsQuery.isLoading;
 
   if (loading) {
     return (
@@ -326,15 +268,6 @@ export default function OrganizationDetail() {
     pendingInvites: org.pending_invite_count ?? 0,
     seatLimit: org.seat_limit,
   });
-
-  // Surface the backend seat cap (409) inline in the add-existing-user dialog,
-  // in addition to the failure toast, so it doesn't read as a generic error.
-  // Adding a member consumes a seat, so the same 409 can fire there.
-  const addUserErrorMessage =
-    addUserMutation.error instanceof ApiError &&
-    addUserMutation.error.code === 'SEAT_LIMIT_REACHED'
-      ? addUserMutation.error.message
-      : null;
 
   // OrgDetailHeader owns the page's single <h1> (the org name), so AppLayout's `title`
   // is omitted here to avoid a duplicate <h1> (#320). The loading branch above keeps
@@ -379,10 +312,6 @@ export default function OrganizationDetail() {
       <MembersSection
         members={members}
         updatingRoleId={updatingRoleId}
-        onAddUserClick={() => {
-          addUserMutation.reset();
-          setAddUserOpen(true);
-        }}
         onRoleChange={(member, newRole) => setRoleChangeDialog({ open: true, member, newRole })}
         onDisable={(id) => disableMemberMutation.mutate(id)}
         onReactivate={(id) => reactivateMemberMutation.mutate(id)}
@@ -407,17 +336,6 @@ export default function OrganizationDetail() {
           onCancel={(id) => cancelInvitationMutation.mutate(id)}
         />
       )}
-
-      <AddExistingUserDialog
-        open={addUserOpen}
-        onOpenChange={setAddUserOpen}
-        orgName={org.name}
-        availableUsers={availableUsers}
-        seatUsage={seatUsage}
-        errorMessage={addUserErrorMessage}
-        onSubmit={handleAddUser}
-        pending={addUserMutation.isPending}
-      />
 
       <RoleChangeDialog
         selection={roleChangeDialog}
