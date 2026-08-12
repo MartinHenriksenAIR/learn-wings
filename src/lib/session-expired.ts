@@ -43,8 +43,9 @@ export function handleSessionExpired(): void {
   const go = () => window.location.assign(routes.auth.login);
   // clearCache is async; navigate only once the stale account is gone, so the
   // reloaded app doesn't see it, refetch, 401, and loop straight back here.
-  // clearCache() removes only MSAL's own sessionStorage keys (msal-prefixed /
-  // clientId-keyed), so the redirect target + notice set just above survive it.
+  // clearCache() removes only MSAL's own localStorage keys (msal-prefixed /
+  // clientId-keyed), so the redirect target + notice in sessionStorage set just
+  // above survive it.
   Promise.resolve(msalInstance.clearCache()).catch(() => {}).finally(go);
 }
 

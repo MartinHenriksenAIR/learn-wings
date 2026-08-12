@@ -1,7 +1,8 @@
 // Preserves the URL a user was headed to when a route guard bounced them to
 // /login. Router state cannot be used: the Entra login is a full-page redirect
-// and React Router state does not survive it — sessionStorage does (and matches
-// the tab-scoped MSAL cache in msal-config.ts).
+// and React Router state does not survive it — sessionStorage does, and its
+// tab-scoping is what we want here: each tab keeps its own pending redirect
+// target (the MSAL token cache is separately in localStorage since #431).
 const KEY = 'postLoginRedirect';
 
 // Only in-app absolute paths — never anything that could leave the SPA.
