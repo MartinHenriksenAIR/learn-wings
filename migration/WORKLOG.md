@@ -2739,3 +2739,19 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **996** (128 files, incl. the new 12 csv tests + i18n en/da parity) / build ✓; functions untouched. zero-`supabase.*` on touched files. CI green on the PR (Frontend + Functions jobs pass). Button click → file download not driveable here (needs a real browser + Entra login, no local DB) → owner post-merge check on prod.
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #441.
+
+---
+
+## 2026-08-12 — #429 Custom dropdown component: Course Catalog filters use the shadcn Select, not the native OS dropdown (PR #440)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`fix+custom-dropdown-selects-429`). Classified bounded + planned before coding; TDD (FilterSelect test red first).
+
+**What:** The learner Course Catalog's three filter dropdowns (category / level / status) were the only native `<select>` elements left in the app, so they rendered as the browser/OS control instead of the app's own styling. Added `src/components/FilterSelect.tsx` — a thin wrapper over the shared shadcn `Select` — and swapped the three selects for it; removed the now-dead `selectClasses` const.
+- **API:** options-array (`{value,label}[]`) + `label` (→ trigger `aria-label`) + `value`/`onValueChange`, since the category list is data-driven (`availableCategories`). Behavioral parity with the old selects: same `"all"` sentinel, same aria-labels, same setters.
+- **Styling:** overrides on the shadcn `SelectTrigger` base resolve via tailwind-merge — `w-auto`/`h-auto` over `w-full`/`h-10` (the filter bar is `flex-wrap`, so `w-full` would break the compact layout), `rounded-xl`/`bg-card` to match the adjacent search field, focus ring suppressed (`ring-0`/`ring-offset-0`) for the old `focus:border-primary`+shadow look.
+- **Tests:** new `FilterSelect.test.tsx` (wrapper contract). `Courses.test.tsx` migrated to the shared Radix `select-mock` (`src/test/select-mock.tsx`): `fireEvent.change(getByLabelText)` → `fireEvent.click(getByRole('button',{name}))`; the `select.options` structural check became a presence/absence-of-option-button assertion (category labels resolve to `name_da` under the `da` test i18n, e.g. `cat-ai`→"AI", `cat-empty`→"Tom").
+- **No new i18n** (reuses the existing `courses.*` keys); no backend change.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **986** (128 files, +2 FilterSelect) / build ✓; functions untouched. Real-browser check via a throwaway Vite harness: the filters render as Radix `combobox`s (not native `<select>`), open a `listbox` of options, and selecting one updates the trigger + closes the menu. Independent Opus code review clean (behavioral parity, tailwind-merge overrides, and test correctness all validated).
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #440.
