@@ -2808,3 +2808,22 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 errors / tsc app+node 0 / test **1002** (129 files) / build ✓; functions untouched. `min-w` value backed by real-font (Hanken Grotesk 700) measurement. Change is a single utility class + JSX comment — no logic/type/i18n surface.
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #446.
+
+---
+
+## 2026-08-13 — #449 My Training card/list view toggle (PR #450)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`worktree-training-view-toggle-449` off `main`).
+
+**What:** Mirror the Course Catalog's card/list view toggle onto the **My Training** page (`Training.tsx`), applied to **all four** course listings — In-Progress, Completed, Mandatory, Favorites (owner chose "all listings" over the tighter In-Progress-only scope). Each listing switches between the card grid and a compact list-row layout.
+- **Shared extraction:** the catalog's previously-inline toggle + `localStorage` persistence are now a shared `useListView` hook (`src/hooks/useListView.ts`) + `ListViewToggle` component (`src/components/learner/ListViewToggle.tsx`); `Courses.tsx` was refactored onto them so the two pages can't drift. Catalog behaviour preserved exactly (default `list`, key `kursuskatalog-view`, explicit `card` wins, same `catalog-list`/`catalog-grid` testids).
+- **My Training specifics:** owns view state via `useListView('min-traening-view', 'card')` — **defaults to `card`** (unlike the list-first catalog) so the page keeps its familiar look; list is opt-in. Preference persists under its **own** key, independent of the catalog. `MandatoryCourses`/`FavoriteCourses` take an optional `view` prop (default `card`) + a row variant.
+- **i18n:** no new keys — reuses `courses.viewAsCards`/`viewAsList` (already en+da).
+
+**Why:** owner wanted the same card/list choice they have in the catalog on My Training too.
+
+**Review:** independent Opus code review — no Critical/Important; confirmed the shared hook is behaviourally identical to the old inline logic and the Courses refactor has no drift. Two Minor polish items applied (certs-off completed card uses row styling in list view; added a certs-on list-view test); the row-markup duplication note was consciously left (middle content differs per listing — abstracting would over-engineer).
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 errors / tsc app+node 0 / test **1025** (131 files) / build ✓; functions untouched. Rebased on trunk after #448 landed (clean merge, no overlap).
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #450. **Auth-gated UI → verify on prod after merge, not the PR preview** (SWA preview login blocked, AADSTS50011).
