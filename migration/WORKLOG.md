@@ -2771,3 +2771,24 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **1002** post-merge (the "defaults to card" case inverted to "defaults to list, toggles to card, persists"; new "restores persisted card view, overriding the list default" case; `beforeEach` `localStorage.clear()` makes the default assertion a true empty-store guard) / build ✓; functions untouched. Independent Opus code review clean (no findings; logic, both-way persistence, and test guards confirmed).
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #444.
+
+---
+
+## 2026-08-13 — #447 Idle-timeout auto sign-out (PR #448)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`idle-timeout-447`). Requirements grilled first — the reporter's instinct ("closing all tabs and reopening doesn't require login → log out on tab close") was reframed into the standard control after establishing that (a) surviving a tab-close is the norm on professional platforms and the deliberate side effect of #431's `localStorage` cache, (b) "log out on last-tab-close" fights that cross-tab SSO and Entra's SSO cookie would silently re-auth anyway, and (c) an **idle/inactivity timeout** targets the real threat (unattended/shared device). Owner decisions: 60-min window, video playback counts as activity, warn-with-countdown, **local-only** teardown (no Entra logout), absolute session cap explicitly dropped.
+
+**What:** A 60-minute inactivity timeout that auto signs-out and redirects to `/login`.
+- **`src/hooks/useIdleTimeout.ts`** — the timer. Last-activity timestamp mirrored to `localStorage` (key `idleLastActivity`, writes throttled to ≤1/5s) so every tab shares one clock: activity in any tab keeps them all alive, and a timeout trips them all within a tick. Activity = `mousemove`/`mousedown`/`keydown`/`wheel`/`scroll`/`touchstart` (capture-phase, so nested scrolls count) **plus** a custom `app:activity` event. `onTimeout` is routed through a ref so the effect never re-subscribes on the caller's identity; effect re-runs only on `enabled` flips. App load counts as activity (measures *continuous* inactivity within a session, not wall-clock since login), so a stale cross-session timestamp can't cause a spurious immediate logout (the arm overwrites it with `now` before the first check).
+- **`src/pages/learner/CoursePlayer.tsx`** — both `<video>` elements fire `app:activity` on `timeupdate`, so a learner watching a long lecture is never signed out mid-video.
+- **`src/components/IdleTimeout.tsx`** — mounted once at the app root inside `AuthProvider`; arms the timer only while `user` is set and renders the final-60s countdown `AlertDialog` with a "Stay signed in" action (`t('idleTimeout.*')`).
+- **`src/lib/session-expired.ts`** — refactored the #389 redirect into a shared `redirectToLogin(noticeKey)`; added `handleIdleTimeout()` + `consumeIdleTimeoutNotice()` alongside the existing session-expired pair. Idle teardown clears **only** the local MSAL cache (no `logoutRedirect`), so a valid Entra SSO cookie can re-auth the next sign-in silently — the owner's explicit trade-off for a snappier flow.
+- **`src/pages/Login.tsx`** — shows a distinct inactivity notice (`auth.idleTimeoutNotice`) vs. the dead-session one; both keys referenced as static literals so the #300 drift gate validates them.
+- **i18n:** `idleTimeout.{title,description,staySignedIn}` + `auth.idleTimeoutNotice` in en + da (`{{seconds}}` interpolation).
+- **Tests:** `useIdleTimeout.test.ts` (warning window, timeout-fires-once, activity reset, video/custom-event activity, cross-tab reconcile via storage event, disabled), `IdleTimeout.test.tsx` (auth-gating, handler wiring, modal + button), plus idle-path cases in `session-expired.test.ts` and `Login.test.tsx`.
+
+**Out of scope (per #447, consciously decided):** absolute session-lifetime cap (not built); "log out on last-tab-close" (rejected); no change to #431's `localStorage` cross-tab SSO.
+
+**Verify:** frontend-only, no schema/functions change. root lint 0 / tsc app+node 0 / test **1018** (131 files) / build ✓; functions untouched. Independent Opus code review: no Critical/Important bugs (cross-tab, throttle, stale-storage, StrictMode, i18n paths all traced), one Minor style fix applied (a module const wedged between imports in `CoursePlayer.tsx`).
+
+**Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #448. **Auth-gated UI → verify on prod after merge, not the PR preview** (SWA preview login blocked, AADSTS50011).
