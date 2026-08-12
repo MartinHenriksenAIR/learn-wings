@@ -163,7 +163,6 @@ describe('OrganizationDetail — AlertDialog controlled from first render (#81)'
       if (path === '/api/organizations') return { organization };
       if (path === '/api/org-memberships') return { memberships: [membershipRow] };
       if (path === '/api/invitations') return { invitations: [] };
-      if (path === '/api/profiles') return { profiles: [] };
       throw new Error(`Unexpected callApi path: ${path}`);
     });
   });
@@ -215,7 +214,6 @@ describe('OrganizationDetail — load-failure retry (#53)', () => {
       }
       if (path === '/api/org-memberships') return { memberships: [] };
       if (path === '/api/invitations') return { invitations: [] };
-      if (path === '/api/profiles') return { profiles: [] };
       throw new Error(`Unexpected callApi path: ${path}`);
     });
 
@@ -240,7 +238,6 @@ describe('OrganizationDetail — load-failure retry (#53)', () => {
       if (path === '/api/organizations') throw new ApiError('missing', 404);
       if (path === '/api/org-memberships') return { memberships: [] };
       if (path === '/api/invitations') return { invitations: [] };
-      if (path === '/api/profiles') return { profiles: [] };
       throw new Error(`Unexpected callApi path: ${path}`);
     });
 
@@ -258,7 +255,6 @@ describe('OrganizationDetail — heading (#320)', () => {
       if (path === '/api/organizations') return { organization };
       if (path === '/api/org-memberships') return { memberships: [membershipRow] };
       if (path === '/api/invitations') return { invitations: [] };
-      if (path === '/api/profiles') return { profiles: [] };
       throw new Error(`Unexpected callApi path: ${path}`);
     });
   });
@@ -281,7 +277,6 @@ describe('OrganizationDetail — assign course wiring (#365)', () => {
       if (path === '/api/organizations') return { organization };
       if (path === '/api/org-memberships') return { memberships: [membershipRow] };
       if (path === '/api/invitations') return { invitations: [] };
-      if (path === '/api/profiles') return { profiles: [] };
       throw new Error(`Unexpected callApi path: ${path}`);
     });
   });
@@ -313,26 +308,28 @@ describe('OrganizationDetail — assign course wiring (#365)', () => {
   });
 });
 
-describe('OrganizationDetail — no invite affordance in Platform view (#352)', () => {
+describe('OrganizationDetail — no member-adding in Platform view (#352, #434)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/organizations') return { organization };
       if (path === '/api/org-memberships') return { memberships: [membershipRow] };
       if (path === '/api/invitations') return { invitations: [invitationRow] };
-      if (path === '/api/profiles') return { profiles: [] };
       throw new Error(`Unexpected callApi path: ${path}`);
     });
   });
 
-  it('renders no email-invite affordance; the add-existing-user path stays', async () => {
+  it('renders no member-adding affordance at all — neither invite nor add-existing', async () => {
     renderPage();
     await screen.findByText('Bob Member');
 
-    // Email-invite is gone — the only invite path is the org-admin flow.
+    // Email-invite (#352) and Add member / add-existing-user (#434) are both gone —
+    // a platform admin manages membership via the org-admin flow.
     expect(screen.queryByRole('button', { name: 'orgDetail.inviteUser' })).toBeNull();
-    // Add-existing-user is platform-admin-only (no org-admin equivalent) and stays.
-    expect(screen.getByRole('button', { name: 'orgDetail.addMember' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'orgDetail.addMember' })).toBeNull();
+    // The members section still renders (Bob Member above) with its non-adding
+    // controls — only member-adding is gone.
+    expect(screen.getAllByRole('button', { name: 'assignments.assignCourse' }).length).toBeGreaterThan(0);
   });
 
   it('pending invitations can be viewed and cancelled, but not shared as a link', async () => {
