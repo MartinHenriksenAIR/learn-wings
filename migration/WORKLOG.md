@@ -2827,3 +2827,21 @@ Decisions: unknown/mismatched `link_id` and "not your org" both return a **unifo
 **Verify:** frontend-only, no schema/functions change. root lint 0 errors / tsc app+node 0 / test **1025** (131 files) / build ✓; functions untouched. Rebased on trunk after #448 landed (clean merge, no overlap).
 
 **Deploy:** frontend-only → SWA auto-ships on merge. Announce on PR #450. **Auth-gated UI → verify on prod after merge, not the PR preview** (SWA preview login blocked, AADSTS50011).
+
+---
+
+## 2026-08-13 — #456 My Training favorites row reflects completion (PR #457)
+
+**Who:** claude (Opus 4.8, 1M) with martin, in a dedicated worktree (`fix/favorites-completion-456` off `main`).
+
+**What:** The My Training **Favorites** row showed "Open course" for *every* favorited course, even completed ones, while the **Mandatory** row correctly showed a "Completed" pill. The two rows are separate components on different endpoints, and `/api/favorites` never joined `enrollments` (and `FavoriteCourses.tsx` had no completion branch), so the favorites list carried no completion signal at all. Now the favorites row reflects per-course completion, mirroring the mandatory card.
+- **Backend** (`functions/favorites/index.ts`): the read LEFT JOINs `enrollments` scoped to the caller (`e.user_id = $1`, the server-side `profile.id`, never client-supplied) and the current org (`e.org_id = $3`), deriving `COALESCE(e.status='completed', false) AS completed` — the same signal `learner-assignments` surfaces. A new `$3` slot binds the org on **both** the standard and individual-tier branches (the visibility predicate owns `$2`: orgId standard / language individual, so the ordinals never collide). No fan-out / no GROUP BY: `enrollments` is `UNIQUE(org_id,user_id,course_id)` (schema:294) and `enrollment_status` is only `enrolled|completed`. JS normalizes NULL→false, mirroring `learner-assignments`.
+- **Frontend**: new `FavoriteCourse extends Course { completed }` (`types.ts`); `useFavorites` carries the flag through (optimistic toggle-add defaults `completed:false`, corrected by the existing `invalidateQueries` backstop); `FavoriteCourses.tsx` renders the "Completed" pill in **both card and list views**, mirroring `MandatoryCourses.tsx`, else the "Open course" button. Reuses the existing `training.mandatory.completed` key (en `Completed` / da `Gennemført`) — no new i18n.
+
+**Why:** owner logged in as a real test learner, completed a course, and saw it marked Completed in the mandatory row but "Open course" in favorites. Scope broadened during grilling: favorites never reflected completion for *any* course, not just courses that are both mandatory and favorited.
+
+**Review:** independent Opus code review — no Critical/Important/Minor findings. Org-isolation verified end-to-end (completion scoped to `profile.id` + the membership-checked org, no leak path even for a platform admin bypassing `requireActiveMember`), `$1/$2/$3` binding verified on both branches, no-fan-out confirmed against the schema, optimistic-default self-heal confirmed sound (sub-second flash at worst, replaced wholesale by the refetch).
+
+**Verify:** TDD throughout (red→green per step). root lint 0 errors / tsc app+node 0 / test **1027** (131 files) / build ✓; functions build ✓ / functions test **2796** (160 files, 3 skipped).
+
+**Deploy:** **functions changed** → the functions workflow auto-ships on merge (frontend ships via SWA). Announce on PR #457. **Auth-gated UI → verify on prod after merge, not the PR preview** (SWA preview login blocked, AADSTS50011).

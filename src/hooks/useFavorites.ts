@@ -5,10 +5,10 @@ import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import { getSignedLmsAssetUrl } from '@/lib/storage';
 import { useToastMutation } from '@/hooks/useToastMutation';
-import type { Course } from '@/lib/types';
+import type { Course, FavoriteCourse } from '@/lib/types';
 
 interface FavoritesData {
-  courses: Course[];
+  courses: FavoriteCourse[];
 }
 
 export interface ToggleFavoriteInput {
@@ -40,7 +40,7 @@ export function useFavorites(
   const query = useQuery({
     queryKey: queryKeys.favorites.list(orgId),
     queryFn: async () => {
-      const data = await callApi<{ courses: Course[] }>('/api/favorites', { orgId });
+      const data = await callApi<{ courses: FavoriteCourse[] }>('/api/favorites', { orgId });
       const courses = Array.isArray(data.courses) ? data.courses : [];
 
       const coursesWithFreshThumbnails = await Promise.all(
@@ -95,9 +95,11 @@ export function useToggleFavorite(orgId: string | undefined) {
         // Add: patchable only when the caller supplied the course; otherwise the
         // invalidateQueries backstop below refetches the authoritative list.
         // Prepend so the just-favorited course leads, matching the endpoint's
-        // ORDER BY created_at DESC (newest first).
+        // ORDER BY created_at DESC (newest first). The caller passes a catalog
+        // Course with no completion flag, so default completed:false — the
+        // invalidateQueries backstop corrects it if the course was already completed.
         if (!course || prev.courses.some((c) => c.id === courseId)) return prev;
-        return { ...prev, courses: [course, ...prev.courses] };
+        return { ...prev, courses: [{ ...course, completed: false }, ...prev.courses] };
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.favorites.list(orgId) });
     },
