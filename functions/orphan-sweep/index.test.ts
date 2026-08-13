@@ -444,14 +444,17 @@ describe('orphan-sweep — per-bucket orphan share', () => {
     expect(summary).toMatchObject({ aborted: true, reason: 'orphan-share-implausible' });
   });
 
-  it('still aborts on a TWO-blob prefix bucket — the root-class floor is not applied here', async () => {
-    // The prefix buckets have no minimum-size floor and must not acquire one:
+  it('sweeps a TWO-blob prefix bucket instead of wedging on it — the floor applies here now (#451)', async () => {
+    // THE #451 REGRESSION TEST, in miniature. Before the floor reached the prefix
+    // buckets this run REFUSED, and refused identically every following night,
+    // because nothing but the sweep ever clears a `videos/` orphan:
     //   listing        = 40 referenced root .mp4 + 2 unreferenced videos/ = 42 eligible
     //   GLOBAL share   =  2/42 = 4.8%   → under the ceiling,  does NOT trip
     //   root bucket    =  0/40 = 0%     → does NOT trip
-    //   videos/ share  =  2/2  = 100%   → over the ceiling,   TRIPS
-    // Two orphans is below MIN_ROOT_CLASS_ORPHANS; if that floor were ever
-    // generalised to every bucket, this run would sweep instead of refusing.
+    //   videos/ share  =  2/2  = 100%   → over the ceiling, but 2 orphans is BELOW
+    //                                     MIN_BUCKET_ORPHANS, so it is not judged
+    // A 100% share on a two-blob namespace is not evidence of a broken match; it
+    // is two cancelled uploads. Judging it anyway is what deadlocked the job.
     const root = rootFleet(40);
     mockQuery.mockResolvedValue(root.map((path) => ({ path })));
     const { deleted } = stubFetch({
@@ -463,9 +466,88 @@ describe('orphan-sweep — per-bucket orphan share', () => {
 
     const summary = await runOrphanSweep(log, NOW);
 
+    expect(deleted.sort()).toEqual(['videos/a.mp4', 'videos/b.mp4']);
+    expect(summary).toMatchObject({ aborted: false, reason: null, deleted: 2 });
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it('still aborts on a prefix bucket once the break is big enough to be evidence', async () => {
+    // The floor must not become a blanket exemption for prefixed blobs. The bug
+    // class the bucket pass exists for — a break in one path-writing column —
+    // false-orphans everything that column ever wrote, so it clears a floor of 5
+    // trivially:
+    //   listing         = 40 referenced root .mp4 + 5 unreferenced avatars/ = 45
+    //   GLOBAL share    =  5/45 = 11.1%  → under the ceiling,  does NOT trip
+    //   avatars/ share  =  5/5  = 100%   → at the floor AND over the ceiling, TRIPS
+    const root = rootFleet(40);
+    const avatars = Array.from({ length: 5 }, (_, i) => `avatars/u-${i}.jpg`);
+    mockQuery.mockResolvedValue(root.map((path) => ({ path })));
+    const { deleted } = stubFetch({
+      pages: [listPage([...root, ...avatars].map((name) => ({ name })))],
+    });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
     expect(deleted).toEqual([]);
     expect(summary).toMatchObject({ aborted: true, reason: 'orphan-bucket-share-implausible', deleted: 0 });
-    expect(log.error.mock.calls[0][0] as string).toContain('2/2');
+    expect(log.error.mock.calls[0][0] as string).toContain('5/5');
+  });
+
+  it('sweeps the exact production container that wedged the job for 19 nights (#451)', async () => {
+    // THE CENSUS THAT ACTUALLY HAPPENED, read out of prod storage and Postgres on
+    // 2026-08-13 and reproduced here blob for blob. Every night from the job's
+    // first scheduled occurrence it refused on this, and every night the six
+    // branding orphans it refused over were still there — they are swept by
+    // nothing else. The blobs were confirmed unreferenced against every text
+    // column in the schema, not just the six in REFERENCED_PATHS_SQL.
+    //
+    //   avatars/        3/5  = 60.0%  → over the ceiling, BELOW the floor → not judged
+    //   org-logos/      3/4  = 75.0%  → over the ceiling, BELOW the floor → not judged
+    //   documents/      0/2  =  0.0%  → clean
+    //   root:image      5/12 = 41.7%  → at the floor, under the ceiling    → fine
+    //   root:video      1/3  = 33.3%  → below the floor                    → not judged
+    //   container root  6/15 = 40.0%  → unfloored, under the ceiling       → fine
+    //   GLOBAL         12/26 = 46.2%  → under the ceiling                  → fine
+    //   deletions      12            → under the 500 ceiling               → fine
+    const referencedFixture = [
+      'avatars/4fd3938e.webp',
+      'avatars/a690881b.JPG',
+      'org-logos/c7973ef4.png',
+      'documents/handbook-1.pdf',
+      'documents/handbook-2.pdf',
+      ...Array.from({ length: 7 }, (_, i) => `thumb-${i}.png`),
+      ...Array.from({ length: 2 }, (_, i) => `lesson-${i}.mp4`),
+    ];
+    const orphanFixture = [
+      'avatars/2e2afef5.JPG',
+      'avatars/956d1789.jpeg',
+      'avatars/f36cc8f9.JPG',
+      'org-logos/0aebb9ce.jpg',
+      'org-logos/5edebeda.png',
+      'org-logos/7fad1639.png',
+      ...Array.from({ length: 5 }, (_, i) => `stranded-thumb-${i}.png`),
+      'stranded-lesson.mp4',
+    ];
+    mockQuery.mockResolvedValue(referencedFixture.map((path) => ({ path })));
+    const { deleted } = stubFetch({
+      pages: [listPage([...referencedFixture, ...orphanFixture].map((name) => ({ name })))],
+    });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
+    expect(summary).toMatchObject({
+      aborted: false,
+      reason: null,
+      abortDetail: null,
+      eligible: 26,
+      orphaned: 12,
+      deleted: 12,
+      failed: 0,
+    });
+    expect(deleted.sort()).toEqual([...orphanFixture].sort());
+    expect(log.error).not.toHaveBeenCalled();
   });
 });
 
@@ -626,6 +708,37 @@ describe('orphan-sweep — root file-type classes', () => {
 // Abort conditions — every one of these must delete NOTHING
 // ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — refusals', () => {
+  it('carries the whole refusal on the summary, not only into the log (#451)', async () => {
+    // The reason CODE does not name the bucket, and for 19 nights the only place
+    // that did was a log.error the alerting could not reach. `abortDetail` is what
+    // lets the run record and the email quote the refusal verbatim, so it has to
+    // hold the numbers, a sample path and the remedy — not a summary of them.
+    const root = Array.from({ length: 40 }, (_, i) => `root-${i}.mp4`);
+    const avatars = Array.from({ length: 6 }, (_, i) => `avatars/u-${i}.jpg`);
+    mockQuery.mockResolvedValue(root.map((path) => ({ path })));
+    stubFetch({ pages: [listPage([...root, ...avatars].map((name) => ({ name })))] });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
+    expect(summary.reason).toBe('orphan-bucket-share-implausible');
+    expect(summary.abortDetail).toContain('avatars/');
+    expect(summary.abortDetail).toContain('6/6');
+    expect(summary.abortDetail).toContain('avatars/u-0.jpg');
+    expect(summary.abortDetail).toContain('WHAT TO DO');
+    // Composed once: the log line and the summary must not be able to disagree.
+    expect(log.error.mock.calls[0][0] as string).toContain(summary.abortDetail as string);
+  });
+
+  it('leaves abortDetail null on a run that did not refuse', async () => {
+    stubFetch({ pages: [listPage([...referencedBlobs(), { name: 'stranded.mp4' }])] });
+    mockQuery.mockResolvedValue(REFERENCED_ROWS);
+
+    const summary = await runOrphanSweep(makeLog(), NOW);
+
+    expect(summary).toMatchObject({ aborted: false, reason: null, abortDetail: null, deleted: 1 });
+  });
+
   it('aborts when the orphan share is implausible, deleting nothing', async () => {
     mockQuery.mockResolvedValue([{ path: 'lesson-video.mp4' }]);
     const { deleted } = stubFetch({

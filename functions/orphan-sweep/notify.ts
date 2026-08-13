@@ -118,6 +118,11 @@ export interface SweepRunRecord {
   startedAt: number;
   outcome: SweepRunOutcome;
   reason: string | null;
+  /**
+   * The refusal in full (#451) — see `OrphanSweepSummary.abortDetail`. Null on a
+   * completed run, and on any abort recorded before the column existed.
+   */
+  abortDetail: string | null;
   deleted: number;
   failed: number;
   bytesReclaimed: number;
@@ -251,6 +256,18 @@ function renderAbortEmail(
       : previous === null
         ? '<p>There is no earlier run on record, so there is nothing to compare this against — either the sweep has never completed a run, or its records have aged out.</p>'
         : '<p>The previous run was healthy, so this is the first refused night.</p>';
+  // THE REFUSAL ITSELF, IN THE EMAIL (#451). This used to be a pointer at an App
+  // Insights query and nothing else, which made acting on a refusal depend on log
+  // ingestion working — and when it silently was not, the sweep wedged for 19
+  // nights while every one of those emails sent its reader to an empty result set.
+  // The reason code alone never named the bucket, so there was nothing else in the
+  // message to act on. `abort_detail` is null only for aborts recorded before the
+  // column existed, so the old pointer stays as the fallback for those.
+  const detail = run.abortDetail
+    ? `<p><strong>What it refused, and what to do about it:</strong></p>
+       <p style="background:#f5f4f0;border-left:3px solid #d97757;padding:10px 14px;white-space:pre-wrap">${escapeHtml(run.abortDetail)}</p>`
+    : `<p><strong>What to do:</strong> read the full refusal, which names what it refused and the remedy, in App Insights:<br>
+       <code>traces | where message contains 'REFUSED TO SWEEP' | order by timestamp desc | take 20</code></p>`;
   return {
     kind: 'abort',
     subject: `[orphan-sweep] refused to sweep — ${run.reason ?? 'unknown'}${nights > 1 ? ` (night ${nights})` : ''}`,
@@ -260,8 +277,7 @@ function renderAbortEmail(
     <p><strong>Reason:</strong> <code>${reason}</code> · run started ${utcStamp(run.startedAt)}</p>
     ${streak}
     ${failedLine(run.failed)}
-    <p><strong>What to do:</strong> read the full refusal, which names what it refused and the remedy, in App Insights:<br>
-       <code>traces | where message contains 'REFUSED TO SWEEP' | order by timestamp desc | take 20</code></p>
+    ${detail}
     <p style="color:#777;font-size:12px">You will not hear about this again for 7 days unless it changes state.</p>
   `,
   };
@@ -435,13 +451,13 @@ const INSERT_RUN_SQL = `
   INSERT INTO orphan_sweep_runs (
     started_at, outcome, reason, scanned, referenced, eligible, orphaned,
     skipped_by_grace, skipped_unsafe_name, skipped_by_recheck, deleted, failed,
-    bytes_reclaimed, deleted_sample
-  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    bytes_reclaimed, deleted_sample, abort_detail
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
   RETURNING id
 `;
 
 const HISTORY_SQL = `
-  SELECT id, started_at, outcome, reason, deleted, failed, bytes_reclaimed,
+  SELECT id, started_at, outcome, reason, abort_detail, deleted, failed, bytes_reclaimed,
          deleted_sample, abort_notified_at, deletions_reported_at
   FROM orphan_sweep_runs
   WHERE started_at > now() - interval '${HISTORY_WINDOW_DAYS} days'
@@ -461,6 +477,7 @@ interface RunRow {
   started_at: unknown;
   outcome: unknown;
   reason: string | null;
+  abort_detail: string | null;
   deleted: unknown;
   failed: unknown;
   /** bigint — node-pg hands int8 back as a string. */
@@ -493,6 +510,7 @@ function toRecord(row: RunRow): SweepRunRecord {
     startedAt: toMillis(row.started_at) ?? 0,
     outcome: row.outcome === 'completed' ? 'completed' : row.outcome === 'skipped' ? 'skipped' : 'aborted',
     reason: typeof row.reason === 'string' ? row.reason : null,
+    abortDetail: typeof row.abort_detail === 'string' ? row.abort_detail : null,
     deleted: toCount(row.deleted),
     failed: toCount(row.failed),
     bytesReclaimed: toCount(row.bytes_reclaimed),
@@ -572,6 +590,7 @@ export async function recordAndNotify(summary: OrphanSweepSummary, ctx: SweepNot
       summary.failed,
       summary.bytesReclaimed,
       summary.deletedSample,
+      summary.abortDetail,
     ]);
     runId = row?.id ?? null;
   } catch (err) {
@@ -617,6 +636,7 @@ async function notify(summary: OrphanSweepSummary, ctx: SweepNotifyContext, runI
     startedAt,
     outcome: runOutcome(summary),
     reason: summary.reason,
+    abortDetail: summary.abortDetail,
     deleted: summary.deleted,
     failed: summary.failed,
     bytesReclaimed: summary.bytesReclaimed,

@@ -111,13 +111,13 @@ const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
  * subdividing them would only manufacture more small populations for a healthy
  * night to trip over.
  *
- * FLOORS. The prefix buckets and the container root as a whole have NO
- * minimum-size floor: a bucket holding two blobs, both unreferenced, trips them.
- * A floor there is exactly the hole this exists to close, and the asymmetry of
- * errors says a nuisance abort (one night of unreclaimed storage, loudly logged
- * with the bucket named) is the cheap side. The root FILE-TYPE CLASSES do carry a
- * small floor, for a reason that does not apply to any of the others — see
- * `MIN_ROOT_CLASS_ORPHANS`.
+ * FLOORS. Every bucket EXCEPT the undivided container root carries a small
+ * minimum-orphan floor — see `MIN_BUCKET_ORPHANS`, which also records why the
+ * prefix buckets originally had none and what production did with that decision.
+ * The container root keeps its no-floor rule: it is the aggregate of a namespace
+ * live writers keep genuinely populated (every lesson video and course
+ * thumbnail), so "wholly unreferenced" really is anomalous there at any size, and
+ * after the #282 split it is the only fully-sensitive check the root still has.
  *
  * A genuine first-run backlog can also trip this. That is the intended outcome:
  * the run logs loudly and a human decides, rather than an unattended job
@@ -152,36 +152,52 @@ const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_MAX_ORPHAN_SHARE = 0.5;
 
 /**
- * How many orphans a ROOT FILE-TYPE CLASS must hold before its share is allowed
- * to abort a run. Applies ONLY to the classes the #282 root split creates; the
- * prefix buckets and the container root as a whole keep their no-floor rule,
- * unchanged.
+ * How many orphans a bucket must hold before its share is allowed to abort a run.
+ * Applies to the PREFIX buckets and to the root file-type classes — every leaf
+ * population. The undivided container root is exempt (see TRIPWIRE 1, FLOORS).
  *
- * WHY THE SPLIT NEEDS A FLOOR AND THE PREFIX BUCKETS DO NOT. `avatars/`,
- * `org-logos/`, `documents/` and `videos/` are namespaces a real writer owns and
- * keeps populated, so "this entire namespace is unreferenced" is anomalous at any
- * size. The root classes are a synthetic subdivision of ONE namespace, and two of
- * the four have no current writer at all: nothing mints a root-level `.pdf` or an
- * off-allow-list extension today, so a single stray blob makes `document` or
- * `other` 1/1 = 100%. Without a floor that one blob aborts the sweep — and keeps
- * aborting it every night forever, because the only thing that could clear the
- * blob is the sweep the blob is blocking. A tripwire that fires on healthy data
- * gets its ceiling raised to shut it up, and the ceilings are the safety system.
+ * WHY THE ROOT CLASSES NEED A FLOOR. They are a synthetic subdivision of ONE
+ * namespace, and two of the four have no current writer at all: nothing mints a
+ * root-level `.pdf` or an off-allow-list extension today, so a single stray blob
+ * makes `document` or `other` 1/1 = 100%. Without a floor that one blob aborts
+ * the sweep — and keeps aborting it every night forever, because the only thing
+ * that could clear the blob is the sweep the blob is blocking. A tripwire that
+ * fires on healthy data gets its ceiling raised to shut it up, and the ceilings
+ * are the safety system.
  *
- * Not hypothetical: this endpoint's own healthy-container fixtures already reach
- * 60% in the root `video` class (three stray root `.mp4`s beside two referenced
- * ones) on runs that must NOT abort, and 100% in `other` on a single stray file.
+ * WHY THE PREFIX BUCKETS NOW NEED ONE TOO (#451). They were originally excluded,
+ * on the premise that `avatars/`, `org-logos/`, `documents/` and `videos/` are
+ * "namespaces a real writer owns and keeps populated, so this entire namespace is
+ * unreferenced is anomalous at any size", and that a nuisance abort therefore
+ * costs "one night of unreclaimed storage". Production falsified both halves.
+ * This job aborted on EVERY run it ever made — 19 consecutive nights from the
+ * first scheduled occurrence — on `avatars/` at 3/5 and `org-logos/` at 3/4,
+ * against a container holding 26 blobs in total. The six blobs were genuine
+ * orphans, confirmed against every text column in the schema.
+ *   - "One night" was never right. These buckets are swept by nothing else, so
+ *     the orphans that trip the ceiling are still there tomorrow. The refusal is
+ *     permanent, and it is the same deadlock the root classes are floored for.
+ *   - "Keeps populated" was the load-bearing word. Branding namespaces hold at
+ *     most ONE live asset per user and per org; every replacement strands its
+ *     predecessor. Their orphan share therefore climbs toward 100% by
+ *     construction, and on a 4-blob bucket two ordinary logo changes clear a 50%
+ *     ceiling. A majority-orphan share is these buckets' steady state, not an
+ *     anomaly — which is precisely the "fires on healthy data" case above.
  *
  * WHY FIVE, AND WHAT IT COSTS. The bug class this tripwire exists for is a break
  * in a path-writing COLUMN, which false-orphans everything that column ever wrote
  * — hundreds of thumbnails, not four. A floor of five therefore never stands
  * between the tripwire and the bug it is for. What it costs is precision on tiny
- * classes: at most four orphans per class per night go unjudged BY THIS CHECK.
- * They are still counted by the undivided container-root bucket, by the global
- * share and by the per-run count ceiling, all of which see them exactly as they
- * did before the split — so no run that aborts today stops aborting.
+ * populations: at most four orphans per bucket per night go unjudged BY THIS
+ * CHECK. They are still counted by the global share and the per-run count
+ * ceiling; a root-level name is additionally still counted by the unfloored
+ * container-root bucket, so no root run that aborted before #282 stops aborting.
+ * What is genuinely given up is a whole-column break inside a PREFIX bucket that
+ * never held more than four blobs — bounded by definition to those four, and
+ * backstopped by 7-day blob soft-delete plus the deletion digest, which mails the
+ * deleted names inside three days.
  */
-const MIN_ROOT_CLASS_ORPHANS = 5;
+const MIN_BUCKET_ORPHANS = 5;
 
 /**
  * TRIPWIRE 2 — an absolute ceiling, independent of the share.
@@ -379,8 +395,10 @@ function rootClassOf(bucket: string): RootFileClass | null {
  * belongs to TWO: the undivided container root, exactly as before #282, and its
  * file-type class. Counting it in both is what makes the root split strictly
  * ADDITIVE — the root-wide check keeps its old sensitivity and its no-floor rule
- * whatever `MIN_ROOT_CLASS_ORPHANS` does, so no run that aborted before the split
- * stops aborting after it.
+ * whatever `MIN_BUCKET_ORPHANS` does, so no run that aborted before the split
+ * stops aborting after it. That property is why the root stayed exempt when #451
+ * extended the floor to every other bucket: it is the last unfloored check the
+ * root-level blobs have.
  *
  * The root bucket is emitted FIRST, and a class key can only ever be created by a
  * root-level name, so `''` is always inserted into the census map before any of
@@ -409,6 +427,20 @@ export interface OrphanSweepSummary {
   /** True when the run refused to delete. `deleted` is always 0 in that case. */
   aborted: boolean;
   reason: SweepAbortReason | null;
+  /**
+   * The whole refusal in prose — what it refused, the numbers behind it, the
+   * sample paths and the remedy — or null on a run that did not abort (#451).
+   *
+   * The reason CODE alone is not actionable: `orphan-bucket-share-implausible`
+   * does not say which bucket, and that one fact is the difference between a
+   * two-minute check and a re-derivation of the whole census by hand. It used to
+   * exist only inside the `log.error` call below, which made every refusal
+   * hostage to log ingestion actually working — and when it silently was not, 19
+   * nightly emails each pointed at a query that returned nothing. Carrying it on
+   * the summary lets the record and the alert quote it verbatim, so a wedge is
+   * actionable from the email alone.
+   */
+  abortDetail: string | null;
   /** Blobs returned by the listing. */
   scanned: number;
   /** Distinct blob names the database still references (after variant expansion). */
@@ -449,6 +481,7 @@ const DELETED_SAMPLE_SIZE = 20;
 const emptySummary = (): OrphanSweepSummary => ({
   aborted: false,
   reason: null,
+  abortDetail: null,
   scanned: 0,
   referenced: 0,
   eligible: 0,
@@ -692,10 +725,13 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
     summary.aborted = true;
     summary.reason = reason;
     summary.deleted = 0;
+    // Composed ONCE and both logged and carried on the summary, so the email and
+    // the log line can never drift into saying different things about the same
+    // refusal (#451).
+    summary.abortDetail = `${message} WHAT TO DO: ${remedy}`;
     log.error(
       `[orphan-sweep] REFUSED TO SWEEP — 0 blobs deleted, nothing in storage was touched. ` +
-        `This is NOT a clean run with nothing to do. Reason: ${reason}. ${message} ` +
-        `WHAT TO DO: ${remedy}`,
+        `This is NOT a clean run with nothing to do. Reason: ${reason}. ${summary.abortDetail}`,
       summary,
     );
     return summary;
@@ -870,9 +906,11 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   for (const [bucket, eligible] of bucketEligible) {
     const orphaned = bucketOrphaned.get(bucket) ?? 0;
     const rootClass = rootClassOf(bucket);
-    // The floor applies to the root classes and to nothing else — see
-    // MIN_ROOT_CLASS_ORPHANS for why they need one and the prefix buckets do not.
-    if (rootClass !== null && orphaned < MIN_ROOT_CLASS_ORPHANS) continue;
+    // The floor applies to every LEAF population — the prefix namespaces and the
+    // root file-type classes alike — and to nothing else. `''` is the undivided
+    // container root, the one bucket that stays fully sensitive; see
+    // MIN_BUCKET_ORPHANS for what each of those decisions costs.
+    if (bucket !== '' && orphaned < MIN_BUCKET_ORPHANS) continue;
     const bucketShare = orphaned / eligible;
     if (bucketShare <= maxShare) continue;
     const label = rootClass !== null ? ROOT_CLASS_LABELS[rootClass] : bucket === '' ? 'the container root' : bucket;
@@ -989,13 +1027,15 @@ function refusePastDue(log: SweepLogger): OrphanSweepSummary {
   const summary = emptySummary();
   summary.aborted = true;
   summary.reason = 'past-due';
+  summary.abortDetail =
+    'The host fired this as CATCH-UP for a missed 03:00 UTC occurrence, so it is running at some ' +
+    'arbitrary time of day rather than in the maintenance window — and possibly against a reference ' +
+    'set the paired frontend/schema deploy has not caught up with. WHAT TO DO: nothing; the next ' +
+    'scheduled 03:00 UTC run proceeds normally. If this appears at all, `useMonitor` has been turned ' +
+    'back on — see the registration below.';
   log.warn(
     '[orphan-sweep] REFUSED TO SWEEP — 0 blobs deleted, nothing in storage was touched. ' +
-      'Reason: past-due. The host fired this as CATCH-UP for a missed 03:00 UTC occurrence, ' +
-      'so it is running at some arbitrary time of day rather than in the maintenance window — ' +
-      'and possibly against a reference set the paired frontend/schema deploy has not caught up ' +
-      'with. WHAT TO DO: nothing; the next scheduled 03:00 UTC run proceeds normally. If this ' +
-      'appears at all, `useMonitor` has been turned back on — see the registration below.',
+      `Reason: past-due. ${summary.abortDetail}`,
     summary,
   );
   return summary;

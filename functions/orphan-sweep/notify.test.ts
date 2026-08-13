@@ -33,6 +33,7 @@ const run = (overrides: Partial<SweepRunRecord> = {}): SweepRunRecord => ({
   startedAt: daysAgo(1),
   outcome: 'completed',
   reason: null,
+  abortDetail: null,
   deleted: 0,
   failed: 0,
   bytesReclaimed: 0,
@@ -174,6 +175,62 @@ describe('decideSweepNotifications — abort alerting', () => {
     });
     expect(decision.alert?.kind).toBe('abort');
     expect(decision.alert?.subject).toContain('disabled');
+  });
+
+  it('puts the whole refusal in the abort email rather than a pointer to it (#451)', () => {
+    // THE #451 REGRESSION TEST. This email used to carry the reason CODE and an
+    // App Insights query, and nothing else. The code does not name the bucket, and
+    // the query returned nothing for 19 nights because the component's Log
+    // Analytics workspace had been deleted — so every alert was unactionable and
+    // the sweep stayed wedged. The detail has to travel IN the message.
+    const detail =
+      '3/4 blobs under org-logos/ (75.0%) look unreferenced, above the 50.0% ceiling — even though ' +
+      'the container as a whole is only 46.2% unreferenced. Sample: org-logos/0aebb9ce.jpg. ' +
+      'WHAT TO DO: do NOT raise the ceiling first.';
+    const decision = decideSweepNotifications({
+      thisRun: run({
+        startedAt: NOW,
+        outcome: 'aborted',
+        reason: 'orphan-bucket-share-implausible',
+        abortDetail: detail,
+      }),
+      history: [completed(1)],
+      now: NOW,
+    });
+
+    expect(decision.alert?.kind).toBe('abort');
+    expect(decision.alert?.html).toContain('org-logos/');
+    expect(decision.alert?.html).toContain('3/4');
+    expect(decision.alert?.html).toContain('WHAT TO DO');
+    // The dead pointer must not be what the reader is sent to when the refusal is
+    // right there in the body.
+    expect(decision.alert?.html).not.toContain('App Insights');
+  });
+
+  it('falls back to the App Insights pointer for a run recorded before abort_detail existed', () => {
+    // Rows written before the #451 migration have a null detail. They still have
+    // to produce a usable email rather than an abort with no guidance at all.
+    const decision = decideSweepNotifications({
+      thisRun: run({ startedAt: NOW, outcome: 'aborted', reason: 'listing-failed', abortDetail: null }),
+      history: [completed(1)],
+      now: NOW,
+    });
+    expect(decision.alert?.html).toContain('App Insights');
+  });
+
+  it('escapes the refusal detail — blob names carry user-supplied filename fragments', () => {
+    const decision = decideSweepNotifications({
+      thisRun: run({
+        startedAt: NOW,
+        outcome: 'aborted',
+        reason: 'orphan-bucket-share-implausible',
+        abortDetail: 'Sample: avatars/<script>alert(1)</script>.jpg',
+      }),
+      history: [completed(1)],
+      now: NOW,
+    });
+    expect(decision.alert?.html).not.toContain('<script>');
+    expect(decision.alert?.html).toContain('&lt;script&gt;');
   });
 
   it('never emails a past-due catch-up run, whatever preceded it', () => {
@@ -569,6 +626,7 @@ const makeLog = () => ({ log: vi.fn(), warn: vi.fn(), error: vi.fn() });
 const summaryOf = (overrides: Partial<OrphanSweepSummary> = {}): OrphanSweepSummary => ({
   aborted: false,
   reason: null,
+  abortDetail: null,
   scanned: 40,
   referenced: 30,
   eligible: 40,
@@ -589,6 +647,7 @@ const historyRow = (overrides: Record<string, unknown> = {}) => ({
   started_at: new Date(daysAgo(1)),
   outcome: 'completed',
   reason: null,
+  abort_detail: null,
   deleted: 0,
   failed: 0,
   bytes_reclaimed: '0',
@@ -630,6 +689,22 @@ describe('recordAndNotify', () => {
     expect(params[11]).toBe(1); // failed
     expect(params[12]).toBe(4096); // bytes_reclaimed
     expect(params[13]).toEqual(['a.mp4', 'b.mp4']);
+    expect(params[14]).toBeNull(); // abort_detail — a completed run has none
+  });
+
+  it('persists the refusal detail so a later night can still quote it (#451)', async () => {
+    // The record is what the policy reads on EVERY subsequent night. Without the
+    // detail on the row, a wedge that has been running for a week can only be
+    // re-announced as a bare reason code.
+    const detail = '3/4 blobs under org-logos/ (75.0%) look unreferenced. WHAT TO DO: do NOT raise the ceiling first.';
+    await recordAndNotify(
+      summaryOf({ aborted: true, reason: 'orphan-bucket-share-implausible', abortDetail: detail }),
+      { startedAt: NOW, now: NOW, log: makeLog() },
+    );
+
+    const params = callsMatching(mockQueryOne, 'INSERT INTO orphan_sweep_runs')[0][1] as unknown[];
+    expect(params[1]).toBe('aborted');
+    expect(params[14]).toBe(detail);
   });
 
   it('records a past-due catch-up as skipped and a kill-switched run as aborted', async () => {

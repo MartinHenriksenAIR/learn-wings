@@ -24,6 +24,7 @@ consumers).
 | `13-course-assignments.sql` | Additive, idempotent migration for #365 (`course_assignments` — mandatory/recommended training assignment). |
 | `14-org-self-registration.sql` | Additive, idempotent migration for #356 (`organizations.allow_self_registration` — per-org on/off switch governing #353 tenant auto-join). |
 | `15-gamification-indexes.sql` | Additive, idempotent migration for #362 (read-indexes for the DERIVED dashboard XP/streak/leaderboard — no new tables). |
+| `16-orphan-sweep-abort-detail.sql` | Additive, idempotent migration for #451 (`orphan_sweep_runs.abort_detail` — the full refusal text, so an abort is actionable from the alert email alone). |
 | `README.md`     | This file. |
 
 > **Standing rule:** additive prod migrations (the numbered `0N-*.sql` files) are folded into `01-schema.sql` after they are applied to prod, so a fresh DB stood up from `01`+`02` is always complete. The numbered files stay in this folder as the applied-migration record.
