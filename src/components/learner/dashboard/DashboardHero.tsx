@@ -20,9 +20,12 @@ interface DashboardHeroProps {
 
 /**
  * The dark slab that anchors the page: the greeting with a level-ringed avatar,
- * a sentence stating what the learner did in the last seven days, the primary
- * call to action, overall progress — and the course tiles sitting flush inside
- * it on the right.
+ * a sentence stating what the learner did lately, the primary call to action,
+ * overall progress — and the course tiles sitting flush inside it on the right.
+ *
+ * The headline says "this week" but the number behind it is a rolling seven-day
+ * window (#455) — the copy is the design's, kept short so it lands on two lines
+ * inside `max-w-[17ch]`; a third line makes the left column outgrow the tiles.
  *
  * A brand-new learner gets the same slab rather than a wall of zeros: the
  * headline asks instead of counting, the progress bar is dropped, and the tiles

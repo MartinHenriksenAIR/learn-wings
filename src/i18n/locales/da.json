@@ -197,8 +197,8 @@
     "seeMore": "Se mere",
     "hero": {
       "greeting": "Hej, <b>{{name}}</b>!",
-      "headline_one": "Du har gennemført <em>{{count}} lektion</em> de seneste 7 dage!",
-      "headline_other": "Du har gennemført <em>{{count}} lektioner</em> de seneste 7 dage!",
+      "headline_one": "Du har gennemført <em>{{count}} lektion</em> denne uge!",
+      "headline_other": "Du har gennemført <em>{{count}} lektioner</em> denne uge!",
       "headlineFresh": "Klar til <em>din første lektion</em>?",
       "cta": "Se min træning",
       "ctaFresh": "Find et kursus",
@@ -209,9 +209,9 @@
     "stats": {
       "coursesInProgress": "Kurser i gang",
       "coursesCompleted": "Kurser gennemført",
-      "learningTime": "Læringstid, de seneste 7 dage",
+      "learningTime": "Timer brugt denne uge",
       "hoursUnit": "t",
-      "vsPrevious": "mod de 7 dage før",
+      "vsPrevious": "mod sidste uge",
       "untimed_one": "{{count}} lektion har ingen angivet længde",
       "untimed_other": "{{count}} lektioner har ingen angivet længde"
     },

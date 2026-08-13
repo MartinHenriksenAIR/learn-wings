@@ -197,8 +197,8 @@
     "seeMore": "See more",
     "hero": {
       "greeting": "Hi, <b>{{name}}</b>!",
-      "headline_one": "You have completed <em>{{count}} lesson</em> in the last 7 days!",
-      "headline_other": "You have completed <em>{{count}} lessons</em> in the last 7 days!",
+      "headline_one": "You have completed <em>{{count}} lesson</em> this week!",
+      "headline_other": "You have completed <em>{{count}} lessons</em> this week!",
       "headlineFresh": "Ready for <em>your first lesson</em>?",
       "cta": "See my training",
       "ctaFresh": "Find a course",
@@ -209,9 +209,9 @@
     "stats": {
       "coursesInProgress": "Courses in progress",
       "coursesCompleted": "Courses completed",
-      "learningTime": "Learning time, last 7 days",
+      "learningTime": "Hours spent this week",
       "hoursUnit": "h",
-      "vsPrevious": "vs the 7 days before",
+      "vsPrevious": "vs last week",
       "untimed_one": "{{count}} lesson has no set length",
       "untimed_other": "{{count}} lessons have no set length"
     },
