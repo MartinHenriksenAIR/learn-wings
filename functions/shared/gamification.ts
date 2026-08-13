@@ -382,8 +382,12 @@ export async function getLearnerDashboardData(
         GROUP BY 1`,
       [orgId, callerId],
     ),
-    // 8 · the hero's course cards — in-progress enrollments, most recently
-    //     opened first so the tiles read as "pick this back up".
+    // 8 · the hero's course cards — the learner's own courses, in-progress
+    //     first and most recently opened first, so the tiles read as "pick this
+    //     back up". Completed courses fill the remaining slots rather than
+    //     leaving the slab lopsided: a learner who has finished everything is
+    //     enrolled in everything, so the recommendations below come back empty
+    //     for them and the hero would otherwise have nothing on its right.
     query<CourseRow>(
       `SELECT c.id, c.title, c.thumbnail_url,
               (SELECT count(*)::int
@@ -397,8 +401,8 @@ export async function getLearnerDashboardData(
                       AND lp.status = 'completed') AS lessons_done
          FROM enrollments e
          JOIN courses c ON c.id = e.course_id
-        WHERE e.org_id = $1 AND e.user_id = $2 AND e.status = 'enrolled'
-        ORDER BY e.last_accessed_at DESC NULLS LAST, e.enrolled_at DESC
+        WHERE e.org_id = $1 AND e.user_id = $2
+        ORDER BY (e.status = 'enrolled') DESC, e.last_accessed_at DESC NULLS LAST, e.enrolled_at DESC
         LIMIT ${HERO_COURSES}`,
       [orgId, callerId],
     ),

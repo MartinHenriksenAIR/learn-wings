@@ -159,9 +159,10 @@ describe('learner-dashboard', () => {
     ]);
 
     const calls = mockQuery.mock.calls as [string, unknown[]][];
-    // Hero courses: the caller's own in-progress enrollments in this org only.
+    // Hero courses: the caller's own enrollments in this org only, in-progress
+    // ranked first so completed courses merely fill the empty slots.
     expect(calls[7][1]).toEqual(['org-1', 'p1']);
-    expect(calls[7][0]).toContain("e.status = 'enrolled'");
+    expect(calls[7][0]).toContain("ORDER BY (e.status = 'enrolled') DESC");
     // Recommendations exclude what the caller is already enrolled in.
     expect(calls[8][0]).toContain('NOT EXISTS');
     expect(calls[8][1]).toEqual(['org-1', 'da', 'p1']);
