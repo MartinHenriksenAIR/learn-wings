@@ -91,6 +91,36 @@ describe('FavoriteCourses', () => {
     expect(toggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'c-1', favorite: false }));
   });
 
+  it('shows the Completed pill (not an open-course link) for a completed favorited course', () => {
+    mockUseFavorites.mockReturnValue({
+      data: { courses: [{ ...course, completed: true }] },
+      isFavorite: (id: string) => id === 'c-1',
+      isLoading: false,
+    });
+
+    renderSection();
+
+    expect(screen.getByTestId('favorite-completed')).toHaveTextContent('training.mandatory.completed');
+    expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
+  });
+
+  it('shows the Completed pill in list view, keeping the unfavorite control', () => {
+    const toggleFavorite = vi.fn();
+    mockUseFavorites.mockReturnValue({
+      data: { courses: [{ ...course, completed: true }] },
+      isFavorite: (id: string) => id === 'c-1',
+      isLoading: false,
+    });
+    mockUseToggleFavorite.mockReturnValue({ toggleFavorite, togglingId: null, isPending: false });
+
+    renderSection('list');
+
+    expect(screen.getByTestId('favorite-completed')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
+    // The heart stays — a learner can still unfavorite a completed course.
+    expect(screen.getByRole('button', { name: 'courses.removeFromFavorites' })).toBeInTheDocument();
+  });
+
   it('renders rows (not cards) in list view, keeping the player link and unfavorite control', () => {
     const toggleFavorite = vi.fn();
     mockUseFavorites.mockReturnValue({

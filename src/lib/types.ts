@@ -92,6 +92,15 @@ export interface CourseFavorite {
   created_at: string;
 }
 
+/**
+ * A favorited course as returned by `/api/favorites` (#456): the catalog {@link Course}
+ * shape plus the caller's completion state in the current org, so the Favorites list can
+ * show the same Completed pill as the mandatory list instead of always "Open course".
+ */
+export interface FavoriteCourse extends Course {
+  completed: boolean;
+}
+
 export interface CourseCategory {
   id: string;
   name_en: string;

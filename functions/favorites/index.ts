@@ -26,18 +26,33 @@ export default endpoint('favorites', async ({ req, profile, reply, requireActive
   const visibility = isIndividual
     ? individualCourseVisibility({ courseAlias: 'c', langParam: 2 })
     : courseVisibilityPredicate({ courseAlias: 'c', orgParam: 2 });
-  const params = isIndividual ? [profile.id, language] : [profile.id, orgId];
+  // $3 is always the org the list is scoped to, bound for the enrollment join below. It is a
+  // separate slot from the visibility param ($2) because the individual tier binds language at $2.
+  const params = isIndividual ? [profile.id, language, orgId] : [profile.id, orgId, orgId];
 
-  // Column list mirrors learner-courses so the row shape is identical to the catalog's Course[].
-  const courses = await query(
-    `SELECT c.id, c.title, c.description, c.level, c.language, c.is_published, c.thumbnail_url, c.created_by_user_id, c.created_at
+  // Base column list mirrors learner-courses (the catalog's Course[] shape); `completed` is
+  // derived from the caller's own enrollment in THIS org — the same signal learner-assignments
+  // surfaces — so the favorites list shows the same Completed state as the mandatory list (#456).
+  // enrollments is UNIQUE(org_id,user_id,course_id), so the LEFT JOIN yields at most one row
+  // (no fan-out, no GROUP BY); enrollment_status is only 'enrolled'|'completed'.
+  const rows = await query(
+    `SELECT c.id, c.title, c.description, c.level, c.language, c.is_published, c.thumbnail_url, c.created_by_user_id, c.created_at,
+            COALESCE(e.status = 'completed', false) AS completed
        FROM course_favorites f
        JOIN courses c ON c.id = f.course_id
+       LEFT JOIN enrollments e
+         ON e.user_id = $1 AND e.course_id = c.id AND e.org_id = $3
       WHERE f.user_id = $1
             AND ${visibility}
       ORDER BY f.created_at DESC`,
     params,
   );
+
+  // completed comes back NULL when there is no enrollment row — normalize to a strict boolean.
+  const courses = (Array.isArray(rows) ? rows : []).map((r) => {
+    const row = r as Record<string, unknown>;
+    return { ...row, completed: row.completed === true };
+  });
 
   return reply(200, { courses });
 });
