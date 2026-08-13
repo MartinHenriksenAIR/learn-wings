@@ -163,8 +163,10 @@ describe('learner-dashboard', () => {
     // ranked first so completed courses merely fill the empty slots.
     expect(calls[7][1]).toEqual(['org-1', 'p1']);
     expect(calls[7][0]).toContain("ORDER BY (e.status = 'enrolled') DESC");
-    // Recommendations exclude what the caller is already enrolled in.
+    // Recommendations exclude what the caller is already enrolled in, and any
+    // course with no lessons — a tile reading "0 lessons" opens onto nothing.
     expect(calls[8][0]).toContain('NOT EXISTS');
+    expect(calls[8][0]).toContain('JOIN lessons l ON l.module_id = cm.id');
     expect(calls[8][1]).toEqual(['org-1', 'da', 'p1']);
   });
 

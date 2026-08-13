@@ -425,6 +425,13 @@ export async function getLearnerDashboardData(
                     SELECT 1 FROM enrollments e
                      WHERE e.course_id = c.id AND e.user_id = $3 AND e.org_id = $1
                   )
+              -- A course with no lessons is a dead end, not a recommendation:
+              -- its tile would read "0 lessons" and open onto nothing.
+              AND EXISTS (
+                    SELECT 1 FROM course_modules cm
+                      JOIN lessons l ON l.module_id = cm.id
+                     WHERE cm.course_id = c.id
+                  )
         ORDER BY popularity DESC, c.title
         LIMIT ${HERO_COURSES}`,
       [orgId, recommendLanguage, callerId],
