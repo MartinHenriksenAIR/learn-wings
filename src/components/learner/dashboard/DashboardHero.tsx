@@ -48,7 +48,7 @@ export function DashboardHero({
   const cards = courses.length > 0 && (
     <div
       data-testid="hero-courses"
-      className="grid shrink-0 grid-cols-1 gap-3.5 sm:grid-cols-3 lg:flex lg:[&>*]:w-[176px]"
+      className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-3 lg:flex lg:[&>*]:w-[160px]"
     >
       {courses.map((course, i) => (
         <HeroCourseCard
@@ -65,27 +65,27 @@ export function DashboardHero({
   return (
     <section
       data-testid="dashboard-hero"
-      className="mb-[30px] flex flex-col items-stretch gap-6 rounded-[26px] bg-dash-ink p-[30px] text-white lg:flex-row lg:items-center"
+      className="mb-[30px] flex flex-col items-stretch gap-8 rounded-[26px] bg-dash-ink p-[34px] text-white lg:flex-row lg:items-center"
     >
       <div className="min-w-0 flex-1">
-        <div className="mb-3.5 flex items-center gap-3">
+        <div className="mb-3 flex items-center gap-3">
           <span
-            className="relative grid h-[46px] w-[46px] shrink-0 place-items-center rounded-full p-[3px]"
+            className="relative grid h-[42px] w-[42px] shrink-0 place-items-center rounded-full p-[3px]"
             style={{
               background: `conic-gradient(#a7e8c4 ${isFresh ? 0 : level.progressPct}%, rgba(255,255,255,0.22) 0)`,
             }}
           >
-            <span className="grid h-full w-full place-items-center rounded-full bg-white text-sm font-extrabold tracking-[-0.02em] text-dash-ink">
+            <span className="grid h-full w-full place-items-center rounded-full bg-white text-[13px] font-extrabold tracking-[-0.02em] text-dash-ink">
               {initials}
             </span>
             <span
               aria-label={t('dashboard.level.label', { level: level.level })}
-              className="absolute -bottom-1 -right-1 grid h-[21px] min-w-[21px] place-items-center rounded-full border-[2.5px] border-dash-ink bg-dash-a3 px-[5px] text-[10.5px] font-extrabold leading-none text-dash-ink"
+              className="absolute -bottom-1 -right-1 grid h-[19px] min-w-[19px] place-items-center rounded-full border-[2.5px] border-dash-ink bg-dash-a3 px-[5px] text-[10px] font-extrabold leading-none text-dash-ink"
             >
               {level.level}
             </span>
           </span>
-          <span className="text-[17.5px] font-semibold opacity-[0.78]">
+          <span className="text-[16.5px] font-semibold opacity-[0.78]">
             {name ? (
               <Trans i18nKey="dashboard.hero.greeting" values={{ name }} components={{ b: <b className="font-extrabold opacity-100" /> }} />
             ) : (
@@ -94,7 +94,7 @@ export function DashboardHero({
           </span>
         </div>
 
-        <h1 className="mb-5 max-w-[17ch] font-display text-[27px] font-extrabold leading-[1.12] tracking-[-0.03em] sm:text-[34px]">
+        <h1 className="mb-[18px] max-w-[17ch] font-display text-[25px] font-extrabold leading-[1.12] tracking-[-0.03em] sm:text-[30px]">
           {isFresh ? (
             <Trans i18nKey="dashboard.hero.headlineFresh" components={{ em: <em className="not-italic text-dash-a3" /> }} />
           ) : (
@@ -110,19 +110,19 @@ export function DashboardHero({
         <button
           type="button"
           onClick={onCta}
-          className="inline-flex items-center gap-[9px] rounded-full bg-white px-5 py-3 text-[12.5px] font-extrabold uppercase tracking-[0.06em] text-dash-ink transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dash-ink"
+          className="inline-flex items-center gap-2 rounded-full bg-white px-[18px] py-[11px] text-[12px] font-extrabold uppercase tracking-[0.06em] text-dash-ink transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dash-ink"
         >
           {isFresh ? t('dashboard.hero.ctaFresh') : t('dashboard.hero.cta')}
-          <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
+          <ArrowUpRight aria-hidden="true" className="h-3 w-3" />
         </button>
 
         {!isFresh && (
-          <div className="mt-[18px] max-w-[320px]">
-            <div className="mb-[7px] flex items-baseline justify-between text-[12.5px] font-semibold opacity-[0.72]">
+          <div className="mt-4 max-w-[290px]">
+            <div className="mb-1.5 flex items-baseline justify-between text-[12px] font-semibold opacity-[0.72]">
               <span>{t('dashboard.overallProgress')}</span>
-              <b className="text-[13.5px] font-extrabold tabular-nums opacity-100">{overallPct}%</b>
+              <b className="text-[13px] font-extrabold tabular-nums opacity-100">{overallPct}%</b>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-white/20">
+            <div className="h-[5px] overflow-hidden rounded-full bg-white/20">
               <span className="block h-full rounded-full bg-dash-a3" style={{ width: `${overallPct}%` }} />
             </div>
           </div>

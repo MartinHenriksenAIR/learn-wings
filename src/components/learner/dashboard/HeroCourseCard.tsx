@@ -31,7 +31,7 @@ export function HeroCourseCard({ course, index, showProgress = true, onClick }: 
       onClick={onClick}
       data-testid="hero-course-card"
       className={cn(
-        'group relative flex min-h-[210px] w-full flex-col overflow-hidden rounded-[20px] text-left',
+        'group relative flex min-h-[190px] w-full flex-col overflow-hidden rounded-[18px] text-left',
         'shadow-[0_10px_26px_rgba(9,12,32,0.16)] transition-shadow focus-visible:outline-none',
         'focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dash-ink',
         hasArt ? 'bg-[#fbf9f4] text-white' : cn(accent, 'text-dash-ink'),
@@ -51,14 +51,14 @@ export function HeroCourseCard({ course, index, showProgress = true, onClick }: 
         </>
       )}
 
-      <span className="relative z-[1] flex flex-1 flex-col px-[17px] pb-[15px] pt-4">
-        <span className="mb-auto text-[12.5px] font-bold tabular-nums opacity-70">
+      <span className="relative z-[1] flex flex-1 flex-col px-[15px] pb-[13px] pt-[14px]">
+        <span className="mb-auto text-[11.5px] font-bold tabular-nums opacity-70">
           {String(index + 1).padStart(2, '0')}
         </span>
-        <span className="line-clamp-3 text-base font-extrabold leading-[1.2] tracking-[-0.02em]">
+        <span className="line-clamp-3 text-[15px] font-extrabold leading-[1.2] tracking-[-0.02em]">
           {course.title}
         </span>
-        <span className="mb-2 mt-[9px] text-[11.5px] font-semibold tabular-nums opacity-[0.72]">
+        <span className="mb-[7px] mt-2 text-[11px] font-semibold tabular-nums opacity-[0.72]">
           {showProgress
             ? t('dashboard.hero.lessonsAndPct', { lessons: course.lessonsTotal, pct: course.pct })
             : t('dashboard.hero.lessonsOnly', { lessons: course.lessonsTotal })}
