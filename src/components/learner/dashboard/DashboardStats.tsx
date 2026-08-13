@@ -56,26 +56,25 @@ export function DashboardStats({ snapshot, week }: DashboardStatsProps) {
           <div className="text-[12.5px] font-semibold leading-[1.35] text-muted-foreground">
             {t('dashboard.stats.learningTime')}
           </div>
-          <div className="mt-[7px] text-xs font-semibold text-muted-foreground">
-            {deltaPct !== null && (
-              <>
-                <span className="font-extrabold text-foreground">
-                  {deltaPct > 0 ? '+' : ''}
-                  {deltaPct}%
-                </span>{' '}
-                {t('dashboard.stats.vsPrevious')}
-              </>
-            )}
-            {/* Authored lesson lengths are nullable; say what the total leaves out
-                rather than let it quietly undercount. */}
-            {untimedLessons > 0 && (
-              <span className={deltaPct !== null ? 'before:content-["_·_"]' : undefined}>
-                {t('dashboard.stats.untimed', { count: untimedLessons })}
-              </span>
-            )}
-          </div>
+          {deltaPct !== null && (
+            <div className="mt-[7px] whitespace-nowrap text-xs font-semibold text-muted-foreground">
+              <span className="font-extrabold text-foreground">
+                {deltaPct > 0 ? '+' : ''}
+                {deltaPct}%
+              </span>{' '}
+              {t('dashboard.stats.vsPrevious')}
+            </div>
+          )}
+          {/* Authored lesson lengths are nullable; say what the total leaves out
+              rather than let it quietly undercount. Its own line, so a long
+              disclosure cannot widen the figures into the plot's space. */}
+          {untimedLessons > 0 && (
+            <div className="mt-1 text-[11px] font-medium text-muted-foreground">
+              {t('dashboard.stats.untimed', { count: untimedLessons })}
+            </div>
+          )}
         </div>
-        <div className="-my-5 -mr-[22px] flex min-w-0 flex-[1_1_0] self-stretch items-end [mask-image:linear-gradient(90deg,transparent_0%,rgba(0,0,0,0.35)_14%,#000_34%)]">
+        <div className="-my-5 -mr-[22px] flex min-w-[110px] flex-[1_1_0] self-stretch items-end [mask-image:linear-gradient(90deg,transparent_0%,rgba(0,0,0,0.35)_14%,#000_34%)]">
           <Sparkline values={perDayMinutes} />
         </div>
       </div>

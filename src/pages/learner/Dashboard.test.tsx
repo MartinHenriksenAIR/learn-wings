@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -26,6 +26,12 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
 
 const mockCommunityGate = vi.fn(() => 'blocked');
 vi.mock('@/hooks/useCommunityGate', () => ({ useCommunityGate: () => mockCommunityGate() }));
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useNavigate: () => mockNavigate,
+}));
 
 const mockFetchPosts = vi.fn(async (_args: { scope: string; org_id?: string }) => [] as CommunityPost[]);
 vi.mock('@/lib/community-api', () => ({
@@ -329,5 +335,99 @@ describe('LearnerDashboard — community gating', () => {
     // The board is the rail's only remaining occupant and still renders.
     expect(screen.getByTestId('dashboard-leaderboard')).toBeInTheDocument();
     expect(mockFetchPosts).not.toHaveBeenCalled();
+  });
+});
+
+describe('LearnerDashboard — where everything clicks through to', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCommunityGate.mockReturnValue('allowed');
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+    mockFetchPosts.mockImplementation(async ({ scope }) =>
+      scope === 'org'
+        ? ([
+            {
+              id: 'post-1', scope: 'org', title: 'Copilot is open to everyone', content: 'From Monday…',
+              created_at: '2026-08-12T10:00:00Z', comment_count: 12, event_date: null,
+              profile: { full_name: 'Mette S.' },
+            },
+            {
+              id: 'event-1', scope: 'org', title: 'AI coffee break', content: '',
+              created_at: '2026-08-11T10:00:00Z', comment_count: 0,
+              event_date: '2099-01-20T13:00:00Z', event_location: 'Online',
+              profile: { full_name: 'Mette S.' },
+            },
+          ] as unknown as CommunityPost[])
+        : [],
+    );
+  });
+
+  it('sends the hero CTA to My Training and a course tile to the player', async () => {
+    await mockData(dashData());
+    renderDashboard();
+    const hero = await screen.findByTestId('dashboard-hero');
+
+    fireEvent.click(within(hero).getByText('dashboard.hero.cta'));
+    expect(mockNavigate).toHaveBeenCalledWith('/app/training');
+
+    fireEvent.click(within(hero).getAllByTestId('hero-course-card')[0]);
+    expect(mockNavigate).toHaveBeenCalledWith('/app/learn/c-1');
+  });
+
+  it('sends a brand-new learner to the catalog, and a recommendation to the course page — not the player', async () => {
+    await mockData(dashData({
+      snapshot: { started: 0, inProgress: 0, completed: 0, overallPct: 0 },
+      courses: [],
+      recommended: [
+        { courseId: 'c-9', title: 'Prompt Engineering', thumbnailUrl: null, lessonsTotal: 6, lessonsCompleted: 0, pct: 0 },
+      ],
+    }));
+    renderDashboard();
+    const hero = await screen.findByTestId('dashboard-hero');
+
+    fireEvent.click(within(hero).getByText('dashboard.hero.ctaFresh'));
+    expect(mockNavigate).toHaveBeenCalledWith('/app/courses');
+
+    // Nothing to resume yet — a suggestion opens its description first.
+    fireEvent.click(within(hero).getAllByTestId('hero-course-card')[0]);
+    expect(mockNavigate).toHaveBeenCalledWith('/app/courses/c-9');
+  });
+
+  it('opens a community row and its See more', async () => {
+    await mockData(dashData());
+    renderDashboard();
+    const community = await screen.findByTestId('dashboard-community');
+
+    fireEvent.click(within(community).getByText('Copilot is open to everyone'));
+    expect(mockNavigate).toHaveBeenCalledWith('/app/community/org/posts/post-1');
+
+    fireEvent.click(within(community).getByText('dashboard.seeMore'));
+    expect(mockNavigate).toHaveBeenCalledWith('/app/community');
+  });
+
+  it('opens an event row and its See more', async () => {
+    await mockData(dashData());
+    renderDashboard();
+    const events = await screen.findByTestId('dashboard-events');
+
+    fireEvent.click(within(events).getByText('AI coffee break'));
+    expect(mockNavigate).toHaveBeenCalledWith('/app/community/org/posts/event-1');
+
+    fireEvent.click(within(events).getByText('dashboard.seeMore'));
+    expect(mockNavigate).toHaveBeenCalledWith('/app/events');
+  });
+
+  it('activates the unboxed rows from the keyboard — they are role=button, not links', async () => {
+    await mockData(dashData());
+    renderDashboard();
+    const community = await screen.findByTestId('dashboard-community');
+    const row = within(community).getAllByRole('button')[0];
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(mockNavigate).toHaveBeenCalledWith('/app/community/org/posts/post-1');
+
+    mockNavigate.mockClear();
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(mockNavigate).toHaveBeenCalledWith('/app/community/org/posts/post-1');
   });
 });
