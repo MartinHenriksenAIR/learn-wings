@@ -20,6 +20,14 @@ Single source of truth for all coding agents. `CLAUDE.md` imports this file — 
 - **Deploys: only from trunk, never from work branches** — merging to `main` deploys automatically (see Deploys). Announce on the merged PR.
 - **Bookkeeping:** merged PRs append a dated `migration/WORKLOG.md` entry (append-only) and update `migration/STATUS.html`'s checkpoint.
 
+### Integration branches (`integration/**`)
+A long-lived `integration/*` branch collects a programme of related work that should reach `main` as one story instead of landing piecemeal. **`integration/ux-refresh` is open now and owns the app-wide UI/UX pass** — UI and UX work branches off it and PRs back into it, not into `main`. Everything else (bug fixes, backend, features) keeps going straight to `main` as usual.
+
+- CI runs on PRs into `integration/**` and on pushes to it, and the SWA workflow builds a preview environment per PR — same gates as `main`.
+- **An integration branch never deploys.** Production ships only on push to `main`: the SWA workflow's `push` trigger and the functions workflow's are both `main`-only, deliberately.
+- Merge `main` into the integration branch whenever `main` moves, so the final PR is a clean diff rather than a conflict pile.
+- It is not in `protectedBranches` — merging `main` in requires committing on it. Land work through PRs anyway, for the same visibility reason work branches do.
+
 ## Preferred development workflow
 Default to **subagent-driven development** (`superpowers:subagent-driven-development` skill) for any task with more than a small surface — multi-file refactors, code-review fix sweeps, implementation plans with several discrete pieces, anything where the work decomposes into independent tasks with clear handoffs.
 
