@@ -275,3 +275,42 @@ describe('LearnerTraining — card/list view toggle (#449)', () => {
     expect(screen.queryByTestId('training-completed-card')).toBeNull();
   });
 });
+
+describe('LearnerTraining — assessment banner', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    mockPlatformSettings.mockImplementation(platformDefault);
+    setTraining({ enrollments: [completedEnrollment, enrolled], progress });
+  });
+
+  // The banner moved here from the dashboard with the redesign (#455) — this is
+  // where a learner decides what to study next.
+  it('shows the banner to a learner who has not taken the assessment', () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState, ...withOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+    });
+    renderTraining();
+    expect(screen.getByTestId('assessment-banner')).toBeInTheDocument();
+  });
+
+  it('hides the banner once the learner has an assessment level', () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState, ...withOrg,
+      profile: { ...baseAuthState.profile, assessment_level: 'basic' },
+    });
+    renderTraining();
+    expect(screen.queryByTestId('assessment-banner')).toBeNull();
+  });
+
+  it('hides the banner for an org admin', () => {
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState, ...withOrg,
+      profile: { ...baseAuthState.profile, assessment_level: null },
+      isOrgAdmin: true,
+    });
+    renderTraining();
+    expect(screen.queryByTestId('assessment-banner')).toBeNull();
+  });
+});

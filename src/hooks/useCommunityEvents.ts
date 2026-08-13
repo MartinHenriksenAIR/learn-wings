@@ -12,9 +12,15 @@ import type { CommunityScope } from '@/lib/community-types';
  * stays at the call site. Reuses the `communityPosts.list` key with empty
  * filter args so the unfiltered feed query and this share one cache entry.
  * Gates on org presence so the `'org'` variant stays idle until the user
- * actually belongs to an org.
+ * actually belongs to an org. Pass `enabled: false` on top of that where the
+ * caller cannot mount/unmount around the gate — the dashboard reads both scopes
+ * from the page body and must keep them idle while community is switched off.
  */
-export function useCommunityEvents(scope: CommunityScope, orgId?: string) {
+export function useCommunityEvents(
+  scope: CommunityScope,
+  orgId?: string,
+  options: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: queryKeys.communityPosts.list(scope, orgId, '', '', []),
     queryFn: async () => {
@@ -24,6 +30,6 @@ export function useCommunityEvents(scope: CommunityScope, orgId?: string) {
       });
       return Array.isArray(posts) ? posts : [];
     },
-    enabled: scope === 'global' || !!orgId,
+    enabled: (options.enabled ?? true) && (scope === 'global' || !!orgId),
   });
 }

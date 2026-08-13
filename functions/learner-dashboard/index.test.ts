@@ -15,7 +15,10 @@ const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember }));
-vi.mock('../shared/course-visibility', () => ({ resolveVisibilityContext: mockResolveVisibilityContext }));
+vi.mock('../shared/course-visibility', () => ({
+  resolveVisibilityContext: mockResolveVisibilityContext,
+  courseVisibilityPredicate: () => 'c.is_published = TRUE AND ORG_ACCESS($1)',
+}));
 
 import handler from './index';
 
@@ -25,7 +28,7 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// The six derived queries, in the order getLearnerDashboardData issues them.
+// The nine derived queries, in the order getLearnerDashboardData issues them.
 const seedHappyPath = () => {
   mockQuery
     .mockResolvedValueOnce([{ started: 3, in_progress: 1, completed: 2 }])                 // 1 snapshot
@@ -36,7 +39,18 @@ const seedHappyPath = () => {
       { user_id: 'p1', first_name: 'Martin', last_name: 'Henriksen', full_name: 'Martin Henriksen' },
       { user_id: 'p2', first_name: 'Anna', last_name: 'Berg', full_name: 'Anna Berg' },
     ])
-    .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06', '2026-08-05', '2026-08-04'] }]); // 6 streak
+    .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06', '2026-08-05', '2026-08-04'] }]) // 6 streak
+    .mockResolvedValueOnce([                                                               // 7 per-day activity
+      { day: '2026-08-06', lessons: 2, minutes: 30, untimed: 1 },
+      { day: '2026-08-04', lessons: 1, minutes: 15, untimed: 0 },
+      { day: '2026-07-28', lessons: 3, minutes: 60, untimed: 0 },                          // previous window
+    ])
+    .mockResolvedValueOnce([                                                               // 8 hero courses
+      { id: 'c-1', title: 'AI in everyday work', thumbnail_url: 'lms/c1.png', lessons_total: 9, lessons_done: 4 },
+    ])
+    .mockResolvedValueOnce([                                                               // 9 recommendations
+      { id: 'c-9', title: 'Prompt Engineering', thumbnail_url: null, lessons_total: 6, lessons_done: 0 },
+    ]);
 };
 
 describe('learner-dashboard', () => {
@@ -111,6 +125,48 @@ describe('learner-dashboard', () => {
     expect(body.showLeaderboard).toBe(true);
   });
 
+  it('derives the rolling seven-day window, its per-day series and the preceding week (#455)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    seedHappyPath();
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    const body = JSON.parse(res.body as string);
+
+    // Window is 2026-07-31 … 2026-08-06 (today): the 08-06 and 08-04 rows land
+    // inside it, the 07-28 row in the preceding seven days.
+    expect(body.week.lessons).toBe(3);
+    expect(body.week.minutes).toBe(45);
+    expect(body.week.previous).toEqual({ lessons: 3, minutes: 60 });
+    // One value per day, oldest → today, zero-filled for days with no activity.
+    expect(body.week.perDayMinutes).toEqual([0, 0, 0, 0, 15, 0, 30]);
+    // Lessons completed with no authored length are reported, not silently dropped.
+    expect(body.week.untimedLessons).toBe(1);
+  });
+
+  it('returns the in-progress hero courses and the recommendations behind the new-user hero (#455)', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    seedHappyPath();
+
+    const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
+    const body = JSON.parse(res.body as string);
+
+    expect(body.courses).toEqual([
+      { courseId: 'c-1', title: 'AI in everyday work', thumbnailUrl: 'lms/c1.png', lessonsTotal: 9, lessonsCompleted: 4, pct: 44 },
+    ]);
+    // Recommendations carry the lesson count only — no progress to show yet.
+    expect(body.recommended).toEqual([
+      { courseId: 'c-9', title: 'Prompt Engineering', thumbnailUrl: null, lessonsTotal: 6, lessonsCompleted: 0, pct: 0 },
+    ]);
+
+    const calls = mockQuery.mock.calls as [string, unknown[]][];
+    // Hero courses: the caller's own in-progress enrollments in this org only.
+    expect(calls[7][1]).toEqual(['org-1', 'p1']);
+    expect(calls[7][0]).toContain("e.status = 'enrolled'");
+    // Recommendations exclude what the caller is already enrolled in.
+    expect(calls[8][0]).toContain('NOT EXISTS');
+    expect(calls[8][1]).toEqual(['org-1', 'da', 'p1']);
+  });
+
   it('scopes every org query to orgId and derives the board from learners only', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     seedHappyPath();
@@ -162,7 +218,10 @@ describe('learner-dashboard', () => {
       .mockResolvedValueOnce([{ user_id: 'p1', all_time: 5, month: 2 }])                                  // 2 lessons
       .mockResolvedValueOnce([{ user_id: 'p1', all_time: 1, month: 1 }])                                  // 3 quizzes
       .mockResolvedValueOnce([])                                                                          // 4 courses
-      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06', '2026-08-05', '2026-08-04'] }]); // 5 streak (member query skipped)
+      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06', '2026-08-05', '2026-08-04'] }]) // 5 streak (member query skipped)
+      .mockResolvedValueOnce([])                                                                          // 6 per-day activity
+      .mockResolvedValueOnce([])                                                                          // 7 hero courses
+      .mockResolvedValueOnce([]);                                                                         // 8 recommendations
 
     const res = await handler(baseReq({ orgId: 'org-solo' }), {} as any);
 
@@ -199,7 +258,10 @@ describe('learner-dashboard', () => {
       .mockResolvedValueOnce([{ user_id: 'p1', all_time: 5, month: 2 }])              // 2 lessons
       .mockResolvedValueOnce([{ user_id: 'p1', all_time: 1, month: 1 }])              // 3 quizzes
       .mockResolvedValueOnce([])                                                       // 4 courses
-      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06'] }]);        // 5 streak
+      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06'] }])         // 5 streak
+      .mockResolvedValueOnce([])                                                       // 6 per-day activity
+      .mockResolvedValueOnce([])                                                       // 7 hero courses
+      .mockResolvedValueOnce([]);                                                      // 8 recommendations
 
     const res = await handler(baseReq({ orgId: 'org-1' }), {} as any);
 

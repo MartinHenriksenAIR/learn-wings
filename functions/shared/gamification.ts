@@ -1,4 +1,5 @@
 import { query } from './db';
+import { courseVisibilityPredicate } from './course-visibility';
 
 /**
  * Derived gamification for the learner dashboard (issue #362).
@@ -29,6 +30,26 @@ const TZ = 'Europe/Copenhagen';
 // Start of the current calendar month as a timestamptz instant, in Copenhagen
 // local time. Inlined (not a param) so the derived filter needs no JS tz math.
 const MONTH_START_SQL = `(date_trunc('month', now() AT TIME ZONE '${TZ}') AT TIME ZONE '${TZ}')`;
+// Today's Copenhagen calendar date, as a `date`.
+const TODAY_SQL = `((now() AT TIME ZONE '${TZ}')::date)`;
+
+/**
+ * The activity window behind the hero headline and the trend card (#455).
+ *
+ * ROLLING SEVEN DAYS, not the ISO week: today plus the six days before it,
+ * bucketed by Copenhagen calendar day (same boundary as the streak). Compared
+ * against the seven days before that. A calendar week would make the comparison
+ * a partial week against a whole one — "-60% vs last week" every Monday — and
+ * would leave the sparkline with a single point at the start of a week. The
+ * copy says "last 7 days" accordingly; it must never claim "this week".
+ */
+export const WINDOW_DAYS = 7;
+// Both windows in one read: the current 7 days plus the 7 before them.
+const WINDOW_SPAN = WINDOW_DAYS * 2;
+
+// Course cards in the hero slab — in-progress courses, or recommendations for a
+// learner with nothing started yet.
+const HERO_COURSES = 3;
 
 export interface LevelInfo {
   level: number;
@@ -52,11 +73,45 @@ export interface LeaderboardWindow {
   me: LeaderboardRow | null;
 }
 
+/** One course tile in the hero slab. `thumbnailUrl` is a raw storage path — the client signs it. */
+export interface DashboardCourseCard {
+  courseId: string;
+  title: string;
+  thumbnailUrl: string | null;
+  lessonsTotal: number;
+  lessonsCompleted: number;
+  pct: number;
+}
+
+/**
+ * Rolling-seven-day learning activity (see WINDOW_DAYS).
+ *
+ * `minutes` is the summed `lessons.duration_minutes` of lessons COMPLETED in the
+ * window — an authored estimate of lesson length, not measured time-on-task
+ * (the schema tracks no such thing). `duration_minutes` is nullable, so
+ * `untimedLessons` reports how many completed lessons carried no length and are
+ * therefore absent from the total; the UI discloses it rather than letting the
+ * figure silently undercount.
+ */
+export interface WeekActivity {
+  lessons: number;
+  minutes: number;
+  untimedLessons: number;
+  /** Minutes per day, oldest → today, exactly WINDOW_DAYS entries (the sparkline). */
+  perDayMinutes: number[];
+  previous: { lessons: number; minutes: number };
+}
+
 export interface LearnerDashboardData {
   snapshot: { started: number; inProgress: number; completed: number; overallPct: number };
   xp: { allTime: number; month: number };
   level: LevelInfo;
   streak: { current: number; activeToday: boolean };
+  week: WeekActivity;
+  /** Up to three in-progress courses for the hero, most recently opened first. */
+  courses: DashboardCourseCard[];
+  /** Up to three catalogue courses for a learner with nothing in progress. */
+  recommended: DashboardCourseCard[];
   leaderboard: { allTime: LeaderboardWindow; month: LeaderboardWindow };
   // Whether the client should render the leaderboard at all. False when the board
   // is suppressed — individual tier (#354) OR a per-org opt-out (#369). The board
@@ -148,6 +203,63 @@ export function computeStreak(today: string, daysDesc: string[]): { current: num
 
 interface AggRow { user_id: string; all_time: number; month: number }
 interface MemberRow { user_id: string; first_name: string | null; last_name: string | null; full_name: string | null }
+interface DayRow { day: string; lessons: number; minutes: number; untimed: number }
+interface CourseRow { id: string; title: string; thumbnail_url: string | null; lessons_total: number; lessons_done: number }
+
+function toCourseCard(r: CourseRow): DashboardCourseCard {
+  const total = r.lessons_total ?? 0;
+  const done = r.lessons_done ?? 0;
+  return {
+    courseId: r.id,
+    title: r.title,
+    thumbnailUrl: r.thumbnail_url,
+    lessonsTotal: total,
+    lessonsCompleted: done,
+    pct: total > 0 ? Math.round((done / total) * 100) : 0,
+  };
+}
+
+/**
+ * Fold the per-day rows into the two rolling windows. `today` is the Copenhagen
+ * date the rest of the payload is bucketed against, so both windows and the
+ * streak always agree on where "today" ends. Days with no completions are
+ * absent from `rows` and become zeroes — the sparkline needs a value per day.
+ */
+export function buildWeekActivity(today: string, rows: DayRow[]): WeekActivity {
+  const empty: WeekActivity = {
+    lessons: 0, minutes: 0, untimedLessons: 0,
+    perDayMinutes: new Array(WINDOW_DAYS).fill(0),
+    previous: { lessons: 0, minutes: 0 },
+  };
+  // No anchor date (the streak query returned nothing) — a flat window beats
+  // stepping off an unparseable date and emitting NaNs.
+  if (!today) return empty;
+
+  const byDay = new Map(rows.map((r) => [r.day, r]));
+  const dayAt = (offset: number) => byDay.get(addDays(today, offset));
+
+  const perDayMinutes: number[] = [];
+  let lessons = 0;
+  let minutes = 0;
+  let untimedLessons = 0;
+  for (let i = WINDOW_DAYS - 1; i >= 0; i--) {
+    const row = dayAt(-i);
+    perDayMinutes.push(row?.minutes ?? 0);
+    lessons += row?.lessons ?? 0;
+    minutes += row?.minutes ?? 0;
+    untimedLessons += row?.untimed ?? 0;
+  }
+
+  let prevLessons = 0;
+  let prevMinutes = 0;
+  for (let i = WINDOW_SPAN - 1; i >= WINDOW_DAYS; i--) {
+    const row = dayAt(-i);
+    prevLessons += row?.lessons ?? 0;
+    prevMinutes += row?.minutes ?? 0;
+  }
+
+  return { lessons, minutes, untimedLessons, perDayMinutes, previous: { lessons: prevLessons, minutes: prevMinutes } };
+}
 
 function rankWindow(
   members: { userId: string; name: string; xp: number }[],
@@ -172,9 +284,21 @@ function rankWindow(
 export async function getLearnerDashboardData(
   orgId: string,
   callerId: string,
-  opts?: { suppressLeaderboard?: boolean },
+  opts?: { suppressLeaderboard?: boolean; isIndividual?: boolean; language?: string },
 ): Promise<LearnerDashboardData> {
-  const [snapshotRows, lessonRows, quizRows, courseRows, memberRows, streakRows] = await Promise.all([
+  // Recommendation visibility mirrors learner-courses: standard orgs see
+  // published + org-enabled courses, individuals bypass org_course_access.
+  // The language is the caller's server-side preference — the dashboard request
+  // carries no UI language, and a learner cannot widen their own catalogue.
+  const recommendVisibility = opts?.isIndividual
+    ? 'c.is_published = TRUE'
+    : courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 });
+  const recommendLanguage = opts?.language === 'en' ? 'en' : 'da';
+
+  const [
+    snapshotRows, lessonRows, quizRows, courseRows, memberRows, streakRows,
+    dayRows, heroCourseRows, recommendedRows,
+  ] = await Promise.all([
     // 1 · snapshot — course counts for the caller (deep-link cards → Min Træning)
     query<{ started: number; in_progress: number; completed: number }>(
       `SELECT count(*)::int AS started,
@@ -240,6 +364,67 @@ export async function getLearnerDashboardData(
               ) AS days`,
       [callerId],
     ),
+    // 7 · per-day completions for the caller across both rolling windows (#455).
+    //     Org-scoped like the rest of the hub (the streak above is the one
+    //     deliberately global figure). duration_minutes is an authored estimate
+    //     and nullable — summed as learning time, with the nulls counted, never
+    //     coerced to a guess.
+    query<DayRow>(
+      `SELECT ((lp.completed_at AT TIME ZONE '${TZ}')::date)::text AS day,
+              count(*)::int AS lessons,
+              COALESCE(sum(l.duration_minutes), 0)::int AS minutes,
+              count(*) FILTER (WHERE l.duration_minutes IS NULL)::int AS untimed
+         FROM lesson_progress lp
+         JOIN lessons l ON l.id = lp.lesson_id
+        WHERE lp.org_id = $1 AND lp.user_id = $2
+          AND lp.status = 'completed' AND lp.completed_at IS NOT NULL
+          AND lp.completed_at >= ((${TODAY_SQL} - ${WINDOW_SPAN - 1}) AT TIME ZONE '${TZ}')
+        GROUP BY 1`,
+      [orgId, callerId],
+    ),
+    // 8 · the hero's course cards — in-progress enrollments, most recently
+    //     opened first so the tiles read as "pick this back up".
+    query<CourseRow>(
+      `SELECT c.id, c.title, c.thumbnail_url,
+              (SELECT count(*)::int
+                 FROM course_modules cm JOIN lessons l ON l.module_id = cm.id
+                WHERE cm.course_id = c.id) AS lessons_total,
+              (SELECT count(*)::int
+                 FROM lesson_progress lp
+                 JOIN lessons l ON l.id = lp.lesson_id
+                 JOIN course_modules cm ON cm.id = l.module_id
+                WHERE cm.course_id = c.id AND lp.org_id = $1 AND lp.user_id = $2
+                      AND lp.status = 'completed') AS lessons_done
+         FROM enrollments e
+         JOIN courses c ON c.id = e.course_id
+        WHERE e.org_id = $1 AND e.user_id = $2 AND e.status = 'enrolled'
+        ORDER BY e.last_accessed_at DESC NULLS LAST, e.enrolled_at DESC
+        LIMIT ${HERO_COURSES}`,
+      [orgId, callerId],
+    ),
+    // 9 · "Courses learners love" — the hero's fallback when nothing is in
+    //     progress. Ranked by platform-wide enrollment count (an anonymous
+    //     aggregate; no member data crosses an org boundary), so the label is a
+    //     real popularity signal rather than catalogue order. Courses the
+    //     caller is already enrolled in are excluded.
+    query<CourseRow>(
+      `SELECT c.id, c.title, c.thumbnail_url,
+              (SELECT count(*)::int
+                 FROM course_modules cm JOIN lessons l ON l.module_id = cm.id
+                WHERE cm.course_id = c.id) AS lessons_total,
+              0 AS lessons_done,
+              (SELECT count(*)::int FROM enrollments en WHERE en.course_id = c.id) AS popularity
+         FROM courses c
+        WHERE ${recommendVisibility}
+              AND c.language = $2
+              AND NOT EXISTS (
+                    SELECT 1 FROM enrollments e
+                     WHERE e.course_id = c.id AND e.user_id = $3 AND e.org_id = $1
+                  )
+        ORDER BY popularity DESC, c.title
+        LIMIT ${HERO_COURSES}`,
+      [orgId, recommendLanguage, callerId],
+    ),
   ]);
 
   // Per-user XP maps from the org-scoped aggregates.
@@ -273,6 +458,9 @@ export async function getLearnerDashboardData(
     xp: { allTime: xpAllTime, month: xpMonth },
     level: levelProgress(xpAllTime),
     streak: computeStreak(streakRow?.today ?? '', streakRow?.days ?? []),
+    week: buildWeekActivity(streakRow?.today ?? '', dayRows ?? []),
+    courses: (heroCourseRows ?? []).map(toCourseCard),
+    recommended: (recommendedRows ?? []).map(toCourseCard),
     showLeaderboard: !opts?.suppressLeaderboard,
     leaderboard: opts?.suppressLeaderboard
       ? { allTime: { rows: [], me: null }, month: { rows: [], me: null } }

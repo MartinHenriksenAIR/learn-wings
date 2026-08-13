@@ -167,65 +167,58 @@
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Velkommen tilbage",
-    "coursesEnrolled": "Tilmeldte kurser",
-    "inProgress": "I gang",
     "completed": "Afsluttet",
     "overallProgress": "Samlet fremgang",
-    "continueLearning": "Fortsæt læring",
-    "viewAllCourses": "Se alle kurser",
-    "noCoursesInProgress": "Ingen kurser i gang",
-    "startLearning": "Start din læring ved at åbne et kursus fra Kursuskatalog.",
     "browseCourses": "Gennemse kurser",
-    "completedCourses": "Afsluttede kurser",
     "noMembershipTitle": "Endnu intet organisationsmedlemskab",
     "noMembershipDescription": "Du er endnu ikke medlem af nogen organisation. Bed din administrator om en invitation for at komme i gang.",
     "invitationOnlyTitle": "Registrering kræver en invitation",
     "invitationOnlyDescription": "Bed din organisation om en invitation for at komme i gang.",
-    "welcomeBack": "Velkommen tilbage, {{name}}",
-    "pickUpWhereYouLeftOff": "Fortsæt, hvor du slap.",
-    "heroContinueBadge": "Fortsæt læringen",
-    "heroResumeCta": "Genoptag kursus",
-    "heroLessonsDone": "{{done}} af {{total}} lektioner gennemført",
-    "heroAllCaughtUpBadge": "Helt ajour",
-    "heroAllDoneTitle": "Alle kurser gennemført — flot arbejde!",
-    "heroAllDoneDescription": "Hold momentum — gennemse kataloget og start et nyt kursus.",
-    "heroStartNewCta": "Start et nyt kursus",
-    "heroCoursesCompleted": "{{completed}} af {{total}} kurser gennemført",
-    "heroFirstTimeBadge": "Kom i gang",
-    "heroFirstTimeTitle": "Klar til at lære?",
-    "heroFirstTimeDescription": "Vælg dit første kursus i kataloget og begynd at opbygge praktiske AI-færdigheder.",
-    "heroPickFirstCourse": "Vælg dit første kursus",
     "noFavoritesTitle": "Ingen favoritter endnu",
     "noFavoritesDescription": "Tryk på hjertet på et kursus for at gemme det her.",
-    "subtitle": "Følg dit momentum og se hvor du står.",
-    "started": "Startet",
     "level": {
-      "label": "Niveau {{level}}",
-      "toNext": "{{xp}} XP til Niveau {{level}}"
-    },
-    "xp": {
-      "total": "{{xp}} XP i alt"
-    },
-    "streak": {
-      "days_one": "{{count}} dag i træk",
-      "days_other": "{{count}} dage i træk",
-      "activeToday": "Du har lært i dag — bliv ved!",
-      "keepItUp": "Lær noget i dag for at holde din streak i live.",
-      "none": "Fuldfør en lektion i dag for at starte en streak."
+      "label": "Niveau {{level}}"
     },
     "leaderboard": {
       "title": "Leaderboard",
-      "allTime": "Samlet",
-      "thisMonth": "Denne måned",
       "yourRank": "Din placering",
-      "empty": "Ingen er på listen endnu — vær den første."
+      "empty": "Ingen er på listen endnu — vær den første.",
+      "xpLabel": "{{xp}} XP"
     },
     "community": {
       "title": "Fællesskab",
-      "viewAll": "Se alle",
-      "recentActivity": "Seneste aktivitet",
       "noActivityTitle": "Ingen nylig aktivitet endnu",
-      "noActivityDescription": "Vær den første til at starte en samtale i fællesskabet."
+      "noActivityDescription": "Vær den første til at starte en samtale i fællesskabet.",
+      "scopeOrg": "Org",
+      "scopeGlobal": "Global",
+      "comments_one": "{{count}} kommentar",
+      "comments_other": "{{count}} kommentarer"
+    },
+    "seeMore": "Se mere",
+    "hero": {
+      "greeting": "Hej, <b>{{name}}</b>!",
+      "headline_one": "Du har gennemført <em>{{count}} lektion</em> de seneste 7 dage!",
+      "headline_other": "Du har gennemført <em>{{count}} lektioner</em> de seneste 7 dage!",
+      "headlineFresh": "Klar til <em>din første lektion</em>?",
+      "cta": "Se min træning",
+      "ctaFresh": "Find et kursus",
+      "lovedLabel": "Kurser som medlemmer elsker",
+      "lessonsOnly": "{{lessons}} lektioner",
+      "lessonsAndPct": "{{lessons}} lektioner | {{pct}}%"
+    },
+    "stats": {
+      "coursesInProgress": "Kurser i gang",
+      "coursesCompleted": "Kurser gennemført",
+      "learningTime": "Læringstid, de seneste 7 dage",
+      "hoursUnit": "t",
+      "vsPrevious": "mod de 7 dage før",
+      "untimed_one": "{{count}} lektion har ingen angivet længde",
+      "untimed_other": "{{count}} lektioner har ingen angivet længde"
+    },
+    "events": {
+      "title": "Kommende",
+      "emptyTitle": "Ingen kommende begivenheder",
+      "emptyDescription": "Nye begivenheder dukker op her."
     }
   },
   "training": {
@@ -680,8 +673,15 @@
       "adminNotesLabel": "Administratornoter (intern)",
       "adminNotesPlaceholder": "Noter, der kun er synlige for administratorer..."
     },
-    "tabs": { "board": "Tavle", "prioritize": "Prioritér" },
-    "levels": { "low": "Lav", "medium": "Middel", "high": "Høj" },
+    "tabs": {
+      "board": "Tavle",
+      "prioritize": "Prioritér"
+    },
+    "levels": {
+      "low": "Lav",
+      "medium": "Middel",
+      "high": "Høj"
+    },
     "bands": {
       "quick_win": "Hurtig gevinst",
       "big_bet": "Stor satsning",

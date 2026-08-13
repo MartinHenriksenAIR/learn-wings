@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import type { LearnerDashboardData } from '@/hooks/useLearnerDashboard';
+import type { CommunityPost } from '@/lib/community-types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
+  // The hero interpolates its greeting and headline through <Trans>; the key
+  // alone is enough for these assertions.
+  Trans: ({ i18nKey }: { i18nKey: string }) => <>{i18nKey}</>,
 }));
 
 vi.mock('@/components/layout/AppLayout', () => ({
@@ -23,8 +27,9 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
 const mockCommunityGate = vi.fn(() => 'blocked');
 vi.mock('@/hooks/useCommunityGate', () => ({ useCommunityGate: () => mockCommunityGate() }));
 
-vi.mock('@/components/learner/DashboardCommunitySection', () => ({
-  DashboardCommunitySection: () => <div data-testid="community-section" />,
+const mockFetchPosts = vi.fn(async (_args: { scope: string; org_id?: string }) => [] as CommunityPost[]);
+vi.mock('@/lib/community-api', () => ({
+  fetchPosts: (args: { scope: string; org_id?: string }) => mockFetchPosts(args),
 }));
 
 import LearnerDashboard from './Dashboard';
@@ -55,8 +60,19 @@ const withOrg = {
 const dashData = (over: Partial<LearnerDashboardData> = {}): LearnerDashboardData => ({
   snapshot: { started: 3, inProgress: 1, completed: 2, overallPct: 67 },
   xp: { allTime: 75, month: 45 },
-  level: { level: 1, xp: 75, xpIntoLevel: 75, xpForLevel: 200, xpToNext: 125, nextThreshold: 200, progressPct: 38 },
+  level: { level: 4, xp: 75, xpIntoLevel: 75, xpForLevel: 200, xpToNext: 125, nextThreshold: 200, progressPct: 38 },
   streak: { current: 3, activeToday: true },
+  week: {
+    lessons: 6,
+    minutes: 510,
+    untimedLessons: 0,
+    perDayMinutes: [30, 0, 60, 90, 120, 90, 120],
+    previous: { lessons: 4, minutes: 300 },
+  },
+  courses: [
+    { courseId: 'c-1', title: 'AI in everyday work', thumbnailUrl: 'https://blob/a.png', lessonsTotal: 9, lessonsCompleted: 4, pct: 44 },
+  ],
+  recommended: [],
   showLeaderboard: true,
   leaderboard: {
     allTime: {
@@ -92,7 +108,10 @@ function renderDashboard() {
 }
 
 describe('LearnerDashboard — guards', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCommunityGate.mockReturnValue('blocked');
+  });
 
   it('shows the invitation-only empty state for a non-admin with no memberships (blocked walk-in)', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, memberships: [], currentOrg: null });
@@ -120,82 +139,121 @@ describe('LearnerDashboard — guards', () => {
     expect(document.querySelector('.animate-spin')).toBeNull();
   });
 
-  it('renders the retryable error fork (not an all-zero hub) when the fetch fails', async () => {
+  it('renders the retryable error fork (not an all-zero dashboard) when the fetch fails', async () => {
     await mockData(new Error('boom'));
     mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
     renderDashboard();
     expect(await screen.findByText('common.loadErrorTitle')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-hero')).toBeNull();
     expect(screen.queryByTestId('dashboard-snapshot')).toBeNull();
   });
 });
 
-describe('LearnerDashboard — motivation hub', () => {
+describe('LearnerDashboard — hero', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCommunityGate.mockReturnValue('blocked');
     mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
   });
 
-  it('renders the progress snapshot with counts', async () => {
+  it('states the lessons completed in the window, the level and overall progress', async () => {
     await mockData(dashData());
     renderDashboard();
-    const snapshot = await screen.findByTestId('dashboard-snapshot');
-    expect(within(snapshot).getByText('dashboard.started')).toBeInTheDocument();
-    expect(within(snapshot).getByText('67%')).toBeInTheDocument();
+    const hero = await screen.findByTestId('dashboard-hero');
+    expect(within(hero).getByText('dashboard.hero.headline')).toBeInTheDocument();
+    expect(within(hero).getByText('dashboard.hero.cta')).toBeInTheDocument();
+    expect(within(hero).getByText('67%')).toBeInTheDocument();
+    // The level rides on the avatar ring, not a separate card.
+    expect(within(hero).getByLabelText('dashboard.level.label')).toHaveTextContent('4');
   });
 
-  it('renders XP/level and streak', async () => {
+  it('renders one card per in-progress course', async () => {
     await mockData(dashData());
     renderDashboard();
-    await screen.findByTestId('dashboard-snapshot');
-    expect(screen.getByText('dashboard.level.label')).toBeInTheDocument();
-    expect(screen.getByText('dashboard.level.toNext')).toBeInTheDocument();
-    expect(screen.getByText('dashboard.streak.days')).toBeInTheDocument();
+    const cards = await screen.findAllByTestId('hero-course-card');
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toHaveTextContent('AI in everyday work');
+    expect(cards[0]).toHaveTextContent('dashboard.hero.lessonsAndPct');
   });
 
-  it('renders the org leaderboard with first-name+initial names and XP', async () => {
+  it('asks instead of counting for a learner who has never started a course, and shows recommendations', async () => {
+    await mockData(dashData({
+      snapshot: { started: 0, inProgress: 0, completed: 0, overallPct: 0 },
+      week: { lessons: 0, minutes: 0, untimedLessons: 0, perDayMinutes: [0, 0, 0, 0, 0, 0, 0], previous: { lessons: 0, minutes: 0 } },
+      courses: [],
+      recommended: [
+        { courseId: 'c-9', title: 'Prompt Engineering', thumbnailUrl: null, lessonsTotal: 6, lessonsCompleted: 0, pct: 0 },
+      ],
+    }));
+    renderDashboard();
+    const hero = await screen.findByTestId('dashboard-hero');
+    expect(within(hero).getByText('dashboard.hero.headlineFresh')).toBeInTheDocument();
+    expect(within(hero).getByText('dashboard.hero.ctaFresh')).toBeInTheDocument();
+    expect(within(hero).getByText('dashboard.hero.lovedLabel')).toBeInTheDocument();
+    // No wall of zeros: the overall-progress bar is dropped, and the tiles carry
+    // a lesson count with no percentage or bar.
+    expect(within(hero).queryByText('dashboard.overallProgress')).toBeNull();
+    expect(within(hero).getByText('dashboard.hero.lessonsOnly')).toBeInTheDocument();
+    expect(within(hero).queryByText('dashboard.hero.lessonsAndPct')).toBeNull();
+  });
+});
+
+describe('LearnerDashboard — statistics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCommunityGate.mockReturnValue('blocked');
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+  });
+
+  it('renders the two counters and the learning-time trend with its change figure', async () => {
+    await mockData(dashData());
+    renderDashboard();
+    const stats = await screen.findByTestId('dashboard-snapshot');
+    expect(within(stats).getByText('dashboard.stats.coursesInProgress')).toBeInTheDocument();
+    expect(within(stats).getByText('dashboard.stats.coursesCompleted')).toBeInTheDocument();
+    // 510 min → 8.5 h, up 70% on the previous 300 min.
+    expect(within(stats).getByText('8.5')).toBeInTheDocument();
+    expect(within(stats).getByText('+70%')).toBeInTheDocument();
+  });
+
+  it('drops the change figure when there is no previous window to compare against', async () => {
+    await mockData(dashData({
+      week: { lessons: 2, minutes: 60, untimedLessons: 0, perDayMinutes: [0, 0, 0, 0, 0, 0, 60], previous: { lessons: 0, minutes: 0 } },
+    }));
+    renderDashboard();
+    const stats = await screen.findByTestId('dashboard-snapshot');
+    expect(within(stats).queryByText('dashboard.stats.vsPrevious')).toBeNull();
+  });
+
+  it('discloses completed lessons that carry no authored length', async () => {
+    await mockData(dashData({
+      week: { lessons: 6, minutes: 510, untimedLessons: 2, perDayMinutes: [0, 0, 0, 0, 0, 0, 510], previous: { lessons: 4, minutes: 300 } },
+    }));
+    renderDashboard();
+    const stats = await screen.findByTestId('dashboard-snapshot');
+    expect(within(stats).getByText('dashboard.stats.untimed')).toBeInTheDocument();
+  });
+});
+
+describe('LearnerDashboard — leaderboard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCommunityGate.mockReturnValue('blocked');
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+  });
+
+  it('renders the all-time board with no window toggle', async () => {
     await mockData(dashData());
     renderDashboard();
     const board = await screen.findByTestId('dashboard-leaderboard');
     expect(within(board).getByText('Anna B.')).toBeInTheDocument();
-    expect(within(board).getByText('300 XP')).toBeInTheDocument();
-    expect(within(board).getByText('Martin H.')).toBeInTheDocument();
+    expect(within(board).getByText('300')).toBeInTheDocument();
+    // The all-time / this-month tabs were dropped with the redesign (#455).
+    expect(within(board).queryAllByRole('button')).toHaveLength(0);
   });
 
-  it('switches the leaderboard window to this month', async () => {
-    await mockData(dashData());
-    renderDashboard();
-    const board = await screen.findByTestId('dashboard-leaderboard');
-    fireEvent.click(within(board).getByRole('button', { name: 'dashboard.leaderboard.thisMonth' }));
-    expect(within(board).getByText('45 XP')).toBeInTheDocument();
-  });
-
-  it('hides the leaderboard for an individual-tier learner (server sets showLeaderboard=false)', async () => {
-    // The individual placeholder org suppresses the board server-side (#354),
-    // surfaced to the client as showLeaderboard=false.
-    await mockData(dashData({ showLeaderboard: false }));
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
-      currentOrg: { id: 'org-solo', name: 'Individuals', slug: 'individuals', kind: 'individual' },
-    });
-    renderDashboard();
-    // The hub still renders (snapshot present) but the org leaderboard is suppressed.
-    await screen.findByTestId('dashboard-snapshot');
-    expect(screen.queryByTestId('dashboard-leaderboard')).toBeNull();
-  });
-
-  it('hides the leaderboard when the org opted out (#369: showLeaderboard=false in a standard org)', async () => {
-    // A normal org that turned "Show leaderboard" off — the widget must be hidden,
-    // not rendered with an empty "be the first" state.
-    await mockData(dashData({ showLeaderboard: false }));
-    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
-    renderDashboard();
-    await screen.findByTestId('dashboard-snapshot');
-    expect(screen.queryByTestId('dashboard-leaderboard')).toBeNull();
-  });
-
-  it('pins the caller row when they rank below the visible top', async () => {
+  it('caps the board at four rows and pins the caller below when they rank lower', async () => {
     const rows = Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, name: `User ${i}`, xp: 1000 - i, isSelf: false }));
     await mockData(dashData({
       leaderboard: {
@@ -205,35 +263,31 @@ describe('LearnerDashboard — motivation hub', () => {
     }));
     renderDashboard();
     const board = await screen.findByTestId('dashboard-leaderboard');
+    expect(within(board).getByText('User 3')).toBeInTheDocument();
+    expect(within(board).queryByText('User 4')).toBeNull();
     expect(within(board).getByText('dashboard.leaderboard.yourRank')).toBeInTheDocument();
     expect(within(board).getByText('Martin H.')).toBeInTheDocument();
   });
-});
 
-describe('LearnerDashboard — assessment banner', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('shows the banner when a learner has no assessment level', async () => {
-    await mockData(dashData());
-    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg, profile: { ...baseAuthState.profile, assessment_level: null } });
+  it('hides the board for an individual-tier learner (server sets showLeaderboard=false)', async () => {
+    // The individual placeholder org suppresses the board server-side (#354),
+    // surfaced to the client as showLeaderboard=false.
+    await mockData(dashData({ showLeaderboard: false }));
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
+      currentOrg: { id: 'org-solo', name: 'Individuals', slug: 'individuals', kind: 'individual' },
+    });
     renderDashboard();
-    expect(await screen.findByTestId('assessment-banner')).toBeInTheDocument();
+    await screen.findByTestId('dashboard-hero');
+    expect(screen.queryByTestId('dashboard-leaderboard')).toBeNull();
   });
 
-  it('hides the banner when the learner already has an assessment level', async () => {
-    await mockData(dashData());
-    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg, profile: { ...baseAuthState.profile, assessment_level: 'basic' } });
+  it('hides the board when the org opted out (#369: showLeaderboard=false in a standard org)', async () => {
+    await mockData(dashData({ showLeaderboard: false }));
     renderDashboard();
-    await screen.findByTestId('dashboard-snapshot');
-    expect(screen.queryByTestId('assessment-banner')).toBeNull();
-  });
-
-  it('hides the banner for an org admin', async () => {
-    await mockData(dashData());
-    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg, profile: { ...baseAuthState.profile, assessment_level: null }, isOrgAdmin: true });
-    renderDashboard();
-    await screen.findByTestId('dashboard-snapshot');
-    expect(screen.queryByTestId('assessment-banner')).toBeNull();
+    await screen.findByTestId('dashboard-hero');
+    expect(screen.queryByTestId('dashboard-leaderboard')).toBeNull();
   });
 });
 
@@ -243,18 +297,37 @@ describe('LearnerDashboard — community gating', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
   });
 
-  it('renders the community section when the gate allows it', async () => {
+  it('renders the community rows and the events rail when the gate allows it', async () => {
     mockCommunityGate.mockReturnValue('allowed');
+    // Both scopes are read; only the org feed has anything in it here.
+    mockFetchPosts.mockImplementation(async ({ scope }: { scope: string }) =>
+      scope === 'org'
+        ? ([
+            {
+              id: 'post-1', scope: 'org', title: 'Copilot is open to everyone', content: 'From Monday…',
+              created_at: '2026-08-12T10:00:00Z', comment_count: 12, event_date: null,
+              profile: { full_name: 'Mette S.' },
+            },
+          ] as unknown as CommunityPost[])
+        : [],
+    );
     await mockData(dashData());
     renderDashboard();
-    expect(await screen.findByTestId('community-section')).toBeInTheDocument();
+    const community = await screen.findByTestId('dashboard-community');
+    expect(within(community).getByText('Copilot is open to everyone')).toBeInTheDocument();
+    expect(await screen.findByTestId('dashboard-events')).toBeInTheDocument();
   });
 
-  it('hides the community section when the gate blocks it', async () => {
+  it('drops community AND events when the gate blocks it, without truncating the rail', async () => {
     mockCommunityGate.mockReturnValue('blocked');
     await mockData(dashData());
     renderDashboard();
-    await screen.findByTestId('dashboard-snapshot');
-    expect(screen.queryByTestId('community-section')).toBeNull();
+    await screen.findByTestId('dashboard-hero');
+    expect(screen.queryByTestId('dashboard-community')).toBeNull();
+    // Events derive from community posts, so they go with it (#455).
+    expect(screen.queryByTestId('dashboard-events')).toBeNull();
+    // The board is the rail's only remaining occupant and still renders.
+    expect(screen.getByTestId('dashboard-leaderboard')).toBeInTheDocument();
+    expect(mockFetchPosts).not.toHaveBeenCalled();
   });
 });

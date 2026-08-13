@@ -8,6 +8,11 @@ import { resolveVisibilityContext } from '../shared/course-visibility';
  * snapshot (course counts), the caller's org-scoped XP + level, their global
  * personal streak, and the org-scoped leaderboard (all-time + this month).
  *
+ * The redesign (#455) adds the hero and trend data: rolling-seven-day lessons
+ * and learning minutes with a per-day series and the preceding seven days for
+ * comparison, the in-progress courses behind the hero tiles, and the
+ * recommendations shown instead when nothing is in progress.
+ *
  * All derived live — see shared/gamification.ts. Org isolation is enforced by
  * requireActiveMember before any org-scoped query runs; the leaderboard is
  * built from org_memberships, never a client-supplied user list (#373).
@@ -33,7 +38,7 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
   // Two independent reads: the visibility context (individual-tier detection) and
   // the per-org leaderboard opt-out (#369). A missing settings row or missing key
   // ⇒ enabled (the default); only an explicit `false` turns it off.
-  const [{ isIndividual }, settingsRow] = await Promise.all([
+  const [{ isIndividual, language }, settingsRow] = await Promise.all([
     resolveVisibilityContext(orgId, profile.id),
     queryOne<{ features: { leaderboard_enabled?: boolean } | null }>(
       `SELECT features FROM org_settings WHERE org_id = $1`,
@@ -44,6 +49,8 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
 
   const data = await getLearnerDashboardData(orgId, profile.id, {
     suppressLeaderboard: isIndividual || leaderboardOff,
+    isIndividual,
+    language,
   });
   return reply(200, data);
 });
