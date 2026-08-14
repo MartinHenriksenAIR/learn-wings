@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock the api client so no MSAL/network fires
 const mockCallApi = vi.fn();
 vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
@@ -23,8 +22,6 @@ describe('ideas-api payload coercions (old client-lib parity)', () => {
   });
 
   it('createIdea coerces empty-string optional fields to null (the form defaults every field to "")', async () => {
-    // IdeaSubmit's form initializes business_area (a PG enum server-side) and all
-    // text fields as '' — the old lib mapped them with `|| null` before insert.
     await createIdea({
       org_id: 'org-1',
       title: 'My draft',
@@ -88,10 +85,6 @@ describe('ideas-api payload coercions (old client-lib parity)', () => {
   });
 });
 
-// #268 removed the vestigial `orgId` from these two bodies — the server derives the org
-// from the idea row, and the endpoints ignore (and must keep ignoring) a client-sent one.
-// These assert the wire payload with `toEqual`, not `toMatchObject`, so a re-added `orgId`
-// fails here: the IdeaDetail tests mock this module wholesale and only pin call-site arity.
 describe('ideas-api wire payloads (no vestigial orgId — #268)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -111,7 +104,6 @@ describe('ideas-api wire payloads (no vestigial orgId — #268)', () => {
 
     const [path, body] = mockCallApi.mock.calls[0] as [string, Record<string, unknown>];
     expect(path).toBe('/api/idea-comment-create');
-    // parentCommentId is undefined, not omitted — JSON.stringify drops it on the wire
     expect(body).toEqual({ ideaId: 'idea-1', content: 'hello', parentCommentId: undefined });
     expect(Object.keys(body).sort()).toEqual(['content', 'ideaId', 'parentCommentId']);
   });

@@ -21,8 +21,6 @@ interface ReportDialogProps {
   targetType: 'post' | 'comment';
 }
 
-// Stable machine `value`s (persisted upstream as the report reason); the
-// human-facing text is resolved through i18n via `labelKey` at render time.
 const REPORT_REASONS = [
   { value: 'spam', labelKey: 'community.reportDialog.reasonSpam' },
   { value: 'inappropriate', labelKey: 'community.reportDialog.reasonInappropriate' },
@@ -55,7 +53,7 @@ export function ReportDialog({
       : (matched ? t(matched.labelKey) : selectedReason);
 
     if (!reason) return;
-    
+
     setIsSubmitting(true);
     try {
       await onSubmit(reason);
@@ -63,9 +61,6 @@ export function ReportDialog({
       setSelectedReason('');
       setCustomReason('');
     } catch {
-      // The caller surfaces feedback for failures (#21). Keep the dialog open so
-      // the user can retry; terminal outcomes (e.g. duplicate report) are the
-      // caller's job to resolve without rethrowing.
     } finally {
       setIsSubmitting(false);
     }

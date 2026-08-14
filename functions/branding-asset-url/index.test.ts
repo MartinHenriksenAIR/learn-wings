@@ -32,7 +32,6 @@ describe('branding-asset-url', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@test.com' });
-    // A plain, non-admin authenticated user — branding assets are viewable by anyone signed in.
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockGenerateSasToken.mockReturnValue('sp=r&sig=abc');
     mockBuildBlobUrl.mockReturnValue('https://testaccount.blob.core.windows.net/lms-videos/avatars/x.png?sp=r&sig=abc');

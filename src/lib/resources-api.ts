@@ -19,8 +19,6 @@ export interface CommunityResource {
   } | null;
 }
 
-// `user_id` is server-derived from the bearer token — never client-supplied (parity
-// constraint from the RLS policy `user_id = auth.uid()` on create).
 export interface CreateResourceInput {
   org_id: string;
   title: string;

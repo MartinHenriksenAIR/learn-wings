@@ -67,7 +67,6 @@ export default function Settings() {
 
     setLanguageSaving(true);
 
-    // Update i18n immediately for instant feedback
     await i18n.changeLanguage(newLanguage);
     localStorage.setItem('preferred_language', newLanguage);
 
@@ -89,19 +88,10 @@ export default function Settings() {
   };
 
   const handleAvatarChange = async (_url: string | null, storagePath: string | null) => {
-    // Only ever persist a real storage path. This call site passes no `value`,
-    // so FileUpload renders no remove button and reports only SUCCESSFUL uploads
-    // — a failed one now leaves the parent's value untouched rather than
-    // reporting null, precisely so a dropped connection cannot blank the column
-    // and (since #275) delete the photo it failed to replace. The guard keeps
-    // that guarantee local rather than inherited. (Same guard the org-logo upload
-    // uses in OrgAnalytics.) FileUpload surfaces the error to the user for retry.
     if (!profile || !storagePath) return;
 
     setAvatarSaving(true);
     try {
-      // Persist the raw container-relative blob path; display signs it for
-      // viewing via useSignedBrandingUrl.
       await callApi('/api/profile-update', { avatar_url: storagePath });
       await refreshUserContext();
     } catch (error) {
@@ -135,9 +125,6 @@ export default function Settings() {
 
     try {
       await callApi('/api/profile-update', { first_name: firstName.trim(), last_name: lastName.trim(), department: department.trim() });
-      // Routine save: in-button "Saved" morph, no success toast (toast policy;
-      // supersedes the explicit success toast added for #20 — the morph is the
-      // visible save confirmation now).
       flash('profile');
       await refreshUserContext();
     } catch (error) {
@@ -320,7 +307,6 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Assessment card — shown only to plain learners */}
         {!isPlatformAdmin && !isOrgAdmin && (
           <Card className="mb-4" data-testid="assessment-settings-card">
             <CardContent className="space-y-3 px-[26px] py-6">
@@ -339,7 +325,6 @@ export default function Settings() {
                         {t('assessment.settings.lastTaken', {
                           date: formatDate(
                             new Date(profile.assessment_taken_at),
-                            // Danish writes "22. juli 2026", English "22 July 2026" — no dot.
                             i18n.language?.startsWith('da') ? 'd. MMMM yyyy' : 'd MMMM yyyy',
                             i18n.language,
                           ),

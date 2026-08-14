@@ -1,12 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
-// i18n echo — REPO CONVENTION (see save-button.test.tsx / ReportedContentDialog.test.tsx):
-// t returns the key so the render resolves without a global i18n instance (test files
-// run isolated, so nothing initialises react-i18next otherwise). Key strings still
-// satisfy the /check/i etc. name matchers below. The one exception is the
-// `placeInBucket` aria-label: it must interpolate {{label}} so the "place in <bucket>"
-// accessible-name matchers resolve, mirroring the real en.json value ("Place in {{label}}").
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (k: string, opts?: { label?: string }) =>
@@ -33,7 +27,6 @@ describe('BucketSortPlayer', () => {
     const onComplete = vi.fn();
     render(<BucketSortPlayer config={config} onComplete={onComplete} />);
 
-    // Click-to-place: select item, then click target bucket.
     fireEvent.click(screen.getByRole('button', { name: /Brainstorm/ }));
     fireEvent.click(screen.getByRole('button', { name: /place in Draft/i }));
     fireEvent.click(screen.getByRole('button', { name: /Approve firing/ }));
@@ -70,8 +63,6 @@ describe('BucketSortPlayer', () => {
   });
 });
 
-// The three exercise.* keys the component renders must exist in BOTH locales
-// (frontend convention: every user-facing string has en + da).
 describe('exercise i18n keys', () => {
   it.each(['check', 'allCorrect', 'tryAgain', 'placeHere', 'placeInBucket'])('defines exercise.%s in en and da', (key) => {
     const enVal = (en as unknown as Record<string, Record<string, string>>).exercise?.[key];

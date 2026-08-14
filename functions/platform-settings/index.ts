@@ -3,10 +3,6 @@ import { endpoint } from '../shared/endpoint';
 
 export default endpoint('platform-settings', async ({ profile, reply }) => {
   if (!profile.is_platform_admin) {
-    // RLS parity: the original Supabase RLS restricted platform_settings SELECT to platform admins only.
-    // Non-admins receive an empty array (not 403) because the frontend hook runs for every authenticated
-    // user and treats empty settings as "use client-side defaults". A 403 would break normal users.
-    // This also keeps any sensitive values in the settings rows from leaking to non-admins.
     return reply(200, { settings: [] });
   }
 

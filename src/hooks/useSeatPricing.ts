@@ -3,7 +3,6 @@ import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { SeatPricing } from '@/lib/types';
 
-/** The one way to read the seat price for the request dialog. */
 export function useSeatPricing() {
   return useQuery({
     queryKey: queryKeys.seatPricing.all,

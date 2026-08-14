@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { queryKeys } from './query-keys';
 
-// These tests assert that every factory method returns the EXACT array literal
-// that the corresponding call site used before migration. Byte-for-byte identity
-// matters because TanStack Query invalidation uses prefix matching.
 
 describe('queryKeys', () => {
   it('organizations.all returns the root key', () => {

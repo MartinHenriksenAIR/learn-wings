@@ -4,36 +4,23 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// #205 — composer avatar parity. Both community comment composers (IdeaDetail's
-// and CommentThread's) show the current user's avatar exactly as their posted
-// comments render it: the photo when the profile has an uploaded avatar_url,
-// coloured initials otherwise. CommentThread's composer avatar is optional —
-// with the props omitted it renders nothing rather than a broken avatar.
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
-// Resolve a stored avatar path to a deterministic signed URL (the real hook hits
-// a query). null/undefined path → no URL, so the initials fallback shows.
 vi.mock('@/hooks/useSignedBrandingUrl', () => ({
   useSignedBrandingUrl: (path: string | null | undefined) => ({
     data: path ? `https://signed.example/${path}` : undefined,
   }),
 }));
 
-// Radix's AvatarImage only mounts the <img> after the browser loads it, which
-// jsdom never does. Render deterministic primitives so photo-vs-initials is
-// observable in the DOM.
 vi.mock('@/components/ui/avatar', () => ({
   Avatar: ({ children, ...p }: any) => <div {...p}>{children}</div>,
   AvatarImage: ({ src, alt = '' }: any) => <img src={src} alt={alt} />,
   AvatarFallback: ({ children }: any) => <span>{children}</span>,
 }));
 
-// ---------------------------------------------------------------------------
-// IdeaDetail composer
-// ---------------------------------------------------------------------------
 
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -81,8 +68,6 @@ const baseIdea = {
   user_has_voted: false,
 };
 
-// Non-admin viewer named "Test User" (→ initials "TU"). avatarUrl is threaded in
-// per test so we can flip the photo-vs-initials fork.
 function makeAuth(avatarUrl: string | null) {
   return {
     user: { id: 'oid-entra-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
@@ -126,7 +111,6 @@ function renderIdeaDetail() {
 describe('IdeaDetail composer avatar (#205)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Empty comment list → the only avatar on the page is the composer's.
     mockFetchIdea.mockResolvedValue(baseIdea);
     mockFetchIdeaComments.mockResolvedValue([]);
   });
@@ -149,9 +133,6 @@ describe('IdeaDetail composer avatar (#205)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// CommentThread composer
-// ---------------------------------------------------------------------------
 
 describe('CommentThread composer avatar (#205)', () => {
   const baseProps = {
@@ -182,9 +163,7 @@ describe('CommentThread composer avatar (#205)', () => {
 
   it('renders no composer avatar when the current-user props are not passed', () => {
     const { container } = render(<CommentThread {...baseProps} />);
-    // The composer itself still renders (currentUserId is present)…
     expect(screen.getByPlaceholderText('community.addCommentPlaceholder')).toBeInTheDocument();
-    // …but with no avatar props there is neither a photo nor initials.
     expect(container.querySelector('img')).toBeNull();
     expect(screen.queryByText('TU')).not.toBeInTheDocument();
   });

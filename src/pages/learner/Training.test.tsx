@@ -8,8 +8,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
-// AppLayout → renders children plus the breadcrumb crumb labels, so the page's
-// header breadcrumb (#421) is assertable.
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({
     children,
@@ -38,8 +36,6 @@ vi.mock('@/components/learner/CertificateCard', () => ({
   CertificateCard: () => <div data-testid="cert-card" />,
 }));
 
-// The Mandatory + Favorites sections are self-contained components with their own
-// unit tests; here we stub them to verify the page wires them in with the org id.
 vi.mock('@/components/learner/MandatoryCourses', () => ({
   MandatoryCourses: ({ orgId, view }: { orgId?: string; view?: string }) => (
     <div data-testid="mandatory-section" data-org={orgId} data-view={view} />
@@ -110,7 +106,6 @@ const completedEnrollment = {
   status: 'completed', enrolled_at: '2026-06-01T00:00:00Z', completed_at: '2026-06-10T00:00:00Z',
   course: { id: 'c-1', title: 'Finished Course', level: 'basic', description: '' },
 };
-// total 8 lessons, 6 done -> 75%
 const progress = { 'c-1': { total: 4, completed: 4 }, 'c-2': { total: 4, completed: 2 } };
 
 function setTraining(data: {
@@ -164,7 +159,6 @@ describe('LearnerTraining', () => {
   it('shows the lesson-aggregate figure in the progress strip', () => {
     renderTraining();
     const strip = screen.getByTestId('training-progress-strip');
-    // 6 of 8 lessons -> 75%
     expect(within(strip).getByText('75%')).toBeInTheDocument();
     expect(within(strip).getByText('training.progress.summary')).toBeInTheDocument();
   });
@@ -174,7 +168,6 @@ describe('LearnerTraining', () => {
     const card = screen.getByTestId('training-continue-card');
     expect(within(card).getByText('Ongoing Course')).toBeInTheDocument();
     const resume = within(card).getByRole('link', { name: /common\.continue/ });
-    // The resume link tags its origin so the player's breadcrumb points back to Min Træning (#438).
     expect(resume).toHaveAttribute('href', '/app/learn/c-2?from=training');
   });
 
@@ -239,7 +232,6 @@ describe('LearnerTraining — card/list view toggle (#449)', () => {
     expect(screen.getByTestId('training-continue-card')).toBeInTheDocument();
     expect(screen.queryByTestId('training-continue-row')).toBeNull();
     expect(screen.getByLabelText('courses.viewAsCards')).toHaveAttribute('aria-pressed', 'true');
-    // The toggle drives the Mandatory + Favorites widgets too (all listings, #449).
     expect(screen.getByTestId('mandatory-section')).toHaveAttribute('data-view', 'card');
     expect(screen.getByTestId('favorites-section')).toHaveAttribute('data-view', 'card');
   });
@@ -250,7 +242,6 @@ describe('LearnerTraining — card/list view toggle (#449)', () => {
 
     expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
     expect(screen.queryByTestId('training-continue-card')).toBeNull();
-    // Completed listing (certificates off) stays present in list view.
     expect(screen.getByTestId('training-completed-card')).toBeInTheDocument();
     expect(screen.getByTestId('mandatory-section')).toHaveAttribute('data-view', 'list');
     expect(screen.getByTestId('favorites-section')).toHaveAttribute('data-view', 'list');
@@ -269,7 +260,6 @@ describe('LearnerTraining — card/list view toggle (#449)', () => {
     mockPlatformSettings.mockReturnValue({ features: { certificates_enabled: true }, isLoading: false });
     window.localStorage.setItem('min-traening-view', 'list');
     renderTraining();
-    // In-progress reflects list view, and the certs-on completed branch still renders certificate cards.
     expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
     expect(screen.getByTestId('cert-card')).toBeInTheDocument();
     expect(screen.queryByTestId('training-completed-card')).toBeNull();

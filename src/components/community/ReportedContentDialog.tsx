@@ -24,20 +24,9 @@ interface ReportedContentDialogProps {
   report: Pick<CommunityReport, 'target_type' | 'target_id' | 'post_id'> | null;
 }
 
-/**
- * Read-only "View content" dialog for community moderation (#160).
- *
- * Replaces the old new-tab deep-link (which bounced to login because the fresh
- * tab had no auth session). Renders the reported post + its comment thread
- * in-place; for comment reports the reported comment is highlighted and scrolled
- * into view. The single-post and comments endpoints already return hidden content
- * to platform/org admins, so moderators can see content they have hidden.
- */
 export function ReportedContentDialog({ open, onOpenChange, report }: ReportedContentDialogProps) {
   const { t, i18n } = useTranslation();
 
-  // Resolve which post to load: post targets ARE the post; comment targets carry
-  // their parent post id (community-reports joins it out, #86).
   const postId = report
     ? report.target_type === 'post'
       ? report.target_id
@@ -57,7 +46,6 @@ export function ReportedContentDialog({ open, onOpenChange, report }: ReportedCo
     enabled: open && !!postId,
   });
 
-  // Scroll the reported comment into view once the thread has rendered.
   useEffect(() => {
     if (!open || !highlightedCommentId || comments.length === 0) return;
     const el = document.getElementById(`comment-${highlightedCommentId}`);

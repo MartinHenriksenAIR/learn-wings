@@ -88,10 +88,6 @@ export default function PlatformSettings() {
   const query = usePlatformSettingsAdmin();
   const queryClient = useQueryClient();
 
-  // Platform-admin management (#128, #198). Both lists derive from the single
-  // /api/profiles read (it already returns is_platform_admin), fetched lazily
-  // only once the admins tab is opened — the dedicated /api/platform-admins list
-  // endpoint was dropped as redundant.
   const platformAdminsTabActive = activeTab === 'platform_admins';
   const profilesQuery = useProfiles({ enabled: platformAdminsTabActive });
 
@@ -144,11 +140,6 @@ export default function PlatformSettings() {
     });
   }, [query.data]);
 
-  // Per-panel save. Sends ONLY the panel's fields under `value`; the server
-  // merges with the stored config (`value || $2::jsonb`), so partial/malformed
-  // writes never clobber other keys (#90). Routine saves morph the button
-  // ("Saved" / green) instead of firing a success toast (toast policy); errors
-  // keep their toast.
   const saveSettingMutation = useToastMutation({
     mutationFn: ({ key, value }: { key: SettingsKey; value: SettingsValue }) =>
       callApi('/api/platform-settings-update', { key, value }),
@@ -219,9 +210,6 @@ export default function PlatformSettings() {
           <Card>
             <CardContent className="space-y-[18px] px-[26px] py-6">
               <div className="rounded-xl border border-[#eceef3] bg-muted/50 p-4">
-                {/* Not a field label: the default role is fixed to Learner (see
-                    the note), so there is no control to associate — a heading,
-                    not a <Label>. (#327) */}
                 <p className="text-[13.5px] font-bold leading-none">{t('platformSettings.userAccess.defaultRole')}</p>
                 <p className="mt-1 text-[11.5px] text-muted-foreground">
                   {t('platformSettings.userAccess.defaultRoleNote')}
@@ -260,8 +248,6 @@ export default function PlatformSettings() {
                 />
               </div>
 
-              {/* #354: individual ("walk-in") self-serve tier. A DISTINCT policy from
-                  allow_self_registration (company Entra auto-join) — deliberately not merged. */}
               <div className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]">
                 <div className="flex flex-col gap-px">
                   <Label htmlFor="allow_individual_registration" className="text-[13.5px] font-bold">

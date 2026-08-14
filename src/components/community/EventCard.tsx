@@ -13,15 +13,6 @@ interface EventCardProps {
   event: CommunityPost;
 }
 
-/**
- * Date-forward event card for the community "Events & Office Hours" tab (#125).
- * A scaled-up take on the UpcomingEvents sidebar widget: a month/day date block,
- * the event title, its host (the post author), a time + location line, and a
- * prominent Join button opening the registration URL in a new tab. Clicking the
- * card body opens the post detail page — routed by the event's own `scope`,
- * since a merged events list mixes global and org posts. The Join click stays
- * self-contained (stopPropagation) so it never triggers that navigation.
- */
 export function EventCard({ event }: EventCardProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -45,7 +36,6 @@ export function EventCard({ event }: EventCardProps) {
       }}
       className="flex cursor-pointer items-center gap-4 rounded-2xl border border-border bg-card px-5 py-4 transition-shadow hover:shadow-[0_10px_28px_rgba(20,24,46,0.08)]"
     >
-      {/* Date block — month over day, filled with the primary colour when today */}
       {eventDate && (
         <div
           className={cn(
@@ -95,7 +85,6 @@ export function EventCard({ event }: EventCardProps) {
         )}
       </div>
 
-      {/* Join — opens the external registration page; must not open the detail */}
       {event.event_registration_url && (
         <a
           href={safeHref(event.event_registration_url)}

@@ -16,10 +16,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useViewModeLabels } from '@/components/layout/view-mode-labels';
 import { routes } from '@/lib/routes';
 
-// Default hrefs for common intermediate crumbs, keyed by a STABLE route id — not
-// the display label. Keying by the English label meant the Danish locale (whose
-// translated label never matched) silently dropped the link; a stable id keeps
-// the default href resolving in every locale.
 const DEFAULT_BREADCRUMB_HREFS = {
   community: routes.community.feed,
   ideaLibrary: routes.community.ideas,
@@ -29,9 +25,7 @@ export type BreadcrumbHrefKey = keyof typeof DEFAULT_BREADCRUMB_HREFS;
 
 export interface Crumb {
   label: string;
-  /** Explicit href — wins over `hrefKey`. */
   href?: string;
-  /** Stable route id to resolve a default href, locale-independently. */
   hrefKey?: BreadcrumbHrefKey;
 }
 

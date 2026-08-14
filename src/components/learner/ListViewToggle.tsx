@@ -4,11 +4,6 @@ import { LayoutGrid, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ListView } from '@/hooks/useListView';
 
-/**
- * Card/list segmented toggle shared by the Course Catalog and My Training (#449).
- * Labels come from the `courses.*` namespace (section-agnostic "Card view" /
- * "List view") so both pages read identically to assistive tech.
- */
 export function ListViewToggle({
   view,
   onChange,

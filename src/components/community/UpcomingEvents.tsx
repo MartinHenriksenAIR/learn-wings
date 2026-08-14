@@ -11,7 +11,6 @@ import type { CommunityPost } from '@/lib/community-types';
 interface UpcomingEventsProps {
   events: CommunityPost[];
   onEventClick?: (event: CommunityPost) => void;
-  /** When set, renders a "View all" link in the header (→ the Events page, #344). */
   viewAllTo?: string;
   className?: string;
 }

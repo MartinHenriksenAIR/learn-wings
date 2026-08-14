@@ -13,16 +13,11 @@ interface CommentThreadProps {
   comments: CommunityComment[];
   postId: string;
   currentUserId?: string;
-  /** Current user's stored avatar path — shows their photo in the composer;
-   * omitted (props-not-passed) → the composer avatar is simply hidden. */
   currentUserAvatarPath?: string | null;
-  /** Current user's display name — derives the composer avatar's initials fallback. */
   currentUserName?: string | null;
   isAdmin?: boolean;
   isLocked?: boolean;
   isLoading?: boolean;
-  /** Read-only mode (e.g. the moderation "View content" dialog): render the
-   * thread for viewing only — no composer, reply, copy-link, or locked banner. */
   readOnly?: boolean;
   highlightedCommentId?: string | null;
   onAddComment: (content: string, parentId?: string) => Promise<void>;

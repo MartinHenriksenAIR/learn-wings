@@ -91,11 +91,9 @@ describe('useOrgDetail', () => {
     );
 
     await waitFor(() => {
-      // data should be null (not undefined) after a 404
       expect(capturedData).toBeNull();
     });
 
-    // 404 must NOT propagate as an error to TanStack Query
     expect(capturedError).toBeNull();
   });
 

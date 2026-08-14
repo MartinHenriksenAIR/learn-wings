@@ -25,9 +25,6 @@ import PlatformSettings from './PlatformSettings';
 
 const mockCallApi = callApi as ReturnType<typeof vi.fn>;
 
-// Fixture — the User & Access panel is the default tab. require_email_verification
-// defaults to false, so a server value of `true` is distinguishable from the
-// seed-default the component starts with.
 const serverUserAccessRow = {
   key: 'user_access',
   value: {
@@ -45,8 +42,6 @@ const verificationSwitch = () =>
   screen.getByRole('switch', { name: 'platformSettings.userAccess.requireEmailVerification' });
 
 function renderPage() {
-  // `retry: false` so hook queries surface load errors immediately (matching
-  // the old imperative fetch, which never retried).
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -65,14 +60,8 @@ describe('PlatformSettings', () => {
   it('round-trip: re-mount shows server value, not a locally-edited value (#40 acceptance)', async () => {
     mockCallApi.mockResolvedValue(successResponse);
 
-    // First mount
     const { unmount } = renderPage();
 
-    // Wait for the server value, not merely for the control to exist (#305). The
-    // component seeds local state with defaults (require_email_verification:
-    // false) and copies query.data in via an effect, so there is a render in
-    // which the switch exists and is still unchecked. Awaiting existence can
-    // resolve inside that window; awaiting the checked state cannot.
     await waitFor(() => {
       expect(verificationSwitch()).toBeChecked();
     });
@@ -102,7 +91,6 @@ describe('PlatformSettings', () => {
     expect(screen.getByText('platformSettings.loadFailedDescription')).toBeInTheDocument();
     expect(screen.queryAllByRole('switch')).toHaveLength(0);
 
-    // Save labels are i18n keys (platformSettings.*.save); only the retry button should exist.
     const buttons = screen.getAllByRole('button');
     for (const btn of buttons) {
       expect(btn).not.toHaveAccessibleName(/\.save$/i);
@@ -128,7 +116,6 @@ describe('PlatformSettings', () => {
     const retryBtn = screen.getByRole('button', { name: 'platformSettings.retry' });
     fireEvent.click(retryBtn);
 
-    // Await the value, not the element (#305) — see the round-trip test above.
     await waitFor(() => {
       expect(verificationSwitch()).toBeChecked();
     });
@@ -174,8 +161,6 @@ describe('PlatformSettings', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'platformSettings.userAccess.save' }));
 
-    // Sends only the panel's fields under `value` (#90 merge: the server never
-    // receives other keys, so it can't clobber them).
     await waitFor(() => {
       expect(mockCallApi).toHaveBeenCalledWith(
         '/api/platform-settings-update',
@@ -194,17 +179,13 @@ describe('PlatformSettings', () => {
     const selfRegSwitch = () =>
       screen.getByRole('switch', { name: 'platformSettings.userAccess.allowSelfRegistration' });
 
-    // Default ON (absent from the server row → seeded from defaults), and a
-    // genuinely separate control from company self-registration.
     await waitFor(() => expect(walkInSwitch()).toBeChecked());
     expect(walkInSwitch()).not.toBe(selfRegSwitch());
 
-    // Toggling walk-in off leaves self-registration untouched (distinct policies).
     fireEvent.click(walkInSwitch());
     expect(walkInSwitch()).not.toBeChecked();
     expect(selfRegSwitch()).toBeChecked();
 
-    // Save persists the field through platform-settings-update.
     mockCallApi.mockClear();
     mockCallApi.mockResolvedValue({});
     fireEvent.click(screen.getByRole('button', { name: 'platformSettings.userAccess.save' }));
@@ -246,9 +227,7 @@ describe('PlatformSettings', () => {
 
     renderPage();
 
-    // The caption renders (the default role is fixed to Learner)...
     expect(await screen.findByText('platformSettings.userAccess.defaultRole')).toBeInTheDocument();
-    // ...but it labels no control, so it must not masquerade as a form label.
     expect(screen.queryByLabelText('platformSettings.userAccess.defaultRole')).toBeNull();
   });
 });

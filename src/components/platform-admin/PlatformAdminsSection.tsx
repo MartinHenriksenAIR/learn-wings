@@ -19,14 +19,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-/** A current platform admin, projected from a profile (#198). */
 export interface PlatformAdmin {
   id: string;
   full_name: string;
   email: string | null;
 }
 
-/** A user who could be granted platform-admin (non-admin profile). */
 interface GrantCandidate {
   id: string;
   full_name: string;
@@ -34,11 +32,9 @@ interface GrantCandidate {
 
 interface PlatformAdminsSectionProps {
   admins: PlatformAdmin[];
-  /** Non-admin users selectable in the grant control. */
   availableUsers: GrantCandidate[];
   onGrant: (userId: string) => void;
   onRevoke: (userId: string) => void;
-  /** A grant/revoke request is in flight. */
   pending: boolean;
 }
 
@@ -46,13 +42,6 @@ type Confirm =
   | { action: 'grant'; userId: string; name: string }
   | { action: 'revoke'; userId: string; name: string };
 
-/**
- * Platform-admin management (#128): lists current platform admins with a Revoke
- * action and a grant control to promote an existing user. Every grant/revoke is
- * gated behind a confirmation AlertDialog — the parent's mutation only fires
- * once the user confirms. The server independently HARD-REFUSES demoting the
- * last remaining admin; that 409 surfaces as an error toast at the call site.
- */
 export function PlatformAdminsSection({
   admins,
   availableUsers,

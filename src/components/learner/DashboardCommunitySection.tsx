@@ -13,20 +13,6 @@ import type { CommunityPost } from '@/lib/community-types';
 
 const RECENT_POSTS_LIMIT = 4;
 
-/**
- * Community glance on the learner dashboard (#343): a preview of recent posts
- * plus the shared UpcomingEvents card, with a "View all" link into the feed.
- *
- * Mounted only when `useCommunityGate` reports the feature enabled (the parent
- * gates), so its queries stay idle when community is off. Reuses the
- * community-posts reader (`useCommunityEvents`, which returns every post for a
- * scope) for both derivations — the recent-activity sort and the events cut
- * share one cached request per scope.
- *
- * `orgId` is omitted for the individual tier (#354): the hidden placeholder is
- * not a real org, so the 'org' query self-disables and the teaser shows global
- * content only.
- */
 export function DashboardCommunitySection({ orgId }: { orgId?: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();

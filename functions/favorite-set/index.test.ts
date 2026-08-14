@@ -12,8 +12,6 @@ const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember, isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
-// resolveVisibilityContext is mocked (fragment builders kept real via importOriginal) so it
-// consumes no queryOne slot — every existing order-sensitive queryOne sequence stays intact.
 vi.mock('../shared/course-visibility', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/course-visibility')>()),
   resolveVisibilityContext: mockResolveVisibility,
@@ -36,7 +34,6 @@ describe('favorite-set', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockIsActiveMember.mockResolvedValue(true);
-    // Default: standard (non-individual) tier — keeps every existing test on the org_course_access gate.
     mockResolveVisibility.mockResolvedValue({ isIndividual: false, language: 'da' });
   });
 
@@ -124,12 +121,10 @@ describe('favorite-set', () => {
     expect(JSON.parse(res.body as string)).toEqual({ favorited: true });
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
-    // Individual gate bypasses org_course_access and requires published + the caller's language.
     expect(sql).not.toContain('org_course_access');
     expect(sql).toContain('c.is_published = TRUE');
     expect(sql).toContain('c.language = $3');
     expect(params).toEqual(['org-1', 'course-1', 'en']);
-    // The upsert still runs on the individual path.
     expect(mockQuery).toHaveBeenCalledTimes(1);
     const [insertSql, insertParams] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(insertSql).toContain('INSERT INTO course_favorites (user_id, course_id)');

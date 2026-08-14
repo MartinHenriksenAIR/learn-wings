@@ -26,14 +26,12 @@ export function ExerciseEditorDialog({ lessonId, lessonTitle, open, onOpenChange
 
   const { data } = useExerciseAdmin(lessonId, { enabled: open && !!lessonId });
 
-  // Seed the form from the fetched exercise (or empty for a fresh lesson).
   useEffect(() => {
     if (!open) return;
     if (data?.exercise) { setKind(data.exercise.exercise_kind); setConfig(data.exercise.config); }
     else { setKind('quick_check'); setConfig(emptyQuickCheck()); }
   }, [open, data]);
 
-  // Kind switch = confirmed destructive reset (config shapes are incompatible).
   const changeKind = (next: ExerciseKind) => {
     if (next === kind) return;
     if (!window.confirm(t('exercise.editor.switchKindConfirm'))) return;

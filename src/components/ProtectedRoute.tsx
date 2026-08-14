@@ -42,17 +42,10 @@ export function ProtectedRoute({
   }
 
   if (!user) {
-    // Remember where the user was headed so Login can restore it after the
-    // Entra round trip (deep links / Copy link, #16).
     savePostLoginRedirect(location.pathname + location.search + location.hash);
     return <Navigate to={routes.auth.login} replace />;
   }
 
-  // The user is signed in but /api/user-context failed to load. Surface it with
-  // a retry BEFORE any authorization/redirect logic below — otherwise a platform
-  // admin whose context blipped is read as `!isPlatformAdmin` and silently
-  // bounced to the learner dashboard (#232). A settled-but-null profile is always
-  // a failure here (the backend auto-provisions on first login).
   if (contextError) {
     const isAuth = contextError === 'auth';
     return (
@@ -84,6 +77,6 @@ export function ProtectedRoute({
   if (requireOrgAdmin && !effectiveIsOrgAdmin) {
     return <Navigate to={routes.learner.dashboard} replace />;
   }
-  
+
   return <>{children}</>;
 }

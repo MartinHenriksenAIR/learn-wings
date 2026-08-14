@@ -19,29 +19,14 @@ import { cn } from '@/lib/utils';
 import { Upload, X, FileText, Video, Image as ImageIcon, Loader2 } from 'lucide-react';
 
 interface FileUploadProps {
-  /**
-   * Declares upload intent so the backend routes the blob to the right
-   * container. `org-logo`/`avatar` go to the public branding container;
-   * omitted → the private default (videos, documents, thumbnails).
-   */
   assetType?: 'org-logo' | 'avatar';
   folder?: string;
   accept?: UploadAccept;
   value?: string | null;
   onChange: (url: string | null, storagePath: string | null) => void;
-  /**
-   * Tightens the limit below the server cap for this call site (avatars ask for
-   * 2 MB). Never widens it: `effectiveMaxSizeMB` clamps to the cap the backend
-   * enforces, so the UI can't promise something the save would 413 on. Defaults
-   * to the server cap for `accept`.
-   */
   maxSizeMB?: number;
   className?: string;
   disabled?: boolean;
-  /**
-   * Forwarded to the underlying file input so a `<Label htmlFor>` can name the
-   * control (#325). Clicking such a label opens the file picker.
-   */
   id?: string;
 }
 
@@ -75,10 +60,6 @@ export function FileUpload({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  // Local preview of the just-uploaded image: the stored value is a raw blob
-  // path, which <img> can't load without a signed URL (#158). `forValue` ties
-  // the preview to the value it belongs to, so a parent-supplied value (e.g. a
-  // pre-signed URL, or a reset) is never shadowed by a stale preview.
   const [preview, setPreview] = useState<{ url: string; forValue: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -87,12 +68,6 @@ export function FileUpload({
     return () => URL.revokeObjectURL(preview.url);
   }, [preview]);
 
-  // Drop the preview once the parent adopts a different value than the one it
-  // was made for — e.g. a post-save refetch re-signs the path, or a consumer
-  // stores a public URL instead of the blob path. Without this the object URL
-  // lingers (invisibly) until unmount; clearing it lets the effect above revoke
-  // it now. Safe because setPreview and the parent's onChange→value update batch
-  // into one render, so a live preview is never seen as diverged.
   useEffect(() => {
     if (preview && preview.forValue !== value) setPreview(null);
   }, [value, preview]);
@@ -103,26 +78,13 @@ export function FileUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Clearing the input is the single exit path for EVERY branch below,
-    // including the early returns. A `change` event only fires when the value
-    // changes, so leaving a rejected file in the input means re-picking the same
-    // file after fixing nothing does nothing at all — the control looks dead.
     try {
-      // Refuse what the server's mint endpoint would refuse, but with a message
-      // that names the formats — the server's own answer is a bare
-      // "File type not allowed".
       const typeError = checkUploadFileType(accept, file);
       if (typeError) {
         showMessage(typeError);
         return;
       }
 
-      // Size is validated in TWO places, and the split is the point (#276/#278).
-      // Here we only reject what could never work: for a file that is about to be
-      // downscaled the bar is the decode ceiling, not the upload cap, because a
-      // 15 MB photo destined to become a 200 KB thumbnail must be shrunk rather
-      // than refused. The cap itself is applied further down, to the bytes that
-      // will actually be PUT.
       const downscalable = willDownscale(accept, file.type);
       const selectionError = checkSelectedFileSize(file.size, capMB, downscalable);
       if (selectionError) {
@@ -136,28 +98,11 @@ export function FileUpload({
       setFileName(file.name);
 
       try {
-        // Shrink oversized images before the PUT (#278). This runs first, while
-        // the spinner is already showing and before the short-lived SAS URL is
-        // minted, so a slow decode can't eat into that URL's validity window.
-        // downscaleImageFile never throws, never hangs, and returns the original
-        // file whenever downscaling is impossible, unprofitable or unsafe, so
-        // `upload` is always safe — and its name/MIME type always match the
-        // original, keeping the contentType handshake below unchanged.
         const upload = maxEdge === null ? file : await downscaleImageFile(file, maxEdge);
 
-        // The cap, applied to what will ACTUALLY be uploaded — this is the check
-        // that mirrors the server's post-upload HEAD, so clearing it is what makes
-        // the eventual save succeed. It can still fire after a downscale: a format
-        // we don't re-encode (animated GIF, SVG), a browser without a canvas
-        // encoder, or a re-encode that came out no smaller all leave `upload ===
-        // file`. Bailing here costs the user nothing — no SAS URL has been minted
-        // and no bytes have been sent.
         const payloadError = checkUploadPayloadSize(upload.size, capMB);
         if (payloadError) {
           showMessage(payloadError);
-          // Nothing was stored, so drop the name we optimistically adopted — with a
-          // value already present the tile would otherwise label the OLD blob with
-          // the REJECTED file's name.
           setFileName(null);
           return;
         }
@@ -184,27 +129,12 @@ export function FileUpload({
 
         setProgress(100);
         if (accept === 'image') {
-          // Preview the bytes we actually stored, so what the user sees is what
-          // the blob holds (identical to `file` when no downscale happened).
           setPreview({ url: URL.createObjectURL(upload), forValue: uploadData.blobPath });
         }
         onChange(uploadData.blobPath, uploadData.blobPath);
       } catch (err) {
-        // The thrown text is diagnostic, not actionable, and is the one string
-        // no translation could reach — log it and show the translated summary.
         console.error('Upload failed:', err);
         setError(t('fileUpload.errorUploadFailed'));
-        // Deliberately NO `onChange(null, null)` here. Nothing was stored, so
-        // whatever value the parent already holds still names a live blob — and
-        // since #275 a persisted null is what DELETES that blob, so reporting a
-        // dropped connection as "the field is now empty" would destroy the very
-        // image the retry was meant to replace. `onChange(null, null)` therefore
-        // has exactly ONE meaning in this component: the user cleared the field
-        // (handleRemove). That is the distinction the save paths rely on.
-        //
-        // Drop the optimistically-adopted name for the same reason the
-        // payload-cap bail above does: with a value still present, the tile would
-        // otherwise label the OLD blob with the REJECTED file's name.
         setFileName(null);
       } finally {
         setUploading(false);
@@ -302,12 +232,6 @@ export function FileUpload({
             <>
               <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">{t(ctaKeys[accept])}</p>
-              {/* States what the resize actually does — it caps DIMENSIONS for
-                  three formats. The old "larger images are resized
-                  automatically" promised more than the feature delivers: a
-                  small-but-heavy PNG under the edge cap is not resized at all
-                  and is then refused by the very cap printed beside it, and GIF
-                  and SVG are never resized in any case. */}
               <p className="text-xs text-muted-foreground mt-1">
                 {t('fileUpload.maxSize', { size: formatSizeMB(capMB) })}
                 {maxEdge !== null && ` • ${t('fileUpload.imageResizeHint', { maxEdge })}`}

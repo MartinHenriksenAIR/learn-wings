@@ -6,7 +6,6 @@ import type { Exercise } from '@/lib/types';
 interface ExerciseByLessonResult { exercise: Exercise | null; }
 interface Options { enabled?: boolean; }
 
-/** The one way to fetch /api/exercise-by-lesson (learner, full config incl. answers). */
 export function useExerciseByLesson(lessonId: string | undefined, options: Options = {}) {
   return useQuery({
     queryKey: queryKeys.exerciseByLesson.detail(lessonId),

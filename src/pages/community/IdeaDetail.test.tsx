@@ -140,7 +140,6 @@ describe('IdeaDetail admin status panel', () => {
 
     await screen.findByText('community.updateStatus');
 
-    // Panel seeded from the idea: status=rejected, empty reason → save gated off.
     expect(screen.getByText('community.rejectionReason')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'common.save' })).toBeDisabled();
     fireEvent.change(screen.getByPlaceholderText('community.rejectionReasonPlaceholder'), {
@@ -150,10 +149,6 @@ describe('IdeaDetail admin status panel', () => {
   });
 });
 
-// #268 — voting and commenting take only the idea id: both endpoints derive the
-// org from the idea row, so the page never threads currentOrg through. Pinned
-// with currentOrg null, which the old `currentOrg!.id` call sites would have
-// thrown on.
 describe('IdeaDetail vote/comment arguments', () => {
   beforeEach(() => {
     vi.clearAllMocks();

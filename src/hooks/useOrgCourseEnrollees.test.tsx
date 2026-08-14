@@ -101,7 +101,6 @@ describe('useOrgCourseEnrollees', () => {
       expect(screen.getByTestId('c2')).toHaveTextContent('e:2');
     });
 
-    // Two different course IDs = two separate fetches.
     expect(mockCallApi).toHaveBeenCalledTimes(2);
     expect(mockCallApi).toHaveBeenNthCalledWith(1, '/api/org-course-enrollees', { orgId: 'org-1', courseId: 'course-1' });
     expect(mockCallApi).toHaveBeenNthCalledWith(2, '/api/org-course-enrollees', { orgId: 'org-1', courseId: 'course-2' });

@@ -20,7 +20,6 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// whole-org by default (no userId)
 const orgBody = { orgId: 'org-1', courseId: 'course-1' };
 const individualBody = { orgId: 'org-1', courseId: 'course-1', userId: 'user-1' };
 
@@ -130,7 +129,6 @@ describe('assignment-create', () => {
   });
 
   it('returns 400 when the individual target is not an active member of the org', async () => {
-    // platform admin (skips access check); member check returns ok:false
     mockQueryOne
       .mockResolvedValueOnce({ is_published: true }) // course lookup
       .mockResolvedValueOnce({ ok: false });         // membership check

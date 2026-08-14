@@ -26,7 +26,6 @@ function getKey(header: any, callback: (err: Error | null, key?: string) => void
   });
 }
 
-// Multi-tenant: issuer varies per tenant — validate pattern, not fixed value
 const ISSUER_RE = /^https:\/\/login\.microsoftonline\.com\/[0-9a-f-]{36}\/v2\.0$/;
 
 function verifyToken(token: string): Promise<AuthUser> {
@@ -37,25 +36,9 @@ function verifyToken(token: string): Promise<AuthUser> {
       {
         audience: process.env.ENTRA_CLIENT_ID,
         algorithms: ['RS256'],
-        // issuer intentionally omitted — multi-tenant tokens have per-tenant issuers
       },
       (err, decoded) => {
-        // Only genuine token-verification failures become AuthError → 401.
-        // Two token-problem classes qualify:
-        //   • JsonWebTokenError — covers TokenExpiredError and NotBeforeError (both subclasses),
-        //     i.e. every jsonwebtoken validation error (bad signature, expiry, etc.).
-        //   • SigningKeyNotFoundError — jwks-rsa found no signing key for the token's `kid`.
-        //     An unknown/garbage kid is attacker-controllable via a crafted token, so it's a
-        //     TOKEN problem (→ 401), NOT a server fault. Bucketing it as 500 would let bad-kid
-        //     tokens spam logged 500s on demand, masking a real Entra outage.
-        // Any OTHER error here is a signing-key transport/fetch failure surfaced via
-        // getKey/jwks-rsa (JwksError/JwksRateLimitError/DNS fetching login.microsoftonline.com
-        // keys) — reject it AS-IS so the endpoint factory's catch routes it through internalError
-        // (logs + generic 500, ADR-0014) instead of a silent 401.
         if (err) {
-          // NB: jsonwebtoken types `err` as VerifyErrors (JWT subclasses only), but errors from
-          // getKey/jwks-rsa (SigningKeyNotFoundError, JwksError, transport) also surface here at
-          // runtime — its types don't model that. Widen to Error so both instanceof checks are live.
           const e: Error = err;
           const isTokenFailure = e instanceof JsonWebTokenError || e instanceof SigningKeyNotFoundError;
           return reject(isTokenFailure ? new AuthError(e.message) : e);

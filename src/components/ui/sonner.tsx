@@ -10,7 +10,6 @@ type ToastPayload = {
   variant?: ToastVariant;
 } & ExternalToast;
 
-/** Errors stay visible longer than the 5s default so users can read them. */
 const ERROR_TOAST_DURATION = 8000;
 
 const toast = (message: ReactNode | ToastPayload, options?: ExternalToast) => {

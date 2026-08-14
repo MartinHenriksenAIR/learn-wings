@@ -4,14 +4,6 @@ import { queryKeys } from '@/lib/query-keys';
 
 type PlatformSetting = { key: string; value: Record<string, unknown> };
 
-/**
- * The one way to fetch `/api/platform-settings` from the frontend.
- *
- * All consumers share the `['platform-settings']` TanStack Query cache entry,
- * so multiple mounts produce one network request instead of one per mount.
- * Named `usePlatformSettingsAdmin` to avoid colliding with the theming context
- * hook `usePlatformSettings` in `src/hooks/usePlatformSettings.tsx`.
- */
 export function usePlatformSettingsAdmin() {
   return useQuery({
     queryKey: queryKeys.platformSettings.all,

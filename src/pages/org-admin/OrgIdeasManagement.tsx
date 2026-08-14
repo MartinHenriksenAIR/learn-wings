@@ -103,10 +103,6 @@ export default function OrgIdeasManagement() {
 
   const ideas = allIdeas.filter((i) => i.status !== 'draft');
 
-  // Prioritize list — full committed portfolio, ignores the header filters.
-  // Same key as the Board when no filter is active → deduped into one request.
-  // Its own loading flag so an active header filter's refetch doesn't flicker
-  // a spinner on the (independently-keyed) Prioritize tab.
   const { data: allIdeasUnfiltered = [], isLoading: isPrioritizeLoading } = useQuery({
     queryKey: queryKeys.ideasAdmin.list(currentOrg?.id, '', ''),
     queryFn: () => fetchIdeas(currentOrg!.id, {}),
@@ -310,7 +306,6 @@ export default function OrgIdeasManagement() {
                                   </span>
                                 )}
                                 <PriorityBadge value={idea.value_score} effort={idea.effort_score} />
-                                {/* "Open ->" hint surfaces the click-to-open affordance (drag = move). */}
                                 <span
                                   aria-hidden="true"
                                   className="ml-auto inline-flex items-center gap-0.5 text-[10.5px] font-extrabold text-primary opacity-0 transition-opacity group-hover:opacity-100"

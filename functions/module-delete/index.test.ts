@@ -19,10 +19,6 @@ const {
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-// `query` serves two callers here: the endpoint's own collect SELECT (first call)
-// and the reference query the REAL blob-ownership release gate issues afterwards
-// (second call). The gate is exercised rather than stubbed, so "referenced by
-// another row" is expressed as the rows that second call returns.
 vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne, withTransaction: vi.fn(), getDb: vi.fn() }));
 vi.mock('../shared/profile', () => ({
   getProfile: mockGetProfile,
@@ -30,15 +26,6 @@ vi.mock('../shared/profile', () => ({
   isOrgAdmin: vi.fn(),
   isOrgAdminOfAny: vi.fn(),
 }));
-// cleanupBlobs is faked in terms of mockDeleteBlob so the assertions below still pin what
-// belongs to THIS endpoint: which paths it collects, that it attempts one delete per path,
-// and that it echoes the returned counts into the response body. The arithmetic those
-// assertions compare against comes from the fake, not from the real helper — cleanupBlobs'
-// own counting/warning contract is covered by describe('cleanupBlobs') in shared/blob.test.ts.
-//
-// `classifyBlobPath` stays REAL (spread from the original) because blob-ownership
-// imports it from here and it is a pure string check — stubbing it would make
-// every release-gate assertion below vacuous.
 vi.mock('../shared/blob', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/blob')>()),
   deleteBlob: mockDeleteBlob,
@@ -64,8 +51,6 @@ describe('module-delete', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue(adminProfile);
     mockDeleteBlob.mockResolvedValue(true);
-    // Default: no descendant blob paths; DELETE returns a row. The same default
-    // answers the release gate's reference query with "nobody references these".
     mockQuery.mockResolvedValue([]);
     mockQueryOne.mockResolvedValue({ id: 'mod-1' });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -134,8 +119,6 @@ describe('module-delete', () => {
     expect(sql).toMatch(/FROM lessons/i);
     expect(sql).toMatch(/module_id\s*=\s*\$1/i);
     expect(sql).toMatch(/azure_blob_path IS NOT NULL/i);
-    // #280: collecting only azure_blob_path stranded every document lesson's file
-    // and every Supabase-era video_storage_path.
     expect(sql).toMatch(/video_storage_path IS NOT NULL/i);
     expect(sql).toMatch(/document_storage_path IS NOT NULL/i);
   });
@@ -216,9 +199,6 @@ describe('module-delete', () => {
   });
 
   it('leaves a path another row still references, and still deletes its sibling — #280', async () => {
-    // Pre-#279 rows can share a path; cascading this module must not destroy the
-    // blob a surviving lesson elsewhere points at. The sibling that IS deleted in
-    // the same run is what keeps this test non-vacuous.
     mockQuery
       .mockResolvedValueOnce([
         { video_storage_path: null, azure_blob_path: 'shared.mp4', document_storage_path: null },
@@ -235,11 +215,6 @@ describe('module-delete', () => {
   });
 
   it('release-check DB failure: nothing deleted, request still succeeds', async () => {
-    // The gate fails SAFE — an unanswered "is anyone else using this?" must never
-    // resolve to "delete it", and must never turn a completed row delete into a 500.
-    // A standing implementation rather than a queued `…Once`, so the assertion
-    // cannot be satisfied by the collect query alone: whatever the endpoint asks
-    // second, it gets an error. beforeEach's `mockResolvedValue([])` replaces it.
     let call = 0;
     mockQuery.mockReset();
     mockQuery.mockImplementation(async () => {

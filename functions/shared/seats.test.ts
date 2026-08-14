@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import type { PoolClient } from 'pg';
 import { lockSeatUsage, isAtSeatLimit, seatsRemaining, type SeatUsage } from './seats';
 
-// lockSeatUsage only calls client.query — a minimal mock client is enough.
 const mockClient = (queryImpl: ReturnType<typeof vi.fn>) =>
   ({ query: queryImpl }) as unknown as PoolClient;
 

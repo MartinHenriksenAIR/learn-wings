@@ -4,13 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// The "Platform Admins" tab (#198) derives BOTH lists — current admins and
-// grant candidates — from the single /api/profiles read; the dedicated
-// /api/platform-admins list endpoint was dropped. These tests prove that
-// derivation and that a profiles failure renders an error, NOT the misleading
-// "all users are already admins" empty-state.
 
-// `t`/`Trans` echo the key; Trans is used by PlatformAdminsSection.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
   Trans: ({ i18nKey }: { i18nKey: string }) => React.createElement('span', null, i18nKey),
@@ -20,11 +14,8 @@ vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// Passthrough Select: each item is a button so candidate names render into the
-// DOM (jsdom can't drive the Radix Select portal).
 vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
-// Passthrough AlertDialog — not exercised here, but the section imports it.
 vi.mock('@/components/ui/alert-dialog', () => {
   const pass = ({ children }: { children?: React.ReactNode }) =>
     React.createElement('div', null, children);
@@ -53,7 +44,6 @@ import PlatformSettings from './PlatformSettings';
 
 const mockCallApi = callApi as ReturnType<typeof vi.fn>;
 
-// Two admins + one non-admin candidate, all sharing the /api/profiles shape.
 const profiles = [
   {
     id: 'p1', full_name: 'Ada Admin', first_name: 'Ada', last_name: 'Admin',
@@ -83,7 +73,6 @@ function renderPage() {
   );
 }
 
-/** Open the Platform Admins tab; the profiles query only fires once it's active. */
 async function openAdminsTab() {
   await waitFor(() => {
     expect(screen.getByRole('tab', { name: 'platformSettings.tabs.platformAdmins' })).toBeInTheDocument();
@@ -117,7 +106,6 @@ describe('PlatformSettings — platform-settings-derived (#198)', () => {
     );
     expect(screen.queryByRole('button', { name: 'Ada Admin' })).toBeNull();
 
-    // Both lists come from ONE profiles read — the dropped /api/platform-admins endpoint is never called.
     const profilesCalls = mockCallApi.mock.calls.filter((a: unknown[]) => a[0] === '/api/profiles');
     expect(profilesCalls).toHaveLength(1);
     const adminsCalls = mockCallApi.mock.calls.filter((a: unknown[]) => a[0] === '/api/platform-admins');
@@ -140,7 +128,6 @@ describe('PlatformSettings — platform-settings-derived (#198)', () => {
     expect(screen.getByText('platformAdmins.loadFailedDescription')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'platformSettings.retry' })).toBeInTheDocument();
 
-    // An error must NOT render as the "no candidates" empty-state.
     expect(screen.queryByText('platformAdmins.noCandidates')).toBeNull();
     expect(screen.queryByText('platformAdmins.empty')).toBeNull();
   });

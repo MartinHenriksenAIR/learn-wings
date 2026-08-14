@@ -145,8 +145,6 @@ export default function OrganizationDetail() {
     onSuccess: () => {
       toast({ title: 'Invitation cancelled' });
       invalidateInvitations();
-      // Cancelling frees a seat: refresh pending_invite_count so the seat math
-      // stays truthful.
       queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(orgId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
     },
@@ -160,15 +158,10 @@ export default function OrganizationDetail() {
         logo_url: payload.logoUrl,
         seat_limit: payload.seatLimit ? parseInt(payload.seatLimit, 10) : null,
       };
-      // #353: only send the SSO tenant binding when it actually changed, so an
-      // unrelated edit never clobbers a binding auto-seeded (or edited elsewhere)
-      // since this dialog opened. Empty string = clear (null).
       const nextTid = payload.entraTid.trim() || null;
       const nextLabel = payload.entraTidLabel.trim() || null;
       if (nextTid !== (org?.entra_tid ?? null)) updates.entra_tid = nextTid;
       if (nextLabel !== (org?.entra_tid_label ?? null)) updates.entra_tid_label = nextLabel;
-      // #356: same change-only rule — an unrelated edit never rewrites the
-      // per-org self-registration switch. Default true mirrors the DB default.
       if (payload.allowSelfRegistration !== (org?.allow_self_registration ?? true)) {
         updates.allow_self_registration = payload.allowSelfRegistration;
       }
@@ -182,8 +175,6 @@ export default function OrganizationDetail() {
       });
       setEditOpen(false);
       queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(orgId) });
-      // The shared org-list cache (OrganizationsManager / OrgSelector) must not
-      // show a stale name/logo after an edit.
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
     },
   });
@@ -268,9 +259,6 @@ export default function OrganizationDetail() {
     seatLimit: org.seat_limit,
   });
 
-  // OrgDetailHeader owns the page's single <h1> (the org name), so AppLayout's `title`
-  // is omitted here to avoid a duplicate <h1> (#320). The loading branch above keeps
-  // `title` since it has no in-page header — same split as OrganizationsManager / CoursesManager.
   return (
     <AppLayout
       breadcrumbs={[

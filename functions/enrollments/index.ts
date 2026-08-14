@@ -32,13 +32,10 @@ export default endpoint('enrollments', async ({ req, profile, reply }) => {
     if (vUserId) add('user_id', vUserId);
     if (vCourseId) add('course_id', vCourseId);
   } else if (vOrgId && await isOrgAdmin(profile.id, vOrgId)) {
-    // Tier 2: Org admin scope — vOrgId is guaranteed non-empty by the branch condition
     add('org_id', vOrgId);
     if (vUserId) add('user_id', vUserId);
     if (vCourseId) add('course_id', vCourseId);
   } else {
-    // Tier 3: Self scope — force user_id = profile.id, ignore client-supplied userId.
-    // No 403 for unrecognised tiers: READ endpoint uses scoped-down access rather than rejection.
     add('user_id', profile.id);
     if (vOrgId) add('org_id', vOrgId);
     if (vCourseId) add('course_id', vCourseId);

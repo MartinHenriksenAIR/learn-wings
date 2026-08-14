@@ -7,7 +7,6 @@ export default endpoint('exercise-by-lesson', async ({ req, profile, reply }) =>
     return reply(400, { error: 'lessonId is required' });
   }
 
-  // Access check — skip entirely for platform admins (parity with quiz-by-lesson)
   if (!profile.is_platform_admin) {
     const access = await queryOne<{ ok: boolean }>(
       `SELECT EXISTS(
@@ -24,7 +23,6 @@ export default endpoint('exercise-by-lesson', async ({ req, profile, reply }) =>
     if (!access?.ok) return reply(403, { error: 'Exercise access denied' });
   }
 
-  // Full config incl. answers — correctness is checked client-side (ADR-0017).
   const exercise = await queryOne<{ id: string; lesson_id: string; exercise_kind: string; config: unknown }>(
     'SELECT id, lesson_id, exercise_kind, config FROM exercises WHERE lesson_id = $1',
     [lessonId],

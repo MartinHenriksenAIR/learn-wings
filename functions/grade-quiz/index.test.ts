@@ -33,17 +33,11 @@ describe('grade-quiz', () => {
   });
 
   it('returns score and inserts quiz_attempts server-side (happy path)', async () => {
-    // access check
     mockQueryOne.mockResolvedValueOnce({ has_access: true });
-    // quiz metadata
     mockQueryOne.mockResolvedValueOnce({ id: 'quiz-uuid', passing_score: 70 });
-    // quiz questions
     mockQuery.mockResolvedValueOnce([{ id: 'q1-uuid' }, { id: 'q2-uuid' }]);
-    // correct options for q1 → user selected opt-a (correct)
     mockQuery.mockResolvedValueOnce([{ id: 'opt-a', is_correct: true }]);
-    // correct options for q2 → user selected opt-c (wrong, correct is opt-b)
     mockQuery.mockResolvedValueOnce([{ id: 'opt-b', is_correct: true }]);
-    // quiz_attempts insert → rowCount 1 (membership found)
     mockQuery.mockResolvedValueOnce([{ org_id: 'org-1' }]);
 
     const res = await handler(baseReq as any, {} as any);
@@ -55,15 +49,12 @@ describe('grade-quiz', () => {
     expect(body.total_questions).toBe(2);
     expect(body.recorded).toBe(true);
 
-    // SECURITY: is_correct must never appear in the response
     expect(JSON.stringify(body)).not.toContain('is_correct');
 
-    // SECURITY PIN: access check must use profile.id ('p1'), not raw oid
     const accessCall = mockQueryOne.mock.calls.find(c => (c[0] as string).includes('has_access'));
     expect(accessCall).toBeDefined();
     expect(accessCall![1]).toEqual(['p1', 'quiz-uuid']);
 
-    // SECURITY PIN: attempt insert must use profile.id ('p1'), not raw oid
     const insertCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('quiz_attempts'));
     expect(insertCall).toBeDefined();
     expect(insertCall![1]).toEqual(['p1', 'quiz-uuid', 50, false]);
@@ -87,13 +78,9 @@ describe('grade-quiz', () => {
   it('platform-admin bypass: skips access-check SQL, grading still runs', async () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
 
-    // quiz metadata (NO access-check queryOne before this)
     mockQueryOne.mockResolvedValueOnce({ id: 'quiz-uuid', passing_score: 80 });
-    // quiz questions
     mockQuery.mockResolvedValueOnce([{ id: 'q1-uuid' }]);
-    // correct options for q1 → user selected opt-a (correct)
     mockQuery.mockResolvedValueOnce([{ id: 'opt-a', is_correct: true }]);
-    // quiz_attempts insert → zero rows (platform admin has no org_membership row by design)
     mockQuery.mockResolvedValueOnce([]);
 
     const req = {
@@ -110,24 +97,17 @@ describe('grade-quiz', () => {
     expect(body.passed).toBe(true);
     expect(body.recorded).toBe(false);
 
-    // SECURITY: no access-check SQL executed at all (queryOne only called for quiz metadata)
     const allQueryOneCalls = mockQueryOne.mock.calls.map(c => c[0] as string);
     expect(allQueryOneCalls.some(sql => sql.includes('has_access'))).toBe(false);
-    // The only queryOne call should be the quiz metadata fetch
     expect(allQueryOneCalls).toHaveLength(1);
     expect(allQueryOneCalls[0]).toContain('quizzes');
   });
 
   it('still returns 200 with correct grade when INSERT writes zero rows (recorded: false)', async () => {
-    // Simulates a learner whose membership was disabled mid-session (passed access
-    // check earlier but has no active row at INSERT time). Grade is valid feedback;
-    // the attempt is simply not persisted — surface it via recorded: false (#18).
     mockQueryOne.mockResolvedValueOnce({ has_access: true });
     mockQueryOne.mockResolvedValueOnce({ id: 'quiz-uuid', passing_score: 50 });
-    // one question, answered correctly
     mockQuery.mockResolvedValueOnce([{ id: 'q1-uuid' }]);
     mockQuery.mockResolvedValueOnce([{ id: 'opt-a', is_correct: true }]);
-    // INSERT returns no rows — no active membership found
     mockQuery.mockResolvedValueOnce([]);
 
     const req = {
@@ -155,9 +135,7 @@ describe('grade-quiz', () => {
   });
 
   it('returns 404 when quiz not found', async () => {
-    // access check passes
     mockQueryOne.mockResolvedValueOnce({ has_access: true });
-    // quiz not found
     mockQueryOne.mockResolvedValueOnce(null);
 
     const res = await handler(baseReq as any, {} as any);

@@ -188,7 +188,6 @@ export function EnrollUserDialog({
       onSuccess();
       onOpenChange(false);
     } else if (success > 0) {
-      // Mixed outcome: keep the dialog open so the per-row failure reasons stay visible.
       toast({
         title: t('enrollDialog.partialTitle'),
         description: t('enrollDialog.partialDescription', { success, failed }),
@@ -253,9 +252,6 @@ export function EnrollUserDialog({
 
           {selectedUserId && (
             <div className="space-y-2">
-              {/* A section heading over the course checkbox list, not a field
-                  label: it titles a group of controls, not one input — so a
-                  heading, not a <Label>. (#327) */}
               <p className="text-sm font-medium leading-none">{t('enrollDialog.selectCoursesLabel')}</p>
               {loading ? (
                 <div className="flex items-center justify-center p-8">

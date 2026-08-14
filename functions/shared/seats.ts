@@ -7,12 +7,6 @@ export interface SeatUsage {
   pendingCount: number;
 }
 
-/**
- * Locks the organization row FOR UPDATE and returns seat limit + current usage
- * (active memberships + pending invitations). MUST be called inside withTransaction:
- * the row lock serializes concurrent seat-consuming creates so check-then-insert
- * cannot race past the cap. Returns exists:false if the org row is absent.
- */
 export async function lockSeatUsage(client: PoolClient, orgId: string): Promise<SeatUsage> {
   const res = await client.query<{ seat_limit: number | null; active_count: number; pending_count: number }>(
     `SELECT o.seat_limit,
@@ -33,12 +27,10 @@ export async function lockSeatUsage(client: PoolClient, orgId: string): Promise<
   };
 }
 
-/** True when ONE more seat-consuming entity would exceed the cap (null limit → false). */
 export function isAtSeatLimit(usage: SeatUsage): boolean {
   return usage.seatLimit !== null && usage.activeCount + usage.pendingCount >= usage.seatLimit;
 }
 
-/** Seats remaining; Infinity when unlimited; never negative. */
 export function seatsRemaining(usage: SeatUsage): number {
   return usage.seatLimit === null ? Infinity : Math.max(0, usage.seatLimit - usage.activeCount - usage.pendingCount);
 }

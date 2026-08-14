@@ -3,11 +3,6 @@ import { endpoint } from '../shared/endpoint';
 import { isOrgAdmin } from '../shared/profile';
 import { validateHttpUrl } from '../shared/validate';
 
-// URL field(s) writable via this endpoint (must be in ALLOWED_UPDATE_FIELDS below)
-// that get rendered into an anchor href; when present in an update it must be an
-// http(s) URL (sec-1, #232 — defence in depth against stored-XSS, since React 18
-// does not block `javascript:` hrefs). event_recording_url is rendered too but has
-// no write path here, so it is not in the whitelist and needs no validation entry.
 const URL_UPDATE_FIELDS = ['event_registration_url'] as const;
 
 const ALLOWED_UPDATE_FIELDS = new Set([
@@ -52,7 +47,6 @@ export default endpoint('community-post-update', async ({ req, profile, reply })
     return reply(400, { error: 'No valid update fields provided' });
   }
 
-  // Validate URL-bearing fields (defence in depth against stored-XSS — sec-1, #232).
   for (const field of URL_UPDATE_FIELDS) {
     if (field in updatesObj) {
       const urlError = validateHttpUrl(updatesObj[field], field);
@@ -87,7 +81,6 @@ export default endpoint('community-post-update', async ({ req, profile, reply })
       return reply(403, { error: 'Forbidden' });
     }
 
-    // Author cannot move post into restricted category
     if (updatesObj.category_id && typeof updatesObj.category_id === 'string') {
       const newCatRow = await queryOne<{ is_restricted: boolean }>(
         `SELECT is_restricted FROM community_categories WHERE id = $1`,

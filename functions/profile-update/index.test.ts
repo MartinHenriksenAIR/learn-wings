@@ -26,7 +26,6 @@ vi.mock('../shared/blob-ownership', () => ({
   isBlobReleasable: mockIsBlobReleasable,
 }));
 
-/** The one candidate this endpoint ever builds, handed to both gates. */
 const avatarCandidate = (path: string | null) => [{ path, kind: 'image', family: 'avatar' }];
 
 import handler from './index';
@@ -50,10 +49,6 @@ const profileRow = {
   created_at: '2024-01-01T00:00:00Z',
 };
 
-/**
- * When (and only when) `avatar_url` is in the body, the endpoint issues a
- * previous-avatar SELECT before the UPDATE — so queryOne is called twice.
- */
 const mockAvatarDb = (previousAvatarUrl: string | null, updated: unknown = profileRow) => {
   mockQueryOne.mockResolvedValueOnce({ avatar_url: previousAvatarUrl }).mockResolvedValueOnce(updated);
 };
@@ -175,7 +170,6 @@ describe('profile-update', () => {
     const body = JSON.parse(res.body as string);
     expect(body.profile.avatar_url).toBe('avatars/abc.png');
 
-    // calls[0] is the previous-avatar SELECT; calls[1] is the UPDATE.
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     const setClause = sql.split('RETURNING')[0];
     expect(setClause).toContain('avatar_url =');
@@ -269,7 +263,6 @@ describe('profile-update', () => {
     expect(mockQueryOne).toHaveBeenCalledTimes(2);
     const [selectSql, selectParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(selectSql).toMatch(/SELECT avatar_url FROM profiles/i);
-    // id comes from the authenticated profile, never from the body
     expect(selectParams).toEqual(['p1']);
   });
 
@@ -324,10 +317,6 @@ describe('profile-update', () => {
     );
   });
 
-  // This endpoint is `endpoint()`, not `adminEndpoint()`: every authenticated
-  // user reaches it. `course-player-data` returns every lesson path to any active
-  // org member and `org-memberships` returns other members' avatar_url, so the
-  // paths a caller can name are not remotely secret.
 
   it('400 when the ownership gate refuses the path: no probe, no UPDATE, no delete', async () => {
     mockQueryOne.mockResolvedValueOnce({ avatar_url: null }); // only the previous-avatar SELECT
@@ -337,8 +326,6 @@ describe('profile-update', () => {
 
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
-    // The refusal must land BEFORE anything touches storage — otherwise the
-    // 413-vs-200 split is an existence oracle for other rows' blobs.
     expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
     expect(mockDeleteBlob).not.toHaveBeenCalled();
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
@@ -362,8 +349,6 @@ describe('profile-update', () => {
   });
 
   it('step 2 of the two-step attack: a still-referenced old path is NOT deleted', async () => {
-    // Even if a row somehow already points at a shared path (written before the
-    // bind gate existed), clearing it must not destroy the blob.
     mockIsBlobReleasable.mockResolvedValueOnce(false);
     mockAvatarDb('avatars/victim.png', { ...profileRow, avatar_url: null });
 
@@ -384,8 +369,6 @@ describe('profile-update', () => {
 
     await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
 
-    // The row must already point at the new value, or "is anything still
-    // referencing the old path?" answers the wrong question.
     expect(order).toEqual(['update', 'releasable', 'delete']);
   });
 
@@ -397,7 +380,6 @@ describe('profile-update', () => {
     const res = await handler(baseReq({ avatar_url: 'avatars/new.png' }), {} as any);
 
     expect(res.status).toBe(200);
-    // Cleanup outcome is deliberately NOT surfaced in the response.
     expect(JSON.parse(res.body as string)).toEqual({ profile: updated });
   });
 

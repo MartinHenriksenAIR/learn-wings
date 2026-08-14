@@ -11,9 +11,6 @@ function Boom(): React.ReactElement {
   throw new Error("kaboom");
 }
 
-// The boundary reads copy from i18next by key; assert against the locale JSON
-// (not hardcoded English) and check en/da parity so a missing Danish key for
-// title/description/reload can't ship silently.
 const ERROR_BOUNDARY_KEYS = ["title", "description", "reload"] as const;
 
 describe("errorBoundary i18n keys", () => {
@@ -27,8 +24,6 @@ describe("errorBoundary i18n keys", () => {
 
 describe("ErrorBoundary", () => {
   beforeEach(() => {
-    // The boundary console.errors the caught error; React also logs the
-    // uncaught error itself. Silence both so the test output stays clean.
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 

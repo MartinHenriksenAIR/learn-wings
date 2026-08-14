@@ -1,12 +1,3 @@
-/**
- * Tests for the level-distribution card in AnalyticsOverview.
- *
- * Covers:
- * - Learner-only scope: org_admin rows with a level must not shift the distribution.
- * - not-assessed = learners with null assessment_level.
- * - Single-org vs all-orgs title switch.
- * - Empty learner state: card renders without crashing.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
@@ -15,7 +6,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-// Stub heavy sub-components so this test stays focused on distribution logic.
 vi.mock('@/components/ui/progress-ring', () => ({
   ProgressRing: () => null,
 }));
@@ -54,7 +44,6 @@ describe('AnalyticsOverview — level distribution card', () => {
       />
     );
 
-    // t() echoes the key
     expect(screen.getByText('assessment.analytics.distributionTitle')).toBeInTheDocument();
     expect(screen.queryByText('assessment.analytics.distributionTitleAll')).not.toBeInTheDocument();
   });
@@ -79,7 +68,6 @@ describe('AnalyticsOverview — level distribution card', () => {
     const members = makeMembers([
       { role: 'learner', assessment_level: 'basic' },
       { role: 'learner', assessment_level: 'basic' },
-      // This admin has a level — it must be excluded from the distribution count.
       { role: 'org_admin', assessment_level: 'advanced' },
     ]);
 
@@ -95,20 +83,12 @@ describe('AnalyticsOverview — level distribution card', () => {
       />
     );
 
-    // Legend shows counts. basic=2, intermediate=0, advanced=0, notAssessed=0.
-    // All four legend items are rendered regardless of count.
-    // We find each legend swatch label + count pair by querying the label text
-    // and then reading the sibling bold count.
     const legendItems = screen.getAllByText('courses.levels.basic');
-    // There's exactly one legend item for basic.
     expect(legendItems).toHaveLength(1);
 
-    // Verify 'advanced' legend item shows 0 (admin not counted).
     const advancedLabel = screen.getByText('courses.levels.advanced');
-    // The count element is the next sibling bold span. We check its text.
     expect(advancedLabel.nextSibling?.textContent).toBe('0');
 
-    // basic count = 2
     const basicLabel = screen.getByText('courses.levels.basic');
     expect(basicLabel.nextSibling?.textContent).toBe('2');
   });
@@ -152,9 +132,7 @@ describe('AnalyticsOverview — level distribution card', () => {
       />
     );
 
-    // Subtitle is always shown.
     expect(screen.getByText('assessment.analytics.distributionSubtitle')).toBeInTheDocument();
-    // All legend items show 0.
     const notAssessedLabel = screen.getByText('assessment.analytics.notAssessed');
     expect(notAssessedLabel.nextSibling?.textContent).toBe('0');
   });

@@ -4,7 +4,6 @@ import { StatCard } from '@/components/ui/stat-card';
 
 interface OrgStatCardsProps {
   activeCount: number;
-  /** active members + pending invites — shown against the seat limit */
   usedSeats: number;
   adminCount: number;
   learnerCount: number;
@@ -28,8 +27,6 @@ export function OrgStatCards({
         icon={<UsersRound className="h-[18px] w-[18px]" />}
         value={
           <>
-            {/* Against a seat limit this is "seats used" (active + pending);
-                with no limit it's just the active-member count. */}
             {seatLimit ? usedSeats : activeCount}
             {seatLimit ? (
               <span className="text-base font-normal text-muted-foreground"> / {seatLimit}</span>

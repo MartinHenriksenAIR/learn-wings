@@ -12,7 +12,6 @@ describe('StatCard', () => {
     expect(screen.getByTestId('icon')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
     expect(screen.getByText('Courses enrolled')).toBeInTheDocument();
-    // Not interactive without onClick.
     expect(screen.queryByRole('button')).toBeNull();
   });
 

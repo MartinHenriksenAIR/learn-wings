@@ -30,11 +30,6 @@ function Row({ row }: { row: LeaderboardRow }) {
   );
 }
 
-/**
- * Org-scoped leaderboard: top learners (all-time or this month) with the
- * caller's own row highlighted, and — when the caller ranks below the visible
- * top — their rank pinned at the bottom.
- */
 export function Leaderboard({ leaderboard }: LeaderboardProps) {
   const { t } = useTranslation();
   const [window, setWindow] = useState<'allTime' | 'month'>('allTime');

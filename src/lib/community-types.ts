@@ -6,14 +6,14 @@ type ReportTargetType = 'post' | 'comment';
 export type BusinessArea = 'hr' | 'finance' | 'sales' | 'support' | 'ops' | 'it' | 'legal' | 'other';
 
 export type IdeaStatusExtended =
-  | 'draft' 
-  | 'submitted' 
-  | 'under_review' 
+  | 'draft'
+  | 'submitted'
+  | 'under_review'
   | 'in_review'
-  | 'approved' 
+  | 'approved'
   | 'accepted'
   | 'rejected'
-  | 'in_progress' 
+  | 'in_progress'
   | 'completed'
   | 'done'
   | 'archived';
@@ -78,14 +78,7 @@ export interface CommunityReport {
   reviewed_at: string | null;
   admin_notes: string | null;
   created_at: string;
-  /**
-   * Parent post id, populated by community-reports for comment targets (#86).
-   * NULL for post targets and for orphaned comment reports (comment deleted).
-   */
   post_id?: string | null;
-  /** Target's current moderation state, joined by community-reports (#169).
-   *  post target → the post's flags; comment target → the comment's is_hidden
-   *  (+ null lock); NULL when the target was deleted. */
   target_is_hidden?: boolean | null;
   target_is_locked?: boolean | null;
   reporter?: Profile;
@@ -122,7 +115,6 @@ export interface EnhancedIdea {
   systems_involved: string | null;
   constraints_risks: string | null;
   success_metrics: string | null;
-  // Prioritization scores (#118) — admin-set Value/Effort, 1=Low 2=Med 3=High, null=unscored
   value_score: number | null;
   effort_score: number | null;
   admin_notes: string | null;
@@ -156,9 +148,6 @@ export const BUSINESS_AREAS: { value: BusinessArea; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-// Idea status options for admin workflow. Stable machine `value`s are persisted
-// upstream; the human-facing text is resolved through i18n via `labelKey` at
-// render time (precedent: REPORT_REASONS in ReportDialog.tsx).
 export const IDEA_STATUS_OPTIONS: { value: IdeaStatusExtended; labelKey: string }[] = [
   { value: 'draft', labelKey: 'community.ideaStatus.draft' },
   { value: 'submitted', labelKey: 'community.ideaStatus.submitted' },
@@ -209,7 +198,6 @@ export interface CreateIdeaInput {
   systems_involved?: string;
   constraints_risks?: string;
   success_metrics?: string;
-  // Legacy fields for compatibility
   description?: string;
   problem_statement?: string;
   proposed_solution?: string;

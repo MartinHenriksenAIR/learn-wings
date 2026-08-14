@@ -16,17 +16,6 @@ export interface SlidingTabsProps {
   className?: string;
 }
 
-/**
- * Segmented tab bar with a white indicator that slides under the active tab.
- * Controlled: the indicator position derives from the `active` prop; callers
- * own the state (and any URL sync). Port of the design prototype's
- * SlidingTabs, minus the rAF watchdog (a capture-iframe workaround).
- *
- * Implements the ARIA tabs keyboard pattern with selection-follows-focus:
- * roving tabindex (only the active tab is in the tab order), ArrowLeft /
- * ArrowRight wrap through enabled tabs, Home / End jump to the first / last
- * enabled tab, and disabled tabs are skipped.
- */
 export function SlidingTabs({ tabs, active, onChange, className }: SlidingTabsProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const btnRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
@@ -47,7 +36,6 @@ export function SlidingTabs({ tabs, active, onChange, className }: SlidingTabsPr
     measure();
   }, [measure, tabs]);
 
-  // Re-measure when the container resizes (labels wrap, fonts load, window resizes).
   React.useLayoutEffect(() => {
     const node = containerRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;

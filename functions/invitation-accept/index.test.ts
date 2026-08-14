@@ -17,8 +17,6 @@ vi.mock('../shared/db', () => ({
   queryOne: mockQueryOne,
   withTransaction: mockWithTransaction,
 }));
-// Tenant binding (#353) is unit-tested in shared/tenant-binding.test.ts; here we
-// mock it and assert the accept path seeds a binding for org_admin acceptances.
 vi.mock('../shared/tenant-binding', () => ({ seedTenantBinding: mockSeedTenantBinding }));
 
 import handler from './index';
@@ -31,10 +29,8 @@ const baseReq = (body: unknown) => ({
 
 const validBody = { linkId: 'link-1' };
 
-// pg QueryResult shape: the handler reads `.rows`.
 const rows = (...r: unknown[]) => ({ rows: r });
 
-// The locked invitation row (SELECT ... FOR UPDATE OF i, LEFT JOIN organizations).
 const pendingOrgInvite = {
   id: 'inv-1',
   org_id: 'org-1',
@@ -100,13 +96,11 @@ describe('invitation-accept', () => {
       kind: 'org', orgId: 'org-1', orgName: 'Acme A/S', role: 'learner', alreadyMember: false,
     });
 
-    // Invitation lookup locks the row and never touches token/token_hash.
     const [lockSql, lockParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
     expect(lockSql).toContain('FOR UPDATE OF i');
     expect(lockSql).not.toMatch(/\btoken\b/);
     expect(lockParams).toEqual(['link-1']);
 
-    // Membership is created ACTIVE (never 'invited') with the invitation's role.
     const insertCall = findCall('INSERT INTO org_memberships');
     expect(insertCall).toBeDefined();
     expect(insertCall![0]).toContain(`'active'`);
@@ -130,7 +124,6 @@ describe('invitation-accept', () => {
     expect(insertProfile).toBeDefined();
     expect(insertProfile![1]).toContain('oid-1');
     expect(insertProfile![1]).toContain('tid-1');
-    // The freshly provisioned profile id is used for the membership.
     const insertMembership = findCall('INSERT INTO org_memberships');
     expect(insertMembership![1]).toEqual(['org-1', 'p-new', 'learner']);
   });
@@ -213,7 +206,6 @@ describe('invitation-accept', () => {
 
     expect(res.status).toBe(410);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Invitation has expired', code: 'INVITE_EXPIRED' });
-    // The expiry job owns flipping status to 'expired' — no UPDATE here.
     expect(mockClientQuery).toHaveBeenCalledTimes(1);
   });
 

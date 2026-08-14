@@ -76,7 +76,6 @@ export default endpoint('community-posts', async ({ req, profile, reply, require
     conditions.push(`p.tags && $${params.length}::text[]`);
   }
 
-  // includeHidden as a boolean param for the comment_count subquery
   params.push(includeHidden);
   const kIndex = params.length;
 

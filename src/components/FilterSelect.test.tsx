@@ -1,9 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
-// jsdom can't drive the real Radix Select portal — swap it for the shared test
-// double (renders each item as a clickable button). Same pattern as the other
-// Select-consuming suites.
 vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
 import { FilterSelect } from './FilterSelect';

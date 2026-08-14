@@ -11,11 +11,6 @@ interface AccessRow {
   course: Course;
 }
 
-/**
- * An org's assignable catalogue — courses that are published AND enabled for the
- * org — for the assign picker. Filtered by the admin's resolved UI language,
- * mirroring EnrollUserDialog. `enabled` gates on `!!orgId`.
- */
 export function useOrgCourseAccess(orgId: string | undefined) {
   const { i18n } = useTranslation();
   const lang = i18n.resolvedLanguage ?? 'en';

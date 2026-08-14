@@ -200,10 +200,8 @@ describe('lesson-create', () => {
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO lessons');
     expect(sql).toContain('RETURNING *');
-    // sort_order is server-owned: MAX+1 within the module, computed in the INSERT
     expect(sql).toContain('COALESCE(MAX(sort_order) + 1, 0)');
     expect(sql).toContain('WHERE module_id = $1');
-    // Params order: [moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, null (video_url), azureBlobPath, documentStoragePath]
     expect(params).toHaveLength(9); // no client sort_order param
     expect(params[0]).toBe('mod-1');    // module_id
     expect(params[1]).toBe('Lesson One'); // title (raw)
@@ -303,10 +301,6 @@ describe('lesson-create', () => {
       documentStoragePath: 'docs/new.pdf',
     }), {} as any);
 
-    // No previousPaths argument: a create has no prior row, so every supplied
-    // path is new and gets probed. `family: 'lms'` on all three — course
-    // thumbnails, lesson videos and lesson documents share one flat namespace,
-    // so `kind` is what tells them apart.
     expect(mockEnforceUploadLimits).toHaveBeenCalledWith([
       { path: 'legacy/new.mp4', kind: 'video', family: 'lms' },
       { path: 'videos/new.mp4', kind: 'video', family: 'lms' },

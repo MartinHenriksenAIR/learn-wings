@@ -9,10 +9,6 @@ interface GamificationSummaryProps {
   streak: { current: number; activeToday: boolean };
 }
 
-/**
- * The two motivation cards at the top of the hub: lifetime XP + level (with a
- * bar to the next level) and the personal learning streak.
- */
 export function GamificationSummary({ xp, level, streak }: GamificationSummaryProps) {
   const { t } = useTranslation();
 
@@ -24,7 +20,6 @@ export function GamificationSummary({ xp, level, streak }: GamificationSummaryPr
 
   return (
     <div className="mb-7 grid gap-3.5 sm:grid-cols-2">
-      {/* XP + level */}
       <div className="rounded-2xl border border-border bg-card px-5 py-[18px]">
         <div className="mb-3 flex items-center gap-3.5">
           <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-accent text-primary">
@@ -45,7 +40,6 @@ export function GamificationSummary({ xp, level, streak }: GamificationSummaryPr
         </p>
       </div>
 
-      {/* Streak */}
       <div className="rounded-2xl border border-border bg-card px-5 py-[18px]">
         <div className="flex items-center gap-3.5">
           <span

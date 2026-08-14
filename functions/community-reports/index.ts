@@ -33,7 +33,6 @@ export default endpoint('community-reports', async ({ req, reply, requireOrgAdmi
     requirePlatformAdmin();
     whereClauses.push('r.org_id IS NULL');
   } else {
-    // no filter: platform admin only (documented deviation — tighter than RLS)
     requirePlatformAdmin();
   }
 
@@ -44,10 +43,6 @@ export default endpoint('community-reports', async ({ req, reply, requireOrgAdmi
 
   const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-  // post_id: for comment targets we join out the comment's parent post so the
-  // moderation UIs can deep-link /posts/<post_id>#comment-<target_id> (#86).
-  // NULL for post targets, and NULL for orphaned comment reports (comment
-  // deleted) — the frontend disables the link in that case.
   const reports = await query(
     `SELECT r.*,
       json_build_object('id', rep.id, 'full_name', rep.full_name) AS reporter,

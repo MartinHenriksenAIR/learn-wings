@@ -22,12 +22,8 @@ export interface EditOrgPayload {
   slug: string;
   logoUrl: string | null;
   seatLimit: string;
-  // SSO tenant binding (#353). Empty string = clear/off. OrganizationDetail only
-  // forwards these to the backend when they actually change (see saveEditMutation).
   entraTid: string;
   entraTidLabel: string;
-  // Per-org self-registration switch (#356). OrganizationDetail forwards it only
-  // when it actually changed, so an unrelated edit never clobbers it.
   allowSelfRegistration: boolean;
 }
 
@@ -56,7 +52,6 @@ export function EditOrganizationDialog({
   const [entraTid, setEntraTid] = useState<string>('');
   const [entraTidLabel, setEntraTidLabel] = useState<string>('');
   const [allowSelfRegistration, setAllowSelfRegistration] = useState(true);
-  // logoUrl holds the raw container-relative path (for save); sign it for display.
   const { data: logoDisplaySrc } = useSignedBrandingUrl(logoUrl);
 
   useEffect(() => {
@@ -86,9 +81,6 @@ export function EditOrganizationDialog({
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
                   <Building2 className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
                 </div>
-                {/* Size and accepted formats are stated by FileUpload itself,
-                    from the caps it actually enforces — a second statement here
-                    could only drift out of true. */}
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">{t('orgDetail.logoRecommended')}</p>
                   <p className="text-xs text-muted-foreground">{t('orgDetail.logoSize')}</p>
@@ -102,8 +94,6 @@ export function EditOrganizationDialog({
               accept="image"
               value={logoDisplaySrc ?? null}
               onChange={(url, storagePath) => {
-                // Store the raw container-relative path; it's signed for display
-                // via the value prop above (useSignedBrandingUrl).
                 setLogoUrl(url && storagePath ? storagePath : null);
               }}
               maxSizeMB={5}

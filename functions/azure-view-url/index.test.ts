@@ -38,8 +38,6 @@ describe('azure-view-url', () => {
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
   });
 
-  // issue #104: an AuthError whose message lacks the literal "token" must still
-  // map to 401 — the old substring check collapsed it to a generic 500.
   it('returns 401 when authenticate throws an AuthError with a token-less message', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing oid or tid claims'));
 
@@ -49,8 +47,6 @@ describe('azure-view-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing oid or tid claims' });
   });
 
-  // issue #104: a non-auth error whose message merely contains "token" must NOT
-  // be mistaken for a 401 and must not leak its message (CWE-209) — generic 500.
   it('returns a generic 500 (no leak) when a non-auth error mentions "token"', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('db connection token expired'));
     const ctx = { error: vi.fn() };
@@ -84,9 +80,6 @@ describe('azure-view-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'blobPath is required' });
   });
 
-  // Validation hardening (#239): azure-view-url adopts the same strict
-  // typeof check as asset-signed-url — empty string and non-string values
-  // must 400, not slip through to the access check.
   it('returns 400 when blobPath is an empty string', async () => {
     const req = {
       method: 'POST',
@@ -121,7 +114,6 @@ describe('azure-view-url', () => {
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Access denied' });
 
-    // SECURITY PIN: access check must use profile.id ('p1'), not raw oid ('oid-1')
     const accessCall = mockQueryOne.mock.calls.find(c => (c[0] as string).includes('can_access'));
     expect(accessCall).toBeDefined();
     expect(accessCall![1]).toEqual(['p1', 'videos/x.mp4']);
@@ -132,10 +124,6 @@ describe('azure-view-url', () => {
 
     await handler(baseReq as any, {} as any);
 
-    // LESSON-BRANCH PARITY PIN vs public.can_user_access_lms_asset (migration/azure/
-    // 01-schema.sql): a video lesson's path is stored in azure_blob_path
-    // (video_storage_path is the legacy Supabase column) — matching only the other
-    // two 403s every video blob. Full parity now lives in shared/lms-asset (issue #60).
     const accessCall = mockQueryOne.mock.calls.find(c => (c[0] as string).includes('can_access'));
     expect(accessCall).toBeDefined();
     const sql = accessCall![0] as string;

@@ -25,6 +25,10 @@ export default tseslint.config(
       // Legacy Lovable-era codebase carries ~1500 `any`s; keep them visible as
       // warnings without failing the lint gate. New code should still type properly.
       "@typescript-eslint/no-explicit-any": "warn",
+      // Swallowing a failure is a deliberate pattern here — every one of these is
+      // best-effort web-storage or cleanup work whose failure must not break the
+      // caller. The empty block IS the intent; it needs no body to prove it.
+      "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
   // ── Date-locale guard (#238) ─────────────────────────────────────────────

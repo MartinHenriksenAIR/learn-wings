@@ -15,13 +15,6 @@ import { fetchCategories, createPost } from '@/lib/community-api';
 import { Plus } from 'lucide-react';
 import type { CommunityScope } from '@/lib/community-types';
 
-/**
- * Events & Office Hours — a standalone top-level destination (#344). It was a
- * tab inside the community feed; now it's its own page in the Fællesskab group,
- * community-gated like the feed. The upcoming-events list is the reusable
- * EventsTab body; this page supplies the page chrome and the admin-only
- * event-creation flow (moved off the feed header).
- */
 export default function EventsPage() {
   const { t } = useTranslation();
   const { currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
@@ -30,8 +23,6 @@ export default function EventsPage() {
 
   const [showPostForm, setShowPostForm] = useState(false);
 
-  // #354: the hidden Individuals placeholder is not a real org — an org admin
-  // there posts nothing org-scoped; identity reads stay on the real currentOrg.
   const orgForEvents = currentOrg?.kind === 'individual' ? null : currentOrg;
 
   const { data: categories = [] } = useQuery({
@@ -50,12 +41,9 @@ export default function EventsPage() {
     },
   });
 
-  // Admin-only creation: platform admins post events globally; org admins post
-  // to their current org. Learners get no create affordance.
   const canCreateEvent = effectiveIsPlatformAdmin || effectiveIsOrgAdmin;
   const eventScope: CommunityScope = effectiveIsPlatformAdmin ? 'global' : 'org';
   const eventsCategoryId = categories.find((c) => c.slug === 'events')?.id;
-  // Fresh literal each render would re-reset the form; memoize so it's stable.
   const eventInitialData = useMemo(
     () => (eventsCategoryId ? { category_id: eventsCategoryId } : undefined),
     [eventsCategoryId],
@@ -85,9 +73,6 @@ export default function EventsPage() {
 
       <EventsTab canCreateEvent={canCreateEvent} onNewEvent={() => setShowPostForm(true)} />
 
-      {/* Post form dialog: opens with the events category preselected and posts
-          at the admin's event scope (global for platform admins, current org
-          for org admins). */}
       <PostForm
         open={showPostForm}
         onOpenChange={setShowPostForm}

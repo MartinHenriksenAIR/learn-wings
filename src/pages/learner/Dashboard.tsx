@@ -19,8 +19,6 @@ import { BookOpen, Clock, Award, TrendingUp, Sparkles } from 'lucide-react';
 export default function LearnerDashboard() {
   const { currentOrg, profile, memberships, isPlatformAdmin, isOrgAdmin } = useAuth();
   const orgGuard = useOrgGuard();
-  // Solo learners run against a hidden placeholder org; the leaderboard is org-scoped
-  // and meaningless for them, so it's suppressed for the individual tier.
   const isIndividual = currentOrg?.kind === 'individual';
   const communityGate = useCommunityGate();
   const { t } = useTranslation();
@@ -39,9 +37,6 @@ export default function LearnerDashboard() {
   }
 
   if (!currentOrg) {
-    // A non-admin with no membership is a blocked walk-in — registration is
-    // invitation-only. Platform admins (and anyone with memberships but no selection)
-    // keep the generic no-org-selected copy.
     const showInvitationOnly = memberships.length === 0 && !isPlatformAdmin;
     return (
       <AppLayout title={t('dashboard.title')}>
@@ -56,8 +51,6 @@ export default function LearnerDashboard() {
     );
   }
 
-  // A failed dashboard fetch must not masquerade as an all-zero hub; show a
-  // distinct error fork with retry instead.
   if (query.isError || !query.data) {
     return (
       <AppLayout title={t('dashboard.title')}>
@@ -80,7 +73,6 @@ export default function LearnerDashboard() {
         <p className="text-sm text-muted-foreground">{t('dashboard.subtitle')}</p>
       </div>
 
-      {/* Assessment banner — shown only to plain learners who haven't taken the assessment yet */}
       {profile && !isPlatformAdmin && !isOrgAdmin && profile.assessment_level == null && (
         <div
           data-testid="assessment-banner"
@@ -102,7 +94,6 @@ export default function LearnerDashboard() {
         </div>
       )}
 
-      {/* Progress snapshot — compact; each card deep-links into Min Træning. */}
       <div data-testid="dashboard-snapshot" className="mb-7 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label={t('dashboard.started')}
@@ -132,9 +123,6 @@ export default function LearnerDashboard() {
 
       <GamificationSummary xp={xp} level={level} streak={streak} />
 
-      {/* Server decides visibility: false for the individual tier (#354) and for a
-          per-org leaderboard opt-out (#369). Hides the widget entirely rather than
-          rendering an empty board for a disabled feature. */}
       {showLeaderboard && <Leaderboard leaderboard={leaderboard} />}
 
       {communityGate === 'allowed' && (

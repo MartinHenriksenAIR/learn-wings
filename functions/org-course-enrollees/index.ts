@@ -12,11 +12,6 @@ export default endpoint('org-course-enrollees', async ({ req, reply, requireOrgA
     return reply(400, { error: 'courseId is required' });
   }
 
-  // All-orgs aggregate (Global Analytics "All Organizations", #159) — platform-admin-only.
-  // #163: one row per (learner, org) enrollment — NOT deduped — each carrying its org so the
-  // dialog can show an Organization column. A learner enrolled in the course through two orgs
-  // appears once per org; UNIQUE(org_id, user_id, course_id) caps that at one row per org, so
-  // (user_id, org_id) is a stable unique key downstream. Ordered by learner name, then org.
   if (orgId === 'all') {
     requirePlatformAdmin();
     const enrollees = await query(

@@ -3,7 +3,6 @@ import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { SeatRequest } from '@/lib/types';
 
-/** The one way to read an org's seat requests. Gated on orgId. */
 export function useSeatRequests(orgId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.seatRequests.list(orgId),

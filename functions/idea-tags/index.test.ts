@@ -85,7 +85,6 @@ describe('idea-tags', () => {
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('unnest(tags)');
     expect(sql).toContain('org_id =');
-    // visibility filter: drafts only count when authored by the caller
     expect(sql).toContain("status <> 'draft'");
     expect(sql).toContain('user_id =');
     expect(sql).toContain('ORDER BY');

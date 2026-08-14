@@ -54,7 +54,6 @@ interface CourseProgressTabProps {
 interface CourseEnrollee {
   userId: string;
   name: string;
-  // Present only in all-orgs mode (#163): one row per (learner, org) enrollment.
   orgId?: string;
   orgName?: string;
   status: 'enrolled' | 'completed';
@@ -77,13 +76,8 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped');
   const [selectedCourse, setSelectedCourse] = useState<CourseStats | null>(null);
 
-  // In the platform-admin "All Organizations" view a per-org breakdown is shown
-  // in the course dialog (#163); for a single org it is meaningless.
   const isAllOrgs = orgId === 'all';
 
-  // Fetch course data via shared query hook. The representative edition's
-  // title/level per group depends on the admin's app language (#213), so the
-  // resolved language is threaded through (and lives in the query key).
   const courseProgressQuery = useOrgCourseProgress(orgId, i18n.resolvedLanguage);
 
   const courseStats = useMemo((): CourseStats[] => {
@@ -101,8 +95,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
 
   const enrolleesQuery = useOrgCourseEnrollees(orgId, selectedCourse?.id);
 
-  // Derive enrollees (snake_case → camelCase). In all-orgs mode each row is a
-  // (learner, org) enrollment and carries its org for the Organization column.
   const enrollees = useMemo((): CourseEnrollee[] => {
     const data = enrolleesQuery.data;
     if (!data) return [];
@@ -117,8 +109,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
     }));
   }, [enrolleesQuery.data]);
 
-  // Per-org engagement breakdown for the selected course — all-orgs mode only,
-  // lazily fetched when the dialog opens (mirrors the enrollees drill-in).
   const breakdownQuery = useOrgCourseOrgBreakdown(isAllOrgs ? selectedCourse?.id : undefined);
 
   const orgBreakdown = useMemo((): OrgBreakdownRow[] => {
@@ -277,7 +267,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
       )}
 
       <Dialog open={!!selectedCourse} onOpenChange={(open) => !open && setSelectedCourse(null)}>
-        {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -286,8 +275,6 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
             </DialogTitle>
           </DialogHeader>
 
-          {/* Per-org breakdown — all-orgs view only (#163). Shown above the enrollee
-              list; renders every org with the course enabled, incl. 0/0 gap rows. */}
           {isAllOrgs && (
             <div className="mb-4">
               <h3 className="text-sm font-semibold">{t('analytics.courseOrgBreakdown.title')}</h3>

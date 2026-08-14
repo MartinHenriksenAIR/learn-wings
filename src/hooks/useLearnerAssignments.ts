@@ -4,7 +4,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { getSignedLmsAssetUrl } from '@/lib/storage';
 import type { LearnerAssignment } from '@/lib/types';
 
-/** Raw row shape returned by `/api/learner-assignments` (snake_case). */
 interface LearnerAssignmentRow {
   course_id: string;
   course_title: string;
@@ -15,11 +14,6 @@ interface LearnerAssignmentRow {
   completed: boolean;
 }
 
-/**
- * The learner's own assigned/mandatory courses for `orgId` — the read the
- * Min Træning view (#364) consumes. Thumbnails are signed inside the queryFn so
- * callers always get fresh signed URLs. `enabled` defaults to `!!orgId`.
- */
 export function useLearnerAssignments(
   orgId: string | undefined,
   options: { enabled?: boolean; staleTime?: number } = {},

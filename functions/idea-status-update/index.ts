@@ -2,7 +2,6 @@ import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 import { loadIdea } from '../shared/ideas';
 
-// idea_status enum values (provenance: supabase enum idea_status).
 const VALID_STATUSES = [
   'draft',
   'submitted',
@@ -44,15 +43,8 @@ export default endpoint('idea-status-update', async ({ req, reply, requireOrgAdm
   const idea = await loadIdea(ideaId);
   if (!idea) return reply(404, { error: 'Idea not found' });
 
-  // Authorization: platform admin OR org admin of the IDEA's org (never client-supplied).
-  // Authorship grants nothing here; status writes are admin-only.
   await requireOrgAdmin(idea.org_id);
 
-  // Build whitelist-only dynamic UPDATE (supabase-js parity):
-  //   status              — always set
-  //   admin_notes         — only when adminNotes !== undefined (explicit null clears)
-  //   rejection_reason    — ALWAYS set: 'rejected' ? (rejectionReason ?? null) : null
-  // submitted_at (idea-submit only) and updated_at (DB trigger) are untouched.
   const params: unknown[] = [];
   const setClauses: string[] = [];
 

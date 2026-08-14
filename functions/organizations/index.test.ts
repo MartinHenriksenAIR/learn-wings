@@ -62,7 +62,6 @@ describe('organizations', () => {
     expect(body.organizations[1]).toMatchObject({ id: 'org-2', member_count: 0, pending_invite_count: 0 });
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // Platform-admin branch has NO outer JOIN to org_memberships — only the inline subquery
     expect(sql).not.toContain('JOIN org_memberships');
     expect(sql).toContain('member_count');
     expect(sql).toContain('org_memberships om2');
@@ -86,7 +85,6 @@ describe('organizations', () => {
     expect(sql).toContain('JOIN org_memberships om');
     expect(sql).toContain("status = 'active'");
     expect(sql).toContain('member_count');
-    // Subquery alias must differ from outer JOIN alias to avoid collision
     expect(sql).toContain('org_memberships om2');
     expect(sql).toContain('pending_invite_count');
     expect(sql).toContain("i.status = 'pending'");
@@ -142,7 +140,6 @@ describe('organizations', () => {
     const body = JSON.parse(res.body as string);
     expect(body.organization).not.toHaveProperty('entra_tid');
     expect(body.organization).not.toHaveProperty('entra_tid_label');
-    // The column is still SELECTed — the strip is in code, not SQL.
     expect(mockQueryOne.mock.calls[0][0]).toContain('o.entra_tid');
   });
 
@@ -213,7 +210,6 @@ describe('organizations', () => {
 
     expect(res.status).toBe(200);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // Detection by kind, never the seeded id (schema comment / individual-tier.ts).
     expect(sql).toContain("o.kind = 'standard'");
     expect(sql).not.toContain(INDIVIDUAL_ORG_ID);
     expect(params ?? []).toEqual([]);
@@ -232,8 +228,6 @@ describe('organizations', () => {
 
   it('#354: single-org fetch of the placeholder id returns 404 (filtered out by kind)', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
-    // With `AND o.kind = 'standard'` the placeholder row is never returned by the DB,
-    // so the handler sees no row and 404s — the placeholder is not inspectable here.
     mockQueryOne.mockResolvedValueOnce(null);
 
     const res = await handler(baseReq({ orgId: INDIVIDUAL_ORG_ID }), {} as any);

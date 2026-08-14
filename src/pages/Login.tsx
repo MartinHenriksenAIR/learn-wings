@@ -9,24 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import logoLight from '@/assets/logo-light.png';
 
-// Soft slate gradient behind both the loading spinner and the login card.
-// Exported for Signup, which renders the same auth-card treatment (#175).
 export const PAGE_GRADIENT_CLASSES = 'bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)]';
 export const AUTH_CARD_CLASSES =
   'flex w-full max-w-[380px] flex-col items-center gap-5 rounded-[20px] border border-border bg-card px-10 py-11 shadow-[0_24px_60px_rgba(16,41,143,0.10)]';
 
-// Both front-door CTAs share one size; only the variant (primary vs. outline)
-// differs. Both fire the same Entra sign-in — org-vs-individual is decided
-// server-side by tenant match, so this is presentation, not two auth flows (#355).
 const CTA_CLASSES = 'h-auto w-full gap-2.5 rounded-xl px-4 py-[13px] text-[14.5px] font-semibold';
 
 export default function Login() {
   const { signIn, user, profile, isPlatformAdmin, isOrgAdmin, isLoading } = useAuth();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
-  // Read once on mount: which (if any) notice sent us here, so the message fits
-  // the reason and a later manual visit to /login stays quiet. Only one flag is
-  // ever set; idle is checked first purely for determinism.
   const [notice] = useState<'idle' | 'expired' | null>(() => {
     if (consumeIdleTimeoutNotice()) return 'idle';
     if (consumeSessionExpiredNotice()) return 'expired';
@@ -34,13 +26,7 @@ export default function Login() {
   });
 
   useEffect(() => {
-    // `isLoading` covers the user-context fetch (useAuth), so once it clears
-    // `profile` is resolved — guard on it too so a plain learner isn't routed
-    // to the dashboard before the assessment predicate can be evaluated.
     if (!isLoading && user) {
-      // A guard stashed the originally requested URL before sending us here —
-      // restore it; otherwise fall back to the role home (#16). A deep-linked
-      // login always keeps precedence and skips the assessment prompt.
       const redirect = consumePostLoginRedirect();
       if (redirect) {
         navigate(redirect, { replace: true });
@@ -49,8 +35,6 @@ export default function Login() {
       } else if (isOrgAdmin) {
         navigate(routes.orgAdmin.root);
       } else if (profile && !profile.assessment_level && !profile.assessment_skipped_at) {
-        // Plain learner who has neither taken nor explicitly skipped the
-        // onboarding assessment: prompt them for it (#117).
         navigate(routes.learner.assessment, { replace: true });
       } else {
         navigate(routes.learner.dashboard);
@@ -66,10 +50,6 @@ export default function Login() {
     );
   }
 
-  // The front door is public, so no signed-in language preference exists yet:
-  // the browser-detected default is offered with a manual override. Persisted to
-  // the LanguageDetector's localStorage key so the choice survives the full-page
-  // Entra sign-in redirect and returns on the next visit.
   const activeLang = i18n.language?.startsWith('da') ? 'da' : 'en';
   const changeLanguage = (lng: 'en' | 'da') => {
     void i18n.changeLanguage(lng);

@@ -30,7 +30,6 @@ export default endpoint('community-post-delete', async ({ req, profile, reply })
   } else if (post.scope === 'org' && post.org_id && await isOrgAdmin(profile.id, post.org_id)) {
     authorized = true;
   } else if (post.user_id === profile.id) {
-    // Author can delete only if the post's category is not restricted
     const categoryRow = await queryOne<{ is_restricted: boolean }>(
       `SELECT is_restricted FROM community_categories WHERE id = $1`,
       [post.category_id],

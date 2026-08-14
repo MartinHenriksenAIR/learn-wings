@@ -49,8 +49,6 @@ describe('asset-signed-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing Bearer token' });
   });
 
-  // 1b. issue #104: an AuthError whose message lacks the literal "token" must
-  // still map to 401 — the old substring check collapsed it to a generic 500.
   it('returns 401 when authenticate throws an AuthError with a token-less message', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing oid or tid claims'));
 
@@ -60,8 +58,6 @@ describe('asset-signed-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing oid or tid claims' });
   });
 
-  // 1c. issue #104: a non-auth error whose message merely contains "token" must
-  // NOT be mistaken for a 401 and must not leak its message — generic 500.
   it('returns a generic 500 (no leak) when a non-auth error mentions "token"', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('db connection token expired'));
     const ctx = { error: vi.fn() };
@@ -112,8 +108,6 @@ describe('asset-signed-url', () => {
     expect(params).toEqual(['p1', 'thumbnails/course.jpg']);
   });
 
-  // 5b. issue #60: shared canAccessLmsAsset restores azure_blob_path to the lesson branch
-  // (the exact bug class issue #14 fixed in azure-view-url — video blobs live in azure_blob_path)
   it('access SQL covers all three lesson asset columns including azure_blob_path', async () => {
     mockQueryOne.mockResolvedValueOnce({ can_access: true });
 

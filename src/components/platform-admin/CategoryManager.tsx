@@ -22,19 +22,12 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-/**
- * Platform-admin management UI for course categories: add, rename (both
- * locales), reorder via up/down arrows, and delete. Lives in its own component
- * so CoursesManager stays focused on the course + access tabs.
- */
 export function CategoryManager() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data: categories = [], isLoading, error, refetch } = useCourseCategories();
 
-  // The server already returns rows ordered by sort_order; sort defensively so
-  // the reorder index math never depends on response ordering.
   const ordered = useMemo(
     () => [...categories].sort((a, b) => a.sort_order - b.sort_order),
     [categories],
@@ -86,7 +79,6 @@ export function CategoryManager() {
       toast({ title: t('categoryManager.deleted') });
       setDeleting(null);
       invalidateCategories();
-      // Courses in the deleted category lose their category_id on the server.
       queryClient.invalidateQueries({ queryKey: queryKeys.coursesAdmin.all });
     },
   });
@@ -121,7 +113,6 @@ export function CategoryManager() {
     renameMutation.mutate({ categoryId: renaming.id, nameEn, nameDa });
   };
 
-  /** Swap the row at `index` with its neighbour and persist the new id order. */
   const move = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= ordered.length) return;
@@ -157,7 +148,6 @@ export function CategoryManager() {
         <p className="mt-1 text-sm text-muted-foreground">{t('categoryManager.description')}</p>
       </div>
 
-      {/* Add form */}
       <div className="rounded-2xl border border-border bg-card p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1 space-y-2">
@@ -192,7 +182,6 @@ export function CategoryManager() {
         </div>
       </div>
 
-      {/* List */}
       {ordered.length === 0 ? (
         <EmptyState
           icon={<Tags className="h-6 w-6" />}
@@ -258,7 +247,6 @@ export function CategoryManager() {
         </div>
       )}
 
-      {/* Rename dialog */}
       <Dialog open={renaming !== null} onOpenChange={(open) => !open && setRenaming(null)}>
         <DialogContent>
           <DialogHeader>
@@ -296,7 +284,6 @@ export function CategoryManager() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirm */}
       <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -307,8 +294,6 @@ export function CategoryManager() {
             <AlertDialogCancel disabled={deleteMutation.isPending}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
-                // Keep the dialog mounted until the mutation settles (it closes
-                // itself onSuccess); the default action closes on click.
                 e.preventDefault();
                 if (deleting) deleteMutation.mutate(deleting.id);
               }}

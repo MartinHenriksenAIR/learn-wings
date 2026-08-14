@@ -64,7 +64,6 @@ describe('idea-prioritize', () => {
     const res = await handler(baseReq({ ideaId: 'idea-1', value: 3, effort: null }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'value and effort must both be set or both be null' });
-    // rejected before any DB access
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 

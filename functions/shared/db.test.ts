@@ -8,21 +8,6 @@ import {
   MICROSOFT_RSA_ROOT_CA_2017,
 } from './azure-ca';
 
-/**
- * The ssl pg would ACTUALLY use for a given Pool/Client config — the value a
- * real connection is configured with, after pg's own resolution. pg computes it
- * in ConnectionParameters at Client construction (no socket opens until
- * .connect()); crucially, if the config still carries a `connectionString`, pg
- * re-derives ssl from it and overlays the explicit `ssl` option — which is the
- * exact clobber issue #103 fixes. Asserting on this resolved value (rather than
- * the raw config object) is what catches that regression; a bare buildSslConfig()
- * unit test cannot.
- *
- * Read `connectionParameters.ssl`, not the public `client.ssl`: the latter is
- * `connectionParameters.ssl || {}`, which silently turns a resolved `false`
- * (sslmode=disable) into `{}` and would hide that case. @types/pg doesn't expose
- * `.connectionParameters`, so reach it through a narrow local shape.
- */
 function effectiveSsl(config: PoolConfig): false | { ca?: string; rejectUnauthorized?: boolean } {
   const client = new Client(config);
   return (
@@ -87,9 +72,6 @@ describe('buildPoolConfig', () => {
     'postgres://app:secret@db.example.postgres.database.azure.com:5432/learnwings?sslmode=require';
 
   beforeEach(() => {
-    // pg-connection-string emits a process warning when it sees sslmode=require
-    // (a v3 deprecation notice, irrelevant here — our explicit ssl object governs
-    // verification, not sslmode). Silence it to keep test output pristine.
     vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
   });
   afterEach(() => {

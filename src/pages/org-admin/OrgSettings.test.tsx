@@ -20,7 +20,6 @@ vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
 
-// The logo uploader is exercised elsewhere; here it is inert so the form renders.
 vi.mock('@/components/ui/file-upload', () => ({ FileUpload: () => null }));
 vi.mock('@/hooks/useSignedBrandingUrl', () => ({ useSignedBrandingUrl: () => ({ data: null }) }));
 
@@ -98,7 +97,6 @@ describe('OrgSettings', () => {
     mockUseOrgSettings.mockReturnValue({ data: null, isLoading: false });
   });
 
-  // ---- three-way loading guard ----
 
   it('renders empty state when profile resolved + no currentOrg', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: null });
@@ -138,7 +136,6 @@ describe('OrgSettings', () => {
     expect(document.querySelector('.animate-spin')).not.toBeNull();
   });
 
-  // ---- structure ----
 
   it('renders three tabs and a disabled Save when nothing has changed', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
@@ -148,7 +145,6 @@ describe('OrgSettings', () => {
     expect(screen.getByRole('tab', { name: 'orgSettings.tabs.profile' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'orgSettings.tabs.access' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'orgSettings.tabs.features' })).toBeInTheDocument();
-    // Profile tab is default: the org name input is shown, Save is disabled (pristine).
     expect(screen.getByLabelText('orgSettings.profile.nameLabel')).toHaveValue('Test Org');
     expect(saveButton()).toBeDisabled();
   });
@@ -163,12 +159,10 @@ describe('OrgSettings', () => {
     expect(screen.queryAllByRole('switch')).toHaveLength(1);
 
     switchTo('orgSettings.tabs.features');
-    // 5 platform-overridable feature flags + the org-only leaderboard toggle.
     expect(screen.queryAllByRole('switch')).toHaveLength(6);
     expect(screen.getByRole('switch', { name: 'orgSettings.leaderboardLabel' })).toBeInTheDocument();
   });
 
-  // ---- save fans out to only the changed fields ----
 
   it('renaming the org saves via organization-update only (features untouched)', async () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
@@ -233,7 +227,6 @@ describe('OrgSettings', () => {
 
   it('merges onto raw features so an unmanaged key is preserved on save', async () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
-    // exercises_enabled is not surfaced as a toggle — it must survive the upsert.
     mockUseOrgSettings.mockReturnValue({ data: { exercises_enabled: true }, isLoading: false });
     vi.mocked(callApi).mockResolvedValue({} as never);
 

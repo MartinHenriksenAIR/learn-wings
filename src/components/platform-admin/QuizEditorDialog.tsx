@@ -53,7 +53,6 @@ interface QuizAdminResponse {
   }>;
 }
 
-/** Cache key for one lesson's admin quiz (quiz + questions + options). */
 const quizAdminQueryKey = (lessonId: string) => queryKeys.quizAdmin.detail(lessonId);
 
 export function QuizEditorDialog({
@@ -201,8 +200,6 @@ export function QuizEditorDialog({
     return true;
   };
 
-  // Plain useMutation (not useToastMutation): this dialog's failure toast is the
-  // bare sonner `toast.error(...)` with no description — preserved as-is.
   const saveQuizMutation = useMutation({
     mutationFn: () =>
       callApi<{ quiz: { id: string; lesson_id: string; passing_score: number } }>(
@@ -222,9 +219,6 @@ export function QuizEditorDialog({
       ),
     onSuccess: () => {
       toast.success('Quiz saved successfully');
-      // The server regenerates question/option ids on save, so mark the cache
-      // stale instead of patching it with client-side ids. refetchType 'none':
-      // the dialog is closing, the next open refetches.
       queryClient.invalidateQueries({ queryKey: quizAdminQueryKey(lessonId), refetchType: 'none' });
       onQuizSaved?.();
       onOpenChange(false);
@@ -285,8 +279,6 @@ export function QuizEditorDialog({
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                {/* A section heading over the questions list, not a field
-                    label — a heading, not a <Label>. (#327) */}
                 <h3 className="text-base font-semibold">{t('quizEditor.questionsHeading')}</h3>
                 <Badge variant="outline">{questions.length} question(s)</Badge>
               </div>
@@ -333,9 +325,6 @@ export function QuizEditorDialog({
                       </CardHeader>
                       <CardContent className="pt-0">
                         <div className="pl-8 space-y-3">
-                          {/* Names the radio group as a whole (not one input),
-                              so it titles the group via aria-labelledby rather
-                              than a <Label htmlFor>. (#327) */}
                           <p id={`quiz-options-label-${question.id}`} className="text-sm text-muted-foreground">
                             {t('quizEditor.answerOptionsLabel')}
                           </p>

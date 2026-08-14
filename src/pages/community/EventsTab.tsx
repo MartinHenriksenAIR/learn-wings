@@ -9,24 +9,14 @@ import { useCommunityEvents } from '@/hooks/useCommunityEvents';
 import type { CommunityPost } from '@/lib/community-types';
 
 interface EventsTabProps {
-  /** Admins get the New Event CTA on the empty state; learners get the message only. */
   canCreateEvent?: boolean;
-  /** Opens the events-preselected PostForm — same action as the header New Event button. */
   onNewEvent?: () => void;
 }
 
-/**
- * The community "Events & Office Hours" tab (#125). A clean single column:
- * upcoming-only events (event_date today or later) merged from global scope
- * plus the user's current org, soonest first. Each event renders as a full
- * date-forward EventCard with a click-through to its post detail.
- */
 export function EventsTab({ canCreateEvent = false, onNewEvent }: EventsTabProps) {
   const { t } = useTranslation();
   const { currentOrg } = useAuth();
 
-  // #354: the hidden Individuals placeholder is not a real org, so its org
-  // events are skipped — the hook disables the 'org' query on a missing id.
   const orgIdForEvents = currentOrg?.kind === 'individual' ? undefined : currentOrg?.id;
 
   const globalQuery = useCommunityEvents('global', currentOrg?.id);
@@ -34,8 +24,6 @@ export function EventsTab({ canCreateEvent = false, onNewEvent }: EventsTabProps
 
   const isLoading = globalQuery.isLoading || orgQuery.isLoading;
 
-  // Merge global + org, keep only events-category posts that are today or in
-  // the future, soonest first — same semantics as UpcomingEvents.tsx.
   const events = useMemo<CommunityPost[]>(() => {
     const merged = [...(globalQuery.data ?? []), ...(orgQuery.data ?? [])];
     return merged
