@@ -225,7 +225,7 @@ export function EnrollUserDialog({
               <div className="p-4 rounded-lg border bg-muted/50 text-center">
                 <Users className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  No active learners to enroll. Invite team members first.
+                  No active learners to enroll. Invite users first.
                 </p>
               </div>
             ) : (
