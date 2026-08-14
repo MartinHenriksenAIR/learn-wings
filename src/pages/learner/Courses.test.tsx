@@ -25,9 +25,6 @@ vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
 
-// The filter dropdowns render via the shared shadcn Select (through FilterSelect),
-// which jsdom can't drive — swap in the shared test double so each option is a
-// clickable button.
 vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
 const mockUseAuth = vi.fn();
@@ -50,13 +47,8 @@ vi.mock('@/hooks/useCourseCategories', () => ({
 import LearnerCourses from './Courses';
 import { callApi } from '@/lib/api-client';
 
-// vi.clearAllMocks() only clears call history (not implementations), so these
-// module-scope defaults survive every describe's beforeEach; individual tests
-// override them when they exercise the heart toggle.
 mockUseFavorites.mockReturnValue({ isFavorite: () => false, favoriteIds: new Set(), data: { courses: [] } });
 mockUseToggleFavorite.mockReturnValue({ toggleFavorite: vi.fn(), togglingId: null, isPending: false });
-// Default: no categories (so useCourseCategories fires no callApi — keeps the "only /api/learner-courses
-// was called" assertions valid). Tests exercising the category filter override this with rows.
 mockUseCourseCategories.mockReturnValue({ data: [] });
 
 const baseAuthState = {
@@ -112,8 +104,6 @@ describe('LearnerCourses — profile-gated loading guard', () => {
 
     expect(document.querySelector('.animate-spin')).toBeNull();
 
-    // A non-admin with no org is a blocked walk-in — registration is invitation-only,
-    // not a "join an org" prompt.
     expect(screen.getByText('dashboard.invitationOnlyTitle')).toBeInTheDocument();
     expect(screen.getByText('dashboard.invitationOnlyDescription')).toBeInTheDocument();
     expect(screen.queryByText('common.noOrgSelected')).toBeNull();
@@ -192,7 +182,6 @@ describe('LearnerCourses — warm, org-name-free subtitle (#360)', () => {
     renderCourses();
 
     expect(await screen.findByText('courses.subtitle')).toBeInTheDocument();
-    // The old individual-only variant is gone now that the subtitle carries no org name.
     expect(screen.queryByText('courses.subtitleIndividual')).toBeNull();
   });
 
@@ -234,9 +223,7 @@ describe('LearnerCourses — single Start/Continue/Review CTA (implicit enrollme
 
     const start = await screen.findByRole('link', { name: /courses\.startCourse/ });
     expect(start).toHaveAttribute('href', '/app/learn/c-1');
-    // No enroll button anywhere — opening the course is the only step.
     expect(screen.queryByRole('button', { name: /common\.enroll/ })).toBeNull();
-    // The only backend call is the catalogue read; the page never calls /api/enroll.
     expect(vi.mocked(callApi).mock.calls.every(([url]) => url === '/api/learner-courses')).toBe(true);
   });
 
@@ -282,7 +269,6 @@ describe('LearnerCourses — failed fetch shows error fork, not empty state', ()
 
     expect(await screen.findByText('common.loadErrorTitle')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
-    // The success-empty state must NOT be shown on a failure.
     expect(screen.queryByText('courses.noCoursesAvailable')).toBeNull();
   });
 });
@@ -369,12 +355,9 @@ describe('LearnerCourses — recommended section', () => {
 
     expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
     expect(screen.getByTestId('recommended-chip')).toBeInTheDocument();
-    // c-basic matches the assessment level, so it renders in both the recommended grid
-    // and the full catalogue — each copy exposes a Continue link to the player.
     const continueLinks = screen.getAllByRole('link', { name: /common\.continue/ });
     expect(continueLinks.length).toBeGreaterThanOrEqual(1);
     continueLinks.forEach((l) => expect(l).toHaveAttribute('href', '/app/learn/c-basic'));
-    // The old "Enrolled" badge is gone with the enroll step (#357).
     expect(screen.queryByTestId('status-badge-enrolled')).toBeNull();
   });
 
@@ -388,7 +371,6 @@ describe('LearnerCourses — recommended section', () => {
     renderCourses();
 
     expect(await screen.findByTestId('recommended-section')).toBeInTheDocument();
-    // Applying any filter switches to "browsing results" — the recommended strip + its heading hide.
     fireEvent.click(screen.getByRole('button', { name: 'courses.levels.advanced' }));
     expect(screen.queryByTestId('recommended-section')).toBeNull();
     expect(screen.queryByText('assessment.recommendations.allCourses')).toBeNull();
@@ -398,7 +380,6 @@ describe('LearnerCourses — recommended section', () => {
 describe('LearnerCourses — enrolled-first ordering of the "All courses" grid (#338)', () => {
   const currentOrg = { id: 'org-1', name: 'Org One' };
 
-  // Backend returns courses ORDER BY c.title (alphabetical); mirror that here.
   const apple = {
     id: 'c-apple', title: 'Apple', description: 'a course', level: 'basic',
     is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
@@ -416,7 +397,6 @@ describe('LearnerCourses — enrolled-first ordering of the "All courses" grid (
     is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
   };
 
-  // banana = enrolled (older), cherry = completed (newer) — both count as "enrolled".
   const enrollments = [
     { id: 'e-banana', course_id: 'c-banana', status: 'enrolled', enrolled_at: '2026-01-10T00:00:00Z', completed_at: null },
     { id: 'e-cherry', course_id: 'c-cherry', status: 'completed', enrolled_at: '2026-01-20T00:00:00Z', completed_at: '2026-02-01T00:00:00Z' },
@@ -427,8 +407,6 @@ describe('LearnerCourses — enrolled-first ordering of the "All courses" grid (
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // assessment_level null → no "Recommended for you" section, so h3 course titles
-    // appear exactly once (only in the "All courses" grid) and order is unambiguous.
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
       currentOrg,
@@ -445,8 +423,6 @@ describe('LearnerCourses — enrolled-first ordering of the "All courses" grid (
     renderCourses();
 
     await screen.findByText('Apple');
-    // Enrolled first by enrolled_at DESC (Cherry 01-20, Banana 01-10),
-    // then non-enrolled preserving the backend's alphabetical order (Apple, Date).
     expect(titleOrder()).toEqual(['Cherry', 'Banana', 'Apple', 'Date']);
   });
 
@@ -471,10 +447,8 @@ describe('LearnerCourses — enrolled-first ordering of the "All courses" grid (
     renderCourses();
 
     await screen.findByText('Apple');
-    // Narrow to 'basic' — excludes Date (advanced); Apple/Banana/Cherry remain.
     fireEvent.click(screen.getByRole('button', { name: 'courses.levels.basic' }));
 
-    // Enrolled first (Cherry, Banana), then non-enrolled (Apple); Date filtered out.
     expect(titleOrder()).toEqual(['Cherry', 'Banana', 'Apple']);
   });
 });
@@ -507,7 +481,6 @@ describe('LearnerCourses — progress bar + % on enrolled cards (#340)', () => {
 
     const bar = await screen.findByTestId('course-progress-c-1');
     expect(bar).toBeInTheDocument();
-    // 2/3 rounds to 67%
     expect(screen.getByText('67%')).toBeInTheDocument();
     const fill = bar.querySelector('.bg-primary') as HTMLElement | null;
     expect(fill).not.toBeNull();
@@ -536,7 +509,6 @@ describe('LearnerCourses — progress bar + % on enrolled cards (#340)', () => {
 
     renderCourses();
 
-    // The "Start course" CTA is present, but no progress bar is rendered.
     expect(await screen.findByRole('link', { name: /courses\.startCourse/ })).toBeInTheDocument();
     expect(screen.queryByTestId('course-progress-c-1')).toBeNull();
     expect(screen.queryByText('0%')).toBeNull();
@@ -560,7 +532,6 @@ describe('LearnerCourses — progress bar + % on enrolled cards (#340)', () => {
 describe('LearnerCourses — recency ordering of the enrolled group (#339)', () => {
   const currentOrg = { id: 'org-1', name: 'Org One' };
 
-  // Backend returns courses ORDER BY c.title (alphabetical); mirror that here.
   const apple = {
     id: 'c-apple', title: 'Apple', description: 'a course', level: 'basic',
     is_published: true, thumbnail_url: null, created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
@@ -579,8 +550,6 @@ describe('LearnerCourses — recency ordering of the enrolled group (#339)', () 
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // assessment_level null → no "Recommended for you" section, so h3 course titles
-    // appear exactly once (only in the "All courses" grid) and order is unambiguous.
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
       currentOrg,
@@ -589,8 +558,6 @@ describe('LearnerCourses — recency ordering of the enrolled group (#339)', () 
   });
 
   it('orders enrolled courses by last_accessed_at DESC, independent of enrolled_at', async () => {
-    // Banana enrolled first but was accessed most recently → it leads. Ordering
-    // is by activity recency, not enrollment recency.
     vi.mocked(callApi).mockResolvedValue({
       courses: [apple, banana, cherry],
       enrollments: [
@@ -603,14 +570,10 @@ describe('LearnerCourses — recency ordering of the enrolled group (#339)', () 
     renderCourses();
 
     await screen.findByText('Apple');
-    // Most recent activity first: Banana (03-05), Cherry (03-03), Apple (03-01).
     expect(titleOrder()).toEqual(['Banana', 'Cherry', 'Apple']);
   });
 
   it('falls back to enrolled_at when last_accessed_at is null', async () => {
-    // Banana has recent activity; Apple/Cherry have no activity yet (null) and fall
-    // back to enrolled_at, so a null-activity course never outranks an active one and
-    // the two null courses order by their own enrolled_at DESC (Cherry before Apple).
     vi.mocked(callApi).mockResolvedValue({
       courses: [apple, banana, cherry],
       enrollments: [
@@ -623,8 +586,6 @@ describe('LearnerCourses — recency ordering of the enrolled group (#339)', () 
     renderCourses();
 
     await screen.findByText('Apple');
-    // Banana (activity 02-01) leads; then null-activity courses by enrolled_at DESC:
-    // Cherry (enrolled 01-30) before Apple (enrolled 01-20).
     expect(titleOrder()).toEqual(['Banana', 'Cherry', 'Apple']);
   });
 });
@@ -654,7 +615,6 @@ describe('LearnerCourses — favorite heart toggle (#358)', () => {
     renderCourses();
 
     const heart = await screen.findByRole('button', { name: 'courses.addToFavorites' });
-    // Not favorited → outline heart (no fill-current).
     expect(heart.querySelector('.fill-current')).toBeNull();
 
     fireEvent.click(heart);
@@ -674,7 +634,6 @@ describe('LearnerCourses — favorite heart toggle (#358)', () => {
     renderCourses();
 
     const heart = await screen.findByRole('button', { name: 'courses.removeFromFavorites' });
-    // Favorited → filled heart.
     expect(heart.querySelector('.fill-current')).not.toBeNull();
 
     fireEvent.click(heart);
@@ -728,7 +687,6 @@ describe('LearnerCourses — catalog refinements: category filter, view toggle, 
     expect(detailHrefs).toContain('/app/courses/c-ai');
     expect(detailHrefs).toContain('/app/courses/c-data');
 
-    // The thumbnail Start action opens the player, not the detail page.
     screen.getAllByRole('link', { name: /courses\.startCourse/ }).forEach((s) =>
       expect(s.getAttribute('href')).toMatch(/^\/app\/learn\//));
   });
@@ -753,8 +711,6 @@ describe('LearnerCourses — catalog refinements: category filter, view toggle, 
     renderCourses();
     await screen.findByText('AI Course');
 
-    // The category dropdown offers only categories that have a course in the catalogue.
-    // Options render by their (Danish, here) display name: cat-ai → "AI", cat-empty → "Tom".
     expect(screen.getByRole('button', { name: 'AI' })).toBeInTheDocument();  // has a course
     expect(screen.queryByRole('button', { name: 'Tom' })).toBeNull();        // no course → omitted
   });
@@ -809,7 +765,6 @@ describe('LearnerCourses — catalog refinements: category filter, view toggle, 
     renderCourses();
     await screen.findByText('AI Course');
 
-    // Narrow status to "completed" with nothing completed → empty grid via a non-search filter.
     fireEvent.click(screen.getByRole('button', { name: 'courses.statusOptions.completed' }));
 
     expect(screen.getByText('courses.noCoursesMatch')).toBeInTheDocument();

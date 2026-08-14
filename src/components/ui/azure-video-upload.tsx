@@ -20,10 +20,6 @@ interface AzureVideoUploadProps {
   onChange: (blobPath: string | null) => void;
   className?: string;
   disabled?: boolean;
-  /**
-   * Forwarded to the underlying file input so a `<Label htmlFor>` can name the
-   * control (#325). Clicking such a label opens the file picker.
-   */
   id?: string;
 }
 
@@ -35,8 +31,6 @@ export function AzureVideoUpload({
   id,
 }: AzureVideoUploadProps) {
   const { t } = useTranslation();
-  // Via the clamp helper rather than UPLOAD_MAX_MB directly, so every call site
-  // in the app reaches the server cap through exactly one code path.
   const capMB = effectiveMaxSizeMB('video');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -71,23 +65,13 @@ export function AzureVideoUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Clearing the input is the single exit path for every branch below: a
-    // `change` event only fires when the value changes, so a rejected file left
-    // in the input makes re-picking it a no-op.
     try {
-      // Mirrors the server's mint-time allow-list rather than a bare `video/`
-      // prefix, so .mkv/.avi/.wmv are refused here — naming the formats —
-      // instead of by the server with a bare "File type not allowed".
       const typeError = checkUploadFileType('video', file);
       if (typeError) {
         showMessage(typeError);
         return;
       }
 
-      // Validate file size against the server cap (#276). This component used to
-      // have no size check at all and advertised "Unlimited file size"; without it
-      // an oversized video uploads for minutes and only then fails the save with a
-      // 413, having already cost the user (and the storage account) the transfer.
       const sizeError = checkUploadPayloadSize(file.size, capMB);
       if (sizeError) {
         showMessage(sizeError);
@@ -141,15 +125,8 @@ export function AzureVideoUpload({
         setProgress(100);
         onChange(blobPath);
       } catch (err) {
-        // The thrown text is diagnostic, not actionable, and is the one string
-        // no translation could reach — log it and show the translated summary.
         console.error('Video upload failed:', err);
         setError(t('fileUpload.errorUploadFailed'));
-        // Deliberately NO `onChange(null)` here — same rule as FileUpload.
-        // Nothing was stored, so the parent's current value still names a live
-        // blob, and since #275 saving a null is what DELETES it. A failed
-        // replacement must not destroy the video it failed to replace, so
-        // `onChange(null)` means only one thing: the user removed the video.
         setFileName(null);
       } finally {
         setUploading(false);

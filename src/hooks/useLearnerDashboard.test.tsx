@@ -93,7 +93,6 @@ describe('useLearnerDashboard', () => {
     await waitFor(() => {
       expect(screen.getByTestId('thumb')).toHaveTextContent('https://blob/signed-a.png');
     });
-    // A course with no artwork must stay null so the card can fall back to its accent fill.
     expect(screen.getByTestId('rec-thumb')).toHaveTextContent('none');
   });
 

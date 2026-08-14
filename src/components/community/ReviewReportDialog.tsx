@@ -14,22 +14,13 @@ import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 export interface ReviewReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Controlled admin-notes value + setter; the page owns the state so the
-   *  same notes seed both dismiss and mark-reviewed. */
   adminNotes: string;
   onAdminNotesChange: (value: string) => void;
   onDismiss: () => void;
   onReview: () => void;
-  /** True while the underlying update mutation is in flight. */
   pending: boolean;
 }
 
-/**
- * Review-a-report dialog shared by the org + platform community moderation
- * queues (#237). Controlled: the page owns open/adminNotes state (the notes
- * seed both actions) and supplies the dismiss/review handlers, which mutate via
- * useReportModeration. Presentation-only — no data fetching or mutation here.
- */
 export function ReviewReportDialog({
   open,
   onOpenChange,

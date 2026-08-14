@@ -10,10 +10,6 @@ interface SendInvitationEmailParams {
   inviterLanguage?: InviteLanguage;
 }
 
-/**
- * Sends an invitation email via the send-invitation-email edge function.
- * This is a fire-and-forget operation - errors are logged but don't block the flow.
- */
 export async function sendInvitationEmail({
   email,
   orgName,

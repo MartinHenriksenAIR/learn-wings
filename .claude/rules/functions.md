@@ -3,7 +3,7 @@ paths:
   - "functions/**"
 ---
 
-# Azure Functions conventions (hard-won — see WORKLOG Slice 0)
+# Azure Functions conventions
 
 - **New endpoints MUST use `endpoint()` / `adminEndpoint()` from `functions/shared/endpoint.ts`** (ADR-0015). The factory owns the whole HTTP envelope — origin/CORS, OPTIONS→204, authenticate→getProfile→401, the platform-admin 403 gate (`adminEndpoint`), `AuthError`→401, the generic-500 catch, and the `app.http` registration. The hand-rolled endpoints that remain are deliberate exceptions, each with a pointer comment stating why (grep `app.http(` for the list).
 - **Every new function MUST be imported in the `functions/index.ts` barrel** (`main: dist/index.js`) — an unimported function silently never registers. Enforced by the fleet guard `functions/registration-names.test.ts` (route↔folder parity, uniqueness, reserved prefixes, barrel cross-check).

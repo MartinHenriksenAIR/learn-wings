@@ -3,10 +3,6 @@ import { render, screen } from '@testing-library/react';
 import { BrandingAvatar } from './branding-avatar';
 import { getInitials, getAvatarColor } from '@/lib/utils';
 
-// #201 — BrandingAvatar derives initials + fallback color from an optional `name`
-// prop, collapsing the per-site getInitials/getAvatarColor cluster. These tests
-// pin that the internal derivation equals the old per-site logic and that any
-// explicit prop wins over the derived value.
 
 vi.mock('@/hooks/useSignedBrandingUrl', () => ({
   useSignedBrandingUrl: (path: string | null | undefined) => ({
@@ -14,9 +10,6 @@ vi.mock('@/hooks/useSignedBrandingUrl', () => ({
   }),
 }));
 
-// Radix's AvatarImage only mounts the <img> after the browser loads it, which
-// jsdom never does. Render deterministic primitives so the fallback content and
-// its style are observable in the DOM.
 vi.mock('@/components/ui/avatar', () => ({
   Avatar: ({ children, className }: any) => <div className={className}>{children}</div>,
   AvatarImage: ({ src, alt = '' }: any) => <img src={src} alt={alt} />,

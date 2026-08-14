@@ -20,9 +20,7 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// idea authored by p2 in org-1
 const othersIdea = { id: 'idea-1', org_id: 'org-1', user_id: 'p2' };
-// idea authored by caller p1
 const myIdea = { ...othersIdea, user_id: 'p1' };
 
 describe('idea-delete', () => {
@@ -82,10 +80,6 @@ describe('idea-delete', () => {
 
   it('happy path: author (not admin) deletes their own idea', async () => {
     mockQueryOne.mockResolvedValueOnce(myIdea); // load
-    // isOrgAdmin may be consulted and return false (beforeEach default); author check must still pass.
-    // Do NOT queue a mockResolvedValueOnce here: the author short-circuit skips the isOrgAdmin call,
-    // leaving a once-value in the queue that vi.clearAllMocks() does NOT drain — it would then leak
-    // into the next test and wrongly deny the org admin.
     mockQuery.mockResolvedValueOnce([]); // DELETE
 
     const res = await handler(baseReq({ ideaId: 'idea-1' }), {} as any);

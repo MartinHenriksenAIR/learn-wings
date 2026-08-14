@@ -20,7 +20,6 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// idea loaded by the handler: authored by p2, in org-1
 const ideaRow = { id: 'idea-1', org_id: 'org-1', user_id: 'p2', status: 'submitted' };
 
 const VALID_STATUSES =
@@ -106,7 +105,6 @@ describe('idea-status-update', () => {
   });
 
   it('returns 403 when the idea AUTHOR (not admin) tries to update status', async () => {
-    // caller p1 authored the idea, but is neither platform nor org admin → authorship grants nothing here
     mockQueryOne.mockResolvedValueOnce({ ...ideaRow, user_id: 'p1' });
     mockIsOrgAdmin.mockResolvedValueOnce(false);
     const res = await handler(baseReq({ ideaId: 'idea-1', status: 'approved' }), {} as any);
@@ -123,7 +121,6 @@ describe('idea-status-update', () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ idea: updated });
 
-    // authz used the loaded idea's org_id, never client-supplied
     expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
 
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
@@ -208,7 +205,6 @@ describe('idea-status-update', () => {
     await handler(baseReq({ ideaId: 'idea-1', status: 'approved', rejectionReason: 'ignored' }), {} as any);
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('rejection_reason =');
-    // the supplied reason must NOT make it into params; rejection_reason is forced null
     expect(params).not.toContain('ignored');
     expect(params).toContain(null);
   });

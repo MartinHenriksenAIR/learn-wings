@@ -132,7 +132,6 @@ describe('enrollments', () => {
 
     expect(res.status).toBe(200);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // user_id is added first (profile.id forced), then org_id — pinned positional order
     expect(sql).toContain('user_id = $1');
     expect(sql).toContain('org_id = $2');
     expect(params).toEqual(['p1', 'org-1']);

@@ -69,9 +69,6 @@ export default function IdeaDetail() {
     enabled: !!ideaId,
   });
 
-  // Seed the admin status panel once per loaded idea (the panel replaced the
-  // old dialog, which seeded on open). Keyed on the id so background refetches
-  // (e.g. after a comment) don't clobber in-progress admin edits.
   useEffect(() => {
     if (!idea) return;
     setNewStatus(idea.status);
@@ -86,16 +83,12 @@ export default function IdeaDetail() {
       queryClient.invalidateQueries({ queryKey: queryKeys.ideaComments.list(ideaId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.idea.detail(ideaId) });
       setNewComment('');
-      // Routine: the new comment appearing in the thread is the feedback
-      // (matches PostDetail) — no success toast (toast policy). Errors keep toasts.
     },
     onError: () => {
       toast.error(t('community.toasts.commentAddFailed'));
     },
   });
 
-  // Vote mutation — routine toggle: the button's pressed state + vote count are
-  // the feedback (toast policy: like/vote toggles get no success toast). Errors keep toasts.
   const voteMutation = useMutation({
     mutationFn: () => voteForIdea(ideaId!),
     onSuccess: () => {
@@ -106,7 +99,6 @@ export default function IdeaDetail() {
     },
   });
 
-  // Unvote mutation — routine toggle (see voteMutation): no success toast.
   const unvoteMutation = useMutation({
     mutationFn: () => removeVoteFromIdea(ideaId!),
     onSuccess: () => {
@@ -117,7 +109,6 @@ export default function IdeaDetail() {
     },
   });
 
-  // Status update mutation — routine save: in-button "Saved" morph, no success toast.
   const statusMutation = useMutation({
     mutationFn: () =>
       updateIdeaStatus(ideaId!, {
@@ -381,7 +372,6 @@ export default function IdeaDetail() {
           )}
         </div>
 
-        {/* Admin status panel (replaces the old dialog; in-button save feedback) */}
         {effectiveIsOrgAdmin && (
           <div className="mt-4 rounded-2xl border border-border bg-card px-6 py-5">
             <h3 className="mb-3 text-sm font-extrabold">{t('community.updateStatus')}</h3>

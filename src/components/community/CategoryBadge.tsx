@@ -15,7 +15,6 @@ import {
 
 interface CategoryBadgeProps {
   name: string;
-  /** Stable category slug — drives the color, independent of the (translatable) name. */
   slug: string;
   icon?: string | null;
   isRestricted?: boolean;
@@ -34,7 +33,6 @@ const iconMap: Record<string, LucideIcon> = {
   Calendar,
 };
 
-// Keyed by the seeded category slugs (migration/azure/02-seed.sql).
 const colorMap: Record<string, string> = {
   'challenges-obstacles': 'bg-orange-100 text-orange-800',
   'risks-mitigation': 'bg-red-100 text-red-800',

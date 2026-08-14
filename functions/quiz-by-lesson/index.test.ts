@@ -89,7 +89,6 @@ describe('quiz-by-lesson', () => {
       { id: 'q1', quiz_id: 'quiz-1', question_text: 'Question 1', sort_order: 1 },
       { id: 'q2', quiz_id: 'quiz-1', question_text: 'Question 2', sort_order: 2 },
     ];
-    // Options returned from DB ordered by sort_order across all questions: q1-opt1, q1-opt2, q2-opt1, q2-opt2
     const options = [
       { id: 'o1', question_id: 'q1', option_text: 'A', sort_order: 1 },
       { id: 'o2', question_id: 'q1', option_text: 'B', sort_order: 2 },
@@ -118,7 +117,6 @@ describe('quiz-by-lesson', () => {
     expect(body.questions[1].options[0].id).toBe('o3');
     expect(body.questions[1].options[1].id).toBe('o4');
 
-    // Options query must batch via ANY($1::uuid[]) — no N+1
     const [optionsSql, optionsParams] = mockQuery.mock.calls[1] as [string, unknown[]];
     expect(optionsSql).toContain('ANY($1::uuid[])');
     expect(optionsParams).toEqual([['q1', 'q2']]);
@@ -147,7 +145,6 @@ describe('quiz-by-lesson', () => {
       expect(sql).not.toContain('is_correct');
     }
 
-    // Response body must not contain is_correct
     expect(res.body as string).not.toContain('is_correct');
     expect(JSON.stringify(JSON.parse(res.body as string))).not.toContain('is_correct');
   });
@@ -163,7 +160,6 @@ describe('quiz-by-lesson', () => {
     const body = JSON.parse(res.body as string);
     expect(body).toEqual({ quiz: null, questions: [] });
 
-    // No quiz_questions or quiz_options queries should have run
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
@@ -181,7 +177,6 @@ describe('quiz-by-lesson', () => {
     expect(body.quiz).toEqual({ id: 'quiz-1', lesson_id: 'lesson-1', passing_score: 70 });
     expect(body.questions).toEqual([]);
 
-    // Only one query call (questions), no options query
     expect(mockQuery).toHaveBeenCalledTimes(1);
     const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).not.toContain('ANY');
@@ -202,7 +197,6 @@ describe('quiz-by-lesson', () => {
 
     expect(res.status).toBe(200);
 
-    // queryOne should only have been called once (for quiz), not for the access EXISTS check
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     const [sql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('quizzes');

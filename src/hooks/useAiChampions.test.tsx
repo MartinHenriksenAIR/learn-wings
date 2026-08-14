@@ -42,7 +42,6 @@ describe('useAiChampions', () => {
     });
     expect(screen.getByTestId('second')).toHaveTextContent('u-1,u-2');
 
-    // The whole point of the shared hook: one network call, not one per consumer.
     expect(mockCallApi).toHaveBeenCalledTimes(1);
     expect(mockCallApi).toHaveBeenCalledWith('/api/ai-champions', { orgId: 'org-1' });
   });
@@ -52,7 +51,6 @@ describe('useAiChampions', () => {
 
     renderWithClient(<Consumer testId="gated" />);
 
-    // Let pending microtasks settle, then assert no request fired.
     await Promise.resolve();
     expect(mockCallApi).not.toHaveBeenCalled();
     expect(screen.getByTestId('gated')).toHaveTextContent('');

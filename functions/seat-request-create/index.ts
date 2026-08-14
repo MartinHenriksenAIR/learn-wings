@@ -23,7 +23,6 @@ export default endpoint('seat-request-create', async ({ req, context, profile, r
 
   await requireOrgAdmin(orgId);
 
-  // Binding price is authoritative server-side; the client never sends a price.
   const pricingRow = await queryOne<{ value: SeatPricingValue }>(
     `SELECT value FROM platform_settings WHERE key = 'seat_pricing'`,
   );

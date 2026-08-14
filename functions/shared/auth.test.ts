@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// Mirror jwks-rsa's SigningKeyNotFoundError, a plain Error subclass (jwks-rsa@3.2.2). The
-// production code does `err instanceof SigningKeyNotFoundError`, so the mock module MUST export
-// the SAME class the getSigningKey callback throws below — otherwise instanceof would be a no-op
-// and the test would pass vacuously. Declared via vi.hoisted so it exists when the (hoisted)
-// vi.mock factory runs and is shared by both the mock's export and the throw site.
 const { MockSigningKeyNotFoundError } = vi.hoisted(() => {
   class MockSigningKeyNotFoundError extends Error {
     constructor(message: string) { super(message); this.name = 'SigningKeyNotFoundError'; }
@@ -15,8 +10,6 @@ const { MockSigningKeyNotFoundError } = vi.hoisted(() => {
 vi.mock('jwks-rsa', () => ({
   default: () => ({
     getSigningKey: (kid: string, cb: (err: Error | null, key?: any) => void) => {
-      // An unknown/garbage kid (attacker-controllable) → SigningKeyNotFoundError, exactly as
-      // real jwks-rsa does. This is a TOKEN problem → must map to AuthError → 401, not a 500.
       if (kid === 'unknown-kid') return cb(new MockSigningKeyNotFoundError('Unable to find a signing key that matches'));
       cb(null, { getPublicKey: () => 'mock-public-key' });
     },
@@ -26,9 +19,6 @@ vi.mock('jwks-rsa', () => ({
 
 const VALID_ISSUER = 'https://login.microsoftonline.com/11111111-1111-1111-1111-111111111111/v2.0';
 
-// Mirror jsonwebtoken's real class hierarchy: TokenExpiredError/NotBeforeError extend
-// JsonWebTokenError, so the production `instanceof JsonWebTokenError` classification covers all three.
-// Declared via vi.hoisted so they exist when the (hoisted) vi.mock factory below runs.
 const { MockJsonWebTokenError, MockTokenExpiredError } = vi.hoisted(() => {
   class MockJsonWebTokenError extends Error {
     constructor(message: string) { super(message); this.name = 'JsonWebTokenError'; }
@@ -53,16 +43,9 @@ vi.mock('jsonwebtoken', () => ({
     try {
       const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString());
       const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-      // A genuine jsonwebtoken validation failure (bad signature) → JsonWebTokenError → AuthError → 401.
       if (payload._forceError) return cb(new MockJsonWebTokenError('invalid signature'));
-      // Expired token → TokenExpiredError (subclass) → still classified as AuthError → 401.
       if (payload._forceExpired) return cb(new MockTokenExpiredError('jwt expired'));
-      // A signing-key TRANSPORT failure surfaced via getKey/jwks-rsa is a plain Error,
-      // NOT a JsonWebTokenError → must NOT be wrapped as AuthError (so it 500s + logs, not a silent 401).
       if (payload._forceTransportError) return cb(new Error('getaddrinfo ENOTFOUND login.microsoftonline.com'));
-      // Real jsonwebtoken resolves the signing key via getKey(header, cb) and surfaces any error
-      // it yields to the verify callback. Drive that real path so an unknown-kid header produces
-      // the production getKey → getSigningKey → SigningKeyNotFoundError chain (→ AuthError → 401).
       return getKey(header, (keyErr) => {
         if (keyErr) return cb(keyErr);
         cb(null, payload);
@@ -117,21 +100,15 @@ describe('authenticate', () => {
   });
 
   it('throws AuthError on unknown kid (SigningKeyNotFoundError → 401, not a 500)', async () => {
-    // A crafted token with an unknown/garbage kid is attacker-controllable. jwks-rsa raises
-    // SigningKeyNotFoundError (a plain Error subclass) — a TOKEN problem, so it must map to
-    // AuthError → 401, NOT bucket into a logged 500 that masks a real Entra outage.
     const token = makeToken({ oid: 'o', tid: 't', iss: VALID_ISSUER }, 'unknown-kid');
     const req = { headers: { get: () => `Bearer ${token}` } };
     await expect(authenticate(req as any)).rejects.toBeInstanceOf(AuthError);
   });
 
   it('a JWKS transport failure is NOT wrapped as AuthError — rejects as-is so the factory 500s + logs it', async () => {
-    // Simulates a signing-key fetch failure (getKey/jwks-rsa DNS/network/rate-limit against
-    // login.microsoftonline.com). During an Entra outage this must NOT be a silent 401.
     const token = makeToken({ _forceTransportError: true });
     const req = { headers: { get: () => `Bearer ${token}` } };
     await expect(authenticate(req as any)).rejects.not.toBeInstanceOf(AuthError);
-    // And the raw transport message is preserved (for App Insights logging), not swallowed.
     await expect(authenticate(req as any)).rejects.toThrow('getaddrinfo ENOTFOUND login.microsoftonline.com');
   });
 

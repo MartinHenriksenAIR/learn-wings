@@ -3,11 +3,8 @@ import { cn } from '@/lib/utils';
 import { SectionHeading } from './section';
 import type { LeaderboardRow, LeaderboardWindow } from '@/hooks/useLearnerDashboard';
 
-/** Four rows fit the rail beside the community column without scrolling it. */
 const VISIBLE_ROWS = 4;
 
-// Colour is identity here, not decoration: the podium ranks carry an accent
-// tile, everyone below gets the neutral one.
 const RANK_TILES: Record<number, string> = {
   1: 'bg-dash-a3 text-dash-ink',
   2: 'bg-dash-a1 text-dash-ink',
@@ -39,11 +36,6 @@ function Row({ row, xpLabel }: { row: LeaderboardRow; xpLabel: string }) {
   );
 }
 
-/**
- * The org board, all-time. The window toggle the old widget carried was dropped
- * with the redesign (#455) — the month window is still in the payload, unused.
- * When the caller ranks below the visible rows their own row is pinned beneath.
- */
 export function DashboardLeaderboard({ leaderboard }: { leaderboard: LeaderboardWindow }) {
   const { t } = useTranslation();
 

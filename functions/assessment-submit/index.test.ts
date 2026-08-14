@@ -136,7 +136,6 @@ describe('assessment-submit', () => {
   });
 
   it('score-8 mixed answers → intermediate', async () => {
-    // 7 questions × index 1 = 7, bump one to index 2 → +1 = 8
     const answers = uniformAnswers(1);
     const firstQ = ASSESSMENT_QUESTIONS[0];
     answers[firstQ.id] = firstQ.options[2];

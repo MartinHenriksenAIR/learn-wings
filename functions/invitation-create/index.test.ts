@@ -45,9 +45,7 @@ const insertedRow = {
   department: null,
 };
 
-// pg QueryResult shape: the handler reads `.rows`.
 const rows = (...r: unknown[]) => ({ rows: r });
-// First client.query is the seat-usage lookup (org row + active-member/pending-invite counts).
 const seatRow = (seat_limit: number | null, active_count: number, pending_count: number) => ({ seat_limit, active_count, pending_count });
 
 describe('invitation-create', () => {
@@ -138,7 +136,6 @@ describe('invitation-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ invitation: insertedRow });
     expect(mockIsOrgAdmin).not.toHaveBeenCalled(); // platform-admin bypass
 
-    // First query: seat-usage lookup (row lock + active-member/pending-invite counts)
     const [seatSql, seatParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
     expect(seatSql).toContain('FOR UPDATE');
     expect(seatSql).toContain(`m.status = 'active'`);

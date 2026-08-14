@@ -4,12 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// Initialize i18n so t() resolves real (English) strings, matching production.
 import '@/i18n';
 
-// --- mock AppLayout faithfully: the real one renders its `title` prop as an <h1>
-// (see AppLayout.tsx). Modeling that here is what lets the #101 regression test below
-// observe a duplicate heading if a page ever passes `title` AND renders its own <h1>. ---
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ title, children }: { title?: string; children: React.ReactNode }) => (
     <div>
@@ -75,13 +71,10 @@ describe('CoursesManager — fetchData error handling', () => {
   });
 
   it('(b) Retry clears error and on success renders normal page (tabs visible)', async () => {
-    // Use a call-count approach: first round of calls (initial load) fails, second round (Retry) succeeds.
     let callCount = 0;
     mockCallApi.mockImplementation(async (path: string) => {
       callCount++;
-      // First two calls are the initial load (courses-admin + shared organizations query) — fail them
       if (callCount <= 2) throw new Error('Network error');
-      // Subsequent calls are the Retry's refetches — succeed them
       if (path === '/api/courses-admin') return successResponse[0];
       if (path === '/api/organizations') return successResponse[1];
     });
@@ -117,9 +110,6 @@ describe('CoursesManager — fetchData error handling', () => {
   });
 
   it('(#101) renders the "Course Manager" heading exactly once on the success path', async () => {
-    // Regression guard for #101: the success-path <AppLayout> must NOT also pass `title`,
-    // or the (faithfully-mocked) layout title + the in-page <h1> stack into two identical
-    // headings. The fix relies on the in-page header alone here.
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/courses-admin') return successResponse[0];
       if (path === '/api/organizations') return successResponse[1];
@@ -172,8 +162,6 @@ describe('CoursesManager — mutations patch the courses cache (#48)', () => {
       updates: { isPublished: true },
     });
 
-    // The whole point of #48: a one-row toggle must NOT refire courses-admin
-    // (which would also re-sign every course thumbnail)
     const coursesAdminCalls = mockCallApi.mock.calls.filter(([path]) => path === '/api/courses-admin');
     expect(coursesAdminCalls).toHaveLength(1);
   });
@@ -294,8 +282,6 @@ describe('CoursesManager — language field (#191)', () => {
 
     renderPage();
 
-    // Load one course so the empty-state "New Course" button is absent and the
-    // header trigger is the only one, then open the create dialog.
     await screen.findByText('Existing Course');
     fireEvent.click(screen.getByRole('button', { name: /new course/i }));
 

@@ -22,7 +22,6 @@ import type { CommunityPost } from '@/lib/community-types';
 const RECENT_POSTS = 3;
 const UPCOMING_EVENTS = 5;
 
-/** "Emil Vladinov" → "EV"; a single name → its first letter; nothing → "?". */
 function initialsOf(first?: string | null, last?: string | null, full?: string | null): string {
   const parts = [first, last].filter(Boolean) as string[];
   const tokens = parts.length > 0 ? parts : (full ?? '').split(/\s+/).filter(Boolean);
@@ -35,8 +34,6 @@ function initialsOf(first?: string | null, last?: string | null, full?: string |
 export default function LearnerDashboard() {
   const { currentOrg, profile, memberships, isPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
-  // Solo learners run against a hidden placeholder org; community content is
-  // global-only for them, so the org-scoped read is skipped (#354).
   const isIndividual = currentOrg?.kind === 'individual';
   const communityGate = useCommunityGate();
   const communityOn = communityGate === 'allowed';
@@ -47,8 +44,6 @@ export default function LearnerDashboard() {
     enabled: orgGuard === 'ready' && !!currentOrg,
   });
 
-  // Community and events are two cuts of the same posts, so both scopes are read
-  // once here and reshaped at the call site rather than fetched per section.
   const communityOrgId = isIndividual ? undefined : currentOrg?.id;
   const globalPosts = useCommunityEvents('global', communityOrgId, { enabled: communityOn });
   const orgPosts = useCommunityEvents('org', communityOrgId, { enabled: communityOn });
@@ -84,9 +79,6 @@ export default function LearnerDashboard() {
   }
 
   if (!currentOrg) {
-    // A non-admin with no membership is a blocked walk-in — registration is
-    // invitation-only. Platform admins (and anyone with memberships but no selection)
-    // keep the generic no-org-selected copy.
     const showInvitationOnly = memberships.length === 0 && !isPlatformAdmin;
     return (
       <AppLayout title={t('dashboard.title')}>
@@ -101,8 +93,6 @@ export default function LearnerDashboard() {
     );
   }
 
-  // A failed dashboard fetch must not masquerade as an all-zero hub; show a
-  // distinct error fork with retry instead.
   if (query.isError || !query.data) {
     return (
       <AppLayout title={t('dashboard.title')}>
@@ -115,16 +105,10 @@ export default function LearnerDashboard() {
 
   const { snapshot, level, week, courses, recommended, leaderboard, showLeaderboard } = query.data;
 
-  // Nothing in flight → the hero shows what to start instead of an empty shelf.
-  // That is not the same as being brand new: a learner who finished everything
-  // keeps their headline and progress bar above the suggestions.
   const heroCourses = courses.length > 0 ? courses : recommended;
   const coursesAreRecommendations = courses.length === 0 && recommended.length > 0;
   const isFresh = snapshot.started === 0;
 
-  // Events are derived from community posts, so they go when community does.
-  // With both gone the rail would be a lonely four-row board, so the whole right
-  // column drops and the left one takes the full width rather than looking cut off.
   const showRail = showLeaderboard || communityOn;
   const communityLoading = communityOn && (globalPosts.isLoading || orgPosts.isLoading);
   const communityError = communityOn && (globalPosts.isError || orgPosts.isError);
@@ -178,13 +162,7 @@ export default function LearnerDashboard() {
         </div>
 
         {showRail && (
-          // Hairline in the gutter — the columns are told apart by the rule
-          // alone, with no change of plane. It only exists once they sit
-          // side by side; stacked, the sections read in order.
           <div className="min-w-0 self-stretch lg:border-l lg:border-[rgba(23,26,38,0.09)] lg:pl-[26px]">
-            {/* Server decides visibility: false for the individual tier (#354) and for a
-                per-org leaderboard opt-out (#369). Hides the widget entirely rather than
-                rendering an empty board for a disabled feature. */}
             {showLeaderboard && <DashboardLeaderboard leaderboard={leaderboard.allTime} />}
 
             {communityOn && !communityLoading && !communityError && (

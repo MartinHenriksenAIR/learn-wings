@@ -3,7 +3,6 @@ import { endpoint } from '../shared/endpoint';
 import { lockSeatUsage, seatsRemaining } from '../shared/seats';
 
 const ALLOWED_ROLES = new Set(['org_admin', 'learner']);
-// Basic email regex — matches the BulkInviteDialog / invitation-create validation.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_INVITES = 500;
 
@@ -23,31 +22,10 @@ type RowResult = {
   code?: string;
 };
 
-/**
- * Bulk variant of invitation-create — replaces the per-row loop the BulkInviteDialog
- * used to run on the client (one network call per CSV row). The dialog now sends
- * a single call with an array of invites; we INSERT each row independently so one
- * bad row does not abort the rest. Sequential (no Promise.all) to keep deterministic
- * ordering and avoid hammering the small connection pool.
- *
- * Seat-limit enforcement (issue #126): the whole batch runs in ONE transaction with a
- * single `FOR UPDATE` lock on the organization row (see functions/shared/seats.ts).
- * Seats fill partially in request order — valid rows succeed until the org's seats run
- * out, after which every further valid row fails with a seat-limit error. `remaining`
- * is tracked locally and decremented only on a successful INSERT; the row lock (held
- * for the whole batch) keeps that count authoritative against concurrent creates.
- * Partial success is still intentional: per-row failures (validation, duplicate,
- * seat cap) surface as `success: false` and never abort the batch. Each INSERT runs
- * inside a per-row SAVEPOINT so a failed statement (e.g. a duplicate pending email)
- * can be rolled back without poisoning the surrounding transaction.
- * `token` / `token_hash` are NEVER exposed in the response (same security note as
- * invitation-create).
- */
 export default endpoint('invitation-bulk-create', async ({ req, context, profile, reply, requireOrgAdmin }) => {
   const body = await req.json() as { orgId?: unknown; invites?: unknown };
   const { orgId, invites } = body;
 
-  // Request-level validation: shape errors abort the whole request with 400.
   if (!orgId || typeof orgId !== 'string') {
     return reply(400, { error: 'orgId is required' });
   }
@@ -64,10 +42,6 @@ export default endpoint('invitation-bulk-create', async ({ req, context, profile
     return reply(400, { error: `invites must not exceed ${MAX_INVITES} entries` });
   }
 
-  // Authorization: platform admin OR org admin of the target org.
-  // RLS provenance: supabase/migrations/20260130144031_*.sql —
-  // "Admins can insert invitations" policy (WITH CHECK is_platform_admin()
-  // OR (org_id IS NOT NULL AND is_org_admin(org_id))). Same gate as invitation-create.
   await requireOrgAdmin(orgId);
 
   const validateOptionalText = (val: unknown): { ok: true; value: string | null } | { ok: false } => {
@@ -77,8 +51,6 @@ export default endpoint('invitation-bulk-create', async ({ req, context, profile
     return { ok: true, value: val === '' ? null : val };
   };
 
-  // Per-row processing inside ONE transaction. Each row resolves to a result entry —
-  // never throws out of the loop. Sequential by design (see header comment).
   const results: RowResult[] = await withTransaction(async (client) => {
     const rows: RowResult[] = [];
     const usage = await lockSeatUsage(client, orgId);
@@ -88,8 +60,6 @@ export default endpoint('invitation-bulk-create', async ({ req, context, profile
       const rawEmail = typeof raw?.email === 'string' ? raw.email : '';
       const normalizedEmail = rawEmail.toLowerCase().trim();
 
-      // Per-row validation — non-fatal. Failed rows surface as success: false and
-      // NEVER consume a seat (validation always precedes the seat check).
       if (!rawEmail || typeof raw.email !== 'string' || !EMAIL_REGEX.test(rawEmail)) {
         rows.push({ email: normalizedEmail, success: false, error: 'email is required and must be a valid email address' });
         continue;
@@ -114,22 +84,15 @@ export default endpoint('invitation-bulk-create', async ({ req, context, profile
         continue;
       }
 
-      // Org existence: a platform admin can pass a bad orgId (requireOrgAdmin bypasses
-      // the existence check for platform admins), so guard here before any INSERT.
       if (!usage.exists) {
         rows.push({ email: normalizedEmail, success: false, error: 'Organization not found' });
         continue;
       }
-      // Seat cap: partial-fill in request order. Once seats are exhausted, every
-      // further valid row fails — the batch does not abort.
       if (remaining <= 0) {
         rows.push({ email: normalizedEmail, success: false, error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' });
         continue;
       }
 
-      // Per-row SAVEPOINT: a failed INSERT (e.g. duplicate pending) aborts the current
-      // transaction state; SAVEPOINT/ROLLBACK-TO lets us recover and keep going. This is
-      // MANDATORY — without it, one bad row would poison the whole batch.
       await client.query('SAVEPOINT bulk_row');
       try {
         const insertRes = await client.query(
@@ -150,11 +113,6 @@ export default endpoint('invitation-bulk-create', async ({ req, context, profile
         } else if ((dbErr as { code?: string })?.code === '23503') {
           rows.push({ email: normalizedEmail, success: false, error: 'Organization not found' });
         } else {
-          // Unexpected DB error for this row. The request-level internalError never
-          // sees it (the loop intentionally swallows per-row failures), so log it
-          // here for App Insights, and return a CONSTANT message — never the raw
-          // driver text (CWE-209, ADR-0014, #25 — the leak was still open inside
-          // this loop).
           const message = dbErr instanceof Error ? dbErr.message : String(dbErr);
           const stack = dbErr instanceof Error && dbErr.stack ? `\n${dbErr.stack}` : '';
           context.error(`invitation-bulk-create row failed: ${message}${stack}`);

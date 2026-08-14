@@ -64,10 +64,6 @@ export default function PostDetail() {
   const navigate = useNavigate();
   const scope = (routeScope || 'org') as CommunityScope;
   const { profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
-  // allowPlatformAdmin: the gate is keyed on the VIEWER's effective flags (platform +
-  // their currentOrg override), not the reported post's org. Platform admins moderating
-  // an org-scoped report must not be bounced just because their own org has community
-  // disabled (or they have no org selected). Backend authz already permits them.
   const communityGate = useCommunityGate({ allowPlatformAdmin: true });
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -90,8 +86,8 @@ export default function PostDetail() {
   });
 
   const isAuthor = profile?.id === post?.user_id;
-  const isAdmin = post?.scope === 'global' 
-    ? effectiveIsPlatformAdmin 
+  const isAdmin = post?.scope === 'global'
+    ? effectiveIsPlatformAdmin
     : effectiveIsOrgAdmin || effectiveIsPlatformAdmin;
   const isRestricted = post?.category?.is_restricted;
 
@@ -183,8 +179,6 @@ export default function PostDetail() {
       setShowReportDialog(false);
     },
     onError: (error: Error) => {
-      // 409 (already reported) is handled at the dialog boundary (#21) — it gets
-      // its own informational toast there, not a misleading failure toast here.
       if (error instanceof ApiError && error.status === 409) return;
       toast({ title: t('community.toasts.reportSubmitFailed'), description: error.message, variant: 'destructive' });
     },
@@ -449,9 +443,6 @@ export default function PostDetail() {
             await createCommentMutation.mutateAsync({ content, parentId });
           }}
           onEditComment={async (commentId, content) => {
-            // onError toasts the failure; swallow the rejection so it doesn't
-            // surface as an unhandled promise rejection (no post-await success
-            // dependency at the call site — CommentItem closes edit mode eagerly).
             await updateCommentMutation.mutateAsync({ commentId, content }).catch(() => {});
           }}
           onDeleteComment={async (commentId) => {
@@ -470,8 +461,6 @@ export default function PostDetail() {
             try {
               await reportMutation.mutateAsync(reason);
             } catch (error) {
-              // Duplicate report: the report already exists, so this is terminal —
-              // surface it as information and resolve the dialog (#21).
               if (error instanceof ApiError && error.status === 409) {
                 toast({
                   title: t('community.alreadyReported'),
@@ -479,8 +468,6 @@ export default function PostDetail() {
                 });
                 return;
               }
-              // Other failures: rethrow so the dialog stays open for a retry
-              // (the mutation's onError already showed a destructive toast).
               throw error;
             }
           }}

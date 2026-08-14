@@ -15,9 +15,6 @@ export default adminEndpoint('course-category-update', async ({ req, reply }) =>
     return reply(400, { error: 'updates must be an object' });
   }
 
-  // Only name_en / name_da are mutable here — slug and sort_order are never
-  // touched by a rename (slug stays whatever CREATE derived; order is the
-  // reorder endpoint's job). Build the SET clause from whichever names are given.
   const setClauses: string[] = [];
   const params: unknown[] = [];
 

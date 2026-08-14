@@ -72,7 +72,6 @@ describe('courses-admin', () => {
   });
 
   it('happy path: returns courses and accessRecords', async () => {
-    // Dispatch by SQL so the test is order-agnostic with respect to Promise.all parallelism
     mockQuery.mockImplementation((sql: string) => {
       if (sql.includes('FROM courses')) return Promise.resolve(fakeCourses);
       if (sql.includes('FROM org_course_access')) return Promise.resolve(fakeAccessRecords);

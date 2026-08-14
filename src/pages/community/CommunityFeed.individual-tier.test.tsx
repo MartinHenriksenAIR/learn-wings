@@ -86,20 +86,15 @@ describe('CommunityFeed — individual tier treats the placeholder org as no-org
     });
     renderAt('/community');
 
-    // The org→global redirect fires (placeholder counts as no org), so the feed
-    // lands on the global scope and fetches global posts.
     await waitFor(() =>
       expect(mockFetchPosts).toHaveBeenCalledWith(expect.objectContaining({ scope: 'global' })),
     );
 
-    // Exactly the Global tab — no tab bearing the placeholder org name.
     expect(screen.getByRole('tab', { name: /community\.globalCommunity/ })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /Individuals/ })).not.toBeInTheDocument();
 
-    // Org scope is never fetched for a placeholder learner.
     expect(mockFetchPosts).not.toHaveBeenCalledWith(expect.objectContaining({ scope: 'org' }));
 
-    // Org-only sidebar extras are absent.
     expect(screen.queryByText('community.ideaLibrary')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ai-champions')).not.toBeInTheDocument();
   });

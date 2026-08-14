@@ -13,12 +13,6 @@ interface DashboardCommunityProps {
   onSeeMore: () => void;
 }
 
-/**
- * The community glance: unboxed rows on the canvas, separated by hairlines.
- * The post's own anatomy does the work — author avatar, name, relative time,
- * scope chip, title, a two-line snippet and the comment count. There is no
- * reactions table, so the count is the only engagement figure we can show.
- */
 export function DashboardCommunity({ posts, onPostClick, onSeeMore }: DashboardCommunityProps) {
   const { t, i18n } = useTranslation();
 
@@ -31,7 +25,6 @@ export function DashboardCommunity({ posts, onPostClick, onSeeMore }: DashboardC
           icon={<MessageSquare className="h-6 w-6" />}
           title={t('dashboard.community.noActivityTitle')}
           description={t('dashboard.community.noActivityDescription')}
-          // Borderless with a soft shadow, like every other card on this surface.
           className="border-0 p-10 shadow-[0_2px_5px_rgba(17,20,45,0.045)]"
         />
       ) : (
@@ -54,8 +47,6 @@ export function DashboardCommunity({ posts, onPostClick, onSeeMore }: DashboardC
               name={post.profile?.full_name}
               className="h-[34px] w-[34px] shrink-0"
               fallbackClassName="text-[11.5px] font-extrabold text-dash-ink"
-              // BrandingAvatar derives a per-name colour and applies it inline,
-              // which would beat a class — so the accent goes in as a style.
               fallbackStyle={{ backgroundColor: DASH_ACCENTS[i % DASH_ACCENTS.length] }}
             />
             <div className="min-w-0 flex-1">

@@ -32,7 +32,6 @@ vi.mock('../shared/blob-ownership', () => ({
 
 import handler from './index';
 
-/** The one candidate this endpoint ever builds, handed to both gates. */
 const thumbCandidate = (path: string | null | undefined) => [{ path, kind: 'image', family: 'lms' }];
 
 const baseReq = (body: unknown) => ({
@@ -56,10 +55,6 @@ const fakeCourse = {
   is_published: false,
 };
 
-/**
- * When (and only when) `thumbnailUrl` is in the update, the endpoint issues a
- * previous-thumbnail SELECT before the UPDATE — so queryOne is called twice.
- */
 const mockThumbnailDb = (previousThumbnail: string | null, updated: unknown = fakeCourse) => {
   mockQueryOne.mockResolvedValueOnce({ thumbnail_url: previousThumbnail }).mockResolvedValueOnce(updated);
 };
@@ -261,7 +256,6 @@ describe('course-update', () => {
     mockQueryOne.mockResolvedValueOnce({ ...fakeCourse, category_id: null }); // UPDATE only
     const res = await handler(baseReq({ courseId: 'c1', updates: { categoryId: null } }), {} as any);
     expect(res.status).toBe(200);
-    // null is allowed straight through — no existence lookup, only the UPDATE
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('UPDATE courses');
@@ -403,7 +397,6 @@ describe('course-update', () => {
     });
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE courses');
-    // The refused blob's cleanup is the helper's job, not the endpoint's.
     expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
@@ -434,12 +427,6 @@ describe('course-update', () => {
     );
   });
 
-  // --- Path ownership ---
-  //
-  // Course thumbnails have NO folder prefix, so they share one flat namespace
-  // with lesson videos and documents. The prefix cannot tell one course's
-  // thumbnail from another's, or from a lesson video — the extension allow-list
-  // and the cross-row reference check have to.
 
   it('400 when the ownership gate refuses the path: no probe, no UPDATE, no delete', async () => {
     mockQueryOne.mockResolvedValueOnce({ thumbnail_url: null });
@@ -500,7 +487,6 @@ describe('course-update', () => {
     mockDeleteBlob.mockResolvedValue(false);
     const res = await handler(baseReq(thumbUpdate('thumbs/new.png')), {} as any);
     expect(res.status).toBe(200);
-    // Cleanup outcome is deliberately NOT surfaced in the response.
     expect(JSON.parse(res.body as string)).toEqual({ course: fakeCourse });
   });
 

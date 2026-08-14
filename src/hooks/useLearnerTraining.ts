@@ -6,18 +6,6 @@ import type { Course, Enrollment } from '@/lib/types';
 
 type TrainingEnrollment = Enrollment & { course: Course };
 
-/**
- * Fetch the learner's training data (enrollments + lesson progress) for
- * `orgId`, with thumbnail signing baked in.
- *
- * Returns:
- *  - `enrollments` — enriched with a required `course` shape (as the API returns)
- *  - `progress`    — map of courseId → { total, completed }
- *  - `thumbnailUrls` — map of courseId → signed thumbnail URL
- *
- * `enabled` defaults to `!!orgId` — pass it explicitly to gate on the
- * org-guard state (e.g. `enabled: orgGuard === 'ready' && !!currentOrg`).
- */
 export function useLearnerTraining(
   orgId: string | undefined,
   options: { enabled?: boolean; staleTime?: number } = {},

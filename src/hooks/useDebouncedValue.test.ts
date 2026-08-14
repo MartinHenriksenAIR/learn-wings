@@ -43,7 +43,6 @@ describe('useDebouncedValue', () => {
       { initialProps: { value: '' } }
     );
 
-    // Simulate keystrokes 100ms apart — each resets the pending timer.
     rerender({ value: 'r' });
     act(() => {
       vi.advanceTimersByTime(100);
@@ -57,8 +56,6 @@ describe('useDebouncedValue', () => {
       vi.advanceTimersByTime(100);
     });
 
-    // 300ms since the first keystroke, but only 100ms since the last:
-    // none of the intermediate values may have leaked through.
     expect(result.current).toBe('');
 
     act(() => {

@@ -50,22 +50,10 @@ interface UserProgressResult {
 }
 
 interface UseUserProgressOptions {
-  /**
-   * Gate the fetch. Typically set to the dialog's `open` state so the fetch
-   * only fires when the dialog is visible. Defaults to true.
-   */
   enabled?: boolean;
-  /** Per-observer staleTime override. Defaults to 60s. */
   staleTime?: number;
 }
 
-/**
- * The one way to fetch `/api/user-progress` from the frontend.
- *
- * The query key includes both orgId and userId, so switching users yields a
- * fresh cache entry — data from a previous user is never visible under a new
- * user's name. Pass `{ enabled: open }` to gate the fetch on dialog visibility.
- */
 export function useUserProgress(
   orgId: string | undefined,
   userId: string | undefined,

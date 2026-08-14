@@ -27,7 +27,6 @@ const submittedIdea = {
   status: 'submitted',
 };
 
-// draft owned by p2 (not the caller)
 const othersDraft = {
   id: 'idea-2',
   org_id: 'org-1',
@@ -163,7 +162,6 @@ describe('idea-comment-create', () => {
     expect(sql).toContain('WITH ins AS');
     expect(sql).toContain('INSERT INTO idea_comments');
     expect(sql).toContain('JOIN profiles pr');
-    // params: [ideaId, org_id-from-row, profile.id, content, parent??null]
     expect(params).toEqual(['idea-1', 'org-1', 'p1', 'Great idea!', null]);
   });
 

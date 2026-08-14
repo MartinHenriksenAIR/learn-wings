@@ -8,8 +8,6 @@ import type { CommunityPost } from '@/lib/community-types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
-  // The hero interpolates its greeting and headline through <Trans>; the key
-  // alone is enough for these assertions.
   Trans: ({ i18nKey }: { i18nKey: string }) => <>{i18nKey}</>,
 }));
 
@@ -170,7 +168,6 @@ describe('LearnerDashboard — hero', () => {
     expect(within(hero).getByText('dashboard.hero.headline')).toBeInTheDocument();
     expect(within(hero).getByText('dashboard.hero.cta')).toBeInTheDocument();
     expect(within(hero).getByText('67%')).toBeInTheDocument();
-    // The level rides on the avatar ring, not a separate card.
     expect(within(hero).getByLabelText('dashboard.level.label')).toHaveTextContent('4');
   });
 
@@ -197,8 +194,6 @@ describe('LearnerDashboard — hero', () => {
     expect(within(hero).getByText('dashboard.hero.headlineFresh')).toBeInTheDocument();
     expect(within(hero).getByText('dashboard.hero.ctaFresh')).toBeInTheDocument();
     expect(within(hero).getByText('dashboard.hero.lovedLabel')).toBeInTheDocument();
-    // No wall of zeros: the overall-progress bar is dropped, and the tiles carry
-    // a lesson count with no percentage or bar.
     expect(within(hero).queryByText('dashboard.overallProgress')).toBeNull();
     expect(within(hero).getByText('dashboard.hero.lessonsOnly')).toBeInTheDocument();
     expect(within(hero).queryByText('dashboard.hero.lessonsAndPct')).toBeNull();
@@ -218,7 +213,6 @@ describe('LearnerDashboard — statistics', () => {
     const stats = await screen.findByTestId('dashboard-snapshot');
     expect(within(stats).getByText('dashboard.stats.coursesInProgress')).toBeInTheDocument();
     expect(within(stats).getByText('dashboard.stats.coursesCompleted')).toBeInTheDocument();
-    // 510 min → 8.5 h, up 70% on the previous 300 min.
     expect(within(stats).getByText('8.5')).toBeInTheDocument();
     expect(within(stats).getByText('+70%')).toBeInTheDocument();
   });
@@ -255,7 +249,6 @@ describe('LearnerDashboard — leaderboard', () => {
     const board = await screen.findByTestId('dashboard-leaderboard');
     expect(within(board).getByText('Anna B.')).toBeInTheDocument();
     expect(within(board).getByText('300')).toBeInTheDocument();
-    // The all-time / this-month tabs were dropped with the redesign (#455).
     expect(within(board).queryAllByRole('button')).toHaveLength(0);
   });
 
@@ -276,8 +269,6 @@ describe('LearnerDashboard — leaderboard', () => {
   });
 
   it('hides the board for an individual-tier learner (server sets showLeaderboard=false)', async () => {
-    // The individual placeholder org suppresses the board server-side (#354),
-    // surfaced to the client as showLeaderboard=false.
     await mockData(dashData({ showLeaderboard: false }));
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
@@ -305,7 +296,6 @@ describe('LearnerDashboard — community gating', () => {
 
   it('renders the community rows and the events rail when the gate allows it', async () => {
     mockCommunityGate.mockReturnValue('allowed');
-    // Both scopes are read; only the org feed has anything in it here.
     mockFetchPosts.mockImplementation(async ({ scope }: { scope: string }) =>
       scope === 'org'
         ? ([
@@ -330,9 +320,7 @@ describe('LearnerDashboard — community gating', () => {
     renderDashboard();
     await screen.findByTestId('dashboard-hero');
     expect(screen.queryByTestId('dashboard-community')).toBeNull();
-    // Events derive from community posts, so they go with it (#455).
     expect(screen.queryByTestId('dashboard-events')).toBeNull();
-    // The board is the rail's only remaining occupant and still renders.
     expect(screen.getByTestId('dashboard-leaderboard')).toBeInTheDocument();
     expect(mockFetchPosts).not.toHaveBeenCalled();
   });
@@ -388,7 +376,6 @@ describe('LearnerDashboard — where everything clicks through to', () => {
     fireEvent.click(within(hero).getByText('dashboard.hero.ctaFresh'));
     expect(mockNavigate).toHaveBeenCalledWith('/app/courses');
 
-    // Nothing to resume yet — a suggestion opens its description first.
     fireEvent.click(within(hero).getAllByTestId('hero-course-card')[0]);
     expect(mockNavigate).toHaveBeenCalledWith('/app/courses/c-9');
   });

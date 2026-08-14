@@ -2,10 +2,8 @@ import { DASH_ACCENT_1 } from './palette';
 
 const W = 200;
 const H = 60;
-// Room above and below so a peak or a flat run never clips against the viewBox.
 const PAD = 8;
 
-/** Catmull-Rom → cubic Bézier: one smooth pass through every point, no library. */
 function smoothPath(points: { x: number; y: number }[]): string {
   if (points.length === 0) return '';
   if (points.length === 1) return `M0,${points[0].y} L${W},${points[0].y}`;
@@ -25,13 +23,6 @@ function smoothPath(points: { x: number; y: number }[]): string {
   return d;
 }
 
-/**
- * The trend plot behind the learning-time figure. Presentational only — the
- * numbers beside it carry the meaning, so it is hidden from assistive tech.
- *
- * An all-zero week draws a flat baseline rather than a straight line through the
- * middle of the card, so "nothing yet" doesn't read as "steady progress".
- */
 export function Sparkline({ values }: { values: number[] }) {
   const max = Math.max(...values, 0);
   const flat = max <= 0;

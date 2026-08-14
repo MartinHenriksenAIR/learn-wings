@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 
-// --- i18n echo; interpolation params are appended so the title is assertable ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) =>
@@ -14,8 +13,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// --- passthrough alert-dialog primitives (jsdom can't drive the Radix portal).
-// AlertDialog honours `open` so the closed case stays testable. ---
 vi.mock('@/components/ui/alert-dialog', () => {
   const pass = ({ children }: { children?: React.ReactNode }) =>
     React.createElement('div', null, children);

@@ -36,29 +36,11 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
     return reply(400, { error: 'userId is required' });
   }
 
-  // All-orgs aggregate (Global Analytics "All Organizations", #159): the user's progress
-  // across EVERY org, platform-admin-only (org admins stay isolated). The 'all' sentinel is
-  // UUID-safe. Being platform-admin, the visibility filter is empty here too, so this simply
-  // drops the org scope from every query and dedups enrollments by course.
   const allOrgs = orgId === 'all';
 
-  // Authorization: platform admin OR org admin of the target org.
-  // RLS provenance: supabase/migrations/20260127153401_*.sql:412-449 —
-  // "Org admins can view enrollments/progress/attempts in their org" (is_org_admin(org_id))
-  // + platform-admin-ALL policies. Self-access deliberately omitted (admin dialog only;
-  // learner-side reads live in Slice 1 endpoints).
   if (allOrgs) requirePlatformAdmin();
   else await requireOrgAdmin(orgId);
 
-  // 1. Enrollments + course metadata. Non-platform-admins see only published, org-accessible
-  //    courses (the old PostgREST embed nulled RLS-hidden courses and the dialog skipped them).
-  //    DELIBERATE DIVERGENCE from exact RLS parity: the old courses policy resolved access via
-  //    ALL the caller's orgs (current_org_ids_for_user()); this filter keys on the TARGET org
-  //    only — a multi-org admin viewing org A no longer sees a course visible solely via org B.
-  //    Scoped-to-the-org-being-viewed is the intended semantics (documented in the PR/plan).
-  //    ORDER BY c.title is a deliberate tightening (determinism).
-  //    All-orgs path: DISTINCT ON (course) collapses the same course reached via several orgs
-  //    to one card (unique React keys), preferring a completed enrollment.
   const visibilityFilter = profile.is_platform_admin
     ? ''
     : `AND ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}`;
@@ -89,10 +71,6 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
   const courseIds = enrollments.map((e) => e.course_id);
 
   const [progressRows, attemptRows, structureRows] = await Promise.all([
-    // 2. The user's lesson progress in this org. Parity: the old client fetched ALL of the
-    //    user's progress in the org (not just enrolled courses) — filtered during assembly.
-    //    All-orgs: span every org; ORDER BY completed-last so a lesson completed in ANY org
-    //    wins when the progressMap dedups by lesson_id.
     allOrgs
       ? query<ProgressRow>(
           `SELECT lesson_id, status, completed_at FROM lesson_progress
@@ -105,8 +83,6 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
             WHERE org_id = $1 AND user_id = $2`,
           [orgId, userId],
         ),
-    // 3. The user's quiz attempts in this org, latest first (the dialog's ordering).
-    //    Parity: fetches ALL attempts in the org, like the old client — filtered during assembly.
     allOrgs
       ? query<AttemptRow>(
           `SELECT id, quiz_id, score, passed, started_at, finished_at
@@ -120,7 +96,6 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
             ORDER BY started_at DESC`,
           [orgId, userId],
         ),
-    // 4. Structure for the enrolled courses (modules already filtered transitively by step 1).
     query<StructureRow>(
       `SELECT cm.id AS module_id, cm.course_id, cm.title AS module_title,
               cm.sort_order AS module_sort_order,
@@ -160,8 +135,6 @@ export default endpoint('user-progress', async ({ req, profile, reply, requireOr
         const latest = quizId !== undefined
           ? attemptRows.find((a) => a.quiz_id === quizId) // attempts are DESC — first match is latest
           : undefined;
-        // Casts are safe: the LEFT JOIN nulls all lesson columns together, so when
-        // lesson_id is non-null the other lesson fields are non-null too.
         mod.lessons.push({
           id: row.lesson_id,
           title: row.lesson_title as string,

@@ -55,7 +55,6 @@ describe('PrioritizationMatrix', () => {
         onScore={vi.fn()}
       />,
     );
-    // cell test id encodes value/effort: cell-<value>-<effort>
     const cell = screen.getByTestId('cell-3-1');
     expect(cell).toHaveTextContent('Quick win idea');
   });
@@ -66,7 +65,6 @@ describe('PrioritizationMatrix', () => {
         ideas={[
           idea({ id: 'scored', title: 'Scored idea', status: 'accepted', value_score: 3, effort_score: 1 }),
           idea({ id: 'blank', title: 'Blank idea', status: 'accepted', value_score: null, effort_score: null }),
-          // a half-score (one column null) counts as unscored, not placed in a cell
           idea({ id: 'half', title: 'Half idea', status: 'accepted', value_score: 3, effort_score: null }),
         ]}
         onScore={vi.fn()}
@@ -74,10 +72,8 @@ describe('PrioritizationMatrix', () => {
     );
     const tray = screen.getByTestId('unscored-tray');
     const cell = screen.getByTestId('cell-3-1');
-    // fully-scored idea lives in its cell, never in the tray
     expect(cell).toHaveTextContent('Scored idea');
     expect(tray).not.toHaveTextContent('Scored idea');
-    // unscored + half-scored ideas live in the tray, never in a cell
     expect(tray).toHaveTextContent('Blank idea');
     expect(tray).toHaveTextContent('Half idea');
     expect(cell).not.toHaveTextContent('Blank idea');

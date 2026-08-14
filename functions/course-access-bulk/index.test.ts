@@ -96,7 +96,6 @@ describe('course-access-bulk', () => {
     expect(sql.toUpperCase()).toContain('ON CONFLICT');
     expect(sql.toUpperCase()).toContain('DO UPDATE SET');
     expect(sql).toContain('RETURNING *');
-    // 'enabled' must be a server-side literal, never client-controlled
     expect(sql).toContain("'enabled'");
     expect(params).toEqual(['org-1']);
   });

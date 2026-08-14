@@ -1,23 +1,3 @@
-/**
- * Permanent drift gate for #300.
- *
- * Scans `src/` for every statically-known `t('some.key')` call site and FAILS if
- * the key is missing from `en.json` or `da.json`. This is the gate that catches
- * the #300 bug class at its root: `auth.signInWithMicrosoft` existed in neither
- * locale file, and an inline i18next default (`t(key, 'Sign in with Microsoft')`)
- * kept the English string rendering on a Danish page with no missing-key warning.
- * The lint rule in `eslint.config.js` blocks that masking default; this test
- * blocks the missing key it was hiding.
- *
- * It enforces the `.claude/rules/frontend.md` rule directly — "every new
- * user-facing string gets keys in BOTH `en` and `da`" — so a one-locale string
- * can no longer reach prod on the English fallback.
- *
- * What is (intentionally) NOT checked:
- *  - Runtime-assembled keys (`t(\`level.${x}\`)`, `t(item.labelKey)`) — they are
- *    unknowable statically, so the scanner skips them (see the scanner header).
- *  - Test/spec files — they pass throwaway keys to assert i18n behaviour itself.
- */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -29,16 +9,10 @@ import daJson from './locales/da.json';
 
 const SRC_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/**
- * i18next resolves a `{ count }` call to a suffixed sibling (`key_one`,
- * `key_other`, …) via Intl.PluralRules, so the bare key legitimately does not
- * exist for plurals. Accept a key when any CLDR plural form is present.
- */
 const PLURAL_SUFFIXES = ['zero', 'one', 'two', 'few', 'many', 'other'];
 
 type LocaleTree = { [key: string]: string | LocaleTree };
 
-/** Walk a dotted path through a locale tree; undefined if any segment is absent. */
 function lookup(tree: LocaleTree, key: string): string | LocaleTree | undefined {
   let node: string | LocaleTree | undefined = tree;
   for (const segment of key.split('.')) {
@@ -115,9 +89,6 @@ describe('translation-key drift gate (#300)', () => {
   });
 
   it('scans a meaningful number of call sites (guards against a silently broken scan)', () => {
-    // A scanner regression that returned nothing would make the gate above pass
-    // vacuously. The app had ~950 static keys when this gate landed; assert the
-    // scan still finds a large population rather than an exact, churn-prone count.
     const total = collectSourceFiles(SRC_ROOT).reduce(
       (sum, file) =>
         sum +

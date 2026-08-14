@@ -2,10 +2,6 @@ import { describe, it, expect } from 'vitest';
 
 import { renderSeatRequestEmail } from './seat-request-notify';
 
-// #195 — the platform-admin notification template interpolates user- and
-// org-supplied strings into inline HTML. Assert they are HTML-escaped so a
-// malicious org/requester name cannot inject markup into the recipient's
-// mail client.
 const params = {
   recipient: 'admin@ai-uddannelse.dk',
   orgName: '<script>alert("x")</script> & Co "A/S"',
@@ -37,8 +33,6 @@ describe('renderSeatRequestEmail — HTML escaping (#195)', () => {
   });
 
   it('renders no raw user-supplied markup in the email body', () => {
-    // No angle bracket from the payloads should survive un-escaped. The only
-    // raw '<' in the output are the template's own literal tags.
     expect(html).not.toContain('onerror="');
     expect(html).not.toContain('</script>');
   });

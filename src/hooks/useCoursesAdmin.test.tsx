@@ -8,8 +8,6 @@ vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
 }));
 
-// Re-signing runs over each course's thumbnail path; the mock prefixes it so
-// the test can assert the queryFn re-signs before the data lands in the cache.
 vi.mock('@/lib/storage', () => ({
   getSignedLmsAssetUrl: vi.fn((url: string | null) => Promise.resolve(url ? `signed:${url}` : null)),
 }));

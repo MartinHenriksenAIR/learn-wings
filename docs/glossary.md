@@ -3,9 +3,7 @@
 Canonical source of truth for **user-facing** wording across the platform, in both
 English and Danish. When UI copy and this file disagree, this file wins — fix the copy.
 
-This extends the naming conventions in `AIEDU/CLAUDE.md` ("Organization Members" not
-"Team Members"; "Organization" not "Analytics") and **supersedes "Course Overview"**
-(now "Course Catalog" / "Kursuskatalog").
+It **supersedes "Course Overview"** (now "Course Catalog" / "Kursuskatalog").
 
 ## Rules
 

@@ -39,7 +39,6 @@ export default endpoint('quiz-by-lesson', async ({ req, profile, reply }) => {
     return reply(200, { quiz, questions: [] });
   }
 
-  // Batched options fetch — no N+1; is_correct is intentionally excluded (security: never expose correct answer)
   const questionIds = questions.map(q => q.id);
   const options = await query<{ id: string; question_id: string; option_text: string; sort_order: number }>(
     'SELECT id, question_id, option_text, sort_order FROM quiz_options WHERE question_id = ANY($1::uuid[]) ORDER BY sort_order',

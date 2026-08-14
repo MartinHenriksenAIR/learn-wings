@@ -2,24 +2,16 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import type { DashboardCourseCard } from '@/hooks/useLearnerDashboard';
 
-/** Accent fill per position — the tile's identity, and the fallback when a course has no artwork. */
 const ACCENTS = ['bg-dash-a1', 'bg-dash-a2', 'bg-dash-a3'] as const;
 const BAR_ACCENTS = ['bg-dash-a1', 'bg-dash-a2', 'bg-dash-a3'] as const;
 
 interface HeroCourseCardProps {
   course: DashboardCourseCard;
   index: number;
-  /** Recommendations have no progress yet: lesson count only, no bar. */
   showProgress?: boolean;
   onClick: () => void;
 }
 
-/**
- * A course tile in the hero slab. The thumbnail IS the card — nothing sits on
- * the artwork but the gradient that makes the text legible. `thumbnail_url` is
- * nullable, so a card with no artwork falls back to the flat accent fill and
- * has to look deliberate on its own.
- */
 export function HeroCourseCard({ course, index, showProgress = true, onClick }: HeroCourseCardProps) {
   const { t } = useTranslation();
   const accent = ACCENTS[index % ACCENTS.length];

@@ -10,7 +10,6 @@ type Member = OrgMembership & { profile: Profile };
 
 interface MembersSectionProps {
   members: Member[];
-  /** Org name — used to build the CSV export filename. */
   orgName: string;
   updatingRoleId: string | null;
   onRoleChange: (member: Member, newRole: OrgRole) => void;

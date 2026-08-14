@@ -4,12 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { ReportedContentDialog } from './ReportedContentDialog';
 
-// t returns the key so we can assert on i18n keys directly
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
-// CommentThread passthrough exposing the props the dialog wires in
 vi.mock('./CommentThread', () => ({
   CommentThread: (props: {
     comments: { id: string }[];

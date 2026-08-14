@@ -20,16 +20,7 @@ interface AzureDocumentUploadProps {
   onChange: (blobPath: string | null) => void;
   className?: string;
   disabled?: boolean;
-  /**
-   * Tightens the limit below the server cap for this call site. Never widens it:
-   * `effectiveMaxSizeMB` clamps to the cap the backend enforces, so the UI can't
-   * promise something the save would 413 on. Defaults to the server cap.
-   */
   maxSizeMB?: number;
-  /**
-   * Forwarded to the underlying file input so a `<Label htmlFor>` can name the
-   * control (#325). Clicking such a label opens the file picker.
-   */
   id?: string;
 }
 
@@ -55,20 +46,13 @@ export function AzureDocumentUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Clearing the input is the single exit path for every branch below: a
-    // `change` event only fires when the value changes, so a rejected file left
-    // in the input makes re-picking it a no-op.
     try {
-      // Mirrors the server's mint-time allow-list (extension decides, declared
-      // content type must agree) rather than a local copy that can drift.
       const typeError = checkUploadFileType('document', file);
       if (typeError) {
         showMessage(typeError);
         return;
       }
 
-      // Validate file size against the (server-clamped) cap — documents are never
-      // downscaled, so what was picked is what will be uploaded.
       const sizeError = checkUploadPayloadSize(file.size, capMB);
       if (sizeError) {
         showMessage(sizeError);
@@ -122,15 +106,8 @@ export function AzureDocumentUpload({
         setProgress(100);
         onChange(blobPath);
       } catch (err) {
-        // The thrown text is diagnostic, not actionable, and is the one string
-        // no translation could reach — log it and show the translated summary.
         console.error('Document upload failed:', err);
         setError(t('fileUpload.errorUploadFailed'));
-        // Deliberately NO `onChange(null)` here — same rule as FileUpload.
-        // Nothing was stored, so the parent's current value still names a live
-        // blob, and since #275 saving a null is what DELETES it. Clearing the
-        // optimistic name lets the tile fall back to the name derived from the
-        // value that is actually still stored.
         setFileName(null);
       } finally {
         setUploading(false);

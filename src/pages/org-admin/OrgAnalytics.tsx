@@ -52,7 +52,6 @@ export default function OrgAnalytics() {
   const { data: orgsData, error: orgsError } = useOrganizations({
     enabled: isGlobalView && isPlatformAdmin,
   });
-  // endpoint returns created_at DESC but the filter dropdown was name-ordered
   const organizations = useMemo(
     () => [...(orgsData ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
     [orgsData]
@@ -63,14 +62,8 @@ export default function OrgAnalytics() {
     }
   }, [orgsError]);
 
-  // Determine which org ID to use for queries. In global view selectedOrgId is either the
-  // 'all' sentinel or a concrete org id — both truthy, so the analytics queries stay enabled
-  // and every tab renders. 'all' flows through to the backend, which returns the platform-admin
-  // cross-org aggregate (#159); previously this collapsed to null and showed an empty view.
   const effectiveOrgId = isGlobalView ? selectedOrgId : currentOrg?.id;
 
-  // Fetch org analytics data via shared query hook. Enabled for both a concrete org and the
-  // 'all' aggregate; only disabled in org view before currentOrg resolves.
   const analyticsQuery = useOrgAnalyticsData(effectiveOrgId ?? undefined);
 
   const stats = useMemo(() => {
@@ -132,7 +125,6 @@ export default function OrgAnalytics() {
   }, [analyticsQuery.data]);
 
   const handleGenerateReport = async () => {
-    // The compliance report is per-org — not offered for the 'all' aggregate.
     if (!effectiveOrgId || effectiveOrgId === 'all') {
       toast.error('Please select an organization');
       return;
@@ -140,7 +132,6 @@ export default function OrgAnalytics() {
 
     setGeneratingReport(true);
     try {
-      // #71: report follows the reader's live UI language
       const response = await callApiRaw('/api/generate-compliance-report', { orgId: effectiveOrgId, language: i18n.resolvedLanguage });
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -190,8 +181,6 @@ export default function OrgAnalytics() {
     );
   }
 
-  // A failed analytics fetch must not render all-zero stats — an org admin would
-  // read the zeros as truth. Show a distinct, retryable error fork instead.
   if (analyticsQuery.isError) {
     return (
       <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
@@ -208,7 +197,6 @@ export default function OrgAnalytics() {
       : t('analytics.subtitleGlobalOne')
     : t('analytics.subtitleOrg', { orgName: currentOrg?.name ?? t('nav.organization') });
 
-  // Members tab is org-only; no all-orgs membership view.
   const tabs = [
     { key: 'overview', label: t('analytics.tabs.overview'), icon: <BarChart3 className="h-4 w-4" aria-hidden="true" /> },
     ...(!isGlobalView

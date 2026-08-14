@@ -9,10 +9,6 @@ import {
   notifySeatRequestFulfilled,
 } from './seat-request-notify';
 
-// The three notify* wrappers all route through one internal sendBestEffort()
-// helper (#200). These tests pin its shared contract via the public surface:
-// a null recipient is skipped, a Resend failure is swallowed, and the subject
-// has CR/LF stripped before it reaches Resend.
 const ctx = () => ({ error: vi.fn(), log: vi.fn() }) as any;
 
 const adminParams = {
@@ -82,7 +78,6 @@ describe('sendBestEffort — CR/LF is stripped from the subject (header-injectio
     const { subject } = mockSend.mock.calls[0][0];
     expect(subject).not.toContain('\n');
     expect(subject).not.toContain('\r');
-    // Subject stays raw plain text — the org name is not HTML-escaped.
     expect(subject).toContain('Bcc: evil@example.com');
     expect(subject).not.toContain('&');
   });

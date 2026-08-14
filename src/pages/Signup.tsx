@@ -21,7 +21,6 @@ import {
 import logoLight from '@/assets/logo-light.png';
 import { PAGE_GRADIENT_CLASSES, AUTH_CARD_CLASSES } from './Login';
 
-/** Response contract of POST /api/invitation-accept (functions/invitation-accept). */
 type AcceptResponse =
   | {
       kind: 'org';
@@ -90,13 +89,6 @@ function CardBody({ children }: { children: ReactNode }) {
 const PRIMARY_BUTTON_CLASSES =
   'h-auto w-full gap-2.5 rounded-xl px-4 py-[13px] text-[14.5px] font-semibold';
 
-/**
- * Accept-invitation page (#175). Reached via the emailed link
- * `/signup?invite=<link_id>`; drives the whole accept flow: generic pre-auth
- * sign-in prompt (no org disclosure before auth), explicit Accept card,
- * success cards, and one card per backend error code. Without an `invite`
- * param this stays the historical redirect to /login.
- */
 export default function Signup() {
   const { user, isLoading, isPlatformAdmin, isOrgAdmin, signIn, signOut, refreshUserContext } =
     useAuth();
@@ -120,8 +112,6 @@ export default function Signup() {
   }
 
   const handleSignIn = () => {
-    // The Entra login is a full-page redirect: stash the invite URL so Login
-    // can restore it after the round trip (same machinery as ProtectedRoute).
     savePostLoginRedirect(location.pathname + location.search + location.hash);
     signIn();
   };
@@ -131,8 +121,6 @@ export default function Signup() {
     setState({ phase: 'accept', submitting: true });
     try {
       const result = await callApi<AcceptResponse>('/api/invitation-accept', { linkId: inviteId });
-      // The new membership exists only server-side: refresh BEFORE the user can
-      // continue, or the role home renders from a stale/empty context.
       await refreshUserContext();
       setState({ phase: 'success', result });
     } catch (err) {
@@ -140,7 +128,6 @@ export default function Signup() {
     }
   };
 
-  // Same role-home fallback Login.tsx uses after consuming a redirect stash.
   const goToRoleHome = () => {
     if (isPlatformAdmin) {
       navigate(routes.platformAdmin.organizations);
@@ -151,7 +138,6 @@ export default function Signup() {
     }
   };
 
-  // ---- Pre-sign-in: generic invite screen (never discloses org/role) ----
   if (!user) {
     return (
       <AuthShell>
@@ -185,12 +171,8 @@ export default function Signup() {
         </AuthShell>
       );
     }
-    // LEFT JOIN safety: orgName can't practically be null, but if it ever is,
-    // fall back to the platform name rather than rendering awkward blank copy.
     const org = result.orgName ?? 'AI Uddannelse';
     if (result.alreadyMember) {
-      // Deliberately role-free: the response echoes the invitation's role,
-      // not the member's actual one (see functions/invitation-accept).
       return (
         <AuthShell>
           <StatusIcon tone="success">

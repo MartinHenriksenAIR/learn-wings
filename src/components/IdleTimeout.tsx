@@ -13,13 +13,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-/**
- * App-wide inactivity guard (#447). While the user is signed in, an hour with no
- * activity signs them out and redirects to /login; the final minute shows this
- * countdown modal with a "Stay signed in" escape hatch. Renders nothing until
- * the warning window. Mounted once at the app root so a single timer, shared
- * across tabs via localStorage, governs the whole session.
- */
 export function IdleTimeout() {
   const { user } = useAuth();
   const { t } = useTranslation();

@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/**
- * Per-key transient "flashed" state for in-button success feedback
- * (port of the design prototype's `flash()`): `flash(key)` marks the key
- * flashed for `timeoutMs`, then it auto-reverts. Re-flashing a key resets
- * its timer. All pending timers are cleared on unmount.
- */
 export function useFlash(timeoutMs = 1600): { flashed: (key: string) => boolean; flash: (key: string) => void } {
   const [flashedKeys, setFlashedKeys] = useState<Record<string, true>>({});
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});

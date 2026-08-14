@@ -9,7 +9,6 @@ export default endpoint('idea-vote-remove', async ({ req, profile, reply }) => {
     return reply(400, { error: 'ideaId is required' });
   }
 
-  // Blind delete — no idea load; idempotent (parity with old client blind-delete)
   await query(
     `DELETE FROM idea_votes WHERE idea_id = $1 AND user_id = $2`,
     [ideaId, profile.id],

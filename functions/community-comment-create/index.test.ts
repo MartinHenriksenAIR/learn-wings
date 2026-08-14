@@ -115,7 +115,6 @@ describe('community-comment-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // Accessibility checked before locked
   it('returns 403 Forbidden (not 403 locked) for inaccessible locked org post', async () => {
     mockQueryOne.mockResolvedValueOnce(lockedPost);
     mockIsActiveMember.mockResolvedValueOnce(false);
@@ -155,7 +154,6 @@ describe('community-comment-create', () => {
     const insertCall = mockQueryOne.mock.calls[1] as [string, unknown[]];
     const [sql, params] = insertCall;
     expect(sql).toContain('INSERT INTO community_comments');
-    // profile.id ('p1') must be the user_id param, not 'attacker'
     expect(params).toContain('p1');
     expect(params).not.toContain('attacker');
   });
@@ -166,7 +164,6 @@ describe('community-comment-create', () => {
     await handler(baseReq({ postId: 'post-1', content: 'A comment' }), {} as any);
     const insertCall = mockQueryOne.mock.calls[1] as [string, unknown[]];
     const params = insertCall[1];
-    // 4th param is parent_comment_id — should be null
     expect(params[3]).toBeNull();
   });
 

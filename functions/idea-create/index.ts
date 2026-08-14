@@ -1,9 +1,6 @@
 import { queryOne } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 
-// Author-writable fields. Everything else (org_id, status, user_id, submitted_at,
-// admin_notes, rejection_reason, category_id, course/lesson context) is NOT settable
-// through this endpoint.
 const STRING_FIELDS = [
   'title',
   'description',
@@ -46,7 +43,6 @@ export default endpoint('idea-create', async ({ req, profile, reply, requireActi
     return reply(400, { error: 'tags must be an array of strings' });
   }
 
-  // Validate business_area (one of the 8 enum values or null) — fail fast before PG enum cast 500.
   if (body.business_area !== undefined && body.business_area !== null
     && !(BUSINESS_AREAS as readonly string[]).includes(body.business_area as string)) {
     return reply(400, {
@@ -56,7 +52,6 @@ export default endpoint('idea-create', async ({ req, profile, reply, requireActi
 
   await requireActiveMember(orgId);
 
-  // Insert. user_id is ALWAYS profile.id (never client-supplied); status is ALWAYS 'draft'.
   const idea = await queryOne(
     `INSERT INTO ideas
       (org_id, user_id, status, title, description, problem_statement, proposed_solution,

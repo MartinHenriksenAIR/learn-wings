@@ -134,8 +134,6 @@ describe('platform-settings-update', () => {
     expect(sql).toContain('UPDATE');
     expect(sql).toContain('platform_settings');
     expect(sql).toContain('updated_by');
-    // Merge semantics pinned: stored value is the base, body fields overlay it —
-    // absent fields keep their stored values (no more blind replace).
     expect(sql).toContain('value = value || $2::jsonb');
     expect(params[0]).toBe('features');
     expect(params[1]).toBe(JSON.stringify({ quizzes_enabled: false }));
@@ -192,10 +190,6 @@ describe('platform-settings-update', () => {
     expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "allow_individual_registration"/);
   });
 
-  // The Features panel saves the WHOLE object (PlatformSettings.tsx `saveSetting('features', features)`),
-  // so FIELD_SHAPES.features must cover every key in that file's `featureKeys` — a field added there and
-  // in the seed but not here 400s the entire panel (#394, missed because the full-body test above only
-  // covered user_access). Keep this list in sync with `featureKeys`.
   it('a full features body passes validation and merges all fields', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const fullFeatures = {

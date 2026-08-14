@@ -11,15 +11,10 @@ interface DashboardEventsProps {
   onSeeMore: () => void;
 }
 
-/**
- * Upcoming events, each led by a date block. The block is the row's only glyph —
- * the date is the thing you scan for — so no decorative icon sits beside it.
- */
 export function DashboardEvents({ events, onEventClick, onSeeMore }: DashboardEventsProps) {
   const { t, i18n } = useTranslation();
 
   return (
-    // first:mt-0 — this leads the rail when the leaderboard is suppressed.
     <section className="mt-[30px] first:mt-0" data-testid="dashboard-events">
       <SectionHeading>{t('dashboard.events.title')}</SectionHeading>
 
@@ -28,7 +23,6 @@ export function DashboardEvents({ events, onEventClick, onSeeMore }: DashboardEv
           icon={<Calendar className="h-6 w-6" />}
           title={t('dashboard.events.emptyTitle')}
           description={t('dashboard.events.emptyDescription')}
-          // The rail's lists sit straight on the canvas, so its empty does too.
           className="border-0 bg-transparent p-8"
         />
       ) : (

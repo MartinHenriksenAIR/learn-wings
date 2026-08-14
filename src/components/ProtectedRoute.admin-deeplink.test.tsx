@@ -1,8 +1,3 @@
-// Regression tests for #79: cold-loading an admin deep link must never bounce
-// to the dashboard just because the user-context fetch hasn't resolved yet.
-// These exercise the REAL AuthProvider + ProtectedRoute together (unlike
-// ProtectedRoute.test.tsx, which mocks useAuth wholesale) so the race between
-// the MSAL account appearing and /api/user-context resolving is covered.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import React from 'react';
@@ -29,7 +24,6 @@ vi.mock('@/lib/msal-config', () => ({
 }));
 
 const { mockCallApi } = vi.hoisted(() => ({ mockCallApi: vi.fn() }));
-// Preserve the real ApiError export so useAuth's 401-vs-network classification runs.
 vi.mock('@/lib/api-client', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
   return { ...actual, callApi: mockCallApi };
@@ -42,9 +36,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// The real AuthProvider reads i18n.resolvedLanguage to pass the UI language to
-// /api/user-context (#226/#229). Mock the singleton so the real @/i18n module
-// (which .use()s initReactI18next) isn't initialized in this unit test.
 vi.mock('@/i18n', () => ({ default: { resolvedLanguage: 'en' } }));
 
 import { AuthProvider } from '@/hooks/useAuth';
@@ -94,8 +85,6 @@ describe('admin deep-link cold load (#79)', () => {
   });
 
   it('renders loading (not a redirect) while the user context is pending, then the page once admin=true resolves', async () => {
-    // Hard refresh on the deep link: account already cached at mount,
-    // /api/user-context still in flight.
     setMsal({ account: mockAccount, inProgress: 'none' });
     let resolveCtx!: (v: unknown) => void;
     mockCallApi.mockReturnValue(new Promise((r) => { resolveCtx = r; }));
@@ -114,8 +103,6 @@ describe('admin deep-link cold load (#79)', () => {
   });
 
   it('does not bounce to the dashboard when the MSAL account materializes after mount (cold login return)', async () => {
-    // Phase 1: MSAL is still processing the redirect back from Entra — no
-    // account in the provider state yet.
     setMsal({ account: null, inProgress: 'handleRedirect' });
     let resolveCtx!: (v: unknown) => void;
     mockCallApi.mockReturnValue(new Promise((r) => { resolveCtx = r; }));
@@ -123,15 +110,12 @@ describe('admin deep-link cold load (#79)', () => {
     const view = render(<AdminApp guard={{ requirePlatformAdmin: true }} />);
     expect(spinner()).not.toBeNull();
 
-    // Phase 2: redirect handled — account present, MSAL idle, context fetch
-    // in flight. The guard must keep waiting, not redirect.
     setMsal({ account: mockAccount, inProgress: 'none' });
     view.rerender(<AdminApp guard={{ requirePlatformAdmin: true }} />);
 
     expect(screen.queryByText('DASHBOARD')).toBeNull();
     expect(spinner()).not.toBeNull();
 
-    // Phase 3: context resolves with admin=true → the deep link renders.
     await act(async () => {
       resolveCtx({ profile: { id: 'p-1', is_platform_admin: true }, memberships: [] });
     });
@@ -150,10 +134,6 @@ describe('admin deep-link cold load (#79)', () => {
   });
 
   it('shows the retry state (not a dashboard bounce) when an admin deep link fails to load context (#232)', async () => {
-    // End-to-end through the real AuthProvider: the account is cached, but
-    // /api/user-context rejects. Pre-fix this settled as profile=null →
-    // !isPlatformAdmin → silent redirect to the learner dashboard. The admin
-    // must now see the retry state instead.
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     setMsal({ account: mockAccount, inProgress: 'none' });
     mockCallApi.mockRejectedValue(new Error('bootstrap 500'));
@@ -187,7 +167,6 @@ describe('admin deep-link cold load (#79)', () => {
 
     await waitFor(() => expect(screen.getByText('contextError.retry')).toBeInTheDocument());
 
-    // Retry succeeds with admin=true → the deep-linked page renders.
     mockCallApi.mockResolvedValueOnce({
       profile: { id: 'p-1', is_platform_admin: true },
       memberships: [],

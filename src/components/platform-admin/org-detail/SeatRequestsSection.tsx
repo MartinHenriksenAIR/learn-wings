@@ -8,11 +8,6 @@ interface SeatRequestsSectionProps {
   fulfilingId: string | null;
 }
 
-/**
- * Platform-admin fulfilment: lists an org's PENDING seat requests with a
- * "Mark fulfilled" action that bumps the org's seat_limit. Renders nothing
- * when there is nothing pending.
- */
 export function SeatRequestsSection({ requests, onFulfil, fulfilingId }: SeatRequestsSectionProps) {
   const { t } = useTranslation();
   const pending = requests.filter((r) => r.status === 'pending');

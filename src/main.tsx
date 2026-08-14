@@ -5,10 +5,6 @@ import App from "./App.tsx";
 import "./index.css";
 import "./i18n";
 
-// Initialize AND consume any Entra redirect response BEFORE rendering.
-// React Router's "/" -> "/login" replace would otherwise destroy the #code=
-// hash on first render, before MsalProvider's post-render handleRedirectPromise
-// could read it — silently losing the login every time.
 msalInstance
   .initialize()
   .then(() =>
@@ -27,12 +23,6 @@ msalInstance
     );
   })
   .catch((e) => {
-    // A rejection from initialize() (storage/crypto init failures, restricted
-    // browser contexts) skips both .then blocks above, so createRoot().render
-    // never runs — a permanent blank page whose only trace is an unhandled
-    // rejection. Render a minimal static message with plain DOM instead: React
-    // itself may be what failed, and we run before any user language is known,
-    // so the copy is hardcoded bilingual (da + en), not i18n.
     console.error("App bootstrap failed", e);
     const root = document.getElementById("root");
     if (root) {

@@ -14,25 +14,9 @@ interface FavoritesData {
 export interface ToggleFavoriteInput {
   courseId: string;
   favorite: boolean;
-  /**
-   * The course being favorited, passed by callers that already hold it (e.g. a
-   * catalog card) so the success cache-patch can add it to the list at once.
-   * Omit it and the invalidateQueries backstop refetches the authoritative list.
-   */
   course?: Course;
 }
 
-/**
- * Fetch the learner's favorited courses for `orgId`.
- *
- * The list endpoint returns the same `Course[]` shape as `/api/learner-courses`,
- * so thumbnails are re-signed in the queryFn (mirroring `useLearnerCourses`) and
- * a `favoriteIds` set is derived for O(1) `isFavorite(courseId)` checks by the
- * catalog cards that read this one source alongside the Dashboard section.
- *
- * `enabled` defaults to `!!orgId` — pass it explicitly to gate on the org-guard
- * state (e.g. `enabled: orgGuard === 'ready' && !!currentOrg`).
- */
 export function useFavorites(
   orgId: string | undefined,
   options: { enabled?: boolean; staleTime?: number } = {},
@@ -69,14 +53,6 @@ export function useFavorites(
   return { ...query, favoriteIds, isFavorite };
 }
 
-/**
- * Toggle a course's favorite state for `orgId`. Mirrors CoursesManager's
- * `togglePublish` idiom: `useToastMutation` + a `setQueryData` success patch of
- * the favorites cache, plus `invalidateQueries` as a backstop. No `onMutate`
- * optimistic rollback (repo convention — feedback comes from the success patch).
- * `togglingId` exposes the in-flight course id so a button can show a per-course
- * busy state (mirrors `publishingId`).
- */
 export function useToggleFavorite(orgId: string | undefined) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -92,12 +68,6 @@ export function useToggleFavorite(orgId: string | undefined) {
         if (!favorite) {
           return { ...prev, courses: prev.courses.filter((c) => c.id !== courseId) };
         }
-        // Add: patchable only when the caller supplied the course; otherwise the
-        // invalidateQueries backstop below refetches the authoritative list.
-        // Prepend so the just-favorited course leads, matching the endpoint's
-        // ORDER BY created_at DESC (newest first). The caller passes a catalog
-        // Course with no completion flag, so default completed:false — the
-        // invalidateQueries backstop corrects it if the course was already completed.
         if (!course || prev.courses.some((c) => c.id === courseId)) return prev;
         return { ...prev, courses: [{ ...course, completed: false }, ...prev.courses] };
       });

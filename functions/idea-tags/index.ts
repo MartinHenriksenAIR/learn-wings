@@ -11,8 +11,6 @@ export default endpoint('idea-tags', async ({ req, profile, reply, requireActive
 
   await requireActiveMember(orgId);
 
-  // Distinct, non-empty tags from the org's ideas that are VISIBLE to the caller
-  // (drafts are author-private). $1 = orgId, $2 = caller profile id.
   const rows = await query<{ tag: string }>(`
     SELECT DISTINCT unnest(tags) AS tag
     FROM ideas

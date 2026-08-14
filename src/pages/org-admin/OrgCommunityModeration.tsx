@@ -25,7 +25,6 @@ export default function OrgCommunityModeration() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
-  // Report whose content is shown in the "View content" dialog (#160).
   const [viewReport, setViewReport] = useState<ReportWithDetails | null>(null);
 
   const { data: reports = [], isLoading } = useQuery({

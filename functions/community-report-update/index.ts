@@ -33,7 +33,6 @@ export default endpoint('community-report-update', async ({ req, profile, reply 
   );
   if (!report) return reply(404, { error: 'Report not found' });
 
-  // Platform admin OR org admin of the report's org; global reports → platform admin only.
   const canAccess = profile.is_platform_admin ||
     (report.org_id !== null && await isOrgAdmin(profile.id, report.org_id));
   if (!canAccess) return reply(403, { error: 'Forbidden' });

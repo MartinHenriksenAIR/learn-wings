@@ -15,7 +15,6 @@ function Counter({ value, label }: { value: number; label: string }) {
   );
 }
 
-/** One decimal, but never a trailing ".0" — "8.5 h" and "9 h", not "9.0 h". */
 function formatHours(minutes: number, language: string): string {
   const hours = minutes / 60;
   return new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(hours);
@@ -26,17 +25,10 @@ interface DashboardStatsProps {
   week: WeekActivity;
 }
 
-/**
- * Two narrow counters and one wide trend card. The trend plot bleeds to the
- * card's right and bottom edges and fades in from the left, so it reads as part
- * of the card rather than a chart dropped into it — and it is basis-0 so the
- * SVG's intrinsic ratio can never squeeze the figures beside it.
- */
 export function DashboardStats({ snapshot, week }: DashboardStatsProps) {
   const { t, i18n } = useTranslation();
 
   const { minutes, previous, untimedLessons, perDayMinutes } = week;
-  // No baseline to compare against reads as "new", not as "+100%".
   const deltaPct =
     previous.minutes > 0 ? Math.round(((minutes - previous.minutes) / previous.minutes) * 100) : null;
 
@@ -65,9 +57,6 @@ export function DashboardStats({ snapshot, week }: DashboardStatsProps) {
               {t('dashboard.stats.vsPrevious')}
             </div>
           )}
-          {/* Authored lesson lengths are nullable; say what the total leaves out
-              rather than let it quietly undercount. Its own line, so a long
-              disclosure cannot widen the figures into the plot's space. */}
           {untimedLessons > 0 && (
             <div className="mt-1 text-[11px] font-medium text-muted-foreground">
               {t('dashboard.stats.untimed', { count: untimedLessons })}

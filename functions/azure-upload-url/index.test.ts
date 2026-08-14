@@ -118,8 +118,6 @@ describe('azure-upload-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'fileName is required' });
   });
 
-  // issue #104: an AuthError (even one whose message lacks "token") maps to 401
-  // through the platform-admin gate — not the old catch-block substring check.
   it('returns 401 when authenticate throws an AuthError with a token-less message', async () => {
     mockAuthenticate.mockRejectedValueOnce(new MockAuthError('Missing oid or tid claims'));
 
@@ -129,8 +127,6 @@ describe('azure-upload-url', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Missing oid or tid claims' });
   });
 
-  // issue #104: a non-auth error whose message merely contains "token" must NOT
-  // be mistaken for a 401 — it routes to a generic, logged 500 (no leak).
   it('returns a generic 500 (no leak) when a non-auth error mentions "token"', async () => {
     mockGetProfile.mockRejectedValueOnce(new Error('profile token lookup failed'));
     const ctx = { error: vi.fn() };
@@ -242,11 +238,6 @@ describe('azure-upload-url', () => {
   });
 
   it('reaches the container fall-through with an UNUSUAL extension and no declared type', async () => {
-    // Restores what the `weird.bin` + application/octet-stream fixture used to
-    // cover before #276 turned that input into a 400: the fall-through must not
-    // depend on the caller declaring a content type, nor on the extension being
-    // one of the two or three everybody thinks of. `.ogv` is allow-listed but
-    // obscure, and an absent content type is what some browsers actually report.
     const req = {
       ...baseReq,
       json: async () => ({ fileName: 'clip.ogv', assetType: 'not-a-real-type' }),

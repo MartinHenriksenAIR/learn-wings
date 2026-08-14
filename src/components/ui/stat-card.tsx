@@ -10,10 +10,6 @@ export interface StatCardProps {
   className?: string;
 }
 
-/**
- * Dashboard stat card: 42px tinted icon chip, big value, small label.
- * When `onClick` is given the whole card is clickable and keyboard accessible.
- */
 export function StatCard({ icon, value, label, onClick, className }: StatCardProps) {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!onClick) return;

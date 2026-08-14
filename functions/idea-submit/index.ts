@@ -13,7 +13,6 @@ export default endpoint('idea-submit', async ({ req, profile, reply }) => {
   const idea = await loadIdea(ideaId);
   if (!idea) return reply(404, { error: 'Idea not found' });
 
-  // Author-only-403 + draft-only-409 (shared/ideas; no admin bypass).
   const gate = checkAuthorDraft(idea, profile, { notDraftError: 'Only draft ideas can be submitted' });
   if (!gate.ok) return reply(gate.status, gate.body);
 

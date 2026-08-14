@@ -51,9 +51,6 @@ export default function CommunityFeed() {
   const scopeParam = searchParams.get('scope');
   const scope: CommunityScope = scopeParam === 'global' ? 'global' : 'org';
 
-  // #354: in the community area the hidden Individuals placeholder behaves as
-  // "no org" — global + events only, no org tab, no org-scoped extras. Identity/
-  // admin reads stay keyed on the real currentOrg.
   const orgForCommunity = currentOrg?.kind === 'individual' ? null : currentOrg;
 
   const [showPostForm, setShowPostForm] = useState(false);
@@ -61,15 +58,12 @@ export default function CommunityFeed() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  // Redirect the org feed to global when the user has no org.
   useEffect(() => {
     if (scope === 'org' && !orgForCommunity) {
       setSearchParams({ scope: 'global' });
     }
   }, [scope, orgForCommunity, setSearchParams]);
 
-  // Fetch categories (secondary data — the chip row degrades gracefully; a
-  // failure just toasts + logs rather than blocking the feed).
   const {
     data: categories = [],
     isError: categoriesError,
@@ -165,7 +159,6 @@ export default function CommunityFeed() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
-          {/* Submit Idea is org-feed only. */}
           {scope === 'org' && (
             <Button
               variant="outline"
@@ -270,7 +263,6 @@ export default function CommunityFeed() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : postsError ? (
-            // A failed fetch must not render the "no posts yet" empty state.
             <QueryErrorState onRetry={() => refetchPosts()} />
           ) : posts.length === 0 ? (
             <CommunityEmptyState
@@ -358,7 +350,6 @@ export default function CommunityFeed() {
         </div>
       </div>
 
-      {/* Post form dialog for creating a new community post. */}
       <PostForm
         open={showPostForm}
         onOpenChange={setShowPostForm}

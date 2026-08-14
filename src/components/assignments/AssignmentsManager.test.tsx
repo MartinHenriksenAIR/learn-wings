@@ -59,16 +59,13 @@ describe('AssignmentsManager', () => {
     expect(screen.getByText('AI Basics')).toBeInTheDocument();
     expect(screen.getByText('AI Ethics')).toBeInTheDocument();
     expect(screen.getByText('Alice Learner')).toBeInTheDocument();
-    // The whole-org (null-user) row shows the wholeOrg label.
     expect(screen.getByText('assignments.wholeOrg')).toBeInTheDocument();
   });
 
   it('confirms and removes an assignment via assignment-delete', async () => {
     renderManager();
-    // First row's Remove opens the confirm dialog.
     fireEvent.click(screen.getAllByRole('button', { name: 'assignments.remove' })[0]);
     expect(screen.getByText('assignments.removeConfirmTitle')).toBeInTheDocument();
-    // Confirm inside the dialog.
     const dialog = screen.getByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'assignments.remove' }));
 

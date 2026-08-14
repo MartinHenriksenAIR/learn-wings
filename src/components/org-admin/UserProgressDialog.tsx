@@ -54,8 +54,6 @@ export function UserProgressDialog({
   const { i18n } = useTranslation();
   const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set());
 
-  // Fetch gated on dialog open — query key includes userId so switching users
-  // yields a fresh cache entry; stale data from a previous user is never shown.
   const query = useUserProgress(orgId, userId, { enabled: open });
   const courseProgress: CourseProgress[] = query.data?.courses ?? [];
   const loading = query.isLoading;
@@ -99,7 +97,6 @@ export function UserProgressDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

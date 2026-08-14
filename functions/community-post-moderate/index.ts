@@ -34,7 +34,6 @@ export default endpoint('community-post-moderate', async ({ req, profile, reply 
   );
   if (!post) return reply(404, { error: 'Post not found' });
 
-  // Platform admin OR org admin of the org post; global posts: platform admin only.
   const canAccess = profile.is_platform_admin ||
     (post.scope === 'org' && post.org_id !== null && await isOrgAdmin(profile.id, post.org_id));
   if (!canAccess) return reply(403, { error: 'Forbidden' });

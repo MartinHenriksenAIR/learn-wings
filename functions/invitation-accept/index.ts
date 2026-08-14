@@ -1,6 +1,3 @@
-// Hand-rolled (not shared/endpoint.ts): accepting an invite can be the user's very
-// first authenticated call, so the profile is provisioned here on demand — the
-// factory 401s ('Profile not found') when getProfile misses (mirrors user-context).
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne, withTransaction } from '../shared/db';
@@ -27,13 +24,6 @@ type AcceptOutcome =
   | { kind: 'email_mismatch' }
   | { kind: 'converted'; result: ConvertResult; orgName: string | null };
 
-/**
- * Accepts a pending invitation by its shareable link_id (the /signup?invite=<link_id>
- * secret — a bearer credential: NEVER log it). Atomically converts the invitation
- * into membership via the shared convertInvitation helper (#175; reused by #176).
- * No seat check: the accept transition is net-zero against the seat cap — see the
- * reasoning in functions/shared/invitation-convert.ts.
- */
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const origin = req.headers.get('origin');
   if (req.method === 'OPTIONS') return corsPreflightResponse(origin);
@@ -47,8 +37,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return corsResponse(origin, 400, { error: 'linkId is required' });
     }
 
-    // First-login provisioning (mirrors user-context): accept must be
-    // self-contained — never assume the frontend called user-context first.
     let profile = await queryOne<{ id: string }>(
       'SELECT id FROM profiles WHERE entra_oid = $1 AND entra_tid = $2',
       [user.id, user.tid],
@@ -64,8 +52,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const profileId = profile!.id;
 
     const outcome = await withTransaction<AcceptOutcome>(async (client) => {
-      // Lock the invitation row for the whole transaction so concurrent accepts
-      // of the same link serialize instead of double-consuming the invite.
       const invRes = await client.query<LockedInvitation>(
         `SELECT i.id, i.org_id, i.email, i.role, i.status,
                 i.expires_at, o.name AS org_name
@@ -78,13 +64,9 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       const invitation = invRes.rows[0];
       if (!invitation) return { kind: 'not_found' };
       if (invitation.status === 'accepted') return { kind: 'already_accepted' };
-      // Expired-but-still-pending is rejected too; the expiry job owns flipping
-      // status to 'expired' — never mutate it here.
       if (invitation.status === 'expired' || new Date(invitation.expires_at) < new Date()) {
         return { kind: 'expired' };
       }
-      // Strict, case-insensitive match between the invited email and the
-      // authenticated Entra identity (both sides normalized defensively).
       if (invitation.email.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
         return { kind: 'email_mismatch' };
       }
@@ -92,10 +74,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       return { kind: 'converted', result, orgName: invitation.org_name };
     });
 
-    // #353: seed the org↔tenant binding when an org_admin accepts via link, so
-    // the binding is established through the link flow too — not only via
-    // user-context login adoption. Best-effort, own connection (seedTenantBinding),
-    // AFTER the accept transaction commits so it can never roll the accept back.
     if (outcome.kind === 'converted' && outcome.result.kind === 'org' && outcome.result.role === 'org_admin') {
       await seedTenantBinding(outcome.result.orgId, user.tid, user.email, context);
     }

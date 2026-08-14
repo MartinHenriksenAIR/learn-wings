@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 
-// Mock the auth + api dependencies so the provider runs in isolation.
 const { mockUseAuth, mockCallApi } = vi.hoisted(() => ({
   mockUseAuth: vi.fn(),
   mockCallApi: vi.fn(),
@@ -41,7 +40,6 @@ describe('usePlatformSettings — feature flags', () => {
     await waitFor(() => {
       expect(screen.getByTestId('loading')).toHaveTextContent('false');
     });
-    // Defaults: community enabled, course reviews disabled.
     expect(screen.getByTestId('community')).toHaveTextContent('true');
     expect(screen.getByTestId('reviews')).toHaveTextContent('false');
     expect(mockCallApi).not.toHaveBeenCalled();
@@ -62,7 +60,6 @@ describe('usePlatformSettings — feature flags', () => {
     await waitFor(() => {
       expect(screen.getByTestId('community')).toHaveTextContent('false');
     });
-    // A flag the API didn't touch keeps its default.
     expect(screen.getByTestId('reviews')).toHaveTextContent('false');
   });
 });

@@ -40,7 +40,6 @@ import { SeatUsageBar } from '@/components/platform-admin/SeatUsageBar';
 import { InviteLanguageSelect } from '@/components/InviteLanguageSelect';
 import { uiLangToInvite, type InviteLanguage } from '@/lib/inviteLanguage';
 
-/** Org-list row logo: signs the stored branding path for display; placeholder otherwise. */
 function OrgRowLogo({ logoPath }: { logoPath: string | null }) {
   const { data: src } = useSignedBrandingUrl(logoPath);
   if (src) {
@@ -71,9 +70,6 @@ export default function OrganizationsManager() {
       (orgsData ?? []).map((o) => ({
         ...o,
         memberCount: o.member_count ?? 0,
-        // A seat is consumed by an active member OR a pending invite, so the
-        // seat ratio / atLimit must count both (the plain Members column below
-        // still shows active members only).
         usedSeats: (o.member_count ?? 0) + (o.pending_invite_count ?? 0),
       })),
     [orgsData]
@@ -84,13 +80,11 @@ export default function OrganizationsManager() {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  // logoUrl holds the raw container-relative path (for create); sign it for the preview.
   const { data: logoDisplaySrc } = useSignedBrandingUrl(logoUrl);
   const [seatLimit, setSeatLimit] = useState<string>('');
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Initial admin state
   const [adminTab, setAdminTab] = useState<'existing' | 'invite'>('existing');
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [inviteEmail, setInviteEmail] = useState('');
@@ -146,7 +140,6 @@ export default function OrganizationsManager() {
         newOrg = result.organization;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create organization';
-        // Match the structured code (ADR-0013), not the English error sentence.
         if (err instanceof ApiError && err.code === 'DUPLICATE_SLUG') {
           setErrors({ slug: t('organizations.slugTaken') });
         } else {
@@ -276,8 +269,6 @@ export default function OrganizationsManager() {
               accept="image"
               value={logoDisplaySrc ?? null}
               onChange={(url, storagePath) => {
-                // Store the raw container-relative path; it's signed for display
-                // via the value prop above (useSignedBrandingUrl).
                 setLogoUrl(url && storagePath ? storagePath : null);
               }}
               maxSizeMB={5}
@@ -326,9 +317,6 @@ export default function OrganizationsManager() {
           </div>
 
           <div className="space-y-2">
-            {/* A section heading over the existing/invite Tabs group, not a
-                field label: the controls live inside the tabs and carry their
-                own accessible names — so a heading, not a <Label>. (#327) */}
             <p className="text-sm font-medium leading-none">{t('organizations.initialAdminOptional')}</p>
             <Tabs value={adminTab} onValueChange={(v) => setAdminTab(v as 'existing' | 'invite')}>
               <TabsList className="grid w-full grid-cols-2">
@@ -387,8 +375,6 @@ export default function OrganizationsManager() {
 
   return (
     <AppLayout breadcrumbs={[{ label: t('organizations.title') }]}>
-      {/* Header — the page owns its heading; AppLayout `title` is omitted here to avoid a
-          duplicate <h1> (the loading/error branches keep `title` since they have no in-page header). */}
       <div className="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('organizations.title')}</h1>

@@ -2,13 +2,8 @@ import { describe, it, expect } from 'vitest';
 
 import { functionBody, tableBody } from './__fixtures__/schema';
 
-// These guard the fixture's own matchers (used by the schema-drift pins in
-// course-visibility.test.ts and lms-asset.test.ts). They inject a synthetic
-// schema so the extraction logic can be exercised without the real file.
 describe('schema fixture matchers', () => {
   describe('functionBody', () => {
-    // A prefix-named sibling declared *before* the target must not be matched.
-    // A bare `FUNCTION public.<name>` prefix match grabs `<name>_v2`'s body here.
     it('matches the exact function, not a prefix-named sibling', () => {
       const schema = [
         'CREATE OR REPLACE FUNCTION public.foo_v2(x int)',
@@ -20,8 +15,6 @@ describe('schema fixture matchers', () => {
       expect(functionBody('foo', schema).trim()).toBe('SELECT true');
     });
 
-    // `EXECUTE FUNCTION public.<name>()` trigger references also contain the
-    // bare `FUNCTION public.<name>` text; the CREATE anchor skips them.
     it('matches the definition, not an EXECUTE reference', () => {
       const schema = [
         'CREATE OR REPLACE FUNCTION public.touch()',

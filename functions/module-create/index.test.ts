@@ -110,7 +110,6 @@ describe('module-create', () => {
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO course_modules');
     expect(sql).toContain('RETURNING *');
-    // sort_order is server-owned: MAX+1 within the course, computed in the INSERT
     expect(sql).toContain('COALESCE(MAX(sort_order) + 1, 0)');
     expect(sql).toContain('WHERE course_id = $1');
     expect(params).toEqual(['course-1', 'Module 1']); // no client sort_order param

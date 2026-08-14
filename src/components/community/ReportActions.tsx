@@ -5,8 +5,6 @@ import { canViewReportedContent } from '@/lib/community-report-link';
 import type { CommunityReport } from '@/lib/community-types';
 import { Eye, EyeOff, Lock, Unlock, CheckCircle, XCircle } from 'lucide-react';
 
-/** The report fields the moderation action bar needs. Both moderation pages
- *  pass a superset (ReportWithDetails), so a Pick keeps the contract minimal. */
 export type ReportActionsReport = Pick<
   CommunityReport,
   'id' | 'target_type' | 'target_id' | 'status' | 'post_id' | 'target_is_hidden' | 'target_is_locked'
@@ -24,12 +22,6 @@ export interface ReportActionsProps {
   updatePending: boolean;
 }
 
-/**
- * Per-report moderation action bar, shared by the platform + org moderation
- * views (#169). Lock/hide are single toggles reflecting the target's current
- * state (target_is_locked / target_is_hidden from community-reports); a null
- * state means the target was deleted, so its toggle is disabled.
- */
 export function ReportActions({
   report,
   onViewContent,

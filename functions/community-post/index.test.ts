@@ -115,7 +115,6 @@ describe('community-post', () => {
   });
 
   it('returns 200 { post: null } for org post when caller is org admin but not an active member', async () => {
-    // isOrgAdmin is no longer checked for the basic org-access path; isActiveMember is required
     mockQueryOne.mockResolvedValueOnce(orgPost);
     mockIsActiveMember.mockResolvedValueOnce(false);
     const res = await handler(baseReq({ postId: 'post-2' }), {} as any);
@@ -138,7 +137,6 @@ describe('community-post', () => {
     const hiddenPost = { ...orgPost, is_hidden: true };
     mockQueryOne.mockResolvedValueOnce(hiddenPost);
     mockIsActiveMember.mockResolvedValueOnce(true);
-    // isOrgAdmin called once: for the hidden-visibility check only
     mockIsOrgAdmin.mockResolvedValueOnce(true);
     const res = await handler(baseReq({ postId: 'post-2' }), {} as any);
     expect(res.status).toBe(200);
@@ -171,7 +169,6 @@ describe('community-post', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // #180 — post detail author payload must carry avatar_url.
   it('joins avatar_url into the author profile payload', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const post = { id: 'post-1', scope: 'global', org_id: null, is_hidden: false, profile: { id: 'a1', full_name: 'Ann', avatar_url: 'avatars/a1.png' } };

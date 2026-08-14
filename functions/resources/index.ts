@@ -48,8 +48,6 @@ export default endpoint('resources', async ({ req, reply, requireActiveMember })
   }
 
   if (search) {
-    // Escape LIKE metacharacters so user input like "100%" or "snake_case"
-    // is treated as a literal substring rather than a wildcard.
     const escaped = search.replace(/[\\%_]/g, '\\$&');
     params.push(`%${escaped}%`);
     const n = params.length;
@@ -67,7 +65,6 @@ export default endpoint('resources', async ({ req, reply, requireActiveMember })
     ORDER BY r.is_pinned DESC, r.created_at DESC
   `, params);
 
-  // Distinct tags for the org, regardless of search/type/tag filters.
   const tagsRow = await queryOne<{ all_tags: string[] }>(
     `SELECT COALESCE(array_agg(DISTINCT t ORDER BY t), '{}'::text[]) AS all_tags
      FROM community_resources r, unnest(r.tags) AS t

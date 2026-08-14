@@ -9,11 +9,6 @@ export interface LevelBadgeProps {
   className?: string;
 }
 
-/**
- * Colors from the design prototype's `lvlStyles` ([fg, bg] per level).
- * Exported so the assessment result ring stroke can reuse the exact same
- * per-level colors instead of duplicating them (#117).
- */
 export const LEVEL_STYLES: Record<CourseLevel, { fg: string; bg: string }> = {
   basic: { fg: "#1e9e6a", bg: "#e7f6ef" },
   intermediate: { fg: "#b07514", bg: "#fbf2dd" },
@@ -24,11 +19,6 @@ const LEVEL_FILLED: Record<CourseLevel, number> = { basic: 1, intermediate: 2, a
 
 const BAR_HEIGHTS = [5, 8, 11];
 
-/**
- * Squarer course-level pill with three signal bars (1/2/3 filled for
- * basic/intermediate/advanced). Port of the prototype's `levelBars` + level
- * pill styling.
- */
 export function LevelBadge({ level, className }: LevelBadgeProps) {
   const { t } = useTranslation();
   const { fg, bg } = LEVEL_STYLES[level];
