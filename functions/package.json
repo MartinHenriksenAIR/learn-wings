@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "verify": "npm run build && npm test",
     "start": "npm run build && func start",
     "test": "vitest run",
     "test:watch": "vitest"

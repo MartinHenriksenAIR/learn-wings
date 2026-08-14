@@ -19,14 +19,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run lint
-      - run: npx tsc --noEmit -p tsconfig.app.json
-      # The tooling tree: vite.config.ts, playwright.config.ts and e2e/. A pure
-      # type-check — it starts no browser and touches no network or database, so it
-      # is safe here where the e2e suite it covers deliberately is not (e2e/README.md).
-      - run: npx tsc --noEmit -p tsconfig.node.json
-      - run: npm test
-      - run: npm run build
+      # The gate list lives in package.json, once. Keeping it there rather than
+      # here is deliberate: it used to be restated in five documents, three of
+      # which had drifted into omitting a gate.
+      - run: npm run verify
 
   functions:
     name: Functions build and test
@@ -43,5 +39,4 @@ jobs:
           cache: npm
           cache-dependency-path: functions/package-lock.json
       - run: npm ci
-      - run: npm run build
-      - run: npm test
+      - run: npm run verify
