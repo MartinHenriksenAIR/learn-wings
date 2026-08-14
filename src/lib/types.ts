@@ -32,18 +32,9 @@ export interface Organization {
   created_at: string;
   member_count?: number;
   pending_invite_count?: number;
-  // SSO tenant binding (#353) — only present for platform admins (the
-  // `organizations` endpoint strips it for org admins). entra_tid = the bound
-  // Entra tenant id; entra_tid_label = its human-friendly domain hint.
   entra_tid?: string | null;
   entra_tid_label?: string | null;
-  // Per-org "Allow self-registration" switch (#356) — governs #353 tenant
-  // auto-join. Optional because the org-admin org list omits it; present on the
-  // single-org fetch and in currentOrg (user-context). Absent ⇒ treat as true
-  // (the DB default).
   allow_self_registration?: boolean;
-  // Org classifier (#354). 'individual' marks the hidden self-serve placeholder;
-  // absent/'standard' is a normal org. Populated via user-context (row_to_json).
   kind?: 'standard' | 'individual';
 }
 
@@ -92,11 +83,6 @@ export interface CourseFavorite {
   created_at: string;
 }
 
-/**
- * A favorited course as returned by `/api/favorites` (#456): the catalog {@link Course}
- * shape plus the caller's completion state in the current org, so the Favorites list can
- * show the same Completed pill as the mandatory list instead of always "Open course".
- */
 export interface FavoriteCourse extends Course {
   completed: boolean;
 }
@@ -110,14 +96,12 @@ export interface CourseCategory {
   created_at: string;
 }
 
-/** One lesson within a course-detail module outline (#409) — title only, no lesson bodies. */
 export interface CourseDetailLesson {
   id: string;
   title: string;
   sort_order: number;
 }
 
-/** One row of the course-detail module outline (#403) — title + lesson count + lesson titles, no lesson bodies. */
 export interface CourseDetailModule {
   id: string;
   title: string;
@@ -126,12 +110,6 @@ export interface CourseDetailModule {
   lessons: CourseDetailLesson[];
 }
 
-/**
- * Response of `/api/learner-course-detail` (#403) — the read-only "read about a
- * course" payload. `course` is a subset of {@link Course} (the fields the detail
- * page needs); `enrollment` is the caller's own status for the state-aware CTA,
- * null when the course is not started.
- */
 export interface LearnerCourseDetail {
   course: Pick<Course, 'id' | 'title' | 'description' | 'level' | 'language' | 'thumbnail_url' | 'category_id'>;
   modules: CourseDetailModule[];
@@ -183,7 +161,6 @@ export interface QuizOption {
   is_correct: boolean;
 }
 
-// ── Exercises (ADR-0017) — ungraded interactive lessons ──────────────────────
 export type ExerciseKind = 'quick_check' | 'bucket_sort';
 
 export interface QuickCheckOption { id: string; text: string; correct: boolean; }
@@ -224,8 +201,6 @@ export interface Enrollment {
   profile?: Profile;
 }
 
-/** A learner's own assigned course (from `useLearnerAssignments`) — the shape the
- *  Min Træning view (#364) consumes. Deduped per course, mandatory wins. */
 export interface LearnerAssignment {
   courseId: string;
   courseTitle: string;
@@ -237,7 +212,6 @@ export interface LearnerAssignment {
   assignedByOrgId: string;       // the org context of the assignment
 }
 
-/** An org's assignment row for the admin management view (`useOrgAssignments`). */
 export interface OrgAssignment {
   id: string;
   orgId: string;
@@ -252,7 +226,6 @@ export interface OrgAssignment {
   createdAt: string;
 }
 
-/** A course an admin may assign (published + enabled for the org). */
 export interface AssignableCourse {
   id: string;
   title: string;

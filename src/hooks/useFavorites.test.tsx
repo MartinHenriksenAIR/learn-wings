@@ -70,8 +70,6 @@ function ToggleConsumer({ orgId }: { orgId: string | undefined }) {
   );
 }
 
-// Fires an arbitrary toggle input so a test can drive the onSuccess cache-patch
-// (add with/without a course object, dedup, remove) against a shared QueryClient.
 function ToggleInputConsumer({
   orgId,
   input,
@@ -92,8 +90,6 @@ function renderWithClient(ui: React.ReactElement) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-// Renders against a caller-owned client so the test can seed the favorites cache
-// beforehand and read it back after the mutation settles.
 function renderWithSeededClient(ui: React.ReactElement, queryClient: QueryClient) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
@@ -177,7 +173,6 @@ describe('useToggleFavorite', () => {
     renderWithClient(<ToggleConsumer orgId="org-1" />);
     fireEvent.click(screen.getByText('remove'));
 
-    // togglingId is set to the in-flight course id while the mutation runs.
     expect(screen.getByTestId('togglingId')).toHaveTextContent('c-1');
 
     await waitFor(() => {
@@ -188,7 +183,6 @@ describe('useToggleFavorite', () => {
       });
     });
 
-    // onSettled clears the pending id once the mutation resolves.
     await waitFor(() => {
       expect(screen.getByTestId('togglingId')).toHaveTextContent('');
     });
@@ -204,7 +198,6 @@ describe('useToggleFavorite', () => {
     );
     fireEvent.click(screen.getByText('toggle'));
 
-    // Prepended (newest first), matching the endpoint's ORDER BY created_at DESC.
     await waitFor(() => {
       expect(cachedIds(queryClient)).toEqual(['c-1', 'c-0']);
     });
@@ -227,7 +220,6 @@ describe('useToggleFavorite', () => {
         favorite: true,
       });
     });
-    // Dedup guard: still a single entry, not two.
     expect(cachedIds(queryClient)).toEqual(['c-1']);
   });
 
@@ -248,7 +240,6 @@ describe('useToggleFavorite', () => {
         favorite: true,
       });
     });
-    // No course to add and no throw: the cache is left untouched.
     expect(cachedIds(queryClient)).toEqual(['c-0']);
   });
 

@@ -9,14 +9,6 @@ import { useFavorites, useToggleFavorite } from '@/hooks/useFavorites';
 import { FavoriteToggle } from './FavoriteToggle';
 import type { ListView } from '@/hooks/useListView';
 
-/**
- * Favorited-courses section for the learner dashboard (#358). Self-contained so
- * #364 can drop it into the future Min Træning page unchanged: it owns its own
- * `useFavorites` read and toggle, renders an <EmptyState> when there are no
- * favorites, and stays silent (renders nothing) until the query resolves so it
- * never flashes the empty state on first load. A favorited course can also be
- * in-progress or completed — this list is that one axis, not deduped against them.
- */
 export function FavoriteCourses({
   orgId,
   view = 'card',
@@ -28,7 +20,6 @@ export function FavoriteCourses({
   const { data, isFavorite, isLoading } = useFavorites(orgId);
   const { toggleFavorite, togglingId } = useToggleFavorite(orgId);
 
-  // No cached favorites yet — don't flash the empty state before the query lands.
   if (isLoading) return null;
 
   const courses = data?.courses ?? [];

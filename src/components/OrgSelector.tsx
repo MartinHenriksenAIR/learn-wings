@@ -22,9 +22,6 @@ export function OrgSelector() {
     enabled: isPlatformAdmin,
   });
 
-  // Auto-select the first org ONCE per mount when none is currently selected.
-  // Deliberately not re-running on later refetches — a background refetch must
-  // not reset the user's explicit "Platform-wide (no org)" choice.
   const autoSelected = useRef(false);
   useEffect(() => {
     if (autoSelected.current || orgs.length === 0) return;
@@ -32,7 +29,6 @@ export function OrgSelector() {
     if (!currentOrg) {
       setCurrentOrg(orgs[0]);
     }
-    // Only react to the org list arriving — not currentOrg, to avoid resetting user's choice
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgs]);
 
@@ -74,7 +70,6 @@ export function OrgSelector() {
       <Select
         value={currentOrg?.id || 'none'}
         onValueChange={(value) => {
-          // Prevent clearing org in org_admin mode
           if (value === 'none') {
             if (!isOrgAdminMode) {
               setCurrentOrg(null as unknown as Organization);
@@ -86,10 +81,6 @@ export function OrgSelector() {
         }}
       >
         {collapsed ? (
-          // Icon rail (#370): a 32px square that still opens the full switcher; the org
-          // name moves to a tooltip (+ aria-label) as there is no room for it. [&>svg]:hidden
-          // drops the trigger's built-in chevron — the org mark survives because it is
-          // wrapped in a <span>, not a direct <svg> child.
           <Tooltip>
             <TooltipTrigger asChild>
               <SelectTrigger

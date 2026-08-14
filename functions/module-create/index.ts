@@ -13,9 +13,6 @@ export default adminEndpoint('module-create', async ({ req, reply }) => {
     return reply(400, { error: 'title is required' });
   }
 
-  // sort_order is server-owned (issue #46): computed as MAX+1 within the course
-  // inside the INSERT. Any client-supplied sortOrder is ignored — array-length
-  // ranks from the client collided after delete-middle-then-add.
   const module_ = await queryOne(
     `INSERT INTO course_modules (course_id, title, sort_order)
      VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order) + 1, 0) FROM course_modules WHERE course_id = $1))

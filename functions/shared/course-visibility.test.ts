@@ -11,7 +11,6 @@ import {
 } from './course-visibility';
 import { functionBody, tableBody } from './__fixtures__/schema';
 
-// Collapse whitespace so the pins assert SQL shape, not formatting.
 const flat = (sql: string) => sql.replace(/\s+/g, ' ').trim();
 
 describe('orgCourseAccessEnabled', () => {
@@ -71,12 +70,6 @@ describe('resolveVisibilityContext', () => {
   });
 });
 
-// Drift guard mirroring lms-asset.test.ts: the predicate above is pinned by hand
-// against an inline comment, so a change to the canonical visibility rule in
-// migration/azure/01-schema.sql would NOT be caught. These read the schema and
-// fail if a column the predicate depends on is renamed/retyped, or if the
-// canonical rule (embedded in can_user_access_lms_asset) drops or renames one
-// of the published/org-enabled conjuncts courseVisibilityPredicate emits.
 describe('schema-drift parity guard', () => {
   it('courses still declares the is_published boolean the predicate gates on', () => {
     expect(tableBody('courses')).toMatch(/^\s*is_published\s+boolean/m);
@@ -84,8 +77,6 @@ describe('schema-drift parity guard', () => {
 
   it('org_course_access still declares the uuid org_id/course_id and access_type access columns the EXISTS clause joins on', () => {
     const body = tableBody('org_course_access');
-    // Pin name AND type (mirroring the courses `is_published boolean` check) so a
-    // retype — e.g. access enum → text, org_id uuid → bigint — also trips the guard.
     const columns = { org_id: 'uuid', course_id: 'uuid', access: 'public\\.access_type' };
     for (const [col, type] of Object.entries(columns)) {
       expect(body, `org_course_access.${col} missing or retyped`).toMatch(
@@ -95,9 +86,6 @@ describe('schema-drift parity guard', () => {
   });
 
   it('canonical rule and courseVisibilityPredicate both contain the three published + org-enabled conjuncts', () => {
-    // Substring pin, not a structural diff: catches a conjunct being dropped or
-    // renamed on either side, but NOT one being widened while the literal
-    // survives (e.g. access = 'enabled' → access IN ('enabled', 'trial')).
     const canonical = flat(functionBody('can_user_access_lms_asset'));
     const predicate = flat(courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 }));
 

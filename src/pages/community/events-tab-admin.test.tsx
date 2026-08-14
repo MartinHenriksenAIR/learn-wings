@@ -14,7 +14,6 @@ vi.mock('@/components/community/EventCard', () => ({
   ),
 }));
 
-// --- PostForm: surface the props that prove events-preselection + scope ---
 vi.mock('@/components/community/PostForm', () => ({
   PostForm: ({
     open,

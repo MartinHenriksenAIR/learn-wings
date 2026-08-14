@@ -2,8 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 
-// --- i18n echo: t/Trans return the key. Interpolation params are appended so
-// they stay assertable. REPO CONVENTION (see SeatRequestsSection.test). ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) =>
@@ -13,9 +11,6 @@ vi.mock('react-i18next', () => ({
     React.createElement('span', null, values ? `${i18nKey}:name=${values.name}` : i18nKey),
 }));
 
-// --- passthrough AlertDialog; Action/Cancel stay real buttons so onClick fires
-// (jsdom can't drive the Radix portal). The section gates the dialog body on
-// its own `confirm` state, so the passthrough still proves the two-step flow. ---
 vi.mock('@/components/ui/alert-dialog', () => {
   const pass = ({ children }: { children?: React.ReactNode }) =>
     React.createElement('div', null, children);
@@ -33,8 +28,6 @@ vi.mock('@/components/ui/alert-dialog', () => {
   };
 });
 
-// --- passthrough Select: each item is a button that sets the selection via the
-// parent's onValueChange (jsdom can't drive Radix Select). ---
 vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
 import { PlatformAdminsSection, type PlatformAdmin } from './PlatformAdminsSection';
@@ -72,14 +65,11 @@ describe('PlatformAdminsSection (admins-section)', () => {
       />,
     );
 
-    // No confirm action yet — the dialog body is gated on internal state.
     expect(screen.queryByRole('button', { name: 'platformAdmins.confirm' })).toBeNull();
 
-    // Click a row's Revoke: opens the confirm, does NOT call onRevoke.
     fireEvent.click(screen.getAllByRole('button', { name: 'platformAdmins.revoke' })[0]);
     expect(onRevoke).not.toHaveBeenCalled();
 
-    // Confirming fires the mutation with the right id.
     fireEvent.click(screen.getByRole('button', { name: 'platformAdmins.confirm' }));
     expect(onRevoke).toHaveBeenCalledWith('p1');
   });
@@ -96,7 +86,6 @@ describe('PlatformAdminsSection (admins-section)', () => {
       />,
     );
 
-    // Select the candidate, then click Grant → opens confirm without granting.
     fireEvent.click(screen.getByRole('button', { name: 'Cy Candidate' }));
     fireEvent.click(screen.getByRole('button', { name: 'platformAdmins.grant' }));
     expect(onGrant).not.toHaveBeenCalled();

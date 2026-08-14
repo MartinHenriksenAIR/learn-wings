@@ -15,11 +15,6 @@ vi.mock('react-router-dom', async (importOriginal) => ({
   useNavigate: () => mockNavigate,
 }));
 
-// Resolve keys against the real en.json rather than echoing an inline default.
-// The previous stub returned `t()`'s second argument, which meant the button
-// assertion below passed on a hard-coded English literal even though
-// `auth.signInWithMicrosoft` was missing from both locale files (#300). Reading
-// the shipped copy makes a missing key render as the raw key and fail here.
 vi.mock('react-i18next', async () => {
   const en = (await import('@/i18n/locales/en.json')).default;
   const translate = (key: string): string => {
@@ -40,8 +35,6 @@ vi.mock('react-i18next', async () => {
 
 vi.mock('@/assets/logo-light.png', () => ({ default: 'logo-light.png' }));
 
-// Mocked so importing Login doesn't pull in the real msal-config (which builds a
-// live MSAL client). The notice tests below drive the two consume* flags.
 vi.mock('@/lib/session-expired', () => ({
   consumeSessionExpiredNotice: vi.fn(),
   consumeIdleTimeoutNotice: vi.fn(),
@@ -180,7 +173,6 @@ describe('Login session-expired notice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-    // Signed out and settled so Login renders its card (no navigate effect).
     mockUseAuth.mockReturnValue({ ...baseAuth, user: null, profile: null });
   });
 

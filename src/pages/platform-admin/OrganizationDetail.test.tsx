@@ -4,10 +4,6 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// `t` echoes the key so assertions pin i18n keys; `Trans` renders its key —
-// enough for the controlled-dialog test, which never inspects the interpolated
-// member name inside descriptions. `language`/`resolvedLanguage` feed the date
-// formatters in this tree — both are 'en'.
 vi.mock('react-i18next', async () => {
   const ReactActual = await import('react');
   return {
@@ -20,9 +16,6 @@ vi.mock('react-i18next', async () => {
   };
 });
 
-// Mock AppLayout faithfully: the real one renders its `title` prop as an <h1>
-// (see AppLayout.tsx). Modeling that here is what lets the #320 regression test
-// observe a duplicate heading if the page ever passes `title` AND renders its own <h1>.
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ title, children }: { title?: string; children: React.ReactNode }) =>
     React.createElement('div', null, title ? React.createElement('h1', null, title) : null, children),
@@ -51,8 +44,6 @@ vi.mock('@/components/ui/file-upload', () => ({
   FileUpload: () => null,
 }));
 
-// Stub the assignment components (their own tests cover behavior) so no
-// '/api/assignments' call fires here; markers expose the wired props.
 vi.mock('@/components/assignments/AssignmentsManager', async () => {
   const ReactActual = await import('react');
   return {
@@ -72,7 +63,6 @@ vi.mock('@/components/assignments/AssignCourseDialog', async () => {
   };
 });
 
-// Render the Radix dropdown menu inline — jsdom can't drive the real portal.
 vi.mock('@/components/ui/dropdown-menu', async () => {
   const ReactActual = await import('react');
   const h = ReactActual.createElement;
@@ -135,8 +125,6 @@ const invitationRow = {
 };
 
 function renderPage() {
-  // `retry: false` so hook queries surface load errors immediately (matching
-  // the old imperative fetch, which never retried).
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -155,8 +143,6 @@ describe('OrganizationDetail — AlertDialog controlled from first render (#81)'
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Radix's useControllableState emits the uncontrolled-to-controlled message
-    // via console.warn; React's own variant uses console.error. Watch both.
     consoleErrorSpy = vi.spyOn(console, 'error');
     consoleWarnSpy = vi.spyOn(console, 'warn');
     mockCallApi.mockImplementation(async (path: string) => {
@@ -200,8 +186,6 @@ describe('OrganizationDetail — load-failure retry (#53)', () => {
   });
 
   it('shows a Try again button on load failure and refetches when clicked', async () => {
-    // First load: the organization fetch throws a non-404 (load_failed); the
-    // other fetches resolve empty. The retry must re-run the load.
     let orgCallCount = 0;
     const { ApiError } = (await import('@/lib/api-client')) as unknown as {
       ApiError: new (m: string, s: number, c?: string) => Error;
@@ -262,8 +246,6 @@ describe('OrganizationDetail — heading (#320)', () => {
   it('renders the org name as a heading exactly once on the loaded page', async () => {
     renderPage();
 
-    // OrgDetailHeader owns the single <h1>; AppLayout's `title` is omitted on the
-    // main branch. Re-adding it would resurface the duplicate this test guards.
     const headings = await screen.findAllByRole('heading', { name: 'Acme Corp' });
     expect(headings).toHaveLength(1);
     expect(headings[0].tagName).toBe('H1');
@@ -323,12 +305,8 @@ describe('OrganizationDetail — no member-adding in Platform view (#352, #434)'
     renderPage();
     await screen.findByText('Bob Member');
 
-    // Email-invite (#352) and Add member / add-existing-user (#434) are both gone —
-    // a platform admin manages membership via the org-admin flow.
     expect(screen.queryByRole('button', { name: 'orgDetail.inviteUser' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'orgDetail.addMember' })).toBeNull();
-    // The members section still renders (Bob Member above) with its non-adding
-    // controls — only member-adding is gone.
     expect(screen.getAllByRole('button', { name: 'assignments.assignCourse' }).length).toBeGreaterThan(0);
   });
 
@@ -336,7 +314,6 @@ describe('OrganizationDetail — no member-adding in Platform view (#352, #434)'
     renderPage();
     await screen.findByText('pending@example.com');
 
-    // Copy-invite-link is an invite affordance — removed. Cancel (management) stays.
     expect(screen.queryByRole('button', { name: 'orgDetail.copyLink' })).toBeNull();
     expect(screen.getByRole('button', { name: 'orgDetail.cancelInvite' })).toBeInTheDocument();
   });

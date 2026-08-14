@@ -51,15 +51,11 @@ export default endpoint('ideas', async ({ req, profile, reply, requireActiveMemb
   params.push(orgId);
   conditions.push(`i.org_id = $${params.length}`);
 
-  // Draft-privacy rule (CRITICAL): drafts are author-private for EVERY role,
-  // no admin bypass. Deliberate, documented decision.
   params.push(profile.id);
   conditions.push(`(i.status <> 'draft' OR i.user_id = $${params.length})`);
 
   if (vStatus && vStatus.length > 0) {
     params.push(vStatus);
-    // compare column cast to text so unknown labels yield no rows (parity with
-    // the old client's .in()), rather than a PG enum-cast error (500).
     conditions.push(`i.status::text = ANY($${params.length}::text[])`);
   }
 

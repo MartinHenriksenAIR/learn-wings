@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ReportActions, type ReportActionsReport } from './ReportActions';
 
-// t echoes keys so assertions pin i18n keys, not translated copy.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));

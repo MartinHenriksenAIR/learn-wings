@@ -15,12 +15,6 @@ export interface SaveButtonProps {
   type?: "button" | "submit" | "reset";
 }
 
-/**
- * Primary save button with in-button success feedback (port of the design
- * prototype's `saveBtn`): navy + Save icon when idle; success green + Check
- * icon + done label while `done` is true. The done-state timing is owned by
- * callers (pair with `useFlash`).
- */
 export function SaveButton({ done, idleLabel, doneLabel, onClick, disabled, className, type = "button" }: SaveButtonProps) {
   const { t } = useTranslation();
 

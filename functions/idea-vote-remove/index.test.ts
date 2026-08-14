@@ -65,7 +65,6 @@ describe('idea-vote-remove', () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
 
-    // Verify DELETE SQL and params
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('DELETE FROM idea_votes');
     expect(sql).toContain('idea_id = $1');

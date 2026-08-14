@@ -3,21 +3,17 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock api-client ---
 const mockCallApi = vi.fn();
 vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
 }));
 
-// --- mock sonner toast ---
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-// --- i18n echo: t() returns the key (the dialog's labels are the only t() calls). ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-// Radix Dialog uses a Portal — renders into document.body which is in scope in jsdom.
 
 import { QuizEditorDialog } from './QuizEditorDialog';
 
@@ -31,14 +27,11 @@ const defaultProps = {
 
 const emptyQuizResponse = { quiz: null, questions: [] };
 
-/** Returns the passing-score number input. It's a spinbutton by ARIA role. */
 function getPassingScoreInput() {
   return screen.getByRole('spinbutton');
 }
 
 function renderDialog(props: Partial<typeof defaultProps> = {}) {
-  // Fresh QueryClient per render (retry off) so the once-mocks stay
-  // deterministic and no quiz cache leaks between renders.
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -57,41 +50,32 @@ describe('QuizEditorDialog — load-error guard', () => {
 
     renderDialog();
 
-    // Retry button should appear after failed load
     const retryBtn = await screen.findByRole('button', { name: /retry/i });
     expect(retryBtn).toBeInTheDocument();
 
-    // No passing-score spinbutton (editable form is not rendered)
     expect(screen.queryByRole('spinbutton')).toBeNull();
 
-    // Save Quiz button must be disabled
     const saveBtn = screen.getByRole('button', { name: /save quiz/i });
     expect(saveBtn).toBeDisabled();
   });
 
   it('(b) Retry clears the error, refires fetch, and renders the form on success', async () => {
-    // First call fails, second succeeds
     mockCallApi
       .mockRejectedValueOnce(new Error('Network error'))
       .mockResolvedValueOnce(emptyQuizResponse);
 
     renderDialog();
 
-    // Wait for error state
     const retryBtn = await screen.findByRole('button', { name: /retry/i });
 
-    // Click retry
     fireEvent.click(retryBtn);
 
-    // After successful retry, Retry button disappears and form renders
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /retry/i })).toBeNull()
     );
 
-    // Passing score spinbutton now visible
     expect(getPassingScoreInput()).toBeInTheDocument();
 
-    // Save Quiz is no longer disabled
     const saveBtn = screen.getByRole('button', { name: /save quiz/i });
     expect(saveBtn).not.toBeDisabled();
   });
@@ -136,7 +120,6 @@ describe('QuizEditorDialog — passingScore', () => {
   });
 
   it('(d) no-quiz load resets passingScore to default 70 (fresh instance)', async () => {
-    // First instance: quiz with score 90 on lesson-a
     mockCallApi.mockResolvedValueOnce({
       quiz: { id: 'quiz-1', lesson_id: 'lesson-a', passing_score: 90 },
       questions: [],
@@ -144,20 +127,15 @@ describe('QuizEditorDialog — passingScore', () => {
 
     const { unmount } = renderDialog({ lessonId: 'lesson-a' });
 
-    // Wait for the async quiz load to apply before asserting. findByRole resolves
-    // as soon as the spinbutton exists — showing the useState(70) default — so a bare
-    // assertion here races the load and flakes under heavy parallel test load.
     await waitFor(() => expect((getPassingScoreInput() as HTMLInputElement).value).toBe('90'));
 
     unmount();
 
-    // Fresh instance (key change remounts): lesson-b has no quiz
     mockCallApi.mockResolvedValueOnce(emptyQuizResponse);
 
     renderDialog({ lessonId: 'lesson-b' });
 
     const input2 = await screen.findByRole('spinbutton');
-    // Should be reset to default 70, not carried over from lesson-a
     expect((input2 as HTMLInputElement).value).toBe('70');
   });
 });
@@ -172,7 +150,6 @@ describe('QuizEditorDialog — label associations (#327)', () => {
 
     renderDialog();
 
-    // The label must resolve to exactly one control — the passing-score input.
     const input = await screen.findByLabelText('quizEditor.passingScoreLabel');
     expect(input).toHaveAttribute('id', 'quiz-passing-score');
     expect(input).toBe(screen.getByRole('spinbutton'));

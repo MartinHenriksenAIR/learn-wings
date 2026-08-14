@@ -41,8 +41,6 @@ export default function IdeaLibrary() {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID
-  // and never matches ideas.user_id post-migration.
   const { currentOrg, profile, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
   const communityGate = useCommunityGate();
@@ -100,8 +98,6 @@ export default function IdeaLibrary() {
     enabled: !!currentOrg,
   });
 
-  // Org tags are secondary (the tag filter dropdown) — a failure degrades the
-  // filter but should not blank the page, so it toasts + logs instead.
   const { data: orgTags = [], isError: orgTagsError, error: orgTagsErrorObj } = useQuery({
     queryKey: queryKeys.ideaTags.list(currentOrg?.id),
     queryFn: () => fetchOrgTags(currentOrg!.id),
@@ -126,7 +122,6 @@ export default function IdeaLibrary() {
     },
   });
 
-  // Filter out drafts for non-owners in the library view (except in drafts tab)
   const filteredIdeas = safeTab === 'all'
     ? ideas.filter((i) => i.status !== 'draft')
     : safeTab === 'drafts'
@@ -241,7 +236,6 @@ export default function IdeaLibrary() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : ideasError ? (
-        // A failed fetch must not render the "no ideas yet" empty state.
         <QueryErrorState onRetry={() => refetchIdeas()} />
       ) : filteredIdeas.length === 0 ? (
         <CommunityEmptyState
@@ -263,7 +257,6 @@ export default function IdeaLibrary() {
               key={idea.id}
               idea={idea}
               onClick={() => {
-                // Drafts go to edit mode, other ideas go to detail view
                 if (idea.status === 'draft') {
                   navigate(routes.community.ideaEdit(idea.id));
                 } else {

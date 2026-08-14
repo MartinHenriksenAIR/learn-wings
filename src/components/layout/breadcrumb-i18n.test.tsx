@@ -7,8 +7,6 @@ import en from '@/i18n/locales/en.json';
 import da from '@/i18n/locales/da.json';
 import i18n from '@/i18n';
 
-// AppSidebar pulls in the full auth/navigation tree; the breadcrumb header is
-// what we're exercising, so stub the sidebar to keep the render focused.
 vi.mock('./AppSidebar', () => ({
   AppSidebar: () => <div data-testid="app-sidebar" />,
 }));
@@ -20,8 +18,6 @@ vi.mock('@/hooks/useAuth', () => ({
 
 import { AppLayout } from './AppLayout';
 
-// The breadcrumb crumb labels these keys back (#206): the AppLayout Home crumb
-// plus the community pages' intermediate/leaf crumbs.
 const REQUIRED_KEYS = [
   'nav.home',
   'community.title',
@@ -86,7 +82,6 @@ describe('AppLayout Home crumb (#206)', () => {
     await i18n.changeLanguage('da');
     renderLayout();
     expect(screen.getByText(da.nav.home)).toBeInTheDocument();
-    // The English literal must not leak once translated.
     expect(en.nav.home).not.toBe(da.nav.home);
   });
 });

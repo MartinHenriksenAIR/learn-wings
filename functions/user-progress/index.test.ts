@@ -20,8 +20,6 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// Fixture: 1 enrollment, 2 modules (m1: video lesson l1 + quiz lesson l2; m2: empty),
-// l1 completed, quiz q1 on l2 with 2 attempts (latest first).
 const enrollmentRows = [{
   id: 'e1', course_id: 'c1', status: 'active', enrolled_at: '2026-01-01T00:00:00Z',
   completed_at: null, title: 'Course One', level: 'basic',
@@ -123,18 +121,15 @@ describe('user-progress', () => {
     expect(c.modules).toHaveLength(2);
     expect(c.modules[0].lessons).toHaveLength(2);
     expect(c.modules[1].lessons).toHaveLength(0);
-    // l1: completed via progress row, no quiz → quiz keys omitted
     expect(c.modules[0].lessons[0]).toEqual({
       id: 'l1', title: 'Lesson One', lessonType: 'video', sortOrder: 0,
       status: 'completed', completedAt: '2026-01-02T00:00:00Z',
     });
-    // l2: no progress row → not_started; latest attempt (a2) attached
     expect(c.modules[0].lessons[1]).toEqual({
       id: 'l2', title: 'Quiz Lesson', lessonType: 'quiz', sortOrder: 1,
       status: 'not_started', completedAt: null,
       quizId: 'q1', latestQuizScore: 90, latestQuizPassed: true,
     });
-    // attempts: both, lessonTitle resolved, order preserved (latest first)
     expect(c.quizAttempts).toEqual([
       { id: 'a2', quizId: 'q1', lessonTitle: 'Quiz Lesson', score: 90, passed: true,
         startedAt: '2026-01-04T00:00:00Z', finishedAt: '2026-01-04T00:10:00Z' },
@@ -171,11 +166,9 @@ describe('user-progress', () => {
     const { courses } = JSON.parse(res.body as string);
     expect(courses).toHaveLength(2);
     const [c1, c2] = courses;
-    // c1 unchanged by c2's data: same modules, attempts only for q1
     expect(c1.modules.map((m: { id: string }) => m.id)).toEqual(['m1', 'm2']);
     expect(c1.quizAttempts.map((a: { id: string }) => a.id)).toEqual(['a2', 'a1']);
     expect(c1.totalLessons).toBe(2);
-    // c2 gets only its own module, lesson and attempt
     expect(c2.modules.map((m: { id: string }) => m.id)).toEqual(['m3']);
     expect(c2.modules[0].lessons[0]).toEqual({
       id: 'l3', title: 'C2 Lesson', lessonType: 'quiz', sortOrder: 0,
@@ -255,14 +248,12 @@ describe('user-progress', () => {
       expect(courses).toHaveLength(1);
       expect(mockIsOrgAdmin).not.toHaveBeenCalled();
 
-      // enrollment query: one row per course across orgs, no org bind, no publish filter
       const [enrSql, enrParams] = mockQuery.mock.calls[0] as [string, unknown[]];
       expect(enrSql).toContain('DISTINCT ON (e.course_id)');
       expect(enrSql).not.toContain('is_published');
       expect(enrSql).not.toContain('e.org_id');
       expect(enrParams).toEqual(['p2']); // userId only — no orgId
 
-      // progress + attempts filter by user only (span every org)
       const [progSql, progParams] = mockQuery.mock.calls[1] as [string, unknown[]];
       expect(progSql).not.toContain('org_id');
       expect(progParams).toEqual(['p2']);

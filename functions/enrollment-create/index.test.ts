@@ -103,7 +103,6 @@ describe('enrollment-create', () => {
   });
 
   it('returns 404 when course does not exist (no access or insert query runs)', async () => {
-    // platform admin path — skips org_course_access entirely. Course lookup returns null.
     mockQueryOne.mockResolvedValueOnce(null);
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(404);

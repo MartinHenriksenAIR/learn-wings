@@ -1,12 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Only clearCache is exercised here; msal-config also builds a real MSAL client
-// (env-dependent) that we never want to touch in a unit test.
 const clearCache = vi.fn().mockResolvedValue(undefined);
 vi.mock('./msal-config', () => ({ msalInstance: { clearCache } }));
 
-// jsdom leaves navigation unimplemented, so swap in a location whose assign()
-// we can assert and whose path we can set per test.
 const realLocation = window.location;
 function stubLocation(pathname: string, search = '', hash = '') {
   Object.defineProperty(window, 'location', {
@@ -16,7 +12,6 @@ function stubLocation(pathname: string, search = '', hash = '') {
   });
 }
 
-// Fresh module each test so the one-shot redirect guard starts un-tripped.
 async function loadModule() {
   vi.resetModules();
   return import('./session-expired');
@@ -107,7 +102,6 @@ describe('session-expired', () => {
     await vi.waitFor(() => expect(window.location.assign).toHaveBeenCalledWith('/login'));
     expect(clearCache).toHaveBeenCalledOnce();
     expect(consumeIdleTimeoutNotice()).toBe(true);
-    // The idle path must not masquerade as a dead session.
     expect(consumeSessionExpiredNotice()).toBe(false);
   });
 

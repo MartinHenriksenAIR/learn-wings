@@ -21,7 +21,6 @@ export default endpoint('idea-comment-create', async ({ req, profile, reply, req
 
   if (!idea) return reply(404, { error: 'Idea not found' });
 
-  // Draft privacy (shared/ideas): other-author's draft is invisible (no admin bypass)
   if (!isIdeaVisibleTo(idea, profile)) {
     return reply(404, { error: 'Idea not found' });
   }
@@ -38,7 +37,6 @@ export default endpoint('idea-comment-create', async ({ req, profile, reply, req
     }
   }
 
-  // CTE insert with profile join (parity with community-comment-create)
   const comment = await queryOne(
     `WITH ins AS (
        INSERT INTO idea_comments (idea_id, org_id, user_id, content, parent_comment_id)

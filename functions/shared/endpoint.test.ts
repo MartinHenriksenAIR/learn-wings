@@ -10,7 +10,6 @@ const { mockAuthenticate, MockAuthError, mockGetProfile, mockIsOrgAdmin, mockIsA
     mockAppHttp: vi.fn(),
   };
 });
-// Mocked HERE ONLY (endpoint.ts calls app.http at factory time) so registration is assertable.
 vi.mock('@azure/functions', () => ({ app: { http: mockAppHttp } }));
 vi.mock('./auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('./profile', () => ({
@@ -19,7 +18,6 @@ vi.mock('./profile', () => ({
   isOrgAdmin: mockIsOrgAdmin,
   isOrgAdminOfAny: vi.fn(),
 }));
-// ./cors and ./errors deliberately NOT mocked — they run real, as in every endpoint test.
 
 import { endpoint, adminEndpoint, Reply } from './endpoint';
 import type { AuthedCtx } from './endpoint';
@@ -172,8 +170,6 @@ describe('endpoint', () => {
     expect(config.handler).toBe(handler);
   });
 
-  // The two org-scoped guards share one contract (admin short-circuit, DB probe
-  // with (profile.id, orgId), 403 Forbidden on denial) — asserted once for both.
   describe.each([
     { name: 'requireOrgAdmin', mock: mockIsOrgAdmin, invoke: (ctx: AuthedCtx) => ctx.requireOrgAdmin('org-1') },
     { name: 'requireActiveMember', mock: mockIsActiveMember, invoke: (ctx: AuthedCtx) => ctx.requireActiveMember('org-1') },
@@ -209,8 +205,6 @@ describe('endpoint', () => {
   });
 
   describe('requirePlatformAdmin', () => {
-    // Different shape from the org-scoped guards: no DB probe involved — the
-    // gate reads profile.is_platform_admin only (hence sync, not async).
     const run = vi.fn(async (ctx: AuthedCtx) => {
       ctx.requirePlatformAdmin();
       return ctx.reply(200, { ok: true });

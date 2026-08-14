@@ -1,10 +1,6 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 
-/**
- * Entra sign-in button with the four-square Microsoft logo. The label stays a
- * prop because the two auth screens (Login, Signup) use different i18n keys.
- */
 export function MicrosoftSignInButton({
   onClick,
   label,

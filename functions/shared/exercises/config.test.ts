@@ -10,7 +10,6 @@ describe('validateExerciseConfig', () => {
     expect([...EXERCISE_KINDS]).toEqual(['quick_check', 'bucket_sort']);
   });
 
-  // ── quick_check ──────────────────────────────────────────────────────────
   const validQuickCheck = {
     version: 1,
     questions: [
@@ -53,7 +52,6 @@ describe('validateExerciseConfig', () => {
     ] })).toMatch(/exactly one correct/i);
   });
 
-  // ── bucket_sort ──────────────────────────────────────────────────────────
   const validBucketSort = {
     version: 1,
     buckets: [{ id: 'b1', label: 'X' }, { id: 'b2', label: 'Y' }],

@@ -39,28 +39,17 @@ import { useCourseCategories } from '@/hooks/useCourseCategories';
 import { cn } from '@/lib/utils';
 import { coursesAdminQueryKey } from './CoursesManager';
 
-/** Cache key for one course's full admin structure (course + modules + lessons). */
 const courseStructureQueryKey = (courseId: string) => queryKeys.courseStructureAdmin.detail(courseId);
 
-/**
- * Radix Select cannot hold an empty-string value, so the "Uncategorized" option
- * uses this sentinel; it maps to/from `category_id: null` at the state boundary.
- */
 const UNCATEGORIZED = '__none__';
 
 interface CourseStructureData {
   course: Course | null;
   modules: CourseModule[];
-  /**
-   * DISPLAY-ONLY URL re-signed from course.thumbnail_url (the DB row carries the
-   * raw path). Null when there is no thumbnail OR when signing failed — which is
-   * why it is never the value the editor saves; see `editThumbnailPath`.
-   */
   signedThumbnailUrl: string | null;
 }
 
 interface SaveLessonInput {
-  /** null → create (sort_order is server-owned, issue #46); set → update. */
   lessonId: string | null;
   moduleId: string;
   title: string;
@@ -79,29 +68,13 @@ export default function CourseEditor() {
   const queryClient = useQueryClient();
   const { features } = usePlatformSettings();
 
-  // In-button "Save changes" success morph (toast policy: course save is routine).
   const { flashed, flash } = useFlash();
 
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editLevel, setEditLevel] = useState<CourseLevel>('basic');
   const [editLanguage, setEditLanguage] = useState<'en' | 'da'>('da');
-  /** null → uncategorized; a category id otherwise. */
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
-  /**
-   * The thumbnail value that will be PERSISTED — the raw storage path, seeded
-   * from the course row and never from the signed display URL.
-   *
-   * The split matters. Signing is a display concern and is allowed to fail:
-   * `getSignedLmsAssetUrl` swallows a failed `/api/asset-signed-url` call and
-   * returns null (src/lib/storage.ts). While this field held the signed URL, that
-   * null was seeded straight into the form and the next save wrote
-   * `thumbnailUrl: null` — which #275 turned from a recoverable "column cleared,
-   * blob survives" into an irreversible `deleteBlob`. Holding the path instead
-   * means a signing blip can only cost the PREVIEW: the save still carries the
-   * path the row already has, which `course-update` sees as unchanged and leaves
-   * (and its blob) alone. Clearing the field is then unambiguously deliberate.
-   */
   const [editThumbnailPath, setEditThumbnailPath] = useState<string | null>(null);
 
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
@@ -125,15 +98,10 @@ export default function CourseEditor() {
   const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
   const [quizLessonTitle, setQuizLessonTitle] = useState('');
 
-  // Exercise editor state
   const [exerciseEditorOpen, setExerciseEditorOpen] = useState(false);
   const [exerciseLessonId, setExerciseLessonId] = useState<string | null>(null);
   const [exerciseLessonTitle, setExerciseLessonTitle] = useState('');
 
-  // Module/lesson mutations patch this cache from their RETURNING'd rows (issue
-  // #48); only the course save path refetches it, because a changed thumbnail
-  // needs re-signing. Patches must keep the `course` object reference intact so
-  // the edit-field seeding effect below doesn't clobber unsaved course edits.
   const structureQueryKey = courseStructureQueryKey(courseId ?? '');
   const {
     data: structureData,
@@ -156,8 +124,6 @@ export default function CourseEditor() {
   const modules = structureData?.modules ?? [];
   const signedThumbnailUrl = structureData?.signedThumbnailUrl ?? null;
 
-  // Category options for the picker below — gated on `course` so we don't fetch
-  // before the editor has loaded. Labelled by the admin's UI language at render.
   const { data: categories = [] } = useCourseCategories({ enabled: !!course });
 
   useEffect(() => {
@@ -166,10 +132,6 @@ export default function CourseEditor() {
     }
   }, [loadError, t]);
 
-  // Seed the editable text fields when the course identity changes (initial load
-  // / switching courses). Keyed on the id, not the object, so a publish-toggle
-  // cache patch (new `course` object, same id) can flip is_published WITHOUT
-  // clobbering unsaved title/description edits.
   useEffect(() => {
     if (course) {
       setEditTitle(course.title);
@@ -181,27 +143,11 @@ export default function CourseEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course?.id]);
 
-  // Seed the thumbnail from the STORED PATH, and re-seed only when that path
-  // changes — initial load, switching courses, or a refetch that brought back a
-  // genuinely different value (someone else edited the course). Keying on the
-  // signed URL instead would re-seed on every refetch, because each one carries a
-  // fresh SAS token, silently discarding an unsaved thumbnail pick.
   useEffect(() => {
-    // `|| null` not `?? null`: an empty stored value means "no thumbnail" and
-    // must not be persisted back as an empty string.
     if (course) setEditThumbnailPath(course.thumbnail_url || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course?.id, course?.thumbnail_url]);
 
-  /**
-   * What FileUpload should SHOW. While the field still holds the course's stored
-   * path, that is the signed URL the structure query resolved for it; once the
-   * user picks a replacement it is the fresh blob path, which FileUpload renders
-   * from its own local object-URL preview until the post-save refetch re-signs it.
-   *
-   * null here means "we could not resolve a viewable URL", which is NOT the same
-   * as "there is no thumbnail" — `editThumbnailPath` is what answers that.
-   */
   const thumbnailDisplayUrl =
     editThumbnailPath === (course?.thumbnail_url || null) ? signedThumbnailUrl : editThumbnailPath;
 
@@ -210,9 +156,7 @@ export default function CourseEditor() {
       callApi<{ course: Course }>('/api/course-update', { courseId, updates }),
     errorTitle: 'Failed to save course',
     onSuccess: () => {
-      // Toast policy: routine save → in-button morph, not a toast.
       flash('course');
-      // KEEP the refetch here: a changed thumbnail path needs re-signing.
       queryClient.invalidateQueries({ queryKey: structureQueryKey });
     },
   });
@@ -220,10 +164,6 @@ export default function CourseEditor() {
 
   const handleSaveCourse = () => {
     if (!courseId || !editTitle.trim()) return;
-    // `editThumbnailPath` is already a path for everything this app writes; the
-    // extraction only still normalizes a LEGACY row that stored an absolute
-    // storage URL. It can no longer turn a display URL back into a path, because
-    // no display URL ever reaches this state.
     const thumbnailToPersist = extractLmsAssetPath(editThumbnailPath) ?? editThumbnailPath;
     saveCourseMutation.mutate({
       title: editTitle,
@@ -235,12 +175,6 @@ export default function CourseEditor() {
     });
   };
 
-  // Publish toggle — same mutation/payload as the manager's publish switch
-  // (#48: patch the cache from the RETURNING'd row, no full refetch). The patch
-  // keeps the same course id so the seeding effects above don't re-seed; it also
-  // preserves the already-signed thumbnail (the RETURNING'd row carries the raw
-  // path). Toast policy: publish toggle is routine — the switch state IS the
-  // feedback, no toast.
   const togglePublishMutation = useToastMutation({
     mutationFn: (isPublished: boolean) =>
       callApi<{ course: Course }>('/api/course-update', {
@@ -263,7 +197,6 @@ export default function CourseEditor() {
     togglePublishMutation.mutate(!course.is_published);
   };
 
-  /** Patch only `modules` in the structure cache, preserving the `course` reference. */
   const patchModules = (update: (modules: CourseModule[]) => CourseModule[]) => {
     queryClient.setQueryData<CourseStructureData>(structureQueryKey, (prev) =>
       prev && { ...prev, modules: update(prev.modules) },
@@ -294,9 +227,7 @@ export default function CourseEditor() {
       setModuleDialogOpen(false);
       patchModules((mods) =>
         moduleId
-          // RETURNING'd row is the bare module — keep the lessons we already have.
           ? mods.map((m) => (m.id === module.id ? { ...m, ...module, lessons: m.lessons } : m))
-          // Server appends at MAX+1, so the end of the list is its sorted position.
           : [...mods, { ...module, lessons: [] }],
       );
     },
@@ -368,7 +299,6 @@ export default function CourseEditor() {
                 ...m,
                 lessons: lessonId
                   ? (m.lessons ?? []).map((l) => (l.id === lesson.id ? lesson : l))
-                  // Server appends at MAX+1, so the end of the list is its sorted position.
                   : [...(m.lessons ?? []), lesson],
               },
         ),
@@ -424,8 +354,6 @@ export default function CourseEditor() {
       } else {
         toast({ title: t('courseEditor.courseDeleted') });
       }
-      // The cached admin list still holds the deleted course; drop it so the
-      // list page does a fresh load instead of flashing the deleted row.
       queryClient.removeQueries({ queryKey: coursesAdminQueryKey });
       navigate(routes.platformAdmin.courses);
     },
@@ -437,19 +365,12 @@ export default function CourseEditor() {
     deleteCourseMutation.mutate();
   };
 
-  // ── Language editions (#213) ───────────────────────────────────────────────
-  // Candidate source is the shared admin course list — the same ['courses-admin']
-  // cache CoursesManager populates, read through the shared hook so both sites
-  // see one { courses, accessRecords } shape. Gated on `course` so we don't fetch
-  // before the editor has loaded (the section only renders once the course exists).
   const { data: coursesData } = useCoursesAdmin({ enabled: !!course, staleTime: 60 * 1000 });
   const allCourses = coursesData?.courses ?? [];
   const thisCourse = allCourses.find((c) => c.id === courseId);
   const siblings = thisCourse?.course_group_id
     ? allCourses.filter((c) => c.id !== courseId && c.course_group_id === thisCourse.course_group_id)
     : [];
-  // A candidate is eligible only if it's standalone (no group) and brings a
-  // language the group doesn't already have — one edition per language.
   const groupLanguages = new Set(
     [thisCourse, ...siblings].filter(Boolean).map((c) => (c as Course).language),
   );
@@ -512,8 +433,6 @@ export default function CourseEditor() {
         <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
           <p className="text-destructive font-medium">{t('courseEditor.failedToLoad')}</p>
           <p className="text-sm text-muted-foreground">{loadError.message}</p>
-          {/* While the retry is in flight with no cached data, isLoading goes
-              true and the spinner branch above takes over. */}
           <Button variant="outline" onClick={() => refetchStructure()}>
             {t('courseEditor.retry')}
           </Button>
@@ -577,22 +496,13 @@ export default function CourseEditor() {
             <div className="w-full shrink-0 space-y-3.5 md:w-[220px]">
               <div className="space-y-1.5">
                 <Label htmlFor="course-thumbnail">{t('courseEditor.thumbnail')}</Label>
-                {/* No maxSizeMB: the image cap is the server's, and FileUpload
-                    defaults to it (src/lib/upload-limits.ts). */}
                 <FileUpload
                   id="course-thumbnail"
                   folder="thumbnails"
                   accept="image"
                   value={thumbnailDisplayUrl}
-                  // FileUpload reports (null, null) only when the user clears the
-                  // field — a failed upload leaves the current value alone — so
-                  // this null is a deliberate removal, and the save is meant to
-                  // clear the column and delete the blob (#275).
                   onChange={(_url, storagePath) => setEditThumbnailPath(storagePath)}
                 />
-                {/* A stored thumbnail we could not sign renders as the empty
-                    dropzone, which on its own reads as "there is no image". Say
-                    what actually happened, and that the save will not discard it. */}
                 {editThumbnailPath && !thumbnailDisplayUrl && (
                   <p className="text-xs text-muted-foreground">{t('courseEditor.thumbnailPreviewUnavailable')}</p>
                 )}
@@ -639,9 +549,6 @@ export default function CourseEditor() {
           </div>
 
           <div className="mb-[18px] space-y-2 border-t border-border pt-[18px]">
-            {/* A section heading, not a field label: this titles the editions
-                group (a list + a link control), so it takes no htmlFor — the
-                link-target select below carries its own accessible name (#325). */}
             <h3 className="text-sm font-medium leading-none">{t('courseEditor.editions.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('courseEditor.editions.description')}</p>
 
@@ -930,8 +837,6 @@ export default function CourseEditor() {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="lesson-document">{t('courseEditor.documentFileLabel')}</Label>
-                  {/* No maxSizeMB: the document cap is the server's, and
-                      AzureDocumentUpload defaults to it (src/lib/upload-limits.ts). */}
                   <AzureDocumentUpload
                     id="lesson-document"
                     value={lessonDocPath}
@@ -1019,8 +924,6 @@ export default function CourseEditor() {
         </DialogContent>
       </Dialog>
 
-      {/* Quiz Editor Dialog — no onQuizSaved refetch: the structure response
-          carries no quiz data, so a quiz save changes nothing on this page. */}
       {quizLessonId && (
         <QuizEditorDialog
           key={quizLessonId}
@@ -1031,8 +934,6 @@ export default function CourseEditor() {
         />
       )}
 
-      {/* Exercise Editor Dialog — like the quiz editor, the structure response
-          carries no exercise data, so an exercise save changes nothing here. */}
       {exerciseLessonId && (
         <ExerciseEditorDialog
           key={exerciseLessonId}

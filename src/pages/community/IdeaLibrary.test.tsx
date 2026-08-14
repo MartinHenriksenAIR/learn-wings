@@ -31,8 +31,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// --- useAuth mock: user.id (Entra OID) is DELIBERATELY different from profile.id
-//     (the DB row UUID) — pre-migration the legacy backend made them the same value, Entra does not ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),

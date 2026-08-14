@@ -49,7 +49,6 @@ describe('post-login-redirect — off-SPA / malicious targets are rejected', () 
   });
 
   it('does not return a value that was somehow stored but is unsafe', () => {
-    // Simulate a poisoned sessionStorage entry (guard also runs on read).
     sessionStorage.setItem('postLoginRedirect', '/\\evil.com');
     expect(consumePostLoginRedirect()).toBeNull();
   });

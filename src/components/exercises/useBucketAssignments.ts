@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { BucketSortConfig } from '@/lib/types';
 
-/** Input-agnostic state: itemId -> bucketId | null (null = unassigned tray). */
 export type Assignments = Record<string, string | null>;
 
 export function useBucketAssignments(config: BucketSortConfig) {

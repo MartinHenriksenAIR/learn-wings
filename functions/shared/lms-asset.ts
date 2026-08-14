@@ -2,22 +2,6 @@ import { queryOne } from './db';
 import { generateSasToken, buildBlobUrl } from './sas';
 import type { CallerProfile } from './profile';
 
-/**
- * TS port of the canonical authz rule public.can_user_access_lms_asset
- * (migration/azure/01-schema.sql) — the ONE place the LMS-asset predicate
- * lives. Before this module, azure-view-url and asset-signed-url carried
- * hand-inlined copies that drifted in complementary directions (azure-view-url
- * lost the thumbnail branch; asset-signed-url lost azure_blob_path — the bug
- * class issue #14 fixed). See issue #60.
- *
- * Parity notes vs the SQL function:
- * - The RPC's first EXISTS (profiles.is_platform_admin) is NOT ported here —
- *   platform admin stays a TS short-circuit at the endpoint level, per suite
- *   convention (endpoints skip the query entirely for platform admins).
- * - Lesson branch matches ALL THREE asset-path columns (video_storage_path,
- *   document_storage_path, azure_blob_path) + the thumbnail branch matches
- *   courses.thumbnail_url. $1 = profile id, $2 = blob path.
- */
 export const CAN_ACCESS_LMS_ASSET_SQL = `SELECT (
   EXISTS (
     SELECT 1 FROM lessons l
@@ -39,11 +23,6 @@ export const CAN_ACCESS_LMS_ASSET_SQL = `SELECT (
   )
 ) AS can_access`;
 
-/**
- * Can this (non-platform-admin) profile access the LMS asset at blobPath?
- * True when an active org membership reaches a published, org-enabled course
- * that references the path via a lesson asset column or its thumbnail.
- */
 export async function canAccessLmsAsset(profileId: string, blobPath: string): Promise<boolean> {
   const result = await queryOne<{ can_access: boolean }>(
     CAN_ACCESS_LMS_ASSET_SQL,
@@ -52,23 +31,10 @@ export async function canAccessLmsAsset(profileId: string, blobPath: string): Pr
   return result?.can_access ?? false;
 }
 
-/**
- * Tagged result returned by mintLmsAssetUrl — lets thin endpoint wrappers
- * dispatch to their own reply() without importing Reply from endpoint.ts.
- */
 export type MintResult =
   | { ok: true; url: string }
   | { ok: false; status: 400 | 403; error: string };
 
-/**
- * Shared core for asset-signed-url and azure-view-url (#239):
- *   validate blobPath (strict typeof — the ONE sanctioned behaviour change vs the
- *   old azure-view-url truthiness check) → platform-admin short-circuit → authz
- *   gate via canAccessLmsAsset → mint 120-min read SAS → build blob URL.
- *
- * Env vars read lazily here (not at module load) per functions.md.
- * Returns a tagged MintResult; callers map ok:false → reply(status, {error}).
- */
 export async function mintLmsAssetUrl(
   profile: CallerProfile,
   blobPath: unknown,

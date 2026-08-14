@@ -20,7 +20,6 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// A non-draft idea owned by someone else (p2) in org-1
 const submittedIdea = {
   id: 'idea-1',
   org_id: 'org-1',
@@ -29,7 +28,6 @@ const submittedIdea = {
   title: 'Submitted Idea',
 };
 
-// A draft idea owned by someone else (p2)
 const othersDraft = {
   id: 'idea-2',
   org_id: 'org-1',
@@ -38,7 +36,6 @@ const othersDraft = {
   title: 'Their Draft',
 };
 
-// A draft idea owned by the caller (p1)
 const ownDraft = {
   id: 'idea-3',
   org_id: 'org-1',
@@ -107,7 +104,6 @@ describe('idea', () => {
     expect(sql).toContain('user_has_voted');
     expect(sql).toContain('AS profile');
     expect(sql).toContain('AS organization');
-    // both ideaId and caller profile id are params
     expect(params).toContain('idea-1');
     expect(params).toContain('p1');
   });
@@ -169,7 +165,6 @@ describe('idea', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // #180 — idea detail author payload must carry avatar_url.
   it('joins avatar_url into the idea author profile payload', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const idea = { id: 'idea-1', org_id: 'org-1', user_id: 'a1', status: 'submitted', profile: { id: 'a1', full_name: 'Ann', avatar_url: 'avatars/a1.png' } };

@@ -5,17 +5,11 @@ import { Button } from '@/components/ui/button';
 import { routes } from '@/lib/routes';
 
 interface OrgNotFoundScreenProps {
-  /** True when the org query erred (retryable); false for an honest 404. */
   loadFailed: boolean;
   onRetry: () => void;
   onBack: () => void;
 }
 
-/**
- * The not-found / load-failed screen shown when the org can't be resolved.
- * A 404 renders an honest not-found (no retry); a query error renders the
- * load-failed variant with a "Try Again" action.
- */
 export function OrgNotFoundScreen({ loadFailed, onRetry, onBack }: OrgNotFoundScreenProps) {
   const { t } = useTranslation();
 

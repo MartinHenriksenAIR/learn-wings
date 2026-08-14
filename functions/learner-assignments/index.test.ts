@@ -65,8 +65,6 @@ describe('learner-assignments', () => {
     expect(sql).toContain('min(ca.due_date)');
     expect(sql).toContain('ca.user_id = $2 OR ca.user_id IS NULL');
     expect(sql).toContain('c.is_published');
-    // overdue must survive a never-started (no-enrollment) course: COALESCE the
-    // aggregate so NOT NULL can't collapse a past-due assignment to false.
     expect(sql).toContain("NOT COALESCE(bool_or(e.status = 'completed'), false)");
     expect(JSON.parse(res.body as string)).toEqual({
       assignments: [

@@ -14,8 +14,6 @@ export default adminEndpoint('course-structure-admin', async ({ req, reply }) =>
     return reply(200, { course: null, modules: [] });
   }
 
-  // `, id` tie-breaker (issue #46): legacy rows may carry duplicate sort_order
-  // ranks; the tie-breaker keeps their relative order stable across reads.
   const [modules, lessons] = await Promise.all([
     query('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order, id', [courseId]),
     query(

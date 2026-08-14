@@ -57,8 +57,6 @@ export default function ResourceLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
-  // The input binds the raw value (stays responsive); the query key gets the
-  // debounced one, so typing fires ~one request per pause, not per keystroke (#41).
   const debouncedSearch = useDebouncedValue(searchQuery, 250);
 
   const isAdmin = effectiveIsOrgAdmin || effectiveIsPlatformAdmin;

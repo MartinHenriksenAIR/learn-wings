@@ -1,5 +1,3 @@
-// Tests for #80: PLATFORM_BASE_URL must be env-driven with an origin fallback,
-// so invite links minted on a preview environment point at the preview, not prod.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { resolvePlatformBaseUrl } from './config';
 

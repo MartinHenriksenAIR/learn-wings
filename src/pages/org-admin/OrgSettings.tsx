@@ -24,11 +24,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { formatDate } from '@/lib/date-locale';
 import { toast } from '@/components/ui/sonner';
 
-// The five platform-overridable feature flags an org admin can turn OFF for their
-// org (each gated by the platform default). Kept in sync with the shared
-// FeatureSettings, minus exercises_enabled — which is not surfaced as an org
-// override today. A save MERGES onto the raw features jsonb, so any key not in
-// this list (exercises_enabled, or a future flag) is preserved, never dropped.
 type FeatureKey =
   | 'certificates_enabled'
   | 'quizzes_enabled'
@@ -63,9 +58,6 @@ export default function OrgSettings() {
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
 
-  // Server values the form seeds from. Keyed on primitives / the stable query
-  // data reference so a re-render never resets a mid-edit field — only an org
-  // switch or a real server-value change reseeds (mirrors the #356 pattern).
   const rawFeatures = orgSettingsQuery.data ?? null;
 
   const [name, setName] = useState('');
@@ -101,7 +93,6 @@ export default function OrgSettings() {
   const trimmedName = name.trim();
   const nameInvalid = trimmedName.length < 2 || trimmedName.length > 100;
 
-  // Per-field dirty tracking so an unchanged column/jsonb is never rewritten.
   const orgDirty =
     (!nameInvalid && trimmedName !== (currentOrg?.name ?? '')) ||
     allowSelfReg !== (currentOrg?.allow_self_registration ?? true);
@@ -119,8 +110,6 @@ export default function OrgSettings() {
     if (!currentOrg || nameInvalid) return;
     setSaving(true);
     try {
-      // Org columns (name + self-registration) — only the changed fields, so an
-      // unrelated save never rewrites a column (last-write-wins hygiene).
       const orgUpdates: Record<string, unknown> = {};
       if (trimmedName !== (currentOrg.name ?? '')) orgUpdates.name = trimmedName;
       if (allowSelfReg !== (currentOrg.allow_self_registration ?? true)) {
@@ -130,8 +119,6 @@ export default function OrgSettings() {
         await callApi('/api/organization-update', { orgId: currentOrg.id, updates: orgUpdates });
       }
 
-      // Features jsonb — MERGE onto the raw object so keys this form does not
-      // manage (e.g. exercises_enabled) survive the full-replace upsert.
       if (featuresDirty) {
         const nextFeatures = {
           ...(rawFeatures ?? {}),
@@ -141,7 +128,6 @@ export default function OrgSettings() {
         await callApi('/api/org-settings-update', { orgId: currentOrg.id, features: nextFeatures });
       }
 
-      // Routine save: in-button "Saved" morph, no success toast (toast policy).
       flash('orgSettings');
       await Promise.all([
         refreshUserContext(),
@@ -159,9 +145,6 @@ export default function OrgSettings() {
     }
   };
 
-  // Logo upload/removal persist immediately (a file operation, not a form field)
-  // and refresh the user context so currentOrg.logo_url — read by the sidebar
-  // co-brand (#372) and the preview here — updates everywhere at once.
   const persistLogo = async (logo_url: string | null) => {
     if (!currentOrg) return;
     setLogoBusy(true);
@@ -179,10 +162,6 @@ export default function OrgSettings() {
     }
   };
 
-  // Spinner: user context not yet resolved, OR settings still on their first
-  // load. `!saving` keeps the form mounted during the post-save refetch (which
-  // flips usePlatformSettings' shared isLoading) — otherwise every Save flashes
-  // a full-page spinner mid-edit.
   if (
     orgGuard === 'loading' ||
     (platformLoading && !saving) ||
@@ -372,9 +351,6 @@ export default function OrgSettings() {
                     />
                   </div>
                 ))}
-                {/* Org-only leaderboard toggle (#369) — no platform gate, so it lives
-                    in the same list as the platform-overridable flags, with its own
-                    descriptive hint instead of a platform-default line. */}
                 <div className={rowClass}>
                   <div className="flex flex-col gap-px pr-4">
                     <Label htmlFor="leaderboard-enabled" className="text-[13.5px] font-bold">

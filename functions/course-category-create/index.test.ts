@@ -104,13 +104,11 @@ describe('course-category-create', () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ category: fakeCategory });
 
-    // slug lookup ran on the derived base
     const [lookupSql, lookupParams] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(lookupSql).toContain('SELECT slug FROM course_categories');
     expect(lookupParams[0]).toBe('machine-learning');
     expect(lookupParams[1]).toBe('machine-learning-%');
 
-    // insert derives sort_order from MAX and stores the trimmed names + free slug
     const [insertSql, insertParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(insertSql).toContain('INSERT INTO course_categories');
     expect(insertSql).toContain('COALESCE(MAX(sort_order), 0) + 1');

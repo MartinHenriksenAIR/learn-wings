@@ -12,22 +12,12 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
   await requireActiveMember(orgId);
 
   const { isIndividual, language: savedLang } = await resolveVisibilityContext(orgId, profile.id);
-  // Standard orgs keep the client-supplied UI language; individuals use the
-  // server-authoritative saved language (the client cannot widen its catalogue).
   const lang = isIndividual ? savedLang : (language === 'en' || language === 'da' ? language : 'da');
 
-  // Individuals bypass org_course_access entirely — visibility is PUBLISHED-ONLY here,
-  // so the language filter lives solely in the shared OR-group below (otherwise a
-  // language=$2 baked into the outer AND would absorb the OR-group via B AND (B OR D) ≡ B,
-  // silently dropping the enrolled-relaxation). Standard orgs keep the published + 'enabled'
-  // org_course_access predicate.
   const visibility = isIndividual
     ? 'c.is_published = TRUE'                                          // published; org access bypassed
     : courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 });    // published + org access
 
-  // Query 1: Available published courses. In both branches the language filter is
-  // relaxed (never the visibility/publish predicate) for courses the learner is
-  // already enrolled in, so a language switch never hides them.
   const courses = await query(
     `SELECT c.id, c.title, c.description, c.level, c.language, c.is_published, c.thumbnail_url, c.category_id, c.created_by_user_id, c.created_at
        FROM courses c
@@ -43,7 +33,6 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
     [orgId, lang, profile.id],
   );
 
-  // Query 2: Caller's own enrollments in this org, scoped to profile.id (never a client-supplied user id).
   const enrollments = await query(
     `SELECT id, org_id, user_id, course_id, status, enrolled_at, completed_at, last_accessed_at
        FROM enrollments
@@ -54,14 +43,10 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
 
   const courseIds = enrollments.map((e) => (e as { course_id: string }).course_id);
 
-  // No enrollments → no progress to compute; skip the count queries entirely.
   if (courseIds.length === 0) {
     return reply(200, { courses, enrollments, progress: {} });
   }
 
-  // Per-course lesson progress for the caller's enrolled courses. These two batched
-  // COUNT queries mirror functions/learner-dashboard/index.ts verbatim (same aliases,
-  // params, and zero-fill) so both surfaces derive progress identically — no N+1.
   const totalsRows = await query<{ course_id: string; total: number }>(
     `SELECT cm.course_id, COUNT(l.id)::int AS total
        FROM course_modules cm

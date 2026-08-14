@@ -23,7 +23,6 @@ describe('LevelBadge', () => {
     render(<LevelBadge level={level} />);
 
     expect(filledBarCount()).toBe(filled);
-    // Unfilled bars are dimmed, not removed.
     const dimmed = screen.getAllByTestId('level-bar').filter((bar) => bar.style.opacity === '0.28');
     expect(dimmed).toHaveLength(3 - filled);
   });

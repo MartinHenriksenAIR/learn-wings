@@ -4,8 +4,6 @@ import { categoryLabel } from './community-category-label';
 import en from '@/i18n/locales/en.json';
 import da from '@/i18n/locales/da.json';
 
-// The fixed, seeded community taxonomy (migration/azure/02-seed.sql). There is
-// no UI to create categories, so this is the closed set that must stay keyed.
 const SEEDED_SLUGS = [
   'challenges-obstacles',
   'risks-mitigation',
@@ -15,8 +13,6 @@ const SEEDED_SLUGS = [
   'events',
 ] as const;
 
-// Minimal i18next-like t: returns a mapped translation, else the raw key
-// (i18next's no-defaultValue behavior — see #300).
 const makeT = (translations: Record<string, string>): TFunction =>
   ((key: string) => translations[key] ?? key) as unknown as TFunction;
 

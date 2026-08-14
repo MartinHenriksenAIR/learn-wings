@@ -1,33 +1,11 @@
 import { query } from './db';
 
-/**
- * Derived gamification for the learner dashboard (issue #362).
- *
- * There are NO XP / streak / leaderboard tables. XP, streaks, and both
- * leaderboard windows are computed live from the existing completion tables
- * (lesson_progress, quiz_attempts, enrollments), backed by the read-indexes in
- * migration/azure/14-gamification-indexes.sql. Nothing is stored; nothing can
- * drift from real progress.
- *
- * Security: XP and the leaderboard are strictly org-scoped. Every query filters
- * by the caller-supplied orgId AFTER the endpoint has proven active membership
- * (requireActiveMember). Leaderboard membership is derived from org_memberships
- * — never from a client-supplied user list — so no data crosses orgs (#373).
- */
 
-// XP earning rates. Distinct items only (lesson_progress is unique per lesson,
-// enrollments unique per course; quizzes counted as DISTINCT passed quiz_id) —
-// so re-completing/re-taking cannot farm points.
 export const LESSON_XP = 10;
 export const QUIZ_XP = 25;
 export const COURSE_XP = 100;
 
-// The learner's local day boundary. This is a Danish platform; bucket everyone
-// by Copenhagen time rather than UTC so an evening session lands on the right
-// day (WEBSITE_TIME_ZONE is unset — do not rely on server-local time).
 const TZ = 'Europe/Copenhagen';
-// Start of the current calendar month as a timestamptz instant, in Copenhagen
-// local time. Inlined (not a param) so the derived filter needs no JS tz math.
 const MONTH_START_SQL = `(date_trunc('month', now() AT TIME ZONE '${TZ}') AT TIME ZONE '${TZ}')`;
 
 export interface LevelInfo {
@@ -58,26 +36,17 @@ export interface LearnerDashboardData {
   level: LevelInfo;
   streak: { current: number; activeToday: boolean };
   leaderboard: { allTime: LeaderboardWindow; month: LeaderboardWindow };
-  // Whether the client should render the leaderboard at all. False when the board
-  // is suppressed — individual tier (#354) OR a per-org opt-out (#369). The board
-  // windows are already empty when suppressed; this flag lets the UI HIDE the
-  // widget rather than show an empty "be the first" state for a disabled feature.
   showLeaderboard: boolean;
 }
 
 const TOP_N = 10;
 
-// Level thresholds rise so early levels come fast and later ones take longer:
-// threshold(L) = 50·L·(L+1) − 100  →  0, 200, 500, 900, 1400, 2000, …
-// (gaps grow 200/300/400/500…). Kept as a closed form so both directions are
-// exact and cheap.
 export function levelThreshold(level: number): number {
   return 50 * level * (level + 1) - 100;
 }
 
 export function levelForXp(xp: number): number {
   if (xp <= 0) return 1;
-  // Invert 50L² + 50L − 100 ≤ xp  →  L = ⌊(−50 + √(22500 + 200·xp)) / 100⌋.
   const level = Math.floor((-50 + Math.sqrt(22500 + 200 * xp)) / 100);
   return Math.max(1, level);
 }
@@ -100,7 +69,6 @@ export function levelProgress(xp: number): LevelInfo {
   };
 }
 
-/** First name + last initial ("Martin H."). Falls back to full_name tokens. */
 export function displayName(p: { first_name?: string | null; last_name?: string | null; full_name?: string | null }): string {
   const full = (p.full_name ?? '').trim();
   const first = (p.first_name?.trim()) || full.split(/\s+/)[0] || '';
@@ -114,9 +82,6 @@ export function displayName(p: { first_name?: string | null; last_name?: string 
   return lastInitial ? `${first} ${lastInitial.toUpperCase()}.` : first;
 }
 
-// Step an ISO date ('YYYY-MM-DD') by n days. Pure calendar math on UTC midnights
-// (the dates are already bucketed to Copenhagen days in SQL, so UTC stepping has
-// no DST hazard).
 function addDays(iso: string, n: number): string {
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
@@ -124,12 +89,6 @@ function addDays(iso: string, n: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-/**
- * Current streak = run of consecutive active days ending today or yesterday.
- * The "or yesterday" grace means the streak does not visibly collapse at
- * midnight — you have all of today to keep it. `daysDesc` are the distinct
- * Copenhagen activity-days, most-recent first; `today` is the Copenhagen date.
- */
 export function computeStreak(today: string, daysDesc: string[]): { current: number; activeToday: boolean } {
   if (!daysDesc || daysDesc.length === 0) return { current: 0, activeToday: false };
   const set = new Set(daysDesc);
@@ -164,18 +123,12 @@ function rankWindow(
   return { rows: ranked.slice(0, TOP_N), me };
 }
 
-/**
- * Build the whole learner-dashboard payload for `callerId` in `orgId`.
- * Runs the derived queries in parallel; the query order below is the contract
- * the endpoint test asserts against.
- */
 export async function getLearnerDashboardData(
   orgId: string,
   callerId: string,
   opts?: { suppressLeaderboard?: boolean },
 ): Promise<LearnerDashboardData> {
   const [snapshotRows, lessonRows, quizRows, courseRows, memberRows, streakRows] = await Promise.all([
-    // 1 · snapshot — course counts for the caller (deep-link cards → Min Træning)
     query<{ started: number; in_progress: number; completed: number }>(
       `SELECT count(*)::int AS started,
               count(*) FILTER (WHERE status = 'enrolled')::int  AS in_progress,
@@ -184,7 +137,6 @@ export async function getLearnerDashboardData(
         WHERE org_id = $1 AND user_id = $2`,
       [orgId, callerId],
     ),
-    // 2 · lessons per member (org-scoped), all-time + this month
     query<AggRow>(
       `SELECT user_id,
               count(*)::int AS all_time,
@@ -194,7 +146,6 @@ export async function getLearnerDashboardData(
         GROUP BY user_id`,
       [orgId],
     ),
-    // 3 · distinct quizzes passed per member
     query<AggRow>(
       `SELECT user_id,
               count(DISTINCT quiz_id)::int AS all_time,
@@ -204,7 +155,6 @@ export async function getLearnerDashboardData(
         GROUP BY user_id`,
       [orgId],
     ),
-    // 4 · courses completed per member
     query<AggRow>(
       `SELECT user_id,
               count(*)::int AS all_time,
@@ -214,11 +164,6 @@ export async function getLearnerDashboardData(
         GROUP BY user_id`,
       [orgId],
     ),
-    // 5 · leaderboard membership — active LEARNERS only, from org_memberships
-    //     (never a client-supplied list). Admins are excluded from the board.
-    //     Suppressed for the individual (self-serve) tier: the placeholder org
-    //     pools unrelated solo learners, so the query is not run at all and no
-    //     stranger names/XP ever cross the wire (#354/#373).
     opts?.suppressLeaderboard
       ? Promise.resolve([] as MemberRow[])
       : query<MemberRow>(
@@ -228,8 +173,6 @@ export async function getLearnerDashboardData(
             WHERE m.org_id = $1 AND m.status = 'active' AND m.role = 'learner'`,
           [orgId],
         ),
-    // 6 · global personal streak — distinct Copenhagen activity-days for the
-    //     caller across ALL orgs (a streak is a personal habit; self-data only).
     query<{ today: string; days: string[] | null }>(
       `SELECT ((now() AT TIME ZONE '${TZ}')::date)::text AS today,
               ARRAY(
@@ -242,7 +185,6 @@ export async function getLearnerDashboardData(
     ),
   ]);
 
-  // Per-user XP maps from the org-scoped aggregates.
   const toMap = (rows: AggRow[]) => new Map(rows.map((r) => [r.user_id, r]));
   const lessons = toMap(lessonRows);
   const quizzes = toMap(quizRows);
@@ -252,8 +194,6 @@ export async function getLearnerDashboardData(
     (quizzes.get(userId)?.[window] ?? 0) * QUIZ_XP +
     (courses.get(userId)?.[window] ?? 0) * COURSE_XP;
 
-  // Leaderboard rows: learners only, but the caller's OWN xp is read from the
-  // maps directly so it is correct even if the caller is not a ranked learner.
   const learnersAllTime = memberRows.map((m) => ({ userId: m.user_id, name: displayName(m), xp: xpFor(m.user_id, 'all_time') }));
   const learnersMonth = memberRows.map((m) => ({ userId: m.user_id, name: displayName(m), xp: xpFor(m.user_id, 'month') }));
 

@@ -3,8 +3,6 @@ import { endpoint } from '../shared/endpoint';
 import { isAtSeatLimit, lockSeatUsage } from '../shared/seats';
 
 const ALLOWED_ROLES = new Set(['org_admin', 'learner']);
-// 'invited' is deliberately NOT accepted here — the invitation flow (invitation-create /
-// invitation-accept) is the only entry point to that state (issue #66).
 const ALLOWED_STATUSES = new Set(['active', 'disabled']);
 
 export default endpoint('org-membership-create', async ({ req, reply, requireOrgAdmin }) => {
@@ -24,24 +22,10 @@ export default endpoint('org-membership-create', async ({ req, reply, requireOrg
     return reply(400, { error: 'status must be one of: active, disabled' });
   }
 
-  // Authorization: platform admin OR org admin of the target org.
-  // RLS provenance: supabase/migrations/20260127153401_*.sql lines 279-285 —
-  // "Platform admins can do everything with memberships" (is_platform_admin())
-  // + "Org admins can manage memberships in their org" (is_org_admin(org_id)).
   await requireOrgAdmin(orgId);
 
   const effectiveStatus = status ?? 'active';
 
-  // Seat-limit enforcement (issue #66): the UI disables the add button at the limit,
-  // but the backend must hold the line for any caller. Counts active members +
-  // pending invitations (issue #126) — both consume a seat, so the cap is coherent
-  // no matter which create path fills it.
-  //
-  // The seat count and the INSERT run in ONE transaction with `FOR UPDATE` on the
-  // organization row (review finding C-2). Without the lock, two concurrent adds at
-  // (limit - 1) both read an under-limit count and both insert, overshooting the cap.
-  // FOR UPDATE serializes them: the second add blocks until the first commits, then
-  // re-counts with that insert already visible and is correctly rejected.
   try {
     const result = await withTransaction(async (client) => {
       const usage = await lockSeatUsage(client, orgId);

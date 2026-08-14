@@ -5,10 +5,6 @@ import { SeatUsageBar } from './SeatUsageBar';
 
 const fill = () => screen.getByTestId('seat-usage-bar-fill');
 
-// jsdom's CSSOM does not recognise `hsl(var(--token))`, so reading back
-// `style.background` yields ''. The fill's `data-danger` attribute is the
-// single source of truth for the navy/red decision (it drives the inline
-// background), so assertions target it rather than the dropped style value.
 
 describe('SeatUsageBar', () => {
   it('stays navy below the limit', () => {
@@ -19,8 +15,6 @@ describe('SeatUsageBar', () => {
   });
 
   it('does NOT trip danger at the old 90% threshold (consolidated rule)', () => {
-    // 9/10 = 90%: under the prior list-screen rule this was red; the unified
-    // limit-reached rule keeps it navy until used >= limit.
     render(<SeatUsageBar used={9} limit={10} />);
     const el = fill();
     expect(el).toHaveAttribute('data-danger', 'false');

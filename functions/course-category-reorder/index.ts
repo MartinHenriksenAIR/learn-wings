@@ -14,9 +14,6 @@ export default adminEndpoint('course-category-reorder', async ({ req, reply }) =
   }
   const ids = orderedIds as string[];
 
-  // One transaction: set sort_order = position for every id given, then read the
-  // whole table back in the new order. Ids not present are simply left as-is
-  // (we only update what the caller sent), but the writes + the read are atomic.
   const categories = await withTransaction(async (client: PoolClient) => {
     for (let i = 0; i < ids.length; i++) {
       await client.query(

@@ -1,35 +1,3 @@
-/**
- * Shared field validators for Azure Functions endpoint validation.
- *
- * validateLessonFields(body) — validates the fields shared by lesson-create AND lesson-update:
- *   Required: moduleId, title (non-empty trim), lessonType ∈ ('video','document','quiz','exercise')
- *   Optional: contentText (string|null), durationMinutes (int|null),
- *             videoStoragePath / azureBlobPath / documentStoragePath (non-empty string|null)
- *
- * Returns null on success; returns an error message string on first failure.
- * The caller returns its existing 400 response with { error: <message> }.
- *
- * NOT included: sortOrder (create-only), lessonId (update-only).
- *
- * SCOPE — these are TYPE checks, not authorization. The three storage-path fields
- * are checked for "non-empty string or null" and nothing more: this function
- * cannot tell whose blob a well-formed path names, and must not be mistaken for
- * the place that does. Whether a path may be bound to the row being written is
- * decided by `assertBindablePaths` (`blob-ownership.ts`), which lesson-create and
- * lesson-update both call before the path reaches storage or the database.
- */
-
-/**
- * True when `value` is a string whose scheme is http: or https: (defence in
- * depth against stored-XSS — sec-1, #232). Community URL fields (event
- * registration/recording URLs, resource URLs) are rendered into anchor hrefs,
- * where React 18 does NOT block `javascript:` and friends; rejecting non-http(s)
- * schemes on write keeps such payloads out of the database entirely.
- *
- * Parses with the URL constructor (no base) so casing, whitespace, and exotic
- * encodings can't smuggle a bad scheme past, and relative/unparseable input is
- * rejected — these fields are meant to be absolute external URLs.
- */
 export function isHttpUrl(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   const trimmed = value.trim();
@@ -42,15 +10,6 @@ export function isHttpUrl(value: unknown): boolean {
   }
 }
 
-/**
- * Validates an OPTIONAL URL field that must be an http(s) URL when present.
- * Returns null when the value is acceptable (absent, null, empty string, or a
- * valid http/https URL); returns an error message string otherwise. `fieldName`
- * is interpolated into the message so callers get a field-specific 400.
- *
- * Empty/absent is allowed because these fields are optional in the schema and
- * elsewhere (the create/update handlers) coalesce '' → null.
- */
 export function validateHttpUrl(value: unknown, fieldName: string): string | null {
   if (value === undefined || value === null) return null;
   if (typeof value === 'string' && value.trim() === '') return null;
@@ -87,10 +46,6 @@ export interface LessonFieldsBody {
   [key: string]: unknown;
 }
 
-/**
- * Validates the lesson fields shared between lesson-create and lesson-update.
- * Returns null if all fields are valid; returns an error message string on the first failure.
- */
 export function validateLessonFields(body: LessonFieldsBody): string | null {
   const { moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath } = body;
 
@@ -98,7 +53,6 @@ export function validateLessonFields(body: LessonFieldsBody): string | null {
     return 'moduleId is required';
   }
 
-  // Required: title — string with non-empty trim (stored raw)
   if (!title || typeof title !== 'string' || (title as string).trim() === '') {
     return 'title is required';
   }
@@ -115,7 +69,6 @@ export function validateLessonFields(body: LessonFieldsBody): string | null {
     return 'durationMinutes must be an integer or null';
   }
 
-  // Optional: videoStoragePath — non-empty string or null ('' is rejected — flows into blob cleanup)
   if (videoStoragePath !== undefined && !isNonEmptyStringOrNull(videoStoragePath)) {
     return 'videoStoragePath must be a non-empty string or null';
   }

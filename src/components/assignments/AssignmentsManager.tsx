@@ -34,8 +34,6 @@ interface AssignmentsManagerProps {
   orgId: string;
 }
 
-/** Admin table of an org's course assignments with confirm-to-remove. Shared by
- *  the org-admin and platform-admin surfaces (both gate server-side on org admin). */
 export function AssignmentsManager({ orgId }: AssignmentsManagerProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();

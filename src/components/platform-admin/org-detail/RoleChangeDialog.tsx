@@ -28,9 +28,6 @@ export function RoleChangeDialog({ selection, orgName, onOpenChange, onConfirm }
   const { t } = useTranslation();
 
   return (
-    // `open` must be a boolean from the first render — `selection?.open` is
-    // undefined until the dialog is first used, which flips the AlertDialog from
-    // uncontrolled to controlled and triggers a React console warning.
     <AlertDialog open={!!selection?.open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>

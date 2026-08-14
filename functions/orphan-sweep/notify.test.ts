@@ -18,8 +18,6 @@ import {
   runOutcome,
   type SweepRunRecord,
 } from './notify';
-// Type-only: importing the sweep itself would fire its app.timer registration,
-// and the point of this module is that the policy is testable without it.
 import type { OrphanSweepSummary } from './index';
 
 const NOW = Date.parse('2026-07-25T03:00:00.000Z');
@@ -48,7 +46,6 @@ const completed = (days: number, overrides: Partial<SweepRunRecord> = {}) =>
   run({ startedAt: daysAgo(days), outcome: 'completed', ...overrides });
 const pastDue = (days: number) =>
   run({ startedAt: daysAgo(days), outcome: 'skipped', reason: 'past-due' });
-/** A night that deleted and whose receipt has not gone out. */
 const deletedRun = (days: number, overrides: Partial<SweepRunRecord> = {}) =>
   run({
     startedAt: daysAgo(days),
@@ -59,9 +56,6 @@ const deletedRun = (days: number, overrides: Partial<SweepRunRecord> = {}) =>
     ...overrides,
   });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Outcome mapping — the one place past-due and the kill switch are told apart
-// ──────────────────────────────────────────────────────────────────────────────
 describe('runOutcome', () => {
   it('maps a clean run to completed', () => {
     expect(runOutcome({ aborted: false, reason: null })).toBe('completed');
@@ -90,9 +84,6 @@ describe('runOutcome', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Abort alerting — state change, then weekly. Never nightly, never once-only.
-// ──────────────────────────────────────────────────────────────────────────────
 describe('decideSweepNotifications — abort alerting', () => {
   it('sends when a healthy sweep starts refusing (the transition into broken)', () => {
     const decision = decideSweepNotifications({
@@ -184,10 +175,6 @@ describe('decideSweepNotifications — abort alerting', () => {
   });
 
   it('does NOT let a past-due night in between reset the escalation clock', () => {
-    // The failure this guards: one catch-up run reads as "the previous run",
-    // makes tonight look like a fresh transition into broken, and the wedged
-    // sweep starts emailing every other night — or, on the recovered side,
-    // claims a recovery that never happened.
     const decision = decideSweepNotifications({
       thisRun: aborted(0),
       history: [pastDue(1), aborted(2, { abortNotifiedAt: daysAgo(2) }), aborted(3), completed(4)],
@@ -236,10 +223,6 @@ describe('decideSweepNotifications — abort alerting', () => {
   });
 
   it('sends the recovered note across an intervening past-due night (abort → past-due → healthy)', () => {
-    // The `previous` filter that makes this work is easy to "simplify" into
-    // `ordered[0]`, which silently swallows the recovered note on exactly this
-    // sequence — the catch-up night reads as the previous run and nothing has
-    // recovered from it. This test is what fails if anyone does that.
     const decision = decideSweepNotifications({
       thisRun: run({ startedAt: NOW, outcome: 'completed', deleted: 1 }),
       history: [pastDue(1), aborted(2, { abortNotifiedAt: daysAgo(2) }), completed(3)],
@@ -258,15 +241,7 @@ describe('decideSweepNotifications — abort alerting', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Flapping — the failure state-change alone does not cover
-// ──────────────────────────────────────────────────────────────────────────────
 
-/**
- * Walk a sequence of nights through the policy exactly as the runtime does: one
- * run per night, 24 h apart, and every alert that is sent stamps its own run so
- * the next night's decision can see it. Returns the nights that emailed.
- */
 const walkNights = (outcomes: readonly SweepRunRecord['outcome'][]) => {
   const history: SweepRunRecord[] = [];
   const sent: { night: number; kind: string }[] = [];
@@ -290,11 +265,6 @@ const walkNights = (outcomes: readonly SweepRunRecord['outcome'][]) => {
 
 describe('decideSweepNotifications — a flapping sweep does not email every night', () => {
   it('caps an alternating abort/healthy sequence at one break-and-heal pair per 4 nights', () => {
-    // `reference-read-failed` (pool exhaustion, PG failover) and `listing-failed`
-    // (storage 503) flap by nature. Under state-change alone EVERY abort is a
-    // fresh transition and EVERY healthy night closes it, so all 14 nights email
-    // — the nightly drone the module header calls "the same silence by another
-    // route". The gap floor cuts that to four pairs, each one still honest.
     const sent = walkNights(Array.from({ length: 14 }, (_, i) => (i % 2 === 0 ? 'aborted' : 'completed')));
 
     expect(sent).toEqual([
@@ -310,18 +280,11 @@ describe('decideSweepNotifications — a flapping sweep does not email every nig
   });
 
   it('never announces a recovery from a refusal nobody was told about', () => {
-    // Nights 2 and 6 abort but are floored; nights 3 and 7 must therefore stay
-    // silent — a "recovered" note closing a notice that was never sent is the
-    // other half of the nightly loop.
     const sent = walkNights(['aborted', 'completed', 'aborted', 'completed', 'aborted', 'completed']);
     expect(sent.map((s) => s.night)).not.toContain(3);
   });
 
   it('still announces a wedge whose opening night was floored, one night later', () => {
-    // The floor must not become a way to lose a real wedge. Night 2 opens a
-    // sustained refusal and is suppressed (night 1 emailed); night 3 is not a
-    // transition and is nowhere near the weekly re-announcement, so only the
-    // "this streak has never been announced" arm can catch it — and must.
     const sent = walkNights(['aborted', 'completed', 'aborted', 'aborted', 'aborted', 'aborted']);
     expect(sent).toEqual([
       { night: 0, kind: 'abort' },
@@ -338,9 +301,6 @@ describe('decideSweepNotifications — a flapping sweep does not email every nig
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Deletion digest — weekly cadence, deadline-forced at 3 days
-// ──────────────────────────────────────────────────────────────────────────────
 describe('decideSweepNotifications — deletion digest', () => {
   it('forces a digest at age 4 days even though the weekly cadence is not due', () => {
     const decision = decideSweepNotifications({
@@ -392,8 +352,6 @@ describe('decideSweepNotifications — deletion digest', () => {
   });
 
   it('reports what an earlier night deleted even though THIS run aborted', () => {
-    // The digest reads the table, not this run's outcome: a night that deleted
-    // followed by a week of wedged nights must still produce the receipt.
     const decision = decideSweepNotifications({
       thisRun: aborted(0),
       history: [deletedRun(4), completed(5, { deletionsReportedAt: daysAgo(5) })],
@@ -404,10 +362,6 @@ describe('decideSweepNotifications — deletion digest', () => {
   });
 
   it('reports every deletion while at least 3 days of the soft-delete window remain', () => {
-    // The guarantee the deadline buys, walked hour by hour: the first digest
-    // that fires still leaves >= 3 days of the 7-day window, and one has fired
-    // by age 4 d even if a night is missed. The cadence arm cannot interfere —
-    // the last digest is only 1 day older than the deletion.
     const deletionAt = daysAgo(4);
     const unreported = deletedRun(4, { id: 'd' });
     const priorDigest = completed(5, { deletionsReportedAt: deletionAt - DAY });
@@ -433,17 +387,11 @@ describe('decideSweepNotifications — deletion digest', () => {
   });
 
   describe('the deadline has a whole night of slack on either side', () => {
-    // The walk above steps in exact hours and therefore lands ON the deadline,
-    // which is the one input that flatters it. The nightly run is a cron fired
-    // by a host, so the real question is what the comparison does a heartbeat
-    // early, a heartbeat late, and — because `useMonitor: false` means a missed
-    // 03:00 is SKIPPED rather than caught up — a whole night late.
     const probe = (ageOfDeletion: number) =>
       decideSweepNotifications({
         thisRun: run({ id: 'tonight', startedAt: NOW, outcome: 'completed' }),
         history: [
           deletedRun(0, { id: 'd', startedAt: NOW - ageOfDeletion }),
-          // Recent enough that the weekly cadence arm cannot fire instead.
           completed(0, { id: 'prior', startedAt: NOW - ageOfDeletion - DAY, deletionsReportedAt: NOW - ageOfDeletion - DAY }),
         ],
         now: NOW,
@@ -464,8 +412,6 @@ describe('decideSweepNotifications — deletion digest', () => {
     });
 
     it('still leaves the promised 3 days when a whole night is missed', () => {
-      // This is the case a 4-day deadline lost outright: one skipped 03:00 and
-      // the receipt arrived with 2 days of the restore window left.
       const digest = probe(4 * DAY).digest;
       expect(digest).not.toBeNull();
       expect((digest?.runs[0].restorableUntil ?? 0) - NOW).toBeGreaterThanOrEqual(3 * DAY);
@@ -485,11 +431,8 @@ describe('decideSweepNotifications — deletion digest', () => {
     expect(html).toContain('340.0 MB');
     expect(html).toContain('clip.mp4');
     expect(html).toContain('documents/old.pdf');
-    // The line that starts the clock in a human's head: deleted 2026-07-21,
-    // soft-delete keeps it for 7 days.
     expect(html).toContain('Restorable until 2026-07-28');
     expect(html).toContain('3 day(s) left');
-    // 12 deleted, 2 sampled — the remainder is stated, never silently dropped.
     expect(html).toContain('and 10 more');
     expect(decision.digest?.runs[0].restorableUntil).toBe(daysAgo(4) + 7 * DAY);
   });
@@ -561,9 +504,6 @@ describe('formatBytes', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// recordAndNotify — the impure half. Nothing here may break the sweep.
-// ──────────────────────────────────────────────────────────────────────────────
 const makeLog = () => ({ log: vi.fn(), warn: vi.fn(), error: vi.fn() });
 
 const summaryOf = (overrides: Partial<OrphanSweepSummary> = {}): OrphanSweepSummary => ({
@@ -583,7 +523,6 @@ const summaryOf = (overrides: Partial<OrphanSweepSummary> = {}): OrphanSweepSumm
   ...overrides,
 });
 
-/** A history row exactly as node-pg hands it back (bigint → string, ts → Date). */
 const historyRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'r1',
   started_at: new Date(daysAgo(1)),
@@ -672,16 +611,10 @@ describe('recordAndNotify', () => {
 
     expect(summary).toEqual(before);
     expect(log.error).toHaveBeenCalled();
-    // A send that never landed must NOT stamp the run as notified — that would
-    // silence the next seven nights on the strength of a lost email.
     expect(callsMatching(mockQuery, 'SET abort_notified_at')).toHaveLength(0);
   });
 
   it('treats a Resend `{ error }` payload as a failed send and stamps nothing', async () => {
-    // The shape the SDK ACTUALLY returns on a 401/422/429/5xx and on a network
-    // failure — it does not reject (see shared/resend.test.ts). Read as success,
-    // this stamps `abort_notified_at` on an email nobody received and the wedged
-    // sweep then goes silent for seven nights.
     mockQuery.mockImplementation(async (sql: string) =>
       sql.includes('SELECT') ? [historyRow({ outcome: 'completed' })] : [],
     );
@@ -699,9 +632,6 @@ describe('recordAndNotify', () => {
   });
 
   it('does not mark deletions reported when the digest send returns a Resend error', async () => {
-    // Worse than the abort case: a stamped-but-unsent digest drops those runs
-    // out of the unreported working set forever, so the 7-day restore window
-    // expires with nobody ever told.
     mockQuery.mockImplementation(async (sql: string) =>
       sql.includes('SELECT')
         ? [historyRow({ id: 'old-deletion', started_at: new Date(daysAgo(5)), deleted: 4, bytes_reclaimed: '2048' })]
@@ -735,8 +665,6 @@ describe('recordAndNotify', () => {
   });
 
   it('still ships the digest when the abort stamp fails', async () => {
-    // Unwrapped, the throwing UPDATE returned before the digest below — and on a
-    // deadline-forced night that costs a day of the restore window.
     mockQuery.mockImplementation(async (sql: string) => {
       if (sql.includes('SET abort_notified_at')) throw new Error('deadlock detected');
       if (sql.includes('SELECT')) {
@@ -775,9 +703,6 @@ describe('recordAndNotify', () => {
   });
 
   it('prints the whole receipt when the record write loses deletions', async () => {
-    // No row means no future digest can ever see these deletions — tonight's
-    // digest is the last chance and it usually is not due. This log line is then
-    // the only surviving evidence, so it has to carry the names and the bytes.
     mockQueryOne.mockImplementation(async (sql: string) => {
       if (sql.includes('INSERT INTO orphan_sweep_runs')) throw new Error('pool exhausted');
       if (sql.includes('platform_settings')) return { value: { recipients: ['ev@x.dk'], enabled: true } };
@@ -813,10 +738,6 @@ describe('recordAndNotify', () => {
   });
 
   it('counts a run whose INSERT committed but whose response was lost only once', async () => {
-    // Statement timeout / connection reset after the commit: `runId` is null, so
-    // an id-only dedup leaves tonight's own row in the history and the digest
-    // reports it twice — doubled counts, doubled bytes, the section rendered
-    // twice. `started_at` is what identifies the readback.
     mockQueryOne.mockImplementation(async (sql: string) => {
       if (sql.includes('INSERT INTO orphan_sweep_runs')) return null;
       if (sql.includes('platform_settings')) return { value: { recipients: ['ev@x.dk'], enabled: true } };

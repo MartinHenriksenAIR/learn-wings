@@ -1,8 +1,3 @@
-/**
- * Server-owned questionnaire — pure data and pure functions.
- * Zero side-effect imports: this file is imported by frontend tests directly.
- */
-
 export const QUESTIONNAIRE_VERSION = 'v1';
 
 export interface AssessmentQuestion {
@@ -10,7 +5,6 @@ export interface AssessmentQuestion {
   options: readonly string[];
 }
 
-// Options are in ladder order; an option's score = its index (0–3).
 export const ASSESSMENT_QUESTIONS: readonly AssessmentQuestion[] = [
   { id: 'usage-frequency',      options: ['never', 'tried-a-few-times', 'weekly', 'daily'] },
   { id: 'task-breadth',         options: ['nothing-yet', 'one-task-type', 'a-few-task-types', 'many-task-types'] },
@@ -23,19 +17,12 @@ export const ASSESSMENT_QUESTIONS: readonly AssessmentQuestion[] = [
 
 export type AssessmentLevel = 'basic' | 'intermediate' | 'advanced';
 
-/** Map a raw score (0–21) to a level. basic 0–7, intermediate 8–14, advanced 15–21. */
 export function levelForScore(score: number): AssessmentLevel {
   if (score <= 7) return 'basic';
   if (score <= 14) return 'intermediate';
   return 'advanced';
 }
 
-/**
- * Validate a caller-supplied answers object and compute score + level.
- * The answers object must have exactly the 7 question ids as keys, each mapped
- * to a known option id for that question. Returns ok:false with a short
- * caller-facing error string on any validation failure (deliberate 400 contract).
- */
 export function evaluateAnswers(
   answers: unknown,
 ): { ok: true; score: number; level: AssessmentLevel } | { ok: false; error: string } {

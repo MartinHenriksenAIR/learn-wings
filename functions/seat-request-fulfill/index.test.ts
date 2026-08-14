@@ -27,7 +27,6 @@ describe('seat-request-fulfill', () => {
     mockWithTransaction.mockImplementation(async (cb) => cb({ query: mockClientQuery }));
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'admin-1', is_platform_admin: true });
-    // Post-fulfilment lookups: (1) requester profile, (2) organization name.
     mockQueryOne.mockImplementation(async (sql: string) =>
       sql.includes('FROM profiles')
         ? { email: 'requester@acme.dk', preferred_language: 'en' }
@@ -75,7 +74,6 @@ describe('seat-request-fulfill', () => {
     const [bumpSql, bumpParams] = mockClientQuery.mock.calls[2] as [string, unknown[]];
     expect(bumpSql).toContain('UPDATE organizations SET seat_limit = seat_limit +');
     expect(bumpParams).toEqual(['org-1', 5]);
-    // requester-facing "seats active" email, to the requester only, with the new limit
     expect(mockNotifyFulfilled).toHaveBeenCalledTimes(1);
     expect(mockNotifyFulfilled.mock.calls[0][1]).toMatchObject({ recipient: 'requester@acme.dk', orgName: 'Acme', additionalSeats: 5, seatLimit: 15, language: 'en' });
   });

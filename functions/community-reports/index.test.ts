@@ -97,11 +97,9 @@ describe('community-reports', () => {
     const res = await handler(baseReq({ scope: 'global' }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
-    // isOrgAdmin should NOT be called for global scope
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
   });
 
-  // neither orgId nor scope — non-platform-admin → 403 (documented deviation)
   it('returns 403 when non-platform-admin requests without filter', async () => {
     const res = await handler(baseReq({}), {} as any);
     expect(res.status).toBe(403);
@@ -125,8 +123,6 @@ describe('community-reports', () => {
     expect(params).toContain('org-1');
   });
 
-  // #86: comment targets carry the parent post id so moderation UIs can
-  // deep-link /posts/<post_id>#comment-<target_id>.
   it('projection joins out the parent post id for comment targets', async () => {
     const commentReport = {
       ...sampleReport,

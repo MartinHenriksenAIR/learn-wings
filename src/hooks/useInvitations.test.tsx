@@ -92,7 +92,6 @@ describe('useInvitations', () => {
       expect(screen.getByTestId('platform')).toHaveTextContent('alice@example.com');
     });
 
-    // Two distinct cache keys → two fetches.
     expect(mockCallApi).toHaveBeenCalledTimes(2);
   });
 

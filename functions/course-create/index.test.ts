@@ -26,7 +26,6 @@ vi.mock('../shared/blob-ownership', () => ({ assertBindablePaths: mockAssertBind
 
 import handler from './index';
 
-/** The one candidate this endpoint ever builds, handed to both gates. */
 const thumbCandidate = (path: string | null | undefined) => [{ path, kind: 'image', family: 'lms' }];
 
 const baseReq = (body: unknown) => ({
@@ -176,7 +175,6 @@ describe('course-create', () => {
     const res = await handler(baseReq({ ...validBody, categoryId: 'ghost' }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'category not found' });
-    // only the existence check ran — no INSERT
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(mockQueryOne.mock.calls[0][0]).not.toContain('INSERT INTO courses');
   });
@@ -202,7 +200,6 @@ describe('course-create', () => {
     mockQueryOne.mockResolvedValueOnce({ ...fakeCourse, category_id: null }); // INSERT only
     const res = await handler(baseReq({ ...validBody, categoryId: null }), {} as any);
     expect(res.status).toBe(200);
-    // no existence lookup — queryOne called once (the INSERT)
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(params[6]).toBeNull(); // category_id stored as null
@@ -219,9 +216,7 @@ describe('course-create', () => {
     expect(sql).toContain('INSERT INTO courses');
     expect(sql).toContain('language');
     expect(sql).toContain('RETURNING *');
-    // created_by_user_id must be server-set from profile, not client
     expect(params).toContain('admin-1');
-    // is_published must be false (hardcoded)
     expect(sql).toContain('false');
     expect(params[1]).toBeNull();
     expect(params[3]).toBe('da');
@@ -293,7 +288,6 @@ describe('course-create', () => {
     await handler(baseReq({ ...validBody, thumbnailUrl: 'thumbs/new.png' }), {} as any);
 
     expect(order).toEqual(['ownership', 'limits']);
-    // A create has no prior row, so nothing is ever exempt from the check.
     expect(mockAssertBindablePaths).toHaveBeenCalledWith(thumbCandidate('thumbs/new.png'));
     expect(mockAssertBindablePaths.mock.calls[0][0]).toEqual(mockEnforceUploadLimits.mock.calls[0][0]);
   });

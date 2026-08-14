@@ -27,7 +27,6 @@ const submittedIdea = {
   status: 'submitted',
 };
 
-// draft owned by p2 (not the caller p1)
 const othersDraft = {
   id: 'idea-2',
   org_id: 'org-1',
@@ -35,7 +34,6 @@ const othersDraft = {
   status: 'draft',
 };
 
-// draft owned by p1 (the caller)
 const ownDraft = {
   id: 'idea-3',
   org_id: 'org-1',
@@ -92,7 +90,6 @@ describe('idea-comments', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'ideaId is required' });
   });
 
-  // RLS parity: missing idea → 200 {comments: []}
   it('returns 200 empty comments when idea not found (RLS parity)', async () => {
     mockQueryOne.mockResolvedValueOnce(null); // idea load → null
     const res = await handler(baseReq({ ideaId: 'idea-999' }), {} as any);
@@ -118,7 +115,6 @@ describe('idea-comments', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // Non-member → 200 {comments: []}
   it('returns 200 empty comments when caller is not a member', async () => {
     mockQueryOne.mockResolvedValueOnce(submittedIdea);
     mockIsActiveMember.mockResolvedValueOnce(false);
@@ -128,8 +124,6 @@ describe('idea-comments', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  // Own draft but caller is no longer an active member → empty (membership check
-  // runs after the draft-privacy check and has no author bypass)
   it('returns 200 empty comments for caller\'s own draft when caller is not an active member', async () => {
     mockQueryOne.mockResolvedValueOnce(ownDraft);
     mockIsActiveMember.mockResolvedValueOnce(false);
@@ -181,7 +175,6 @@ describe('idea-comments', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // #180 — idea comment author payload must carry avatar_url.
   it('joins avatar_url into the comment author profile payload', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce({ id: 'idea-1', org_id: 'org-1', user_id: 'a1', status: 'submitted' });

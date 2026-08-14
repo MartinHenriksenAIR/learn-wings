@@ -9,8 +9,6 @@ export default adminEndpoint('course-category-delete', async ({ req, reply }) =>
     return reply(400, { error: 'categoryId is required' });
   }
 
-  // courses.category_id is FK ON DELETE SET NULL, so any course in this category
-  // is silently un-categorized by the delete — no orphan rows, no manual cleanup.
   const deleted = await queryOne(
     `DELETE FROM course_categories WHERE id = $1 RETURNING id`,
     [categoryId],

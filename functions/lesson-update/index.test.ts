@@ -56,7 +56,6 @@ const fakeLesson = {
   video_url: null,
 };
 
-/** The row the endpoint's pre-update SELECT returns (all three blob columns). */
 const prevPaths = (over: Partial<Record<'video_storage_path' | 'azure_blob_path' | 'document_storage_path', string | null>> = {}) => ({
   video_storage_path: null,
   azure_blob_path: null,
@@ -64,7 +63,6 @@ const prevPaths = (over: Partial<Record<'video_storage_path' | 'azure_blob_path'
   ...over,
 });
 
-/** The endpoint issues exactly two queryOne calls: [0] the previous-paths SELECT, [1] the UPDATE. */
 const mockDb = (previous: unknown, updated: unknown) => {
   mockQueryOne.mockResolvedValueOnce(previous).mockResolvedValueOnce(updated);
 };
@@ -256,10 +254,8 @@ describe('lesson-update', () => {
     const [sql, params] = updateCall();
     expect(sql).toContain('UPDATE lessons');
     expect(sql).toContain('RETURNING *');
-    // video_url must be set to NULL in the SQL (not as a param), sort_order NOT in SET
     expect(sql).toContain('video_url=NULL');
     expect(sql).not.toMatch(/sort_order\s*=\s*\$/);
-    // Params order: [moduleId, title, lessonType, contentText, durationMinutes, videoStoragePath, azureBlobPath, documentStoragePath, lessonId]
     expect(params[0]).toBe('mod-1');         // module_id
     expect(params[1]).toBe('Updated Lesson'); // title (raw)
     expect(params[2]).toBe('video');          // lesson_type
@@ -301,7 +297,6 @@ describe('lesson-update', () => {
     const res = await handler(baseReq(validBody), { error: vi.fn() } as any);
     expect(res.status).toBe(500);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
-    // Row-first ordering: a failed UPDATE must never strand-delete a live video.
     expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
@@ -391,7 +386,6 @@ describe('lesson-update', () => {
     });
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE lessons');
-    // The refused blob's cleanup is the helper's job, not the endpoint's.
     expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
@@ -411,9 +405,6 @@ describe('lesson-update', () => {
         { path: 'videos/new.mp4', kind: 'video', family: 'lms' },
         { path: 'docs/new.pdf', kind: 'document', family: 'lms' },
       ],
-      // Row-wide previous paths in column order (video, azure, document) — the
-      // same set the cleanup below diffs against, so an unchanged (or merely
-      // relocated) path is never probed.
       [null, 'videos/old.mp4', null],
     );
   });
@@ -431,9 +422,6 @@ describe('lesson-update', () => {
     expect(order).toEqual(['select', 'gate', 'update']);
   });
 
-  // Lesson videos, lesson documents and course thumbnails all share one flat
-  // namespace (`azure-upload-url` gives non-branding uploads an empty prefix), so
-  // the path shape alone cannot say which row a `<uuid>.<ext>` belongs to.
 
   it('400 when the ownership gate refuses a path: no probe, no UPDATE, no delete', async () => {
     mockQueryOne.mockResolvedValueOnce(prevPaths({ azure_blob_path: 'videos/old.mp4' }));
@@ -486,11 +474,6 @@ describe('lesson-update', () => {
     expect(order).toEqual(['update', 'releasable', 'delete']);
   });
 
-  // `?? null` used to collapse "the caller did not mention this column" into
-  // "the caller cleared this column". That was merely lossy while the column was
-  // inert; once a clear started deleting the file, a sparse payload could destroy
-  // a lesson video by omission. course-update, organization-update and
-  // profile-update all draw this distinction — this endpoint now does too.
 
   it('a payload omitting the blob keys keeps the stored paths and deletes nothing', async () => {
     mockDb(
@@ -558,7 +541,6 @@ describe('lesson-update', () => {
     mockDeleteBlob.mockResolvedValue(false);
     const res = await handler(baseReq({ ...validBody, azureBlobPath: 'videos/new.mp4' }), {} as any);
     expect(res.status).toBe(200);
-    // Cleanup outcome is deliberately NOT surfaced — server logs are the only signal.
     expect(JSON.parse(res.body as string)).toEqual({ lesson: fakeLesson });
   });
 

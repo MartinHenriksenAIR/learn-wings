@@ -8,8 +8,6 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Configure PDF.js worker — bundled by Vite and served from our own origin,
-// so a CDN outage or corporate proxy can't break document lessons.
 pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
 interface PdfViewerProps {
@@ -26,30 +24,28 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [fetchingPdf, setFetchingPdf] = useState(false);
 
-  // Fetch PDF and create object URL to avoid CORS and ArrayBuffer issues
   useEffect(() => {
     let isCancelled = false;
     let objectUrl: string | null = null;
-    
+
     const fetchPdf = async () => {
       if (!url) return;
-      
+
       setFetchingPdf(true);
       setError(null);
       setPdfUrl(null);
       setPageNumber(1);
       setNumPages(0);
       setLoading(true);
-      
+
       try {
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Failed to fetch PDF: ${response.status}`);
         }
         const blob = await response.blob();
-        
+
         if (!isCancelled) {
-          // Create an object URL from the blob - this avoids ArrayBuffer issues
           objectUrl = URL.createObjectURL(blob);
           setPdfUrl(objectUrl);
         }
@@ -67,7 +63,7 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
     };
 
     fetchPdf();
-    
+
     return () => {
       isCancelled = true;
       if (objectUrl) {

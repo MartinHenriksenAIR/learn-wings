@@ -32,7 +32,6 @@ describe('seat-request-create', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
     mockIsOrgAdmin.mockResolvedValue(false);
-    // Default: price configured. queryOne is called for (1) seat_pricing then (2) requester profile.
     mockQueryOne.mockImplementation(async (sql: string) =>
       sql.includes('platform_settings')
         ? { value: { annual_price_per_seat: 1200, currency: 'DKK', notification_email: 'jacob@ai-raadgivning.dk' } }
@@ -89,13 +88,11 @@ describe('seat-request-create', () => {
     const res = await handler(baseReq(valid), { error: vi.fn() } as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ request: inserted });
-    // price came from the setting, not the client (client sent none anyway)
     const [insertSql, insertParams] = mockClientQuery.mock.calls[1] as [string, unknown[]];
     expect(insertSql).toContain('INSERT INTO seat_requests');
     expect(insertParams).toEqual(['org-1', 'p1', 5, 1200, 'DKK']);
     expect(mockNotify).toHaveBeenCalledTimes(1);
     expect(mockNotify.mock.calls[0][1]).toMatchObject({ recipient: 'jacob@ai-raadgivning.dk', orgName: 'Acme', additionalSeats: 5, unitPrice: 1200 });
-    // requester-facing email goes to the requester only, not the platform admin
     expect(mockNotifyReceived).toHaveBeenCalledTimes(1);
     expect(mockNotifyReceived.mock.calls[0][1]).toMatchObject({ recipient: 'mette@acme.dk', orgName: 'Acme', additionalSeats: 5 });
   });

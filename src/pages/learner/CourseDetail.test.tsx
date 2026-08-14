@@ -101,16 +101,13 @@ describe('CourseDetail', () => {
 
     expect(await screen.findByTestId('course-detail-title')).toHaveTextContent('Intro to AI');
     expect(screen.getByText('Learn the basics')).toBeInTheDocument();
-    // Localized (da) category label.
     expect(screen.getByText('Grundlæggende')).toBeInTheDocument();
 
     const outline = screen.getByTestId('module-outline');
     expect(outline).toHaveTextContent('Module 1');
     expect(outline).toHaveTextContent('Module 2');
-    // Two modules → the lesson-count key renders once per module.
     expect(screen.getAllByText('courses.detail.lessonCount')).toHaveLength(2);
 
-    // Not started → "Start course" linking to the PLAYER (never enrolls from here).
     const cta = screen.getByTestId('course-detail-cta');
     expect(cta).toHaveAttribute('href', '/app/learn/c-1');
     expect(cta).toHaveTextContent('courses.startCourse');
@@ -132,16 +129,13 @@ describe('CourseDetail', () => {
     renderDetail();
     await screen.findByTestId('course-detail-title');
 
-    // Collapsed on load: no lesson names visible yet.
     expect(screen.queryByText('Intro lesson')).toBeNull();
     expect(screen.queryByText('Wrap-up lesson')).toBeNull();
 
-    // Expand Module 1 → its lesson names appear.
     fireEvent.click(screen.getByRole('button', { name: /Module 1/ }));
     expect(await screen.findByText('Intro lesson')).toBeInTheDocument();
     expect(screen.getByText('Deep dive lesson')).toBeInTheDocument();
 
-    // Expand Module 2 → its lesson appears and Module 1 collapses (single/collapsible).
     fireEvent.click(screen.getByRole('button', { name: /Module 2/ }));
     expect(await screen.findByText('Wrap-up lesson')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Intro lesson')).toBeNull());
@@ -170,11 +164,9 @@ describe('CourseDetail', () => {
     await screen.findByTestId('course-detail-title');
 
     const outline = screen.getByTestId('module-outline');
-    // The empty module still shows its title + lesson count in the outline.
     expect(outline).toHaveTextContent('Empty Module');
     expect(screen.getAllByText('courses.detail.lessonCount')).toHaveLength(2);
 
-    // Only the module WITH lessons is an expandable trigger; the empty one is not clickable.
     const triggers = screen.getAllByRole('button', { name: /Module/ });
     expect(triggers).toHaveLength(1);
     expect(triggers[0]).toHaveTextContent('Module 1');
@@ -190,7 +182,6 @@ describe('CourseDetail', () => {
     await waitFor(() => {
       expect(callApi).toHaveBeenCalledWith('/api/learner-course-detail', { orgId: 'org-1', courseId: 'c-1' });
     });
-    // Reading about a course must not enroll or hit the player.
     const urls = vi.mocked(callApi).mock.calls.map(([url]) => url);
     expect(urls).not.toContain('/api/course-player-data');
     expect(urls.some((u) => /enroll/.test(u as string))).toBe(false);
@@ -223,7 +214,6 @@ describe('CourseDetail', () => {
     expect(await screen.findByText('courses.detail.notAvailable')).toBeInTheDocument();
     const back = screen.getByRole('link', { name: 'courses.detail.backToCatalog' });
     expect(back).toHaveAttribute('href', '/app/courses');
-    // No CTA / outline when the course isn't available.
     expect(screen.queryByTestId('course-detail-cta')).toBeNull();
   });
 

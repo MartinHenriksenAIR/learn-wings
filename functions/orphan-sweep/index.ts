@@ -6,268 +6,36 @@ import { generateContainerSasToken, SAS_SIGNED_VERSION } from '../shared/sas';
 import { UPLOAD_LIMITS, fileExtension, type UploadAssetKind } from '../shared/upload-limits';
 import { recordAndNotify } from './notify';
 
-/**
- * ORPHAN SWEEP (#277) — the only unattended, scheduled DELETER of production
- * customer data in this system. Read this header before changing anything below.
- *
- * WHY IT EXISTS
- * Browser uploads go straight to blob storage via a SAS URL BEFORE the form that
- * would reference them is saved. Cancel the dialog and the blob is stranded with
- * nothing pointing at it. `deleteBlob` never throws, so failed cleanups strand
- * blobs too. Nothing has ever reclaimed any of it, so container usage only grows.
- *
- * WHAT IT DOES
- * Nightly at 03:00 UTC — 04:00 or 05:00 Danish local time, because no
- * `WEBSITE_TIME_ZONE` app setting exists and NCRONTAB is therefore evaluated in
- * UTC: list the container, build the set of blob names the database still
- * references, and delete the listed blobs that are in neither the reference set
- * nor the 24-hour grace window.
- *
- * ALERTING (#286)
- * Every refusal below is a log line and nothing else, which made both failure
- * directions silent. `./notify` records each run and turns the ones that matter
- * into email; it is wired in at `runScheduledSweep`, so no refusal path in this
- * file has to know it exists.
- *
- * THE DESIGN RULE — asymmetry of errors
- * Deleting a referenced blob destroys a customer's lesson video / thumbnail /
- * logo / avatar with no undo. NOT deleting an orphan costs a few pennies of
- * storage until tomorrow's run. Those are not remotely comparable, so every
- * uncertain branch in this file resolves to "do not delete", and any doubt about
- * the INPUTS (database unreadable, listing incomplete, reference set empty,
- * implausible orphan share) aborts the whole run rather than deleting a subset.
- * There is no partial-confidence mode.
- *
- * THE COMPARISON — the part that would destroy data if it were wrong
- * `List Blobs` returns the FULL blob name including any folder prefix. Stored
- * paths come in BOTH shapes, and NO column is guaranteed to hold one or the
- * other:
- *   - bare       — `azure-upload-url` mints `<uuid>.<ext>` with no prefix for
- *                  lesson videos and course thumbnails (`abc.mp4`)
- *   - prefixed   — `azure-document-upload-url` mints `documents/<uuid>.<ext>`;
- *                  branding uploads mint `avatars/…` and `org-logos/…`
- *                  (BRANDING_ASSET_PREFIXES); seeded and legacy lesson rows also
- *                  carry `videos/…` (see migration/azure/02-seed.sql)
- * Which shape a given row holds does not matter, and no code here may care: the
- * listed name is matched VERBATIM against the union of all six columns, full
- * stop. The listed name is never stripped, never basenamed, never normalized —
- * doing any of those would make every referenced PREFIXED asset look like an
- * orphan, and that includes every document and every branding asset, not just
- * the ones a reader happens to think of as "prefixed".
- * (`lessons.video_url` is a deprecated EXTERNAL url, never a blob path, and is
- * deliberately not a reconciliation target.)
- *
- * The DATABASE side, by contrast, is deliberately EXPANDED (see
- * `referenceVariants`): stored values have historically also held absolute URLs.
- * Widening the reference set can only ever cause the sweep to delete LESS, so it
- * is safe in a way that touching the listed name is not.
- */
 
-/** NCRONTAB — `{second} {minute} {hour} {day} {month} {day-of-week}`; daily 03:00. */
 const SCHEDULE = '0 0 3 * * *';
 
-/**
- * A blob younger than this is never touched, however unreferenced it looks.
- * This is what protects an upload that is sitting in a half-filled form: the
- * bytes land in storage minutes (or hours) before the row that references them
- * is written. A blob whose age we cannot establish is treated as brand new.
- */
 const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
 
-/**
- * TRIPWIRE 1 — the backstop against a reconciliation bug.
- *
- * A broken match does NOT reliably make "almost everything" look orphaned, and
- * assuming it does is how this tripwire would miss the very bug class it exists
- * for. The six columns are independent code paths, so a break confined to one of
- * them produces a MINORITY orphan share. Concretely: production holds roughly a
- * few thousand root-level lesson/thumbnail blobs against a few hundred
- * `avatars/` + `org-logos/`, so a break that only affects branding paths reads as
- * ~11% globally — comfortably under this ceiling AND under the per-run count
- * ceiling. Both tripwires would pass while every avatar and org logo in the
- * system was destroyed in one night.
- *
- * So the share is evaluated at THREE granularities, and ANY of them over the
- * ceiling aborts the whole run:
- *   - globally, over every eligible blob;
- *   - per TOP-LEVEL PREFIX BUCKET — `''` (container root), `avatars/`,
- *     `org-logos/`, `documents/`, `videos/`, and any other prefix the listing
- *     actually contains; and
- *   - per FILE-TYPE CLASS WITHIN THE CONTAINER ROOT — image / video / document /
- *     other, read off the extension (`rootFileClass`).
- * The second turns the 11% global share above into a 100% `avatars/` share.
- *
- * The third (#282) exists because the root is the one bucket that is NOT a single
- * writer's namespace. `courses.thumbnail_url` puts images there and the bare
- * lesson paths put videos and documents there, and production holds far more
- * videos than thumbnails — so a break confined to thumbnails is diluted INSIDE
- * the root bucket exactly as the branding break above was diluted inside the
- * container. Same blind spot, one level down. Split by extension, a
- * thumbnails-only break reads as ~100% of the root image class instead of a thin
- * slice of everything at the root.
- *
- * The PREFIX buckets are deliberately not split any further. Each already belongs
- * to one writer, so a break in it already shows up as a whole-bucket anomaly, and
- * subdividing them would only manufacture more small populations for a healthy
- * night to trip over.
- *
- * FLOORS. The prefix buckets and the container root as a whole have NO
- * minimum-size floor: a bucket holding two blobs, both unreferenced, trips them.
- * A floor there is exactly the hole this exists to close, and the asymmetry of
- * errors says a nuisance abort (one night of unreclaimed storage, loudly logged
- * with the bucket named) is the cheap side. The root FILE-TYPE CLASSES do carry a
- * small floor, for a reason that does not apply to any of the others — see
- * `MIN_ROOT_CLASS_ORPHANS`.
- *
- * A genuine first-run backlog can also trip this. That is the intended outcome:
- * the run logs loudly and a human decides, rather than an unattended job
- * deleting most of the container on its first night.
- *
- * CONSIDERED AND DECLINED (#282) — a complementary tripwire: "the database
- * references `avatars/` paths but the listing returned no `avatars/` blob at all,
- * so refuse". It was weighed and deliberately left out. That decision is recorded
- * here so the gap it leaves is on the record rather than something a later reader
- * rediscovers as an oversight and closes without knowing the cost.
- *   WHAT IT WOULD HAVE CAUGHT is the one hole bucketing structurally cannot: a
- *   normalisation applied UPSTREAM, inside `parseListPage`, transforms the listed
- *   name before anything buckets it. Every blob then collapses into the root,
- *   every per-bucket census agrees with itself, and no amount of per-bucket
- *   analysis sees anything wrong.
- *   WHY IT IS NOT HERE: it also fires when branding blobs are genuinely ABSENT
- *   from storage while rows still reference them — what a manual cleanup, a
- *   restore, or a partly-failed migration leaves behind. That state is untidy,
- *   not broken, and it does not heal on its own: the sweep would refuse every
- *   night until a human intervened. A tripwire that fires on healthy data gets
- *   its ceiling raised to shut it up, and these ceilings are the safety system.
- *   WHAT STANDS BEHIND THE GAP, without flattery: the global share and the
- *   per-run count ceiling, and nothing else. For the production shape described
- *   at the top of this comment, an upstream collapse reads as roughly the same
- *   ~11% that motivated bucketing in the first place, so those two are a thin
- *   backstop for this specific failure rather than a substitute for the check.
- *   What makes the trade acceptable is not their strength but that the hole
- *   cannot open by itself: it takes a specific edit to `parseListPage`, which is
- *   why "the listed name is used verbatim" is written at the top of this file, at
- *   `parseListPage`, and next to `blobBucket`.
- */
 const DEFAULT_MAX_ORPHAN_SHARE = 0.5;
 
-/**
- * How many orphans a ROOT FILE-TYPE CLASS must hold before its share is allowed
- * to abort a run. Applies ONLY to the classes the #282 root split creates; the
- * prefix buckets and the container root as a whole keep their no-floor rule,
- * unchanged.
- *
- * WHY THE SPLIT NEEDS A FLOOR AND THE PREFIX BUCKETS DO NOT. `avatars/`,
- * `org-logos/`, `documents/` and `videos/` are namespaces a real writer owns and
- * keeps populated, so "this entire namespace is unreferenced" is anomalous at any
- * size. The root classes are a synthetic subdivision of ONE namespace, and two of
- * the four have no current writer at all: nothing mints a root-level `.pdf` or an
- * off-allow-list extension today, so a single stray blob makes `document` or
- * `other` 1/1 = 100%. Without a floor that one blob aborts the sweep — and keeps
- * aborting it every night forever, because the only thing that could clear the
- * blob is the sweep the blob is blocking. A tripwire that fires on healthy data
- * gets its ceiling raised to shut it up, and the ceilings are the safety system.
- *
- * Not hypothetical: this endpoint's own healthy-container fixtures already reach
- * 60% in the root `video` class (three stray root `.mp4`s beside two referenced
- * ones) on runs that must NOT abort, and 100% in `other` on a single stray file.
- *
- * WHY FIVE, AND WHAT IT COSTS. The bug class this tripwire exists for is a break
- * in a path-writing COLUMN, which false-orphans everything that column ever wrote
- * — hundreds of thumbnails, not four. A floor of five therefore never stands
- * between the tripwire and the bug it is for. What it costs is precision on tiny
- * classes: at most four orphans per class per night go unjudged BY THIS CHECK.
- * They are still counted by the undivided container-root bucket, by the global
- * share and by the per-run count ceiling, all of which see them exactly as they
- * did before the split — so no run that aborts today stops aborting.
- */
 const MIN_ROOT_CLASS_ORPHANS = 5;
 
-/**
- * TRIPWIRE 2 — an absolute ceiling, independent of the share.
- *
- * A share alone is not enough: in a container of 200 000 blobs, 49% is 98 000
- * deletions. This caps the blast radius of any single run regardless of ratio.
- * Exceeding it aborts (rather than deleting the first N) because a run that big
- * is itself the anomaly worth looking at.
- */
 const DEFAULT_MAX_DELETIONS_PER_RUN = 500;
 
-/** Azure's own maximum page size for List Blobs. */
 const LIST_PAGE_SIZE = 5000;
 
-/**
- * Hard stop on pagination — 200 pages x 5000 = 1M blobs. Guards against a
- * pathological or repeating `NextMarker`; hitting it aborts the run, because a
- * listing we could not finish must never be mistaken for the whole container.
- *
- * MEMORY: the whole listing is materialised in memory before any tripwire runs,
- * so this constant is also the memory bound — 1M `ListedBlob` objects is on the
- * order of hundreds of MB and would be the first thing to hit the Function App's
- * memory ceiling. The container currently holds thousands of blobs, so this is
- * headroom rather than a live constraint. If it ever stops being headroom the
- * fix is to classify per page as it streams, NOT to raise the page cap — the
- * tripwires need the whole census before they can mean anything.
- */
 const MAX_LIST_PAGES = 200;
 
-/** Simultaneous DELETEs. Deliberately small — this is a background job. */
 const DELETE_CONCURRENCY = 8;
 
-/** Lifetime of the container SAS minted for listing. */
 const LIST_SAS_MINUTES = 15;
 
-/**
- * How many candidate names an abort quotes. An abort an operator cannot act on
- * recurs forever, and the first thing they need is a handful of names to check
- * against the database by hand — but not all 500 of them.
- */
 const ABORT_SAMPLE_SIZE = 10;
 
-/**
- * The only blob names this job will ever DELETE.
- *
- * This is no longer a URL-safety gate. `buildBlobUrl` percent-encodes the name
- * one path segment at a time (`functions/shared/sas.ts`, which still signs the
- * DECODED name — that asymmetry is the Azure Service SAS contract), so a `?`,
- * `#` or `%` can no longer bend the request onto a DIFFERENT blob than the one
- * classified: the DELETE now addresses exactly the name that was listed.
- *
- * What encoding does NOT settle is the RECONCILIATION, which is where this job
- * destroys data. The listed name is matched VERBATIM, while the database side is
- * widened by `referenceVariants` — which DECODES percent-escapes out of stored
- * absolute URLs. For a name that genuinely contains `%`, the two sides of that
- * comparison therefore reach the name through different transforms, and "no row
- * references it" stops being a conclusive answer. Every name this system mints is
- * `[prefix/]<uuid>.<ext>`, for which encoding and decoding are both the identity
- * and the question is answerable; anything else has a provenance nobody here can
- * account for, and an unattended nightly deleter is the wrong thing to settle it.
- * So nothing legitimate is excluded; anything else is counted, logged and left
- * alone. Leading-dot segments are rejected too, which takes `.` and `..` with them.
- */
 const SAFE_BLOB_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/;
 
-/** Hostname suffix identifying an Azure Blob Storage URL (see `referenceVariants`). */
 const AZURE_BLOB_HOST = /\.blob\.core\.windows\.net$/i;
 
-/** Legacy Supabase storage URL prefixes that stored values may still carry. */
 const LEGACY_STORAGE_PREFIXES = [
   '/storage/v1/object/sign/lms-assets/',
   '/storage/v1/object/public/lms-assets/',
 ];
 
-/**
- * Every blob-path column in the schema, unioned. UNION (not UNION ALL) dedupes.
- *
- * The six columns are listed verbatim with no expression around them — no trim,
- * no substring, no regexp_replace. Any per-row transform here would be applied
- * to the DB side of a comparison whose other side is an untransformed blob name,
- * which is precisely how referenced branding assets would get deleted.
- *
- * Reading this is a plain pooled SELECT, not a transaction: the pool is shared
- * with live traffic (`max: 5`) and the HTTP deletes that follow must never be
- * performed with a connection checked out.
- */
 const REFERENCED_PATHS_SQL = `
       SELECT video_storage_path    AS path FROM lessons       WHERE video_storage_path    IS NOT NULL
 UNION SELECT azure_blob_path       AS path FROM lessons       WHERE azure_blob_path       IS NOT NULL
@@ -277,68 +45,30 @@ UNION SELECT logo_url              AS path FROM organizations WHERE logo_url    
 UNION SELECT avatar_url            AS path FROM profiles      WHERE avatar_url            IS NOT NULL
 `;
 
-/** The slice of `InvocationContext` the sweep logs through. Keeps the run testable. */
 export interface SweepLogger {
   log(...args: unknown[]): void;
   warn(...args: unknown[]): void;
   error(...args: unknown[]): void;
 }
 
-/** One blob as returned by List Blobs. */
 export interface ListedBlob {
-  /** The full name including any folder prefix, exactly as Azure returned it. */
   name: string;
-  /** Content-Length in bytes, or null when absent/unparseable. */
   contentLength: number | null;
-  /** Last-Modified as epoch ms, or null when absent/unparseable (→ treated as brand new). */
   lastModified: number | null;
-  /**
-   * True when Azure qualified the name with an attribute — in practice
-   * `<Name Encoded="true">`, which it emits when the real name contains a
-   * character that cannot appear in XML. The text between the tags is then NOT
-   * the literal blob name, so it is neither safe to compare nor safe to delete.
-   * Such a blob is counted and skipped; it never aborts the run (one permanently
-   * odd name must not wedge the sweep forever).
-   */
   encodedName: boolean;
 }
 
-/**
- * The top-level prefix a listed blob sits under, INCLUDING its trailing slash —
- * `avatars/`, `org-logos/`, `documents/`, `videos/`, or `''` for a name at the
- * container root. Nested names bucket by their first segment only.
- *
- * Derived from the raw listed name, the same string the comparison uses, so a
- * normalisation applied at the comparison site cannot also launder the bucket.
- * (A normalisation applied further upstream — in `parseListPage` itself — WOULD
- * collapse every bucket into the root; see TRIPWIRE 1 for what remains uncaught.)
- *
- * This is the PREFIX bucket only. `blobBuckets` is what the census actually uses,
- * because a root-level name is additionally counted in its file-type class.
- */
 export function blobBucket(name: string): string {
   const slash = name.indexOf('/');
   return slash < 0 ? '' : name.slice(0, slash + 1);
 }
 
-/** A root-level blob's file-type class. `other` is a real bucket, not a discard. */
 export type RootFileClass = UploadAssetKind | 'other';
 
-/**
- * Census-key prefix for the root file-type classes.
- *
- * `:` is outside SAFE_BLOB_NAME and every prefix-bucket key ends in `/`, so a
- * class key can never collide with a bucket key derived from a real blob name.
- */
 const ROOT_CLASS_KEY = 'root:';
 
-/**
- * The upload kinds, in lookup order. Their extension sets are disjoint
- * (`shared/upload-limits`), so the order is documentation, not precedence.
- */
 const UPLOAD_KINDS: readonly UploadAssetKind[] = ['image', 'video', 'document'];
 
-/** How each class is named in an abort message. */
 const ROOT_CLASS_LABELS: Readonly<Record<RootFileClass, string>> = {
   image: 'image files at the container root',
   video: 'video files at the container root',
@@ -346,54 +76,23 @@ const ROOT_CLASS_LABELS: Readonly<Record<RootFileClass, string>> = {
   other: 'files of no recognised type at the container root',
 };
 
-/**
- * The file-type class of a root-level blob name, taken from its extension.
- *
- * READING an extension is not transforming the name, and the distinction is the
- * whole discipline of this file. The lower-casing inside `fileExtension` feeds a
- * CENSUS KEY and nothing else: `referenced.has()` and the DELETE both still
- * address `blob.name` exactly as Azure returned it. An edit that lets a value
- * derived here reach either of those breaks the rule the header states.
- *
- * The extension→kind table is `UPLOAD_LIMITS`, the same allow-list the mint and
- * persist gates use, rather than a second list here that would drift from it. An
- * extension off that list — a legacy `.tif`, a name with no dot at all — lands in
- * `other`, which is counted like any other class.
- */
 export function rootFileClass(name: string): RootFileClass {
   const ext = fileExtension(name);
   return UPLOAD_KINDS.find((kind) => UPLOAD_LIMITS[kind].extensions.has(ext)) ?? 'other';
 }
 
-/** The class a census key names, or null when the key is a prefix bucket instead. */
 function rootClassOf(bucket: string): RootFileClass | null {
   if (!bucket.startsWith(ROOT_CLASS_KEY)) return null;
   const cls = bucket.slice(ROOT_CLASS_KEY.length);
   return cls in ROOT_CLASS_LABELS ? (cls as RootFileClass) : null;
 }
 
-/**
- * Every census bucket a listed name belongs to (TRIPWIRE 1).
- *
- * A prefixed name belongs to exactly one — its prefix bucket. A root-level name
- * belongs to TWO: the undivided container root, exactly as before #282, and its
- * file-type class. Counting it in both is what makes the root split strictly
- * ADDITIVE — the root-wide check keeps its old sensitivity and its no-floor rule
- * whatever `MIN_ROOT_CLASS_ORPHANS` does, so no run that aborted before the split
- * stops aborting after it.
- *
- * The root bucket is emitted FIRST, and a class key can only ever be created by a
- * root-level name, so `''` is always inserted into the census map before any of
- * its classes. That is what makes the whole-root diagnosis win over a class
- * diagnosis when both are over the ceiling, whatever order the listing came in.
- */
 export function blobBuckets(name: string): string[] {
   const prefix = blobBucket(name);
   if (prefix !== '') return [prefix];
   return ['', `${ROOT_CLASS_KEY}${rootFileClass(name)}`];
 }
 
-/** Why a run refused to delete anything. Every value means "nothing was deleted". */
 export type SweepAbortReason =
   | 'disabled'
   | 'past-due'
@@ -406,44 +105,21 @@ export type SweepAbortReason =
   | 'orphan-count-implausible';
 
 export interface OrphanSweepSummary {
-  /** True when the run refused to delete. `deleted` is always 0 in that case. */
   aborted: boolean;
   reason: SweepAbortReason | null;
-  /** Blobs returned by the listing. */
   scanned: number;
-  /** Distinct blob names the database still references (after variant expansion). */
   referenced: number;
-  /** Scanned blobs with a name safe enough to delete (see SAFE_BLOB_NAME). */
   eligible: number;
-  /** Eligible blobs the database does not reference. */
   orphaned: number;
-  /** Orphans left alone because they are younger than the grace window. */
   skippedByGrace: number;
-  /** Blobs skipped because their name is not URL-safe, or was not returned literally. */
   skippedUnsafeName: number;
-  /**
-   * Deletion candidates dropped by the pre-delete re-check — i.e. blobs that
-   * became referenced after the listing. A non-zero value here is the sweep
-   * working exactly as intended, not an anomaly.
-   */
   skippedByRecheck: number;
   deleted: number;
   failed: number;
-  /**
-   * Bytes behind the blobs actually deleted. A blob Azure listed without a
-   * Content-Length contributes 0 rather than guessing. This is what makes the
-   * #286 digest a readable receipt — "12 blobs" alone says nothing about whether
-   * a night was routine or the container just lost 340 MB.
-   */
   bytesReclaimed: number;
-  /** The first `DELETED_SAMPLE_SIZE` names deleted, in delete order (#286). */
   deletedSample: string[];
 }
 
-/**
- * How many deleted names a run carries into its record and its digest. Enough to
- * recognise what went, far short of a 500-name wall of text in an email.
- */
 const DELETED_SAMPLE_SIZE = 20;
 
 const emptySummary = (): OrphanSweepSummary => ({
@@ -462,20 +138,6 @@ const emptySummary = (): OrphanSweepSummary => ({
   deletedSample: [],
 });
 
-/**
- * Every blob name a stored column value could plausibly denote.
- *
- * ONE-WAY WIDENING. This expands the DB side of the comparison only. A variant
- * that matches nothing is harmless; a variant that matches wrongly can only ever
- * SPARE a blob. The listed blob name is never passed through this.
- *
- * The verbatim value comes first and is what we actually expect to match. The
- * rest exist because `thumbnail_url` / `logo_url` / `avatar_url` have always been
- * allowed to hold absolute URLs (see `src/lib/storage.ts` `extractLmsAssetPath`,
- * which resolves exactly these shapes on the read path) — a stored
- * `https://acct.blob.core.windows.net/lms-videos/abc.png` refers to a LIVE blob
- * named `abc.png`, and matching only the verbatim string would delete it.
- */
 export function referenceVariants(stored: string): string[] {
   const variants = new Set<string>();
   const add = (value: string | null | undefined) => {
@@ -492,12 +154,10 @@ export function referenceVariants(stored: string): string[] {
   try {
     const parsed = new URL(trimmed);
     if (AZURE_BLOB_HOST.test(parsed.hostname)) {
-      // pathname is `/<container>/<blobPath>` — drop the container, keep the rest.
       const segments = parsed.pathname.split('/').filter(Boolean);
       if (segments.length >= 2) add(segments.slice(1).map(decodeURIComponent).join('/'));
     }
   } catch {
-    // Malformed URL or undecodable escape — the verbatim variants still stand.
   }
 
   for (const prefix of LEGACY_STORAGE_PREFIXES) {
@@ -515,40 +175,16 @@ export function referenceVariants(stored: string): string[] {
   return [...variants];
 }
 
-/**
- * Parses one List Blobs page, or returns null when the payload is not a shape we
- * fully understand.
- *
- * null means ABORT, never "no blobs": a response we misread could omit blobs that
- * are actually referenced, and every omission is a candidate for deletion. There
- * is no XML parser in this package, so this is regex over a schema Azure pins to
- * the `sv` we sign with — hence the structural assertions before any extraction.
- */
 export function parseListPage(xml: string): { blobs: ListedBlob[]; nextMarker: string | null } | null {
   if (typeof xml !== 'string') return null;
-  // `<Blobs />` (self-closing, empty container) is legitimate, so match the
-  // opening tag name only.
   if (!xml.includes('<EnumerationResults') || !xml.includes('<Blobs')) return null;
 
   const blobs: ListedBlob[] = [];
-  // `<BlobPrefix>` cannot match this — the literal `>` is part of the pattern.
   for (const element of xml.matchAll(/<Blob>([\s\S]*?)<\/Blob>/g)) {
     const body = element[1];
-    // Attributes are ACCEPTED, not required: Azure returns `<Name Encoded="true">`
-    // whenever the real name holds a character XML cannot carry. Demanding a bare
-    // `<Name>` made a single such blob unparseable, and an unparseable page aborts
-    // — so one permanently odd name anywhere in the container wedged every future
-    // run of the sweep, visible only as a log line. The blob is now skipped
-    // instead (see `encodedName`), which costs one unreclaimed blob rather than
-    // the entire job.
     const named = /<Name(\s[^>]*)?>([\s\S]*?)<\/Name>/.exec(body);
     const name = named?.[2];
-    // A <Blob> we cannot name is a payload we do not understand — abort rather
-    // than silently drop it (a dropped entry is a blob we never protect).
     if (name === undefined || name === '') return null;
-    // ANY attribute, not just `Encoded="true"`: an attribute we do not model is
-    // an attribute that could requalify what the text between the tags means, and
-    // "we are not certain this is the literal name" resolves to "do not delete".
     const encodedName = named?.[1] !== undefined;
 
     const rawModified = /<Last-Modified>([\s\S]*?)<\/Last-Modified>/.exec(body)?.[1];
@@ -557,11 +193,6 @@ export function parseListPage(xml: string): { blobs: ListedBlob[]; nextMarker: s
     const rawLength = /<Content-Length>([\s\S]*?)<\/Content-Length>/.exec(body)?.[1];
     const parsedLength = rawLength ? Number(rawLength) : Number.NaN;
 
-    // XML entity references (`a&amp;b.mp4`) are deliberately NOT decoded here.
-    // Every character that gets entity-encoded (`& < > " '`) is outside
-    // SAFE_BLOB_NAME, so such a name is skipped either way — but leaving the text
-    // exactly as Azure sent it keeps the rule "the listed name is used verbatim"
-    // literally true, with no decode step for a future edit to get wrong.
     blobs.push({
       name,
       contentLength: Number.isFinite(parsedLength) ? parsedLength : null,
@@ -574,17 +205,8 @@ export function parseListPage(xml: string): { blobs: ListedBlob[]; nextMarker: s
   return { blobs, nextMarker: marker ? marker : null };
 }
 
-/** Thrown internally when the listing could not be completed. Always aborts the run. */
 class ListingError extends Error {}
 
-/**
- * Walks EVERY page of List Blobs.
- *
- * Pagination here is a safety property, not a completeness nicety: an unread page
- * is a set of blobs whose DB references we never consulted. Any failed page, any
- * unparseable page, a repeating marker or an implausible page count throws — the
- * caller aborts, and a partial listing is never used as a basis for deletion.
- */
 async function listContainer(
   accountName: string,
   accountKey: string,
@@ -595,7 +217,6 @@ async function listContainer(
   let marker: string | null = null;
 
   for (let page = 0; page < MAX_LIST_PAGES; page++) {
-    // Minted per page so a long listing cannot outlive its own SAS.
     const sasToken = generateContainerSasToken(accountName, accountKey, containerName, 'l', LIST_SAS_MINUTES);
     const params = new URLSearchParams({
       restype: 'container',
@@ -607,8 +228,6 @@ async function listContainer(
 
     let xml: string;
     try {
-      // x-ms-version must match the `sv` we signed with — the response schema is
-      // versioned, and this parser is written against that schema.
       const res = await fetch(url, { method: 'GET', headers: { 'x-ms-version': SAS_SIGNED_VERSION } });
       if (!res.ok) throw new ListingError(`storage returned ${res.status} on page ${page + 1}`);
       xml = await res.text();
@@ -623,7 +242,6 @@ async function listContainer(
     blobs.push(...parsed.blobs);
     if (!parsed.nextMarker) return blobs;
 
-    // A marker that repeats would loop forever and, worse, silently duplicate work.
     if (seenMarkers.has(parsed.nextMarker)) throw new ListingError('NextMarker repeated — listing did not advance');
     seenMarkers.add(parsed.nextMarker);
     marker = parsed.nextMarker;
@@ -632,12 +250,6 @@ async function listContainer(
   throw new ListingError(`listing exceeded ${MAX_LIST_PAGES} pages`);
 }
 
-/**
- * Reads the six-column union and expands each stored value into its variants.
- * Rejects (does not return an empty set) when the query fails; returns an empty
- * set only when the query genuinely produced no rows — which the caller treats
- * as an abort, not as "everything is an orphan".
- */
 async function readReferencedPaths(): Promise<{ rows: number; referenced: Set<string> }> {
   const rows = await query<{ path: string | null }>(REFERENCED_PATHS_SQL);
   const referenced = new Set<string>();
@@ -650,7 +262,6 @@ async function readReferencedPaths(): Promise<{ rows: number; referenced: Set<st
   return { rows: counted, referenced };
 }
 
-/** Parses a positive-number env override, falling back to `fallback` when unusable. */
 function numericEnv(
   raw: string | undefined,
   fallback: number,
@@ -667,27 +278,8 @@ function numericEnv(
   return value;
 }
 
-/**
- * One sweep. Returns a summary; never throws (a timer failure would just be
- * retried by the host against the same container).
- *
- * Env is read HERE, not at module load: a module-level read that threw would
- * crash the worker entry and deregister the ENTIRE function fleet
- * (`.claude/rules/functions.md`). No new app setting is required — the overrides
- * below all have working defaults.
- */
 export async function runOrphanSweep(log: SweepLogger, now: number = Date.now()): Promise<OrphanSweepSummary> {
   const summary = emptySummary();
-  /**
-   * Refuse the run.
-   *
-   * Every abort is a refusal to do the job, and a refusal that repeats means
-   * storage is NEVER being reclaimed — which is indistinguishable, from the
-   * outside, from a healthy container with nothing to clean up. So the log line
-   * says so in words: what it refused, why, and what a human is expected to do
-   * about it. `remedy` is not optional decoration; an abort nobody can act on is
-   * an abort that recurs nightly forever.
-   */
   const abort = (reason: SweepAbortReason, message: string, remedy: string): OrphanSweepSummary => {
     summary.aborted = true;
     summary.reason = reason;
@@ -701,7 +293,6 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
     return summary;
   };
 
-  // Kill switch: flip an app setting to stop the sweep without a redeploy.
   if (process.env.ORPHAN_SWEEP_DISABLED === '1') {
     return abort(
       'disabled',
@@ -712,8 +303,6 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
 
   const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
   const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
-  // Same env var and same default as `deleteBlob`, so the container we list is
-  // always the container we delete from.
   const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME ?? 'lms-videos';
   if (!accountName || !accountKey) {
     return abort(
@@ -738,17 +327,6 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
     'ORPHAN_SWEEP_MAX_DELETIONS',
   );
 
-  // ── The reference set ────────────────────────────────────────────────────
-  // Read BEFORE and AFTER the listing, and unioned. A row written while we were
-  // listing would otherwise be invisible to the first read while its (possibly
-  // old) blob is already in the listing — a moved or re-attached path would be
-  // classified as an orphan and destroyed. Both reads must succeed and both must
-  // be non-empty; either failing aborts.
-  //
-  // WHAT THIS PAIR DOES AND DOES NOT BUY: it closes the LISTING window, and only
-  // that. It says nothing whatever about a row written AFTER the second read, so
-  // on its own it does not make the sweep race-free — a third read immediately
-  // before the delete loop narrows what remains (see `Pre-delete re-check`).
   const readFailureRemedy =
     'nothing immediately — a database the sweep cannot read makes it refuse, which is the safe direction, and it retries tomorrow. If it recurs, check the function app can reach Postgres (DATABASE_URL, pool exhaustion, firewall).';
   const emptySetRemedy =
@@ -795,14 +373,8 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   const referenced = new Set<string>([...before.referenced, ...after.referenced]);
   summary.referenced = referenced.size;
 
-  // ── Classification ───────────────────────────────────────────────────────
-  // `blob.name` is used exactly as Azure returned it. Do not trim it, do not
-  // strip its prefix, do not lower-case it.
   const orphans: ListedBlob[] = [];
   const deletable: ListedBlob[] = [];
-  // Per-bucket census for TRIPWIRE 1, keyed by top-level prefix and — for
-  // root-level names — additionally by file-type class. Counted off the raw
-  // listed name, the same string the `referenced.has` comparison below uses.
   const bucketEligible = new Map<string, number>();
   const bucketOrphaned = new Map<string, number>();
   for (const blob of blobs) {
@@ -826,8 +398,6 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
 
     orphans.push(blob);
     for (const bucket of buckets) bucketOrphaned.set(bucket, (bucketOrphaned.get(bucket) ?? 0) + 1);
-    // Unknown age counts as brand new — an upload we cannot date is exactly the
-    // one that might still be sitting in an open form.
     if (blob.lastModified === null || now - blob.lastModified < GRACE_PERIOD_MS) {
       summary.skippedByGrace++;
       continue;
@@ -836,9 +406,7 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   }
   summary.orphaned = orphans.length;
 
-  // ── Tripwires ────────────────────────────────────────────────────────────
   const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
-  /** A few names an operator can spot-check by hand, rather than a wall of them. */
   const sampleOf = (candidates: ListedBlob[]) => {
     const names = candidates.slice(0, ABORT_SAMPLE_SIZE).map((b) => b.name);
     const rest = candidates.length - names.length;
@@ -856,22 +424,9 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
     );
   }
 
-  // The per-bucket pass. The global share above can sit comfortably under the
-  // ceiling while one prefix is 100% false-orphaned — that is the whole point of
-  // this loop, and it is the difference between "11% of the container looks odd"
-  // and "every avatar in the system is about to be deleted". The root file-type
-  // classes are in the same map (see `blobBuckets`), so the same reasoning runs
-  // one level down inside the root, where two writers share a bucket.
-  //
-  // ONE abort reason covers all of them: it is one tripwire with a finer census,
-  // not three failures, and it is the MESSAGE that has to be actionable — so the
-  // message names the bucket, its share, the container-wide share it hid behind,
-  // and sample paths to spot-check.
   for (const [bucket, eligible] of bucketEligible) {
     const orphaned = bucketOrphaned.get(bucket) ?? 0;
     const rootClass = rootClassOf(bucket);
-    // The floor applies to the root classes and to nothing else — see
-    // MIN_ROOT_CLASS_ORPHANS for why they need one and the prefix buckets do not.
     if (rootClass !== null && orphaned < MIN_ROOT_CLASS_ORPHANS) continue;
     const bucketShare = orphaned / eligible;
     if (bucketShare <= maxShare) continue;
@@ -895,26 +450,6 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
     );
   }
 
-  // ── Pre-delete re-check ──────────────────────────────────────────────────
-  // Both reads above happened BEFORE classification. Between them and the DELETE
-  // of any given blob, a save can attach a blob that is already older than the
-  // grace window — precisely the "form left open since yesterday" case the grace
-  // window exists for. That blob is referenced now, and deleting it would leave a
-  // freshly written row pointing at bytes that no longer exist.
-  //
-  // So the reference set is read once more, immediately before the loop, and any
-  // candidate that has become referenced in the meantime is dropped. This is the
-  // FULL read rather than a bounded `WHERE path = ANY($1)` over the candidate
-  // names: the widening in `referenceVariants` (absolute Azure URLs, legacy
-  // Supabase URLs) lives in JS, so a name-equality predicate in SQL would not see
-  // a row that stores an absolute URL denoting one of these candidates — and the
-  // whole point of this read is to catch the row nobody expected.
-  //
-  // WHAT IS STILL EXPOSED, stated plainly: a row written DURING the delete loop
-  // itself. That window is bounded by the loop (at most `maxDeletions` blobs at
-  // DELETE_CONCURRENCY, i.e. seconds) rather than by the listing (minutes), but
-  // it is not zero. No placement of a read can make it zero without a lock that
-  // the rest of the system does not take.
   let confirmed = deletable;
   if (deletable.length > 0) {
     let final: { rows: number; referenced: Set<string> };
@@ -945,10 +480,6 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
     }
   }
 
-  // ── Deletion ─────────────────────────────────────────────────────────────
-  // No DB connection is held here. `deleteBlob` never throws; a failure is
-  // counted and the next run will try again. `confirmed`, not `deletable` — the
-  // re-check above is the last word on what gets deleted.
   for (let i = 0; i < confirmed.length; i += DELETE_CONCURRENCY) {
     const chunk = confirmed.slice(i, i + DELETE_CONCURRENCY);
     const outcomes = await Promise.all(
@@ -967,8 +498,6 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
         return { ok, blob };
       }),
     );
-    // Accumulated in CHUNK order rather than completion order, so the sample a
-    // digest quotes is the same one on every re-run of the same night.
     for (const { ok, blob } of outcomes) {
       if (!ok) {
         summary.failed++;
@@ -984,7 +513,6 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   return summary;
 }
 
-/** The past-due refusal. Nothing is read: no DB, no listing, no delete. */
 function refusePastDue(log: SweepLogger): OrphanSweepSummary {
   const summary = emptySummary();
   summary.aborted = true;
@@ -1001,21 +529,6 @@ function refusePastDue(log: SweepLogger): OrphanSweepSummary {
   return summary;
 }
 
-/**
- * The scheduled entry point: the past-due gate, then the sweep, then the run
- * record and the alerting (#286).
- *
- * Split out from the registration trailer purely so the refusal is testable —
- * an `InvocationContext` cannot reasonably be fabricated, a `SweepLogger` can.
- *
- * THE ALERTING IS WIRED HERE, NOT INSIDE `runOrphanSweep`. That function has a
- * dozen-plus early-return abort paths; wrapping at the call site catches every
- * one of them — including this past-due refusal, which never enters the sweep at
- * all — without putting a single line into the refusal logic that must stay
- * readable. `recordAndNotify` never throws and never touches the summary; the
- * catch here is belt and braces, because a notification outage turning into a
- * sweep outage would be a strictly worse system than the silent one it replaced.
- */
 export async function runScheduledSweep(
   timer: Pick<Timer, 'isPastDue'> | undefined,
   log: SweepLogger,
@@ -1030,29 +543,11 @@ export async function runScheduledSweep(
   return summary;
 }
 
-// Registration trailer. Line-anchored `app.timer('orphan-sweep'` so the fleet
-// guard (functions/registration-names.test.ts) can read the name statically and
-// check it against this folder, exactly as it does for the HTTP fleet.
 app.timer('orphan-sweep', {
   schedule: SCHEDULE,
-  // Never true in production: a restart, a scale-out or a deploy would each fire
-  // an unattended deletion run outside the maintenance window.
   runOnStartup: false,
-  // `useMonitor` DEFAULTS TO TRUE for every schedule with an interval >= 1 minute,
-  // and `runOnStartup: false` does NOT suppress what it enables — the two are
-  // unrelated switches. With the schedule persisted, a host that was stopped,
-  // failed or idle across 03:00 UTC (a redeploy re-run in the morning, an app
-  // setting changed at 02:59, a storage blip) fires a CATCH-UP run the moment it
-  // comes back: the only unattended deleter in this system, running mid-business
-  // day. Turning the monitor off means a missed 03:00 is simply skipped until
-  // tomorrow — the correct outcome for a job whose only action is deletion, and
-  // one night of unreclaimed storage is the entire cost.
   useMonitor: false,
   handler: async (timer: Timer, context: InvocationContext): Promise<void> => {
-    // Belt and braces: with `useMonitor: false` above, `isPastDue` should never
-    // be true. The check is what makes that a claim the code enforces rather
-    // than one it merely assumes, and it survives someone flipping the monitor
-    // back on without reading this comment.
     await runScheduledSweep(timer, context);
   },
 });

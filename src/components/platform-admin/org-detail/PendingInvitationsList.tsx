@@ -9,11 +9,6 @@ interface PendingInvitationsListProps {
   onCancel: (invitationId: string) => void;
 }
 
-/**
- * Pending-invitations list with a cancel action. No invite-link sharing here:
- * platform admins can view/cancel outstanding invites but cannot hand out an
- * invite link — the only invite path is the org-admin flow (#352).
- */
 export function PendingInvitationsList({
   invitations,
   onCancel,

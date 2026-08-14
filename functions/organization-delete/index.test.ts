@@ -19,18 +19,8 @@ const {
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-// This endpoint issues no collect SELECT of its own, so `query` has exactly one
-// caller: the reference query the REAL blob-ownership release gate runs after the
-// DELETE. The gate is exercised rather than stubbed, so "another row still
-// references this logo" is expressed as the rows that call returns.
 vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne, withTransaction: vi.fn(), getDb: vi.fn() }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
-// cleanupBlobs is faked in terms of mockDeleteBlob so the assertions pin what belongs
-// to THIS endpoint: which paths it collects and that it echoes the counts back. Its
-// own counting/warning contract is covered by describe('cleanupBlobs') in
-// shared/blob.test.ts. `classifyBlobPath` stays REAL (spread from the original)
-// because blob-ownership imports it from here and it is a pure string check —
-// stubbing it would make every release-gate assertion below vacuous.
 vi.mock('../shared/blob', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/blob')>()),
   deleteBlob: mockDeleteBlob,
@@ -51,7 +41,6 @@ describe('organization-delete', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
     mockDeleteBlob.mockResolvedValue(true);
-    // Default: the release gate's reference query answers "nobody references these".
     mockQuery.mockResolvedValue([]);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -84,8 +73,6 @@ describe('organization-delete', () => {
   });
 
   it('returns 400 (not 403) for invalid body when caller is not platform admin', async () => {
-    // Pins the deliberate validation-before-authz ordering (why this endpoint
-    // uses endpoint() + an inline admin check instead of adminEndpoint).
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     const res = await handler(baseReq({}), {} as any);
     expect(res.status).toBe(400);
@@ -121,7 +108,6 @@ describe('organization-delete', () => {
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('DELETE FROM organizations');
     expect(sql).toContain('RETURNING id');
-    // #285: the logo rides the DELETE, so it is still ONE round trip.
     expect(sql).toContain('logo_url');
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(params).toEqual(['org-1']);
@@ -146,9 +132,6 @@ describe('organization-delete', () => {
   });
 
   it('leaves a logo another row still references, and still deletes an unreferenced one — #285', async () => {
-    // Pre-bind-gate rows can share a logo path; deleting this org must not destroy
-    // the blob a surviving organization still points at. The second run — same
-    // shape, nobody referencing — is what keeps this test non-vacuous.
     mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: 'org-logos/shared.png' });
     mockQuery.mockResolvedValueOnce([{ path: 'org-logos/shared.png' }]);
     const shared = await handler(baseReq({ orgId: 'org-1' }), {} as any);
@@ -166,8 +149,6 @@ describe('organization-delete', () => {
   });
 
   it('release-check DB failure: nothing deleted, request still succeeds', async () => {
-    // The gate fails SAFE — an unanswered "is anyone else using this?" must never
-    // resolve to "delete it", and must never turn a completed row delete into a 500.
     mockQueryOne.mockResolvedValueOnce({ id: 'org-1', logo_url: 'org-logos/logo.png' });
     mockQuery.mockReset();
     mockQuery.mockRejectedValue(new Error('connection refused'));
@@ -183,7 +164,6 @@ describe('organization-delete', () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true, blobsDeleted: 0, blobsFailed: 0 });
     expect(mockDeleteBlob).not.toHaveBeenCalled();
-    // Not even asked about — `classifyBlobPath` drops it before the reference query.
     expect(mockQuery).not.toHaveBeenCalled();
   });
 

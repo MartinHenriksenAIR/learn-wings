@@ -10,14 +10,6 @@ import { formatDate } from '@/lib/date-locale';
 import { useLearnerAssignments } from '@/hooks/useLearnerAssignments';
 import type { ListView } from '@/hooks/useListView';
 
-/**
- * Mandatory-courses section for the Min Træning page (#414). Self-contained so it
- * drops into the page like <FavoriteCourses>: owns its own `useLearnerAssignments`
- * read, stays silent until the query resolves (never flashes an empty state), and
- * renders its own heading + empty state. The assignments endpoint also returns
- * *recommended* courses (`mandatory: false`); those are filtered out here so the
- * "Mandatory" heading stays honest — surfacing recommended courses is out of scope.
- */
 export function MandatoryCourses({
   orgId,
   view = 'card',
@@ -28,7 +20,6 @@ export function MandatoryCourses({
   const { t, i18n } = useTranslation();
   const { data, isLoading } = useLearnerAssignments(orgId);
 
-  // No cached assignments yet — don't flash the empty state before the query lands.
   if (isLoading) return null;
 
   const courses = (data ?? []).filter((a) => a.mandatory);

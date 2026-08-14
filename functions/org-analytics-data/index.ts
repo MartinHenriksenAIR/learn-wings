@@ -1,4 +1,3 @@
-// Hand-rolled (not shared/endpoint.ts): legacy oid-only single-SQL authz check (entra_oid without tid) — pending identity normalization.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';
@@ -12,9 +11,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const user = await authenticate(req);
     const { orgId } = await req.json() as { orgId: string };
 
-    // All-orgs aggregate (Global Analytics "All Organizations", #159). The 'all'
-    // sentinel is UUID-safe, so it can never collide with a real org id. This
-    // cross-org view is platform-admin-only — org admins stay isolated to their org.
     if (orgId === 'all') {
       const admin = await queryOne<{ is_admin: boolean }>(
         `SELECT EXISTS(SELECT 1 FROM profiles WHERE entra_oid = $1 AND is_platform_admin = TRUE) AS is_admin`,
@@ -23,16 +19,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       if (!admin?.is_admin) return corsResponse(origin, 403, { error: 'Forbidden' });
 
       const [members, enrollments, quizAttempts] = await Promise.all([
-        // DISTINCT ON (p.id): one row per user even if they belong to several orgs,
-        // so totalUsers counts distinct people and the Team table has unique row keys.
-        // department lives on profiles (not org_memberships), so it's per-user and
-        // deterministic under DISTINCT ON (p.id) — cf. generate-compliance-report.
-        // om.role is included so callers can identify org_admin members and exclude them
-        // from learner-only computations (e.g. assessment level distribution). The
-        // deterministic ORDER BY p.id, om.role relies on enum sort order: 'org_admin'
-        // sorts before 'learner', so the org_admin row wins for users who hold both roles
-        // across organisations — ensuring the analytics consumer sees the admin role and
-        // correctly skips that user from the level-distribution count.
         query(
           `SELECT DISTINCT ON (p.id) om.user_id, om.role, p.full_name, p.email, p.department, p.assessment_level
              FROM org_memberships om JOIN profiles p ON p.id = om.user_id
@@ -69,9 +55,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
         'SELECT * FROM quiz_attempts qa JOIN enrollments e ON e.user_id = qa.user_id AND e.org_id = $1 WHERE e.org_id = $1',
         [orgId]
       ),
-      // Explicit columns, NOT SELECT * — the SSO tenant binding (entra_tid /
-      // entra_tid_label, #353) is platform-admin config and must never surface
-      // to an org admin here.
       queryOne('SELECT id, name, slug, logo_url, seat_limit, created_at FROM organizations WHERE id = $1', [orgId]),
     ]);
 

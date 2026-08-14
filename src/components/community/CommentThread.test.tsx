@@ -3,12 +3,10 @@ import { render, screen } from '@testing-library/react';
 import { CommentThread } from './CommentThread';
 import type { CommunityComment } from '@/lib/community-types';
 
-// t returns the key so we can assert on i18n keys directly
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
-// CommentItem passthrough that reveals whether the reply affordance was wired
 vi.mock('./CommentItem', () => ({
   CommentItem: ({ comment, onReply }: { comment: CommunityComment; onReply?: unknown }) => (
     <div data-testid="comment-item">
@@ -47,7 +45,6 @@ describe('CommentThread readOnly (#160)', () => {
     expect(screen.queryByPlaceholderText('community.addCommentPlaceholder')).not.toBeInTheDocument();
     expect(screen.queryByTestId('reply-enabled')).not.toBeInTheDocument();
     expect(screen.queryByText('community.commentsLocked')).not.toBeInTheDocument();
-    // the comment itself is still rendered for reading
     expect(screen.getByText('a reported comment')).toBeInTheDocument();
   });
 });

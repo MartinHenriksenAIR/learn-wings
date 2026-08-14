@@ -9,18 +9,10 @@ export default endpoint('course-player-data', async ({ req, profile, reply, requ
   const course = await queryOne('SELECT * FROM courses WHERE id = $1', [courseId]);
   if (!course) return reply(404, { error: 'Course not found' });
 
-  // Individual tier (#354) takes a different visibility rule than standard orgs; the
-  // resolver also yields the caller's server-authoritative language. Resolved for all
-  // callers (incl. platform admins) since `isIndividual` also branches the enroll below.
   const { isIndividual, language } = await resolveVisibilityContext(orgId, profile.id);
 
-  // Platform admins bypass (suite convention); everyone else needs an active
-  // membership in an org that has this course enabled and published (parity with quiz-by-lesson).
   if (!profile.is_platform_admin) {
     if (isIndividual) {
-      // Individual tier: active member of the placeholder + published + in the
-      // caller's saved language (OR already enrolled, so a later language switch
-      // never locks them out of a started course). org_course_access bypassed.
       await requireActiveMember(orgId);
       const access = await queryOne<{ ok: boolean }>(
         `SELECT (
@@ -49,8 +41,6 @@ export default endpoint('course-player-data', async ({ req, profile, reply, requ
     }
   }
 
-  // `, id` tie-breaker (issue #46): legacy rows may carry duplicate sort_order
-  // ranks; the tie-breaker keeps their relative order stable across reads.
   const modules = await query('SELECT * FROM course_modules WHERE course_id = $1 ORDER BY sort_order, id', [courseId]);
   const modulesWithLessons = await Promise.all(
     modules.map(async (m: Record<string, unknown>) => {
@@ -70,15 +60,6 @@ export default endpoint('course-player-data', async ({ req, profile, reply, requ
     [profile.id, orgId, courseId]
   );
 
-  // Implicit enrollment (#357): opening a course auto-creates the enrollment so
-  // lesson progress and certificates work without a manual enroll step. The INSERT
-  // is self-gating for org isolation — it writes only when the caller is an active
-  // member of THIS org, the org has the course enabled, and the course is published,
-  // so a client can't fabricate an enrollment in an org it does not belong to.
-  // Platform admins previewing without a membership create no row (matches the
-  // suite's no-side-effect convention). #213: skipped when a sibling-language edition
-  // is already enrolled in this org, preserving one-edition-per-org. #354: the individual
-  // tier drops the org_course_access EXISTS (it has no such rows) but keeps every other gate.
   if (orgId) {
     const accessClause = isIndividual
       ? ''  // individual tier bypasses org_course_access

@@ -46,9 +46,7 @@ describe('FavoriteCourses', () => {
 
     expect(screen.getByText('training.favorites.title')).toBeInTheDocument();
     expect(screen.getByText('Intro to AI')).toBeInTheDocument();
-    // Opened from Min Træning → the link tags its origin for the player breadcrumb (#438).
     expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
-    // No empty state when there are favorites.
     expect(screen.queryByText('dashboard.noFavoritesTitle')).toBeNull();
   });
 
@@ -117,7 +115,6 @@ describe('FavoriteCourses', () => {
 
     expect(screen.getByTestId('favorite-completed')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
-    // The heart stays — a learner can still unfavorite a completed course.
     expect(screen.getByRole('button', { name: 'courses.removeFromFavorites' })).toBeInTheDocument();
   });
 

@@ -42,7 +42,6 @@ export default function CourseDetail() {
   const modules = query.data?.modules ?? [];
   const enrollment = query.data?.enrollment;
 
-  // Localized category label for this course, resolved once per data/language change.
   const isDanish = i18n.language.startsWith('da');
   const categoryName = useMemo(() => {
     if (!course?.category_id) return null;
@@ -72,9 +71,6 @@ export default function CourseDetail() {
     );
   }
 
-  // A 404 (course gone) or 403 (no access) both surface as query errors — this is a
-  // "read about a course" page, so a retry spinner is the wrong affordance. Offer a
-  // clear way back to the catalog instead.
   if (query.isError || !course) {
     return (
       <AppLayout breadcrumbs={[catalogCrumb]}>
@@ -115,7 +111,6 @@ export default function CourseDetail() {
         </Button>
 
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          {/* Thumbnail banner — gradient fallback matches the catalog cards. */}
           <div className="relative h-[190px] bg-gradient-to-br from-primary/80 to-primary">
             {course.thumbnail_url && (
               <img
@@ -157,8 +152,6 @@ export default function CourseDetail() {
               </p>
             )}
 
-            {/* Contents — expandable outline: module title + lesson count collapsed,
-                lesson names revealed on expand (no lesson bodies — that's the player). */}
             {modules.length > 0 && (
               <div className="mt-1" data-testid="module-outline">
                 <div className="mb-2.5 flex items-center gap-2">
@@ -190,7 +183,6 @@ export default function CourseDetail() {
                         </AccordionContent>
                       </AccordionItem>
                     ) : (
-                      // Empty module: static, non-interactive row (no chevron, nothing to reveal).
                       <div
                         key={m.id}
                         className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3"

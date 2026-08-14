@@ -1,9 +1,6 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 
-// Admin list of an org's course assignments (individual + whole-org), joined with
-// the course title, the target member's name (NULL = whole org), and the assigner.
-// Gate: platform admin OR active org_admin of the org.
 export default endpoint('assignments', async ({ req, reply, requireOrgAdmin }) => {
   const body = await req.json() as { orgId?: unknown };
   const { orgId } = body;

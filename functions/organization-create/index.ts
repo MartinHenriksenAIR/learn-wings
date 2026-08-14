@@ -27,27 +27,10 @@ export default endpoint('organization-create', async ({ req, reply, requirePlatf
     return reply(400, { error: 'seat_limit must be a positive integer or null' });
   }
 
-  // Authorization: platform-admin-only.
-  // RLS provenance: supabase/migrations/20260127153401_*.sql lines 269-276 —
-  // "Platform admins can do everything with orgs" was the only INSERT-capable policy.
   requirePlatformAdmin();
 
   const nextLogoUrl = (logo_url as string | null | undefined) ?? null;
 
-  // Ownership gate on the bound logo path (#280). This endpoint was the seventh
-  // writer into a column in the reconciliation union and the only one outside the
-  // gates: it accepted any string, so a path belonging to another org's live logo
-  // (readable by any learner via `/organizations`) or to a lesson video could be
-  // bound here — and once bound, `organization-update`'s superseded-blob cleanup
-  // is what would eventually act on it. Family `'org-logo'` is the COLUMN's
-  // property, never the caller's claim, and there is no `previousPaths`: the row
-  // does not exist yet, so every path is fresh and must clear the check.
-  //
-  // Placed after `requirePlatformAdmin()` so an unauthorized caller still never
-  // reaches the DB (pinned by the 403 test), and before the INSERT so a refused
-  // path never lands in a row. Unlike `organization-update` there is no
-  // `enforceUploadLimits` to order against — creation is platform-admin-only and
-  // the org logo is re-checked on every subsequent update.
   const candidates: UploadCandidate[] = [{ path: nextLogoUrl, kind: 'image', family: 'org-logo' }];
   const bindError = await assertBindablePaths(candidates);
   if (bindError) {

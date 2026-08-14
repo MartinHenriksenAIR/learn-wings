@@ -13,13 +13,8 @@ export default endpoint('org-course-progress', async ({ req, reply, requireOrgAd
   }
   const lang = asLang(adminLang);
 
-  // Representative edition per group: prefer the admin's app-language edition,
-  // else the earliest-created; NULL languages never win ((x = $n) IS TRUE → false).
-  // enrolled/completed count DISTINCT learners over the SAME visible edition set.
 
   if (orgId === 'all') {
-    // All-orgs aggregate (#159) — platform-admin-only. Distinct learners across a group's
-    // editions and orgs (a learner in different editions across two orgs counts once).
     requirePlatformAdmin();
     const courses = await query(
       `WITH visible AS (

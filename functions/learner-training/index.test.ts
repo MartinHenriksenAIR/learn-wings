@@ -83,9 +83,7 @@ describe('learner-training', () => {
       },
     ];
 
-    // totals: only c1 has lessons, c2 has none
     const totalsRows = [{ course_id: 'c1', total: 5 }];
-    // completed: only c1 has progress, c2 has none
     const completedRows = [{ course_id: 'c1', completed: 3 }];
 
     mockQuery
@@ -99,13 +97,11 @@ describe('learner-training', () => {
     const body = JSON.parse(res.body as string);
 
     expect(body.enrollments).toEqual(enrollmentRows);
-    // Zero-fill proven: c2 has 0/0
     expect(body.progress).toEqual({
       c1: { total: 5, completed: 3 },
       c2: { total: 0, completed: 0 },
     });
 
-    // Assert enrollment SQL — user_id scoped to profile.id, not raw oid
     const [enrollSql, enrollParams] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(enrollSql).toContain('e.user_id = $1');
     expect(enrollSql).toContain('e.org_id = $2');
@@ -132,7 +128,6 @@ describe('learner-training', () => {
     const body = JSON.parse(res.body as string);
     expect(body).toEqual({ enrollments: [], progress: {} });
 
-    // Only the one enrollment query ran — no totals or completed queries
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 

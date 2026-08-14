@@ -4,25 +4,13 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface FavoriteToggleProps {
-  /** Current favorite state — drives the heart fill and the add/remove label. */
   isFavorite: boolean;
-  /** Fired with the DESIRED next state; the parent owns the toggle mutation. */
   onToggle: (next: boolean) => void;
-  /** Disables the control while a toggle for this course is in flight. */
   pending?: boolean;
-  /**
-   * `icon` — compact heart-only button for catalog/dashboard cards.
-   * `button` — labelled outline button for the course player sidebar.
-   */
   variant?: 'icon' | 'button';
   className?: string;
 }
 
-/**
- * Presentational heart toggle. It only renders the current favorite state and
- * fires `onToggle(!isFavorite)` — the parent holds `useToggleFavorite` and decides
- * what to do (and which course object to pass for the cache add-patch).
- */
 export function FavoriteToggle({
   isFavorite,
   onToggle,
@@ -33,7 +21,6 @@ export function FavoriteToggle({
   const { t } = useTranslation();
   const label = isFavorite ? t('courses.removeFromFavorites') : t('courses.addToFavorites');
 
-  // These toggles sit next to card CTAs / links; keep the click from bubbling.
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onToggle(!isFavorite);

@@ -6,22 +6,16 @@ import React from 'react';
 import { routes } from '@/lib/routes';
 import en from '@/i18n/locales/en.json';
 
-// OrgAnalytics is one component serving two routes; it decides which by
-// matching location.pathname against routes.platformAdmin.analytics. This test
-// pins that branch so a future route rename can't silently flip the platform
-// "Global Analytics" page into the org-scoped view (review #174, findings #1/#2).
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-// AppLayout passthrough so the page's own <h1>{pageTitle}</h1> is observable.
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', null, children),
 }));
 
-// SlidingTabs: render each tab label as text so we can assert which tabs exist.
 vi.mock('@/components/ui/sliding-tabs', () => ({
   SlidingTabs: ({ tabs }: { tabs: { key: string; label: React.ReactNode }[] }) =>
     React.createElement(
@@ -108,7 +102,6 @@ describe('OrgAnalytics — failed fetch shows error fork, not all-zero stats', (
 
   it('renders the retryable error state (not the stats tabs) when the analytics fetch fails', () => {
     primeHooks({ isPlatformAdmin: false, currentOrg: org });
-    // Override the analytics query to a failed state.
     const refetch = vi.fn();
     vi.mocked(useOrgAnalyticsData).mockReturnValue({
       data: undefined,
@@ -120,7 +113,6 @@ describe('OrgAnalytics — failed fetch shows error fork, not all-zero stats', (
     renderAt(routes.orgAdmin.root);
 
     expect(screen.getByText('common.loadErrorTitle')).toBeInTheDocument();
-    // en.common.retry is the accessible name under the mocked `t`; verify it's non-empty.
     expect(en.common.retry.length).toBeGreaterThan(0);
     const retryButton = screen.getByRole('button', { name: 'common.retry' });
     expect(retryButton).toBeInTheDocument();

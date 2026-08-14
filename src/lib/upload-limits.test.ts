@@ -18,12 +18,6 @@ const mb = (n: number) => n * BYTES_PER_MB;
 const pick = (name: string, type = '') => ({ name, type });
 
 describe('UPLOAD_MAX_MB', () => {
-  // NOT a mirror check — it cannot be one. The server module lives in a
-  // separate npm package with its own tsconfig, and it imports @azure/storage-blob
-  // transitively, so a frontend test cannot load it to compare. What this pins
-  // is the numbers themselves, so changing the UI's caps is a deliberate,
-  // reviewable edit that has to be made alongside
-  // functions/shared/upload-limits.ts rather than drifting silently.
   it('pins the caps the UI advertises: video 2 GB, document 100 MB, image 10 MB', () => {
     expect(UPLOAD_MAX_MB.video).toBe(2048);
     expect(UPLOAD_MAX_MB.document).toBe(100);
@@ -33,9 +27,6 @@ describe('UPLOAD_MAX_MB', () => {
 
 describe('MAX_IMAGE_DECODE_MB', () => {
   it('stays well under anything that would wedge a tab, and above any real photo', () => {
-    // A decoded bitmap costs 4 bytes per PIXEL, and flat-colour PNG art
-    // compresses ~100:1 — so the byte ceiling is the only lever there is, and it
-    // has to stay low. A 108 MP phone photo is ~12 MB.
     expect(MAX_IMAGE_DECODE_MB).toBeLessThanOrEqual(20);
     expect(MAX_IMAGE_DECODE_MB).toBeGreaterThanOrEqual(UPLOAD_MAX_MB.image);
   });
@@ -43,7 +34,6 @@ describe('MAX_IMAGE_DECODE_MB', () => {
 
 describe('UPLOAD_ACCEPT_ATTRIBUTE', () => {
   it('offers every format the server accepts for documents — all seven', () => {
-    // The picker used to offer 3 of the server's 7 document types.
     for (const ext of ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']) {
       expect(UPLOAD_ACCEPT_ATTRIBUTE.document).toContain(ext);
     }
@@ -88,8 +78,6 @@ describe('isAllowedUploadFile', () => {
   });
 
   it('refuses container formats the server has no extension for', () => {
-    // These passed both old client gates (`video/*`) and were then refused by
-    // the server with a bare "File type not allowed".
     expect(isAllowedUploadFile('video', pick('clip.mkv', 'video/x-matroska'))).toBe(false);
     expect(isAllowedUploadFile('video', pick('clip.avi', 'video/x-msvideo'))).toBe(false);
     expect(isAllowedUploadFile('video', pick('clip.wmv', 'video/x-ms-wmv'))).toBe(false);
@@ -101,8 +89,6 @@ describe('isAllowedUploadFile', () => {
   });
 
   it('applies an explicit image list, not an `image/` prefix', () => {
-    // The prefix was a hole on the server too: an allow-listed EXTENSION with an
-    // off-list image content type must not pass.
     expect(isAllowedUploadFile('image', pick('logo.png', 'image/svg+xml'))).toBe(false);
     expect(isAllowedUploadFile('image', pick('logo.png', 'image/bmp'))).toBe(false);
     expect(isAllowedUploadFile('image', pick('photo.jpg', 'image/tiff'))).toBe(false);
@@ -113,8 +99,6 @@ describe('isAllowedUploadFile', () => {
   });
 
   it('treats an empty or generic content type as inconclusive, like the server', () => {
-    // .mov reports no usable type on some platforms; refusing it here would be
-    // stricter than the gate that actually binds.
     expect(isAllowedUploadFile('video', pick('clip.mov', ''))).toBe(true);
     expect(isAllowedUploadFile('video', pick('clip.mov', 'application/octet-stream'))).toBe(true);
   });
@@ -176,8 +160,6 @@ describe('effectiveMaxSizeMB', () => {
   });
 
   it('clamps a call site that tries to exceed the server cap', () => {
-    // The old FileUpload default was 50 MB against a 10 MB server cap — exactly
-    // the disagreement this clamp exists to make impossible.
     expect(effectiveMaxSizeMB('image', 50)).toBe(10);
     expect(effectiveMaxSizeMB('document', 500)).toBe(100);
   });
@@ -198,7 +180,6 @@ describe('willDownscale', () => {
   });
 
   it('is false for image formats we deliberately never re-encode', () => {
-    // Animated GIFs would lose their animation; SVG is resolution-independent.
     expect(willDownscale('image', 'image/gif')).toBe(false);
     expect(willDownscale('image', 'image/svg+xml')).toBe(false);
   });
@@ -219,8 +200,6 @@ describe('checkSelectedFileSize', () => {
   });
 
   it('lets an over-cap image through to the downscaler instead of refusing it', () => {
-    // The headline case of #278: a 15 MB phone photo with a 10 MB cap must be
-    // shrunk, not rejected. Rejecting here is what this reorder fixes.
     expect(checkSelectedFileSize(mb(15), 10, true)).toBeNull();
   });
 
@@ -236,7 +215,6 @@ describe('checkSelectedFileSize', () => {
   });
 
   it('never applies a ceiling below the cap it is guarding', () => {
-    // A hypothetical cap above the ceiling must not make the gate stricter.
     expect(checkSelectedFileSize(mb(MAX_IMAGE_DECODE_MB + 10), 200, true)).toBeNull();
   });
 });

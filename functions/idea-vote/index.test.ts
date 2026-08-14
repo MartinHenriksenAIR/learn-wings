@@ -20,7 +20,6 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// idea in org-1, owned by p2 (not the caller)
 const submittedIdea = {
   id: 'idea-1',
   org_id: 'org-1',
@@ -28,7 +27,6 @@ const submittedIdea = {
   status: 'submitted',
 };
 
-// draft owned by p2 (not the caller)
 const othersDraft = {
   id: 'idea-2',
   org_id: 'org-1',
@@ -36,7 +34,6 @@ const othersDraft = {
   status: 'draft',
 };
 
-// draft owned by p1 (the caller)
 const ownDraft = {
   id: 'idea-3',
   org_id: 'org-1',
@@ -128,12 +125,10 @@ describe('idea-vote', () => {
     mockQueryOne.mockResolvedValueOnce(submittedIdea); // idea load
     mockIsActiveMember.mockResolvedValueOnce(true); // member
     mockQueryOne.mockResolvedValueOnce({ id: 'vote-new' }); // INSERT
-    // Send a bogus orgId in the body — it must never reach INSERT params
     const res = await handler(baseReq({ ideaId: 'idea-1', orgId: 'bogus-org' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
 
-    // Verify INSERT params: [ideaId, org-from-row, profile.id]
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO idea_votes');
     expect(params).toEqual(['idea-1', 'org-1', 'p1']); // org from loaded row, not client

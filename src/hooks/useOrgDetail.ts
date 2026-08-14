@@ -3,20 +3,6 @@ import { callApi, ApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { Organization } from '@/lib/types';
 
-/**
- * The one way to fetch a single org's details via `/api/organizations` from
- * the frontend. Originally a platform-admin use-case (`OrganizationDetail`);
- * also used by org admins (`OrgMembersTab`) to read the org-wide
- * `member_count` / `pending_invite_count` aggregates for seat usage.
- *
- * The endpoint accepts `{ orgId }` and returns `{ organization }` — distinct
- * from `useOrganizations` which passes `{}` and returns the full list. The
- * two behaviors live on the same endpoint but are NOT request-equivalent, so
- * they use separate cache keys rather than sharing `useOrganizations`'s cache.
- *
- * 404 responses are surfaced as a resolved `null` value so consumers can
- * distinguish "not found" from a thrown error.
- */
 export function useOrgDetail(orgId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.orgDetail.detail(orgId),

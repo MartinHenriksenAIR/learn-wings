@@ -35,7 +35,6 @@ describe('canAccessLmsAsset', () => {
     await expect(canAccessLmsAsset('p1', 'videos/x.mp4')).resolves.toBe(false);
   });
 
-  // The four asset predicates, pinned individually.
   it('SQL pins all three lesson asset columns against $2', () => {
     expect(CAN_ACCESS_LMS_ASSET_SQL).toContain('l.video_storage_path = $2');
     expect(CAN_ACCESS_LMS_ASSET_SQL).toContain('l.document_storage_path = $2');
@@ -62,9 +61,6 @@ describe('canAccessLmsAsset', () => {
     expect(CAN_ACCESS_LMS_ASSET_SQL).not.toContain('FROM profiles');
   });
 
-  // Drift guard: every asset column the canonical SQL function compares against
-  // file_path must be covered by the helper SQL. If the schema function gains a
-  // column, this fails until the helper is updated.
   it('parity pin: covers every `<alias>.<col> = file_path` comparison in public.can_user_access_lms_asset', () => {
     const body = functionBody('can_user_access_lms_asset');
     const comparisons = [...body.matchAll(/(\w+\.\w+) = file_path/g)].map((m) => m[1]);
@@ -77,11 +73,6 @@ describe('canAccessLmsAsset', () => {
   });
 });
 
-/**
- * mintLmsAssetUrl — the shared core extracted in #239.
- * Thin wrappers (asset-signed-url, azure-view-url) are tested end-to-end
- * in their own index.test.ts files; this suite pins the core's own contracts.
- */
 describe('mintLmsAssetUrl', () => {
   const memberProfile = { id: 'p1', is_platform_admin: false };
   const adminProfile = { id: 'p-admin', is_platform_admin: true };
@@ -93,7 +84,6 @@ describe('mintLmsAssetUrl', () => {
     process.env.AZURE_STORAGE_CONTAINER_NAME = 'lms-videos';
   });
 
-  // Validation — strict typeof check (sanctioned hardening, issue #239)
   it('returns 400 when blobPath is undefined', async () => {
     const result = await mintLmsAssetUrl(memberProfile, undefined);
     expect(result).toEqual({ ok: false, status: 400, error: 'blobPath is required' });

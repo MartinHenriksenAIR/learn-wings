@@ -66,7 +66,6 @@ describe('assessment-questions', () => {
     for (const [i, q] of body.questions.entries()) {
       expect(q.id).toBe(ASSESSMENT_QUESTIONS[i].id);
       expect(q.options).toEqual([...ASSESSMENT_QUESTIONS[i].options]);
-      // Points must NOT be exposed to the client.
       expect(q).not.toHaveProperty('points');
     }
   });

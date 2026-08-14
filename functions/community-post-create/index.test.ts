@@ -197,7 +197,6 @@ describe('community-post-create', () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ post: newPost });
 
-    // Verify INSERT SQL uses profile.id not client-supplied user_id
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO community_posts');
     expect(params).toContain('p1');

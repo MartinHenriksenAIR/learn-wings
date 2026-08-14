@@ -14,10 +14,7 @@ const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
 vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
-// isActiveMember backs the factory's requireActiveMember (used by the individual branch).
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember, isOrgAdmin: vi.fn() }));
-// resolveVisibilityContext is mocked (not left to hit the mocked queryOne) so it consumes
-// no query slot — keeping every order-sensitive queryOne sequence intact.
 vi.mock('../shared/course-visibility', () => ({ resolveVisibilityContext: mockResolveVisibility }));
 
 import handler from './index';
@@ -28,7 +25,6 @@ const baseReq = {
   json: async () => ({ courseId: 'course-uuid', orgId: 'org-uuid' }),
 };
 
-/** Every mockQuery call's SQL — used to pin that NO enrollment INSERT ever runs (read-only). */
 const noEnrollmentInsert = () =>
   expect(mockQuery.mock.calls.find(([sql]) => /INSERT INTO enrollments/i.test(sql as string)),
     'learner-course-detail must be READ-ONLY — reading about a course must never enroll (unlike course-player-data)')
@@ -39,15 +35,12 @@ describe('learner-course-detail', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'learner-uuid', tid: 'tid-1', email: 'learner@test.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
-    // Default: standard (non-individual) tier — keeps the org_course_access access path.
     mockResolveVisibility.mockResolvedValue({ isIndividual: false, language: 'da' });
     mockIsActiveMember.mockResolvedValue(true);
   });
 
   it('returns course, module outline (title + lesson_count + lesson names), and the caller enrollment — and NEVER enrolls', async () => {
     const course = { id: 'course-uuid', title: 'AI Basics', description: 'Learn AI', level: 'basic', category_id: 'cat-1' };
-    // Two modules: one with lessons, one empty. lesson rows come back pre-ordered by the
-    // query (sort_order, id) and out of module order to prove attach-by-module_id, not row order.
     const modules = [
       { id: 'mod-1', title: 'Module 1', sort_order: 1, lesson_count: 2 },
       { id: 'mod-2', title: 'Module 2', sort_order: 2, lesson_count: 0 },
@@ -71,26 +64,21 @@ describe('learner-course-detail', () => {
     expect(body.modules).toHaveLength(2);
     expect(body.enrollment.status).toBe('enrolled');
 
-    // Module 1: lesson_count preserved, lessons attached in order as {id, title, sort_order}.
     expect(body.modules[0].lesson_count).toBe(2);
     expect(body.modules[0].lessons).toEqual([
       { id: 'les-1', title: 'Intro', sort_order: 1 },
       { id: 'les-2', title: 'Deep dive', sort_order: 2 },
     ]);
-    // No lesson bodies leak into the summary response.
     expect(body.modules[0].lessons[0]).not.toHaveProperty('content_text');
     expect(body.modules[0].lessons[0]).not.toHaveProperty('module_id');
-    // Empty module → lessons: [] and lesson_count 0.
     expect(body.modules[1].lesson_count).toBe(0);
     expect(body.modules[1].lessons).toEqual([]);
 
-    // Module outline uses a LEFT JOIN + count and the deterministic id tie-breaker (#46).
     const [modulesSql] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(modulesSql).toContain('LEFT JOIN lessons');
     expect(modulesSql).toContain('lesson_count');
     expect(modulesSql).toContain('ORDER BY cm.sort_order, cm.id');
 
-    // Lessons fetched in ONE query for all modules (no N+1): names only, ordered, keyed by module ids.
     const [lessonsSql, lessonsParams] = mockQuery.mock.calls[1] as [string, unknown[]];
     expect(lessonsSql).toContain('FROM lessons');
     expect(lessonsSql).toContain('module_id = ANY($1)');
@@ -98,12 +86,10 @@ describe('learner-course-detail', () => {
     expect(lessonsSql).not.toContain('content_text');
     expect(lessonsParams).toEqual([['mod-1', 'mod-2']]);
 
-    // SECURITY PIN: enrollment lookup keyed on profile.id ('p1'), never the raw token oid.
     const enrollCall = mockQueryOne.mock.calls[2] as [string, unknown[]];
     expect(enrollCall[0]).toContain('FROM enrollments');
     expect(enrollCall[1]).toEqual(['p1', 'org-uuid', 'course-uuid']);
 
-    // READ-ONLY PIN: the single most important difference from course-player-data.
     noEnrollmentInsert();
   });
 
@@ -152,9 +138,6 @@ describe('learner-course-detail', () => {
   });
 
   it('individual org: denies access (403) when the language gate fails — published, wrong language, not enrolled (#354)', async () => {
-    // The language gate is the individual tier's whole security boundary: an active member
-    // must still be blocked from a published course that is not in their saved language
-    // (and that they have not already started). Pin that 403 by value.
     mockResolveVisibility.mockResolvedValueOnce({ isIndividual: true, language: 'en' });
     mockQueryOne.mockResolvedValueOnce({ id: 'course-uuid', title: 'A', language: 'da' }); // course (wrong lang)
     mockIsActiveMember.mockResolvedValueOnce(true);   // active member
@@ -186,7 +169,6 @@ describe('learner-course-detail', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Course access denied' });
     expect(mockQuery).not.toHaveBeenCalled();
 
-    // Pin the gating predicates BY VALUE so a regression that opens the gate fails here.
     const [accessSql, accessParams] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(accessSql).toContain('is_published = TRUE');
     expect(accessSql).toContain("oca.access = 'enabled'");
@@ -202,7 +184,6 @@ describe('learner-course-detail', () => {
 
     const res = await handler(baseReq as any, {} as any);
     expect(res.status).toBe(200);
-    // Only the course lookup + enrollment lookup — no access-check queryOne.
     expect(mockQueryOne).toHaveBeenCalledTimes(2);
     for (const [sql] of mockQueryOne.mock.calls as [string][]) {
       expect(sql).not.toContain('org_course_access');

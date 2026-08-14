@@ -5,11 +5,6 @@ import {
   validateOrgSlug,
 } from '../../functions/shared/org-validation';
 
-// Parity test (issue #51): the frontend zod rules in src/lib/org-validation.ts
-// manually mirror the canonical backend rules in
-// functions/shared/org-validation.ts. This fixture table runs the same inputs
-// through both copies and asserts they agree, so a drift in either copy fails
-// here instead of surfacing as a 400 the form said was valid.
 
 const VALID_NAME = 'Acme Corporation';
 const VALID_SLUG = 'acme-corp';
@@ -21,7 +16,6 @@ const nameFixtures: Array<{ label: string; value: string; valid: boolean }> = [
   { label: 'typical name', value: 'Acme Corporation A/S', valid: true },
   { label: '100 chars (max boundary)', value: 'a'.repeat(100), valid: true },
   { label: '101 chars (above max)', value: 'a'.repeat(101), valid: false },
-  // Whitespace handling (review finding I-1): length is judged on the trimmed value.
   { label: 'whitespace only', value: '   ', valid: false },
   { label: 'padded but valid (trims to "ab")', value: '  ab  ', valid: true },
   { label: 'padded down to 1 char (trims to "a")', value: '  a  ', valid: false },

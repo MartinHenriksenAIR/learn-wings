@@ -184,7 +184,6 @@ describe('invitation-update', () => {
 
     const [selectSql] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     const [updateSql] = mockQueryOne.mock.calls[1] as [string, unknown[]];
-    // Match `token` / `token_hash` as full words (regex word boundaries).
     expect(selectSql).not.toMatch(/\btoken\b/);
     expect(selectSql).not.toMatch(/\btoken_hash\b/);
     expect(updateSql).not.toMatch(/\btoken\b/);

@@ -15,7 +15,6 @@ interface PrioritizationMatrixProps {
 const VALUE_ROWS = [3, 2, 1] as const;   // top → bottom: High, Med, Low
 const EFFORT_COLS = [1, 2, 3] as const;  // left → right: Low, Med, High
 
-// Green (good: high value / low effort) → red (bad). Sum-based tint.
 function cellTint(value: number, effort: number): string {
   const goodness = value - effort; // -2 .. +2
   if (goodness >= 2) return 'bg-success/10';
@@ -35,9 +34,6 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
     [ideas],
   );
 
-  // Partition once per render: unscored (either score null) vs. scored, the
-  // latter bucketed by `${value}-${effort}` so each grid cell is one lookup
-  // instead of a fresh filter over inScope (9 cells × every render).
   const { unscored, scoredByCell } = useMemo(() => {
     const unscored: EnhancedIdea[] = [];
     const scoredByCell = new Map<string, EnhancedIdea[]>();

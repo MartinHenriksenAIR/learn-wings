@@ -1,7 +1,3 @@
-// Hand-rolled (not shared/endpoint.ts): binary PDF response and token-only auth
-// (oid-scoped SQL lookups, no getProfile). Renders a branded AI Act Article-4
-// AI-literacy report with pdfkit (see render.ts); content localized per
-// ADR-0016 category 3 (the requesting user's UI language, sent as `language`).
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne } from '../shared/db';

@@ -84,8 +84,6 @@ describe('buildUpdateSet — SET clause + param indexing', () => {
   });
 
   it('only the whitelisted literal key name is interpolated (injection-safety invariant)', () => {
-    // The value carries a SQL-looking string but never reaches the clause text —
-    // only the key name (a whitelisted literal) is interpolated.
     const r = buildUpdateSet({ title: "'; DROP TABLE x; --" }, ALLOWED);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -94,8 +92,6 @@ describe('buildUpdateSet — SET clause + param indexing', () => {
   });
 
   it('caller appends the id param: placeholder = params.length after push', () => {
-    // Mirrors how all three endpoints build the final UPDATE: they push the id
-    // onto params and read params.length for the WHERE placeholder.
     const r = buildUpdateSet({ title: 'a', url: 'b' }, ALLOWED);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -116,7 +112,6 @@ describe('buildUpdateSet — transform hook', () => {
     );
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    // Key name unchanged; value transformed.
     expect(r.setClauses).toEqual(['title = $1', 'url = $2']);
     expect(r.params).toEqual(['Trim Me', 'https://x']);
   });

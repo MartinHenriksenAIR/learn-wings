@@ -47,14 +47,10 @@ const insertedRow = (email: string, id = 'inv-1') => ({
   department: null,
 });
 
-// Seat-usage lookup row shape (org row + active-member/pending-invite counts).
 const seatRow = (seat_limit: number | null, active_count: number, pending_count: number) => ({ seat_limit, active_count, pending_count });
 
 type InsertOutcome = { ok: true; row: unknown } | { ok: false; err: unknown };
 
-// A fake PoolClient whose .query answers control statements (SAVEPOINT/RELEASE/
-// ROLLBACK), the FOR UPDATE seat lookup, and the sequential INSERTs (from the
-// outcome list, in order). `seat === null` models an absent org row.
 function makeClient(seat: ReturnType<typeof seatRow> | null, insertOutcomes: InsertOutcome[] = []) {
   let i = 0;
   return {
@@ -72,7 +68,6 @@ function makeClient(seat: ReturnType<typeof seatRow> | null, insertOutcomes: Ins
   };
 }
 
-// Wire withTransaction to invoke the handler callback with a fresh fake client.
 function wire(seat: ReturnType<typeof seatRow> | null, insertOutcomes: InsertOutcome[] = []) {
   const client = makeClient(seat, insertOutcomes);
   mockWithTransaction.mockImplementation(async (cb: (c: typeof client) => unknown) => cb(client));
@@ -82,7 +77,6 @@ function wire(seat: ReturnType<typeof seatRow> | null, insertOutcomes: InsertOut
 describe('invitation-bulk-create', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: unlimited seats, no queued INSERT outcomes. Tests override via wire().
     wire(seatRow(null, 0, 0));
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
@@ -184,12 +178,10 @@ describe('invitation-bulk-create', () => {
       invitation: insertedRow('bob@example.com', 'inv-2'),
     });
 
-    // First query is the seat-usage lookup (row lock).
     const [seatSql, seatParams] = client.query.mock.calls[0] as [string, unknown[]];
     expect(seatSql).toContain('FOR UPDATE');
     expect(seatParams).toEqual(['org-1']);
 
-    // INSERT calls carry the normalized email + invited_by_user_id.
     const insertCalls = client.query.mock.calls.filter((c) => String(c[0]).includes('INSERT INTO invitations'));
     expect(insertCalls).toHaveLength(2);
     const [sql0, params0] = insertCalls[0] as [string, unknown[]];
@@ -202,7 +194,6 @@ describe('invitation-bulk-create', () => {
   });
 
   it('partial-fill: seats run out mid-batch — earlier rows succeed, later valid rows hit the seat limit (order preserved)', async () => {
-    // seat_limit 5, active 3, pending 1 => remaining 1. Only the first valid row fits.
     const client = wire(seatRow(5, 3, 1), [
       { ok: true, row: insertedRow('first@example.com', 'inv-1') },
     ]);
@@ -220,7 +211,6 @@ describe('invitation-bulk-create', () => {
       { email: 'second@example.com', success: false, error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' },
       { email: 'third@example.com', success: false, error: 'Organization is at seat limit', code: 'SEAT_LIMIT_REACHED' },
     ]);
-    // Exactly one INSERT was attempted (the two over-cap rows never touch the DB).
     const insertCalls = client.query.mock.calls.filter((c) => String(c[0]).includes('INSERT INTO invitations'));
     expect(insertCalls).toHaveLength(1);
   });
@@ -244,7 +234,6 @@ describe('invitation-bulk-create', () => {
   });
 
   it('invalid rows fail validation and do NOT consume a seat — a later valid row still succeeds within remaining', async () => {
-    // remaining 1: only one valid row fits. The two invalid rows must not eat the seat.
     const client = wire(seatRow(5, 4, 0), [
       { ok: true, row: insertedRow('good@example.com', 'inv-1') },
     ]);
@@ -262,7 +251,6 @@ describe('invitation-bulk-create', () => {
     expect(parsed.results[0]).toEqual({ email: 'no-at-sign', success: false, error: 'email is required and must be a valid email address' });
     expect(parsed.results[1]).toEqual({ email: 'bad-role@example.com', success: false, error: 'role must be one of: org_admin, learner' });
     expect(parsed.results[2]).toEqual({ email: 'good@example.com', success: true, invitation: insertedRow('good@example.com', 'inv-1') });
-    // Only the valid row hit the DB.
     const insertCalls = client.query.mock.calls.filter((c) => String(c[0]).includes('INSERT INTO invitations'));
     expect(insertCalls).toHaveLength(1);
   });
@@ -302,7 +290,6 @@ describe('invitation-bulk-create', () => {
     expect(parsed.results[0]).toEqual({ email: 'dup@example.com', success: false, error: 'An invitation for this email is already pending' });
     expect(parsed.results[1]).toEqual({ email: 'valid@example.com', success: true, invitation: insertedRow('valid@example.com', 'inv-2') });
 
-    // A ROLLBACK TO SAVEPOINT was issued to recover the poisoned transaction state.
     const rolledBack = client.query.mock.calls.some((c) => /ROLLBACK TO SAVEPOINT/i.test(String(c[0])));
     expect(rolledBack).toBe(true);
   });
@@ -333,7 +320,6 @@ describe('invitation-bulk-create', () => {
       { email: 'no-at-sign', success: false, error: 'email is required and must be a valid email address' },
       { email: 'c@b.com', success: false, error: 'Organization not found' },
     ]);
-    // No INSERT is ever attempted when the org is absent.
     const insertCalls = client.query.mock.calls.filter((c) => String(c[0]).includes('INSERT INTO invitations'));
     expect(insertCalls).toHaveLength(0);
   });
@@ -347,12 +333,9 @@ describe('invitation-bulk-create', () => {
     expect(res.status).toBe(200);
     const parsed = JSON.parse(res.body as string);
     expect(parsed.results).toEqual([{ email: 'a@b.com', success: false, error: 'Could not create invitation' }]);
-    // Raw driver text never reaches the client...
     expect(res.body as string).not.toContain('connection refused');
-    // ...but is logged server-side for App Insights.
     expect(ctx.error).toHaveBeenCalledOnce();
     expect(String(ctx.error.mock.calls[0][0])).toContain('connection refused');
-    // Recovery via savepoint even for unexpected errors.
     const rolledBack = client.query.mock.calls.some((c) => /ROLLBACK TO SAVEPOINT/i.test(String(c[0])));
     expect(rolledBack).toBe(true);
   });

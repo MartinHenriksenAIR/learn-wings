@@ -3,9 +3,6 @@ import { endpoint } from '../shared/endpoint';
 import { buildUpdateSet } from '../shared/update-builder';
 import { loadIdea, checkAuthorDraft } from '../shared/ideas';
 
-// Author-writable fields. status, user_id, org_id, submitted_at, admin_notes,
-// rejection_reason, category_id, course/lesson context are NOT editable here —
-// admin/status writes go through idea-status-update.
 const STRING_FIELDS = new Set([
   'title',
   'description',
@@ -36,9 +33,6 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
     return reply(400, { error: 'ideaId is required' });
   }
 
-  // Shape check + whitelist walk + SET-clause build (shared #252). NOTE: unknown
-  // keys now 400 ("Invalid update field: X") — this endpoint used to silently
-  // drop them; the frontend only ever sends whitelisted keys (verified #252).
   const built = buildUpdateSet(updates, ALLOWED_UPDATE_FIELDS, {
     emptyError: 'No valid update fields provided',
   });
@@ -71,8 +65,6 @@ export default endpoint('idea-update', async ({ req, profile, reply }) => {
   const idea = await loadIdea(ideaId);
   if (!idea) return reply(404, { error: 'Idea not found' });
 
-  // Author-only-403 + draft-only-409 (shared/ideas; no admin bypass — org-admin
-  // writes go through idea-status-update).
   const gate = checkAuthorDraft(idea, profile, { notDraftError: 'Only draft ideas can be edited' });
   if (!gate.ok) return reply(gate.status, gate.body);
 

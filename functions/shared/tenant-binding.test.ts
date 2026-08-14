@@ -169,7 +169,6 @@ describe('autoJoinByTenant', () => {
     mockQueryOne.mockResolvedValueOnce({ id: 'm1' }); // existing membership (any status)
     await autoJoinByTenant('profile-1', TID, ctx() as never);
     expect(mockWithTransaction).not.toHaveBeenCalled();
-    // Neither switch is consulted once a membership exists (only org + membership lookups).
     expect(mockQueryOne).toHaveBeenCalledTimes(2);
   });
 
@@ -178,8 +177,6 @@ describe('autoJoinByTenant', () => {
     mockQueryOne.mockResolvedValueOnce(null); // no membership
     await autoJoinByTenant('profile-1', TID, ctx() as never);
     expect(mockWithTransaction).not.toHaveBeenCalled();
-    // Short-circuits on the per-org flag carried by the org row — the global
-    // master-switch query is never issued (only org + membership lookups).
     expect(mockQueryOne).toHaveBeenCalledTimes(2);
   });
 
@@ -200,7 +197,6 @@ describe('autoJoinByTenant', () => {
 
     await autoJoinByTenant('profile-1', TID, ctx() as never);
 
-    // The per-org flag is read from the org lookup itself, not a separate query.
     expect(mockQueryOne.mock.calls[0][0]).toContain('allow_self_registration');
     const insert = findClientCall('INSERT INTO org_memberships');
     expect(insert).toBeDefined();

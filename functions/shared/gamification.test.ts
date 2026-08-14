@@ -83,8 +83,6 @@ describe('getLearnerDashboardData suppressLeaderboard', () => {
   });
 
   it('skips the member query and returns empty windows, keeping personal XP/streak', async () => {
-    // Only five queries fire when suppressed — the leaderboard-membership query
-    // is not run, so no stranger names/XP are ever read.
     mockQuery
       .mockResolvedValueOnce([{ started: 2, in_progress: 1, completed: 1 }])   // snapshot
       .mockResolvedValueOnce([{ user_id: 'me', all_time: 5, month: 2 }])        // lessons
@@ -103,7 +101,6 @@ describe('getLearnerDashboardData suppressLeaderboard', () => {
       month: { rows: [], me: null },
     });
 
-    // Personal XP + streak are unchanged: 5·10 + 1·25 = 75 all-time; 2·10 + 1·25 = 45 month.
     expect(data.xp).toEqual({ allTime: 75, month: 45 });
     expect(data.level.level).toBe(1);
     expect(data.streak).toEqual({ current: 1, activeToday: true });

@@ -4,15 +4,6 @@ import { AZURE_POSTGRES_CA } from './azure-ca';
 
 let pool: Pool | null = null;
 
-/**
- * SSL config for the pg Pool. Default is verify-full: the chain is verified
- * against the embedded Azure PostgreSQL root CA bundle (see azure-ca.ts) and
- * Node verifies the hostname when rejectUnauthorized is true.
- *
- * Escape hatch (operational rollback only): set DATABASE_SSL_INSECURE=1 to
- * fall back to the old unverified TLS ({ rejectUnauthorized: false }). This
- * disables certificate AND hostname verification — a loud warning is logged.
- */
 export function buildSslConfig(env: NodeJS.ProcessEnv = process.env): {
   ca?: string;
   rejectUnauthorized: boolean;
@@ -27,17 +18,6 @@ export function buildSslConfig(env: NodeJS.ProcessEnv = process.env): {
   return { ca: AZURE_POSTGRES_CA, rejectUnauthorized: true };
 }
 
-/**
- * Build the pg Pool config from a connection string, parsing the URL into
- * discrete fields and merging our SSL config LAST so it stays authoritative.
- *
- * Why not `{ connectionString, ssl }`: pg's ConnectionParameters does
- * `Object.assign({}, config, parse(connectionString))`, so a `?sslmode=require`
- * URL (the documented prod DATABASE_URL) re-derives `ssl` → `{}` and overwrites
- * our explicit `ssl` — silently discarding the pinned-CA verify-full setup AND
- * the DATABASE_SSL_INSECURE rollback hatch (issue #103). Passing the
- * already-parsed fields (no `connectionString` key) removes that clobber vector.
- */
 export function buildPoolConfig(
   connectionString: string,
   env: NodeJS.ProcessEnv = process.env
@@ -76,11 +56,6 @@ export async function queryOne<T = Record<string, unknown>>(
   return rows[0] ?? null;
 }
 
-/**
- * True when `err` is a Postgres unique_violation (SQLSTATE 23505) — e.g. an
- * INSERT/UPDATE hitting a UNIQUE constraint. Use this instead of hand-checking
- * `(err as { code?: string })?.code === '23505'` at call sites.
- */
 export function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string } | null | undefined)?.code === '23505';
 }
@@ -98,7 +73,6 @@ export async function withTransaction<T>(
     try {
       await client.query('ROLLBACK');
     } catch {
-      // swallow rollback errors — original error takes precedence
     }
     throw err;
   } finally {

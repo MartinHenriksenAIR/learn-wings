@@ -5,12 +5,6 @@ vi.mock('resend', () => ({ Resend: vi.fn().mockImplementation(() => ({ emails: {
 
 import { sendBestEffort } from './resend';
 
-// The regression these pin: the Resend SDK (v6) NEVER REJECTS. Its `fetchRequest`
-// resolves `{ data: null, error }` for every non-2xx and wraps its own `fetch` in
-// a catch that returns the same shape on a network failure. A helper that only
-// watched the `catch` therefore returned "sent" for a 401, a 422, a 429, a 5xx
-// and an unreachable API alike — and callers stamp "we told them" on that return
-// value, which is how a run gets marked notified on an email nobody received.
 const email = {
   recipient: 'ops@example.com',
   subject: 'subject',

@@ -51,8 +51,6 @@ export function CommentItem({
   const canEdit = isAuthor && !comment.is_hidden;
   const canDelete = isAuthor || isAdmin;
 
-  // Only show the "⋯" menu when at least one action is actually available —
-  // otherwise (e.g. the read-only moderation viewer, #160) it opens empty.
   const hasActions = Boolean(
     onReply ||
       (canEdit && onEdit) ||

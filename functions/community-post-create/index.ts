@@ -26,7 +26,6 @@ export default endpoint('community-post-create', async ({ req, profile, reply, r
     return reply(400, { error: 'orgId is required for org scope' });
   }
 
-  // fail-fast before DB CHECK violation
   if (scope === 'global' && orgId !== undefined && orgId !== null) {
     return reply(400, { error: 'orgId must not be provided for global scope' });
   }
@@ -44,8 +43,6 @@ export default endpoint('community-post-create', async ({ req, profile, reply, r
   if (tags !== undefined && (!Array.isArray(tags) || !tags.every((t) => typeof t === 'string'))) {
     return reply(400, { error: 'tags must be an array of strings' });
   }
-  // Defence in depth against stored-XSS (sec-1, #232): the registration URL is
-  // rendered into an anchor href, so reject non-http(s) schemes on write.
   const eventRegistrationUrlError = validateHttpUrl(eventRegistrationUrl, 'eventRegistrationUrl');
   if (eventRegistrationUrlError) {
     return reply(400, { error: eventRegistrationUrlError });
@@ -66,7 +63,6 @@ export default endpoint('community-post-create', async ({ req, profile, reply, r
       const isMember = await isActiveMember(profile.id, vOrgId!);
       if (!isMember) return reply(403, { error: 'Forbidden' });
     }
-    // global scope: any authenticated profile may post
   }
 
   const categoryRow = await queryOne<{ is_restricted: boolean }>(

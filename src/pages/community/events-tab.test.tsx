@@ -19,7 +19,6 @@ vi.mock('@/lib/community-api', () => ({
   togglePostLocked: vi.fn(),
 }));
 
-// --- t returns the key; language is 'en' so real formatDate stays English ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -56,7 +55,6 @@ const authState = {
 
 const eventsCategory = { id: 'cat-events', slug: 'events', name: 'Events' };
 
-// Clearly-past / clearly-future dates keep the isFuture/isToday cut deterministic.
 const globalPosts = [
   {
     id: 'past',
@@ -122,7 +120,6 @@ describe('Events page — upcoming list (#344)', () => {
     renderPage();
 
     expect(await screen.findByText('Soon Global Event')).toBeInTheDocument();
-    // The events page has no post search box (that belongs to the feed).
     expect(screen.queryByPlaceholderText('community.searchPosts')).not.toBeInTheDocument();
   });
 
@@ -140,8 +137,6 @@ describe('Events page — upcoming list (#344)', () => {
     await screen.findByText('Soon Global Event');
     expect(screen.getByText('Mid Org Event')).toBeInTheDocument();
 
-    // Join links appear in soonest-first order: soon (2999-01) < org-mid
-    // (2999-03) < later (2999-06).
     const links = screen.getAllByRole('link');
     expect(links.map((a) => a.getAttribute('href'))).toEqual([
       'https://example.com/soon',

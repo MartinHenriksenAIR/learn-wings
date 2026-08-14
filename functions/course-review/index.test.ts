@@ -127,7 +127,6 @@ describe('course-review', () => {
     expect(insertSql).toContain('updated_at = NOW()');
     expect(insertSql).toContain('RETURNING');
 
-    // SECURITY PIN: params exactly ['org-1','p1','c-1',5,'Great course']
     expect(insertParams).toEqual(['org-1', 'p1', 'c-1', 5, 'Great course']);
   });
 
@@ -147,9 +146,7 @@ describe('course-review', () => {
 
     expect(res.status).toBe(200);
     const [, insertParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
-    // user_id at position 2 is 'p1', not 'evil'
     expect(insertParams[1]).toBe('p1');
-    // 'evil' must not appear anywhere in params
     expect(insertParams).not.toContain('evil');
   });
 
@@ -165,7 +162,6 @@ describe('course-review', () => {
 
     expect(res.status).toBe(200);
     const [, insertParams] = mockQueryOne.mock.calls[0] as [string, unknown[]];
-    // position 5 (index 4) is the comment — must be null
     expect(insertParams[4]).toBeNull();
   });
 

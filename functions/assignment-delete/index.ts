@@ -1,9 +1,6 @@
 import { queryOne, query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 
-// Remove an assignment. Authorized by loading the row's org first, then
-// requireOrgAdmin(that org) — so an org admin can never delete another org's
-// assignment. Removing a whole-org row removes it for everyone (by design).
 export default endpoint('assignment-delete', async ({ req, reply, requireOrgAdmin }) => {
   const body = await req.json() as { assignmentId?: unknown };
   const { assignmentId } = body;

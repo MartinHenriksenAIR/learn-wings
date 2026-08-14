@@ -40,11 +40,8 @@ describe('enrollment-complete', () => {
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
-    // The dashboard counts enrollments.status === 'completed' — pin that this
-    // endpoint actually sets and returns it (#18).
     expect(body.enrollment).toEqual(row);
 
-    // SECURITY PIN: enrollments must use profile.id ('p1'), not raw oid
     const updateCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('enrollments'));
     expect(updateCall).toBeDefined();
     expect(updateCall![1]).toEqual(['p1', 'org-1', 'c-1']);

@@ -5,7 +5,6 @@ import { ArrowLeft } from 'lucide-react';
 import logoLight from '@/assets/logo-light.png';
 import { routes } from '@/lib/routes';
 
-// Match Login's soft slate canvas + centered card chrome.
 const PAGE_GRADIENT_CLASSES = 'bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)]';
 
 export default function ForgotPassword() {
