@@ -47,11 +47,13 @@ export default function OrgAnalytics() {
   const { currentOrg, isPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
   const [generatingReport, setGeneratingReport] = useState(false);
 
+  // The active tab is URL-driven: the same component serves both org-admin routes,
+  // so deriving from the query string prevents a stale tab surviving cross-route nav.
+  const activeTab = searchParams.get('tab') ?? '';
+
   const handleTabChange = (value: string) => {
-    setActiveTab(value);
     setSearchParams({ tab: value });
   };
 
