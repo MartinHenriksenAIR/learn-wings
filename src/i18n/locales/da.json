@@ -86,6 +86,8 @@
     "settings": "Indstillinger",
     "signOut": "Log ud",
     "organization": "Organisation",
+    "administration": "Administration",
+    "users": "Brugere",
     "ideasOverview": "Idéhåndtering",
     "moderation": "Moderation",
     "organizations": "Organisationer",
@@ -1027,7 +1029,7 @@
   "analytics": {
     "tabs": {
       "overview": "Oversigt",
-      "members": "Organisationsmedlemmer",
+      "members": "Brugere",
       "team": "Læringsfremskridt",
       "courses": "Kurser"
     },
@@ -1048,7 +1050,8 @@
     "downloadReport": "Download rapport",
     "generatingReport": "Genererer...",
     "allOrganizations": "Alle organisationer",
-    "subtitleOrg": "Medlemmer, engagement og læring hos {{orgName}}.",
+    "subtitleOrg": "Engagement og læring hos {{orgName}}.",
+    "subtitleUsers": "Brugere og læringsfremskridt hos {{orgName}}.",
     "subtitleGlobalAll": "Engagement og læring på tværs af alle organisationer.",
     "subtitleGlobalOne": "Engagement og læring for den valgte organisation.",
     "courseOrgBreakdown": {

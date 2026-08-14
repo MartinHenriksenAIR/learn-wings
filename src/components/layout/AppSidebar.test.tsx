@@ -90,11 +90,13 @@ describe('AppSidebar nav groups (#271)', () => {
       expect(navLink(routes.platformAdmin.organizations)).toBeNull();
     });
 
-    it('renders the learner groups + Organization for an org admin', () => {
+    it('renders the learner groups + Administration for an org admin', () => {
       mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
       renderSidebar();
 
-      expect(groupLabels()).toEqual([en.nav.learning, en.nav.community, en.nav.organization]);
+      expect(groupLabels()).toEqual([en.nav.learning, en.nav.community, en.nav.administration]);
+      expect(navLink(routes.orgAdmin.users)).not.toBeNull();
+      expect(navLink(routes.orgAdmin.root)).not.toBeNull();
       expect(navLink(routes.orgAdmin.settings)).not.toBeNull();
       expect(navLink(routes.platformAdmin.organizations)).toBeNull();
     });
@@ -119,10 +121,21 @@ describe('AppSidebar nav groups (#271)', () => {
       mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
       renderSidebar();
 
-      expect(groupLabels()).toEqual([en.nav.learning, en.nav.organization]);
+      expect(groupLabels()).toEqual([en.nav.learning, en.nav.administration]);
       expect(navLink(routes.community.feed)).toBeNull();
       expect(navLink(routes.orgAdmin.ideas)).toBeNull();
       expect(navLink(routes.orgAdmin.moderation)).toBeNull();
+      expect(navLink(routes.orgAdmin.users)).not.toBeNull();
+      expect(navLink(routes.orgAdmin.settings)).not.toBeNull();
+    });
+
+    it('keeps Brugere reachable but drops Organisation when analytics is disabled (#465)', () => {
+      mockFeatures.mockReturnValue({ ...allFeatures, analytics_enabled: false });
+      mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
+      renderSidebar();
+
+      expect(navLink(routes.orgAdmin.users)).not.toBeNull();
+      expect(navLink(routes.orgAdmin.root)).toBeNull();
       expect(navLink(routes.orgAdmin.settings)).not.toBeNull();
     });
 

@@ -86,6 +86,8 @@
     "settings": "Settings",
     "signOut": "Sign out",
     "organization": "Organization",
+    "administration": "Administration",
+    "users": "Users",
     "ideasOverview": "Ideas Management",
     "moderation": "Moderation",
     "organizations": "Organizations",
@@ -1027,7 +1029,7 @@
   "analytics": {
     "tabs": {
       "overview": "Overview",
-      "members": "Organization Members",
+      "members": "Users",
       "team": "Learning Progress",
       "courses": "Courses"
     },
@@ -1048,7 +1050,8 @@
     "downloadReport": "Download Report",
     "generatingReport": "Generating...",
     "allOrganizations": "All Organizations",
-    "subtitleOrg": "Members, engagement and learning at {{orgName}}.",
+    "subtitleOrg": "Engagement and learning at {{orgName}}.",
+    "subtitleUsers": "Users and learning progress at {{orgName}}.",
     "subtitleGlobalAll": "Engagement and learning across all organizations.",
     "subtitleGlobalOne": "Engagement and learning for the selected organization.",
     "courseOrgBreakdown": {

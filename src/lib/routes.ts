@@ -39,6 +39,7 @@ export const routes = {
   },
   orgAdmin: {
     root: '/app/admin/org',
+    users: '/app/admin/org/users',
     settings: '/app/admin/org/settings',
     ideas: '/app/admin/org/ideas',
     moderation: '/app/admin/org/moderation',

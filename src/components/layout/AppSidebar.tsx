@@ -34,6 +34,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   Building2,
+  Users,
   BarChart3,
   Settings as SettingsIcon,
   LogOut,
@@ -148,7 +149,7 @@ export function AppSidebar() {
   ];
 
   const orgAdminItems = [
-
+    { title: t('nav.users'), url: routes.orgAdmin.users, icon: Users },
     ...(features.analytics_enabled ? [{ title: t('nav.organization'), url: routes.orgAdmin.root, icon: BarChart3 }] : []),
     ...(features.community_enabled ? [
       { title: t('nav.ideasOverview'), url: routes.orgAdmin.ideas, icon: Lightbulb },
@@ -198,7 +199,7 @@ export function AppSidebar() {
           )}
 
           {effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && (
-            <NavSection label={t('nav.organization')} items={orgAdminItems} />
+            <NavSection label={t('nav.administration')} items={orgAdminItems} />
           )}
 
           {effectiveIsPlatformAdmin && (

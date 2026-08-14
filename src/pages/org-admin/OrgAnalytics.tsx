@@ -37,7 +37,13 @@ export default function OrgAnalytics() {
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isGlobalView = location.pathname === routes.platformAdmin.analytics;
+  const view: 'global' | 'organisation' | 'users' =
+    location.pathname === routes.platformAdmin.analytics
+      ? 'global'
+      : location.pathname === routes.orgAdmin.users
+        ? 'users'
+        : 'organisation';
+  const isGlobalView = view === 'global';
   const { currentOrg, isPlatformAdmin } = useAuth();
   const { features, isLoading: settingsLoading } = usePlatformSettings();
   const [selectedOrgId, setSelectedOrgId] = useState<string>('all');
@@ -64,7 +70,14 @@ export default function OrgAnalytics() {
 
   const effectiveOrgId = isGlobalView ? selectedOrgId : currentOrg?.id;
 
-  const analyticsQuery = useOrgAnalyticsData(effectiveOrgId ?? undefined);
+  // The Brugere (users) view stays reachable with analytics off, showing only the
+  // member list. Its analytics-derived tabs (overview/team/courses) need this data,
+  // so only fetch it when analytics is enabled; a disabled query clears the page's
+  // loading/error guards and lets the standalone member list render.
+  const shouldLoadAnalyticsData = settingsLoading || features.analytics_enabled;
+  const analyticsQuery = useOrgAnalyticsData(
+    shouldLoadAnalyticsData ? effectiveOrgId ?? undefined : undefined
+  );
 
   const stats = useMemo(() => {
     const data = analyticsQuery.data;
@@ -152,14 +165,19 @@ export default function OrgAnalytics() {
     }
   };
 
-  if (!settingsLoading && !features.analytics_enabled) {
+  if (!settingsLoading && !features.analytics_enabled && view !== 'users') {
     return <Navigate to={routes.learner.dashboard} replace />;
   }
 
-  const pageTitle = isGlobalView ? t('nav.globalAnalytics') : t('nav.organization');
+  const pageTitle =
+    view === 'global'
+      ? t('nav.globalAnalytics')
+      : view === 'users'
+        ? t('nav.users')
+        : t('nav.organization');
   const breadcrumbs = isGlobalView
     ? [{ label: t('nav.platformAdmin') }, { label: t('nav.globalAnalytics') }]
-    : [{ label: t('nav.organization') }];
+    : [{ label: pageTitle }];
 
   if (analyticsQuery.isLoading || settingsLoading) {
     return (
@@ -191,20 +209,30 @@ export default function OrgAnalytics() {
     );
   }
 
-  const subtitle = isGlobalView
-    ? selectedOrgId === 'all'
-      ? t('analytics.subtitleGlobalAll')
-      : t('analytics.subtitleGlobalOne')
-    : t('analytics.subtitleOrg', { orgName: currentOrg?.name ?? t('nav.organization') });
+  const subtitle =
+    view === 'global'
+      ? selectedOrgId === 'all'
+        ? t('analytics.subtitleGlobalAll')
+        : t('analytics.subtitleGlobalOne')
+      : view === 'users'
+        ? t('analytics.subtitleUsers', { orgName: currentOrg?.name ?? t('nav.organization') })
+        : t('analytics.subtitleOrg', { orgName: currentOrg?.name ?? t('nav.organization') });
 
-  const tabs = [
-    { key: 'overview', label: t('analytics.tabs.overview'), icon: <BarChart3 className="h-4 w-4" aria-hidden="true" /> },
-    ...(!isGlobalView
-      ? [{ key: 'members', label: t('analytics.tabs.members'), icon: <Users className="h-4 w-4 shrink-0" aria-hidden="true" /> }]
-      : []),
-    { key: 'team', label: t('analytics.tabs.team'), icon: <GraduationCap className="h-4 w-4" aria-hidden="true" /> },
-    { key: 'courses', label: t('analytics.tabs.courses'), icon: <BookOpen className="h-4 w-4" aria-hidden="true" /> },
-  ];
+  const overviewTab = { key: 'overview', label: t('analytics.tabs.overview'), icon: <BarChart3 className="h-4 w-4" aria-hidden="true" /> };
+  const membersTab = { key: 'members', label: t('analytics.tabs.members'), icon: <Users className="h-4 w-4 shrink-0" aria-hidden="true" /> };
+  const teamTab = { key: 'team', label: t('analytics.tabs.team'), icon: <GraduationCap className="h-4 w-4" aria-hidden="true" /> };
+  const coursesTab = { key: 'courses', label: t('analytics.tabs.courses'), icon: <BookOpen className="h-4 w-4" aria-hidden="true" /> };
+
+  // Brugere = people + their learning progress; Organisation = org-wide reporting.
+  // The learning-progress (team) tab is analytics, so it only shows when enabled.
+  const tabs =
+    view === 'global'
+      ? [overviewTab, teamTab, coursesTab]
+      : view === 'users'
+        ? [membersTab, ...(features.analytics_enabled ? [teamTab] : [])]
+        : [overviewTab, coursesTab];
+
+  const currentTab = tabs.some((tab) => tab.key === activeTab) ? activeTab : tabs[0].key;
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -230,9 +258,11 @@ export default function OrgAnalytics() {
         )}
       </div>
 
-      <SlidingTabs tabs={tabs} active={activeTab} onChange={handleTabChange} className="mb-6" />
+      {tabs.length > 1 && (
+        <SlidingTabs tabs={tabs} active={currentTab} onChange={handleTabChange} className="mb-6" />
+      )}
 
-      {activeTab === 'overview' && (
+      {currentTab === 'overview' && (
         <AnalyticsOverview
           stats={stats}
           members={analyticsQuery.data?.members ?? []}
@@ -244,9 +274,9 @@ export default function OrgAnalytics() {
         />
       )}
 
-      {!isGlobalView && activeTab === 'members' && <OrgMembersTab />}
+      {!isGlobalView && currentTab === 'members' && <OrgMembersTab />}
 
-      {activeTab === 'team' &&
+      {currentTab === 'team' &&
         (effectiveOrgId ? (
           <TeamPerformanceTab userStats={userStats} departments={departments} orgId={effectiveOrgId} />
         ) : (
@@ -255,7 +285,7 @@ export default function OrgAnalytics() {
           </div>
         ))}
 
-      {activeTab === 'courses' &&
+      {currentTab === 'courses' &&
         (effectiveOrgId ? (
           <CourseProgressTab orgId={effectiveOrgId} />
         ) : (
