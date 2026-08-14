@@ -160,7 +160,6 @@ describe('resources (list)', () => {
     mockQueryOne.mockResolvedValueOnce({ all_tags: [] });
     await handler(baseReq({ orgId: 'org-1', search: '100% snake_case \\path' }), {} as any);
     const [, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // % _ \ are each prefixed with a literal backslash so PG treats them as literals
     expect(params).toContain('%100\\% snake\\_case \\\\path%');
   });
 

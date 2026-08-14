@@ -102,7 +102,6 @@ describe('course-translation-link', () => {
 
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ ok: true });
-    // Both UPDATEs (and the count between them) run on the transaction client.
     expect(mockWithTransaction).toHaveBeenCalledTimes(1);
     expect(mockClientQuery).toHaveBeenCalledTimes(3);
     expect(mockClientQuery.mock.calls[0][0]).toContain('WHERE id = $1');

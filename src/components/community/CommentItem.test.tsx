@@ -7,8 +7,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
-// The author avatar (#180) resolves a signed URL via a query hook; stub it so
-// this focused actions-menu test needs no QueryClientProvider.
 vi.mock('@/hooks/useSignedBrandingUrl', () => ({ useSignedBrandingUrl: () => ({ data: undefined }) }));
 
 const comment: CommunityComment = {
@@ -25,7 +23,6 @@ const comment: CommunityComment = {
 
 describe('CommentItem actions menu (#160)', () => {
   it('renders the actions trigger when at least one action is available', () => {
-    // viewer is not the author, so Report is available
     render(<CommentItem comment={comment} currentUserId="viewer-1" onReport={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'common.actions' })).toBeInTheDocument();
   });

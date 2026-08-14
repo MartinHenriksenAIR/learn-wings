@@ -42,7 +42,6 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
         });
       }
     } else if (key === 'title') {
-      // title is NOT NULL in schema — must be a non-empty string
       if (!v || typeof v !== 'string') {
         return reply(400, { error: 'title must be a non-empty string' });
       }
@@ -50,8 +49,6 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
       if (v !== null && typeof v !== 'string') {
         return reply(400, { error: 'url must be a string or null' });
       }
-      // Defence in depth against stored-XSS (sec-1, #232): reject non-http(s)
-      // schemes so a `javascript:` payload never persists.
       const urlError = validateHttpUrl(v, 'url');
       if (urlError) {
         return reply(400, { error: urlError });
@@ -63,9 +60,6 @@ export default endpoint('resource-update', async ({ req, profile, reply }) => {
     }
   }
 
-  // Load + authorize (shared gate, #261): null covers both "missing" and
-  // "not authorized" — the single 404 is the anti-enumeration contract
-  // documented on loadResourceForWrite.
   const resource = await loadResourceForWrite(resourceId, profile);
   if (!resource) return reply(404, { error: 'Resource not found' });
 

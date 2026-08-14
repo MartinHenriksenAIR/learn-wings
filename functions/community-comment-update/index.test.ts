@@ -20,7 +20,6 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// comment.user_id is 'p2' (not the caller 'p1') by default
 const otherUserComment = { user_id: 'p2', is_hidden: false, scope: 'org' as const, org_id: 'org-1' };
 const myComment = { ...otherUserComment, user_id: 'p1' };
 const myHiddenComment = { ...myComment, is_hidden: true };
@@ -102,7 +101,6 @@ describe('community-comment-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // RLS asymmetry: author of HIDDEN comment cannot UPDATE (but can DELETE — tested in delete suite)
   it('returns 403 when author tries to update their own hidden comment', async () => {
     mockQueryOne.mockResolvedValueOnce(myHiddenComment);
     mockIsOrgAdmin.mockResolvedValueOnce(false);

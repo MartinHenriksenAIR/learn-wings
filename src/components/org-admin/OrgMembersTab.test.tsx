@@ -3,9 +3,6 @@ import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// --- mock react-i18next (no i18n provider needed) ---
-// `language` feeds this tab's date formatters; `resolvedLanguage` is what the
-// invite-language selector defaults from — both are 'en'.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (k: string) => k,
@@ -13,14 +10,11 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// --- mock sonner toast ---
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
-// --- mock api-client so no network fires (ApiError mirrors the real class so
-// --- `instanceof ApiError` checks in the component resolve) ---
 vi.mock('@/lib/api-client', () => {
   class MockApiError extends Error {
     status: number;
@@ -35,30 +29,22 @@ vi.mock('@/lib/api-client', () => {
   return { callApi: vi.fn(), ApiError: MockApiError };
 });
 
-// --- useAuth mock factory ---
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-// --- useOrgDetail mock factory — the component reads server-wide seat
-// --- aggregates (member_count / pending_invite_count) from this hook rather
-// --- than fetching '/api/organizations' itself (#126) ---
 const mockUseOrgDetail = vi.fn();
 vi.mock('@/hooks/useOrgDetail', () => ({
   useOrgDetail: (...args: unknown[]) => mockUseOrgDetail(...args),
 }));
 
-// --- keep the heavy child dialogs out of this focused test ---
 vi.mock('@/components/org-admin/BulkInviteDialog', () => ({
   BulkInviteDialog: () => null,
 }));
 vi.mock('@/components/org-admin/EnrollUserDialog', () => ({
   EnrollUserDialog: () => null,
 }));
-// Stub the assignment components (their own tests cover behavior) so this test
-// stays focused and no '/api/assignments' call fires. Markers expose the props
-// this tab wires so the wiring block below can assert them.
 vi.mock('@/components/assignments/AssignCourseDialog', async () => {
   const ReactActual = await import('react');
   return {
@@ -78,8 +64,6 @@ vi.mock('@/components/assignments/AssignmentsManager', async () => {
   };
 });
 
-// --- render the Radix dropdown menu inline (jsdom can't drive the real one).
-// --- createElement (not JSX) because vi.mock factories are hoisted above the jsx-runtime import ---
 vi.mock('@/components/ui/dropdown-menu', async () => {
   const ReactActual = await import('react');
   const h = ReactActual.createElement;
@@ -106,8 +90,6 @@ import { OrgMembersTab } from './OrgMembersTab';
 
 const mockCallApi = vi.mocked(callApi);
 
-// The component now reads from the shared TanStack Query hooks, so every render
-// needs a QueryClient in context. retry:false keeps error paths deterministic.
 function renderTab() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -140,17 +122,12 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
       effectiveIsOrgAdmin: true,
       effectiveIsPlatformAdmin: false,
     });
-    // No org-detail aggregates yet loaded — seatUsage falls back to the
-    // locally-fetched members/invitations lists (unrelated to this test).
     mockUseOrgDetail.mockReturnValue({ data: undefined, isLoading: false, isError: false, error: null });
   });
 
   it('second click while in-flight does not fire a second API call; guard clears in finally', async () => {
     let createCalls = 0;
     let resolveCreate: ((v: unknown) => void) | undefined;
-    // The champion toggle invalidates the ['ai-champions'] cache on success
-    // (rather than hand-patching it), so the badge flip is driven by this
-    // refetch returning the newly-created champion.
     let champions: Array<{ user_id: string }> = [];
 
     mockCallApi.mockImplementation(async (path: string) => {
@@ -168,25 +145,15 @@ describe('OrgMembersTab — AI champion toggle in-flight guard (#74)', () => {
 
     renderTab();
 
-    // The mocked t() returns the i18n key verbatim, so the action labels are the
-    // keys themselves (analytics.members.makeAiChampion / removeAiChampion).
     const item = await screen.findByRole('button', { name: 'analytics.members.makeAiChampion' });
 
     fireEvent.click(item);
-    // The in-flight guard (setTogglingChampion) fires synchronously in the click
-    // handler, so the item disables immediately.
     expect(item).toBeDisabled();
-    // useMutation dispatches the mutationFn on a microtask, so the request fires
-    // one tick after the click (the old imperative code called it synchronously).
     await waitFor(() => expect(createCalls).toBe(1));
 
-    // Second fast click while the first request is still in flight — the button
-    // is disabled, so onClick never fires and no second request is dispatched.
     fireEvent.click(item);
     expect(createCalls).toBe(1);
 
-    // Let the request finish — the server now reports the member as a champion,
-    // so the post-success refetch flips the badge and the guard clears.
     champions = [{ user_id: 'u-2' }];
     await act(async () => {
       resolveCreate?.({});
@@ -245,11 +212,9 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
     const copyBtn = await screen.findByRole('button', { name: 'analytics.members.copyLink' });
     fireEvent.click(copyBtn);
 
-    // Clipboard received the invite link (built from the link_id)
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toContain('link-abc');
 
-    // The button morphs to the "Copied!" label — no success toast
     await screen.findByRole('button', { name: 'analytics.members.copied' });
     expect(mockToast).not.toHaveBeenCalled();
   });
@@ -260,7 +225,6 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
     const revokeBtn = await screen.findByRole('button', { name: 'analytics.members.revoke' });
     fireEvent.click(revokeBtn);
 
-    // The update mutation fired with the expired status
     await waitFor(() =>
       expect(
         mockCallApi.mock.calls.some(
@@ -272,7 +236,6 @@ describe('OrgMembersTab — pending invitation copy/revoke feedback (no toast)',
       ).toBe(true),
     );
 
-    // The invitation row is removed (heading + row gone) and no success toast fired
     await waitFor(() =>
       expect(screen.queryByText('pending@example.com')).toBeNull(),
     );
@@ -292,8 +255,6 @@ describe('OrgMembersTab — seat usage uses the org-wide server aggregate (#126)
     });
     mockCallApi.mockImplementation(async (path: string) => {
       if (path === '/api/org-memberships') return { memberships: [membershipRow] };
-      // This admin has created NO invitations of their own — the caller-scoped
-      // list is empty, which is exactly the undercounting bug being fixed.
       if (path === '/api/invitations') return { invitations: [] };
       if (path === '/api/ai-champions') return { champions: [] };
       throw new Error(`Unexpected callApi path: ${path}`);
@@ -301,9 +262,6 @@ describe('OrgMembersTab — seat usage uses the org-wide server aggregate (#126)
   });
 
   it('disables invite and shows the limit-reached note from orgDetail.pending_invite_count, even though this admin\'s own invitation list is empty', async () => {
-    // A co-admin (invisible to this caller's /api/invitations scope) has 1
-    // pending invite outstanding. The server-wide aggregate reports it; the
-    // caller-scoped `invitations` list (mocked empty above) does not.
     mockUseOrgDetail.mockReturnValue({
       data: {
         id: 'org-1',
@@ -322,9 +280,6 @@ describe('OrgMembersTab — seat usage uses the org-wide server aggregate (#126)
     const inviteTrigger = await screen.findByRole('button', { name: 'analytics.members.inviteMember' });
     fireEvent.click(inviteTrigger);
 
-    // 1 active member + 1 org-wide pending invite === seat_limit (2): at cap.
-    // If the component still summed the caller-scoped `invitations` array
-    // (length 0) this would read 1/2 used and NOT be at the limit.
     await screen.findByText('seats.limitReached');
     expect(screen.getByRole('button', { name: 'Create Invitation' })).toBeDisabled();
   });
@@ -337,8 +292,6 @@ describe('OrgMembersTab — seat usage uses the org-wide server aggregate (#126)
     const inviteTrigger = await screen.findByRole('button', { name: 'analytics.members.inviteMember' });
     fireEvent.click(inviteTrigger);
 
-    // Fallback: 1 active member + 0 caller-scoped invitations, no seat_limit
-    // known yet (currentOrg has none in this test) — unlimited, so no cap note.
     await screen.findByRole('button', { name: 'Create Invitation' });
     expect(screen.queryByText('seats.limitReached')).toBeNull();
     expect(screen.getByRole('button', { name: 'Create Invitation' })).not.toBeDisabled();
@@ -404,9 +357,6 @@ describe('OrgMembersTab — invite gated to the org-admin flow (#352)', () => {
   });
 
   it('hides every invite affordance for a platform admin in Platform view', async () => {
-    // The leak this guards: a platform admin whose role switcher grants org-admin
-    // capability (effectiveIsOrgAdmin) while still IN Platform view
-    // (effectiveIsPlatformAdmin). Invite must not appear here.
     mockUseAuth.mockReturnValue({
       user: { id: 'oid-1' },
       profile: { id: 'admin-1', full_name: 'Platform Admin', is_platform_admin: true },
@@ -420,9 +370,7 @@ describe('OrgMembersTab — invite gated to the org-admin flow (#352)', () => {
 
     expect(screen.queryByRole('button', { name: 'analytics.members.inviteMember' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'analytics.members.bulkInvite' })).toBeNull();
-    // The pending-invite copy-link is an invite affordance too — gone here.
     expect(screen.queryByRole('button', { name: 'analytics.members.copyLink' })).toBeNull();
-    // Non-invite member tools stay available (only invite is gated).
     expect(screen.getByRole('button', { name: 'analytics.members.enrollInCourse' })).toBeInTheDocument();
   });
 

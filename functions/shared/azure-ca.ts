@@ -1,14 +1,3 @@
-/**
- * Root CA certificates Azure documents for PostgreSQL flexible server TLS.
- * https://learn.microsoft.com/azure/postgresql/flexible-server/concepts-networking-ssl-tls
- *
- * Embedded as TS constants (not .pem files) so the compiled dist/ ships them.
- * Fetched 2026-06-12; each verified via openssl x509 -noout -subject -fingerprint.
- */
-
-// DigiCert Global Root G2
-// Source: https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem
-// SHA-256 fingerprint: CB:3C:CB:B7:60:31:E5:E0:13:8F:8D:D3:9A:23:F9:DE:47:FF:C3:5E:43:C1:14:4C:EA:27:D4:6A:5A:B1:CB:5F
 export const DIGICERT_GLOBAL_ROOT_G2 = `-----BEGIN CERTIFICATE-----
 MIIDjjCCAnagAwIBAgIQAzrx5qcRqaC7KGSxHQn65TANBgkqhkiG9w0BAQsFADBh
 MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3
@@ -33,9 +22,6 @@ MrY=
 -----END CERTIFICATE-----
 `;
 
-// DigiCert Global Root CA
-// Source: https://cacerts.digicert.com/DigiCertGlobalRootCA.crt.pem
-// SHA-256 fingerprint: 43:48:A0:E9:44:4C:78:CB:26:5E:05:8D:5E:89:44:B4:D8:4F:96:62:BD:26:DB:25:7F:89:34:A4:43:C7:01:61
 export const DIGICERT_GLOBAL_ROOT_CA = `-----BEGIN CERTIFICATE-----
 MIIDrzCCApegAwIBAgIQCDvgVpBCRrGhdWrJWZHHSjANBgkqhkiG9w0BAQUFADBh
 MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3
@@ -60,9 +46,6 @@ CAUw7C29C79Fv1C5qfPrmAESrciIxpg0X40KPMbp1ZWVbd4=
 -----END CERTIFICATE-----
 `;
 
-// Microsoft RSA Root Certificate Authority 2017
-// Source: https://www.microsoft.com/pkiops/certs/Microsoft%20RSA%20Root%20Certificate%20Authority%202017.crt (DER, converted to PEM)
-// SHA-256 fingerprint: C7:41:F7:0F:4B:2A:8D:88:BF:2E:71:C1:41:22:EF:53:EF:10:EB:A0:CF:A5:E6:4C:FA:20:F4:18:85:30:73:E0
 export const MICROSOFT_RSA_ROOT_CA_2017 = `-----BEGIN CERTIFICATE-----
 MIIFqDCCA5CgAwIBAgIQHtOXCV/YtLNHcB6qvn9FszANBgkqhkiG9w0BAQwFADBl
 MQswCQYDVQQGEwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTYw
@@ -98,5 +81,4 @@ RA+GsCyRxj3qrg+E
 -----END CERTIFICATE-----
 `;
 
-/** Combined CA bundle for pg ssl.ca — all three roots Azure may chain to. */
 export const AZURE_POSTGRES_CA = [DIGICERT_GLOBAL_ROOT_G2, DIGICERT_GLOBAL_ROOT_CA, MICROSOFT_RSA_ROOT_CA_2017].join('');

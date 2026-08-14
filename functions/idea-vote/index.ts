@@ -14,7 +14,6 @@ export default endpoint('idea-vote', async ({ req, profile, reply, requireActive
 
   if (!idea) return reply(404, { error: 'Idea not found' });
 
-  // Draft privacy (shared/ideas): other-author's draft is invisible (no admin bypass)
   if (!isIdeaVisibleTo(idea, profile)) {
     return reply(404, { error: 'Idea not found' });
   }

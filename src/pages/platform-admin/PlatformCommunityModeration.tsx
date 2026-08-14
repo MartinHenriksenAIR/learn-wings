@@ -30,7 +30,6 @@ export default function PlatformCommunityModeration() {
   const [selectedReport, setSelectedReport] = useState<ReportWithDetails | null>(null);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
-  // Report whose content is shown in the "View content" dialog (#160).
   const [viewReport, setViewReport] = useState<ReportWithDetails | null>(null);
   const [scope, setScope] = useState<string>('all');
   const [scopeOpen, setScopeOpen] = useState(false);
@@ -48,7 +47,6 @@ export default function PlatformCommunityModeration() {
     },
   });
 
-  // org names don't change mid-session; the longer staleTime avoids window-focus refetches.
   const { data: orgsData } = useOrganizations({ staleTime: 5 * 60 * 1000 });
   const orgsMap = useMemo(() => {
     if (!orgsData) return undefined;
@@ -91,8 +89,6 @@ export default function PlatformCommunityModeration() {
     });
   };
 
-  // Org-scope badge: platform queue spans every org plus global, so each card
-  // shows where the report came from (Global, or the org name).
   const getScopeLabel = (report: ReportWithDetails): { label: string; global: boolean } => {
     if (!report.org_id) {
       return { label: t('platformModeration.scopeGlobal'), global: true };

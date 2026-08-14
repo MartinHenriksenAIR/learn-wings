@@ -68,10 +68,7 @@ describe('PriorityOverview', () => {
     );
     const list = screen.getByTestId('business-area-list');
     const rows = within(list).getAllByRole('listitem');
-    // only the two areas with ideas appear (count>0 filter drops the other 6),
-    // and null-area ideas never create a row
     expect(rows).toHaveLength(2);
-    // sorted by count desc: Sales (3) before HR / People (1)
     expect(rows[0]).toHaveTextContent('Sales');
     expect(rows[1]).toHaveTextContent('HR / People');
   });

@@ -12,13 +12,6 @@ export interface AssessmentQuestionsData {
   questions: AssessmentQuestion[];
 }
 
-/**
- * The one way to fetch `/api/assessment-questions` from the frontend.
- *
- * Questions are fixed content — the server returns a versioned questionnaire
- * that does not change during a session. A 5-minute staleTime avoids redundant
- * refetches while still picking up a server-side version bump on the next mount.
- */
 export function useAssessmentQuestions() {
   return useQuery({
     queryKey: queryKeys.assessment.questions,

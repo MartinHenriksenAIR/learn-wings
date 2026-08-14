@@ -117,7 +117,6 @@ describe('ai-champions', () => {
     expect(ctx.error).toHaveBeenCalledWith(expect.stringContaining('connection refused'));
   });
 
-  // #180 — AI champion author payload must carry avatar_url.
   it('joins avatar_url into the champion author profile payload', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const rows = [{ id: 'ch-1', profile: { id: 'a1', full_name: 'Ann', department: 'IT', avatar_url: 'avatars/a1.png' } }];

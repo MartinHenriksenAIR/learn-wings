@@ -129,9 +129,6 @@ describe('ProtectedRoute', () => {
     });
 
     it('does NOT silently demote/redirect a platform admin whose context failed — shows retry instead', () => {
-      // A platform admin (requirePlatformAdmin route) whose context blipped:
-      // isPlatformAdmin is false only because the load failed. The old code read
-      // `!isPlatformAdmin` and bounced to the learner dashboard; now it must not.
       mockUseAuth.mockReturnValue({
         ...baseAuth,
         profile: null,

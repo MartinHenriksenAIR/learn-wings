@@ -1,21 +1,12 @@
 import { withTransaction } from '../shared/db';
 import { adminEndpoint } from '../shared/endpoint';
 
-// Platform-admin-only: grant or revoke profiles.is_platform_admin (#128).
-//
-// The last-admin guard is a HARD refusal enforced server-side: the count of
-// current admins and the UPDATE run inside ONE transaction, and the admin rows
-// are locked FOR UPDATE so two concurrent revokes can't both slip past the
-// count and leave the platform with zero admins. Every other grant/revoke
-// (including self-demote) is allowed; the UI gates them behind a confirm dialog.
 export default adminEndpoint('platform-admin-update', async ({ req, reply }) => {
   const { userId, grant } = (await req.json()) as { userId?: unknown; grant?: unknown };
   if (!userId || typeof userId !== 'string') return reply(400, { error: 'userId is required' });
   if (typeof grant !== 'boolean') return reply(400, { error: 'grant must be a boolean' });
 
   const result = await withTransaction(async (client) => {
-    // Lock every current admin row — this both counts them and serializes
-    // concurrent revokes so the last-admin check below can't race.
     const admins = await client.query<{ id: string }>(
       `SELECT id FROM profiles WHERE is_platform_admin = true FOR UPDATE`,
     );

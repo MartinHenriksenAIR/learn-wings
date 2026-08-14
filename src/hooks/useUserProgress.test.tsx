@@ -130,7 +130,6 @@ describe('useUserProgress', () => {
       expect(screen.getByTestId('u2')).toHaveTextContent('c:0');
     });
 
-    // Two different user IDs = two separate fetches with different cache keys.
     expect(mockCallApi).toHaveBeenCalledTimes(2);
     expect(mockCallApi).toHaveBeenNthCalledWith(1, '/api/user-progress', { orgId: 'org-1', userId: 'user-1' });
     expect(mockCallApi).toHaveBeenNthCalledWith(2, '/api/user-progress', { orgId: 'org-1', userId: 'user-2' });

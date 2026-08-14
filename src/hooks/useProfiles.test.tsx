@@ -63,7 +63,6 @@ describe('useProfiles', () => {
     });
     expect(screen.getByTestId('second')).toHaveTextContent('Alice,Bob');
 
-    // The whole point of the shared hook: one network call, not one per consumer.
     expect(mockCallApi).toHaveBeenCalledTimes(1);
     expect(mockCallApi).toHaveBeenCalledWith('/api/profiles', {});
   });

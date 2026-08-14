@@ -11,7 +11,6 @@ interface CertificateCardProps {
   enrollment: Enrollment & { course: Course };
   profile: Profile | null;
   downloading: boolean;
-  /** Transient post-download success state (drives the in-button "Saved" morph). */
   saved: boolean;
   onDownload: (enrollmentId: string, courseTitle: string) => void;
 }
@@ -22,8 +21,6 @@ export function CertificateCard({ enrollment, profile, downloading, saved, onDow
 
   return (
     <div className="hover-lift group relative flex items-center gap-4 rounded-2xl border border-border bg-card p-5">
-      {/* Hover preview popover: a miniature of the certificate, revealed on hover.
-          Decorative duplicate of the card's info, so hidden from assistive tech. */}
       <div
         aria-hidden="true"
         data-testid="certificate-preview"

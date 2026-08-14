@@ -31,10 +31,8 @@ describe('extractLmsAssetPath', () => {
   });
 
   it('Azure-lookalike host (blob.core.windows.net in attacker domain) → does NOT match Azure branch (returns null)', () => {
-    // Host is "evil.blob.core.windows.net.attacker.com" — does NOT end with .blob.core.windows.net
     const url =
       'https://evil.blob.core.windows.net.attacker.com/lms-assets/course-thumbnails/evil.png?sig=x';
-    // Falls through — no legacy storage prefix, is an http URL but unrecognised, returns null
     expect(extractLmsAssetPath(url)).toBeNull();
   });
 
@@ -51,7 +49,6 @@ describe('extractLmsAssetPath', () => {
   });
 
   it('Azure URL with undecodable percent-encoding → null, never throws', () => {
-    // decodeURIComponent throws "URI malformed" on %E0%A4%A — the catch must contain it
     const url =
       'https://acct.blob.core.windows.net/lms-assets/bad%E0%A4%A.png?sig=X';
     expect(() => extractLmsAssetPath(url)).not.toThrow();
@@ -91,7 +88,6 @@ describe('extractLmsAssetPath', () => {
   });
 
   it('malformed URL that cannot be parsed → returns null without throwing', () => {
-    // Starts with https:// but is malformed enough to fail URL parsing; falls through to null
     expect(extractLmsAssetPath('https://[invalid')).toBeNull();
   });
 
@@ -116,7 +112,6 @@ describe('getSignedLmsAssetUrl', () => {
 
     const result = await getSignedLmsAssetUrl(storedSasUrl);
 
-    // callApi must be called with the extracted (container-relative) path, NOT the full SAS URL
     expect(mockCallApi).toHaveBeenCalledOnce();
     const [_endpoint, body] = mockCallApi.mock.calls[0];
     expect(body.blobPath).toBe('course-thumbnails/thumb.png');
@@ -143,7 +138,6 @@ describe('getSignedLmsAssetUrl', () => {
   });
 
   it('unrecognised http URL (e.g. CDN) → extraction returns null → stored URL returned unchanged', async () => {
-    // getSignedLmsAssetUrl falls back to storedValue when extractLmsAssetPath returns null
     const cdnUrl = 'https://cdn.example.com/image.png';
     const result = await getSignedLmsAssetUrl(cdnUrl);
     expect(mockCallApi).not.toHaveBeenCalled();

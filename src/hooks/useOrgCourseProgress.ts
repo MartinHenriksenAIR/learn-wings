@@ -13,12 +13,6 @@ interface OrgCourseProgressResult {
   }>;
 }
 
-/**
- * The one way to fetch `/api/org-course-progress` from the frontend.
- *
- * Returns the raw courses array; derivations (avgProgress, filtering,
- * grouping) stay at the call site in useMemo.
- */
 export function useOrgCourseProgress(orgId: string | undefined, adminLang: string | undefined) {
   return useQuery({
     queryKey: queryKeys.orgCourseProgress.detail(orgId, adminLang),

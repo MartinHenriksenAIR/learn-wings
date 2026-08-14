@@ -70,7 +70,6 @@ function AppRoutes() {
       <Route path={routes.community.ideaDetailPattern} element={<ProtectedRoute><IdeaDetail /></ProtectedRoute>} />
       <Route path={routes.community.events} element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
       <Route path={routes.community.resources} element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
-      {/* #344: Resources moved off the old nested path — redirect stale links/bookmarks. */}
       <Route path={routes.community.resourcesLegacy} element={<Navigate to={routes.community.resources} replace />} />
 
       <Route path={routes.orgAdmin.root} element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
@@ -89,7 +88,7 @@ function AppRoutes() {
 
       <Route path={routes.root} element={<Login />} />
       <Route path={routes.appRoot} element={<Navigate to={routes.learner.dashboard} replace />} />
-      
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

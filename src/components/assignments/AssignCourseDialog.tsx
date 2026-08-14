@@ -34,7 +34,6 @@ interface AssignCourseDialogProps {
   orgId: string;
   orgName: string;
   members: (OrgMembership & { profile: Profile })[];
-  /** When set, the target is locked to this member (opened from a member row). */
   presetUserId?: string;
   onSuccess?: () => void;
 }
@@ -70,7 +69,6 @@ export function AssignCourseDialog({
     isError: coursesError,
   } = useOrgCourseAccess(open ? orgId : undefined);
 
-  // Reset the form each time the dialog opens.
   useEffect(() => {
     if (open) {
       setTarget('member');
@@ -105,8 +103,6 @@ export function AssignCourseDialog({
     },
   });
 
-  // Distinguish a genuinely empty catalogue from a failed fetch — otherwise a
-  // transient load error reads as "enable a course first", which is misleading.
   const noCourses = !coursesLoading && !coursesError && courses.length === 0;
   const canSubmit =
     !!courseId &&
@@ -122,7 +118,6 @@ export function AssignCourseDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Target */}
           {presetUserId ? (
             <div className="space-y-1.5">
               <Label>{t('assignments.targetLabel')}</Label>
@@ -155,7 +150,6 @@ export function AssignCourseDialog({
             </div>
           )}
 
-          {/* Member select (only when targeting a member and no preset) */}
           {!presetUserId && target === 'member' && (
             <div className="space-y-1.5">
               <Label htmlFor="assign-member">{t('assignments.selectMember')}</Label>
@@ -174,7 +168,6 @@ export function AssignCourseDialog({
             </div>
           )}
 
-          {/* Course select */}
           <div className="space-y-1.5">
             <Label htmlFor="assign-course">{t('assignments.selectCourse')}</Label>
             <Select value={courseId} onValueChange={setCourseId} disabled={noCourses}>
@@ -197,7 +190,6 @@ export function AssignCourseDialog({
             )}
           </div>
 
-          {/* Type: mandatory / recommended */}
           <div className="space-y-2">
             <Label id="assign-type-label">{t('assignments.typeLabel')}</Label>
             <RadioGroup
@@ -221,7 +213,6 @@ export function AssignCourseDialog({
             </RadioGroup>
           </div>
 
-          {/* Optional due date */}
           <div className="space-y-1.5">
             <Label htmlFor="assign-due-date">{t('assignments.dueDateOptional')}</Label>
             <Input

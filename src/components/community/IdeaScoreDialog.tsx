@@ -26,7 +26,6 @@ const LEVELS = [
   { value: '1', key: 'low' },
 ] as const;
 
-// Element ids linking each <label> to its Select trigger (a11y).
 const VALUE_SELECT_ID = 'idea-score-value';
 const EFFORT_SELECT_ID = 'idea-score-effort';
 
@@ -37,7 +36,6 @@ export function IdeaScoreDialog({
   const [localValue, setLocalValue] = useState<string>('');
   const [localEffort, setLocalEffort] = useState<string>('');
 
-  // Re-seed the selects each time the dialog opens for a (possibly different) idea.
   useEffect(() => {
     if (open) {
       setLocalValue(value != null ? String(value) : '');

@@ -31,8 +31,6 @@ export default function LearnerTraining() {
   const { t, i18n } = useTranslation();
   const { flashed, flash } = useFlash();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  // Card is the default here (unlike the list-first catalog) so the page keeps its
-  // familiar look; the choice persists per-learner under its own key (#449).
   const [view, setView] = useListView('min-traening-view', 'card');
 
   const query = useLearnerTraining(currentOrg?.id, {
@@ -43,10 +41,6 @@ export default function LearnerTraining() {
   const progressData: Record<string, { total: number; completed: number }> = data?.progress ?? {};
   const thumbnailUrls: Record<string, string> = data?.thumbnailUrls ?? {};
 
-  // Site-specific derivation lives at the call site (frontend rules): split
-  // enrollments by status and aggregate lesson counts across ALL enrollments.
-  // Keyed on the stable `data` reference so the memo isn't defeated by the
-  // fresh `?? []`/`?? {}` fallbacks created on every render.
   const { inProgress, completed, lessonTotal, lessonDone, pct } = useMemo(() => {
     const list = data?.enrollments ?? [];
     const prog = data?.progress ?? {};
@@ -83,7 +77,6 @@ export default function LearnerTraining() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      // In-button "Saved" morph on the card, no toast.
       flash(enrollmentId);
     } catch (_err) {
       toast({
@@ -141,7 +134,6 @@ export default function LearnerTraining() {
         <ListViewToggle view={view} onChange={setView} />
       </div>
 
-      {/* 1 · Slim progress strip — a compact lesson-level aggregate, not a hero. */}
       <div
         data-testid="training-progress-strip"
         className="mb-7 rounded-2xl border border-border bg-card px-5 py-4"
@@ -157,10 +149,8 @@ export default function LearnerTraining() {
         <Progress value={pct} className="h-1.5" />
       </div>
 
-      {/* 2 · Mandatory — the learner's mandatory-assigned courses (#365). */}
       <MandatoryCourses orgId={currentOrg.id} view={view} />
 
-      {/* 3 · Continue (in-progress) — live resume cards. */}
       <section className="mb-8">
         <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('training.continue.title')}</h2>
 
@@ -263,10 +253,8 @@ export default function LearnerTraining() {
         )}
       </section>
 
-      {/* 4 · Favorites — the learner's favorited courses (#358/#380). */}
       <FavoriteCourses orgId={currentOrg.id} view={view} />
 
-      {/* 5 · Completed (+ certificate). */}
       <section className="mb-8">
         <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('training.completed.title')}</h2>
 

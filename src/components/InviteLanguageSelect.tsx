@@ -15,11 +15,6 @@ interface InviteLanguageSelectProps {
   id?: string;
 }
 
-/**
- * Language picker for invitation emails. Options reuse the shared `languages.*`
- * labels; the resolved language is applied server-side (an existing recipient's
- * own preference can still override this pick — see ADR-0016 category 3).
- */
 export function InviteLanguageSelect({ value, onChange, id = 'invite-language' }: InviteLanguageSelectProps) {
   const { t } = useTranslation();
   return (

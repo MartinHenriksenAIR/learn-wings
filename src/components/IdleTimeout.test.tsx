@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
-// Drive the hook's output directly so this test covers the wiring (auth gating,
-// handler, modal) without re-exercising the timer logic (its own test does that).
 const useIdleTimeoutSpy = vi.fn();
 vi.mock('@/hooks/useIdleTimeout', () => ({
   useIdleTimeout: (opts: unknown) => useIdleTimeoutSpy(opts),
@@ -14,8 +12,6 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
 
 vi.mock('@/lib/session-expired', () => ({ handleIdleTimeout: vi.fn() }));
 
-// Resolve keys against the real en.json (with basic {{var}} interpolation) so
-// assertions read the shipped copy — the shared pattern from Login.test.tsx.
 vi.mock('react-i18next', async () => {
   const en = (await import('@/i18n/locales/en.json')).default;
   const translate = (key: string, opts?: Record<string, unknown>): string => {

@@ -134,7 +134,6 @@ describe('community-report-create', () => {
     const dedupeCall = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(dedupeCall[1]).toContain('p1'); // reporter from profile, not body
 
-    // Verify INSERT params — reporter_user_id from profile.id
     const insertCall = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(insertCall[0]).toContain('INSERT INTO community_reports');
     expect(insertCall[1]).toContain('p1');

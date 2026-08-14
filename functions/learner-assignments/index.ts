@@ -1,11 +1,6 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
 
-// The learner's own assigned/mandatory courses for one org — the read the
-// Min Træning view (#364) consumes. Self-scoped (never trusts a client user id).
-// Resolves individual (user_id = caller) + whole-org (user_id IS NULL)
-// assignments, deduped by course: mandatory wins, earliest real due date wins.
-// completed/overdue are derived from the caller's enrollment in this org.
 export default endpoint('learner-assignments', async ({ req, profile, reply, requireActiveMember }) => {
   const body = await req.json() as { orgId?: unknown };
   const { orgId } = body;
@@ -34,8 +29,6 @@ export default endpoint('learner-assignments', async ({ req, profile, reply, req
     [orgId, profile.id],
   );
 
-  // overdue/completed can come back NULL when there is no due date / no enrollment
-  // row — normalize to strict booleans for the client contract.
   const assignments = (Array.isArray(rows) ? rows : []).map((r) => {
     const row = r as Record<string, unknown>;
     return { ...row, completed: row.completed === true, overdue: row.overdue === true };

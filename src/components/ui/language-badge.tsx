@@ -8,11 +8,6 @@ export interface LanguageBadgeProps {
   className?: string;
 }
 
-/**
- * Plain globe icon + muted label for a course's language. Unlike
- * `LevelBadge`, this is deliberately not a colored pill. Renders nothing
- * when the language is null (existing courses predating this field).
- */
 export function LanguageBadge({ language, className }: LanguageBadgeProps) {
   const { t } = useTranslation();
 

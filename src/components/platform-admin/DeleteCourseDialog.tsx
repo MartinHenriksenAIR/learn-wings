@@ -14,7 +14,6 @@ import {
 interface DeleteCourseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Undefined where the target is picked from a list and nothing is selected yet. */
   courseTitle: string | undefined;
   onConfirm: () => void;
   pending: boolean;

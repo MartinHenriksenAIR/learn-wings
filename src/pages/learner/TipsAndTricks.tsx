@@ -3,8 +3,6 @@ import { Lightbulb } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyState } from '@/components/ui/empty-state';
 
-// Coming-soon placeholder (#366). Real content and the sidebar nav entry
-// (inside the Læring group) arrive with the navigation restructure (#363).
 export default function TipsAndTricks() {
   const { t } = useTranslation();
 

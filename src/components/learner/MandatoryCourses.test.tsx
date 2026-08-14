@@ -54,10 +54,8 @@ describe('MandatoryCourses', () => {
     expect(screen.getByText('training.mandatory.title')).toBeInTheDocument();
     const card = screen.getByTestId('training-mandatory-card');
     expect(screen.getByText('Compliance 101')).toBeInTheDocument();
-    // Opened from Min Træning → the link tags its origin for the player breadcrumb (#438).
     expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
     expect(screen.getByTestId('mandatory-due')).toHaveTextContent(formatDate(new Date('2026-09-01'), 'P', 'en'));
-    // Not overdue -> no overdue badge on this card.
     expect(card.querySelector('[data-testid="mandatory-overdue"]')).toBeNull();
   });
 

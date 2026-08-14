@@ -74,8 +74,6 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       const nextOrgFeatures = (orgResult.settings?.features as Partial<FeatureSettings> | undefined) ?? null;
       setOrgFeatures(nextOrgFeatures);
     } catch (err) {
-      // The per-call .catch()es above already default failed fetches; this outer
-      // catch only fires on a processing bug — don't swallow it silently.
       console.error('usePlatformSettings: failed to process settings', err);
       setPlatformFeatures(defaultFeatures);
       setOrgFeatures(null);

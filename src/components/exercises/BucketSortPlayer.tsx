@@ -20,8 +20,6 @@ export function BucketSortPlayer({ config, onComplete }: Props) {
   const [selected, setSelected] = useState<string | null>(null);   // click-to-place selection
   const [checked, setChecked] = useState(false);
   const [completed, setCompleted] = useState(false);   // latch: onComplete fires exactly once
-  // distance:8 → a zero-movement click is NOT treated as a drag, so a plain click still
-  // reaches the item's onClick (click-to-place); a real drag starts after 8px of movement.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor),
@@ -42,7 +40,6 @@ export function BucketSortPlayer({ config, onComplete }: Props) {
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      {/* Tray of unassigned items */}
       <Tray bucketId={null} selected={selected}>
         {itemsIn(null).map((it) => (
           <Item key={it.id} id={it.id} text={it.text} isSelected={selected === it.id}
@@ -50,7 +47,6 @@ export function BucketSortPlayer({ config, onComplete }: Props) {
         ))}
       </Tray>
 
-      {/* One drop zone per bucket */}
       <div className="grid gap-4 sm:grid-cols-2 mt-4">
         {config.buckets.map((b) => (
           <Bucket key={b.id} id={b.id} label={b.label}
@@ -80,7 +76,6 @@ export function BucketSortPlayer({ config, onComplete }: Props) {
   );
 }
 
-// Draggable + click-selectable item (button => keyboard/click operable by default)
 function Item({ id, text, isSelected, feedback, onSelect }: {
   id: string; text: string; isSelected: boolean; feedback?: 'correct' | 'incorrect'; onSelect: () => void;
 }) {

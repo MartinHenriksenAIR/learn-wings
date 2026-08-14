@@ -16,12 +16,8 @@ function renderProvider(props: { defaultOpen?: boolean; open?: boolean } = {}) {
   );
 }
 
-// Every page mounts its own AppLayout, so the provider remounts on each navigation.
-// Persistence (#370) therefore hinges on the provider re-reading the cookie on mount —
-// not just writing it on toggle.
 describe('SidebarProvider cookie persistence (#370)', () => {
   beforeEach(() => {
-    // The provider writes the cookie with path=/; clear it the same way between tests.
     document.cookie = 'sidebar:state=; path=/; max-age=0';
   });
 
@@ -49,17 +45,7 @@ describe('SidebarProvider cookie persistence (#370)', () => {
   });
 });
 
-// The panel width animates over 200ms while the content swaps to its target layout
-// in a single frame — so mid-animation the (wider) expanded content is briefly painted
-// into the still-narrow rail and spills out ("warped/oversized" flash, #396). The fix is
-// overflow-hidden on the panel, masking the overflow into a clean reveal. jsdom applies no
-// layout, so this pins the class as a regression guard (e.g. against a shadcn re-sync
-// silently dropping it) rather than asserting the visual behaviour.
 describe('Sidebar panel clips overflow during the width animation (#396)', () => {
-  // The #370 block leaks sidebar:state=false via document.cookie and only resets inside
-  // its own beforeEach; clear it here too so this block is hermetic regardless of order.
-  // (The assertion is state-independent — the class is unconditional — but the render
-  // shouldn't silently depend on a leaked cookie.)
   beforeEach(() => {
     document.cookie = 'sidebar:state=; path=/; max-age=0';
   });

@@ -4,10 +4,6 @@ import { fileURLToPath } from 'node:url';
 
 const { mockQuery } = vi.hoisted(() => ({ mockQuery: vi.fn() }));
 
-// Only the DB is mocked. `../shared/blob` and `../shared/sas` run for real against
-// a stubbed `fetch`, so these tests exercise the actual SAS signing, the actual
-// URL construction and the actual `deleteBlob` — the whole path that would
-// destroy a customer's file if it targeted the wrong blob.
 vi.mock('../shared/db', () => ({
   query: mockQuery,
   queryOne: vi.fn(),
@@ -15,10 +11,6 @@ vi.mock('../shared/db', () => ({
   getDb: vi.fn(),
 }));
 
-// The run record and the alerting (#286) are mocked here so these cases stay
-// about the SWEEP; the policy they implement is pinned in ./notify.test.ts.
-// Mocking also keeps the "refuses before reading anything at all" assertions
-// meaningful — an unmocked notifier would put its own reads on `mockQuery`.
 const { mockRecordAndNotify } = vi.hoisted(() => ({ mockRecordAndNotify: vi.fn() }));
 vi.mock('./notify', () => ({ recordAndNotify: mockRecordAndNotify }));
 
@@ -36,17 +28,6 @@ const NOW = Date.parse('2026-07-25T03:00:00.000Z');
 const HOUR = 3_600_000;
 const hoursAgo = (h: number) => new Date(NOW - h * HOUR).toUTCString();
 
-/**
- * The blobs a healthy container holds — all six path columns, in BOTH storage
- * shapes.
- *
- * Neither shape belongs to a particular column: `azure-upload-url` mints bare
- * names for videos and thumbnails, `azure-document-upload-url` mints
- * `documents/…`, branding mints `avatars/…` and `org-logos/…`, and seeded/legacy
- * lesson rows carry `videos/…` (migration/azure/02-seed.sql). A fixture that only
- * ever showed bare lesson assets would leave the prefixed ones — the majority of
- * what this job could destroy — untested.
- */
 const REFERENCED_ROWS = [
   { path: 'lesson-video.mp4' },        // lessons.azure_blob_path       — bare
   { path: 'videos/welcome.mp4' },      // lessons.video_storage_path    — PREFIXED (seed/legacy)
@@ -58,17 +39,13 @@ const REFERENCED_ROWS = [
   { path: 'org-logos/org-1.png' },     // organizations.logo_url        — PREFIXED
 ];
 const REFERENCED_NAMES = REFERENCED_ROWS.map((r) => r.path);
-/** Every referenced blob, as a listing fixture. */
 const referencedBlobs = () => REFERENCED_NAMES.map((name) => ({ name }));
 
 interface BlobFixture {
   name: string;
   bytes?: number;
-  /** Hours before NOW. Defaults to 72 (well outside the grace window). */
   ageHours?: number;
-  /** Set true to omit <Last-Modified> entirely. */
   undated?: boolean;
-  /** Attributes on the <Name> tag, e.g. `Encoded="true"` (what Azure emits for XML-illegal names). */
   nameAttrs?: string;
 }
 
@@ -97,19 +74,14 @@ function listPage(blobs: BlobFixture[], nextMarker = ''): string {
 </EnumerationResults>`;
 }
 
-/** The blob a DELETE request actually targeted, read back out of the signed URL. */
 function targetOf(url: string): string {
   return new URL(url).pathname.split('/').slice(2).map(decodeURIComponent).join('/');
 }
 
 interface StubOptions {
-  /** XML per list page, in order. */
   pages?: string[];
-  /** Status for the list request (non-2xx makes the listing fail). */
   listStatus?: number;
-  /** Per-blob DELETE status; anything not listed succeeds with 202. */
   deleteStatus?: Record<string, number>;
-  /** Make list requests reject outright. */
   listThrows?: boolean;
 }
 
@@ -161,9 +133,6 @@ afterEach(() => {
   delete process.env.ORPHAN_SWEEP_MAX_DELETIONS;
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// The comparison: what must survive a sweep
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — referenced blobs are never deleted', () => {
   it('leaves a referenced BARE blob name alone and deletes the genuine orphan beside it', async () => {
     const { deleted } = stubFetch({
@@ -177,14 +146,6 @@ describe('orphan-sweep — referenced blobs are never deleted', () => {
     expect(summary).toMatchObject({ aborted: false, scanned: 9, eligible: 9, orphaned: 1, deleted: 1, failed: 0 });
   });
 
-  /**
-   * THE TRAP-2 REGRESSION TEST.
-   *
-   * `List Blobs` returns `avatars/user-1.jpg`; the database stores exactly that.
-   * Any basename-extraction or prefix-stripping on the LISTED name would turn it
-   * into `user-1.jpg`, match nothing, and delete every avatar and org logo in the
-   * system. The assertion below is the whole reason this job can be armed.
-   */
   it('leaves referenced PREFIXED branding paths alone (avatars/, org-logos/)', async () => {
     const { deleted } = stubFetch({
       pages: [listPage([...REFERENCED_NAMES.map((name) => ({ name })), { name: 'stranded.png' }])],
@@ -194,18 +155,9 @@ describe('orphan-sweep — referenced blobs are never deleted', () => {
 
     expect(deleted).not.toContain('avatars/user-1.jpg');
     expect(deleted).not.toContain('org-logos/org-1.png');
-    // Not vacuous: the sweep did run and did delete the one blob it should have.
     expect(deleted).toEqual(['stranded.png']);
   });
 
-  /**
-   * The same trap, for the prefix nobody thinks of as "prefixed".
-   *
-   * `azure-document-upload-url` has ALWAYS minted `documents/<uuid>.<ext>`, and
-   * seeded/legacy lesson rows carry `videos/…`. A reader who believes lesson
-   * assets are stored bare is exactly the reader who would "fix" the listed name
-   * by stripping `documents/` — and take every course document with it.
-   */
   it('leaves referenced PREFIXED lesson assets alone (documents/, videos/)', async () => {
     const { deleted } = stubFetch({
       pages: [listPage([...referencedBlobs(), { name: 'stranded.pdf' }])],
@@ -219,7 +171,6 @@ describe('orphan-sweep — referenced blobs are never deleted', () => {
   });
 
   it('protects a blob referenced by ONE column even though the other five do not mention it', async () => {
-    // Only `lessons.document_storage_path` still points at this file.
     mockQuery.mockResolvedValue([{ path: 'sole-reference.pdf' }, ...REFERENCED_ROWS]);
     const { deleted } = stubFetch({
       pages: [listPage([{ name: 'sole-reference.pdf' }, ...REFERENCED_NAMES.map((name) => ({ name }))])],
@@ -248,9 +199,7 @@ describe('orphan-sweep — referenced blobs are never deleted', () => {
     for (const table of ['lessons', 'courses', 'organizations', 'profiles']) {
       expect(sql).toContain(table);
     }
-    // A transform on the DB side of the comparison is the trap-2 bug class.
     expect(sql).not.toMatch(/trim|substring|replace|lower|split_part|regexp/i);
-    // video_url is a deprecated EXTERNAL url — never a reconciliation target.
     expect(sql).not.toContain('video_url');
   });
 
@@ -280,9 +229,6 @@ describe('orphan-sweep — referenced blobs are never deleted', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Grace window
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — 24 h grace window', () => {
   it('deletes an unreferenced blob older than 24 h', async () => {
     const { deleted } = stubFetch({
@@ -318,34 +264,10 @@ describe('orphan-sweep — 24 h grace window', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// TRIPWIRE 1 — the per-bucket orphan share
-//
-// A global share alone is structurally blind to the bug class it claims to
-// catch. The six path columns are independent code paths, so a break confined to
-// one of them produces a MINORITY orphan share: production holds roughly a few
-// thousand root-level lesson/thumbnail blobs against a few hundred `avatars/` +
-// `org-logos/`, so a prefix-stripping "fix" reads as ~11% globally — under the
-// 50% ceiling AND under the 500-deletion ceiling. Both tripwires pass while
-// every avatar and org logo in the system is destroyed in one night.
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — per-bucket orphan share', () => {
-  /** N referenced root blobs, standing in for the bulk of a real container. */
   const rootFleet = (n: number) => Array.from({ length: n }, (_, i) => `root-${i}.mp4`);
 
   it('aborts when ONE prefix is wholly unreferenced even though the container as a whole looks healthy', async () => {
-    // PRODUCTION SHAPE, scaled 10x down with the ratio preserved: a few thousand
-    // root-level lesson/thumbnail blobs against a few hundred branding assets.
-    //
-    // ARITHMETIC — this is the whole point of the test:
-    //   listing         = 200 referenced root blobs + 25 unreferenced branding = 225 eligible
-    //   GLOBAL share    =  25/225 = 11.1%  → under the 50% ceiling,  does NOT trip
-    //   deletion count  =  25              → under the 500 ceiling,  does NOT trip
-    //   avatars/ share  =  20/20  = 100%   → over the ceiling,       TRIPS
-    //   org-logos/      =   5/5   = 100%   → over the ceiling,       TRIPS
-    // Without the per-bucket pass NOTHING stops this run, and every branding
-    // asset in the container is deleted in one night while both tripwires report
-    // a perfectly ordinary 11%.
     const root = rootFleet(200);
     const branding = [
       ...Array.from({ length: 20 }, (_, i) => `avatars/u-${i}.jpg`),
@@ -367,17 +289,13 @@ describe('orphan-sweep — per-bucket orphan share', () => {
       orphaned: 25,
       deleted: 0,
     });
-    // 11.1% globally — the share the old single tripwire saw, and waved through.
     expect(summary.orphaned / summary.eligible).toBeLessThan(0.5);
-    // The abort has to name the bucket, or an operator cannot act on it.
     const message = log.error.mock.calls[0][0] as string;
     expect(message).toContain('avatars/');
     expect(message).toContain('20/20');
   });
 
   it('aborts on a wholly-unreferenced bucket at the container ROOT too', async () => {
-    // The root is a bucket like any other: 4 unreferenced root blobs against
-    // 20 referenced avatars is 4/24 = 16.7% globally, but 100% of the root.
     const avatars = Array.from({ length: 20 }, (_, i) => `avatars/u-${i}.jpg`);
     mockQuery.mockResolvedValue(avatars.map((path) => ({ path })));
     const { deleted } = stubFetch({
@@ -401,9 +319,6 @@ describe('orphan-sweep — per-bucket orphan share', () => {
   });
 
   it('still sweeps a minority orphan inside a prefix — the bucket check is not a blanket refusal', async () => {
-    // avatars/ = 4 referenced + 1 orphan = 20%, under the ceiling. If the
-    // per-bucket pass were a blanket "never touch a prefixed blob", this run
-    // would abort and the sweep could never reclaim a cancelled avatar upload.
     const root = rootFleet(10);
     const avatars = ['avatars/u-0.jpg', 'avatars/u-1.jpg', 'avatars/u-2.jpg', 'avatars/u-3.jpg'];
     mockQuery.mockResolvedValue([...root, ...avatars].map((path) => ({ path })));
@@ -424,8 +339,6 @@ describe('orphan-sweep — per-bucket orphan share', () => {
   });
 
   it('reports the GLOBAL reason when the whole container is implausible, not the bucket one', async () => {
-    // Both passes would fire here; the global one is the more accurate diagnosis
-    // and must win, so the reason an operator sees matches what actually broke.
     mockQuery.mockResolvedValue([{ path: 'lesson-video.mp4' }]);
     const { deleted } = stubFetch({
       pages: [
@@ -445,13 +358,6 @@ describe('orphan-sweep — per-bucket orphan share', () => {
   });
 
   it('still aborts on a TWO-blob prefix bucket — the root-class floor is not applied here', async () => {
-    // The prefix buckets have no minimum-size floor and must not acquire one:
-    //   listing        = 40 referenced root .mp4 + 2 unreferenced videos/ = 42 eligible
-    //   GLOBAL share   =  2/42 = 4.8%   → under the ceiling,  does NOT trip
-    //   root bucket    =  0/40 = 0%     → does NOT trip
-    //   videos/ share  =  2/2  = 100%   → over the ceiling,   TRIPS
-    // Two orphans is below MIN_ROOT_CLASS_ORPHANS; if that floor were ever
-    // generalised to every bucket, this run would sweep instead of refusing.
     const root = rootFleet(40);
     mockQuery.mockResolvedValue(root.map((path) => ({ path })));
     const { deleted } = stubFetch({
@@ -469,34 +375,10 @@ describe('orphan-sweep — per-bucket orphan share', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// TRIPWIRE 1, one level down — the root file-type classes (#282)
-//
-// The root is the only bucket two writers share: `courses.thumbnail_url` puts
-// images there and the bare lesson paths put videos and documents there. So the
-// dilution the per-bucket pass was built to remove reappears INSIDE the root
-// bucket — a thumbnails-only break is a thin slice of a much larger video
-// population. Splitting the root by file-type class is what separates them.
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — root file-type classes', () => {
   const rootFleet = (n: number) => Array.from({ length: n }, (_, i) => `root-${i}.mp4`);
 
   it('aborts when the root IMAGE class is wholly unreferenced but the root as a whole is not', async () => {
-    // THE #282 REGRESSION TEST — a break confined to `courses.thumbnail_url`.
-    //
-    // ARITHMETIC — every ceiling that could have stopped this, and what it saw:
-    //   listing            = 200 referenced root .mp4
-    //                      +  12 UNREFERENCED root .png (every thumbnail in the system)
-    //                      +  20 referenced avatars/     = 232 eligible
-    //   GLOBAL share       = 12/232 =  5.2%  → under the 50% ceiling,  does NOT trip
-    //   deletion count     = 12               → under the 500 ceiling,  does NOT trip
-    //   avatars/ share     =  0/20  =  0%     → does NOT trip
-    //   ROOT BUCKET share  = 12/212 =  5.7%  → under the ceiling,      does NOT trip
-    //   root VIDEO class   =  0/200 =  0%     → does NOT trip
-    //   root IMAGE class   = 12/12  = 100%    → over the ceiling,      TRIPS
-    // Every pre-#282 check waves this through: the root bucket alone is 5.7%,
-    // because 200 healthy videos dilute 12 dead thumbnails. Remove the root split
-    // and this run deletes every course thumbnail in the container in one night.
     const root = rootFleet(200);
     const avatars = Array.from({ length: 20 }, (_, i) => `avatars/u-${i}.jpg`);
     const thumbnails = Array.from({ length: 12 }, (_, i) => `thumb-${i}.png`);
@@ -516,32 +398,14 @@ describe('orphan-sweep — root file-type classes', () => {
       orphaned: 12,
       deleted: 0,
     });
-    // 5.2% globally — the share every other tripwire in this file was happy with.
     expect(summary.orphaned / summary.eligible).toBeLessThan(0.5);
     const message = log.error.mock.calls[0][0] as string;
-    // Naming "the container root" alone is not actionable when the root holds
-    // 212 blobs and only 12 are the problem — the class has to be in the message.
     expect(message).toContain('image files at the container root');
     expect(message).toContain('12/12');
     expect(message).toContain('thumb-0.png');
   });
 
   it('sweeps a healthy container with orphans scattered across every class', async () => {
-    // THE FALSE-POSITIVE GUARD. A tripwire that fires on a normal night gets its
-    // ceiling raised to shut it up, and the ceilings are the whole safety system.
-    //
-    //   root video     = 40 referenced + 3 orphans =  3/43  =  7.0%  → fine
-    //   root image     = 12 referenced + 2 orphans =  2/14  = 14.3%  → fine
-    //   root document  =  6 referenced + 1 orphan  =  1/7   = 14.3%  → fine
-    //   root other     =  0 referenced + 1 orphan  =  1/1   =  100%  → BELOW the
-    //       floor of 5 orphans, so it does not abort. Nothing mints a root `.tif`,
-    //       so that class holds exactly one stray blob and no healthy population
-    //       to measure it against — and the only thing that could ever clear the
-    //       blob is the sweep it would be blocking.
-    //   avatars/       = 10 referenced + 1 orphan  =  1/11  =  9.1%  → fine
-    //   documents/     =  5 referenced + 1 orphan  =  1/6   = 16.7%  → fine
-    //   ROOT BUCKET    = 58 referenced + 7 orphans =  7/65  = 10.8%  → fine
-    //   GLOBAL         = 73 referenced + 9 orphans =  9/82  = 11.0%  → fine
     const referencedFixture = [
       ...Array.from({ length: 40 }, (_, i) => `root-${i}.mp4`),
       ...Array.from({ length: 12 }, (_, i) => `thumb-${i}.png`),
@@ -574,19 +438,10 @@ describe('orphan-sweep — root file-type classes', () => {
   });
 
   it('reports the WHOLE-ROOT diagnosis, not a class one, when the whole root is unreferenced', async () => {
-    // Both the root bucket and the root image class are 100% here. "The container
-    // root" is the accurate diagnosis and must win — an operator told only about
-    // images would go looking for a thumbnail bug that is not there.
-    //   listing     = 30 referenced avatars/ + 10 unreferenced root .png = 40 eligible
-    //   GLOBAL      = 10/40 = 25%   → under the ceiling, so the global reason
-    //                                 cannot pre-empt the bucket one
-    //   root bucket = 10/10 = 100%  → TRIPS first
     const avatars = Array.from({ length: 30 }, (_, i) => `avatars/u-${i}.jpg`);
     const images = Array.from({ length: 10 }, (_, i) => `thumb-${i}.png`);
     mockQuery.mockResolvedValue(avatars.map((path) => ({ path })));
     const { deleted } = stubFetch({
-      // Prefixed blobs listed FIRST, so root keys enter the census map last —
-      // the ordering claim must not depend on what order Azure listed things in.
       pages: [listPage([...avatars, ...images].map((name) => ({ name })))],
     });
     const log = makeLog();
@@ -602,12 +457,6 @@ describe('orphan-sweep — root file-type classes', () => {
   });
 
   it('aborts on a root class break that a first-glance reading would call videos', async () => {
-    // The classes are read off the EXTENSION, not off a guess about what the root
-    // holds: a break in the bare `lessons.document_storage_path` values shows up
-    // as the root DOCUMENT class, alongside a perfectly healthy video class.
-    //   listing            = 60 referenced root .mp4 + 8 unreferenced root .pdf
-    //   GLOBAL / root      = 8/68 = 11.8% → under the ceiling, does NOT trip
-    //   root document      = 8/8  = 100%  → over the floor of 5 AND the ceiling, TRIPS
     const root = rootFleet(60);
     const docs = Array.from({ length: 8 }, (_, i) => `handbook-${i}.pdf`);
     mockQuery.mockResolvedValue(root.map((path) => ({ path })));
@@ -622,9 +471,6 @@ describe('orphan-sweep — root file-type classes', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Abort conditions — every one of these must delete NOTHING
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — refusals', () => {
   it('aborts when the orphan share is implausible, deleting nothing', async () => {
     mockQuery.mockResolvedValue([{ path: 'lesson-video.mp4' }]);
@@ -661,13 +507,6 @@ describe('orphan-sweep — refusals', () => {
     expect(summary).toMatchObject({ aborted: true, reason: 'orphan-count-implausible', deleted: 0 });
   });
 
-  /**
-   * A container that has accrued more than 500 orphans since June 2026 — the
-   * sweep's entire reason to exist — trips the count ceiling on night one and
-   * trips it identically every night after, silently never doing its job. The
-   * log line is the only signal anyone gets, so it has to say that it REFUSED,
-   * why, and what to do about it.
-   */
   it('logs a refusal an operator can act on, not something that reads like a clean run', async () => {
     process.env.ORPHAN_SWEEP_MAX_DELETIONS = '2';
     const orphans = ['x1.mp4', 'x2.mp4', 'x3.mp4'].map((name) => ({ name }));
@@ -682,7 +521,6 @@ describe('orphan-sweep — refusals', () => {
     expect(message).toContain('NOT a clean run');
     expect(message).toContain('orphan-count-implausible');
     expect(message).toContain('WHAT TO DO');
-    // The env var to change, and names to spot-check before changing it.
     expect(message).toContain('ORPHAN_SWEEP_MAX_DELETIONS');
     expect(message).toContain('x1.mp4');
   });
@@ -694,7 +532,6 @@ describe('orphan-sweep — refusals', () => {
     const summary = await runOrphanSweep(makeLog(), NOW);
 
     expect(summary).toMatchObject({ aborted: true, reason: 'empty-reference-set', deleted: 0 });
-    // It never even listed the container — there was nothing safe to compare against.
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -762,7 +599,6 @@ describe('orphan-sweep — refusals', () => {
   });
 
   it('aborts when a LATER page fails, without acting on the pages it did read', async () => {
-    // Page 1 parses and advertises a marker; page 2 comes back empty/garbage.
     const { fetchMock, deleted } = stubFetch({
       pages: [listPage([...REFERENCED_NAMES.map((name) => ({ name })), { name: 'stranded.mp4' }], 'marker-1'), 'not xml'],
     });
@@ -817,7 +653,6 @@ describe('orphan-sweep — refusals', () => {
   });
 
   it('falls back to the built-in ceilings when the env overrides are unusable', async () => {
-    // A threshold of 5 (or of "banana") must not become a licence to delete more.
     process.env.ORPHAN_SWEEP_MAX_SHARE = '5';
     process.env.ORPHAN_SWEEP_MAX_DELETIONS = 'banana';
     mockQuery.mockResolvedValue([{ path: 'lesson-video.mp4' }]);
@@ -834,21 +669,8 @@ describe('orphan-sweep — refusals', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// The pre-delete re-check
-//
-// The two reads around the listing close the LISTING window only. Between the
-// second read and the DELETE of any given blob, a save can attach a blob that is
-// already older than the grace window — the "form left open since yesterday"
-// case. That blob is referenced now, and deleting it strands a freshly written
-// row on bytes that no longer exist.
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — pre-delete re-check', () => {
   it('drops a candidate that became referenced after BOTH reads around the listing', async () => {
-    // Reads 1 and 2 (either side of the listing) do not know about
-    // `just-saved.mp4`; only the third — taken immediately before the delete
-    // loop — does. Without that third read the blob is deleted and the row that
-    // was just written points at nothing.
     mockQuery
       .mockResolvedValueOnce(REFERENCED_ROWS)
       .mockResolvedValueOnce(REFERENCED_ROWS)
@@ -910,9 +732,6 @@ describe('orphan-sweep — pre-delete re-check', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Listing mechanics
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — listing', () => {
   it('walks every page via NextMarker and sweeps blobs found on the last one', async () => {
     const { fetchMock, listUrls, deleted } = stubFetch({
@@ -931,7 +750,6 @@ describe('orphan-sweep — listing', () => {
     expect(listUrls[2]).toContain('marker=marker-2');
     expect(summary.scanned).toBe(9);
     expect(deleted).toEqual(['page-three-orphan.mp4']);
-    // 3 list requests + 1 delete
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
@@ -962,9 +780,6 @@ describe('orphan-sweep — listing', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Deletion behaviour
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — deletion', () => {
   it('counts delete failures without aborting the rest of the run', async () => {
     const { deleted } = stubFetch({
@@ -1023,11 +838,6 @@ describe('orphan-sweep — deletion', () => {
     expect(log.warn).toHaveBeenCalledWith(expect.stringContaining('will not delete'), 'weird name?x=1.mp4');
   });
 
-  /**
-   * The bytes and the names the #286 digest turns into a receipt. `blob.contentLength`
-   * used to be interpolated into a log line and dropped, so a digest could say
-   * "12 blobs" but not "and 340 MB" — which is most of what makes a receipt readable.
-   */
   it('carries the reclaimed bytes and the deleted names out of the run', async () => {
     stubFetch({
       pages: [
@@ -1068,8 +878,6 @@ describe('orphan-sweep — deletion', () => {
   });
 
   it('caps the sample at 20 names while still counting every deletion', async () => {
-    // A 500-name wall of text is not a readable email; the count and the bytes
-    // stay complete regardless.
     const referenced = Array.from({ length: 30 }, (_, i) => `keep-${i}.mp4`);
     const orphans = Array.from({ length: 25 }, (_, i) => `gone-${i}.mp4`);
     mockQuery.mockResolvedValue([...REFERENCED_ROWS, ...referenced.map((path) => ({ path }))]);
@@ -1091,15 +899,8 @@ describe('orphan-sweep — deletion', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Names Azure did not return literally
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — names that are not literal', () => {
   it('skips a <Name Encoded="true"> blob and finishes the run instead of wedging forever', async () => {
-    // Before the fix, one such blob made the page unparseable → listing-failed →
-    // abort. And it would abort identically EVERY night, because the blob never
-    // goes away. The assertion that matters is `aborted: false`: the run
-    // completed and still swept the blob it should have.
     const { deleted } = stubFetch({
       pages: [
         listPage([
@@ -1120,9 +921,6 @@ describe('orphan-sweep — names that are not literal', () => {
   });
 
   it('never deletes a blob whose listed name carries an XML entity', async () => {
-    // `a&amp;b.mp4` is the listed text for a blob really named `a&b.mp4`. Both
-    // `&` and `;` are outside SAFE_BLOB_NAME, so it is skipped — asserted here so
-    // that safety stops being an accident of the character class.
     const { deleted } = stubFetch({
       pages: [listPage([...referencedBlobs(), { name: 'a&amp;b.mp4' }, { name: 'legit-orphan.mp4' }])],
     });
@@ -1136,15 +934,8 @@ describe('orphan-sweep — names that are not literal', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// The schedule — when this job is allowed to run at all
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — schedule', () => {
   it('refuses a PAST-DUE catch-up run rather than deleting at an arbitrary time of day', async () => {
-    // `useMonitor` defaults to true, and `runOnStartup: false` does not suppress
-    // it: a host that was down across 03:00 UTC fires a catch-up run when it
-    // returns — mid-business-day, possibly before the frontend/schema deploy this
-    // backend pairs with has landed.
     const { fetchMock } = stubFetch({
       pages: [listPage([...referencedBlobs(), { name: 'stranded.mp4' }])],
     });
@@ -1153,7 +944,6 @@ describe('orphan-sweep — schedule', () => {
     const summary = await runScheduledSweep({ isPastDue: true }, log, NOW);
 
     expect(summary).toMatchObject({ aborted: true, reason: 'past-due', deleted: 0 });
-    // It refuses before reading anything at all — no DB, no listing, no delete.
     expect(mockQuery).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(log.warn).toHaveBeenCalledWith(expect.stringContaining('past-due'), expect.anything());
@@ -1170,32 +960,14 @@ describe('orphan-sweep — schedule', () => {
     expect(summary).toMatchObject({ aborted: false, deleted: 1 });
   });
 
-  /**
-   * The registration options are load-time literals handed to the Functions
-   * host — no test can observe them at runtime, and getting them wrong is
-   * invisible until an unattended deletion run fires mid-business-day. Read
-   * statically, exactly as the fleet guard reads route names.
-   */
   it('registers with useMonitor OFF so a missed 03:00 is skipped, never caught up', () => {
     const source = readFileSync(fileURLToPath(new URL('./index.ts', import.meta.url)), 'utf8');
-    // Line-anchored so these match the OPTIONS OBJECT and not the prose about it
-    // — a comment mentioning `useMonitor: false` must never satisfy this test.
     expect(source).toMatch(/^\s*useMonitor: false,$/m);
     expect(source).toMatch(/^\s*runOnStartup: false,$/m);
-    // NCRONTAB is evaluated in UTC — there is no WEBSITE_TIME_ZONE app setting.
     expect(source).toMatch(/const SCHEDULE = '0 0 3 \* \* \*'/);
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// The run record + alerting hand-off (#286)
-//
-// `runOrphanSweep` has a dozen-plus early-return abort paths. The alerting is
-// wired at the CALL SITE precisely so it catches all of them — including the
-// past-due refusal, which never enters the sweep at all — without a line of it
-// living inside the refusal logic. What is pinned here is the hand-off; what is
-// handed over is decided in ./notify.test.ts.
-// ──────────────────────────────────────────────────────────────────────────────
 describe('orphan-sweep — run record + alerting hand-off', () => {
   it('hands a completed run over with the summary it returned', async () => {
     stubFetch({ pages: [listPage([...referencedBlobs(), { name: 'stranded.mp4', bytes: 512 }])] });
@@ -1227,8 +999,6 @@ describe('orphan-sweep — run record + alerting hand-off', () => {
   });
 
   it('returns the sweep result unchanged when the alerting throws', async () => {
-    // A notification outage must never become a sweep outage — that would be a
-    // strictly worse system than the silent one this replaced.
     mockRecordAndNotify.mockRejectedValueOnce(new Error('alerting exploded'));
     const { deleted } = stubFetch({ pages: [listPage([...referencedBlobs(), { name: 'stranded.mp4' }])] });
     const log = makeLog();
@@ -1241,9 +1011,6 @@ describe('orphan-sweep — run record + alerting hand-off', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Units
-// ──────────────────────────────────────────────────────────────────────────────
 describe('blobBucket', () => {
   it('buckets a prefixed name by its first segment, slash included', () => {
     expect(blobBucket('avatars/user-1.jpg')).toBe('avatars/');
@@ -1273,8 +1040,6 @@ describe('rootFileClass', () => {
   });
 
   it('reads the extension case-insensitively without touching the name itself', () => {
-    // Lower-casing here feeds a census key only — the comparison and the DELETE
-    // still address the listed name verbatim (asserted end-to-end above).
     expect(rootFileClass('THUMB.PNG')).toBe('image');
     expect(rootFileClass('Clip.MP4')).toBe('video');
   });
@@ -1291,18 +1056,13 @@ describe('blobBuckets', () => {
   it('gives a ROOT name two buckets: the undivided root first, then its file-type class', () => {
     const buckets = blobBuckets('abc.mp4');
     expect(buckets).toHaveLength(2);
-    // The root-wide census is unchanged by the split, and comes first so its
-    // diagnosis wins when both it and a class are over the ceiling.
     expect(buckets[0]).toBe('');
     expect(buckets[1]).not.toBe('');
-    // The second key is what the split is for: it must differ by file type.
     expect(blobBuckets('abc.png')[1]).not.toBe(buckets[1]);
     expect(blobBuckets('def.mp4')[1]).toBe(buckets[1]);
   });
 
   it('does NOT split a PREFIXED name by extension — one bucket, the prefix', () => {
-    // More buckets means more small populations for a healthy night to trip over,
-    // and a prefix already belongs to a single writer.
     expect(blobBuckets('avatars/u-1.jpg')).toEqual(['avatars/']);
     expect(blobBuckets('org-logos/o-1.png')).toEqual(['org-logos/']);
     expect(blobBuckets('documents/handbook.pdf')).toEqual(['documents/']);
@@ -1310,8 +1070,6 @@ describe('blobBuckets', () => {
   });
 
   it('cannot collide a class key with a bucket key derived from a real blob name', () => {
-    // A prefix key always ends in `/`; a class key never can, because `:` is
-    // outside SAFE_BLOB_NAME and a class key carries no slash.
     for (const name of ['abc.mp4', 'thumb.png', 'weird.tif', 'avatars/u.jpg']) {
       for (const bucket of blobBuckets(name)) {
         expect(bucket === '' || bucket.endsWith('/') || !bucket.includes('/')).toBe(true);
@@ -1359,13 +1117,6 @@ describe('parseListPage', () => {
     expect(parsed?.nextMarker).toBeNull();
   });
 
-  /**
-   * Azure emits `<Name Encoded="true">` whenever the real blob name contains a
-   * character XML cannot carry. The parser used to demand a bare `<Name>`, so
-   * such a blob made the page unparseable — and an unparseable page aborts the
-   * run. ONE such blob anywhere in the container therefore wedged EVERY future
-   * sweep, permanently, visible only as a log line.
-   */
   it('parses a <Name> that carries attributes, flagging the name as not-literal', () => {
     const parsed = parseListPage(listPage([{ name: 'a%00b.mp4', nameAttrs: 'Encoded="true"', bytes: 12, ageHours: 10 }]));
     expect(parsed).not.toBeNull();

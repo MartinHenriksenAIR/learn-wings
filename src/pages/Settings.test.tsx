@@ -24,8 +24,6 @@ vi.mock('react-i18next', () => ({
 
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
-// Avatar signing hits a query hook; stub it so this focused save-feedback test
-// needs no QueryClientProvider (avatar display is exercised elsewhere).
 vi.mock('@/hooks/useSignedBrandingUrl', () => ({ useSignedBrandingUrl: () => ({ data: undefined }) }));
 
 import Settings from './Settings';
@@ -46,9 +44,6 @@ describe('Settings — profile save feedback (#20)', () => {
     });
   });
 
-  // #20: a successful profile save now confirms via the SaveButton morph
-  // (in-button "Saved" + success styling), replacing the old success toast
-  // (toast policy). Pins the morph AND the mutation firing — equal strength.
   it('morphs the save button into the Saved state after a successful profile save', async () => {
     mockCallApi.mockResolvedValue({ profile: {} });
 
@@ -145,7 +140,6 @@ describe('Settings — assessment card (#117)', () => {
     const card = screen.getByTestId('assessment-settings-card');
     expect(card).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'assessment.settings.retake' })).toBeInTheDocument();
-    // lastTaken key is rendered with the date argument
     expect(card).toHaveTextContent('assessment.settings.lastTaken');
   });
 

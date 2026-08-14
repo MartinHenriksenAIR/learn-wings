@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Initialize i18n so t() resolves real (English) strings, matching production.
 import '@/i18n';
 
 const mockCallApi = vi.fn();
@@ -141,12 +140,9 @@ describe('CategoryManager', () => {
     renderManager();
 
     await screen.findByText('Bravo');
-    // Row delete buttons carry the aria-label "Delete category"; the confirm
-    // action inside the dialog is labelled "Delete".
     fireEvent.click(screen.getAllByRole('button', { name: 'Delete category' })[1]);
 
     const confirm = await screen.findByRole('button', { name: 'Delete' });
-    // Not called until the user confirms.
     expect(mockCallApi).not.toHaveBeenCalledWith('/api/course-category-delete', expect.anything());
 
     fireEvent.click(confirm);

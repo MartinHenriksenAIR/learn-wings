@@ -24,8 +24,6 @@ export default endpoint('resource-create', async ({ req, profile, reply, require
   if (url !== undefined && url !== null && typeof url !== 'string') {
     return reply(400, { error: 'url must be a string' });
   }
-  // Defence in depth against stored-XSS (sec-1, #232): reject non-http(s) schemes
-  // so a `javascript:` payload never persists to be rendered into an anchor href.
   const urlError = validateHttpUrl(url, 'url');
   if (urlError) {
     return reply(400, { error: urlError });
@@ -36,9 +34,6 @@ export default endpoint('resource-create', async ({ req, profile, reply, require
 
   await requireActiveMember(orgId);
 
-  // INSERT + LEFT JOIN profiles in one round trip so the response matches the
-  // original lib's .select(`*, profile:profiles!fk(...)`) shape.
-  // user_id is ALWAYS profile.id (never client-supplied).
   const resource = await queryOne(
     `WITH ins AS (
       INSERT INTO community_resources

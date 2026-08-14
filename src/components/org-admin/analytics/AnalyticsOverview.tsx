@@ -16,7 +16,6 @@ interface AnalyticsOverviewProps {
     avgQuizScore: number;
     completionRate: number;
   };
-  /** Raw member rows from the analytics endpoint — used for the level distribution card. */
   members: OrgAnalyticsMember[];
   isGlobalView: boolean;
   selectedOrgId: string;
@@ -25,13 +24,10 @@ interface AnalyticsOverviewProps {
   onGenerateReport: () => void;
 }
 
-// Tints for the icon chips / mini-bar fills (navy primary + success green for a
-// strong quiz score) — values from the design brief palette.
 const NAVY = '#10298f';
 const SUCCESS = '#1e9e6a';
 const TRACK = '#eceef3';
 
-// Gray used for the "not assessed" segment and legend swatch.
 const NOT_ASSESSED_COLOR = '#a1a1aa'; // zinc-400, readable on white
 
 const LEVELS: CourseLevel[] = ['basic', 'intermediate', 'advanced'];
@@ -61,7 +57,6 @@ interface LevelCounts {
 }
 
 function computeLevelCounts(members: OrgAnalyticsMember[]): LevelCounts {
-  // LOCKED: only learner-role rows count toward the distribution.
   const learners = members.filter(m => m.role === 'learner');
   const counts: LevelCounts = { basic: 0, intermediate: 0, advanced: 0, notAssessed: 0, total: learners.length };
   for (const m of learners) {
@@ -81,11 +76,6 @@ interface DistSegment {
   label: string;
 }
 
-/**
- * Horizontal segmented bar showing AI-level distribution across learners.
- * Zero-count segments are omitted from the bar (no 0-width slivers) but
- * always shown in the legend with a count of 0.
- */
 function LevelDistributionCard({
   members,
   isGlobalView,
@@ -118,7 +108,6 @@ function LevelDistributionCard({
     },
   ];
 
-  // Bar segments: omit zero-count segments so we don't get 0-width artifacts.
   const barSegments = legendItems.filter(s => s.count > 0);
 
   return (
@@ -147,7 +136,6 @@ function LevelDistributionCard({
                 style={{
                   width: `${seg.pct}%`,
                   background: seg.color,
-                  // Only round the outermost corners of the bar.
                   borderRadius: i === 0 && barSegments.length === 1
                     ? '9999px'
                     : i === 0
@@ -179,12 +167,6 @@ function LevelDistributionCard({
   );
 }
 
-/**
- * Visual-first analytics overview: a row of stat cards (icon chips, ProgressRings
- * for completion / quiz score, mini bars under the engagement metrics), plus
- * activity / learning summary cards and the AI Act compliance report card.
- * Uses only data the page already computes.
- */
 export function AnalyticsOverview({
   stats,
   members,

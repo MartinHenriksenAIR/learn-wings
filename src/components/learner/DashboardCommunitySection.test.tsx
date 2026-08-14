@@ -68,7 +68,6 @@ function qr(data: CommunityPost[] = [], over: Record<string, unknown> = {}) {
   return { data, isLoading: false, isError: false, refetch: vi.fn(), ...over };
 }
 
-/** Route each (scope) call to a fixed result. */
 function wire(byScope: Partial<Record<CommunityScope, ReturnType<typeof qr>>>) {
   mockUseCommunityEvents.mockImplementation((scope: CommunityScope) => byScope[scope] ?? qr([]));
 }
@@ -103,7 +102,6 @@ describe('DashboardCommunitySection', () => {
     expect(cards).toHaveLength(4);
     const ids = cards.map((c) => c.getAttribute('data-postid'));
     expect(ids).toEqual(['d', 'e', 'b', 'c']);
-    // The oldest post falls outside the 4-item preview.
     expect(ids).not.toContain('a');
   });
 

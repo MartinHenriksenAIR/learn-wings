@@ -2,7 +2,6 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import i18n from "@/i18n";
 import { Button } from "@/components/ui/button";
 
-// Match Login/NotFound's soft slate canvas + centered card chrome.
 const PAGE_GRADIENT_CLASSES = "bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)]";
 
 interface ErrorBoundaryProps {
@@ -13,19 +12,6 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-/**
- * Top-level React error boundary. React 18 unmounts the entire root on an
- * uncaught render/lifecycle error, so without a boundary one bad render blanks
- * the whole app with no message and no recovery path. This catches the error,
- * logs it for diagnostics, and renders a branded "something went wrong" card
- * with a reload button.
- *
- * A class component is required (only class components can be error boundaries).
- * It reads copy from the i18next instance directly (i18n.t) rather than the
- * useTranslation hook: the error may originate in a provider above this
- * boundary, so React context can't be relied on — but i18next is initialized
- * module-level (src/i18n) and its instance works regardless of React context.
- */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false };
 

@@ -10,7 +10,6 @@ export default endpoint('org-memberships', async ({ req, reply, requireOrgAdmin 
 
   await requireOrgAdmin(orgId);
 
-  // NO status filter — org admins manage their full roster incl. invited/disabled members
   const memberships = await query(
     `SELECT om.id, om.org_id, om.user_id, om.role, om.status, om.created_at,
             p.full_name, p.email, p.avatar_url, p.department

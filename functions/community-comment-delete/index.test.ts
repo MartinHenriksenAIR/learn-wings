@@ -20,7 +20,6 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// comment.user_id = 'p2' (different from caller 'p1') by default
 const otherUserComment = { user_id: 'p2', is_hidden: false, scope: 'org' as const, org_id: 'org-1' };
 const myComment = { ...otherUserComment, user_id: 'p1' };
 const myHiddenComment = { ...myComment, is_hidden: true };
@@ -82,7 +81,6 @@ describe('community-comment-delete', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
   });
 
-  // RLS asymmetry: author CAN delete their own hidden comment (unlike UPDATE which forbids it)
   it('author CAN delete their own hidden comment (RLS asymmetry vs update)', async () => {
     mockQueryOne.mockResolvedValueOnce(myHiddenComment);
     mockQueryOne.mockResolvedValueOnce(null);
@@ -93,7 +91,6 @@ describe('community-comment-delete', () => {
 
   it('org admin of global post cannot delete other user comment on global post', async () => {
     mockQueryOne.mockResolvedValueOnce(globalOtherComment);
-    // isOrgAdmin called with null org_id — should not matter because scope check prevents it
     const res = await handler(baseReq({ commentId: 'c1' }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });

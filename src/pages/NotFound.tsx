@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 
-// Match Login's soft slate canvas + centered card chrome.
 const PAGE_GRADIENT_CLASSES = "bg-[linear-gradient(180deg,#f4f5f8_0%,#e9ecf4_100%)]";
 
 const NotFound = () => {

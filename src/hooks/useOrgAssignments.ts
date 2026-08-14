@@ -3,7 +3,6 @@ import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { OrgAssignment } from '@/lib/types';
 
-/** Raw row shape returned by `/api/assignments` (snake_case). */
 interface OrgAssignmentRow {
   id: string;
   org_id: string;
@@ -18,10 +17,6 @@ interface OrgAssignmentRow {
   created_at: string;
 }
 
-/**
- * The admin management list of an org's course assignments. Used by both the
- * org-admin and platform-admin surfaces (both gate server-side on org admin).
- */
 export function useOrgAssignments(orgId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.assignments.list(orgId),

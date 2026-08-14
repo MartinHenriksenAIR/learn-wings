@@ -1,11 +1,3 @@
-/**
- * Drift guard: asserts that the frontend i18n question/option keys exactly
- * cover the server module's IDs — no extras, no omissions.
- *
- * The server module (functions/shared/assessment-questions.ts) is pure data
- * with zero azure/pg imports, so it is safe to import directly from frontend
- * tests by design.
- */
 import { describe, it, expect } from 'vitest';
 
 import { ASSESSMENT_QUESTIONS } from '../../functions/shared/assessment-questions';

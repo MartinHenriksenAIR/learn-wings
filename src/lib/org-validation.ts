@@ -1,10 +1,5 @@
 import { z } from 'zod';
 
-// Organization name/slug validation rules — the single frontend copy
-// (issue #51). Manually mirrors the canonical backend rules in
-// functions/shared/org-validation.ts; the parity test
-// src/lib/org-validation.test.ts pins both against the same fixture table,
-// so a drift in either copy fails the suite.
 
 const ORG_NAME_MIN_LENGTH = 2;
 const ORG_NAME_MAX_LENGTH = 100;
@@ -24,7 +19,6 @@ const orgSlugSchema = z
   .max(ORG_SLUG_MAX_LENGTH, `Slug must be less than ${ORG_SLUG_MAX_LENGTH} characters`)
   .regex(ORG_SLUG_REGEX, 'Slug can only contain lowercase letters, numbers, and hyphens');
 
-/** Shared schema for the org create/edit forms (OrganizationsManager, OrganizationDetail). */
 export const orgSchema = z.object({
   name: orgNameSchema,
   slug: orgSlugSchema,

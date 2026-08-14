@@ -12,8 +12,6 @@ export default endpoint('org-course-access', async ({ req, reply, requireOrgAdmi
 
   const lang = language === 'en' || language === 'da' ? language : 'da';
 
-  // NO filter on oca.access — org admins manage toggle state for both 'enabled' and 'disabled' rows.
-  // Filtered to the viewer's UI language via c.language.
   const access = await query(
     `SELECT oca.id, oca.org_id, oca.course_id, oca.access, oca.created_at,
             json_build_object(

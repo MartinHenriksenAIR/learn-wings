@@ -6,9 +6,6 @@ const { mockAuthenticate, MockAuthError, mockClientQuery, mockWithTransaction, m
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
     mockClientQuery,
-    // withTransaction runs its callback against a mock client. The real BEGIN/
-    // COMMIT/ROLLBACK + FOR UPDATE locking is exercised by the DATABASE_URL-gated
-    // integration tests in shared/db.test.ts; here we test the handler's logic.
     mockWithTransaction: vi.fn(async (cb: (client: { query: typeof mockClientQuery }) => unknown) => cb({ query: mockClientQuery })),
     mockGetProfile: vi.fn(), mockIsOrgAdmin: vi.fn(),
   };
@@ -32,9 +29,7 @@ const baseReq = (body: unknown) => ({
 
 const validBody = { orgId: 'org-1', userId: 'user-1', role: 'learner' };
 
-// pg QueryResult shape: the handler reads `.rows`.
 const rows = (...r: unknown[]) => ({ rows: r });
-// First client.query is the seat-limit lookup (org row + active-member count + pending-invitation count).
 const seatRow = (seat_limit: number | null, active_count: number, pending_count: number) => ({ seat_limit, active_count, pending_count });
 
 describe('org-membership-create', () => {
@@ -145,7 +140,6 @@ describe('org-membership-create', () => {
     expect(JSON.parse(res.body as string)).toEqual({ membership: inserted });
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
 
-    // First query: seat-limit lookup counts active members + pending invitations
     const [seatSql, seatParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
     expect(seatSql).toContain('seat_limit');
     expect(seatSql).toContain(`m.status = 'active'`);
@@ -163,9 +157,7 @@ describe('org-membership-create', () => {
 
     await handler(baseReq(validBody), {} as any);
 
-    // Both statements run inside a single withTransaction callback...
     expect(mockWithTransaction).toHaveBeenCalledTimes(1);
-    // ...and the seat lookup takes FOR UPDATE so concurrent adds serialize.
     const [seatSql] = mockClientQuery.mock.calls[0] as [string, unknown[]];
     expect(seatSql).toContain('FOR UPDATE');
   });

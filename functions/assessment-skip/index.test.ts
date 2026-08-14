@@ -66,7 +66,6 @@ describe('assessment-skip', () => {
   });
 
   it('idempotency: repeat skip returns the original timestamp (COALESCE preserves first)', async () => {
-    // Mock simulates the DB honouring COALESCE — returns the already-existing timestamp.
     mockQueryOne.mockResolvedValueOnce({ assessment_skipped_at: SKIP_TS });
     const res = await handler(baseReq(), {} as any);
     expect(res.status).toBe(200);

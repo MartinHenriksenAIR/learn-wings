@@ -40,7 +40,6 @@ describe('lesson-progress', () => {
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
 
-    // SECURITY PIN: lesson_progress must use profile.id ('p1'), not raw oid
     const upsertCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('lesson_progress'));
     expect(upsertCall).toBeDefined();
     expect(upsertCall![1]).toEqual(['org-1', 'p1', 'lesson-1', 'completed']);
@@ -54,8 +53,6 @@ describe('lesson-progress', () => {
 
     expect(res.status).toBe(200);
 
-    // SECURITY PIN: the enrollment touch must scope to profile.id ('p1'), never a raw oid.
-    // The course is resolved from the lessonId via a subquery, so the params carry the lessonId.
     const touchCall = mockQuery.mock.calls.find(
       c => (c[0] as string).includes('UPDATE enrollments'),
     );
@@ -66,7 +63,6 @@ describe('lesson-progress', () => {
 
   it('still returns 200 when the last_accessed_at stamp fails (best-effort)', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
-    // First query (progress upsert) commits; second query (recency stamp) throws.
     mockQuery
       .mockResolvedValueOnce([])                        // lesson_progress upsert
       .mockRejectedValueOnce(new Error('stamp boom'));  // enrollments last_accessed_at stamp
@@ -74,8 +70,6 @@ describe('lesson-progress', () => {
 
     const res = await handler(baseReq as any, {} as any);
 
-    // The committed progress save must not be reported as failed just because the
-    // non-essential recency stamp threw (protects #289's optimistic-rollback UX).
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ success: true });
     const upsertCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('lesson_progress'));

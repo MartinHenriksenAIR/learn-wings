@@ -14,14 +14,12 @@ vi.mock('@/components/community/PostForm', () => ({
 
 vi.mock('@/components/ui/sonner', () => ({ toast: vi.fn() }));
 
-// --- mock api-client (community-api pulls it in transitively) ---
 vi.mock('@/lib/api-client', () => ({
   ApiError: class ApiError extends Error {},
   callApi: vi.fn(),
   callApiRaw: vi.fn(),
 }));
 
-// --- mock the community api; fetchPost resolves null so we hit the !post branch ---
 const mockFetchPost = vi.fn();
 const mockFetchCategories = vi.fn();
 vi.mock('@/lib/community-api', () => ({
@@ -30,7 +28,6 @@ vi.mock('@/lib/community-api', () => ({
   updatePost: vi.fn(),
 }));
 
-// --- auth stub (values are read but irrelevant to the !post redirect) ---
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     profile: null,

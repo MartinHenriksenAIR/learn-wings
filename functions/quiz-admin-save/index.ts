@@ -95,8 +95,6 @@ export default adminEndpoint('quiz-admin-save', async ({ req, reply }) => {
 
       const opts = q.options as QuizOption[];
 
-      // sort_order = array index: old client inserted without sort_order leaving all 0/nondeterministic;
-      // this makes learner-side ordering deterministic.
       const valuePlaceholders: string[] = [];
       const optParams: unknown[] = [questionId];
       for (let oi = 0; oi < opts.length; oi++) {

@@ -45,7 +45,6 @@ describe('useOrganizations', () => {
     });
     expect(screen.getByTestId('second')).toHaveTextContent('Alpha Org,Beta Org');
 
-    // The whole point of the shared hook: one network call, not one per consumer.
     expect(mockCallApi).toHaveBeenCalledTimes(1);
     expect(mockCallApi).toHaveBeenCalledWith('/api/organizations', {});
   });
@@ -55,7 +54,6 @@ describe('useOrganizations', () => {
 
     renderWithClient(<Consumer testId="gated" enabled={false} />);
 
-    // Let pending microtasks settle, then assert no request fired.
     await Promise.resolve();
     expect(mockCallApi).not.toHaveBeenCalled();
     expect(screen.getByTestId('gated')).toHaveTextContent('');

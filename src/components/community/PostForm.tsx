@@ -107,8 +107,8 @@ export function PostForm({
         tags: values.tags,
         event_date: isEventCategory ? values.event_date : undefined,
         event_location: isEventCategory ? values.event_location : undefined,
-        event_registration_url: isEventCategory && values.event_registration_url 
-          ? values.event_registration_url 
+        event_registration_url: isEventCategory && values.event_registration_url
+          ? values.event_registration_url
           : undefined,
       });
       form.reset();
@@ -144,7 +144,6 @@ export function PostForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="text-[17px] font-extrabold">

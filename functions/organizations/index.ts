@@ -15,15 +15,8 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
        WHERE o.id = $1 AND o.kind = 'standard'`,
       [orgId],
     );
-    // The `kind = 'standard'` filter also makes the Individuals placeholder (#354)
-    // return no row here, so a fetch of its id 404s — it is never inspectable via this
-    // endpoint. Solo learners get their currentOrg from user-context, not this fetch.
     if (!organization) return reply(404, { error: 'Organization not found' });
 
-    // The SSO tenant binding (#353) is platform-admin config — org admins reach
-    // this same fetch (OrgMembersTab), so strip it for non-platform-admins.
-    // allow_self_registration (#356) is deliberately NOT stripped: it's org-owned
-    // config an org admin sees and toggles for their own org.
     if (!profile.is_platform_admin) {
       delete organization.entra_tid;
       delete organization.entra_tid_label;
@@ -32,10 +25,6 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
     return reply(200, { organization });
   }
 
-  // List orgs — correlated subquery for member_count is cleaner than a LEFT JOIN + GROUP BY
-  // (no need to enumerate every column in GROUP BY, no JOIN-cardinality risk).
-  // ::int cast: COUNT(*) returns BIGINT which the pg driver serializes as a string;
-  // cast keeps callers seeing a number.
   if (profile.is_platform_admin) {
     const organizations = await query(
       `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.entra_tid, o.entra_tid_label, o.allow_self_registration, o.created_at,

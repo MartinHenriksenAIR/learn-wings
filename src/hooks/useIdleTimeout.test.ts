@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useIdleTimeout, ACTIVITY_EVENT } from './useIdleTimeout';
 
-// Small, fast windows so a test can "advance an hour" in a few ms: a 10s idle
-// window with the warning in the final 3s, checked every 1s.
 const opts = (over: Partial<Parameters<typeof useIdleTimeout>[0]> = {}) => ({
   enabled: true,
   onTimeout: vi.fn(),
@@ -73,7 +71,6 @@ describe('useIdleTimeout', () => {
     const o = opts();
     renderHook(() => useIdleTimeout(o));
 
-    // Dispatch every second past the idle window — playback must keep it alive.
     for (let i = 0; i < 15; i += 1) {
       act(() => {
         window.dispatchEvent(new Event(ACTIVITY_EVENT));
@@ -107,7 +104,6 @@ describe('useIdleTimeout', () => {
     act(() => void vi.advanceTimersByTime(7_000));
     expect(result.current.warningActive).toBe(true);
 
-    // Another tab writes a fresh timestamp; a storage event reconciles this tab.
     act(() => {
       localStorage.setItem('idleLastActivity', String(Date.now()));
       window.dispatchEvent(new StorageEvent('storage', { key: 'idleLastActivity' }));

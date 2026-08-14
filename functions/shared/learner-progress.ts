@@ -1,16 +1,5 @@
 import { query } from './db';
 
-/**
- * Shared enrollment + per-course progress query for a learner in one org.
- *
- * Single source of truth for the aggregate SQL behind the learner dashboard and
- * the "Min Træning" training page — both endpoints return `{ enrollments,
- * progress }` from here, so the SQL (query order, text, params) lives once.
- *
- * `progress` is a zero-filled map keyed by course id: every enrolled course is
- * present, with `{ total, completed }` lesson counts (0 when a course has no
- * lessons or the learner has no completed lessons).
- */
 export async function getLearnerProgress(
   profileId: string,
   orgId: string,
@@ -33,7 +22,6 @@ export async function getLearnerProgress(
     return { enrollments: [], progress: {} };
   }
 
-  // Batched count queries — no N+1
   const courseIds = enrollments.map((e) => (e as { course_id: string }).course_id);
 
   const totalsRows = await query<{ course_id: string; total: number }>(

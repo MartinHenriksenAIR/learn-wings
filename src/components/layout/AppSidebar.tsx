@@ -51,48 +51,25 @@ import { SidebarBrand } from '@/components/layout/SidebarBrand';
 import { getInitials } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 
-// Pill nav item: navy bg + white text when active, muted slate otherwise.
-// data-[active=true]:font-semibold looks redundant next to the base font-semibold, but it is
-// load-bearing: it twMerge-overrides the sidebar cva's data-[active=true]:font-medium.
 const NAV_BUTTON_CLASSES =
   'h-auto gap-[11px] rounded-[11px] px-3 py-2.5 text-[13.5px] font-semibold text-sidebar-foreground ' +
   'hover:bg-[#f3f4f8] hover:text-foreground active:bg-[#f3f4f8] active:text-foreground ' +
   'data-[active=true]:bg-primary data-[active=true]:font-semibold data-[active=true]:text-primary-foreground ' +
   'data-[active=true]:hover:bg-primary data-[active=true]:hover:text-primary-foreground [&>svg]:size-[17px] ' +
-  // Collapsed to the icon rail (#370): the custom pill sizing (h-auto/px-3/py-2.5) fights
-  // the primitive's own collapse squaring, so re-assert a clean centred 32px square with `!`.
   'group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center';
 
 const GROUP_LABEL_CLASSES =
   'h-auto px-3 pb-1.5 text-[12.5px] font-semibold normal-case text-[#3f4657] ' +
-  // Collapsed, the shadcn primitive only fades the label (opacity-0) but keeps it in the
-  // layout — and with our h-auto override its -mt-8 no longer cancels the label's height, so
-  // the invisible label overlapped the icon buttons and, still hit-testable, stole their
-  // hovers/clicks and showed a text (I-beam) cursor. Drop it from the rail entirely (#370).
   'group-data-[collapsible=icon]:hidden';
 
 const MENU_ITEM_CLASSES = 'rounded-[9px] text-[13px] font-medium';
 
-/** One entry in a sidebar nav group. All three groups share this shape. */
 type NavItem = {
   title: string;
   url: string;
   icon: LucideIcon;
 };
 
-/**
- * One nav group (optional label + pill menu). The three groups in AppSidebar were
- * byte-identical apart from label and items (#271).
- *
- * `label` is optional: omit it to render a bare, unlabelled group — used for the
- * top-level Dashboard item that sits above the labelled Læring/Fællesskab groups (#363).
- *
- * Deliberately at module scope, not nested inside AppSidebar: a component declared
- * inside a render body gets a fresh identity every render, so React would unmount and
- * remount the whole menu subtree (losing tooltip/focus state) on every sidebar render.
- * `collapsed` and `pathname` are read from context here rather than threaded as props,
- * exactly as the underlying sidebar primitives do.
- */
 function NavSection({ label, items }: { label?: string; items: NavItem[] }) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
@@ -151,15 +128,10 @@ export function AppSidebar() {
 
   const viewModeLabels = useViewModeLabels();
 
-  // Learner nav is three sections (#363): a top-level Dashboard, then a labelled
-  // "Læring" group, then a "Fællesskab" group (rendered only when community is on).
   const dashboardItems = [
     { title: t('nav.dashboard'), url: routes.learner.dashboard, icon: LayoutDashboard },
   ];
 
-  // Resources survives community being off (#344): it lives in the Fællesskab
-  // group when community is on, and falls back into Læring when it's off — so it
-  // always has a home regardless of the per-org community flag.
   const resourcesItem = { title: t('nav.resources'), url: routes.community.resources, icon: FolderOpen };
 
   const laeringItems = [
@@ -169,8 +141,6 @@ export function AppSidebar() {
     ...(features.community_enabled ? [] : [resourcesItem]),
   ];
 
-  // #344: the feed is now "Diskussioner"; Events + Resources are promoted to
-  // direct destinations in the community group.
   const faellesskabItems = [
     { title: t('nav.discussions'), url: routes.community.feed, icon: MessageSquare },
     { title: t('nav.events'), url: routes.community.events, icon: Calendar },
@@ -213,9 +183,6 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      {/* #371: the sidebar's right divider lives on the body BELOW the logo header —
-          not on the full-height panel — so no seam splits the logo area from the top
-          bar. The border resumes here and runs down the nav + footer as before. */}
       <div className="flex min-h-0 flex-1 flex-col border-r border-border">
         <OrgSelector />
 

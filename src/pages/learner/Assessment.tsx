@@ -25,8 +25,6 @@ interface AssessmentResult {
   level: CourseLevel;
 }
 
-// A drawn SVG progress ring (NOT an icon) showing score / MAX_SCORE, its arc
-// stroked with the same per-level color LevelBadge uses.
 function ScoreRing({ score, level }: { score: number; level: CourseLevel }) {
   const size = 132;
   const stroke = 10;
@@ -103,12 +101,9 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
   const total = questions.length;
 
   const [index, setIndex] = useState(0);
-  // questionId -> selected optionId
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   const questionHeadingRef = useRef<HTMLHeadingElement>(null);
-  // Move focus to the question heading whenever the question changes so
-  // screen-reader users hear the new question without manual navigation.
   useEffect(() => {
     questionHeadingRef.current?.focus();
   }, [index]);
@@ -199,8 +194,6 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
           <span>{t('assessment.timeEstimate')}</span>
         </div>
 
-        {/* Progress bar — tracks which question you're on (1-based), intentionally
-            matches the "Spørgsmål N af 7" label above. */}
         <div className="mb-8 h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-primary transition-[width] duration-300"
@@ -208,8 +201,6 @@ function Wizard({ onComplete }: { onComplete: (result: AssessmentResult) => void
           />
         </div>
 
-        {/* Keyed by question id: the entrance animation replays only on question
-            change, never when an option is selected (which re-renders in place). */}
         <div
           key={question.id}
           className="animate-in fade-in slide-in-from-right-4 duration-300"
@@ -285,8 +276,6 @@ function RecommendedRow({ course }: { course: Course }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  // Opening the course starts it — enrollment is created implicitly server-side on
-  // first access (#357), so there is no enroll step to perform here.
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
       <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-primary/80 to-primary">
@@ -321,9 +310,6 @@ function ResultView({ result }: { result: AssessmentResult }) {
 
   const courses = coursesQuery.data?.courses;
 
-  // Level-matching courses first; if fewer than 3, fill with nearest-level
-  // courses (by distance in the basic→intermediate→advanced order) so the
-  // column is never empty. No new backend — pure client ordering.
   const recommended = useMemo(() => {
     const resultRank = LEVEL_ORDER.indexOf(result.level);
     const sorted = [...(courses ?? [])].sort((a, b) => {

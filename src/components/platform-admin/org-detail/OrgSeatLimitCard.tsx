@@ -7,10 +7,6 @@ interface OrgSeatLimitCardProps {
   seatLimit: number;
 }
 
-/**
- * The seat-limit usage bar card, shown only when a limit exists. The
- * SEAT_LIMIT_REACHED warning is preserved.
- */
 export function OrgSeatLimitCard({ usedCount, seatLimit }: OrgSeatLimitCardProps) {
   const { t } = useTranslation();
   const seatLimitReached = usedCount >= seatLimit;

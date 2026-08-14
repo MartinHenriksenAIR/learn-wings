@@ -29,7 +29,6 @@ interface IdeaCardProps {
 
 export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) {
   const { t, i18n } = useTranslation();
-  // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
   const { profile, effectiveIsOrgAdmin } = useAuth();
 
   const businessAreaLabel = idea.business_area

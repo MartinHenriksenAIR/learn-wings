@@ -21,8 +21,6 @@ import { BookOpen, CheckCircle2, Play, Search } from 'lucide-react';
 import { useListView } from '@/hooks/useListView';
 import { ListViewToggle } from '@/components/learner/ListViewToggle';
 
-// Module-level stable empty fallbacks so the `?? …` reads keep a referentially
-// stable value across renders (avoids re-running the filter/sort useMemo every render).
 const NO_COURSES: Course[] = [];
 const NO_ENROLLMENTS: Enrollment[] = [];
 const NO_CATEGORIES: CourseCategory[] = [];
@@ -35,8 +33,6 @@ export default function LearnerCourses() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [levelFilter, setLevelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  // The learner's list/card preference persists across visits (#360). List is the default;
-  // an explicitly stored 'card' still wins, so learners who chose cards keep them (#443).
   const [view, setView] = useListView('kursuskatalog-view');
 
   const query = useLearnerCourses(currentOrg?.id, {
@@ -60,8 +56,6 @@ export default function LearnerCourses() {
   const isDanish = i18n.language.startsWith('da');
   const categoryName = (category: CourseCategory) => (isDanish ? category.name_da : category.name_en);
 
-  // Only offer categories that actually have a course in this catalogue — a filter option
-  // that can only ever yield an empty grid is noise. Keeps the admin-managed order.
   const availableCategories = useMemo(
     () => categories.filter((c) => courses.some((course) => course.category_id === c.id)),
     [categories, courses],
@@ -81,20 +75,10 @@ export default function LearnerCourses() {
   const hasActiveFilters =
     search.trim() !== '' || categoryFilter !== 'all' || levelFilter !== 'all' || statusFilter !== 'all';
 
-  // Level-matched recommendations (#117) — drives both the recommended grid and the
-  // "All courses" heading that separates it from the full catalog below.
   const recommendedCourses = profile?.assessment_level != null
     ? courses.filter(c => c.level === profile.assessment_level)
     : [];
 
-  // Filter, then order started courses first (#338). A course is "started" once it has
-  // an enrollment — now created implicitly on first open (#357) rather than by a manual
-  // enroll step. Started courses (status `enrolled` OR `completed`) sort above not-started
-  // ones; within the started group by recent activity — `last_accessed_at` DESC, falling
-  // back to `enrolled_at` when a course has no activity yet (#339). Array.prototype.sort is
-  // stable (ES2019), so returning 0 for two not-started courses preserves the backend's
-  // alphabetical (ORDER BY c.title) order. `.filter` returns a fresh array, so sorting it
-  // does not mutate `courses`.
   const filteredCourses = useMemo(() => {
     const matches = courses.filter(course => {
       const matchesSearch = search === '' ||
@@ -141,9 +125,6 @@ export default function LearnerCourses() {
   }
 
   if (!currentOrg) {
-    // A non-admin with no org here is a blocked walk-in (individual tier off, or the
-    // placeholder org is missing) — registration is invitation-only, so show that
-    // instead of "join an org". Platform admins land here via the no-org-selected edge.
     return (
       <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
@@ -159,8 +140,6 @@ export default function LearnerCourses() {
     );
   }
 
-  // A failed catalogue fetch must not render the "no courses available" empty
-  // state — show a distinct, retryable error fork instead.
   if (query.isError) {
     return (
       <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
@@ -171,16 +150,9 @@ export default function LearnerCourses() {
     );
   }
 
-  /** State-aware player CTA label — review a finished course, continue a started one, start a fresh one. */
   const ctaLabelFor = (enrollment: Enrollment | undefined, isCompleted: boolean) =>
     isCompleted ? t('courses.reviewCourse') : enrollment ? t('common.continue') : t('courses.startCourse');
 
-  /**
-   * The whole card/row opens the course detail page ("read about a course", #360) via a
-   * stretched overlay link (z-10). The interactive controls — the Start/CTA button
-   * (→ player) and the favorite toggle — carry z-20 so they sit above the overlay and keep
-   * their own actions. Static content (title, description, thumbnail) sits under the overlay.
-   */
   const detailOverlay = (course: Course) => (
     <Link
       to={routes.learner.courseDetail(course.id)}
@@ -189,9 +161,6 @@ export default function LearnerCourses() {
     />
   );
 
-  // State-aware player CTA for a catalog card. It renders directly under the title (in the card
-  // body flow), so it carries `relative z-20` to stay clickable above the detail overlay and
-  // `self-start` to keep its natural width in the flex column.
   const courseCta = (course: Course, enrollment: Enrollment | undefined, isCompleted: boolean) => (
     <Button
       asChild
@@ -213,14 +182,12 @@ export default function LearnerCourses() {
     </div>
   );
 
-  /** Percent complete for a started card: completed → 100, else guard divide-by-zero. */
   const percentFor = (course: Course, isCompleted: boolean) => {
     const total = progressData[course.id]?.total ?? 0;
     const completed = progressData[course.id]?.completed ?? 0;
     return isCompleted ? 100 : total === 0 ? 0 : Math.round((completed / total) * 100);
   };
 
-  /** Card layout. `showChip` adds the "Recommended" chip top-right. */
   const renderCourseCard = (course: Course, showChip: boolean) => {
     const enrollment = getEnrollmentStatus(course.id);
     const isCompleted = enrollment?.status === 'completed';
@@ -233,7 +200,6 @@ export default function LearnerCourses() {
       >
         {detailOverlay(course)}
 
-        {/* Thumbnail with status badge */}
         <div className="relative h-[118px] bg-gradient-to-br from-primary/80 to-primary">
           {course.thumbnail_url && (
             <img
@@ -285,7 +251,6 @@ export default function LearnerCourses() {
     );
   };
 
-  /** List-row layout — same whole-row-to-detail + Start/favorite controls as the card. */
   const renderCourseRow = (course: Course) => {
     const enrollment = getEnrollmentStatus(course.id);
     const isCompleted = enrollment?.status === 'completed';
@@ -325,7 +290,6 @@ export default function LearnerCourses() {
             onToggle={(next) => toggleFavorite({ courseId: course.id, favorite: next, course })}
             className="h-8 w-8"
           />
-          {/* min-w keeps every CTA label (Continue / Review course / Start course) the same width so the favorite hearts stay aligned across rows (#445) */}
           <Button
             asChild
             className="h-auto min-w-[150px] rounded-[9px] bg-primary px-3 py-2 text-[12.5px] font-bold text-primary-foreground hover:bg-primary/90"
@@ -356,7 +320,6 @@ export default function LearnerCourses() {
         <p className="max-w-[680px] text-sm text-muted-foreground">{t('courses.subtitle')}</p>
       </div>
 
-      {/* Filters on the left, free-text search to their right, view toggle far right (#360). */}
       <div className="mb-[22px] flex flex-wrap items-center gap-2.5">
         <FilterSelect
           label={t('courses.category')}
@@ -413,10 +376,6 @@ export default function LearnerCourses() {
         <ListViewToggle view={view} onChange={setView} />
       </div>
 
-      {/* Recommended section — a highlighted "For you" strip (always cards, independent of the
-          list/card toggle) shown only when the learner has a known assessment level AND is NOT
-          actively filtering: once you filter/search you're browsing results, so a level-matched
-          strip that ignores the filters (and can sit above a "no matches" empty state) is hidden. */}
       {!hasActiveFilters && profile?.assessment_level != null && recommendedCourses.length > 0 && (
         <div className="mb-8" data-testid="recommended-section">
           <div className="mb-3.5 flex flex-wrap items-center gap-2">
@@ -429,8 +388,6 @@ export default function LearnerCourses() {
         </div>
       )}
 
-      {/* All courses heading — the separator under the recommended strip; shown only when that
-          strip is (i.e. no active filters + a recommended match). */}
       {!hasActiveFilters && recommendedCourses.length > 0 && (
         <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('assessment.recommendations.allCourses')}</h2>
       )}

@@ -36,7 +36,6 @@ export default endpoint('community-comment-update', async ({ req, profile, reply
   } else if (comment.scope === 'org' && comment.org_id && await isOrgAdmin(profile.id, comment.org_id)) {
     authorized = true;
   } else if (comment.user_id === profile.id && comment.is_hidden === false) {
-    // Author can update only if comment is not hidden
     authorized = true;
   }
 

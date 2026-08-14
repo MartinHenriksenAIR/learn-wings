@@ -60,7 +60,6 @@ describe('evaluateAnswers — happy path', () => {
   });
 
   it('mixed answers producing score 8 → intermediate', () => {
-    // 7 questions × index 1 = 7 points, then bump one to index 2 (+1 extra) = 8
     const answers = uniformAnswers(1);
     const firstQ = ASSESSMENT_QUESTIONS[0];
     answers[firstQ.id] = firstQ.options[2]; // index 2 instead of 1: +1

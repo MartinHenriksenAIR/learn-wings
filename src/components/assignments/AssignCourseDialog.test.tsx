@@ -17,8 +17,6 @@ vi.mock('@/lib/api-client', () => ({ callApi: vi.fn() }));
 
 vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
-// The assignable-courses hook is exercised in its own layer; here we stub it with
-// a mutable state so individual tests can flip loading/error.
 const courseAccessState = vi.hoisted(() => ({
   value: {
     data: [{ id: 'c-1', title: 'Course One', language: null }] as unknown[],
@@ -75,7 +73,6 @@ describe('AssignCourseDialog', () => {
   it('hides the whole-org option and locks the target when presetUserId is set', () => {
     renderDialog({ presetUserId: 'u-1' });
     expect(screen.queryByText('assignments.target.wholeOrg')).toBeNull();
-    // The locked member name is shown instead of a member picker.
     expect(screen.getByText('Alice Learner')).toBeInTheDocument();
   });
 
@@ -103,7 +100,6 @@ describe('AssignCourseDialog', () => {
   it('assigns to the whole org (userId null) when the org target is chosen', async () => {
     renderDialog();
 
-    // Switch target to the whole organization.
     fireEvent.click(screen.getByLabelText(/target\.wholeOrg/));
     fireEvent.click(screen.getByText('Course One'));
     fireEvent.click(screen.getByRole('button', { name: 'assignments.assign' }));

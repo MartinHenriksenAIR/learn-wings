@@ -171,8 +171,6 @@ describe('LearnerDashboard — motivation hub', () => {
   });
 
   it('hides the leaderboard for an individual-tier learner (server sets showLeaderboard=false)', async () => {
-    // The individual placeholder org suppresses the board server-side (#354),
-    // surfaced to the client as showLeaderboard=false.
     await mockData(dashData({ showLeaderboard: false }));
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
@@ -180,14 +178,11 @@ describe('LearnerDashboard — motivation hub', () => {
       currentOrg: { id: 'org-solo', name: 'Individuals', slug: 'individuals', kind: 'individual' },
     });
     renderDashboard();
-    // The hub still renders (snapshot present) but the org leaderboard is suppressed.
     await screen.findByTestId('dashboard-snapshot');
     expect(screen.queryByTestId('dashboard-leaderboard')).toBeNull();
   });
 
   it('hides the leaderboard when the org opted out (#369: showLeaderboard=false in a standard org)', async () => {
-    // A normal org that turned "Show leaderboard" off — the widget must be hidden,
-    // not rendered with an empty "be the first" state.
     await mockData(dashData({ showLeaderboard: false }));
     mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
     renderDashboard();

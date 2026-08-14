@@ -1,11 +1,3 @@
-/**
- * Per-kind exercise config validators (ADR-0017). The DB does not enforce
- * config shape — this module is the single authority. exercise-admin-save calls
- * validateExerciseConfig() and returns 400 with the message on any failure.
- *
- * Kinds are plain strings (no DB enum) so new kinds add a case here + a renderer,
- * with zero schema change. Every config must carry integer version === 1.
- */
 export const EXERCISE_KINDS = ['quick_check', 'bucket_sort'] as const;
 export type ExerciseKind = (typeof EXERCISE_KINDS)[number];
 

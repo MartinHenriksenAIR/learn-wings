@@ -14,14 +14,8 @@ const {
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-// `query` is the reference query the REAL blob-ownership bind gate issues — this
-// suite exercises that gate rather than stubbing it, so "already claimed by
-// another row" is expressed as the rows that query returns.
 vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: vi.fn(), isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
-// Only the two storage round trips are faked, so the tests below can assert that a
-// refused path never reaches either. `classifyBlobPath` stays REAL — it is the
-// pure string check the gate is built on.
 vi.mock('../shared/blob', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/blob')>()),
   headBlob: mockHeadBlob,
@@ -46,8 +40,6 @@ describe('organization-create', () => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
-    // Default: the bind gate's reference query finds nobody, so a well-shaped
-    // fresh logo path binds.
     mockQuery.mockResolvedValue([]);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -80,8 +72,6 @@ describe('organization-create', () => {
   });
 
   it('returns 400 (not 403) for invalid body when caller is not platform admin', async () => {
-    // Pins the deliberate validation-before-authz ordering (why this endpoint
-    // uses endpoint() + an inline admin check instead of adminEndpoint).
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     const res = await handler(baseReq({ slug: 'acme-corp' }), {} as any);
     expect(res.status).toBe(400);
@@ -166,15 +156,12 @@ describe('organization-create', () => {
   });
 
   it('refuses a foreign-shaped logo_url BEFORE any storage or write call', async () => {
-    // A lesson video path posted to logo_url. `course-player-data` hands every
-    // lesson path to any active org member, so this is not a guess.
     const res = await handler(baseReq({ ...validBody, logo_url: 'someone-elses-lesson.mp4' }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
     expect(mockQueryOne).not.toHaveBeenCalled();
     expect(mockHeadBlob).not.toHaveBeenCalled();
     expect(mockDeleteBlob).not.toHaveBeenCalled();
-    // Out-of-family is a pure string verdict — it does not even cost a round trip.
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
@@ -186,8 +173,6 @@ describe('organization-create', () => {
   });
 
   it('refuses a well-shaped org-logo path another org already references', async () => {
-    // Shape alone cannot catch this: every org logo is `org-logos/<uuid>.<ext>`,
-    // and `/organizations` hands logo_url to plain learners.
     mockQuery.mockResolvedValueOnce([{ path: 'org-logos/other-org.png' }]);
     const res = await handler(baseReq({ ...validBody, logo_url: 'org-logos/other-org.png' }), {} as any);
     expect(res.status).toBe(400);

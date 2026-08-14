@@ -9,33 +9,10 @@ import {
 } from '@/lib/community-api';
 import type { CommunityReport } from '@/lib/community-types';
 
-/**
- * The moderation view-model both queues render: a community report plus the
- * minimal reporter projection the endpoints join out (`{ id, full_name }`),
- * which is narrower than the full `Profile` on `CommunityReport.reporter`.
- * Owned here because the hook and both moderation pages share it (#237).
- */
 export interface ReportWithDetails extends Omit<CommunityReport, 'reporter'> {
   reporter?: { id: string; full_name: string };
 }
 
-/**
- * The three report-moderation mutations shared by the org + platform community
- * moderation queues (#237). They were byte-identical across both pages apart
- * from which report-list query family they invalidate, so the family to
- * invalidate is the hook's one parameter.
- *
- * Moderation decisions keep their success/failure toasts (toast policy);
- * success also invalidates the passed queue prefix so the list refreshes.
- * Dialog state (open/close, admin notes) stays at the call site — see
- * ReviewReportDialog — because `updateReport` is triggered from two places
- * (the per-card dismiss button and the review dialog) that manage it differently.
- *
- * @param invalidateKey the report-list family's `all` prefix
- *   (`queryKeys.orgReports.all` or `queryKeys.platformReports.all`).
- * @param onUpdateSuccess extra work after a status update succeeds — the
- *   review dialog uses it to close itself and clear its selection.
- */
 export function useReportModeration(
   invalidateKey: readonly unknown[],
   onUpdateSuccess?: () => void,

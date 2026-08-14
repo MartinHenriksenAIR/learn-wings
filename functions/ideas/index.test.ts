@@ -61,8 +61,6 @@ describe('ideas', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'orgId is required' });
   });
 
-  // NOTE: validation runs before the authz check, so these 400 cases do NOT
-  // consume an isActiveMember mock — leave it at the default (false).
   it('returns 400 when status is not an array of strings', async () => {
     const res = await handler(baseReq({ orgId: 'org-1', status: 'submitted' }), {} as any);
     expect(res.status).toBe(400);
@@ -124,12 +122,9 @@ describe('ideas', () => {
 
     expect(res.status).toBe(200);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // org scoping
     expect(sql).toContain('i.org_id =');
-    // draft visibility rule: drafts only visible to their author, no admin bypass
     expect(sql).toContain("i.status <> 'draft'");
     expect(sql).toContain('i.user_id =');
-    // caller profile id must be a param so the author check works
     expect(params).toContain('p1');
   });
 
@@ -142,7 +137,6 @@ describe('ideas', () => {
     expect(res.status).toBe(200);
     expect(mockIsActiveMember).not.toHaveBeenCalled();
     const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // draft rule present even for platform admin
     expect(sql).toContain("i.status <> 'draft'");
   });
 
@@ -158,7 +152,6 @@ describe('ideas', () => {
     expect(sql).toContain('idea_votes');
     expect(sql).toContain('vote_count');
     expect(sql).toContain('AS profile');
-    // list does NOT compute user_has_voted (parity with old client)
     expect(sql).not.toContain('user_has_voted');
     expect(sql).toContain('ORDER BY i.created_at DESC');
   });
@@ -225,7 +218,6 @@ describe('ideas', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // #180 — idea author payload must carry avatar_url.
   it('joins avatar_url into the idea author profile payload', async () => {
     mockIsActiveMember.mockResolvedValueOnce(true);
     const rows = [{ id: 'idea-1', profile: { id: 'a1', full_name: 'Ann', avatar_url: 'avatars/a1.png' } }];

@@ -21,18 +21,12 @@ export default endpoint('org-membership-update', async ({ req, reply, requireOrg
     return reply(400, { error: 'status must be one of: active, invited, disabled' });
   }
 
-  // Lookup first so we know which org to check authz against, and to give a
-  // clean 404 for missing memberships (instead of relying on UPDATE RETURNING).
   const existing = await queryOne<{ org_id: string }>(
     `SELECT org_id FROM org_memberships WHERE id = $1`,
     [id],
   );
   if (!existing) return reply(404, { error: 'Membership not found' });
 
-  // Authorization: platform admin OR org admin of the membership's org.
-  // RLS provenance: supabase/migrations/20260127153401_*.sql lines 279-285 —
-  // "Platform admins can do everything with memberships" (is_platform_admin())
-  // + "Org admins can manage memberships in their org" (is_org_admin(org_id)).
   await requireOrgAdmin(existing.org_id);
 
   const params: unknown[] = [];
@@ -55,7 +49,6 @@ export default endpoint('org-membership-update', async ({ req, reply, requireOrg
     params,
   );
 
-  // TOCTOU: row vanished between SELECT and UPDATE — treat as not found.
   if (!membership) return reply(404, { error: 'Membership not found' });
   return reply(200, { membership });
 });

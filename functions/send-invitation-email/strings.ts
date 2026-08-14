@@ -54,11 +54,6 @@ export const EMAIL_STRINGS: Record<EmailLanguage, EmailStrings> = {
   },
 };
 
-/**
- * Resolve the email language. ADR-0016 category 3: an existing recipient's
- * stored preferred_language wins; otherwise the inviter's dialog pick; otherwise
- * the platform default ('da').
- */
 export function resolveEmailLanguage(bodyLang: unknown, profileLang: string | null): EmailLanguage {
   if (profileLang === 'da' || profileLang === 'en') return profileLang;
   if (bodyLang === 'da' || bodyLang === 'en') return bodyLang;

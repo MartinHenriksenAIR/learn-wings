@@ -120,7 +120,6 @@ describe('course-structure-admin', () => {
 
   it('happy path: passes correct SQL and params for modules and lessons queries', async () => {
     mockQueryOne.mockResolvedValueOnce(fakeCourse);
-    // Dispatch by SQL so the test is order-agnostic with respect to Promise.all parallelism
     mockQuery.mockImplementation((sql: string) => {
       if (sql.includes('lessons') && sql.includes('JOIN course_modules')) return Promise.resolve([fakeLesson1]);
       return Promise.resolve([fakeModule1]); // course_modules query
@@ -134,7 +133,6 @@ describe('course-structure-admin', () => {
     expect(modulesCall).toBeDefined();
     const [modulesSql, modulesParams] = modulesCall!;
     expect(modulesSql).toContain('course_modules');
-    // Deterministic ordering (issue #46): id tie-breaker on equal sort_order ranks
     expect(modulesSql).toContain('ORDER BY sort_order, id');
     expect(modulesParams).toContain('course-1');
 

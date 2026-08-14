@@ -40,7 +40,6 @@ describe('touch-course', () => {
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
 
-    // SECURITY PIN: the UPDATE must scope to profile.id ('p1'), never a client-supplied user id.
     const updateCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('UPDATE enrollments'));
     expect(updateCall).toBeDefined();
     expect(updateCall![0]).toContain('last_accessed_at = now()');

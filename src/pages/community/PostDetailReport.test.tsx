@@ -8,7 +8,6 @@ vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-// --- stub heavy child components (ReportDialog stays REAL — it is under test) ---
 vi.mock('@/components/community/CategoryBadge', () => ({
   CategoryBadge: () => <div data-testid="category-badge" />,
 }));
@@ -29,7 +28,6 @@ vi.mock('react-i18next', () => ({
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({ toast: (...args: unknown[]) => mockToast(...args) }));
 
-// --- mock api-client with a real ApiError class so instanceof checks work ---
 const { MockApiError } = vi.hoisted(() => {
   class MockApiError extends Error {
     status: number;
@@ -159,7 +157,6 @@ describe('PostDetail — duplicate-report 409 handling (#21)', () => {
         description: 'community.alreadyReportedDescription',
       }));
     });
-    // The dialog resolves — the report already exists, so this outcome is terminal
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
@@ -178,7 +175,6 @@ describe('PostDetail — duplicate-report 409 handling (#21)', () => {
         variant: 'destructive',
       }));
     });
-    // Dialog stays open so the user can retry
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
@@ -197,8 +193,6 @@ describe('PostDetail — duplicate-report 409 handling (#21)', () => {
   });
 });
 
-// #243 — moderation toggles were silent on failure (no onError): a 403/500 left
-// the click doing nothing. These assert the destructive toast now fires.
 describe('PostDetail — moderation toggle failure paths (#243)', () => {
   const adminAuth = { ...viewerAuth, isPlatformAdmin: true, effectiveIsPlatformAdmin: true };
 
