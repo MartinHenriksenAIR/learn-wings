@@ -55,7 +55,6 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | `src/` | Frontend SPA — `pages/` (by role), `components/`, `hooks/useAuth.tsx`, `lib/` (api-client, types, msal-config) |
 | `functions/` | One folder per Azure Function + `shared/` (`endpoint`, `auth`, `db`, `profile`, `cors`, `errors`, …) + the `index.ts` barrel |
 | `migration/azure/` | The canonical Postgres schema, seed data, and apply guide |
-| `migration/STATUS.html` | Live ledger — current checkpoint and operational quirks. Read it first. |
 | `docs/adr/` | Architecture decision records — read before structural changes |
 | `docs/glossary.md` | Canonical en/da terminology for user-facing copy |
 | `.claude/` | `rules/` (per-tree conventions), `skills/` (`pickup`/`handoff`), `collab.json` (branch topology) |

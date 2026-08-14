@@ -1,11 +1,11 @@
 ---
 name: pickup
-description: Use at session start on learn-wings — reads the ledger, picks work from the board, creates the branch and draft PR.
+description: Use at session start on learn-wings — picks work from the board, creates the branch and draft PR.
 ---
 
 # Pickup — start-of-session
 
-1. **Read state:** `migration/STATUS.html` (checkpoint, quirks), then:
+1. **Read state:**
    - `gh issue list --state open` — the backlog
    - `gh pr list --state open` — what's already in flight
 2. **Pick an issue** that isn't already in flight (no branch/draft PR working on it). Honor `Depends on:` references and the `blocked` label — AND a filled "Blocked by" field in the issue body (form-created issues may lack labels; the body is authoritative).

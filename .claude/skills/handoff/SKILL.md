@@ -12,7 +12,7 @@ description: Use at session end on learn-wings — pushes state, updates the iss
 
 **When the work is complete (merge ritual):**
 1. Verify locally: `cd functions && npm test` (if functions changed), `npm run build`, `npm test`, `npx tsc --noEmit -p tsconfig.app.json`.
-2. Make the PR description the record of what changed and why. Update `migration/STATUS.html` in place **only** if this work changed the live checkpoint or an operational quirk — otherwise leave it alone.
+2. Make the PR description the record of what changed and why. Do not write it into a file as well.
 3. Mark the PR ready: `gh pr ready`. Run `/code-review` on it.
 4. Merge once the review is clean (the `main` ruleset governs required approvals), then `git switch <trunk> && git pull` (`<trunk>` = the `trunk` value in `.claude/collab.json`), delete the branch.
 5. **Deploy (only if functions changed, only from fresh trunk):** see the Deploys section of `AGENTS.md`. Announce on the merged PR: `deploying trunk @<short-sha>` … then `deployed, smoke ok`.

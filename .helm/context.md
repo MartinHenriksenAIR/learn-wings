@@ -12,6 +12,6 @@ the deltas that matter for autonomous task agents:
 - Read `.claude/rules/frontend.md` / `.claude/rules/functions.md` before touching either tree, and
   `docs/adr/` before structural changes.
 - Skip the AGENTS.md session and collaboration rituals (pickup/handoff skills, draft PRs,
-  `migration/STATUS.html` bookkeeping, deploy announcements) — those belong to human
-  sessions and happen at promotion time, not per task.
+  deploy announcements) — those belong to human sessions and happen at promotion time,
+  not per task.
 - Never deploy, never mutate Azure resources, never touch secrets.
