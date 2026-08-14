@@ -42,6 +42,8 @@ import {
   Flag,
   MessageSquare,
   PlayCircle,
+  Calendar,
+  FolderOpen,
   type LucideIcon,
 } from 'lucide-react';
 import { OrgSelector } from '@/components/OrgSelector';
@@ -49,48 +51,25 @@ import { SidebarBrand } from '@/components/layout/SidebarBrand';
 import { getInitials } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 
-// Pill nav item: navy bg + white text when active, muted slate otherwise.
-// data-[active=true]:font-semibold looks redundant next to the base font-semibold, but it is
-// load-bearing: it twMerge-overrides the sidebar cva's data-[active=true]:font-medium.
 const NAV_BUTTON_CLASSES =
   'h-auto gap-[11px] rounded-[11px] px-3 py-2.5 text-[13.5px] font-semibold text-sidebar-foreground ' +
   'hover:bg-[#f3f4f8] hover:text-foreground active:bg-[#f3f4f8] active:text-foreground ' +
   'data-[active=true]:bg-primary data-[active=true]:font-semibold data-[active=true]:text-primary-foreground ' +
   'data-[active=true]:hover:bg-primary data-[active=true]:hover:text-primary-foreground [&>svg]:size-[17px] ' +
-  // Collapsed to the icon rail (#370): the custom pill sizing (h-auto/px-3/py-2.5) fights
-  // the primitive's own collapse squaring, so re-assert a clean centred 32px square with `!`.
   'group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center';
 
 const GROUP_LABEL_CLASSES =
   'h-auto px-3 pb-1.5 text-[12.5px] font-semibold normal-case text-[#3f4657] ' +
-  // Collapsed, the shadcn primitive only fades the label (opacity-0) but keeps it in the
-  // layout — and with our h-auto override its -mt-8 no longer cancels the label's height, so
-  // the invisible label overlapped the icon buttons and, still hit-testable, stole their
-  // hovers/clicks and showed a text (I-beam) cursor. Drop it from the rail entirely (#370).
   'group-data-[collapsible=icon]:hidden';
 
 const MENU_ITEM_CLASSES = 'rounded-[9px] text-[13px] font-medium';
 
-/** One entry in a sidebar nav group. All three groups share this shape. */
 type NavItem = {
   title: string;
   url: string;
   icon: LucideIcon;
 };
 
-/**
- * One nav group (optional label + pill menu). The three groups in AppSidebar were
- * byte-identical apart from label and items (#271).
- *
- * `label` is optional: omit it to render a bare, unlabelled group — used for the
- * top-level Dashboard item that sits above the labelled Læring/Fællesskab groups (#363).
- *
- * Deliberately at module scope, not nested inside AppSidebar: a component declared
- * inside a render body gets a fresh identity every render, so React would unmount and
- * remount the whole menu subtree (losing tooltip/focus state) on every sidebar render.
- * `collapsed` and `pathname` are read from context here rather than threaded as props,
- * exactly as the underlying sidebar primitives do.
- */
 function NavSection({ label, items }: { label?: string; items: NavItem[] }) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
@@ -149,20 +128,23 @@ export function AppSidebar() {
 
   const viewModeLabels = useViewModeLabels();
 
-  // Learner nav is three sections (#363): a top-level Dashboard, then a labelled
-  // "Læring" group, then a "Fællesskab" group (rendered only when community is on).
   const dashboardItems = [
     { title: t('nav.dashboard'), url: routes.learner.dashboard, icon: LayoutDashboard },
   ];
+
+  const resourcesItem = { title: t('nav.resources'), url: routes.community.resources, icon: FolderOpen };
 
   const laeringItems = [
     { title: t('nav.training'), url: routes.learner.training, icon: PlayCircle },
     { title: t('nav.courses'), url: routes.learner.courses, icon: BookOpen },
     { title: t('nav.tips'), url: routes.learner.tips, icon: Lightbulb },
+    ...(features.community_enabled ? [] : [resourcesItem]),
   ];
 
   const faellesskabItems = [
-    { title: t('nav.community'), url: routes.community.feed, icon: MessageSquare },
+    { title: t('nav.discussions'), url: routes.community.feed, icon: MessageSquare },
+    { title: t('nav.events'), url: routes.community.events, icon: Calendar },
+    resourcesItem,
   ];
 
   const orgAdminItems = [
@@ -201,97 +183,99 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <OrgSelector />
+      <div className="flex min-h-0 flex-1 flex-col border-r border-border">
+        <OrgSelector />
 
-      <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2 group-data-[collapsible=icon]:px-2">
-        {!effectiveIsPlatformAdmin && (
-          <>
-            <NavSection items={dashboardItems} />
-            <NavSection label={t('nav.learning')} items={laeringItems} />
-            {features.community_enabled && (
-              <NavSection label={t('nav.community')} items={faellesskabItems} />
-            )}
-          </>
-        )}
+        <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2 group-data-[collapsible=icon]:px-2">
+          {!effectiveIsPlatformAdmin && (
+            <>
+              <NavSection items={dashboardItems} />
+              <NavSection label={t('nav.learning')} items={laeringItems} />
+              {features.community_enabled && (
+                <NavSection label={t('nav.community')} items={faellesskabItems} />
+              )}
+            </>
+          )}
 
-        {effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && (
-          <NavSection label={t('nav.organization')} items={orgAdminItems} />
-        )}
+          {effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && (
+            <NavSection label={t('nav.organization')} items={orgAdminItems} />
+          )}
 
-        {effectiveIsPlatformAdmin && (
-          <NavSection label={t('nav.platformAdmin')} items={platformAdminItems} />
-        )}
-      </SidebarContent>
+          {effectiveIsPlatformAdmin && (
+            <NavSection label={t('nav.platformAdmin')} items={platformAdminItems} />
+          )}
+        </SidebarContent>
 
-      <SidebarFooter className="border-t border-border p-3 group-data-[collapsible=icon]:p-1.5">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="h-auto w-full justify-start gap-2.5 rounded-xl p-2 text-sidebar-foreground hover:bg-[#f3f4f8] hover:text-foreground group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center"
-            >
-              <Avatar className="h-9 w-9">
-                {avatarSrc && (
-                  <AvatarImage src={avatarSrc} alt="" className="object-cover" />
+        <SidebarFooter className="border-t border-border p-3 group-data-[collapsible=icon]:p-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-auto w-full justify-start gap-2.5 rounded-xl p-2 text-sidebar-foreground hover:bg-[#f3f4f8] hover:text-foreground group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center"
+              >
+                <Avatar className="h-9 w-9">
+                  {avatarSrc && (
+                    <AvatarImage src={avatarSrc} alt="" className="object-cover" />
+                  )}
+                  <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                {!collapsed && (
+                  <>
+                    <div className="flex min-w-0 flex-1 flex-col items-start text-left">
+                      <span className="w-full truncate text-[13px] font-bold text-foreground">
+                        {profile?.full_name}
+                      </span>
+                      <span className="w-full truncate text-[11.5px] text-[#9aa0af]">
+                        {getCurrentRoleLabel()}
+                      </span>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#9aa0af]" />
+                  </>
                 )}
-                <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              {!collapsed && (
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side="top"
+              align="end"
+              className="w-56 rounded-[14px] border-border p-1.5 shadow-[0_16px_40px_rgba(20,24,46,0.14)]"
+            >
+              {isPlatformAdmin && (
                 <>
-                  <div className="flex min-w-0 flex-1 flex-col items-start text-left">
-                    <span className="w-full truncate text-[13px] font-bold text-foreground">
-                      {profile?.full_name}
-                    </span>
-                    <span className="w-full truncate text-[11.5px] text-[#9aa0af]">
-                      {getCurrentRoleLabel()}
-                    </span>
-                  </div>
-                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#9aa0af]" />
+                  <DropdownMenuLabel className="px-2.5 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#9aa0af]">
+                    {t('nav.switchView')}
+                  </DropdownMenuLabel>
+                  <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+                    <DropdownMenuRadioItem className={MENU_ITEM_CLASSES} value="platform_admin">
+                      {t('nav.roles.platformAdmin')}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem className={MENU_ITEM_CLASSES} value="org_admin">
+                      {t('nav.roles.orgAdmin')}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem className={MENU_ITEM_CLASSES} value="learner">
+                      {t('nav.roles.learner')}
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator className="bg-border" />
                 </>
               )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            align="end"
-            className="w-56 rounded-[14px] border-border p-1.5 shadow-[0_16px_40px_rgba(20,24,46,0.14)]"
-          >
-            {isPlatformAdmin && (
-              <>
-                <DropdownMenuLabel className="px-2.5 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#9aa0af]">
-                  {t('nav.switchView')}
-                </DropdownMenuLabel>
-                <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-                  <DropdownMenuRadioItem className={MENU_ITEM_CLASSES} value="platform_admin">
-                    {t('nav.roles.platformAdmin')}
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem className={MENU_ITEM_CLASSES} value="org_admin">
-                    {t('nav.roles.orgAdmin')}
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem className={MENU_ITEM_CLASSES} value="learner">
-                    {t('nav.roles.learner')}
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator className="bg-border" />
-              </>
-            )}
-            <DropdownMenuItem className={MENU_ITEM_CLASSES} onClick={() => navigate(routes.settings)}>
-              <SettingsIcon className="mr-2 h-4 w-4" />
-              {t('nav.settings')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-border" />
-            <DropdownMenuItem
-              onClick={handleSignOut}
-              className={`${MENU_ITEM_CLASSES} text-destructive focus:bg-[#fdf1f1] focus:text-destructive`}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              {t('nav.signOut')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarFooter>
+              <DropdownMenuItem className={MENU_ITEM_CLASSES} onClick={() => navigate(routes.settings)}>
+                <SettingsIcon className="mr-2 h-4 w-4" />
+                {t('nav.settings')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className={`${MENU_ITEM_CLASSES} text-destructive focus:bg-[#fdf1f1] focus:text-destructive`}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                {t('nav.signOut')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarFooter>
+      </div>
     </Sidebar>
   );
 }

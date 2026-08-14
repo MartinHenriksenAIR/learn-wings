@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ---------------------------------------------------------------------------
-// Unit tests for withTransaction. Lives in its own file because vi.mock('pg')
-// is file-scoped — mixing it into db.test.ts would break the real-DB
-// integration tests there whenever DATABASE_URL is set.
-// ---------------------------------------------------------------------------
 const { mockConnect, mockQuery, mockRelease } = vi.hoisted(() => {
   const mockRelease = vi.fn();
   const mockQuery = vi.fn();
@@ -24,8 +19,6 @@ import { withTransaction } from './db';
 describe('withTransaction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // getDb() throws without a connection string; pg is mocked so the value
-    // is never dialled.
     process.env.DATABASE_URL = 'postgres://unit-test-mock/never-connects';
 
     mockConnect.mockResolvedValue({

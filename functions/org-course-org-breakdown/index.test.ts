@@ -24,7 +24,6 @@ describe('org-course-org-breakdown', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
-    // Platform admin by default — this endpoint is platform-admin-only.
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: true });
     mockIsOrgAdmin.mockResolvedValue(false);
   });
@@ -79,26 +78,29 @@ describe('org-course-org-breakdown', () => {
     expect(JSON.parse(res.body as string).orgs).toEqual(rows);
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // Org population = (course access-enabled) UNION (has ≥1 enrollment), so the table
-    // reconciles with the enrollee list even when access was revoked with enrollments left
-    // behind, and still shows 0-enrollment "gap" rows for enabled orgs (LEFT JOIN).
     expect(sql).toContain('FROM organizations o');
     expect(sql).toContain('UNION');
     expect(sql).toContain("oca.access = 'enabled'");
     expect(sql).toContain('LEFT JOIN enrollments');
-    // group-expanded across editions via a grp CTE keyed on the passed course id
     expect(sql).toContain('WITH grp AS');
     expect(sql).toContain('COALESCE(gm.course_group_id, gm.id)');
     expect(sql).toContain('IN (SELECT id FROM grp)');
-    // per-org DISTINCT-learner counts across the group's editions (the per-course UNIQUE
-    // no longer makes rows == distinct learners once editions are grouped)
     expect(sql).toContain('COUNT(DISTINCT e.user_id)');
     expect(sql).toContain("FILTER (WHERE e.status = 'completed')");
     expect(sql).toContain('GROUP BY');
-    // most-engaged first, gap rows sink to the bottom
     expect(sql).toContain('ORDER BY enrolled DESC');
     expect(sql).not.toContain('SELECT *');
     expect(params).toEqual(['c-1']);
+  });
+
+  it('#354: excludes the Individuals placeholder org from the cross-org breakdown', async () => {
+    mockQuery.mockResolvedValueOnce([{ org_id: 'o1', org_name: 'Acme', enrolled: 3, completed: 1 }]);
+
+    const res = await handler(baseReq({ courseId: 'c-1' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("o.kind <> 'individual'");
   });
 
   it('returns 500 on db error', async () => {

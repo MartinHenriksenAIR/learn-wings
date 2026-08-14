@@ -42,8 +42,6 @@ describe('isIdeaVisibleTo (draft-privacy truth table)', () => {
   });
 
   it('draft + non-author who is a platform admin → STILL hidden (no admin bypass)', () => {
-    // isIdeaVisibleTo takes only { id } — a platform admin who is not the author
-    // is just a non-author here. The absence of an admin bypass is the invariant.
     const platformAdmin = { id: 'admin', is_platform_admin: true };
     expect(isIdeaVisibleTo(draft, platformAdmin)).toBe(false);
   });

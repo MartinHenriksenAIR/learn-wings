@@ -1,17 +1,17 @@
 import { useTranslation } from 'react-i18next';
-import { Users, Mail, UserPlus, ClipboardList } from 'lucide-react';
+import { Users, ClipboardList, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MembersTable } from './MembersTable';
+import { membersToCsv, downloadCsv, membersCsvFilename } from '@/lib/csv';
 import type { OrgMembership, Profile, OrgRole } from '@/lib/types';
 
 type Member = OrgMembership & { profile: Profile };
 
 interface MembersSectionProps {
   members: Member[];
+  orgName: string;
   updatingRoleId: string | null;
-  onInviteClick: () => void;
-  onAddUserClick: () => void;
   onRoleChange: (member: Member, newRole: OrgRole) => void;
   onDisable: (membershipId: string) => void;
   onReactivate: (membershipId: string) => void;
@@ -21,9 +21,8 @@ interface MembersSectionProps {
 
 export function MembersSection({
   members,
+  orgName,
   updatingRoleId,
-  onInviteClick,
-  onAddUserClick,
   onRoleChange,
   onDisable,
   onReactivate,
@@ -32,22 +31,25 @@ export function MembersSection({
 }: MembersSectionProps) {
   const { t } = useTranslation();
 
+  const handleExportCsv = () =>
+    downloadCsv(membersCsvFilename(orgName, new Date()), membersToCsv(members));
+
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[17px] font-extrabold">{t('orgDetail.members')}</h2>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExportCsv}
+            disabled={members.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+            {t('orgDetail.exportCsv')}
+          </Button>
           <Button variant="outline" onClick={onAssignClick}>
             <ClipboardList className="mr-2 h-4 w-4" aria-hidden="true" />
             {t('assignments.assignCourse')}
-          </Button>
-          <Button variant="outline" onClick={onInviteClick}>
-            <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
-            {t('orgDetail.inviteUser')}
-          </Button>
-          <Button onClick={onAddUserClick}>
-            <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" />
-            {t('orgDetail.addMember')}
           </Button>
         </div>
       </div>
@@ -57,12 +59,6 @@ export function MembersSection({
           icon={<Users className="h-6 w-6" />}
           title={t('orgDetail.noMembersTitle')}
           description={t('orgDetail.noMembersDescription')}
-          action={
-            <Button onClick={onAddUserClick}>
-              <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t('orgDetail.addUser')}
-            </Button>
-          }
         />
       ) : (
         <MembersTable

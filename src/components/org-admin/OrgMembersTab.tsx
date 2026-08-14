@@ -52,6 +52,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { callApi, ApiError } from '@/lib/api-client';
 import { getSeatUsage } from '@/lib/seats';
 import { formatDate } from '@/lib/date-locale';
+import { membersToCsv, downloadCsv, membersCsvFilename } from '@/lib/csv';
 import { cn } from '@/lib/utils';
 import { SeatUsageNote } from '@/components/SeatUsageNote';
 import { OrgMembership, Profile, Invitation, OrgRole } from '@/lib/types';
@@ -66,6 +67,7 @@ import {
   UserX,
   ShieldCheck,
   User,
+  Download,
   FileSpreadsheet,
   GraduationCap,
   Sparkles,
@@ -92,7 +94,7 @@ const inviteSchema = z.object({
 
 export function OrgMembersTab() {
   const { t, i18n } = useTranslation();
-  const { user, profile, currentOrg } = useAuth();
+  const { user, profile, currentOrg, effectiveIsOrgAdmin, effectiveIsPlatformAdmin } = useAuth();
   const queryClient = useQueryClient();
 
   const membershipsQuery = useOrgMemberships(currentOrg?.id);
@@ -114,12 +116,6 @@ export function OrgMembersTab() {
     [championsQuery.data],
   );
 
-  // Seats consumed = active members + pending invitations, measured against
-  // the org's seat_limit. Prefer the org-wide server aggregates (`orgDetail`)
-  // — the caller-scoped `invitations` list only contains invites THIS admin
-  // created, so it undercounts pending seats when a co-admin (or platform
-  // admin) has outstanding invites in the same org. Fall back to the
-  // already-fetched lists only while `orgDetail` is still loading.
   const activeMemberCount = members.filter((m) => m.status === 'active').length;
   const seatUsage = useMemo(
     () =>
@@ -132,12 +128,11 @@ export function OrgMembersTab() {
   );
   const atSeatLimit = !seatUsage.isUnlimited && seatUsage.atLimit;
 
-  // Seat requests: at most one pending request per org at a time — the
-  // standing "Request more seats" button and at-cap nudge both fold into a
-  // pending-state readout (with Cancel) whenever one exists.
   const { data: seatRequests = [] } = useSeatRequests(currentOrg?.id);
   const pendingSeatRequest = seatRequests.find((r) => r.status === 'pending') ?? null;
   const hasFiniteSeatLimit = (orgDetail?.seat_limit ?? currentOrg?.seat_limit ?? null) !== null;
+
+  const canInvite = effectiveIsOrgAdmin && !effectiveIsPlatformAdmin && !!currentOrg;
 
   useQueryErrorToast({
     isError: membershipsQuery.isError,
@@ -168,8 +163,6 @@ export function OrgMembersTab() {
   const [inviteLanguage, setInviteLanguage] = useState<InviteLanguage>(() =>
     uiLangToInvite(i18n.resolvedLanguage),
   );
-  // In-button morph feedback for copy-link ("Copied!") and revoke ("Revoked"),
-  // keyed by invitation link/id — replaces the routine success toasts.
   const { flashed: copyFlashed, flash: flashCopy } = useFlash();
   const { flashed: revokeFlashed, flash: flashRevoke } = useFlash();
   const [roleChangeDialog, setRoleChangeDialog] = useState<{
@@ -192,11 +185,6 @@ export function OrgMembersTab() {
     queryClient.invalidateQueries({ queryKey: queryKeys.orgMemberships.list(currentOrg?.id) });
   const invalidateInvitations = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.invitations.list(currentOrg?.id, 'org') });
-  // Refresh the org-wide seat aggregates (member_count / pending_invite_count)
-  // that seatUsage reads from. Every mutation that changes the org's active
-  // member or pending invite count calls this so the "seats used · remaining"
-  // note updates immediately after the user's own action — the caller-scoped
-  // lists alone don't move these org-wide totals.
   const invalidateOrgDetail = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.orgDetail.detail(currentOrg?.id) });
 
@@ -267,7 +255,6 @@ export function OrgMembersTab() {
       invalidateMemberships();
       invalidateOrgDetail();
     },
-    // The dialog closed unconditionally in the old `finally` — reproduce with onSettled.
     onSettled: () => setRemoveMemberDialog(null),
   });
 
@@ -276,13 +263,10 @@ export function OrgMembersTab() {
       callApi('/api/invitation-update', { id: invitation.id, status: 'expired' }),
     errorTitle: 'Failed to cancel invitation',
     onSuccess: (_data, invitation) => {
-      // Instant on-success removal (no refetch), matching the old local-state
-      // filter: drop the row from the cached list via setQueryData.
       queryClient.setQueryData<Invitation[]>(
         queryKeys.invitations.list(currentOrg?.id, 'org'),
         (prev) => prev?.filter((inv) => inv.id !== invitation.id) ?? [],
       );
-      // Cancelling frees a seat — refresh the org-wide pending-invite aggregate.
       invalidateOrgDetail();
     },
   });
@@ -311,18 +295,12 @@ export function OrgMembersTab() {
     }) =>
       isCurrentlyChampion
         ? callApi('/api/ai-champion-delete', { orgId: currentOrg?.id, userId: member.user_id })
-        // assigned_by is derived server-side from the caller's profile (issue #11 audit item)
         : callApi('/api/ai-champion-create', { orgId: currentOrg?.id, userId: member.user_id }),
     errorTitle: ({ isCurrentlyChampion }) =>
       isCurrentlyChampion
         ? 'Failed to remove AI Champion status'
         : 'Failed to assign AI Champion status',
     onSuccess: (_data, { member, isCurrentlyChampion }) => {
-      // Invalidate rather than hand-patch the cache: the ['ai-champions', orgId]
-      // entry is shared with AIChampionsList, which reads full champion rows
-      // (id/profile/assigned_at). Writing a partial { user_id } row here would
-      // corrupt that consumer's render, so refetch the real rows instead —
-      // consistent with how the role/member mutations invalidate.
       queryClient.invalidateQueries({ queryKey: queryKeys.aiChampions.list(currentOrg?.id) });
       if (isCurrentlyChampion) {
         toast({ title: 'AI Champion status removed', description: `${member.profile?.full_name} is no longer an AI Champion.` });
@@ -342,8 +320,6 @@ export function OrgMembersTab() {
     },
   });
 
-  // Surface the backend seat cap (409) inline in the invite dialog, alongside
-  // the failure toast, so it doesn't read as a generic error.
   const inviteErrorMessage =
     inviteMutation.error instanceof ApiError &&
     inviteMutation.error.code === 'SEAT_LIMIT_REACHED'
@@ -378,8 +354,6 @@ export function OrgMembersTab() {
   };
 
   const handleCancelInvitation = (invitation: Invitation) => {
-    // Optimistic inline feedback ("Revoked") fires immediately; the row drops
-    // once the request succeeds (setQueryData in onSuccess). Errors keep toasts.
     flashRevoke(invitation.id);
     cancelInvitationMutation.mutate(invitation);
   };
@@ -400,6 +374,9 @@ export function OrgMembersTab() {
     setTogglingChampion(member.id);
     toggleChampionMutation.mutate({ member, isCurrentlyChampion });
   };
+
+  const handleExportCsv = () =>
+    downloadCsv(membersCsvFilename(currentOrg?.name, new Date()), membersToCsv(members));
 
   const filteredMembers = members.filter((member) => {
     const matchesSearch =
@@ -457,15 +434,26 @@ export function OrgMembersTab() {
           <ClipboardList className="mr-2 h-4 w-4" aria-hidden="true" />
           {t('assignments.assignCourse')}
         </Button>
-        <Button variant="outline" onClick={() => setBulkInviteOpen(true)} className="shrink-0">
-          <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
-          {t('analytics.members.bulkInvite')}
+        <Button
+          variant="outline"
+          onClick={handleExportCsv}
+          disabled={members.length === 0}
+          className="shrink-0"
+        >
+          <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+          {t('analytics.members.exportCsv')}
         </Button>
+        {canInvite && (
+          <Button variant="outline" onClick={() => setBulkInviteOpen(true)} className="shrink-0">
+            <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden="true" />
+            {t('analytics.members.bulkInvite')}
+          </Button>
+        )}
+        {canInvite && (
         <Dialog
           open={inviteOpen}
           onOpenChange={(open) => {
             setInviteOpen(open);
-            // Clear any prior seat-cap error when the dialog (re)opens.
             if (open) inviteMutation.reset();
           }}
         >
@@ -566,6 +554,7 @@ export function OrgMembersTab() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
         {hasFiniteSeatLimit && (
           pendingSeatRequest ? (
             <div className="flex items-center gap-2">
@@ -592,14 +581,16 @@ export function OrgMembersTab() {
         )}
       </div>
 
-      <BulkInviteDialog
-        open={bulkInviteOpen}
-        onOpenChange={setBulkInviteOpen}
-        orgId={currentOrg.id}
-        orgName={currentOrg.name}
-        seatUsage={seatUsage}
-        onSuccess={refetchAll}
-      />
+      {canInvite && (
+        <BulkInviteDialog
+          open={bulkInviteOpen}
+          onOpenChange={setBulkInviteOpen}
+          orgId={currentOrg.id}
+          orgName={currentOrg.name}
+          seatUsage={seatUsage}
+          onSuccess={refetchAll}
+        />
+      )}
 
       <EnrollUserDialog
         open={enrollDialogOpen}
@@ -633,7 +624,7 @@ export function OrgMembersTab() {
               : t('analytics.members.noMembersDescription')
           }
           action={
-            !hasFilters ? (
+            !hasFilters && canInvite ? (
               <Button
                 onClick={() => {
                   inviteMutation.reset();
@@ -777,7 +768,7 @@ export function OrgMembersTab() {
 
       <AssignmentsManager orgId={currentOrg.id} />
 
-      {invitations.length > 0 && (
+      {canInvite && invitations.length > 0 && (
         <>
           <h3 className="mb-3 text-[15px] font-extrabold">{t('analytics.members.pendingInvitations')}</h3>
           <div className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -835,9 +826,6 @@ export function OrgMembersTab() {
         </>
       )}
 
-      {/* `open` must be a boolean from the first render — `roleChangeDialog?.open` is
-          undefined until the dialog is first used, which flips the AlertDialog from
-          uncontrolled to controlled and triggers a React console warning (#81 pattern). */}
       <AlertDialog
         open={!!roleChangeDialog?.open}
         onOpenChange={(open) => !open && setRoleChangeDialog(null)}

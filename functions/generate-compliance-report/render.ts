@@ -1,6 +1,3 @@
-// Pure pdfkit renderer for the AI Act AI-literacy report — no DB/auth imports,
-// so it can be unit-tested and previewed in isolation. Data is assembled in
-// index.ts; localized strings come from strings.ts (ADR-0016 category 3).
 import PDFDocument from 'pdfkit';
 import { LOGO_BUFFER } from './logo';
 import { STRINGS, type Lang, type LevelKey, type DeptStatus } from './strings';
@@ -22,7 +19,6 @@ export interface ReportData {
   levels: LevelRow[];
 }
 
-// near-monochrome palette; oxblood only marks a deficiency
 const INK = '#1a1c24', NAVY = '#10298f', OX = '#8a2a2a', MUT = '#565a6b';
 const HAIR = '#c8ccd7', SOFT = '#e3e6ee', DECL = '#2a2d38';
 const PAGE = { w: 595.28, h: 841.89 }, M = 46, CW = PAGE.w - M * 2;

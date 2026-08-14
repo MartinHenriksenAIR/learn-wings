@@ -15,7 +15,6 @@ const req = (body: unknown, method = 'POST') =>
 
 const isPdf = (body: unknown) => Buffer.isBuffer(body) && (body as Buffer).subarray(0, 5).toString('latin1') === '%PDF-';
 
-// Default happy-path DB: org-admin caller, org found, no courses/members.
 function seedDefaults() {
   mockAuthenticate.mockResolvedValue({ id: 'oid-1' });
   mockQueryOne.mockImplementation(async (sql: string) =>
@@ -103,16 +102,9 @@ describe('generate-compliance-report', () => {
     expect(resolveLang('en')).toBe('en');
     expect(resolveLang('es')).toBe('en');
     expect(resolveLang(undefined)).toBe('en');
-    // localization sanity: the two templates really differ
     expect(STRINGS.da.title).not.toBe(STRINGS.en.title);
   });
 
-  // #232 (sec-3) — a department string comes from profiles.department, which any
-  // authenticated user sets arbitrarily. #230 renders the report with pdfkit, which
-  // encodes text through its .text() API instead of interpolating into a raw PDF
-  // content stream, so a crafted department can no longer inject PDF operators.
-  // Guard that a malicious value still renders a valid PDF and doesn't break the
-  // renderer (regression guard against re-introducing raw-string interpolation).
   it('renders a malicious department name safely (pdfkit encodes it — no injection)', async () => {
     mockQuery.mockImplementation(async (sql: string) =>
       sql.includes('GROUP BY c.id')

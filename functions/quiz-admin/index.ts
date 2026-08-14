@@ -23,8 +23,6 @@ export default adminEndpoint('quiz-admin', async ({ req, reply }) => {
       'SELECT id, quiz_id, question_text, sort_order FROM quiz_questions WHERE quiz_id = $1 ORDER BY sort_order',
       [quiz.id],
     ),
-    // Batched options fetch using JOIN on quiz_id — eliminates N+1.
-    // Admin editor receives is_correct (this is the platform-admin endpoint; RLS parity).
     query<{
       id: string;
       question_id: string;

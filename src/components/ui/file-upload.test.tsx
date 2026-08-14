@@ -20,9 +20,6 @@ function line(template: string, values: Record<string, string | number> = {}) {
   );
 }
 
-// The bytes matter: the downscaler sniffs the magic number and refuses to
-// re-encode a file whose content disagrees with its declared type, so a test
-// file full of ASCII would never reach the decoder at all.
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 function pngFile(name = 'pic.png', bytes = 4096): File {
@@ -31,25 +28,20 @@ function pngFile(name = 'pic.png', bytes = 4096): File {
   return new File([data], name, { type: 'image/png' });
 }
 
-/** A PNG that reports `sizeMB` without allocating it. */
 function sizedPng(name: string, sizeMB: number): File {
   const file = pngFile(name);
   Object.defineProperty(file, 'size', { value: sizeMB * 1024 * 1024 });
   return file;
 }
 
-/** A File that reports `sizeMB` without allocating it. */
 function sizedFile(name: string, type: string, sizeMB: number): File {
   const file = new File(['x'], name, { type });
   Object.defineProperty(file, 'size', { value: sizeMB * 1024 * 1024 });
   return file;
 }
 
-// Records the body handed to the PUT, so tests can assert exactly which bytes
-// were uploaded (the original File vs. a downscaled re-encode).
 let lastSentBody: unknown = null;
 
-// Fake XHR that reports an immediately-successful PUT to Azure.
 class FakeXHR {
   upload: { onprogress: ((e: ProgressEvent) => void) | null } = { onprogress: null };
   onload: (() => void) | null = null;
@@ -63,7 +55,6 @@ class FakeXHR {
   }
 }
 
-// Harness mirroring real consumers (CoursesManager): value state fed by onChange.
 function Harness({ onChangeSpy }: { onChangeSpy: (url: string | null, path: string | null) => void }) {
   const [value, setValue] = useState<string | null>(null);
   return (
@@ -89,15 +80,9 @@ function uploadFile(container: HTMLElement) {
   selectFile(container, pngFile());
 }
 
-// jsdom does not implement these; capture whatever is really there so afterEach
-// can restore it and the mocks can't leak into sibling files if test isolation
-// is ever turned off.
 const realCreateObjectURL = URL.createObjectURL;
 const realRevokeObjectURL = URL.revokeObjectURL;
 
-// Every user-facing string this component and its two siblings render. Danish
-// users saw a half-translated dialog before #278's follow-up: a correctly-Danish
-// hint from the page sitting directly above English copy from the component.
 const FILE_UPLOAD_KEYS = Object.keys(en.fileUpload) as Array<keyof typeof en.fileUpload>;
 
 describe('fileUpload i18n keys', () => {
@@ -132,9 +117,6 @@ describe('FileUpload — image preview after upload (#158)', () => {
   });
 
   afterEach(() => {
-    // Unmount now, while the URL mocks are still installed, so components'
-    // revoke-on-unmount cleanup runs against the mock rather than the restored
-    // (jsdom-absent) original.
     cleanup();
     vi.unstubAllGlobals();
     URL.createObjectURL = realCreateObjectURL;
@@ -240,7 +222,6 @@ describe('FileUpload — image preview after upload (#158)', () => {
 
     expect(await screen.findByRole('img')).toHaveAttribute('src', 'blob:preview-url');
 
-    // Simulate the parent swapping the raw blob path for a re-signed URL.
     fireEvent.click(screen.getByRole('button', { name: 'resign' }));
 
     await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-url'));
@@ -248,10 +229,6 @@ describe('FileUpload — image preview after upload (#158)', () => {
   });
 });
 
-// The re-encode itself is exercised in src/lib/image-downscale.test.ts, which
-// stubs getContext/toBlob on the prototype. What these pin is the CONTRACT the
-// component depends on: however the downscale declines or fails, the original
-// bytes still reach Azure and the user is told nothing went wrong.
 describe('FileUpload — image downscale before upload (#278)', () => {
   const realCreateImageBitmap = globalThis.createImageBitmap;
 
@@ -277,7 +254,6 @@ describe('FileUpload — image downscale before upload (#278)', () => {
     globalThis.createImageBitmap = realCreateImageBitmap;
   });
 
-  /** Selects `file` on the component's hidden input and waits for the PUT. */
   async function uploadAndCaptureBody(container: HTMLElement, file: File) {
     selectFile(container, file);
     await waitFor(() => expect(lastSentBody).not.toBeNull());
@@ -300,7 +276,6 @@ describe('FileUpload — image downscale before upload (#278)', () => {
   });
 
   it('uploads the original, and reports success, when the browser cannot decode images', async () => {
-    // jsdom's default: no createImageBitmap at all.
     expect(typeof globalThis.createImageBitmap).not.toBe('function');
     const onChangeSpy = vi.fn();
 
@@ -308,7 +283,6 @@ describe('FileUpload — image downscale before upload (#278)', () => {
     const png = pngFile();
 
     expect(await uploadAndCaptureBody(container, png)).toBe(png);
-    // Failing open means exactly this: the user never learns it happened.
     await waitFor(() => expect(onChangeSpy).toHaveBeenCalledWith('thumbnails/pic.png', 'thumbnails/pic.png'));
     expect(screen.queryByText(en.fileUpload.errorUploadFailed)).not.toBeInTheDocument();
   });
@@ -331,13 +305,10 @@ describe('FileUpload — image downscale before upload (#278)', () => {
   it('uploads the original untouched when the image is already under the cap', async () => {
     const close = vi.fn();
     const createImageBitmap = vi.fn((_source: ImageBitmapSource, options?: ImageBitmapOptions) => {
-      // An engine that supports `imageOrientation` reads it during WebIDL
-      // dictionary conversion; one that does not, never touches it.
       void options?.imageOrientation;
       return Promise.resolve({ width: 800, height: 600, close } as unknown as ImageBitmap);
     });
     vi.stubGlobal('createImageBitmap', createImageBitmap);
-    // If this ever reached the canvas it would throw in jsdom, not silently pass.
     const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
 
     const { container } = render(<Harness onChangeSpy={vi.fn()} />);
@@ -345,7 +316,6 @@ describe('FileUpload — image downscale before upload (#278)', () => {
 
     expect(await uploadAndCaptureBody(container, png)).toBe(png);
     expect(createImageBitmap).toHaveBeenCalledTimes(1);
-    // Decoded with EXIF orientation applied, so a rotated photo is not made worse.
     expect(createImageBitmap.mock.calls[0][1]?.imageOrientation).toBe('from-image');
     expect(getContext).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalled();
@@ -384,8 +354,6 @@ describe('FileUpload — image downscale before upload (#278)', () => {
     const { container } = render(
       <FileUpload assetType="org-logo" accept="image" value={null} onChange={vi.fn()} />
     );
-    // A transparent PNG that someone renamed by hand: `File.type` says JPEG
-    // because the browser reads the extension, not the bytes.
     const data = new Uint8Array(4096);
     data.set(PNG_MAGIC, 0);
     const mislabelled = new File([data], 'logo.jpg', { type: 'image/jpeg' });
@@ -395,11 +363,6 @@ describe('FileUpload — image downscale before upload (#278)', () => {
   });
 });
 
-// The cap used to be applied to the file the user PICKED, before downscaling —
-// so a 20 MB photo with a 10 MB cap was refused outright rather than shrunk to a
-// few hundred KB and accepted, undercutting the whole point of #278. It is now
-// applied to the bytes that will actually be PUT, with a separate, larger
-// ceiling guarding the decoder itself.
 describe('FileUpload — size cap vs. downscale ordering (#276)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -422,10 +385,6 @@ describe('FileUpload — size cap vs. downscale ordering (#276)', () => {
   });
 
   it('does not refuse an over-cap image on selection — the payload check answers instead', async () => {
-    // jsdom has no createImageBitmap, so the downscale fails open and the
-    // ORIGINAL bytes reach the payload check — which then applies the cap. What
-    // this pins is the ordering: the file was not refused on selection, and the
-    // message the user gets is the payload-cap one, not the decode-ceiling one.
     const { container } = render(
       <FileUpload accept="image" maxSizeMB={10} value={null} onChange={vi.fn()} />
     );
@@ -434,7 +393,6 @@ describe('FileUpload — size cap vs. downscale ordering (#276)', () => {
     expect(
       await screen.findByText(line(en.fileUpload.errorTooLarge, { size: '10 MB' }))
     ).toBeInTheDocument();
-    // No SAS URL minted and no bytes sent — the bail costs the user nothing.
     expect(mockCallApi).not.toHaveBeenCalled();
     expect(lastSentBody).toBeNull();
   });
@@ -480,7 +438,6 @@ describe('FileUpload — size cap vs. downscale ordering (#276)', () => {
   });
 
   it('clamps a call site that asks for more than the server cap', async () => {
-    // 50 MB was the old default; the server would 413 anything over 10 MB.
     const { container } = render(
       <FileUpload accept="image" maxSizeMB={50} value={null} onChange={vi.fn()} />
     );
@@ -497,9 +454,6 @@ describe('FileUpload — size cap vs. downscale ordering (#276)', () => {
     );
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
-    // Watch WRITES rather than reading `input.value` afterwards: fireEvent sets
-    // `files` and never `value`, so a plain `expect(input.value).toBe('')` reads
-    // '' whether or not the component ever cleared anything.
     const writes: string[] = [];
     Object.defineProperty(input, 'value', {
       configurable: true,
@@ -510,15 +464,10 @@ describe('FileUpload — size cap vs. downscale ordering (#276)', () => {
     fireEvent.change(input, { target: { files: [sizedPng('enormous.png', 500)] } });
 
     await screen.findByText(line(en.fileUpload.errorTooLargeToDecode, { size: '20 MB' }));
-    // A `change` event only fires when the value changes; leaving the rejected
-    // file in place makes re-picking it silently do nothing.
     expect(writes).toContain('');
   });
 });
 
-// Since #275 a persisted null DELETES the superseded blob, so "the upload failed"
-// and "the user cleared the field" can no longer collapse into the same signal:
-// the first must leave the parent's value alone, only the second may report null.
 describe('FileUpload — a failed upload must not clear the stored value', () => {
   const SIGNED_VALUE = 'https://acct.blob.core.windows.net/lms-assets/thumbnails/live.png?sig=live';
 
@@ -543,11 +492,7 @@ describe('FileUpload — a failed upload must not clear the stored value', () =>
     selectFile(container, pngFile());
 
     expect(await screen.findByText(en.fileUpload.errorUploadFailed)).toBeInTheDocument();
-    // Nothing was stored, so the value the parent holds still names a live blob.
-    // Reporting (null, null) here is what let a dropped connection turn into a
-    // `deleteBlob` of the image the retry was meant to replace.
     expect(onChange).not.toHaveBeenCalled();
-    // And the existing image stays on screen rather than reverting to the dropzone.
     expect(screen.getByRole('img')).toHaveAttribute('src', SIGNED_VALUE);
     expect(lastSentBody).toBeNull();
   });
@@ -556,7 +501,6 @@ describe('FileUpload — a failed upload must not clear the stored value', () =>
     const onChange = vi.fn();
     render(<FileUpload accept="image" value={SIGNED_VALUE} onChange={onChange} />);
 
-    // The only button in the image tile is the remove (X) control.
     fireEvent.click(screen.getByRole('button'));
 
     expect(onChange).toHaveBeenCalledWith(null, null);
@@ -588,9 +532,6 @@ describe('FileUpload — dropzone copy and type gate', () => {
   });
 
   it('describes the resize as the dimension cap it actually is', () => {
-    // The old copy promised "larger images are resized automatically", which the
-    // very next line then contradicted: a small-but-heavy PNG under the edge cap
-    // is not resized at all, and is refused by the cap printed beside it.
     render(<FileUpload accept="image" assetType="avatar" maxSizeMB={2} value={null} onChange={vi.fn()} />);
 
     expect(

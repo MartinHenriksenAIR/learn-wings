@@ -15,8 +15,6 @@ vi.mock('@/lib/storage', () => ({
   getSignedLmsAssetUrl: (...args: unknown[]) => mockGetSignedLmsAssetUrl(...args),
 }));
 
-// Fixed, settable resolvedLanguage so query-key / body assertions stay deterministic
-// while still letting individual tests exercise a different resolved language.
 const { mockResolvedLanguage } = vi.hoisted(() => ({ mockResolvedLanguage: { value: 'da' } }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ i18n: { resolvedLanguage: mockResolvedLanguage.value } }),

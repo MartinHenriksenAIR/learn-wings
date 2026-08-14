@@ -22,12 +22,6 @@ export default endpoint('enrollment-create', async ({ req, profile, reply, requi
     return reply(400, { error: 'status must be one of: enrolled, completed' });
   }
 
-  // Authorization: platform admin OR org admin of the target org.
-  // RLS provenance: supabase/migrations/20260127153401_*.sql —
-  // "Platform admins can do everything with enrollments" (is_platform_admin()).
-  // The RLS schema only grants org admins SELECT on enrollments; this slice introduces
-  // the admin-driven INSERT write path (used by EnrollUserDialog), authorized server-side
-  // via isOrgAdmin to match the suite's admin-create convention.
   await requireOrgAdmin(orgId);
 
   const course = await queryOne<{ is_published: boolean }>(
@@ -41,9 +35,6 @@ export default endpoint('enrollment-create', async ({ req, profile, reply, requi
     return reply(400, { error: 'Course is not published' });
   }
 
-  // Org-access precondition: only enforced for non-platform admins (platform admins override).
-  // Publish state is checked separately above (distinct 404/400 errors), so this uses the
-  // access-only shared fragment.
   if (!profile.is_platform_admin) {
     const access = await queryOne<{ ok: boolean }>(
       `SELECT ${orgCourseAccessEnabled({ courseRef: '$2', orgParam: 1 })} AS ok`,
@@ -54,7 +45,6 @@ export default endpoint('enrollment-create', async ({ req, profile, reply, requi
     }
   }
 
-  // #213: a learner may hold only one language edition of a course per org.
   const sibling = await queryOne<{ blocked: boolean }>(
     `SELECT ${siblingEnrollmentExists({ orgParam: 1, userParam: 2, courseParam: 3 })} AS blocked`,
     [orgId, userId, courseId],

@@ -30,13 +30,9 @@ export default adminEndpoint('course-translation-link', async ({ req, reply }) =
     if (!course.course_group_id) return reply(200, { ok: true }); // already standalone
 
     const groupId = course.course_group_id;
-    // Unlink + group-of-one collapse are one atomic step: if the collapse
-    // failed after a committed unlink, the lone remaining edition would keep
-    // a stale one-member group.
     await withTransaction(async (client) => {
       await client.query(`UPDATE courses SET course_group_id = NULL WHERE id = $1`, [courseId]);
 
-      // A group of one is meaningless — collapse the lone remaining edition to standalone.
       const rest = await client.query<{ remaining: number }>(
         `SELECT COUNT(*)::int AS remaining FROM courses WHERE course_group_id = $1`,
         [groupId],
@@ -48,7 +44,6 @@ export default adminEndpoint('course-translation-link', async ({ req, reply }) =
     return reply(200, { ok: true });
   }
 
-  // action === 'link'
   if (!otherCourseId || typeof otherCourseId !== 'string') {
     return reply(400, { error: 'otherCourseId is required' });
   }
@@ -69,13 +64,11 @@ export default adminEndpoint('course-translation-link', async ({ req, reply }) =
   if (!course.language || !other.language) {
     return reply(400, { error: 'Both courses must have a language set before linking' });
   }
-  // No group-merging: the candidate must be standalone.
   if (other.course_group_id) {
     return reply(409, { error: 'The other course is already linked; unlink it first' });
   }
 
   if (course.course_group_id) {
-    // Join the existing group — reject if that language already exists in it.
     const conflict = await queryOne<{ conflict: boolean }>(
       `SELECT EXISTS(
          SELECT 1 FROM courses WHERE course_group_id = $1 AND language = $2

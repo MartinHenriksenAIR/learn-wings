@@ -119,7 +119,6 @@ describe('resource-update', () => {
     const res = await handler(baseReq({ resourceId: 'r1', updates: { url: 'javascript:alert(1)' } }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'url must be a valid http(s) URL' });
-    // Rejected before any DB access (validation precedes the SELECT).
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
@@ -201,7 +200,6 @@ describe('resource-update', () => {
     }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid update field: user_id' });
-    // SELECT must not have been issued — rejection happens before DB.
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 

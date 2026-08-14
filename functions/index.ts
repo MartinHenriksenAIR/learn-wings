@@ -1,6 +1,3 @@
-// Single entry point for the Azure Functions v4 programmatic model.
-// The host loads this file (package.json "main": "dist/index.js"); importing
-// each function module executes its app.http(...) registration.
 import './ai-champion-create/index';
 import './ai-champion-delete/index';
 import './ai-champions/index';
@@ -75,6 +72,7 @@ import './invitation-bulk-create/index';
 import './invitation-update/index';
 import './invitations/index';
 import './learner-assignments/index';
+import './learner-course-detail/index';
 import './learner-courses/index';
 import './learner-dashboard/index';
 import './learner-training/index';

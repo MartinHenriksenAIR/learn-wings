@@ -4,22 +4,37 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import React from 'react';
 import type { Exercise } from '@/lib/types';
 
-// react-i18next → key-returning t (the player uses t() for the completion-failure toast)
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
 vi.mock('@/components/layout/AppLayout', () => ({
-  AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppLayout: ({
+    children,
+    breadcrumbs = [],
+  }: {
+    children: React.ReactNode;
+    breadcrumbs?: { label: string; href?: string }[];
+  }) => (
+    <div>
+      <nav aria-label="breadcrumb">
+        {breadcrumbs
+          .filter((c) => c.href)
+          .map((c) => (
+            <a key={c.href} href={c.href}>
+              {c.label}
+            </a>
+          ))}
+      </nav>
+      {children}
+    </div>
+  ),
 }));
 
-// PdfViewer → stub (avoids pulling in the pdf.js worker at import time)
 vi.mock('@/components/learner/PdfViewer', () => ({
   PdfViewer: () => <div data-testid="pdf-viewer" />,
 }));
 
-// api-client + storage → no network. Wrapping a `mock`-prefixed vi.fn() in the factory
-// keeps callApi's generic return type satisfied for tsc (matches CoursesManager.test.tsx).
 const mockCallApi = vi.fn();
 vi.mock('@/lib/api-client', () => ({
   callApi: (...args: unknown[]) => mockCallApi(...args),
@@ -29,7 +44,6 @@ vi.mock('@/lib/storage', () => ({ getSignedAssetUrl: vi.fn() }));
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({ toast: (...args: unknown[]) => mockToast(...args) }));
 
-// useAuth + usePlatformSettings → factory mocks (names MUST be `mock`-prefixed for hoisting)
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => mockUseAuth() }));
 
@@ -38,12 +52,6 @@ vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => mockUsePlatformSettings(),
 }));
 
-// useExerciseByLesson → configurable per-lessonId mock. Default returns a static
-// bucket_sort exercise (only rendered when the current lesson is of type
-// 'exercise', so it's inert for the non-exercise tests). The state-isolation test
-// overrides the implementation to return a DIFFERENT exercise per lessonId.
-// (Named `mock`-prefixed for vi.mock hoisting; vi.clearAllMocks clears call
-// history but keeps this default implementation.)
 const mockUseExerciseByLesson = vi.fn<(lessonId?: string) => { data: { exercise: Exercise } }>(() => ({
   data: { exercise: {
     id: 'ex1', lesson_id: 'l-ex', exercise_kind: 'bucket_sort',
@@ -55,8 +63,6 @@ vi.mock('@/hooks/useExerciseByLesson', () => ({
   useExerciseByLesson: (lessonId?: string) => mockUseExerciseByLesson(lessonId),
 }));
 
-// useFavorites/useToggleFavorite → inert factory mocks so the sidebar heart toggle
-// renders without needing a QueryClientProvider (mirrors the other hook mocks).
 const mockUseFavorites = vi.fn((..._args: unknown[]) => ({ isFavorite: () => false, favoriteIds: new Set(), data: { courses: [] } }));
 const mockUseToggleFavorite = vi.fn((..._args: unknown[]) => ({ toggleFavorite: vi.fn(), togglingId: null, isPending: false }));
 vi.mock('@/hooks/useFavorites', () => ({
@@ -193,7 +199,6 @@ describe('CoursePlayer — restyled sidebar and footer', () => {
   });
 
   it("sidebar progress label counts only this course's lessons (n/m · pct%)", async () => {
-    // 1 completed lesson of THIS course + 2 foreign rows — the label must read 1/5 · 20%
     setup({ reviewsEnabled: false, completed: ['l-1', 'other-1', 'other-2'] });
     renderPlayer();
     await screen.findByText('Intro to AI');
@@ -209,13 +214,10 @@ describe('CoursePlayer — restyled sidebar and footer', () => {
 
     const badge = screen.getByText('coursePlayer.completed');
     expect(badge).toBeInTheDocument();
-    // Already-completed-on-load lessons must NOT replay the celebration on mount —
-    // neither the footer badge nor the sidebar status dot.
     expect(badge).not.toHaveClass('animate-pop-in');
     expect(document.querySelector('.animate-pop-in')).toBeNull();
     expect(screen.queryByRole('button', { name: /markAsComplete/i })).toBeNull();
 
-    // Footer nav: Previous disabled on the first lesson, Next enabled
     expect(screen.getByRole('button', { name: /common\.previous/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /common\.next/ })).toBeEnabled();
   });
@@ -227,21 +229,17 @@ describe('CoursePlayer — restyled sidebar and footer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /markAsComplete/i }));
 
-    // The just-completed l-1 sidebar dot animates...
     await waitFor(() => {
       expect(
         screen.getByRole('button', { name: /lesson 1/i }).querySelector('.animate-pop-in')
       ).not.toBeNull();
     });
-    // ...while the pre-completed l-2 dot still does not
     expect(
       screen.getByRole('button', { name: /lesson 2/i }).querySelector('.animate-pop-in')
     ).toBeNull();
 
-    // Auto-advanced onto pre-completed l-2: its footer badge renders without the animation
     expect(screen.getByText('coursePlayer.completed')).not.toHaveClass('animate-pop-in');
 
-    // Navigating back to the just-completed lesson shows the animated footer badge
     fireEvent.click(screen.getByRole('button', { name: /lesson 1/i }));
     expect(await screen.findByText('coursePlayer.completed')).toHaveClass('animate-pop-in');
   });
@@ -263,9 +261,6 @@ describe('CoursePlayer — completion semantics (#18)', () => {
     });
   });
 
-  // Two-lesson course; progressMap is configurable so tests can inject prior
-  // progress (including rows from OTHER courses — course-player-data returns the
-  // user's progress for the whole org, not just this course).
   function setupCompletion(opts: {
     progressMap?: Record<string, { status: string; completed_at: string }>;
     enrollmentCompleteError?: Error;
@@ -292,8 +287,6 @@ describe('CoursePlayer — completion semantics (#18)', () => {
   }
 
   it('does NOT mark the course complete from progress rows that belong to other courses', async () => {
-    // 3 completed lessons from OTHER courses in the org — more rows than this
-    // course's 2 lessons. Completing lesson 1 of 2 must NOT complete the course.
     setupCompletion({
       progressMap: makeProgress(['other-1', 'other-2', 'other-3']),
     });
@@ -308,7 +301,6 @@ describe('CoursePlayer — completion semantics (#18)', () => {
       });
     });
 
-    // No premature completion: no enrollment-complete call, no congratulations dialog
     expect(mockCallApi).not.toHaveBeenCalledWith('/api/enrollment-complete', expect.anything());
     expect(screen.queryByText(/congratulations/i)).toBeNull();
   });
@@ -318,7 +310,6 @@ describe('CoursePlayer — completion semantics (#18)', () => {
     renderPlayer();
 
     await screen.findByText('Intro to AI');
-    // Select the last incomplete lesson and complete it
     fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
     fireEvent.click(await screen.findByRole('button', { name: /markAsComplete/i }));
 
@@ -372,8 +363,6 @@ describe('CoursePlayer — completion semantics (#18)', () => {
       }));
     });
 
-    // Nothing optimistic survives the failure: the sidebar counter stays at 0/2,
-    // the lesson keeps its Mark-as-complete affordance, and no celebration plays.
     expect(
       screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '0/2 · 0%')
     ).toBeInTheDocument();
@@ -416,8 +405,6 @@ describe('CoursePlayer — quiz load failure (#294)', () => {
     ],
   };
 
-  // Lesson 1 is the quiz (the initially selected lesson); lesson 2 defaults to a plain
-  // video so a test can navigate away, and becomes a second quiz for the interleaving test.
   function courseData(secondLessonType: 'video' | 'quiz' = 'video') {
     return {
       course: { id: 'c-1', title: 'Intro to AI', is_published: true },
@@ -437,8 +424,6 @@ describe('CoursePlayer — quiz load failure (#294)', () => {
     };
   }
 
-  // `quizResults` is consumed one entry per quiz-by-lesson call — the last entry sticks —
-  // which is how the retry path gets a different outcome.
   function setupQuizLesson(quizResults: Array<'fail' | 'empty' | 'ok'>) {
     let call = 0;
     mockCallApi.mockImplementation(async (url: string) => {
@@ -454,8 +439,6 @@ describe('CoursePlayer — quiz load failure (#294)', () => {
     });
   }
 
-  // Each quiz-by-lesson call parks on its own deferred so a test can settle the requests
-  // out of order — the only way to reproduce two loads overlapping in flight.
   function setupDeferredQuizLoads(secondLessonType: 'video' | 'quiz' = 'video') {
     const pending: Array<{ resolve: (value: unknown) => void; reject: (error: unknown) => void }> = [];
     mockCallApi.mockImplementation(async (url: string) => {
@@ -477,8 +460,6 @@ describe('CoursePlayer — quiz load failure (#294)', () => {
     setupQuizLesson(['fail']);
     renderPlayer();
 
-    // The shared QueryErrorState: announced to screen readers and visually distinct
-    // from the "nothing uploaded" empty states, with the app-wide retry label.
     const card = await screen.findByRole('alert');
     expect(within(card).getByText('coursePlayer.quizLoadFailed')).toBeInTheDocument();
     expect(within(card).getByRole('button', { name: /common\.retry/i })).toBeInTheDocument();
@@ -518,19 +499,15 @@ describe('CoursePlayer — quiz load failure (#294)', () => {
     const pending = setupDeferredQuizLoads('quiz');
     renderPlayer();
 
-    // Lesson 1's request is still in flight when the learner clicks lesson 2 — the
-    // sidebar stays mounted and clickable during a quiz load.
     await screen.findByText('coursePlayer.loadingQuiz');
     await waitFor(() => expect(pending).toHaveLength(1));
     fireEvent.click(screen.getByRole('button', { name: /lesson 2/i }));
     await waitFor(() => expect(pending).toHaveLength(2));
 
-    // The abandoned lesson-1 request fails first; lesson 2 then succeeds.
     pending[0].reject(new Error('boom'));
     await waitFor(() => expect(consoleError).toHaveBeenCalled());
     pending[1].resolve(quizPayload);
 
-    // The working quiz must not carry the dead lesson's error card on top of it.
     expect(await screen.findByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
     expect(screen.queryByText('coursePlayer.quizLoadFailed')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
@@ -605,18 +582,12 @@ describe('CoursePlayer — exercise rendering (#227)', () => {
     renderPlayer();
 
     await screen.findByText('Intro to AI');
-    // The bucket_sort exercise surfaces its bucket labels — proof the player rendered.
     expect(await screen.findByText('Draft')).toBeInTheDocument();
     expect(screen.getByText('Human')).toBeInTheDocument();
-    // Correctness-gated (ADR-0017): no manual "Mark complete" footer override for exercises.
     expect(screen.queryByRole('button', { name: /markAsComplete/i })).toBeNull();
   });
 
   it('does not leak player state between two consecutive exercise lessons (key remount)', async () => {
-    // Two exercise lessons back-to-back. Completing A auto-advances to B; B must
-    // mount fresh — its Check button ENABLED, not latched-disabled from A's
-    // `completed` state. Without a per-exercise React key the player instance is
-    // reused and B can never be completed. Regression guard for #227 final review.
     const exA: Exercise = {
       id: 'ex-a', lesson_id: 'l-1', exercise_kind: 'quick_check',
       config: { version: 1, questions: [{
@@ -655,25 +626,19 @@ describe('CoursePlayer — exercise rendering (#227)', () => {
     renderPlayer();
 
     await screen.findByText('Intro to AI');
-    // Exercise A is shown and completable.
     await screen.findByText('Question A');
     expect(screen.getByRole('button', { name: /exercise\.check/i })).toBeEnabled();
 
-    // Complete A → onComplete fires → auto-advance to lesson B.
     fireEvent.click(screen.getByRole('radio', { name: /Right A/ }));
     fireEvent.click(screen.getByRole('button', { name: /exercise\.check/i }));
 
-    // Lesson progress recorded for A, then advance renders B's content.
     await waitFor(() => {
       expect(mockCallApi).toHaveBeenCalledWith('/api/lesson-progress', {
         orgId: 'org-1', lessonId: 'l-1', status: 'completed',
       });
     });
     await screen.findByText('Question B');
-    // A's content is gone (single exercise renders at a time).
     expect(screen.queryByText('Question A')).toBeNull();
-    // The decisive assertion: B's Check button is ENABLED (fresh state), not
-    // disabled by A's latched `completed`. Fails without the per-exercise key.
     expect(screen.getByRole('button', { name: /exercise\.check/i })).toBeEnabled();
   });
 });
@@ -709,8 +674,6 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
     ],
   };
 
-  // Course whose first (initially selected) lesson is a quiz, with a plain video
-  // lesson after it so the footer's Next has somewhere to go.
   function courseData() {
     return {
       course: { id: 'c-1', title: 'Intro to AI', is_published: true },
@@ -728,8 +691,6 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
     };
   }
 
-  // Course whose only (and therefore last) lesson is a quiz, so the not-ready
-  // state has no next lesson to point at — the #333 dead-end case.
   function courseDataQuizLast() {
     return {
       course: { id: 'c-1', title: 'Intro to AI', is_published: true },
@@ -767,11 +728,8 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
     renderPlayer();
 
     expect(await screen.findByText('coursePlayer.quizNotReady')).toBeInTheDocument();
-    // Neutral empty state, NOT the #294 failure card (which is role="alert").
     expect(screen.queryByRole('alert')).toBeNull();
-    // A lesson with no quiz must offer no Submit at all.
     expect(screen.queryByRole('button', { name: /submitAnswers/i })).toBeNull();
-    // The durable fix: Previous/Next footer so the learner is never trapped.
     expect(screen.getByRole('button', { name: /common\.previous/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /common\.next/ })).toBeEnabled();
   });
@@ -781,7 +739,6 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
     renderPlayer();
 
     expect(await screen.findByText('coursePlayer.quizNotReady')).toBeInTheDocument();
-    // The empty-quiz Submit bug: the button must not exist (was enabled on 0 === 0).
     expect(screen.queryByRole('button', { name: /submitAnswers/i })).toBeNull();
     expect(screen.getByRole('button', { name: /common\.next/ })).toBeEnabled();
   });
@@ -790,7 +747,6 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
     setupQuiz({ quiz: null, questions: [] });
     renderPlayer();
 
-    // courseData()'s quiz is followed by a video lesson, so the copy may promise it.
     expect(await screen.findByText('coursePlayer.quizNotReadyDescription')).toBeInTheDocument();
     expect(screen.queryByText('coursePlayer.quizNotReadyDescriptionLast')).toBeNull();
   });
@@ -799,7 +755,6 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
     setupQuizLastLesson({ quiz: null, questions: [] });
     renderPlayer();
 
-    // The quiz is the only lesson, so Next is disabled — the copy must not send the learner onward.
     expect(await screen.findByText('coursePlayer.quizNotReadyDescriptionLast')).toBeInTheDocument();
     expect(screen.queryByText('coursePlayer.quizNotReadyDescription')).toBeNull();
     expect(screen.getByRole('button', { name: /common\.next/ })).toBeDisabled();
@@ -811,9 +766,43 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
 
     expect(await screen.findByText(/What is 2 \+ 2\?/)).toBeInTheDocument();
     expect(screen.queryByText('coursePlayer.quizNotReady')).toBeNull();
-    // Submit exists but stays disabled until every question is answered.
     expect(screen.getByRole('button', { name: /submitAnswers/i })).toBeDisabled();
-    // A healthy quiz keeps its own submit/next flow — no duplicated footer nav.
     expect(screen.queryByRole('button', { name: /common\.next/ })).toBeNull();
+  });
+});
+
+describe('CoursePlayer — breadcrumb origin (#438)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function renderPlayerAt(path: string) {
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/app/learn/:courseId" element={<CoursePlayer />} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  it('links the parent crumb to My Training when opened from ?from=training', async () => {
+    setup({ reviewsEnabled: false, completed: [] });
+    renderPlayerAt('/app/learn/c-1?from=training');
+    await screen.findByText('Intro to AI');
+
+    const crumb = screen.getByRole('link', { name: 'nav.training' });
+    expect(crumb).toHaveAttribute('href', '/app/training');
+    expect(screen.queryByRole('link', { name: 'nav.courses' })).toBeNull();
+  });
+
+  it('falls back to the Course Catalog crumb with no origin', async () => {
+    setup({ reviewsEnabled: false, completed: [] });
+    renderPlayerAt('/app/learn/c-1');
+    await screen.findByText('Intro to AI');
+
+    const crumb = screen.getByRole('link', { name: 'nav.courses' });
+    expect(crumb).toHaveAttribute('href', '/app/courses');
+    expect(screen.queryByRole('link', { name: 'nav.training' })).toBeNull();
   });
 });

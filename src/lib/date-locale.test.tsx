@@ -9,9 +9,6 @@ import { getDateFnsLocale } from '@/lib/date-locale';
 import { CommentItem } from '@/components/community/CommentItem';
 import type { CommunityComment } from '@/lib/community-types';
 
-// #209: date-fns timestamps used to render English regardless of UI language.
-// The helper now maps the i18next language to a date-fns Locale, and call sites
-// pass `i18n.language` so output stays reactive.
 
 describe('getDateFnsLocale (#209)', () => {
   it('maps "da" (and region variants) to the Danish date-fns locale', () => {
@@ -33,7 +30,6 @@ describe('CommentItem relative timestamp localization (#209)', () => {
   });
 
   function makeComment(): CommunityComment {
-    // Two hours ago → date-fns "about 2 hours ago" / "cirka 2 timer siden".
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     return {
       id: 'c1',
@@ -61,7 +57,6 @@ describe('CommentItem relative timestamp localization (#209)', () => {
   it('renders a Danish relative timestamp when the language is Danish', async () => {
     await i18n.changeLanguage('da');
     renderComment();
-    // Danish: "cirka 2 timer siden"; the English "about 2 hours ago" must not leak.
     expect(screen.getByText(/cirka 2 timer siden/)).toBeInTheDocument();
     expect(screen.queryByText(/about 2 hours ago/)).not.toBeInTheDocument();
   });

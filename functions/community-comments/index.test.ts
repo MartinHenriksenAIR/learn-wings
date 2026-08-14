@@ -81,7 +81,6 @@ describe('community-comments', () => {
     const res = await handler(baseReq({ postId: 'post-999' }), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ comments: [] });
-    // comments query must NOT be issued
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
@@ -112,7 +111,6 @@ describe('community-comments', () => {
     expect(JSON.parse(res.body as string)).toEqual({ comments: [sampleComment] });
   });
 
-  // Hidden filtering: regular member of org post does NOT see hidden comments
   it('filters hidden comments for regular member (AND c.is_hidden = false in SQL)', async () => {
     mockQuery.mockResolvedValueOnce([orgPost]);
     mockIsActiveMember.mockResolvedValueOnce(true);
@@ -124,7 +122,6 @@ describe('community-comments', () => {
     expect(commentsCall[0]).toContain('is_hidden = false');
   });
 
-  // Org admin of post's org sees hidden comments
   it('org admin of post org sees hidden comments (no hidden filter in SQL)', async () => {
     mockQuery.mockResolvedValueOnce([orgPost]);
     mockIsActiveMember.mockResolvedValueOnce(true);
@@ -137,10 +134,8 @@ describe('community-comments', () => {
     expect(commentsCall[0]).not.toContain('is_hidden = false');
   });
 
-  // Global post + org admin role: isOrgAdmin must NOT be called (global posts: only plat admin moderates)
   it('global post + org admin role: isOrgAdmin NOT called and hidden still filtered', async () => {
     mockQuery.mockResolvedValueOnce([globalPost]); // global post
-    // isOrgAdmin should never be called for global posts
     mockQuery.mockResolvedValueOnce([sampleComment]);
     const res = await handler(baseReq({ postId: 'post-1' }), {} as any);
     expect(res.status).toBe(200);
@@ -149,7 +144,6 @@ describe('community-comments', () => {
     expect(commentsCall[0]).toContain('is_hidden = false');
   });
 
-  // Platform admin bypasses all checks and sees hidden comments
   it('platform admin bypasses access checks and sees hidden comments', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQuery.mockResolvedValueOnce([orgPost]);
@@ -181,10 +175,8 @@ describe('community-comments', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // #180 — comment author payload must carry avatar_url.
   it('joins avatar_url into the comment author profile payload', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    // 1st query: the post visibility lookup; 2nd query: the comments themselves.
     mockQuery.mockResolvedValueOnce([{ scope: 'global', org_id: null }]);
     mockQuery.mockResolvedValueOnce([{ id: 'c1', content: 'hi', profile: { id: 'a1', full_name: 'Ann', avatar_url: 'avatars/a1.png' } }]);
 

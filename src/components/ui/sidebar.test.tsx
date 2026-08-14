@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-import { SidebarProvider, useSidebar } from './sidebar';
+import { Sidebar, SidebarProvider, useSidebar } from './sidebar';
 
 function StateProbe() {
   const { state } = useSidebar();
@@ -16,12 +16,8 @@ function renderProvider(props: { defaultOpen?: boolean; open?: boolean } = {}) {
   );
 }
 
-// Every page mounts its own AppLayout, so the provider remounts on each navigation.
-// Persistence (#370) therefore hinges on the provider re-reading the cookie on mount —
-// not just writing it on toggle.
 describe('SidebarProvider cookie persistence (#370)', () => {
   beforeEach(() => {
-    // The provider writes the cookie with path=/; clear it the same way between tests.
     document.cookie = 'sidebar:state=; path=/; max-age=0';
   });
 
@@ -46,5 +42,24 @@ describe('SidebarProvider cookie persistence (#370)', () => {
     document.cookie = 'sidebar:state=false; path=/';
     renderProvider({ open: true });
     expect(screen.getByTestId('state')).toHaveTextContent('expanded');
+  });
+});
+
+describe('Sidebar panel clips overflow during the width animation (#396)', () => {
+  beforeEach(() => {
+    document.cookie = 'sidebar:state=; path=/; max-age=0';
+  });
+
+  it('keeps overflow-hidden on the panel box', () => {
+    const { container } = render(
+      <SidebarProvider>
+        <Sidebar collapsible="icon">
+          <div>content</div>
+        </Sidebar>
+      </SidebarProvider>,
+    );
+    const panel = container.querySelector('[data-sidebar="sidebar"]');
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass('overflow-hidden');
   });
 });

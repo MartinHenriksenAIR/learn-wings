@@ -10,9 +10,6 @@ export default endpoint('resource-delete', async ({ req, profile, reply }) => {
     return reply(400, { error: 'resourceId is required' });
   }
 
-  // Load + authorize (shared gate, #261): null covers both "missing" and
-  // "not authorized" — the single 404 is the anti-enumeration contract
-  // documented on loadResourceForWrite.
   const resource = await loadResourceForWrite(resourceId, profile);
   if (!resource) return reply(404, { error: 'Resource not found' });
 

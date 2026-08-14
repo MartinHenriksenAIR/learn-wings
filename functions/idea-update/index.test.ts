@@ -20,7 +20,6 @@ const baseReq = (body: unknown) => ({
   json: async () => body,
 }) as any;
 
-// Idea owned by p1 (the caller), in draft.
 const myDraft = { id: 'idea-1', org_id: 'org-1', user_id: 'p1', status: 'draft' };
 
 describe('idea-update', () => {
@@ -75,8 +74,6 @@ describe('idea-update', () => {
   });
 
   it('returns 400 on the first unknown key (only unknown keys — #252)', async () => {
-    // Was "No valid update fields provided" (silent filter to empty); now the
-    // strict whitelist rejects the first unknown key directly.
     const res = await handler(baseReq({ ideaId: 'idea-1', updates: { status: 'approved', admin_notes: 'x' } }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid update field: status' });
@@ -121,7 +118,6 @@ describe('idea-update', () => {
   });
 
   it('returns 403 for an org admin who is not the author (no admin bypass)', async () => {
-    // org admin / platform admin do NOT get an author bypass here
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     mockQueryOne.mockResolvedValueOnce({ ...myDraft, user_id: 'p2' }); // not the author
     const res = await handler(baseReq({ ideaId: 'idea-1', updates: { title: 'x' } }), {} as any);
@@ -146,25 +142,18 @@ describe('idea-update', () => {
 
     const [sql, params] = mockQueryOne.mock.calls[1] as [string, unknown[]];
     expect(sql).toContain('UPDATE ideas');
-    // Exact placeholder positions: SET clauses follow the body's key order, id is last
     expect(sql).toContain('title = $1');
     expect(sql).toContain('pain_points = $2');
     expect(sql).toContain('WHERE id = $3');
-    // SET clause must NOT contain unrelated whitelisted columns
     expect(sql).not.toContain('description');
     expect(sql).not.toContain('business_area');
     expect(params).toEqual(['Updated', 'slow', 'idea-1']); // exact placeholder order
   });
 
   it('rejects unknown keys with 400 (was: silently ignored — #252)', async () => {
-    // Behavior change (#252): unknown keys now 400 instead of being dropped.
-    // The frontend only ever sends whitelisted keys (verified in #252), so no
-    // legitimate caller regresses; smuggled columns (status/user_id) are rejected
-    // before any DB access.
     const res = await handler(baseReq({ ideaId: 'idea-1', updates: { title: 'New', status: 'approved', user_id: 'evil' } }), {} as any);
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid update field: status' });
-    // Rejected before any DB access.
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 

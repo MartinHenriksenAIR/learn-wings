@@ -4,8 +4,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ReportCard } from './ReportCard';
 import type { ReportWithDetails } from '@/hooks/useReportModeration';
 
-// t echoes keys so assertions pin i18n keys, not translated copy; language is
-// needed for the relative-time formatter in the reporter line.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
@@ -55,9 +53,7 @@ describe('ReportCard', () => {
   it('renders the report reason and the shared action bar (no scope badge by default)', () => {
     setup();
     expect(screen.getByText('Spam content')).toBeInTheDocument();
-    // First button of the embedded ReportActions bar is View content (#160).
     expect(screen.getByRole('button', { name: 'moderation.viewContent' })).toBeInTheDocument();
-    // Org queue passes no badge → the platform-only scope label is absent.
     expect(screen.queryByText('scope-badge')).not.toBeInTheDocument();
   });
 

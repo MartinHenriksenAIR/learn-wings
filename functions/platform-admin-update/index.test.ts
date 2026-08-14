@@ -10,9 +10,6 @@ const { mockGetProfile, mockClientQuery, mockWithTransaction } = vi.hoisted(() =
   return {
     mockGetProfile: vi.fn(),
     mockClientQuery,
-    // withTransaction runs its callback against a mock client — the real
-    // BEGIN/COMMIT/FOR UPDATE is exercised by the DATABASE_URL-gated integration
-    // tests in shared/db.test.ts. Here we assert the count-then-update contract.
     mockWithTransaction: vi.fn(async (cb: (client: { query: typeof mockClientQuery }) => unknown) =>
       cb({ query: mockClientQuery }),
     ),

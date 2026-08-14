@@ -97,7 +97,6 @@ describe('deleteBlob', () => {
 });
 
 describe('headBlob', () => {
-  /** A fetch Response stub carrying just the headers headBlob reads. */
   const okResponse = (headers: Record<string, string>) => ({
     ok: true,
     status: 200,
@@ -132,7 +131,6 @@ describe('headBlob', () => {
       contentLength: 1234,
       contentType: 'video/mp4',
     });
-    // 'r', not 'd' — a size probe must never be able to delete.
     expect(mockGenerateSasToken).toHaveBeenCalledWith(
       'testaccount',
       expect.any(String),
@@ -238,12 +236,6 @@ describe('cleanupBlobs', () => {
 
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
-  /**
-   * Drives the REAL `deleteBlob` through the same seam the suite above uses — `./sas`
-   * is module-mocked and `fetch` is stubbed, so nothing leaves the process. (`cleanupBlobs`
-   * calls `deleteBlob` through the module-local binding, so it cannot be mocked away.)
-   * `outcomes[path] === true` → storage 200 → `deleteBlob` true; false → 500 → false.
-   */
   const stubStorage = (outcomes: Record<string, boolean>) => {
     mockBuildBlobUrl.mockImplementation(
       (_account: string, _container: string, blobPath: string) =>
@@ -287,7 +279,6 @@ describe('cleanupBlobs', () => {
     const fetchMock = stubStorage({ [PATH_A]: true, [PATH_B]: false, [PATH_C]: true });
     const result = await cleanupBlobs([PATH_A, PATH_B, PATH_C], 'module-delete', 'mod-7');
     expect(result).toEqual({ blobsDeleted: 2, blobsFailed: 1 });
-    // A failure mid-list must not short-circuit the remaining deletes.
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
@@ -304,7 +295,6 @@ describe('cleanupBlobs', () => {
     const result = await cleanupBlobs([], 'course-delete', 'course-3');
     expect(result).toEqual({ blobsDeleted: 0, blobsFailed: 0 });
     expect(fetchMock).not.toHaveBeenCalled();
-    // blobsFailed is 0, not "not > 0" by accident — an empty cleanup is silent.
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
@@ -383,7 +373,6 @@ describe('isBrandingAssetPath', () => {
     expect(isBrandingAssetPath('')).toBe(false);
   });
   it('rejects a bare dot segment, which the old character class matched', () => {
-    // `[A-Za-z0-9._-]+` accepted `..`; requiring a leading alphanumeric does not.
     expect(isBrandingAssetPath('avatars/..')).toBe(false);
     expect(isBrandingAssetPath('org-logos/.')).toBe(false);
   });
@@ -398,8 +387,6 @@ describe('classifyBlobPath', () => {
   });
 
   it('calls a branding path posted to the WRONG column "foreign"', () => {
-    // The whole point: an avatar path posted to logo_url is not a typo, it is an
-    // attempt to make one row's write act on another row's blob.
     expect(classifyBlobPath('avatars/abc.png', 'org-logo')).toBe('foreign');
     expect(classifyBlobPath('avatars/abc.png', 'lms')).toBe('foreign');
     expect(classifyBlobPath('org-logos/abc.png', 'avatar')).toBe('foreign');
@@ -407,16 +394,12 @@ describe('classifyBlobPath', () => {
   });
 
   it('calls a NON-branding path posted to a branding column "foreign"', () => {
-    // `avatar_url` holding a bare `<uuid>.mp4` is how a lesson video got aimed at
-    // an image cap in the first place.
     expect(classifyBlobPath('abc.mp4', 'avatar')).toBe('foreign');
     expect(classifyBlobPath('videos/abc.mp4', 'avatar')).toBe('foreign');
     expect(classifyBlobPath('documents/abc.pdf', 'org-logo')).toBe('foreign');
   });
 
   it('calls a malformed path under a prefix we mint "foreign", not legacy', () => {
-    // Nothing predates a prefix this system invented, so "unrecognized under
-    // avatars/" is never a legacy value — it is someone probing.
     expect(classifyBlobPath('avatars/../lessons/x.mp4', 'avatar')).toBe('foreign');
     expect(classifyBlobPath('avatars/..', 'avatar')).toBe('foreign');
     expect(classifyBlobPath('avatars/sub/deep.png', 'avatar')).toBe('foreign');
@@ -424,12 +407,6 @@ describe('classifyBlobPath', () => {
   });
 
   it('calls a LEGACY multi-segment LMS name "own", to be settled by the reference check', () => {
-    // These must NOT be refused on shape. `CourseEditor` re-persists
-    // `extractLmsAssetPath(<signed url>)`, which for a legacy thumbnail yields
-    // `thumbnails/x.png` — a 400 there would block saving the course's title and
-    // description too. And they must not be waved through unchecked either:
-    // `deleteBlob` resolves them perfectly well. `own` is what subjects them to
-    // the extension allow-list and the cross-row reference check.
     expect(classifyBlobPath('videos/victim.mp4', 'lms')).toBe('own');
     expect(classifyBlobPath('thumbnails/x.png', 'lms')).toBe('own');
     expect(classifyBlobPath('lms-assets/legacy thumb.png', 'lms')).toBe('own');
@@ -440,11 +417,7 @@ describe('classifyBlobPath', () => {
     expect(classifyBlobPath('https://example.com/logo.png', 'org-logo')).toBe('external');
     expect(classifyBlobPath('HTTPS://EXAMPLE.COM/logo.png', 'org-logo')).toBe('external');
     expect(classifyBlobPath('http://example.com/logo.png', 'lms')).toBe('external');
-    // An absolute URL that DOES denote a live blob (orphan-sweep's
-    // `referenceVariants` resolves this shape to `x.mp4`) is still only
-    // `external`: stored, never reference-checked, never deletable.
     expect(classifyBlobPath('https://acct.blob.core.windows.net/lms-videos/x.mp4', 'lms')).toBe('external');
-    // A URL beats the branding-prefix test, so it can never be mistaken for one.
     expect(classifyBlobPath('https://evil.example/avatars/x.png', 'avatar')).toBe('external');
   });
 
@@ -454,8 +427,6 @@ describe('classifyBlobPath', () => {
   });
 
   it('is case-sensitive on the branding prefix, matching Azure blob names', () => {
-    // `Avatars/x.png` names no blob, so for an LMS column it is just another
-    // unrecognized name; what matters is that it cannot pass as an avatar.
     expect(classifyBlobPath('Avatars/x.png', 'avatar')).toBe('foreign');
     expect(classifyBlobPath('AVATARS/x.png', 'avatar')).toBe('foreign');
   });
@@ -463,8 +434,6 @@ describe('classifyBlobPath', () => {
   it('does not let surrounding whitespace smuggle a branding path through', () => {
     expect(classifyBlobPath(' avatars/x.png', 'avatar')).toBe('foreign');
     expect(classifyBlobPath('avatars/x.png ', 'avatar')).toBe('foreign');
-    // JS `$` is end-of-input, not end-of-line, so a trailing newline cannot
-    // terminate the match early the way it would under PCRE's default.
     expect(classifyBlobPath('avatars/x.png\n', 'avatar')).toBe('foreign');
   });
 });

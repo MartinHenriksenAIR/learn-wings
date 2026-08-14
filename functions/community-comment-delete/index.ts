@@ -26,7 +26,6 @@ export default endpoint('community-comment-delete', async ({ req, profile, reply
   );
   if (!comment) return reply(404, { error: 'Comment not found' });
 
-  // Author CAN delete their own comment even when hidden (no is_hidden condition — RLS asymmetry vs UPDATE).
   let authorized = false;
 
   if (comment.user_id === profile.id) {

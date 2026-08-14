@@ -76,19 +76,14 @@ describe('org-course-progress', () => {
 
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('LEFT JOIN enrollments');
-    // Distinct-learner counts (not enrollment rows) so the combined line stays a true
-    // head-count even if a learner somehow holds two editions in the org.
     expect(sql).toContain('COUNT(DISTINCT e.user_id)');
     expect(sql).toContain('FILTER (WHERE e.status = \'completed\')');
     expect(sql).toContain('GROUP BY');
-    // Group language editions by COALESCE(course_group_id, id)
     expect(sql).toContain('COALESCE(');
     expect(sql).toContain('course_group_id');
     expect(sql).toContain("(language = $2) IS TRUE");     // NULL-safe representative-by-admin-language
     expect(sql).toContain('oca.access = \'enabled\'');
-    // Parity: no is_published filter
     expect(sql).not.toContain('is_published');
-    // No SELECT *
     expect(sql).not.toContain('SELECT *');
     expect(params).toEqual(['org-1', 'da']);
   });
@@ -148,11 +143,8 @@ describe('org-course-progress', () => {
       expect(mockIsOrgAdmin).not.toHaveBeenCalled();
 
       const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
-      // counts must be distinct users, not enrollment rows, once summed across orgs
       expect(sql).toContain('COUNT(DISTINCT e.user_id)');
-      // group language editions across orgs
       expect(sql).toContain('COALESCE(');
-      // representative-by-admin-language ($1 is the only bind — the language)
       expect(sql).toContain("(language = $1) IS TRUE");
       expect(params).toEqual(['da']);
     });

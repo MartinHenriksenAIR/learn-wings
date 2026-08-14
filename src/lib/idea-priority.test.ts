@@ -8,7 +8,6 @@ describe('getBand', () => {
     expect(getBand(null, null)).toBeNull();
   });
 
-  // Band rule: highValue = value >= 2 ; lowEffort = effort <= 2
   it('quick_win = high value, low effort', () => {
     expect(getBand(3, 1)).toBe('quick_win');
     expect(getBand(2, 2)).toBe('quick_win');
@@ -42,7 +41,6 @@ describe('rankIdeas', () => {
       mk('qw-tie-hivotes', 3, 1, 5),
     ];
     const order = rankIdeas(ideas).map((i) => i.id);
-    // both quickwin(votes 0) tie on value+effort with the two tie rows → votes desc
     expect(order).toEqual(['qw-tie-hivotes', 'qw-tie-lowvotes', 'quickwin', 'bigbet', 'lowval', 'unscored']);
   });
 

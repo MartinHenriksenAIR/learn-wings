@@ -25,7 +25,6 @@ vi.mock('@/lib/api-client', () => ({
   callApi: vi.fn(),
 }));
 
-// Stub the reported-content dialog — its internals are tested separately.
 vi.mock('@/components/community/ReportedContentDialog', () => ({
   ReportedContentDialog: ({
     open,
@@ -127,7 +126,6 @@ describe('PlatformCommunityModeration', () => {
   it('renders both global and org-scoped reports with correct scope badges', async () => {
     renderPage();
 
-    // Both reports should be visible
     await waitFor(() => {
       expect(screen.getByText('Spam content')).toBeInTheDocument();
     });
@@ -138,7 +136,6 @@ describe('PlatformCommunityModeration', () => {
   });
 
   it('view-content opens the reported-content dialog in-app, never a new tab (#160)', async () => {
-    // Render with only the org-scoped report so exactly one card is present
     mockFetchReports.mockResolvedValue([orgReport]);
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 

@@ -12,10 +12,13 @@ export default endpoint('org-settings-update', async ({ req, profile, reply, req
     return reply(400, { error: 'features must be a plain object' });
   }
 
+  if ('leaderboard_enabled' in (features as Record<string, unknown>)
+      && typeof (features as Record<string, unknown>).leaderboard_enabled !== 'boolean') {
+    return reply(400, { error: 'features.leaderboard_enabled must be a boolean' });
+  }
+
   await requireOrgAdmin(orgId);
 
-  // JSON.stringify is deliberate, not required: pg would auto-stringify a plain object, but explicit
-  // serialization sidesteps pg's array-vs-jsonb param footgun if the features guard ever loosens.
   const settings = await queryOne(
     `INSERT INTO org_settings (org_id, features, updated_by)
 VALUES ($1, $2, $3)

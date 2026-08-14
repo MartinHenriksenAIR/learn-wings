@@ -14,10 +14,13 @@ import { useFlash } from '@/hooks/useFlash';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useLearnerTraining } from '@/hooks/useLearnerTraining';
+import { useListView } from '@/hooks/useListView';
 import { callApiRaw } from '@/lib/api-client';
 import { BookOpen, Award, Play } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
-import { ComingSoonSection } from '@/components/learner/ComingSoonSection';
+import { MandatoryCourses } from '@/components/learner/MandatoryCourses';
+import { FavoriteCourses } from '@/components/learner/FavoriteCourses';
+import { ListViewToggle } from '@/components/learner/ListViewToggle';
 import { formatDate } from '@/lib/date-locale';
 import { toast } from '@/components/ui/sonner';
 
@@ -28,6 +31,7 @@ export default function LearnerTraining() {
   const { t, i18n } = useTranslation();
   const { flashed, flash } = useFlash();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [view, setView] = useListView('min-traening-view', 'card');
 
   const query = useLearnerTraining(currentOrg?.id, {
     enabled: orgGuard === 'ready' && !!currentOrg,
@@ -37,10 +41,6 @@ export default function LearnerTraining() {
   const progressData: Record<string, { total: number; completed: number }> = data?.progress ?? {};
   const thumbnailUrls: Record<string, string> = data?.thumbnailUrls ?? {};
 
-  // Site-specific derivation lives at the call site (frontend rules): split
-  // enrollments by status and aggregate lesson counts across ALL enrollments.
-  // Keyed on the stable `data` reference so the memo isn't defeated by the
-  // fresh `?? []`/`?? {}` fallbacks created on every render.
   const { inProgress, completed, lessonTotal, lessonDone, pct } = useMemo(() => {
     const list = data?.enrollments ?? [];
     const prog = data?.progress ?? {};
@@ -77,7 +77,6 @@ export default function LearnerTraining() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      // In-button "Saved" morph on the card, no toast.
       flash(enrollmentId);
     } catch (_err) {
       toast({
@@ -92,7 +91,7 @@ export default function LearnerTraining() {
 
   if (orgGuard === 'loading' || query.isLoading) {
     return (
-      <AppLayout title={t('training.title')}>
+      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
         <PageSpinner />
       </AppLayout>
     );
@@ -101,7 +100,7 @@ export default function LearnerTraining() {
   if (!currentOrg) {
     const isNoMembership = memberships.length === 0;
     return (
-      <AppLayout title={t('training.title')}>
+      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<BookOpen className="h-6 w-6" />}
@@ -115,7 +114,7 @@ export default function LearnerTraining() {
 
   if (query.isError) {
     return (
-      <AppLayout title={t('training.title')}>
+      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
         <div className="flex h-64 items-center justify-center">
           <QueryErrorState onRetry={() => query.refetch()} />
         </div>
@@ -124,15 +123,17 @@ export default function LearnerTraining() {
   }
 
   return (
-    <AppLayout>
-      <div className="mb-6">
-        <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
-          {t('training.title')}
-        </h1>
-        <p className="text-sm text-muted-foreground">{t('training.subtitle')}</p>
+    <AppLayout breadcrumbs={[{ label: t('nav.training') }]}>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
+            {t('training.title')}
+          </h1>
+          <p className="text-sm text-muted-foreground">{t('training.subtitle')}</p>
+        </div>
+        <ListViewToggle view={view} onChange={setView} />
       </div>
 
-      {/* 1 · Slim progress strip — a compact lesson-level aggregate, not a hero. */}
       <div
         data-testid="training-progress-strip"
         className="mb-7 rounded-2xl border border-border bg-card px-5 py-4"
@@ -148,10 +149,8 @@ export default function LearnerTraining() {
         <Progress value={pct} className="h-1.5" />
       </div>
 
-      {/* 2 · Mandatory — placeholder until #365. */}
-      <ComingSoonSection title={t('training.mandatory.title')} />
+      <MandatoryCourses orgId={currentOrg.id} view={view} />
 
-      {/* 3 · Continue (in-progress) — live resume cards. */}
       <section className="mb-8">
         <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('training.continue.title')}</h2>
 
@@ -166,12 +165,52 @@ export default function LearnerTraining() {
             }
           />
         ) : (
-          <div className="grid gap-3.5 md:grid-cols-2 lg:grid-cols-3">
+          <div
+            data-testid={view === 'list' ? 'training-continue-list' : 'training-continue-grid'}
+            className={view === 'list' ? 'flex flex-col gap-3' : 'grid gap-3.5 md:grid-cols-2 lg:grid-cols-3'}
+          >
             {inProgress.map((enrollment) => {
               const p = progressData[enrollment.course_id];
               const coursePct = p && p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
 
-              return (
+              return view === 'list' ? (
+                <div
+                  key={enrollment.id}
+                  data-testid="training-continue-row"
+                  className="hover-lift flex items-center gap-4 rounded-xl border border-border bg-card p-3"
+                >
+                  <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-primary/80 to-primary">
+                    {thumbnailUrls[enrollment.course_id] && (
+                      <img
+                        src={thumbnailUrls[enrollment.course_id]}
+                        alt={enrollment.course?.title || ''}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate text-[14px] font-bold leading-[1.35]">{enrollment.course?.title}</h3>
+                      {enrollment.course?.level && <LevelBadge level={enrollment.course.level} />}
+                    </div>
+                    <div className="mt-1.5 flex max-w-[260px] items-center gap-2.5">
+                      <Progress value={coursePct} className="h-1.5 flex-1" />
+                      <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-muted-foreground">
+                        {p?.completed ?? 0}/{p?.total ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    asChild
+                    className="h-auto shrink-0 rounded-[10px] bg-accent px-3 py-2 text-[12.5px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                  >
+                    <Link to={routes.learner.coursePlayer(enrollment.course_id, 'training')}>
+                      <Play aria-hidden="true" className="h-3.5 w-3.5" />
+                      {t('common.continue')}
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
                 <div
                   key={enrollment.id}
                   data-testid="training-continue-card"
@@ -201,7 +240,7 @@ export default function LearnerTraining() {
                       asChild
                       className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
                     >
-                      <Link to={routes.learner.coursePlayer(enrollment.course_id)}>
+                      <Link to={routes.learner.coursePlayer(enrollment.course_id, 'training')}>
                         <Play aria-hidden="true" className="h-3.5 w-3.5" />
                         {t('common.continue')}
                       </Link>
@@ -214,17 +253,15 @@ export default function LearnerTraining() {
         )}
       </section>
 
-      {/* 4 · Favorites — placeholder until #358/#380. */}
-      <ComingSoonSection title={t('training.favorites.title')} />
+      <FavoriteCourses orgId={currentOrg.id} view={view} />
 
-      {/* 5 · Completed (+ certificate). */}
       <section className="mb-8">
         <h2 className="mb-3.5 font-display text-[17px] font-bold">{t('training.completed.title')}</h2>
 
         {completed.length === 0 ? (
           <EmptyState icon={<Award className="h-6 w-6" />} title={t('training.completed.empty')} />
         ) : features.certificates_enabled ? (
-          <div className="grid gap-3.5 md:grid-cols-2">
+          <div className={view === 'list' ? 'flex flex-col gap-3' : 'grid gap-3.5 md:grid-cols-2'}>
             {completed.map((enrollment) => (
               <CertificateCard
                 key={enrollment.id}
@@ -237,12 +274,16 @@ export default function LearnerTraining() {
             ))}
           </div>
         ) : (
-          <div className="grid gap-3.5 md:grid-cols-2 lg:grid-cols-3">
+          <div className={view === 'list' ? 'flex flex-col gap-3' : 'grid gap-3.5 md:grid-cols-2 lg:grid-cols-3'}>
             {completed.map((enrollment) => (
               <div
                 key={enrollment.id}
                 data-testid="training-completed-card"
-                className="hover-lift flex items-center gap-3.5 rounded-2xl border border-border bg-card px-[18px] py-4"
+                className={
+                  view === 'list'
+                    ? 'hover-lift flex items-center gap-3.5 rounded-xl border border-border bg-card p-3'
+                    : 'hover-lift flex items-center gap-3.5 rounded-2xl border border-border bg-card px-[18px] py-4'
+                }
               >
                 <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-success/10 text-success">
                   <Award className="h-5 w-5" />

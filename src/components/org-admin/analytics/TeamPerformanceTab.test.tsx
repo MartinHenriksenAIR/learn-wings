@@ -1,12 +1,3 @@
-/**
- * Tests for the AI-niveau column in TeamPerformanceTab.
- *
- * Covers:
- * - Column header rendered via i18n key.
- * - LevelBadge rendered for a member with an assessment_level.
- * - Em-dash "—" rendered for a member with null/undefined assessment_level.
- * - assessment_level flows through from both single-org and all-orgs shaped data.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
@@ -15,13 +6,10 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-// Stub dialog to avoid portals / out-of-tree rendering in tests.
 vi.mock('@/components/org-admin/UserProgressDialog', () => ({
   UserProgressDialog: () => null,
 }));
 
-// LevelBadge renders the level via t() — since t() echoes the key, we can assert
-// on the key text.
 vi.mock('@/components/ui/level-badge', () => ({
   LevelBadge: ({ level }: { level: string }) =>
     React.createElement('span', { 'data-testid': 'level-badge' }, `courses.levels.${level}`),
@@ -60,7 +48,6 @@ describe('TeamPerformanceTab — AI-niveau column', () => {
   it('renders the AI level column header via i18n key', () => {
     renderTab([makeUser({ id: 'u1' })]);
 
-    // Header appears once in the list-view table (the grouped view isn't shown by default).
     expect(screen.getAllByText('assessment.analytics.aiLevel').length).toBeGreaterThanOrEqual(1);
   });
 
@@ -97,8 +84,6 @@ describe('TeamPerformanceTab — AI-niveau column', () => {
   });
 
   it('assessment_level flows through — all-orgs shaped data is just another UserStats array', () => {
-    // The all-orgs branch reshapes members the same way (OrgAnalytics.userStats derivation
-    // carries assessment_level through). This test simulates what the component receives.
     const users = [
       makeUser({ id: 'u1', name: 'Carol', assessment_level: 'basic' }),
       makeUser({ id: 'u2', name: 'Dave', assessment_level: null }),

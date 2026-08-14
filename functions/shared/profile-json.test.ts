@@ -23,19 +23,10 @@ describe('profileJson', () => {
   });
 });
 
-// Fleet-wide guard: no endpoint may hand-roll the canonical author-profile fragment —
-// it must come from profileJson(). Mirrors registration-names.test.ts: sources are read
-// with fs and matched by regex, deliberately NOT imported (importing fires the app.http
-// side effects and opens DB pools).
 describe('no endpoint hand-rolls the author-profile json_build_object', () => {
   const FUNCTIONS_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
   const NON_ENDPOINT_DIRS = new Set(['shared', 'node_modules', 'dist']);
 
-  // The exact hand-rolled form profileJson() replaces:
-  //   json_build_object('id', <a>.id, 'full_name', <a>.full_name, 'avatar_url', <a>.avatar_url)
-  // The \1 backreference ties all three columns to one alias, so a deliberately richer
-  // superset that interleaves other keys (e.g. ai-champions' 'department') is NOT matched —
-  // that projection is a distinct shape the frontend consumes, not this canonical fragment.
   const HAND_ROLLED =
     /json_build_object\(\s*'id',\s*(\w+)\.id,\s*'full_name',\s*\1\.full_name,\s*'avatar_url',\s*\1\.avatar_url\s*\)/;
 

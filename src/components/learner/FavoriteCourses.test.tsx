@@ -21,10 +21,10 @@ const course = {
   created_by_user_id: null, created_at: '2026-01-01T00:00:00Z',
 };
 
-function renderSection() {
+function renderSection(view?: 'card' | 'list') {
   return render(
     <MemoryRouter>
-      <FavoriteCourses orgId="org-1" />
+      <FavoriteCourses orgId="org-1" view={view} />
     </MemoryRouter>,
   );
 }
@@ -44,10 +44,9 @@ describe('FavoriteCourses', () => {
 
     renderSection();
 
-    expect(screen.getByText('dashboard.favoriteCourses')).toBeInTheDocument();
+    expect(screen.getByText('training.favorites.title')).toBeInTheDocument();
     expect(screen.getByText('Intro to AI')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1');
-    // No empty state when there are favorites.
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
     expect(screen.queryByText('dashboard.noFavoritesTitle')).toBeNull();
   });
 
@@ -60,7 +59,7 @@ describe('FavoriteCourses', () => {
 
     renderSection();
 
-    expect(screen.getByText('dashboard.favoriteCourses')).toBeInTheDocument();
+    expect(screen.getByText('training.favorites.title')).toBeInTheDocument();
     expect(screen.getByText('dashboard.noFavoritesTitle')).toBeInTheDocument();
     expect(screen.getByText('dashboard.noFavoritesDescription')).toBeInTheDocument();
   });
@@ -71,7 +70,7 @@ describe('FavoriteCourses', () => {
     const { container } = renderSection();
 
     expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByText('dashboard.favoriteCourses')).toBeNull();
+    expect(screen.queryByText('training.favorites.title')).toBeNull();
     expect(screen.queryByText('dashboard.noFavoritesTitle')).toBeNull();
   });
 
@@ -85,6 +84,54 @@ describe('FavoriteCourses', () => {
     mockUseToggleFavorite.mockReturnValue({ toggleFavorite, togglingId: null, isPending: false });
 
     renderSection();
+
+    fireEvent.click(screen.getByRole('button', { name: 'courses.removeFromFavorites' }));
+    expect(toggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'c-1', favorite: false }));
+  });
+
+  it('shows the Completed pill (not an open-course link) for a completed favorited course', () => {
+    mockUseFavorites.mockReturnValue({
+      data: { courses: [{ ...course, completed: true }] },
+      isFavorite: (id: string) => id === 'c-1',
+      isLoading: false,
+    });
+
+    renderSection();
+
+    expect(screen.getByTestId('favorite-completed')).toHaveTextContent('training.mandatory.completed');
+    expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
+  });
+
+  it('shows the Completed pill in list view, keeping the unfavorite control', () => {
+    const toggleFavorite = vi.fn();
+    mockUseFavorites.mockReturnValue({
+      data: { courses: [{ ...course, completed: true }] },
+      isFavorite: (id: string) => id === 'c-1',
+      isLoading: false,
+    });
+    mockUseToggleFavorite.mockReturnValue({ toggleFavorite, togglingId: null, isPending: false });
+
+    renderSection('list');
+
+    expect(screen.getByTestId('favorite-completed')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'courses.removeFromFavorites' })).toBeInTheDocument();
+  });
+
+  it('renders rows (not cards) in list view, keeping the player link and unfavorite control', () => {
+    const toggleFavorite = vi.fn();
+    mockUseFavorites.mockReturnValue({
+      data: { courses: [course] },
+      isFavorite: (id: string) => id === 'c-1',
+      isLoading: false,
+    });
+    mockUseToggleFavorite.mockReturnValue({ toggleFavorite, togglingId: null, isPending: false });
+
+    renderSection('list');
+
+    expect(screen.getByTestId('training-favorite-row')).toBeInTheDocument();
+    expect(screen.getByText('Intro to AI')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
 
     fireEvent.click(screen.getByRole('button', { name: 'courses.removeFromFavorites' }));
     expect(toggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'c-1', favorite: false }));

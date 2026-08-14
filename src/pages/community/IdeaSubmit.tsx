@@ -83,7 +83,6 @@ export default function IdeaSubmit() {
   const navigate = useNavigate();
   const { ideaId } = useParams<{ ideaId?: string }>();
   const { t } = useTranslation();
-  // profile.id (DB row UUID) is the ownership identity — user.id is the Entra OID.
   const { currentOrg, profile } = useAuth();
   const orgGuard = useOrgGuard();
   const communityGate = useCommunityGate();

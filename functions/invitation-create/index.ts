@@ -3,17 +3,8 @@ import { endpoint } from '../shared/endpoint';
 import { isAtSeatLimit, lockSeatUsage } from '../shared/seats';
 
 const ALLOWED_ROLES = new Set(['org_admin', 'learner']);
-// Basic email regex — matches the BulkInviteDialog row validation.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/**
- * Creates a pending org invitation. Replaces the legacy frontend pattern that
- * did a direct `INSERT INTO invitations(...)` followed by an RPC
- * `get_invitation_link_id(invitation_id)` to retrieve the shareable link_id.
- * By returning the freshly-created row INCLUDING `link_id`, we eliminate that
- * second roundtrip. `token` / `token_hash` are NEVER exposed in the response
- * (security-sensitive — see shared invitation safety notes / invitations LIST).
- */
 export default endpoint('invitation-create', async ({ req, profile, reply, requireOrgAdmin }) => {
   const body = await req.json() as {
     orgId?: unknown;
@@ -25,7 +16,6 @@ export default endpoint('invitation-create', async ({ req, profile, reply, requi
   };
   const { orgId, email, role, firstName, lastName, department } = body;
 
-  // Validation first, authz second, db third (mirrors org-membership-create).
   if (!orgId || typeof orgId !== 'string') {
     return reply(400, { error: 'orgId is required' });
   }
@@ -35,12 +25,10 @@ export default endpoint('invitation-create', async ({ req, profile, reply, requi
   if (typeof role !== 'string' || !ALLOWED_ROLES.has(role)) {
     return reply(400, { error: 'role must be one of: org_admin, learner' });
   }
-  // firstName/lastName/department: optional. If provided and not null, must be string ≤ 100.
   const validateOptionalText = (val: unknown, field: string): string | null | undefined => {
     if (val === undefined || val === null) return null;
     if (typeof val !== 'string') return undefined;
     if (val.length > 100) return undefined;
-    // Empty string → null on insert (matches BulkInviteDialog `invite.first_name || null`).
     return val === '' ? null : val;
   };
   const fnVal = validateOptionalText(firstName, 'firstName');
@@ -56,26 +44,15 @@ export default endpoint('invitation-create', async ({ req, profile, reply, requi
     return reply(400, { error: 'department must be a string of 100 characters or fewer' });
   }
 
-  // Authorization: platform admin OR org admin of the target org.
-  // RLS provenance: supabase/migrations/20260130144031_*.sql —
-  // "Admins can insert invitations" policy (WITH CHECK is_platform_admin()
-  // OR (org_id IS NOT NULL AND is_org_admin(org_id))).
   await requireOrgAdmin(orgId);
 
-  // Normalize email casing (matches BulkInviteDialog row normalization).
   const normalizedEmail = email.toLowerCase().trim();
 
-  // Seat-limit enforcement (issue #126): counts ACTIVE members + PENDING invitations,
-  // since both consume a seat. The seat-usage lookup and the INSERT run in ONE
-  // transaction with `FOR UPDATE` on the organization row so concurrent creates
-  // cannot race past the cap (see functions/shared/seats.ts).
   try {
     const result = await withTransaction(async (client) => {
       const usage = await lockSeatUsage(client, orgId);
       if (!usage.exists) return { kind: 'not_found' as const };
       if (isAtSeatLimit(usage)) return { kind: 'seat_limit' as const };
-      // `token`, `token_hash`, `status`, `expires_at`, `link_id`,
-      // `is_platform_admin_invite` all have DB defaults — let the DB populate them.
       const insertRes = await client.query(
         `INSERT INTO invitations (org_id, email, role, invited_by_user_id, first_name, last_name, department)
          VALUES ($1, $2, $3, $4, $5, $6, $7)

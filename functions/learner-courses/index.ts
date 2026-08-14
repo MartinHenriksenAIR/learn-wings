@@ -1,6 +1,6 @@
 import { query } from '../shared/db';
 import { endpoint } from '../shared/endpoint';
-import { courseVisibilityPredicate } from '../shared/course-visibility';
+import { courseVisibilityPredicate, resolveVisibilityContext } from '../shared/course-visibility';
 
 export default endpoint('learner-courses', async ({ req, profile, reply, requireActiveMember }) => {
   const { orgId, language } = await req.json() as { orgId?: unknown; language?: unknown };
@@ -11,17 +11,17 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
 
   await requireActiveMember(orgId);
 
-  const lang = language === 'en' || language === 'da' ? language : 'da';
+  const { isIndividual, language: savedLang } = await resolveVisibilityContext(orgId, profile.id);
+  const lang = isIndividual ? savedLang : (language === 'en' || language === 'da' ? language : 'da');
 
-  // Query 1: Available published courses for the org (shared visibility predicate;
-  // equivalent to the old JOIN form — UNIQUE(org_id, course_id) on org_course_access
-  // guarantees one access row per course per org), filtered to the viewer's UI language.
-  // The language filter is relaxed (never the org-visibility/publish predicate) for
-  // courses the learner is already enrolled in, so a language switch never hides them.
+  const visibility = isIndividual
+    ? 'c.is_published = TRUE'                                          // published; org access bypassed
+    : courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 });    // published + org access
+
   const courses = await query(
     `SELECT c.id, c.title, c.description, c.level, c.language, c.is_published, c.thumbnail_url, c.category_id, c.created_by_user_id, c.created_at
        FROM courses c
-      WHERE ${courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 })}
+      WHERE ${visibility}
             AND (
                   c.language = $2
                   OR EXISTS (
@@ -33,7 +33,6 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
     [orgId, lang, profile.id],
   );
 
-  // Query 2: Caller's own enrollments in this org, scoped to profile.id (never a client-supplied user id).
   const enrollments = await query(
     `SELECT id, org_id, user_id, course_id, status, enrolled_at, completed_at, last_accessed_at
        FROM enrollments
@@ -44,14 +43,10 @@ export default endpoint('learner-courses', async ({ req, profile, reply, require
 
   const courseIds = enrollments.map((e) => (e as { course_id: string }).course_id);
 
-  // No enrollments → no progress to compute; skip the count queries entirely.
   if (courseIds.length === 0) {
     return reply(200, { courses, enrollments, progress: {} });
   }
 
-  // Per-course lesson progress for the caller's enrolled courses. These two batched
-  // COUNT queries mirror functions/learner-dashboard/index.ts verbatim (same aliases,
-  // params, and zero-fill) so both surfaces derive progress identically — no N+1.
   const totalsRows = await query<{ course_id: string; total: number }>(
     `SELECT cm.course_id, COUNT(l.id)::int AS total
        FROM course_modules cm

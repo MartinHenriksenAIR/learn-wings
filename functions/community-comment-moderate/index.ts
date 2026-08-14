@@ -27,7 +27,6 @@ export default endpoint('community-comment-moderate', async ({ req, profile, rep
   );
   if (!row) return reply(404, { error: 'Comment not found' });
 
-  // Platform admin OR org admin of the org post; global posts: platform admin only.
   const canAccess = profile.is_platform_admin ||
     (row.scope === 'org' && row.org_id !== null && await isOrgAdmin(profile.id, row.org_id));
   if (!canAccess) return reply(403, { error: 'Forbidden' });

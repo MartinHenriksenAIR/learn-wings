@@ -13,7 +13,6 @@ vi.mock('react-router-dom', async (importOriginal) => ({
   useNavigate: () => mockNavigate,
 }));
 
-// Trans echoes its key plus any interpolation values so assertions can see both.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
   Trans: ({ i18nKey, values }: { i18nKey: string; values?: Record<string, unknown> }) => (
@@ -23,11 +22,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/assets/logo-light.png', () => ({ default: 'logo-light.png' }));
 
-// Mocked wholesale (the real module instantiates MSAL at import time); the page
-// matches on `err instanceof ApiError`, so the mock ships a compatible class.
 vi.mock('@/lib/api-client', () => {
-  // Named MockApiError (not ApiError) so the factory shorthand can't collide
-  // with the top-level `ApiError` import binding under vitest's transform.
   class MockApiError extends Error {
     status: number;
     code?: string;
@@ -199,7 +194,6 @@ describe('Signup (accept-invitation flow, #175)', () => {
       await acceptAndWaitFor('invitationAccept.orgJoinedTitle');
 
       expect(refreshUserContext).toHaveBeenCalledTimes(1);
-      // Body carries the org name and the reused localized role label — not the raw enum.
       expect(
         screen.getByText('invitationAccept.orgJoinedBody Acme orgDetail.organizationAdmin')
       ).toBeDefined();

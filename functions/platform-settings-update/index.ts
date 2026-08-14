@@ -4,8 +4,6 @@ import { adminEndpoint } from '../shared/endpoint';
 const ALLOWED_KEYS = ['user_access', 'features', 'seat_pricing'] as const;
 type SettingKey = typeof ALLOWED_KEYS[number];
 
-// Field lists derive from the frontend's interfaces (src/pages/platform-admin/PlatformSettings.tsx)
-// and the seed shapes (migration/azure/02-seed.sql) — the two are kept in sync deliberately.
 type FieldCheck = (v: unknown) => boolean;
 const isString: FieldCheck = (v) => typeof v === 'string';
 const isStringOrNull: FieldCheck = (v) => v === null || typeof v === 'string';
@@ -58,8 +56,6 @@ export default adminEndpoint('platform-settings-update', async ({ req, profile, 
   }
   const value = body.value as Record<string, unknown>;
 
-  // Unknown fields are rejected: the frontend only ever sends the known field set,
-  // so a stray field signals a bypassing caller, not a legitimate write.
   const shape = FIELD_SHAPES[key];
   for (const [field, fieldValue] of Object.entries(value)) {
     const check = shape[field];
@@ -71,11 +67,6 @@ export default adminEndpoint('platform-settings-update', async ({ req, profile, 
     }
   }
 
-  // MERGE, never replace (issue #90): `value || $2::jsonb` only touches the
-  // fields present in the body — absent fields keep their stored values, so a
-  // partial write can no longer clobber the rest of the setting (e.g. blank out
-  // the other feature flags). updated_at is managed by a DB trigger on
-  // UPDATE; updated_by is the authenticated caller's profile id.
   const setting = await queryOne(
     `UPDATE platform_settings SET value = value || $2::jsonb, updated_by = $3 WHERE key = $1 RETURNING key, value`,
     [key, JSON.stringify(value), profile.id],

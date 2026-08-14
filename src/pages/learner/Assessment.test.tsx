@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// t returns the key with interpolation appended so we can assert current/total.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (k: string, vars?: Record<string, unknown>) =>
@@ -26,8 +25,6 @@ vi.mock('@/components/ui/sonner', () => ({ toast: vi.fn() }));
 vi.mock('@/assets/logo-light.png', () => ({ default: 'logo-light.png' }));
 vi.mock('@/assets/logo-light-en.png', () => ({ default: 'logo-light-en.png' }));
 
-// Assessment.tsx reads i18n.language for the logo variant; stub the singleton
-// so importing the real i18n bootstrap (initReactI18next) is unnecessary.
 vi.mock('@/i18n', () => ({ default: { language: 'da' } }));
 
 const mockUseAuth = vi.fn();
@@ -53,7 +50,6 @@ vi.mock('@/hooks/useLearnerCourses', () => ({
 
 import Assessment from './Assessment';
 
-// 7 questions, each with the same 4 option ids for simplicity of the fixture.
 const OPTIONS = ['a', 'b', 'c', 'd'];
 const QUESTIONS = [
   'usage-frequency',
@@ -87,7 +83,6 @@ function renderPage() {
   );
 }
 
-// Select option `a` on every question and press Next, advancing to the end.
 function answerAllAndSeeResult() {
   for (let i = 0; i < QUESTIONS.length; i++) {
     fireEvent.click(screen.getAllByRole('radio')[0]);
@@ -136,18 +131,15 @@ describe('Assessment wizard', () => {
   it('preserves earlier answers across forward/back navigation', () => {
     renderPage();
 
-    // Answer q1 with option b, advance.
     const radios = screen.getAllByRole('radio');
     fireEvent.click(radios[1]); // option 'b'
     expect(radios[1]).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: /assessment\.next/ }));
 
-    // Now on q2; Back is enabled.
     const back = screen.getByRole('button', { name: /assessment\.back/ });
     expect(back).toBeEnabled();
     fireEvent.click(back);
 
-    // Back on q1: the previously chosen option is still selected and Next enabled.
     expect(screen.getAllByRole('radio')[1]).toBeChecked();
     expect(screen.getByRole('button', { name: /assessment\.next/ })).toBeEnabled();
   });
@@ -158,17 +150,14 @@ describe('Assessment wizard', () => {
     expect(firstBlock).not.toBeNull();
 
     fireEvent.click(screen.getAllByRole('radio')[0]);
-    // Selecting an option must NOT swap the keyed block (same identity/text).
     expect(container.querySelector('.slide-in-from-right-4')).toBe(firstBlock);
 
     fireEvent.click(screen.getByRole('button', { name: /assessment\.next/ }));
-    // Advancing to q2 renders a different question in the keyed block.
     expect(screen.getByText('assessment.questions.task-breadth.text')).toBeInTheDocument();
   });
 
   it('shows the see-result label on the last question', () => {
     renderPage();
-    // Advance through the first 6 questions.
     for (let i = 0; i < 6; i++) {
       fireEvent.click(screen.getAllByRole('radio')[0]);
       fireEvent.click(screen.getByRole('button', { name: /assessment\.next/ }));
@@ -197,7 +186,6 @@ describe('Assessment wizard', () => {
       });
     });
 
-    // Result view: persona name + score visible.
     await waitFor(() => {
       expect(screen.getByText('assessment.result.personas.basic')).toBeInTheDocument();
     });

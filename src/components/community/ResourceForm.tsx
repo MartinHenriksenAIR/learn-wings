@@ -91,7 +91,6 @@ export function ResourceForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* No description text by design — explicit opt-out silences Radix's missing-Description a11y warning */}
       <DialogContent className="sm:max-w-[500px]" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="text-[17px] font-bold">

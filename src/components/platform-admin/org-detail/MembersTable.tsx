@@ -24,7 +24,6 @@ type Member = OrgMembership & { profile: Profile };
 
 interface MembersTableProps {
   members: Member[];
-  /** Membership id whose role change is in flight (per-row spinner). */
   updatingRoleId: string | null;
   onRoleChange: (member: Member, newRole: OrgRole) => void;
   onDisable: (membershipId: string) => void;

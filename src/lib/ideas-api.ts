@@ -24,9 +24,6 @@ export async function fetchIdea(ideaId: string): Promise<EnhancedIdea | null> {
   return res.idea;
 }
 
-// `|| null` coercions are old-lib parity: IdeaSubmit's form defaults every field
-// to '' (incl. business_area, a PG enum server-side) — '' would 400 the endpoint's
-// enum validation, and the old client lib stored null, not ''.
 export async function createIdea(input: CreateIdeaInput): Promise<EnhancedIdea> {
   const res = await callApi<{ idea: EnhancedIdea }>('/api/idea-create', {
     orgId: input.org_id,
@@ -55,9 +52,6 @@ export async function updateIdea(
   ideaId: string,
   updates: Partial<CreateIdeaInput>
 ): Promise<EnhancedIdea> {
-  // The form's unselected business-area <Select> sends '' — a PG enum server-side;
-  // coerce to null ('' would 400 the endpoint's enum validation). Other fields stay
-  // verbatim (old-lib update behavior).
   const payload =
     updates.business_area !== undefined
       ? { ...updates, business_area: updates.business_area || null }
@@ -75,7 +69,6 @@ export async function updateIdeaStatus(
   ideaId: string,
   input: UpdateIdeaStatusInput
 ): Promise<EnhancedIdea> {
-  // adminNotes absent (undefined) is intentional: JSON.stringify drops undefined keys — leave column untouched
   const res = await callApi<{ idea: EnhancedIdea }>('/api/idea-status-update', {
     ideaId,
     status: input.status,
@@ -85,7 +78,6 @@ export async function updateIdeaStatus(
   return res.idea;
 }
 
-/** value/effort are 1–3 (Low/Med/High) or null to clear. Server derives org from the idea row. */
 export async function updateIdeaPriority(
   ideaId: string,
   value: number | null,
@@ -95,9 +87,6 @@ export async function updateIdeaPriority(
   return res.idea;
 }
 
-// Delete idea — authors may delete their own ideas of ANY status; org admins may
-// delete any idea in their org (RLS provenance: migration 20260202140817 replaced
-// the draft-only policy with author-any-status + org-admin DELETE policies).
 export async function deleteIdea(ideaId: string): Promise<void> {
   await callApi('/api/idea-delete', { ideaId });
 }
@@ -128,7 +117,6 @@ export async function createIdeaComment(
   return res.comment;
 }
 
-/** Client-side localeCompare sort: SQL ASC collation can differ for non-ASCII chars (e.g. æøå). */
 export async function fetchOrgTags(orgId: string): Promise<string[]> {
   const res = await callApi<{ tags: string[] }>('/api/idea-tags', { orgId });
   return (res.tags ?? []).sort((a, b) => a.localeCompare(b));

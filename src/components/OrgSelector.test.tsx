@@ -44,9 +44,6 @@ const baseAuth = {
   effectiveIsOrgAdmin: true,
 };
 
-// useOrganizations needs a QueryClient; fresh per render so no cache leaks between tests.
-// OrgSelector reads useSidebar() (for the collapsed icon-rail rendering, #370), so it must
-// be wrapped in a SidebarProvider — `open` drives expanded vs collapsed.
 function renderSelector({ open = true }: { open?: boolean } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -107,7 +104,6 @@ describe('OrgSelector', () => {
 
     renderSelector();
 
-    // Let any pending microtasks settle, then assert no fetch + no spinner.
     await Promise.resolve();
     expect(mockCallApi).not.toHaveBeenCalled();
     expect(document.querySelector('.animate-spin')).toBeNull();
@@ -131,8 +127,6 @@ describe('OrgSelector', () => {
 
     renderSelector({ open: false });
 
-    // In the rail the switcher is a square button whose accessible name carries the
-    // org (the tooltip mirror), and the org name is NOT rendered as visible trigger text.
     await waitFor(() => {
       expect(document.querySelector('button[aria-label="Beta Org"]')).not.toBeNull();
     });

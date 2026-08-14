@@ -4,12 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
-// Initialize i18n so t() resolves real (English) strings, matching production.
 import '@/i18n';
 
-// mock AppLayout faithfully: the real one renders its `title` prop as an <h1>, letting
-// the #101 regression test observe a duplicate heading if the page ever passes `title`
-// AND renders its own <h1>.
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ title, children }: { title?: string; children: React.ReactNode }) => (
     <div>
@@ -31,7 +27,6 @@ vi.mock('@/hooks/useOrganizations', () => ({
 
 vi.mock('@/components/ui/sonner', () => ({ toast: vi.fn() }));
 
-// Forward `id` to a real file input so the logo label's association is testable (#327).
 vi.mock('@/components/ui/file-upload', () => ({
   FileUpload: ({ id }: { id?: string }) => <input type="file" id={id} data-testid="file-upload" />,
 }));

@@ -8,9 +8,6 @@ import i18n from '@/i18n';
 import { IDEA_STATUS_OPTIONS } from '@/lib/community-types';
 import { IdeaStatusBadge } from './IdeaStatusBadge';
 
-// #208: idea status labels used to render hardcoded English in the Danish UI.
-// Every option now carries an i18n `labelKey`; assert parity in both locales and
-// that a representative consumer (the badge) renders the translated string.
 function resolve(locale: Record<string, unknown>, dottedKey: string): unknown {
   return dottedKey.split('.').reduce<unknown>((node, part) => {
     if (node && typeof node === 'object') {
@@ -48,7 +45,6 @@ describe('IdeaStatusBadge translated rendering (#208)', () => {
   it('renders the Danish label, not the raw English string', async () => {
     await i18n.changeLanguage('da');
     renderBadge();
-    // "Indsendt" (da) must appear; the English "Submitted" must not leak through.
     expect(screen.getByText(da.community.ideaStatus.submitted)).toBeInTheDocument();
     expect(en.community.ideaStatus.submitted).not.toBe(da.community.ideaStatus.submitted);
     expect(screen.queryByText(en.community.ideaStatus.submitted)).not.toBeInTheDocument();

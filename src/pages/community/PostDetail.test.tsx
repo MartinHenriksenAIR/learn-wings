@@ -29,7 +29,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// --- mock api-client (PostDetail imports ApiError; avoid loading real msal-config) ---
 vi.mock('@/lib/api-client', () => ({
   ApiError: class ApiError extends Error {
     status: number;
@@ -83,7 +82,6 @@ const basePost = {
   tags: [],
 };
 
-// useAuth state: community disabled for the viewer's own org; only effectiveIsPlatformAdmin varies.
 function makeAuth(effectiveIsPlatformAdmin: boolean) {
   return {
     user: { id: 'oid-entra-1', tid: 'tid-1', email: 'admin@example.com', name: 'Admin User' },
@@ -123,7 +121,6 @@ describe('PostDetail community gate (#89)', () => {
     vi.clearAllMocks();
     mockFetchPost.mockResolvedValue(basePost);
     mockFetchComments.mockResolvedValue([]);
-    // The viewer's effective flags report community DISABLED for their own org context.
     mockUsePlatformSettings.mockReturnValue({ features: { community_enabled: false }, isLoading: false });
   });
 
@@ -131,7 +128,6 @@ describe('PostDetail community gate (#89)', () => {
     mockUseAuth.mockReturnValue(makeAuth(true));
     renderPost();
 
-    // Platform admin is exempt from the viewer-org gate: the reported post renders.
     expect(await screen.findByText('Reported Org Post')).toBeInTheDocument();
     expect(screen.queryByText('DASHBOARD SENTINEL')).not.toBeInTheDocument();
   });

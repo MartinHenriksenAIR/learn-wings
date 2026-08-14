@@ -29,20 +29,17 @@ export default endpoint('community-comment-create', async ({ req, profile, reply
   );
   if (!post) return reply(404, { error: 'Post not found' });
 
-  // Accessibility check (can_access_community_post parity) — before locked check
   if (!profile.is_platform_admin) {
     if (post.scope === 'org') {
       const canAccess = await isActiveMember(profile.id, post.org_id!);
       if (!canAccess) return reply(403, { error: 'Forbidden' });
     }
-    // global scope: all authenticated profiles can access
   }
 
   if (post.is_locked) {
     return reply(403, { error: 'Post is locked' });
   }
 
-  // Profile join via CTE: parity with old lib, which selected profile on inserted row.
   const comment = await queryOne(
     `WITH ins AS (
        INSERT INTO community_comments (post_id, user_id, content, parent_comment_id)

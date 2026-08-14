@@ -4,25 +4,17 @@ import { PostCard } from './PostCard';
 import { CommentItem } from './CommentItem';
 import type { CommunityPost, CommunityComment } from '@/lib/community-types';
 
-// #180 — community author avatars. When a profile has an avatar_url, the author
-// avatar shows the photo (via the signed branding URL); when null, it falls back
-// to coloured initials — no visual regression for photo-less users.
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en', changeLanguage: vi.fn() } }),
 }));
 
-// Resolve a stored avatar path to a deterministic signed URL (real hook hits a
-// query). null/undefined path → no URL, so the fallback initials show.
 vi.mock('@/hooks/useSignedBrandingUrl', () => ({
   useSignedBrandingUrl: (path: string | null | undefined) => ({
     data: path ? `https://signed.example/${path}` : undefined,
   }),
 }));
 
-// Radix's AvatarImage only mounts the <img> after the browser loads it, which
-// jsdom never does. Render deterministic primitives so photo-vs-initials is
-// observable in the DOM.
 vi.mock('@/components/ui/avatar', () => ({
   Avatar: ({ children, ...p }: any) => <div {...p}>{children}</div>,
   AvatarImage: ({ src, alt = '' }: any) => <img src={src} alt={alt} />,

@@ -37,20 +37,10 @@ import { BookOpen, Plus, Loader2, Trash2, Building2, ShieldCheck, Search, Check,
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 
-/**
- * Cache key for the admin course list + access matrix (one query, one ship).
- * Re-exported from the factory so CourseEditor can import it unchanged.
- */
 export const coursesAdminQueryKey = queryKeys.coursesAdmin.all;
 
-/**
- * Radix Select can't hold an empty-string value, so the create dialog's
- * "Uncategorized" option uses this sentinel; it maps to/from `categoryId: null`
- * at the state boundary — mirroring CourseEditor's picker.
- */
 const UNCATEGORIZED = '__none__';
 
-/** RETURNING'd access rows replace any prior row for the same org+course pair. */
 function upsertAccessRecords(existing: OrgCourseAccess[], incoming: OrgCourseAccess[]): OrgCourseAccess[] {
   const kept = existing.filter(
     (r) => !incoming.some((n) => n.org_id === r.org_id && n.course_id === r.course_id),
@@ -93,10 +83,6 @@ export default function CoursesManager() {
   const [orgComboboxOpen, setOrgComboboxOpen] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  // Mutations patch this cache from their RETURNING'd rows (issue #48); only the
-  // course create path refetches it, because new thumbnails need re-signing.
-  // No-blank-page invariant: during a refetch the stale data keeps rendering
-  // (isLoading is true only while there is no data at all).
   const {
     data: coursesData,
     isLoading: coursesLoading,
@@ -106,8 +92,6 @@ export default function CoursesManager() {
   const courses = coursesData?.courses ?? [];
   const accessRecords = coursesData?.accessRecords ?? [];
 
-  // Only fetch categories once the create dialog is opened — they're only used by
-  // its picker (the management tab mounts CategoryManager, which fetches its own).
   const { data: categories = [] } = useCourseCategories({ enabled: createOpen });
 
   useEffect(() => {
@@ -132,7 +116,6 @@ export default function CoursesManager() {
     onSuccess: () => {
       toast({ title: t('coursesManager.courseCreated') });
       setCreateOpen(false); setTitle(''); setDescription(''); setLevel('basic'); setLanguage('da'); setCategoryId(null); setThumbnailUrl(null);
-      // KEEP the refetch here: the new course's thumbnail path needs re-signing.
       queryClient.invalidateQueries({ queryKey: coursesAdminQueryKey });
     },
   });
@@ -156,7 +139,6 @@ export default function CoursesManager() {
         prev && {
           ...prev,
           courses: prev.courses.map((c) =>
-            // Keep the already-signed thumbnail: the RETURNING'd row carries the raw path.
             c.id === updated.id ? { ...c, ...updated, thumbnail_url: c.thumbnail_url } : c,
           ),
         },
@@ -208,7 +190,6 @@ export default function CoursesManager() {
     return record?.access === 'enabled';
   };
 
-  /** How many orgs currently have this course enabled (derived from the cache). */
   const orgAccessCount = (courseId: string): number =>
     accessRecords.filter((r) => r.course_id === courseId && r.access === 'enabled').length;
 
@@ -325,8 +306,6 @@ export default function CoursesManager() {
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="course-create-thumbnail">{t('coursesManager.thumbnail')}</Label>
-            {/* No maxSizeMB: the image cap is the server's, and FileUpload
-                defaults to it (src/lib/upload-limits.ts). */}
             <FileUpload
               id="course-create-thumbnail"
               folder="thumbnails"
@@ -395,8 +374,6 @@ export default function CoursesManager() {
 
   return (
     <AppLayout breadcrumbs={[{ label: t('coursesManager.tabCourses') }]}>
-      {/* Header — the page owns its heading; AppLayout `title` is omitted here to avoid a
-          duplicate <h1> (the loading/error branches keep `title` since they have no in-page header). */}
       <div className="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('coursesManager.title')}</h1>
@@ -405,7 +382,6 @@ export default function CoursesManager() {
         {createDialog}
       </div>
 
-      {/* Tabs */}
       <div className="mb-5">
         <SlidingTabs
           tabs={[

@@ -19,6 +19,7 @@ import { BookOpen, Clock, Award, TrendingUp, Sparkles } from 'lucide-react';
 export default function LearnerDashboard() {
   const { currentOrg, profile, memberships, isPlatformAdmin, isOrgAdmin } = useAuth();
   const orgGuard = useOrgGuard();
+  const isIndividual = currentOrg?.kind === 'individual';
   const communityGate = useCommunityGate();
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -36,22 +37,20 @@ export default function LearnerDashboard() {
   }
 
   if (!currentOrg) {
-    const isNoMembership = memberships.length === 0;
+    const showInvitationOnly = memberships.length === 0 && !isPlatformAdmin;
     return (
       <AppLayout title={t('dashboard.title')}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<BookOpen className="h-6 w-6" />}
-            title={isNoMembership ? t('dashboard.noMembershipTitle') : t('common.noOrgSelected')}
-            description={isNoMembership ? t('dashboard.noMembershipDescription') : t('common.joinOrgToContinue')}
+            title={showInvitationOnly ? t('dashboard.invitationOnlyTitle') : t('common.noOrgSelected')}
+            description={showInvitationOnly ? t('dashboard.invitationOnlyDescription') : t('common.joinOrgToContinue')}
           />
         </div>
       </AppLayout>
     );
   }
 
-  // A failed dashboard fetch must not masquerade as an all-zero hub; show a
-  // distinct error fork with retry instead.
   if (query.isError || !query.data) {
     return (
       <AppLayout title={t('dashboard.title')}>
@@ -62,7 +61,7 @@ export default function LearnerDashboard() {
     );
   }
 
-  const { snapshot, xp, level, streak, leaderboard } = query.data;
+  const { snapshot, xp, level, streak, leaderboard, showLeaderboard } = query.data;
   const firstName = profile?.first_name || profile?.full_name;
 
   return (
@@ -74,7 +73,6 @@ export default function LearnerDashboard() {
         <p className="text-sm text-muted-foreground">{t('dashboard.subtitle')}</p>
       </div>
 
-      {/* Assessment banner — shown only to plain learners who haven't taken the assessment yet */}
       {profile && !isPlatformAdmin && !isOrgAdmin && profile.assessment_level == null && (
         <div
           data-testid="assessment-banner"
@@ -96,7 +94,6 @@ export default function LearnerDashboard() {
         </div>
       )}
 
-      {/* Progress snapshot — compact; each card deep-links into Min Træning. */}
       <div data-testid="dashboard-snapshot" className="mb-7 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label={t('dashboard.started')}
@@ -126,9 +123,11 @@ export default function LearnerDashboard() {
 
       <GamificationSummary xp={xp} level={level} streak={streak} />
 
-      <Leaderboard leaderboard={leaderboard} />
+      {showLeaderboard && <Leaderboard leaderboard={leaderboard} />}
 
-      {communityGate === 'allowed' && <DashboardCommunitySection orgId={currentOrg.id} />}
+      {communityGate === 'allowed' && (
+        <DashboardCommunitySection orgId={isIndividual ? undefined : currentOrg.id} />
+      )}
     </AppLayout>
   );
 }

@@ -10,12 +10,6 @@ export interface ProgressRingProps {
   className?: string;
 }
 
-/**
- * SVG progress ring (port of the design prototype's `ring()`): rotated -90deg
- * so progress starts at 12 o'clock, round line caps, animated dashoffset.
- * Renders a centered, counter-rotated percentage label only when `labelColor`
- * is given. `pct` is clamped to [0, 100]; `stroke` must be < `size`.
- */
 export function ProgressRing({ pct, size, stroke, fg, bg, labelColor, className }: ProgressRingProps) {
   const clampedPct = Math.min(100, Math.max(0, pct));
   const radius = (size - stroke) / 2;

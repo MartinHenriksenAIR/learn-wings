@@ -57,6 +57,7 @@ const dashData = (over: Partial<LearnerDashboardData> = {}): LearnerDashboardDat
   xp: { allTime: 75, month: 45 },
   level: { level: 1, xp: 75, xpIntoLevel: 75, xpForLevel: 200, xpToNext: 125, nextThreshold: 200, progressPct: 38 },
   streak: { current: 3, activeToday: true },
+  showLeaderboard: true,
   leaderboard: {
     allTime: {
       rows: [
@@ -93,11 +94,12 @@ function renderDashboard() {
 describe('LearnerDashboard — guards', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('shows the no-membership empty state when the user has no memberships', () => {
+  it('shows the invitation-only empty state for a non-admin with no memberships (blocked walk-in)', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, memberships: [], currentOrg: null });
     renderDashboard();
     expect(document.querySelector('.animate-spin')).toBeNull();
-    expect(screen.getByText('dashboard.noMembershipTitle')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.invitationOnlyTitle')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.invitationOnlyDescription')).toBeInTheDocument();
   });
 
   it('shows the no-org-selected state when memberships exist but no org is selected', () => {
@@ -166,6 +168,26 @@ describe('LearnerDashboard — motivation hub', () => {
     const board = await screen.findByTestId('dashboard-leaderboard');
     fireEvent.click(within(board).getByRole('button', { name: 'dashboard.leaderboard.thisMonth' }));
     expect(within(board).getByText('45 XP')).toBeInTheDocument();
+  });
+
+  it('hides the leaderboard for an individual-tier learner (server sets showLeaderboard=false)', async () => {
+    await mockData(dashData({ showLeaderboard: false }));
+    mockUseAuth.mockReturnValue({
+      ...baseAuthState,
+      memberships: [{ id: 'm-1', role: 'learner', status: 'active' }],
+      currentOrg: { id: 'org-solo', name: 'Individuals', slug: 'individuals', kind: 'individual' },
+    });
+    renderDashboard();
+    await screen.findByTestId('dashboard-snapshot');
+    expect(screen.queryByTestId('dashboard-leaderboard')).toBeNull();
+  });
+
+  it('hides the leaderboard when the org opted out (#369: showLeaderboard=false in a standard org)', async () => {
+    await mockData(dashData({ showLeaderboard: false }));
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+    renderDashboard();
+    await screen.findByTestId('dashboard-snapshot');
+    expect(screen.queryByTestId('dashboard-leaderboard')).toBeNull();
   });
 
   it('pins the caller row when they rank below the visible top', async () => {

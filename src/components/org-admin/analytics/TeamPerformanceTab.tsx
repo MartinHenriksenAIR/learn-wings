@@ -30,8 +30,6 @@ import { UserProgressDialog } from '@/components/org-admin/UserProgressDialog';
 import { getAvatarColor, getInitials } from '@/lib/utils';
 import { LevelBadge, type CourseLevel } from '@/components/ui/level-badge';
 
-// Avg-quiz-score color thresholds (port of the prototype: green ≥80, amber ≥50,
-// red >0, muted for ungraded).
 function scoreClass(score: number): string {
   if (score >= 80) return 'text-success';
   if (score >= 50) return 'text-warning';
@@ -55,7 +53,6 @@ function NameCell({ name }: { name: string }) {
   );
 }
 
-// Numeric order for AI level — used for sorting. null sorts last.
 const LEVEL_ORDER: Record<CourseLevel, number> = { basic: 0, intermediate: 1, advanced: 2 };
 function levelSortValue(level: CourseLevel | null | undefined): number {
   if (level == null) return 3; // null last
@@ -94,11 +91,9 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
   const filteredUserStats = useMemo(() => {
     return userStats
       .filter((user) => {
-        // Search filter
         if (searchQuery && !user.name.toLowerCase().includes(searchQuery.toLowerCase())) {
           return false;
         }
-        // Department filter
         if (selectedDepartment === 'all') return true;
         if (selectedDepartment === 'unassigned') return !user.department;
         return user.department === selectedDepartment;
@@ -286,7 +281,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
           </CardContent>
         </Card>
       ) : viewMode === 'grouped' ? (
-        /* Grouped by Department View */
         <Accordion type="multiple" defaultValue={Object.keys(groupedByDepartment)} className="space-y-2">
           {Object.entries(groupedByDepartment).map(([dept, users]) => (
             <AccordionItem key={dept} value={dept} className="border rounded-lg px-4">
@@ -341,7 +335,6 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
           ))}
         </Accordion>
       ) : (
-        /* List View with Pagination */
         <Card>
           <Table>
             <TableHeader>

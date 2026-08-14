@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -9,7 +9,22 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/components/layout/AppLayout', () => ({
-  AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppLayout: ({
+    children,
+    breadcrumbs = [],
+  }: {
+    children: React.ReactNode;
+    breadcrumbs?: { label: string }[];
+  }) => (
+    <div>
+      <nav aria-label="breadcrumb">
+        {breadcrumbs.map((c) => (
+          <span key={c.label}>{c.label}</span>
+        ))}
+      </nav>
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock('@/lib/api-client', () => ({
@@ -19,6 +34,18 @@ vi.mock('@/lib/api-client', () => ({
 
 vi.mock('@/components/learner/CertificateCard', () => ({
   CertificateCard: () => <div data-testid="cert-card" />,
+}));
+
+vi.mock('@/components/learner/MandatoryCourses', () => ({
+  MandatoryCourses: ({ orgId, view }: { orgId?: string; view?: string }) => (
+    <div data-testid="mandatory-section" data-org={orgId} data-view={view} />
+  ),
+}));
+
+vi.mock('@/components/learner/FavoriteCourses', () => ({
+  FavoriteCourses: ({ orgId, view }: { orgId?: string; view?: string }) => (
+    <div data-testid="favorites-section" data-org={orgId} data-view={view} />
+  ),
 }));
 
 vi.mock('@/components/ui/sonner', () => ({
@@ -79,7 +106,6 @@ const completedEnrollment = {
   status: 'completed', enrolled_at: '2026-06-01T00:00:00Z', completed_at: '2026-06-10T00:00:00Z',
   course: { id: 'c-1', title: 'Finished Course', level: 'basic', description: '' },
 };
-// total 8 lessons, 6 done -> 75%
 const progress = { 'c-1': { total: 4, completed: 4 }, 'c-2': { total: 4, completed: 2 } };
 
 function setTraining(data: {
@@ -113,6 +139,7 @@ function renderTraining() {
 describe('LearnerTraining', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mockPlatformSettings.mockImplementation(platformDefault);
     mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
     setTraining({ enrollments: [completedEnrollment, enrolled], progress });
@@ -123,10 +150,15 @@ describe('LearnerTraining', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'training.title' })).toBeInTheDocument();
   });
 
+  it('shows "My Training" in the header breadcrumb (#421)', () => {
+    renderTraining();
+    const crumbs = screen.getByRole('navigation', { name: 'breadcrumb' });
+    expect(within(crumbs).getByText('nav.training')).toBeInTheDocument();
+  });
+
   it('shows the lesson-aggregate figure in the progress strip', () => {
     renderTraining();
     const strip = screen.getByTestId('training-progress-strip');
-    // 6 of 8 lessons -> 75%
     expect(within(strip).getByText('75%')).toBeInTheDocument();
     expect(within(strip).getByText('training.progress.summary')).toBeInTheDocument();
   });
@@ -136,14 +168,14 @@ describe('LearnerTraining', () => {
     const card = screen.getByTestId('training-continue-card');
     expect(within(card).getByText('Ongoing Course')).toBeInTheDocument();
     const resume = within(card).getByRole('link', { name: /common\.continue/ });
-    expect(resume).toHaveAttribute('href', '/app/learn/c-2');
+    expect(resume).toHaveAttribute('href', '/app/learn/c-2?from=training');
   });
 
-  it('renders both "coming soon" placeholders (Mandatory + Favorites)', () => {
+  it('wires in the Mandatory and Favorites sections with the current org id (no coming-soon placeholders)', () => {
     renderTraining();
-    expect(screen.getByText('training.mandatory.title')).toBeInTheDocument();
-    expect(screen.getByText('training.favorites.title')).toBeInTheDocument();
-    expect(screen.getAllByText('training.comingSoon')).toHaveLength(2);
+    expect(screen.getByTestId('mandatory-section')).toHaveAttribute('data-org', 'org-1');
+    expect(screen.getByTestId('favorites-section')).toHaveAttribute('data-org', 'org-1');
+    expect(screen.queryByText('training.comingSoon')).toBeNull();
   });
 
   it('renders a plain completed card when the certificates feature is off', () => {
@@ -183,5 +215,53 @@ describe('LearnerTraining', () => {
     setTraining({ enrollments: [], progress: {} });
     renderTraining();
     expect(screen.getByText('dashboard.noMembershipTitle')).toBeInTheDocument();
+  });
+});
+
+describe('LearnerTraining — card/list view toggle (#449)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    mockPlatformSettings.mockImplementation(platformDefault);
+    mockUseAuth.mockReturnValue({ ...baseAuthState, ...withOrg });
+    setTraining({ enrollments: [completedEnrollment, enrolled], progress });
+  });
+
+  it('defaults to card view and threads it through to every listing', () => {
+    renderTraining();
+    expect(screen.getByTestId('training-continue-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('training-continue-row')).toBeNull();
+    expect(screen.getByLabelText('courses.viewAsCards')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('mandatory-section')).toHaveAttribute('data-view', 'card');
+    expect(screen.getByTestId('favorites-section')).toHaveAttribute('data-view', 'card');
+  });
+
+  it('switches every listing to rows when List view is chosen, and persists the choice', () => {
+    renderTraining();
+    fireEvent.click(screen.getByLabelText('courses.viewAsList'));
+
+    expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
+    expect(screen.queryByTestId('training-continue-card')).toBeNull();
+    expect(screen.getByTestId('training-completed-card')).toBeInTheDocument();
+    expect(screen.getByTestId('mandatory-section')).toHaveAttribute('data-view', 'list');
+    expect(screen.getByTestId('favorites-section')).toHaveAttribute('data-view', 'list');
+    expect(window.localStorage.getItem('min-traening-view')).toBe('list');
+  });
+
+  it('restores the persisted list view on mount, under its own key (not the catalog key)', () => {
+    window.localStorage.setItem('min-traening-view', 'list');
+    renderTraining();
+    expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
+    expect(screen.queryByTestId('training-continue-card')).toBeNull();
+    expect(screen.getByLabelText('courses.viewAsList')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps certificate cards for completed courses in list view when certificates are enabled', () => {
+    mockPlatformSettings.mockReturnValue({ features: { certificates_enabled: true }, isLoading: false });
+    window.localStorage.setItem('min-traening-view', 'list');
+    renderTraining();
+    expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
+    expect(screen.getByTestId('cert-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('training-completed-card')).toBeNull();
   });
 });

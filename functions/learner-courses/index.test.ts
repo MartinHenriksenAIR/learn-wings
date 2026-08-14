@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(),
     MockAuthError,
     mockQuery: vi.fn(),
+    mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(),
     mockIsActiveMember: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: vi.fn() }));
+vi.mock('../shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember }));
 
 import handler from './index';
@@ -28,6 +29,7 @@ describe('learner-courses', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockIsActiveMember.mockResolvedValue(false);
+    mockQueryOne.mockResolvedValue({ kind: 'standard', language: 'da' });
   });
 
   it('returns 401 when bearer token is invalid', async () => {
@@ -98,26 +100,20 @@ describe('learner-courses', () => {
     const body = JSON.parse(res.body as string);
     expect(body.courses).toEqual(courseRows);
     expect(body.enrollments).toEqual(enrollmentRows);
-    // Progress is keyed by enrolled courseId with the lesson totals/completed counts.
     expect(body.progress).toEqual({ c1: { total: 4, completed: 1 } });
 
-    // Assert courses SQL — access = 'enabled', is_published = TRUE, language filter, no SELECT *
     const [coursesSql, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(coursesSql).toContain("access = 'enabled'");
     expect(coursesSql).toContain('c.is_published = TRUE');
     expect(coursesSql).toContain('c.language');
     expect(coursesSql).toContain('c.language = $2');
-    // Language relaxation: an already-enrolled course is always shown regardless of language
     expect(coursesSql).toContain('FROM enrollments e');
     expect(coursesSql).not.toContain('SELECT *');
-    // No language sent — defaults to 'da'; profile.id travels as $3 for the enrolled-union
     expect(coursesParams).toEqual(['org-1', 'da', 'p1']);
 
-    // Assert enrollments SQL — user_id = $1, no SELECT *, params ['p1', 'org-1']
     const [enrollSql, enrollParams] = mockQuery.mock.calls[1] as [string, unknown[]];
     expect(enrollSql).toContain('user_id = $1');
     expect(enrollSql).not.toContain('SELECT *');
-    // last_accessed_at drives the catalog's recency ordering of enrolled courses (#339).
     expect(enrollSql).toContain('last_accessed_at');
     expect(enrollParams).toEqual(['p1', 'org-1']);
   });
@@ -163,7 +159,6 @@ describe('learner-courses', () => {
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
     expect(body.progress).toEqual({});
-    // Only the courses + enrollments queries ran — no totals/completed count queries.
     expect(mockQuery).toHaveBeenCalledTimes(2);
   });
 
@@ -185,15 +180,11 @@ describe('learner-courses', () => {
 
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
-    // c2 is zero-filled to { total: 0, completed: 0 }.
     expect(body.progress).toEqual({
       c1: { total: 5, completed: 3 },
       c2: { total: 0, completed: 0 },
     });
 
-    // Count queries mirror learner-dashboard's batched SQL and params. Assert each
-    // query's distinguishing structure (aggregate, tables, joins, GROUP BY) so an
-    // accidental drift from the dashboard mirror is caught, not just the ANY(...) param.
     const [totalsSql, totalsParams] = mockQuery.mock.calls[2] as [string, unknown[]];
     expect(totalsSql).toContain('COUNT(l.id)::int AS total');
     expect(totalsSql).toContain('FROM course_modules cm');
@@ -254,9 +245,6 @@ describe('learner-courses', () => {
     await handler(baseReq({ orgId: 'org-1', language: 'en' }), {} as any);
 
     const [coursesSql] = mockQuery.mock.calls[0] as [string, unknown[]];
-    // The published + org-enabled visibility predicate must stay an OUTER AND, never
-    // inside the OR group. Otherwise SQL precedence (`A AND B OR C` = `(A AND B) OR C`)
-    // would surface any enrolled course regardless of org/publish — a tenant leak.
     const enabledIdx = coursesSql.indexOf("access = 'enabled'");
     const orGroupIdx = coursesSql.indexOf('AND (');
     const orExistsIdx = coursesSql.indexOf('OR EXISTS');
@@ -276,6 +264,44 @@ describe('learner-courses', () => {
     expect(res.status).toBe(200);
     const [, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(coursesParams).toEqual(['org-1', 'da', 'p1']);
+  });
+
+  it('individual org: catalogue is published + saved language, org-access bypassed', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ kind: 'individual', language: 'en' }); // resolveVisibilityContext
+    mockQuery
+      .mockResolvedValueOnce([{ id: 'c1', title: 'A', language: 'en', is_published: true }]) // courses
+      .mockResolvedValueOnce([]);                                                            // enrollments
+    const res = await handler(baseReq({ orgId: 'ind-354', language: 'da' }), {} as any);
+    expect(res.status).toBe(200);
+    const coursesSql = mockQuery.mock.calls[0][0] as string;
+    expect(coursesSql).not.toContain('org_course_access');
+    expect(coursesSql).toContain('is_published = TRUE');
+    expect(mockQuery.mock.calls[0][1]).toContain('en');
+  });
+
+  it('individual org: enrolled-relaxation survives — a course in a non-saved language stays visible', async () => {
+    mockIsActiveMember.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ kind: 'individual', language: 'en' }); // saved lang = en
+    const daCourse = { id: 'c9', title: 'Dansk kursus', language: 'da', is_published: true };
+    mockQuery
+      .mockResolvedValueOnce([daCourse])                                                     // courses (row the SQL would return)
+      .mockResolvedValueOnce([{ id: 'e9', org_id: 'ind-354', user_id: 'p1', course_id: 'c9', status: 'enrolled', enrolled_at: '2024-01-10', completed_at: null }]) // enrollments
+      .mockResolvedValueOnce([{ course_id: 'c9', total: 3 }])                                 // totals
+      .mockResolvedValueOnce([{ course_id: 'c9', completed: 1 }]);                            // completed
+
+    const res = await handler(baseReq({ orgId: 'ind-354', language: 'da' }), {} as any);
+
+    expect(res.status).toBe(200);
+    const [coursesSql, coursesParams] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(coursesSql).toContain('c.is_published = TRUE');
+    expect(coursesSql).not.toContain('org_course_access');
+    expect(coursesSql).toContain('c.language = $2');
+    expect(coursesSql).toContain('OR EXISTS (');
+    expect(coursesSql).toContain('FROM enrollments e');
+    expect(coursesSql.indexOf('c.language = $2')).toBeGreaterThan(coursesSql.indexOf('AND ('));
+    expect(coursesParams).toEqual(['ind-354', 'en', 'p1']);
+    expect(JSON.parse(res.body as string).courses).toEqual([daCourse]);
   });
 
   it('returns 200 for platform admin without calling isActiveMember', async () => {

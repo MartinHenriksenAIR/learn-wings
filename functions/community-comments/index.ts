@@ -29,7 +29,6 @@ export default endpoint('community-comments', async ({ req, profile, reply }) =>
     if (!canAccess) return reply(200, { comments: [] });
   }
 
-  // Hidden-comment visibility: platform admin OR org admin of the post's org; global posts → platform admin only.
   const includeHidden = profile.is_platform_admin ||
     (post.scope === 'org' && await isOrgAdmin(profile.id, post.org_id!));
 

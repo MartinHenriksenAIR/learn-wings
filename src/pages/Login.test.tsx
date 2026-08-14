@@ -6,17 +6,15 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+const { mockNavigate, mockChangeLanguage } = vi.hoisted(() => ({
+  mockNavigate: vi.fn(),
+  mockChangeLanguage: vi.fn(),
+}));
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
   useNavigate: () => mockNavigate,
 }));
 
-// Resolve keys against the real en.json rather than echoing an inline default.
-// The previous stub returned `t()`'s second argument, which meant the button
-// assertion below passed on a hard-coded English literal even though
-// `auth.signInWithMicrosoft` was missing from both locale files (#300). Reading
-// the shipped copy makes a missing key render as the raw key and fail here.
 vi.mock('react-i18next', async () => {
   const en = (await import('@/i18n/locales/en.json')).default;
   const translate = (key: string): string => {
@@ -27,17 +25,23 @@ vi.mock('react-i18next', async () => {
     }
     return typeof node === 'string' ? node : key;
   };
-  return { useTranslation: () => ({ t: translate }) };
+  return {
+    useTranslation: () => ({
+      t: translate,
+      i18n: { language: 'en', resolvedLanguage: 'en', changeLanguage: mockChangeLanguage },
+    }),
+  };
 });
 
 vi.mock('@/assets/logo-light.png', () => ({ default: 'logo-light.png' }));
 
-// Mocked so importing Login doesn't pull in the real msal-config (which builds a
-// live MSAL client). The notice tests below drive consumeSessionExpiredNotice.
-vi.mock('@/lib/session-expired', () => ({ consumeSessionExpiredNotice: vi.fn() }));
+vi.mock('@/lib/session-expired', () => ({
+  consumeSessionExpiredNotice: vi.fn(),
+  consumeIdleTimeoutNotice: vi.fn(),
+}));
 
 import Login from './Login';
-import { consumeSessionExpiredNotice } from '@/lib/session-expired';
+import { consumeSessionExpiredNotice, consumeIdleTimeoutNotice } from '@/lib/session-expired';
 
 const baseAuth = {
   user: { id: 'u-1', tid: 't-1', email: 'user@x.test', name: 'User' },
@@ -61,6 +65,7 @@ describe('Login post-auth navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+    localStorage.clear();
   });
 
   it('navigates to the stashed deep link instead of the role home, and clears the stash', async () => {
@@ -131,17 +136,28 @@ describe('Login post-auth navigation', () => {
     });
   });
 
-  it('renders the shared Microsoft sign-in button (not a spinner) when signed out, wired to signIn', () => {
+  it('renders both front-door CTAs (not a spinner) when signed out; both fire signIn (#355)', () => {
     const signIn = vi.fn();
     mockUseAuth.mockReturnValue({ ...baseAuth, user: null, profile: null, signIn });
 
     render(<Login />);
 
-    const button = screen.getByRole('button', { name: /sign in with microsoft/i });
-    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: /start free/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
 
-    expect(signIn).toHaveBeenCalledTimes(1);
+    expect(signIn).toHaveBeenCalledTimes(2);
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('language toggle switches language and persists the choice past the Entra redirect (#355)', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuth, user: null, profile: null });
+
+    render(<Login />);
+
+    fireEvent.click(screen.getByRole('button', { name: /dansk/i }));
+
+    expect(mockChangeLanguage).toHaveBeenCalledWith('da');
+    expect(localStorage.getItem('preferred_language')).toBe('da');
   });
 
   it('does not navigate while auth is still resolving', () => {
@@ -157,7 +173,6 @@ describe('Login session-expired notice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-    // Signed out and settled so Login renders its card (no navigate effect).
     mockUseAuth.mockReturnValue({ ...baseAuth, user: null, profile: null });
   });
 
@@ -169,11 +184,21 @@ describe('Login session-expired notice', () => {
     expect(screen.getByText(/right back to where you left off/i)).toBeInTheDocument();
   });
 
+  it('shows the inactivity notice when an idle timeout redirected here', () => {
+    vi.mocked(consumeIdleTimeoutNotice).mockReturnValue(true);
+
+    render(<Login />);
+
+    expect(screen.getByText(/inactivity/i)).toBeInTheDocument();
+  });
+
   it('stays quiet on a normal visit to /login', () => {
     vi.mocked(consumeSessionExpiredNotice).mockReturnValue(false);
+    vi.mocked(consumeIdleTimeoutNotice).mockReturnValue(false);
 
     render(<Login />);
 
     expect(screen.queryByText(/right back to where you left off/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/inactivity/i)).not.toBeInTheDocument();
   });
 });

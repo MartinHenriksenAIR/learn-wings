@@ -6,8 +6,6 @@ import { I18nextProvider } from 'react-i18next';
 import en from '@/i18n/locales/en.json';
 import i18n from '@/i18n';
 
-// AppSidebar pulls in the full auth/navigation tree; the gate states are what
-// we're exercising, so stub the sidebar to keep the render focused.
 vi.mock('./AppSidebar', () => ({
   AppSidebar: () => <div data-testid="app-sidebar" />,
 }));
@@ -51,7 +49,6 @@ describe('OrgGate (#256)', () => {
   });
 
   it('renders the spinner while the user context is still resolving', () => {
-    // Signed in, profile not yet resolved (useOrgGuard → 'loading').
     mockUseAuth.mockReturnValue({
       ...baseAuth,
       user: { id: 'entra-oid' },

@@ -27,7 +27,6 @@ vi.mock('../shared/blob-ownership', () => ({
 
 import handler from './index';
 
-/** The one candidate this endpoint ever builds, handed to both gates. */
 const logoCandidate = (path: string | null) => [{ path, kind: 'image', family: 'org-logo' }];
 
 const baseReq = (body: unknown) => ({
@@ -38,10 +37,6 @@ const baseReq = (body: unknown) => ({
 
 const existingOrg = { id: 'org-1' };
 
-/**
- * When (and only when) `logo_url` is in the update, the endpoint issues a
- * previous-logo SELECT before the UPDATE — so queryOne is called twice.
- */
 const mockLogoDb = (previousLogoUrl: string | null, updated: unknown = { id: 'org-1' }) => {
   mockQueryOne.mockResolvedValueOnce({ logo_url: previousLogoUrl }).mockResolvedValueOnce(updated);
 };
@@ -86,8 +81,6 @@ describe('organization-update', () => {
   });
 
   it('returns 400 (not 403) for invalid body when caller is not platform admin', async () => {
-    // Pins the deliberate validation-before-authz ordering (why this endpoint
-    // uses endpoint() + an inline admin check instead of adminEndpoint).
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     const res = await handler(baseReq({ updates: { name: 'New Name' } }), {} as any);
     expect(res.status).toBe(400);
@@ -227,7 +220,6 @@ describe('organization-update', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // ---- #353 SSO tenant binding (platform-admin override) ----
   const TID = '72f988bf-86f1-41af-91ab-2d7cd011db47';
 
   it('returns 400 when entra_tid is not a GUID', async () => {
@@ -279,7 +271,6 @@ describe('organization-update', () => {
 
   it('clearing entra_tid also clears entra_tid_label (no orphan label)', async () => {
     mockQueryOne.mockResolvedValueOnce({ id: 'org-1', entra_tid: null, entra_tid_label: null });
-    // Client sends only entra_tid: null (label unchanged, so change-detection omits it).
     const res = await handler(baseReq({ orgId: 'org-1', updates: { entra_tid: null } }), {} as any);
     expect(res.status).toBe(200);
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
@@ -323,21 +314,19 @@ describe('organization-update', () => {
     expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
   });
 
-  it('org admin cannot update other fields', async () => {
+  it('org admin cannot update platform-only fields', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
-    // isOrgAdmin is NOT called — `name` is outside ORG_ADMIN_WRITABLE, so the
-    // `.every(...)` is false and the && short-circuits before the membership check.
-    const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'New Name' } }), {} as any);
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { seat_limit: 5 } }), {} as any);
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
     expect(mockIsOrgAdmin).not.toHaveBeenCalled();
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  it('org admin cannot smuggle other fields alongside logo_url', async () => {
+  it('org admin cannot smuggle a platform-only field alongside logo_url', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     const res = await handler(
-      baseReq({ orgId: 'org-1', updates: { logo_url: 'https://x/logo.png', name: 'New Name' } }),
+      baseReq({ orgId: 'org-1', updates: { logo_url: 'https://x/logo.png', seat_limit: 5 } }),
       {} as any,
     );
     expect(res.status).toBe(403);
@@ -365,7 +354,6 @@ describe('organization-update', () => {
     expect(params).toEqual([null, 'org-1']);
   });
 
-  // ---- #356 per-org allow_self_registration toggle ----
 
   it('returns 400 when allow_self_registration is not a boolean (before authz/DB)', async () => {
     const res = await handler(baseReq({ orgId: 'org-1', updates: { allow_self_registration: 'yes' } }), {} as any);
@@ -386,7 +374,6 @@ describe('organization-update', () => {
   it('org admin of the target org can toggle allow_self_registration (org-owned setting)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     mockIsOrgAdmin.mockResolvedValueOnce(true);
-    // No logo_url in the update ⇒ no previous-logo SELECT ⇒ a single queryOne (the UPDATE).
     mockQueryOne.mockResolvedValueOnce({ id: 'org-1', allow_self_registration: true });
     const res = await handler(baseReq({ orgId: 'org-1', updates: { allow_self_registration: true } }), {} as any);
     expect(res.status).toBe(200);
@@ -415,6 +402,45 @@ describe('organization-update', () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
     const res = await handler(
       baseReq({ orgId: 'org-1', updates: { allow_self_registration: true, seat_limit: 5 } }),
+      {} as any,
+    );
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string)).toEqual({ error: 'Forbidden' });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+
+  it('org admin of the target org can rename their own org (name)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', name: 'Renamed Co' });
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { name: 'Renamed Co' } }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('UPDATE organizations SET');
+    expect(sql).toContain('name = $1');
+    expect(params).toEqual(['Renamed Co', 'org-1']);
+  });
+
+  it('org admin can update name and logo_url together', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockLogoDb(null, { id: 'org-1', name: 'Renamed Co', logo_url: 'org-logos/new.png' });
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { name: 'Renamed Co', logo_url: 'org-logos/new.png' } }),
+      {} as any,
+    );
+    expect(res.status).toBe(200);
+    const [sql] = mockQueryOne.mock.calls[1] as [string, unknown[]];
+    expect(sql).toContain('name = $1');
+    expect(sql).toContain('logo_url = $2');
+  });
+
+  it('org admin cannot smuggle slug alongside name (slug stays platform-only)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    const res = await handler(
+      baseReq({ orgId: 'org-1', updates: { name: 'Renamed Co', slug: 'renamed-co' } }),
       {} as any,
     );
     expect(res.status).toBe(403);
@@ -512,7 +538,6 @@ describe('organization-update', () => {
     });
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(mockQueryOne.mock.calls[0][0]).not.toContain('UPDATE organizations');
-    // The refused blob's cleanup is the helper's job, not the endpoint's.
     expect(mockDeleteBlob).not.toHaveBeenCalled();
   });
 
@@ -542,9 +567,6 @@ describe('organization-update', () => {
     expect(mockAssertBindablePaths).not.toHaveBeenCalled();
   });
 
-  // Being an admin of THIS org says nothing about whether the path supplied is
-  // this org's. `/organizations` hands `logo_url` to plain learners, so every
-  // other org's logo path is readable by anyone with an account.
 
   it('400 when the ownership gate refuses the path: no probe, no UPDATE, no delete', async () => {
     mockQueryOne.mockResolvedValueOnce({ logo_url: null }); // only the previous-logo SELECT
@@ -554,8 +576,6 @@ describe('organization-update', () => {
 
     expect(res.status).toBe(400);
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Invalid upload path' });
-    // The refusal must land BEFORE anything touches storage — otherwise the
-    // 413-vs-200 split is an existence oracle for other rows' blobs.
     expect(mockEnforceUploadLimits).not.toHaveBeenCalled();
     expect(mockDeleteBlob).not.toHaveBeenCalled();
     expect(mockQueryOne).toHaveBeenCalledTimes(1);
@@ -608,7 +628,6 @@ describe('organization-update', () => {
     mockDeleteBlob.mockResolvedValue(false);
     const res = await handler(baseReq(logoUpdate('org-logos/new.png')), {} as any);
     expect(res.status).toBe(200);
-    // Cleanup outcome is deliberately NOT surfaced in the response.
     expect(JSON.parse(res.body as string)).toEqual({ organization: updated });
   });
 

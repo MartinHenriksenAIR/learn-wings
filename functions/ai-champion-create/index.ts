@@ -12,14 +12,9 @@ export default endpoint('ai-champion-create', async ({ req, profile, reply, requ
     return reply(400, { error: 'userId is required' });
   }
 
-  // RLS provenance: supabase/migrations/20260202125422_*.sql —
-  // "Platform admins can manage all AI champions" (is_platform_admin())
-  // + "Org admins can manage AI champions" (is_org_admin(org_id)), both FOR ALL.
   await requireOrgAdmin(orgId);
 
   try {
-    // assigned_by is the CALLER's profile id, server-derived — never client-supplied
-    // (the old client sent the Entra OID; issue #11 audit item).
     const champion = await queryOne(
       `INSERT INTO ai_champions (user_id, org_id, assigned_by)
        VALUES ($1, $2, $3)

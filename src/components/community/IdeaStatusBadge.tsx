@@ -32,7 +32,6 @@ export function IdeaStatusBadge({
       className={cn(
         'inline-flex items-center whitespace-nowrap rounded-[7px] text-[11px] font-bold',
         size === 'sm' ? 'px-2.5 py-[3px]' : 'px-[11px] py-1',
-        // Fallback for legacy status values keeps the neutral draft tint.
         STATUS_STYLES[status] ?? 'bg-[#f3f4f8] text-[#686d7e]',
         className
       )}

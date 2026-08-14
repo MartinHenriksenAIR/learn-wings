@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { routes } from '@/lib/routes';
@@ -14,6 +14,7 @@ import { useFavorites, useToggleFavorite } from '@/hooks/useFavorites';
 import { FavoriteToggle } from '@/components/learner/FavoriteToggle';
 import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
 import { callApi } from '@/lib/api-client';
+import { ACTIVITY_EVENT } from '@/hooks/useIdleTimeout';
 import { Course, CourseModule, Lesson, LessonProgress, Quiz, QuizQuestion, QuizOption, CourseReview } from '@/lib/types';
 import { getSignedAssetUrl } from '@/lib/storage';
 import {
@@ -33,14 +34,10 @@ import { toast } from '@/components/ui/sonner';
 import { CourseCompletionDialog } from '@/components/course/CourseCompletionDialog';
 import { CourseReviewDialog } from '@/components/course/CourseReviewDialog';
 
-// Minimum course progress (percent of lessons completed) before the review entry point appears.
+const markVideoActivity = () => window.dispatchEvent(new Event(ACTIVITY_EVENT));
+
 const REVIEW_MIN_PROGRESS = 20;
 
-// Previous / Next lesson navigation, shared by the content-lesson footer and the
-// quiz "not ready" state so a quiz lesson with no interactive quiz can never
-// dead-end the learner (#299). `children` fills the middle slot — the
-// Mark-as-complete button / Completed badge for content lessons, nothing for the
-// quiz empty state (a quiz is completed by passing, not by a manual mark).
 function LessonNav({
   currentIndex,
   total,
@@ -88,6 +85,9 @@ export default function CoursePlayer() {
   const { features } = usePlatformSettings();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const cameFromTraining = searchParams.get('from') === 'training';
 
   const { isFavorite } = useFavorites(currentOrg?.id);
   const { toggleFavorite, togglingId } = useToggleFavorite(currentOrg?.id);
@@ -98,8 +98,6 @@ export default function CoursePlayer() {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [completingLesson, setCompletingLesson] = useState(false);
-  // Lessons completed DURING this session — only these get the pop-in celebration.
-  // Lessons already completed on load render the completed state with no animation.
   const [justCompletedIds, setJustCompletedIds] = useState<Set<string>>(new Set());
 
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -108,12 +106,7 @@ export default function CoursePlayer() {
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
   const [quizLoading, setQuizLoading] = useState(false);
-  // Distinct from `quiz === null`, which also means "this quiz lesson has no quiz yet".
-  // Only a thrown request sets this, so the retry card never shows on an empty lesson.
   const [quizLoadFailed, setQuizLoadFailed] = useState(false);
-  // Monotonic token identifying the newest quiz request. The sidebar stays clickable
-  // while a quiz loads, so a slow-failing request for the lesson the learner just left
-  // could otherwise stamp its error over the lesson that loaded fine after it.
   const quizReq = useRef(0);
 
   const [signedVideoUrl, setSignedVideoUrl] = useState<string | null>(null);
@@ -127,7 +120,6 @@ export default function CoursePlayer() {
   const [existingReview, setExistingReview] = useState<CourseReview | null>(null);
   const [courseJustCompleted, setCourseJustCompleted] = useState(false);
 
-  // Exercise for the current lesson — the hook self-gates on lessonId + enabled.
   const { data: exerciseData } = useExerciseByLesson(
     currentLesson?.id,
     { enabled: currentLesson?.lesson_type === 'exercise' },
@@ -154,8 +146,6 @@ export default function CoursePlayer() {
           setCurrentLesson(data.modules[0].lessons[0] as Lesson);
         }
       } catch (error) {
-        // 403 (no org access to this course), 404, or a transient failure. Leave course null so
-        // the "not found" empty state renders with a Back button instead of a frozen spinner.
         console.error('Error loading course:', error);
         toast({
           title: 'Unable to open course',
@@ -170,11 +160,6 @@ export default function CoursePlayer() {
     fetchData();
   }, [user, currentOrg, courseId]);
 
-  // Fire-and-forget "course opened" telemetry — stamps enrollments.last_accessed_at
-  // so the catalog can order the enrolled group by recent activity (#339). Kept off
-  // the awaited render path so a slow/failed touch never delays or breaks the player.
-  // Best-effort by design: a failed touch is logged, never surfaced (justified
-  // exception to the no-silent-swallow rule).
   useEffect(() => {
     if (!user || !currentOrg || !courseId) return;
     callApi('/api/touch-course', { orgId: currentOrg.id, courseId }).catch((err) => {
@@ -182,9 +167,6 @@ export default function CoursePlayer() {
     });
   }, [user, currentOrg, courseId]);
 
-  // Load quiz when lesson changes - single endpoint, no is_correct exposed.
-  // Kept as a callback (not inline in the effect) so the failure card's Retry button
-  // can re-run the exact same load for the current lesson.
   const loadQuiz = useCallback(async () => {
     if (!currentLesson || currentLesson.lesson_type !== 'quiz') {
       quizReq.current += 1;
@@ -199,8 +181,6 @@ export default function CoursePlayer() {
 
     const req = ++quizReq.current;
     setQuizLoading(true);
-    // Drop any earlier failure first, so a stale card never outlives the lesson or
-    // the retry that fixed it.
     setQuizLoadFailed(false);
     try {
       const data = await callApi<{
@@ -221,8 +201,6 @@ export default function CoursePlayer() {
         setQuizSubmitted(false);
       }
     } catch (error) {
-      // Without the flag the pane renders empty — no quiz, no complete button (the
-      // footer excludes quiz lessons), no way forward but leaving the course (#294).
       console.error('Error loading quiz:', error);
       if (req !== quizReq.current) return;
       setQuiz(null);
@@ -263,7 +241,6 @@ export default function CoursePlayer() {
           }
           setSignedVideoUrl(null);
         } else if (currentLesson.video_storage_path) {
-          // Fallback to legacy storage path for older videos
           const videoUrl = await getSignedAssetUrl(currentLesson.video_storage_path);
           setSignedVideoUrl(videoUrl);
           setAzureVideoUrl(null);
@@ -314,7 +291,6 @@ export default function CoursePlayer() {
 
     setCompletingLesson(true);
     try {
-      // Upsert progress
       try {
         await callApi('/api/lesson-progress', { orgId: currentOrg.id, lessonId: currentLesson.id, status: 'completed' });
       } catch (error) {
@@ -341,18 +317,11 @@ export default function CoursePlayer() {
       setProgress(newProgress);
       setJustCompletedIds(prev => new Set(prev).add(currentLesson.id));
 
-      // Check if this completes the course. Count completed lessons of THIS course
-      // only — the progress map from course-player-data spans every course in the
-      // org, so counting all of it misattributed foreign progress to this course (#18).
       const allLessons = modules.flatMap(m => m.lessons);
       const completedCount = allLessons.filter(l => newProgress[l.id]?.status === 'completed').length;
       const isCourseComplete = allLessons.length > 0 && completedCount >= allLessons.length;
 
       if (isCourseComplete && !courseJustCompleted) {
-        // Record completion server-side BEFORE celebrating — enrollments.status /
-        // completed_at is what the dashboard count and the course cards read. A
-        // failed or silently no-op'd call here left the course stuck on
-        // "Continue" / "Completed 0" forever with no feedback (#18).
         try {
           await callApi('/api/enrollment-complete', { orgId: currentOrg.id, courseId });
         } catch (error) {
@@ -367,9 +336,6 @@ export default function CoursePlayer() {
         setCourseJustCompleted(true);
         setShowCompletionDialog(true);
       } else {
-        // Routine confirmation: the sidebar status dot pops in green (and the
-        // footer shows the Completed badge) — no success toast.
-
         const currentIndex = allLessons.findIndex(l => l.id === currentLesson.id);
         if (currentIndex < allLessons.length - 1) {
           setCurrentLesson(allLessons[currentIndex + 1]);
@@ -383,7 +349,6 @@ export default function CoursePlayer() {
   const handleSubmitQuiz = async () => {
     if (!quiz || !user || !currentOrg) return;
 
-    // Grade quiz server-side — attempts inserted server-side, never trust client score
     let gradeResult: { score: number; passed: boolean };
     try {
       gradeResult = await callApi<{ score: number; passed: boolean }>('/api/grade-quiz', {
@@ -411,11 +376,8 @@ export default function CoursePlayer() {
         variant: 'destructive',
       });
     }
-    // If passed, user will see success UI and can click "Mark as Complete" manually
   };
 
-  // Per-course progress: only lessons of THIS course count — the progress map
-  // from course-player-data spans every course in the org (#18).
   const allLessons = modules.flatMap(m => m.lessons);
   const totalLessons = allLessons.length;
   const completedLessons = allLessons.filter(l => progress[l.id]?.status === 'completed').length;
@@ -455,7 +417,9 @@ export default function CoursePlayer() {
   return (
     <AppLayout
       breadcrumbs={[
-        { label: t('nav.courses'), href: routes.learner.courses },
+        cameFromTraining
+          ? { label: t('nav.training'), href: routes.learner.training }
+          : { label: t('nav.courses'), href: routes.learner.courses },
         { label: course.title },
       ]}
     >
@@ -572,6 +536,7 @@ export default function CoursePlayer() {
                       controls
                       className="h-full w-full"
                       src={azureVideoUrl}
+                      onTimeUpdate={markVideoActivity}
                     />
                   ) : signedVideoUrl ? (
                     <video
@@ -579,6 +544,7 @@ export default function CoursePlayer() {
                       controls
                       className="h-full w-full"
                       src={signedVideoUrl}
+                      onTimeUpdate={markVideoActivity}
                     />
                   ) : currentLesson.azure_blob_path || currentLesson.video_storage_path ? (
                     <div className="text-center text-muted-foreground">
@@ -643,8 +609,6 @@ export default function CoursePlayer() {
               />
             )}
 
-            {/* Quiz lesson with no quiz row, or a quiz with zero questions: a neutral
-                "not ready yet" state, distinct from the #294 failure card (#299). */}
             {currentLesson.lesson_type === 'quiz' && !quizLoading && !quizLoadFailed && (!quiz || questions.length === 0) && (
               <div className="flex flex-col items-center justify-center rounded-[14px] border bg-muted/50 py-12 text-center">
                 <HelpCircle aria-hidden="true" className="mb-3 h-8 w-8 text-muted-foreground" />
@@ -826,7 +790,6 @@ export default function CoursePlayer() {
               </div>
             )}
 
-            {/* Footer: Previous / Mark as complete · Completed badge / Next (non-quiz, non-exercise lessons) */}
             {currentLesson.lesson_type !== 'quiz' && currentLesson.lesson_type !== 'exercise' && (
               <LessonNav
                 currentIndex={currentIndex}
@@ -861,10 +824,6 @@ export default function CoursePlayer() {
               </LessonNav>
             )}
 
-            {/* A quiz lesson that isn't showing an interactive quiz (no quiz, zero
-                questions, or a load failure) still needs a way out — nav-only footer
-                so no quiz lesson can dead-end the learner (#299). A healthy quiz keeps
-                its own submit/next flow and gets no footer. */}
             {currentLesson.lesson_type === 'quiz' && !quizLoading && !(quiz && questions.length > 0) && (
               <LessonNav
                 currentIndex={currentIndex}
@@ -907,7 +866,6 @@ export default function CoursePlayer() {
               '/api/course-player-data', { courseId: course.id, orgId: currentOrg.id }
             )
               .then(data => { if (data?.review) setExistingReview(data.review as any); })
-              // Endpoint can now 403 (access revoked mid-session) — don't leave the rejection unhandled.
               .catch(error => { console.error('Error refreshing review:', error); });
           }}
         />

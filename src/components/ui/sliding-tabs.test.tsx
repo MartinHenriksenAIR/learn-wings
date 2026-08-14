@@ -4,8 +4,6 @@ import React from 'react';
 
 import { SlidingTabs } from './sliding-tabs';
 
-// jsdom does no layout: stub offsetLeft/offsetWidth so the indicator gets
-// deterministic geometry (each tab button is 100px wide, 4px container pad).
 const originalOffsetLeft = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetLeft');
 const originalOffsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
 
@@ -54,7 +52,6 @@ describe('SlidingTabs', () => {
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith('members');
-    // Still controlled by the active prop — selection unchanged until parent re-renders.
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
   });
 
@@ -105,7 +102,6 @@ describe('SlidingTabs', () => {
 
       fireEvent.keyDown(screen.getByRole('tab', { name: 'Two' }), { key: 'ArrowRight' });
 
-      // 'three' is disabled, so selection jumps straight to 'four'.
       expect(onChange).toHaveBeenCalledTimes(1);
       expect(onChange).toHaveBeenCalledWith('four');
       expect(screen.getByRole('tab', { name: 'Four' })).toHaveFocus();
@@ -130,7 +126,6 @@ describe('SlidingTabs', () => {
 
       rerender(<SlidingTabs tabs={fourTabs} active="one" onChange={onChange} />);
       fireEvent.keyDown(screen.getByRole('tab', { name: 'One' }), { key: 'ArrowLeft' });
-      // Backwards from the first tab wraps to 'four' ('three' is disabled).
       expect(onChange).toHaveBeenLastCalledWith('four');
       expect(screen.getByRole('tab', { name: 'Four' })).toHaveFocus();
     });

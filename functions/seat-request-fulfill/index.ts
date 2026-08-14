@@ -40,8 +40,6 @@ export default adminEndpoint('seat-request-fulfill', async ({ req, context, prof
   if (result.kind === 'not_pending') return reply(409, { error: 'Seat request is not pending', code: 'NOT_PENDING' });
   if (result.kind === 'unlimited') return reply(409, { error: 'Organization has no seat limit', code: 'ORG_UNLIMITED' });
 
-  // Best-effort: these fields aren't returned by the transaction; fetch them after the
-  // successful bump. The fulfilment has already committed — nothing on this path may fail the response.
   try {
     const requester = await queryOne<{ email: string | null; preferred_language: string | null }>(
       `SELECT email, preferred_language FROM profiles WHERE id = $1`,

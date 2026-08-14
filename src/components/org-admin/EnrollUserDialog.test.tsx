@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 
-// --- mock react-i18next (no i18n provider needed); interpolation params are
-// --- appended so assertions can check the summary counts ---
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) =>
@@ -16,13 +14,11 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// --- mock sonner toast ---
 const mockToast = vi.fn();
 vi.mock('@/components/ui/sonner', () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
-// --- mock api-client with a local ApiError (importing the real module pulls in MSAL) ---
 vi.mock('@/lib/api-client', () => {
   class MockApiError extends Error {
     status: number;
@@ -37,10 +33,8 @@ vi.mock('@/lib/api-client', () => {
   return { callApi: vi.fn(), ApiError: MockApiError };
 });
 
-// --- replace the Radix Select with a clickable list (jsdom can't drive Radix Select) ---
 vi.mock('@/components/ui/select', async () => (await import('@/test/select-mock')).selectMock());
 
-// --- ScrollArea uses ResizeObserver; a plain div is enough here ---
 vi.mock('@/components/ui/scroll-area', async () => {
   const ReactActual = await import('react');
   return {
@@ -101,8 +95,6 @@ describe('EnrollUserDialog — label associations (#327)', () => {
         onSuccess={vi.fn()}
       />
     );
-    // The member picker renders because there is an active learner; its label
-    // must resolve to the select trigger.
     expect(screen.getByLabelText('enrollDialog.selectMemberLabel')).toHaveAttribute('id', 'enroll-member');
   });
 });
@@ -137,21 +129,17 @@ describe('EnrollUserDialog — per-row failure reasons (#62)', () => {
       />
     );
 
-    // Pick the team member (mocked Select renders members as buttons)
     fireEvent.click(screen.getByText('Alice Learner'));
 
-    // Courses load; select both
     fireEvent.click(await screen.findByText('Course One'));
     fireEvent.click(screen.getByText('Course Two'));
 
     fireEvent.click(screen.getByRole('button', { name: /Enroll in 2 Courses/i }));
 
-    // The 403's real message is rendered per row — not a generic fallback
     expect(await screen.findByText(/No course access for this organization/)).toBeInTheDocument();
     expect(screen.getByText('enrollDialog.failuresTitle')).toBeInTheDocument();
     expect(screen.queryByText(/may already be enrolled/i)).toBeNull();
 
-    // Summary toast reflects the mixed outcome: 1 enrolled, 1 failed
     expect(mockToast).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'enrollDialog.partialTitle',
@@ -160,12 +148,10 @@ describe('EnrollUserDialog — per-row failure reasons (#62)', () => {
       })
     );
 
-    // Both rows were attempted, parent refresh fired despite the failure
     const createCalls = mockCallApi.mock.calls.filter(([p]) => p === '/api/enrollment-create');
     expect(createCalls).toHaveLength(2);
     expect(onSuccess).toHaveBeenCalled();
 
-    // The resolved UI language flows through to the course-access filter (#191)
     expect(mockCallApi).toHaveBeenCalledWith('/api/org-course-access', {
       orgId: 'org-1',
       language: 'da',

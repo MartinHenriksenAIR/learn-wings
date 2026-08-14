@@ -18,9 +18,6 @@ vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => ({ features: mockFeatures() }),
 }));
 
-// The org selector fetches organizations and the footer avatar signs a branding
-// URL — both need a QueryClient. The nav groups are what we're exercising, so
-// stub them to keep the render focused.
 vi.mock('@/components/OrgSelector', () => ({
   OrgSelector: () => <div data-testid="org-selector" />,
 }));
@@ -71,7 +68,6 @@ function groupLabels(): string[] {
   );
 }
 
-/** The nav anchor for a route, regardless of whether its label is rendered. */
 function navLink(url: string): HTMLAnchorElement | null {
   return document.querySelector<HTMLAnchorElement>(`a[href="${url}"]`);
 }
@@ -88,8 +84,6 @@ describe('AppSidebar nav groups (#271)', () => {
       mockUseAuth.mockReturnValue(baseAuth);
       renderSidebar();
 
-      // Dashboard is a top-level item with no group label of its own (#363);
-      // only Læring and Fællesskab carry labels.
       expect(groupLabels()).toEqual([en.nav.learning, en.nav.community]);
       expect(navLink(routes.learner.dashboard)).not.toBeNull();
       expect(navLink(routes.orgAdmin.settings)).toBeNull();
@@ -125,13 +119,31 @@ describe('AppSidebar nav groups (#271)', () => {
       mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
       renderSidebar();
 
-      // The Fællesskab group is community-gated as a whole, so it drops out entirely
-      // (no lone header). The org-admin group stays; only its community-gated items go.
       expect(groupLabels()).toEqual([en.nav.learning, en.nav.organization]);
       expect(navLink(routes.community.feed)).toBeNull();
       expect(navLink(routes.orgAdmin.ideas)).toBeNull();
       expect(navLink(routes.orgAdmin.moderation)).toBeNull();
       expect(navLink(routes.orgAdmin.settings)).not.toBeNull();
+    });
+
+    it('keeps Resources in the Fællesskab group when community is on (#344)', () => {
+      mockUseAuth.mockReturnValue(baseAuth);
+      renderSidebar();
+
+      expect(navLink(routes.community.events)).not.toBeNull();
+      expect(navLink(routes.community.resources)).not.toBeNull();
+      expect(groupLabels()).toEqual([en.nav.learning, en.nav.community]);
+    });
+
+    it('keeps Resources reachable in Læring when community is off (#344)', () => {
+      mockFeatures.mockReturnValue({ ...allFeatures, community_enabled: false });
+      mockUseAuth.mockReturnValue(baseAuth);
+      renderSidebar();
+
+      expect(navLink(routes.community.feed)).toBeNull();
+      expect(navLink(routes.community.events)).toBeNull();
+      expect(groupLabels()).toEqual([en.nav.learning]);
+      expect(navLink(routes.community.resources)).not.toBeNull();
     });
   });
 
@@ -156,9 +168,17 @@ describe('AppSidebar nav groups (#271)', () => {
         'href',
         routes.learner.tips,
       );
-      expect(screen.getByRole('link', { name: en.nav.community })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: en.nav.discussions })).toHaveAttribute(
         'href',
         routes.community.feed,
+      );
+      expect(screen.getByRole('link', { name: en.nav.events })).toHaveAttribute(
+        'href',
+        routes.community.events,
+      );
+      expect(screen.getByRole('link', { name: en.nav.resources })).toHaveAttribute(
+        'href',
+        routes.community.resources,
       );
     });
 
@@ -222,9 +242,6 @@ describe('AppSidebar nav groups (#271)', () => {
       renderSidebar(routes.orgAdmin.settings);
 
       expect(navLink(routes.orgAdmin.settings)).toHaveAttribute('data-active', 'true');
-      // `data-active` is NavSection's own `location.pathname === item.url` — exact string
-      // equality — so the org root is inactive here purely because the pathnames differ.
-      // (The NavLink `end` prop is what keeps React Router's own match strict; see below.)
       expect(navLink(routes.orgAdmin.root)).toHaveAttribute('data-active', 'false');
       expect(navLink(routes.learner.dashboard)).toHaveAttribute('data-active', 'false');
     });
@@ -233,10 +250,6 @@ describe('AppSidebar nav groups (#271)', () => {
       mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
       renderSidebar(routes.orgAdmin.settings);
 
-      // '/app/admin/org' is a strict prefix of '/app/admin/org/settings', so without `end`
-      // React Router would consider the org-root NavLink matched and stamp it with
-      // aria-current="page" (plus its own appended "active" class). data-active would not
-      // catch that regression — it is computed by NavSection, not by NavLink.
       expect(navLink(routes.orgAdmin.settings)).toHaveAttribute('aria-current', 'page');
       expect(navLink(routes.orgAdmin.root)).not.toHaveAttribute('aria-current');
     });
@@ -276,13 +289,6 @@ describe('AppSidebar nav groups (#271)', () => {
       expect(screen.queryByText(en.nav.courses)).not.toBeInTheDocument();
     });
 
-    // Regression: the section labels must leave the rail entirely when collapsed. The shadcn
-    // primitive only fades them (opacity-0) but keeps them in the layout, and our h-auto
-    // override defeats its -mt-8 height-cancel — so an invisible-but-hit-testable label
-    // overlapped the icon buttons, stealing hovers/clicks and showing an I-beam cursor.
-    // The `group-data-[collapsible=icon]:hidden` utility drops them (display:none), which the
-    // Playwright harness confirmed geometrically (every icon centre then hits its own link
-    // with cursor:pointer). jsdom can't do layout/cursor, so guard the wiring here.
     it('drops the section labels from the rail so they cannot intercept the icons (#370)', () => {
       mockUseAuth.mockReturnValue({ ...baseAuth, effectiveIsOrgAdmin: true });
       renderSidebar(routes.learner.dashboard, { open: false });

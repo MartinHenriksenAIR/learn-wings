@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
 vi.mock('@/components/layout/AppLayout', () => ({
@@ -19,6 +20,9 @@ vi.mock('@/components/ui/sonner', () => ({
   toast: vi.fn(),
 }));
 
+vi.mock('@/components/ui/file-upload', () => ({ FileUpload: () => null }));
+vi.mock('@/hooks/useSignedBrandingUrl', () => ({ useSignedBrandingUrl: () => ({ data: null }) }));
+
 const mockUseAuth = vi.fn();
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
@@ -27,6 +31,11 @@ vi.mock('@/hooks/useAuth', () => ({
 const mockUsePlatformSettings = vi.fn();
 vi.mock('@/hooks/usePlatformSettings', () => ({
   usePlatformSettings: () => mockUsePlatformSettings(),
+}));
+
+const mockUseOrgSettings = vi.fn();
+vi.mock('@/hooks/useOrgSettings', () => ({
+  useOrgSettings: () => mockUseOrgSettings(),
 }));
 
 import OrgSettings from './OrgSettings';
@@ -43,20 +52,21 @@ const defaultPlatformSettings = {
   },
   orgFeatures: null,
   isLoading: false,
-  refetch: vi.fn(),
+  refetch: vi.fn().mockResolvedValue(undefined),
 };
 
 const baseAuthState = {
   user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
   profile: { id: 'p-1', is_platform_admin: false, first_name: 'Test', last_name: 'User' },
-  currentOrg: null,
+  currentOrg: null as unknown,
+  contextError: null,
   memberships: [],
   isPlatformAdmin: false,
   isOrgAdmin: false,
   isLoading: false,
   signIn: vi.fn(),
   signOut: vi.fn(),
-  refreshUserContext: vi.fn(),
+  refreshUserContext: vi.fn().mockResolvedValue(undefined),
   setCurrentOrg: vi.fn(),
   viewMode: 'learner' as const,
   setViewMode: vi.fn(),
@@ -64,127 +74,190 @@ const baseAuthState = {
   effectiveIsOrgAdmin: false,
 };
 
+const org = { id: 'org-1', name: 'Test Org', slug: 'test-org', logo_url: null, seat_limit: 50, created_at: '2026-01-01T00:00:00Z' };
+
 function renderOrgSettings() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <OrgSettings />
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <OrgSettings />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
-describe('OrgSettings — three-way loading guard', () => {
+const saveButton = () => screen.getByRole('button', { name: /orgSettings\.saveAll/i });
+const switchTo = (tab: string) => fireEvent.click(screen.getByRole('tab', { name: tab }));
+
+describe('OrgSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings });
+    mockUseOrgSettings.mockReturnValue({ data: null, isLoading: false });
   });
 
-  it('renders empty state when profile resolved + no currentOrg + settings not loading', () => {
+
+  it('renders empty state when profile resolved + no currentOrg', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: null });
-    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
 
     renderOrgSettings();
 
     expect(screen.getByText('common.noOrgSelected')).toBeInTheDocument();
     expect(screen.getByText('orgSettings.noOrgDescription')).toBeInTheDocument();
     expect(screen.queryAllByRole('switch')).toHaveLength(0);
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
     expect(document.querySelector('.animate-spin')).toBeNull();
   });
 
   it('renders spinner when user exists but profile is null (context not yet resolved)', () => {
     mockUseAuth.mockReturnValue({ ...baseAuthState, profile: null, currentOrg: null });
-    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
 
     renderOrgSettings();
 
     expect(document.querySelector('.animate-spin')).not.toBeNull();
     expect(screen.queryByText('common.noOrgSelected')).toBeNull();
-    expect(screen.queryByText('orgSettings.noOrgDescription')).toBeNull();
-    expect(screen.queryAllByRole('switch')).toHaveLength(0);
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
   it('renders spinner when usePlatformSettings().isLoading is true', () => {
-    mockUseAuth.mockReturnValue({ ...baseAuthState });
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
     mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: true });
 
     renderOrgSettings();
 
     expect(document.querySelector('.animate-spin')).not.toBeNull();
-    expect(screen.queryByText('common.noOrgSelected')).toBeNull();
-    expect(screen.queryAllByRole('switch')).toHaveLength(0);
   });
 
-  it('renders form when currentOrg is set and context is resolved', () => {
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      currentOrg: { id: 'org-1', name: 'Test Org' },
-    });
-    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
+  it('renders spinner when useOrgSettings().isLoading is true', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
+    mockUseOrgSettings.mockReturnValue({ data: null, isLoading: true });
 
     renderOrgSettings();
 
-    expect(document.querySelector('.animate-spin')).toBeNull();
-    expect(screen.queryByText('common.noOrgSelected')).toBeNull();
-
-    const switches = screen.queryAllByRole('switch');
-    expect(switches).toHaveLength(6); // 5 feature overrides + self-registration (#356)
-    expect(
-      screen.getByRole('button', { name: /orgSettings\.saveButton/i })
-    ).toBeInTheDocument();
+    expect(document.querySelector('.animate-spin')).not.toBeNull();
   });
 
-  it('keeps the form mounted during the post-save refetch (isLoading flips true while saving)', async () => {
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      currentOrg: { id: 'org-1', name: 'Test Org' },
-    });
-    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
 
-    let resolveSave: (v: unknown) => void = () => {};
-    vi.mocked(callApi).mockReturnValue(new Promise((res) => { resolveSave = res; }));
+  it('renders three tabs and a disabled Save when nothing has changed', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
 
-    const { rerender } = renderOrgSettings();
-    fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
+    renderOrgSettings();
 
-    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: true });
-    rerender(
-      <MemoryRouter>
-        <OrgSettings />
-      </MemoryRouter>
-    );
+    expect(screen.getByRole('tab', { name: 'orgSettings.tabs.profile' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'orgSettings.tabs.access' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'orgSettings.tabs.features' })).toBeInTheDocument();
+    expect(screen.getByLabelText('orgSettings.profile.nameLabel')).toHaveValue('Test Org');
+    expect(saveButton()).toBeDisabled();
+  });
 
+  it('Access tab shows the self-registration switch; Features tab shows 6 switches', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
+
+    renderOrgSettings();
+
+    switchTo('orgSettings.tabs.access');
+    expect(screen.getByRole('switch', { name: 'orgSettings.selfRegLabel' })).toBeInTheDocument();
+    expect(screen.queryAllByRole('switch')).toHaveLength(1);
+
+    switchTo('orgSettings.tabs.features');
     expect(screen.queryAllByRole('switch')).toHaveLength(6);
-    expect(screen.getByRole('button', { name: /orgSettings\.saveButton/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'orgSettings.leaderboardLabel' })).toBeInTheDocument();
+  });
+
+
+  it('renaming the org saves via organization-update only (features untouched)', async () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
+    vi.mocked(callApi).mockResolvedValue({} as never);
+
+    renderOrgSettings();
+    fireEvent.change(screen.getByLabelText('orgSettings.profile.nameLabel'), {
+      target: { value: 'Renamed Co' },
+    });
 
     await act(async () => {
-      resolveSave({});
+      fireEvent.click(saveButton());
     });
+
+    expect(callApi).toHaveBeenCalledWith('/api/organization-update', {
+      orgId: 'org-1',
+      updates: { name: 'Renamed Co' },
+    });
+    expect(callApi).not.toHaveBeenCalledWith('/api/org-settings-update', expect.anything());
   });
 
-  it('morphs the save button to the "Saved" state on a successful save (no success toast)', async () => {
+  it('toggling self-registration saves via organization-update only', async () => {
     mockUseAuth.mockReturnValue({
       ...baseAuthState,
-      currentOrg: { id: 'org-1', name: 'Test Org' },
-    });
-    const refetch = vi.fn().mockResolvedValue(undefined);
-    mockUsePlatformSettings.mockReturnValue({
-      ...defaultPlatformSettings,
-      isLoading: false,
-      refetch,
+      currentOrg: { ...org, allow_self_registration: true },
     });
     vi.mocked(callApi).mockResolvedValue({} as never);
 
     renderOrgSettings();
+    switchTo('orgSettings.tabs.access');
+    fireEvent.click(screen.getByRole('switch', { name: 'orgSettings.selfRegLabel' }));
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
+      fireEvent.click(saveButton());
+    });
+
+    expect(callApi).toHaveBeenCalledWith('/api/organization-update', {
+      orgId: 'org-1',
+      updates: { allow_self_registration: false },
+    });
+    expect(callApi).not.toHaveBeenCalledWith('/api/org-settings-update', expect.anything());
+  });
+
+  it('toggling the leaderboard saves it into features via org-settings-update only', async () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
+    vi.mocked(callApi).mockResolvedValue({} as never);
+
+    renderOrgSettings();
+    switchTo('orgSettings.tabs.features');
+    fireEvent.click(screen.getByRole('switch', { name: 'orgSettings.leaderboardLabel' }));
+
+    await act(async () => {
+      fireEvent.click(saveButton());
     });
 
     expect(callApi).toHaveBeenCalledWith('/api/org-settings-update', {
       orgId: 'org-1',
-      features: expect.any(Object),
+      features: expect.objectContaining({ leaderboard_enabled: false }),
     });
-    expect(refetch).toHaveBeenCalled();
+    expect(callApi).not.toHaveBeenCalledWith('/api/organization-update', expect.anything());
+  });
+
+  it('merges onto raw features so an unmanaged key is preserved on save', async () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
+    mockUseOrgSettings.mockReturnValue({ data: { exercises_enabled: true }, isLoading: false });
+    vi.mocked(callApi).mockResolvedValue({} as never);
+
+    renderOrgSettings();
+    switchTo('orgSettings.tabs.features');
+    fireEvent.click(screen.getByRole('switch', { name: 'orgSettings.leaderboardLabel' }));
+
+    await act(async () => {
+      fireEvent.click(saveButton());
+    });
+
+    const call = vi.mocked(callApi).mock.calls.find(([url]) => url === '/api/org-settings-update');
+    expect(call).toBeTruthy();
+    expect((call![1] as { features: Record<string, boolean> }).features).toMatchObject({
+      exercises_enabled: true,
+      leaderboard_enabled: false,
+    });
+  });
+
+  it('morphs the save button to "Saved" on success with no success toast', async () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
+    vi.mocked(callApi).mockResolvedValue({} as never);
+
+    renderOrgSettings();
+    fireEvent.change(screen.getByLabelText('orgSettings.profile.nameLabel'), {
+      target: { value: 'Renamed Co' },
+    });
+
+    await act(async () => {
+      fireEvent.click(saveButton());
+    });
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /common\.saved/i })).toBeInTheDocument();
@@ -192,41 +265,15 @@ describe('OrgSettings — three-way loading guard', () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
-  it('#356: toggling self-registration off persists it via organization-update on save', async () => {
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      currentOrg: { id: 'org-1', name: 'Test Org', allow_self_registration: true },
-    });
-    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
-    vi.mocked(callApi).mockResolvedValue({} as never);
+  it('disables Save when the name is invalid (too short)', () => {
+    mockUseAuth.mockReturnValue({ ...baseAuthState, currentOrg: org });
 
     renderOrgSettings();
-    fireEvent.click(screen.getByRole('switch', { name: 'orgSettings.selfRegLabel' }));
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
+    fireEvent.change(screen.getByLabelText('orgSettings.profile.nameLabel'), {
+      target: { value: 'a' },
     });
 
-    expect(callApi).toHaveBeenCalledWith('/api/organization-update', {
-      orgId: 'org-1',
-      updates: { allow_self_registration: false },
-    });
-  });
-
-  it('#356: does NOT call organization-update when self-registration is unchanged', async () => {
-    mockUseAuth.mockReturnValue({
-      ...baseAuthState,
-      currentOrg: { id: 'org-1', name: 'Test Org', allow_self_registration: true },
-    });
-    mockUsePlatformSettings.mockReturnValue({ ...defaultPlatformSettings, isLoading: false });
-    vi.mocked(callApi).mockResolvedValue({} as never);
-
-    renderOrgSettings();
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /orgSettings\.saveButton/i }));
-    });
-
-    expect(callApi).toHaveBeenCalledWith('/api/org-settings-update', expect.anything());
-    expect(callApi).not.toHaveBeenCalledWith('/api/organization-update', expect.anything());
+    expect(screen.getByText('orgSettings.profile.nameError')).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
   });
 });

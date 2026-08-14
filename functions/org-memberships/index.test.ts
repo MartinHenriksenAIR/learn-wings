@@ -89,7 +89,6 @@ describe('org-memberships', () => {
     expect(sql).toContain('ORDER BY p.full_name');
     expect(params).toEqual(['org-1']);
     expect(sql).not.toContain('entra_oid');
-    // Roster semantics: no status filter in WHERE clause
     expect(sql).not.toMatch(/WHERE.*om\.status/);
   });
 

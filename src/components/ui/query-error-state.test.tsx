@@ -6,13 +6,10 @@ import en from '@/i18n/locales/en.json';
 import da from '@/i18n/locales/da.json';
 import { QueryErrorState } from './query-error-state';
 
-// `t` echoes the key so assertions can pin i18n keys without an i18n provider.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 
-// The component reads its default copy from these keys — assert en/da parity so
-// a missing Danish key for the shared load-error card can't ship silently.
 const LOAD_ERROR_KEYS = ['loadErrorTitle', 'loadErrorDescription', 'retry'] as const;
 
 describe('common load-error i18n keys', () => {

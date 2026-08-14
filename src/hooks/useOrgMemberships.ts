@@ -3,10 +3,6 @@ import { callApi } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
 import type { OrgMembership, Profile, OrgRole } from '@/lib/types';
 
-/**
- * The raw membership row shape returned by `/api/org-memberships`.
- * The endpoint joins profile columns inline rather than nesting an object.
- */
 interface MembershipRow {
   id: string;
   org_id: string;
@@ -15,14 +11,11 @@ interface MembershipRow {
   status: 'active' | 'invited' | 'disabled';
   created_at: string;
   full_name: string;
-  // The endpoint also returns email and avatar_url, both of which flow into the
-  // reshaped Profile below (email for the member tables, avatar_url for avatars).
   email: string;
   avatar_url: string | null;
   department: string | null;
 }
 
-/** Reshaped form that the two consumer pages both work with. */
 type MemberWithProfile = OrgMembership & { profile: Profile };
 
 function reshapeMembership(row: MembershipRow): MemberWithProfile {
@@ -51,14 +44,6 @@ function reshapeMembership(row: MembershipRow): MemberWithProfile {
   };
 }
 
-/**
- * The one way to fetch `/api/org-memberships` from the frontend.
- *
- * All consumers for the same orgId share one cache entry. Reshaping
- * (joining the profile columns into the membership object) is done here
- * so both OrganizationDetail and OrgMembersTab get an identical shape.
- * Site-specific concerns (filtering, error toasts) stay at the site.
- */
 export function useOrgMemberships(orgId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.orgMemberships.list(orgId),

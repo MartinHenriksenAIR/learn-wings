@@ -1,223 +1,52 @@
-# Azure PostgreSQL 15 migration — learn-wings (AIR Academy LMS)
+# Database — Azure PostgreSQL 15
 
-This folder contains a plain PostgreSQL 15 port of the app's database,
-derived from the Supabase migration history (`supabase/migrations/*.sql`,
-44 files, final state), reconciled against the generated DB types
-(`src/integrations/supabase/types.ts`, the authoritative final column
-sets) and the Azure Functions in `functions/*/index.ts` (the runtime
-consumers).
+`01-schema.sql` is the canonical schema and `02-seed.sql` the seed data. Both are plain
+SQL, PG15-compatible, no `psql` meta-commands, each wrapped in a single `BEGIN/COMMIT`
+so a failure rolls the whole file back. There is no migration tool.
 
-| File | Purpose |
-|------|---------|
-| `01-schema.sql` | Types, tables, indexes, ported functions, triggers. Single `BEGIN/COMMIT`. |
-| `02-seed.sql`   | Synthetic, FK-valid, end-to-end-usable seed data. Single `BEGIN/COMMIT`. |
-| `03-seat-requests.sql` | Additive, idempotent migration for #127 (seat-request flow) — apply to prod directly. |
-| `04-idea-priority-scores.sql` | Additive, idempotent migration for #118 (idea Value × Effort scores). |
-| `05-course-group-id.sql` | Additive, idempotent migration for #213 (multilingual course grouping). |
-| `06-assessment.sql` | Additive, idempotent migration for #117 (AI self-assessment). |
-| _(`07-*.sql` — not in this folder)_ | Slot claimed by `07-exercises.sql` on the unmerged `feat/exercises-lesson-family-227` branch (#227). The gap is deliberate; do not reuse `07`. |
-| `08-orphan-sweep-runs.sql` | Additive, idempotent migration for #286 (orphan-sweep run records + the `ops_alerts` recipients row). |
-| `09-enrollment-last-accessed.sql` | Additive, idempotent migration for #339 (`enrollments.last_accessed_at` — catalog recency ordering). |
-| `10-course-categories.sql` | Additive, idempotent migration for #361 (`course_categories` table + `courses.category_id`, admin-managed category list). |
-| `11-org-entra-tenant.sql` | Additive, idempotent migration for #353 (`organizations.entra_tid` + `entra_tid_label` — SSO tenant auto-join binding). |
-| `12-course-favorites.sql` | Additive, idempotent migration for #358 (`course_favorites` — per-user, org-neutral favorited courses). |
-| `13-course-assignments.sql` | Additive, idempotent migration for #365 (`course_assignments` — mandatory/recommended training assignment). |
-| `14-org-self-registration.sql` | Additive, idempotent migration for #356 (`organizations.allow_self_registration` — per-org on/off switch governing #353 tenant auto-join). |
-| `15-gamification-indexes.sql` | Additive, idempotent migration for #362 (read-indexes for the DERIVED dashboard XP/streak/leaderboard — no new tables). |
-| `16-orphan-sweep-abort-detail.sql` | Additive, idempotent migration for #451 (`orphan_sweep_runs.abort_detail` — the full refusal text, so an abort is actionable from the alert email alone). |
-| `README.md`     | This file. |
+Only `pgcrypto` is created — required for `gen_random_bytes()` (the `invitations.token` /
+`link_id` defaults) and `sha256()` (the `hash_invitation_token` trigger). It is on the
+Azure Flexible Server allow-list. `gen_random_uuid()` needs no extension on PG15.
 
-> **Standing rule:** additive prod migrations (the numbered `0N-*.sql` files) are folded into `01-schema.sql` after they are applied to prod, so a fresh DB stood up from `01`+`02` is always complete. The numbered files stay in this folder as the applied-migration record.
+There is no row-level security anywhere in this schema: authorization is enforced in the
+Azure Functions by hand. `supabase/migrations/` is kept only as provenance for the RLS
+policies those checks replaced.
 
-Plain SQL only — no `psql` meta-commands (`\i`, `\dt`, …). PG15-compatible.
-No Supabase schemas (`auth` / `storage` / `realtime`).
+## Additive migrations
 
----
+Everything alongside `01`/`02` is an additive, idempotent migration applied to production
+after the fact — numbered `0N-*.sql` originally, dated `YYYY-MM-DD-<issue>-<slug>.sql` more
+recently. `ls` this folder for the list; each one names its issue in a header comment.
 
-## What was stripped (and why)
+**Standing rule:** once an additive migration is applied to production, fold it into
+`01-schema.sql`, so a fresh database stood up from `01`+`02` is always complete. The file
+stays here as the applied-migration record.
 
-| Stripped | Reason / replacement |
-|----------|----------------------|
-| **RLS** — every `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY`, `DROP POLICY` | Authorization is enforced in app code by the Azure Functions. No RLS in this schema. |
-| **`auth` schema** — `profiles.id REFERENCES auth.users`, `handle_new_user()` trigger on `auth.users`, `on_auth_user_created` | `profiles.id` is now `uuid PRIMARY KEY DEFAULT gen_random_uuid()`. Profiles are provisioned by `functions/user-context` on first Entra login. |
-| **`auth.uid()` / `auth.role()` / `auth.jwt()`** | Dropped, or (for a few helpers) re-parameterized with an explicit `p_user_id uuid`. |
-| **`storage.*`** — buckets, objects, storage policies (`lms-assets`, `org-logos`, `email-assets`) | Files live in Azure Blob Storage, accessed via SAS tokens by the `azure-*` functions. |
-| **`supabase_realtime` publication, `GRANT`/`REVOKE` to `anon`/`authenticated`/`service_role`** | Not applicable to a plain Azure PG + app-tier-auth model. |
-| **`uuid_generate_v4()` / `extensions.gen_random_bytes()`** | Replaced with `gen_random_uuid()` (built-in PG13+) and `gen_random_bytes()` (pgcrypto). |
-| **`moddatetime` extension** | Never used; `updated_at` maintenance uses a plain plpgsql trigger (`set_updated_at`). |
-
-### Extensions
-
-Only **`pgcrypto`** is created (`CREATE EXTENSION IF NOT EXISTS pgcrypto`).
-It is required for `gen_random_bytes()` (the `invitations.token` /
-`link_id` defaults) and `sha256()` (the `hash_invitation_token` trigger),
-and it is on the Azure Database for PostgreSQL Flexible Server
-allow-list. `gen_random_uuid()` needs no extension on PG15. If your
-server pre-allow-lists pgcrypto via `azure.extensions`, this statement is
-a no-op.
-
----
-
-## Added columns (the Entra delta + function-required columns)
-
-These are not in the Supabase migrations but were added to
-`profiles` / `quiz_options` for the Entra identity model and the
-consuming functions:
-
-| Column | Why |
-|--------|-----|
-| `profiles.entra_oid text` (nullable) | Entra object id. `functions/user-context` looks up / inserts by it; several functions resolve the caller via `WHERE entra_oid = $1`. |
-| `profiles.entra_tid text` (nullable) | Entra tenant id. Used together with `entra_oid` in `user-context`. |
-| `idx_profiles_entra` — `UNIQUE (entra_oid, entra_tid) WHERE entra_oid IS NOT NULL` | Partial unique so many not-yet-provisioned (NULL) rows can coexist; enforces one profile per Entra identity. |
-| `profiles.email text` | Selected and inserted by `user-context`; selected by `org-analytics-data`. |
-| `profiles.avatar_url text` | Selected and inserted by `user-context`. |
-| `quiz_options.sort_order integer DEFAULT 0` | Selected/ordered by the quiz functions (`quiz-by-lesson`, `quiz-admin`, `quiz-admin-save`, `grade-quiz`). |
-
-> The exact `user-context` INSERT/SELECT was matched:
-> `INSERT INTO profiles (full_name, email, entra_oid, entra_tid) … RETURNING id, full_name, email, is_platform_admin, avatar_url`
-> and `SELECT id, full_name, email, is_platform_admin, avatar_url FROM profiles WHERE entra_oid = $1 AND entra_tid = $2`.
-> All five returned columns plus the two lookup columns exist in the schema.
-
----
-
-## Ported vs. omitted Supabase RPCs / triggers
-
-### Ported (auth.uid() → explicit `p_user_id uuid`)
-
-| Function | Note |
-|----------|------|
-| `can_user_access_lms_asset(file_path, p_user_id)` | Already parameter-based in Supabase; kept (minus `search_path`/`SECURITY DEFINER`). Covers video/document/azure_blob paths and course thumbnails. |
-| `user_can_access_quiz(p_quiz_id, p_user_id)` | Supabase used implicit `auth.uid()` + `current_org_ids_for_user()`; replaced with explicit `p_user_id` and an inline membership join. |
-| `get_invitation_link_id(invitation_id, p_user_id)` | Supabase resolved the caller via `auth.uid()`/`is_org_admin()`; replaced with explicit `p_user_id` + inline org-admin check. |
-
-> These are convenience predicates. The functions in `functions/` mostly
-> re-implement the same logic inline in their SQL, so the ported helpers
-> are optional but kept because the port is trivial and they may be useful.
-
-### Omitted (re-implemented in app code; not ported)
-
-Dropped because they depend on `auth.uid()`/RLS and the Azure Functions
-already perform the equivalent checks inline:
-
-- `is_platform_admin()`, `is_org_admin(check_org_id)`, `is_org_member(check_org_id)`, `current_org_ids_for_user()`
-- `can_access_lms_asset(file_path)` (implicit-`auth.uid()` variant; the parameterized `can_user_access_lms_asset` is kept)
-- `can_access_community_post(p_post_id)`, `get_post_org_id(p_post_id)`, `can_post_restricted_category(scope, org_id)`, `can_view_idea_admin_fields(p_org_id)`
-- `get_invitation_by_token(lookup_token)`, `accept_invitation(link_id, user_id)`
-- `get_org_invitations_safe(p_org_id)`, `get_platform_invitations_safe(p_org_id)`
-- `get_quiz_options_for_learner(p_question_id)`, `get_quiz_options_with_answers(p_question_id)`
-- `handle_new_user()` / `on_auth_user_created` — dropped (was on `auth.users`; replaced by `user-context` first-login provisioning)
-- `quiz_options_public` view — dropped (was a learner-safe view; `quiz-by-lesson` excludes `is_correct` in app code)
-
-Kept (not omitted): `hash_invitation_token()` — no `auth.uid()` dependency; plain trigger.
-
----
-
-## Completeness check: functions → tables/columns
-
-Every table/column referenced in `functions/*/index.ts` SQL was verified
-against `01-schema.sql`.
-
-| Function | Tables / columns consumed | OK? |
-|----------|---------------------------|-----|
-| `user-context` | `profiles(id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at, entra_oid, entra_tid, assessment_level, assessment_skipped_at)` + `max(assessment_attempts.created_at)` subquery; `invitations(id, org_id, role, status, email, expires_at)` (login-time invite adoption); `org_memberships(*, user_id, org_id, status)`; `organizations(*)` | ✅ |
-| `course-player-data` | `courses(*)`; `course_modules(course_id, sort_order)`; `lessons(module_id, sort_order)`; `lesson_progress(lesson_id, status, completed_at, user_id, org_id)`; `course_reviews(id, rating, comment, user_id, org_id, course_id)` | ✅ |
-| `enrollment-complete` | `enrollments(status, completed_at, user_id, org_id, course_id)` | ✅ |
-| `lesson-progress` | `lesson_progress(org_id, user_id, lesson_id, status, completed_at)` + `ON CONFLICT (org_id,user_id,lesson_id)` | ✅ (unique constraint present) |
-| `grade-quiz` | `profiles(id, is_platform_admin)`; `quizzes(id, lesson_id, passing_score)`; `lessons(id, module_id)`; `course_modules(id, course_id)`; `courses(id, is_published)`; `org_course_access(course_id, access)`; `org_memberships(org_id, user_id, status)`; `quiz_questions(id, quiz_id, sort_order)`; `quiz_options(id, is_correct, question_id)`; `quiz_attempts(org_id, user_id, quiz_id, score, passed, finished_at)` | ✅ |
-| `quiz-by-lesson` / `quiz-admin` / `quiz-admin-save` | `quiz_options(id, option_text, is_correct, sort_order, question_id)`; `quiz_questions(id, quiz_id, sort_order)` | ✅ (`sort_order` added) |
-| `generate-certificate` | `enrollments(id, user_id, status, course_id, completed_at)`; `profiles(id, full_name, entra_oid)`; `courses(id, title)`; `organizations(id, name)`; `org_memberships(org_id, user_id, status)` | ✅ |
-| `generate-compliance-report` | `profiles(entra_oid, is_platform_admin, id, department)`; `org_memberships(org_id, user_id, role, status)`; `organizations(id, name)`; `enrollments(status, org_id, user_id, course_id)`; `quiz_attempts(score, org_id, user_id)`; `org_course_access(course_id, org_id, access)`; `courses(id, title)` | ✅ |
-| `org-analytics-data` | `profiles(entra_oid, is_platform_admin, id, full_name, email)`; `org_memberships(*, org_id, user_id, role, status)`; `enrollments(*, org_id, user_id)`; `quiz_attempts(*, user_id)`; `organizations(*)` | ✅ |
-| `send-invitation-email` | `profiles(is_platform_admin, id, entra_oid)`; `org_memberships(user_id, role, status)` | ✅ |
-| `azure-upload-url` / `azure-document-upload-url` | `profiles(is_platform_admin, id)` (resolved by the `endpoint()` factory's `getProfile` from the caller's Entra oid) | ✅ |
-| `azure-view-url` | `profiles(id, is_platform_admin)`; `lessons(module_id, video_storage_path, document_storage_path)`; `course_modules(id, course_id)`; `courses(id, is_published)`; `org_course_access(course_id, access, org_id)`; `org_memberships(org_id, user_id, status)` | ✅ |
-
-Identity resolution note: the current suite resolves the caller
-through the `endpoint()` factory's `getProfile` (Entra `oid`/`tid` →
-`profiles.id`), so `WHERE profiles.id = $1` / `om.user_id = $1` in the
-functions above receive a real `profiles.id`, not a raw Entra `oid`.
-The only functions that query by Entra id directly are the hand-rolled
-ones that resolve it (e.g. `user-context` on `entra_oid`/`entra_tid`).
-
-### Tables with no direct function consumer
-
-The frontend has no direct DB layer — every read/write goes through the
-Azure Functions (there is no `pg`/Supabase client in `src/`). As of this
-port every schema table has at least one function consumer **except**
-`ai_conversations`, `idea_categories`, `idea_evaluations`, and
-`idea_specifications`, which have no consumer in `functions/` or `src/`.
-
-> Those four tables exist in the generated `types.ts` but are **never
-> created by any Supabase migration** (Supabase project drift). They were
-> reconstructed here from `types.ts` so a `01-schema.sql` stood up from
-> the types is complete; nothing in the current app reads or writes them.
-
----
-
-## How to apply
-
-### Option A — `psql`
+## Applying it
 
 ```bash
-# Order matters: schema first, then seed.
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migration/azure/01-schema.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migration/azure/02-seed.sql
 ```
 
-`DATABASE_URL` should be the Azure Flexible Server connection string the
-functions already use, e.g.
+`DATABASE_URL` is the same Azure connection string the functions use —
 `postgres://USER:PASSWORD@SERVER.postgres.database.azure.com:5432/DBNAME?sslmode=require`.
 
-### Option B — Node runner (same `pg` client the functions use)
+Re-running `01`/`02` against a populated database fails on duplicate keys; drop and
+recreate for a clean re-apply. The additive migrations are idempotent and safe to re-run.
 
-```bash
-node -e '
-  const fs = require("fs");
-  const { Client } = require("pg");
-  (async () => {
-    const c = new Client({
-      connectionString: process.env.DATABASE_URL,
-      // Mirrors functions/shared/db.ts. For production, prefer verifying
-      // the Azure CA: ssl: { ca: fs.readFileSync("DigiCertGlobalRootCA.crt.pem") }
-      ssl: { rejectUnauthorized: false },
-    });
-    await c.connect();
-    for (const f of ["migration/azure/01-schema.sql", "migration/azure/02-seed.sql"]) {
-      console.log("Applying", f);
-      await c.query(fs.readFileSync(f, "utf8"));
-    }
-    await c.end();
-    console.log("Done.");
-  })().catch(e => { console.error(e); process.exit(1); });
-'
-```
+## Elevate yourself to platform admin
 
-Each file is a single transaction, so a failure rolls the whole file
-back. Re-running `01`/`02` on a populated DB will fail on duplicate keys —
-drop and recreate the schema (or a fresh database) for a clean re-apply.
-(The additive `0N-*.sql` migrations are idempotent and safe to re-run.)
-
----
-
-## Elevate your own profile to platform admin (after first Entra login)
-
-The seed admin/learner have `entra_oid = NULL`. When **you** log in via
-Entra for the first time, `functions/user-context` creates a *new*
-profile row for your identity with `is_platform_admin = false`. To
-promote yourself:
+The seeded admin and learner have `entra_oid = NULL`. Your first Entra login makes a
+*new* profile row with `is_platform_admin = false`, so promote it by hand:
 
 ```sql
--- Replace with your real email (what user-context stored), or use entra_oid.
 UPDATE public.profiles
 SET is_platform_admin = true
 WHERE email = 'you@yourcompany.com';
-
--- Alternatively, by Entra identity:
--- UPDATE public.profiles SET is_platform_admin = true
--- WHERE entra_oid = '<your-oid>' AND entra_tid = '<your-tid>';
 ```
 
-To also make yourself an org admin of the seeded Test Org:
+To also become an org admin of the seeded Test Org:
 
 ```sql
 INSERT INTO public.org_memberships (org_id, user_id, role, status)
@@ -226,53 +55,4 @@ FROM public.profiles WHERE email = 'you@yourcompany.com'
 ON CONFLICT (org_id, user_id) DO UPDATE SET role = 'org_admin', status = 'active';
 ```
 
----
-
-## Fixed seed UUIDs
-
-| Entity | UUID |
-|--------|------|
-| Organization (Test Org) | `11111111-1111-1111-1111-111111111111` |
-| Profile — admin (platform admin) | `22222222-2222-2222-2222-222222222222` |
-| Profile — learner | `33333333-3333-3333-3333-333333333333` |
-| Membership — admin (org_admin) | `a1111111-1111-1111-1111-111111111111` |
-| Membership — learner | `a2222222-2222-2222-2222-222222222222` |
-| Course (AI Fundamentals, published) | `44444444-4444-4444-4444-444444444444` |
-| Module — Getting Started | `51111111-1111-1111-1111-111111111111` |
-| Module — Assessment | `52222222-2222-2222-2222-222222222222` |
-| Lesson — Welcome Video (video, fake blob) | `61111111-1111-1111-1111-111111111111` |
-| Lesson — Course Handbook (document) | `62222222-2222-2222-2222-222222222222` |
-| Lesson — Key Concepts (text) | `63333333-3333-3333-3333-333333333333` |
-| Lesson — Knowledge Check (quiz) | `64444444-4444-4444-4444-444444444444` |
-| Quiz | `71111111-1111-1111-1111-111111111111` |
-| Question 1 / 2 / 3 | `81111111-…` / `82222222-…` / `83333333-…` |
-| Org course access | `a4444444-4444-4444-4444-444444444444` |
-| Enrollment (learner) | `e4444444-4444-4444-4444-444444444444` |
-| Quiz attempt (learner, 67%, failed) | `a7777777-7777-7777-7777-777777777777` |
-| Community post | `b1111111-1111-1111-1111-111111111111` |
-| Community comment | `b2222222-2222-2222-2222-222222222222` |
-| Idea | `d1111111-1111-1111-1111-111111111111` |
-| Idea vote / comment | `d2222222-…` / `d3333333-…` |
-| Community resource | `f1111111-1111-1111-1111-111111111111` |
-| Invitation (pending) | `c2222222-2222-2222-2222-222222222222` |
-| AI champion (learner) | `aac11111-1111-1111-1111-111111111111` |
-
----
-
-## Summary
-
-- **Tables:** 32 (`organizations, profiles, seat_requests, org_memberships,
-  invitations, courses, course_modules, lessons, quizzes, quiz_questions,
-  quiz_options, org_course_access, enrollments, lesson_progress,
-  quiz_attempts, assessment_attempts, course_reviews, platform_settings,
-  org_settings, community_categories, community_posts, community_comments,
-  community_reports, community_resources, ai_champions, idea_categories,
-  ideas, idea_votes, idea_comments, idea_evaluations, idea_specifications,
-  ai_conversations`).
-- **Enums:** 14 (incl. the fully-expanded `idea_status` and `seat_request_status`).
-- **Ported RPCs:** 3 (`can_user_access_lms_asset`, `user_can_access_quiz`,
-  `get_invitation_link_id`) — all auth.uid() → `p_user_id`.
-- **Kept trigger fn:** `set_updated_at` (11 triggers) + `hash_invitation_token`.
-- **Dropped:** all RLS/policies, all `auth.*`, all `storage.*`,
-  realtime/grants, ~15 auth-only RPCs, `handle_new_user`,
-  `quiz_options_public` view.
+Seed UUIDs are fixed and readable in `02-seed.sql` — the Test Org is the all-`1`s UUID above.

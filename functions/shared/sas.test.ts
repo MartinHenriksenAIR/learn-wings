@@ -2,21 +2,11 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { generateSasToken, generateContainerSasToken, buildBlobUrl, SAS_SIGNED_VERSION } from './sas';
 
-// Test account key (base64 of 32 zero bytes — not a real key)
 const TEST_KEY = Buffer.alloc(32).toString('base64');
 
-/**
- * The signature Azure would compute for `stringToSign`. Recomputing it here from
- * a LITERAL string-to-sign is the point of these tests: it pins the exact field
- * order, the empty-field count and the canonical resource. Anything that shifts a
- * newline changes `sig`, and a silent change to the blob-scoped form would break
- * every upload, read and delete in the system.
- */
 const sign = (stringToSign: string) =>
   createHmac('sha256', Buffer.from(TEST_KEY, 'base64')).update(stringToSign, 'utf8').digest('base64');
 
-// Frozen clock → deterministic st/se, so the whole string-to-sign can be literal.
-// start is now-5min (skew buffer), expiry is now+expiryMinutes.
 const FROZEN_NOW = new Date('2026-01-01T12:00:00.000Z');
 const FROZEN_START = '2026-01-01T11:55:00Z';
 const FROZEN_EXPIRY_120M = '2026-01-01T14:00:00Z';
@@ -164,8 +154,6 @@ describe('buildBlobUrl', () => {
   });
 
   it('leaves every name this system mints byte-identical', () => {
-    // `[prefix/]<uuid>.<ext>` needs no escaping, so no existing caller — upload,
-    // read, delete, head, branding, orphan sweep — changes behaviour.
     for (const name of [
       'a1b2c3d4-0000-4000-8000-abcdefabcdef.mp4',
       'avatars/a1b2c3d4-0000-4000-8000-abcdefabcdef.png',
@@ -177,17 +165,10 @@ describe('buildBlobUrl', () => {
     }
   });
 
-  // --- A crafted name must not be able to change the SHAPE of the request ---
-  //
-  // Without encoding, these steered the request at a different resource than the
-  // one named — and for `headBlob`/`deleteBlob` that means classifying one blob
-  // and acting on another. `?` in particular truncated the SAS query entirely,
-  // which is a deterministic route into `headBlob`'s fail-open branch.
 
   it('escapes a `?`, so the SAS query cannot be truncated', () => {
     const url = buildBlobUrl('acct', 'c', 'videos/x.mp4?', 'sig=x');
     expect(url).toBe('https://acct.blob.core.windows.net/c/videos/x.mp4%3F?sig=x');
-    // Exactly one `?` — the one that starts the query string we built.
     expect(url.split('?')).toHaveLength(2);
     expect(new URL(url).searchParams.get('sig')).toBe('x');
   });
@@ -200,7 +181,6 @@ describe('buildBlobUrl', () => {
   });
 
   it('escapes a `%`, so an escape in the name is not decoded by the service', () => {
-    // `%41` unescaped would reach storage as `A` and address a different blob.
     const url = buildBlobUrl('acct', 'c', '%41.mp4', 'sig=x');
     expect(url).toBe('https://acct.blob.core.windows.net/c/%2541.mp4?sig=x');
     expect(decodeURIComponent(new URL(url).pathname)).toBe('/c/%41.mp4');
@@ -222,9 +202,6 @@ describe('buildBlobUrl', () => {
   });
 
   it('signs the DECODED name while requesting the ENCODED one (the Azure contract)', () => {
-    // Not a drift bug — the Service SAS canonicalized resource is the decoded
-    // path (the same split `@azure/storage-blob` makes). Signing the escaped form
-    // instead would fail authentication for any name that needs escaping.
     freezeClock();
     const name = 'my file.png';
     const expected = [
@@ -240,14 +217,9 @@ describe('buildBlobUrl', () => {
   });
 
   it('does not throw on a lone surrogate', () => {
-    // `encodeURIComponent('\uD800')` raises URIError. `lms-asset.ts` passes a
-    // platform admin's blobPath straight through (the access check is
-    // short-circuited for them) and does not catch, so a throw here would turn a
-    // previously-harmless broken URL into a 500.
     expect(() => buildBlobUrl('acct', 'c', '\uD800.png', 'sig=x')).not.toThrow();
     const url = buildBlobUrl('acct', 'c', '\uD800.png', 'sig=x');
     expect(() => new URL(url)).not.toThrow();
-    // U+FFFD — a well-formed URL naming a blob that does not exist.
     expect(url).toContain('%EF%BF%BD.png');
   });
 });

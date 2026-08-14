@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, ExternalLink } from 'lucide-react';
+import { ArrowRight, Calendar, ExternalLink } from 'lucide-react';
 import { isFuture, isToday } from 'date-fns';
 import { formatDate } from '@/lib/date-locale';
 import { safeHref } from '@/lib/safe-href';
@@ -10,12 +11,14 @@ import type { CommunityPost } from '@/lib/community-types';
 interface UpcomingEventsProps {
   events: CommunityPost[];
   onEventClick?: (event: CommunityPost) => void;
+  viewAllTo?: string;
   className?: string;
 }
 
 export function UpcomingEvents({
   events,
   onEventClick,
+  viewAllTo,
   className,
 }: UpcomingEventsProps) {
   const { t, i18n } = useTranslation();
@@ -36,6 +39,15 @@ export function UpcomingEvents({
           <Calendar aria-hidden="true" className="h-[15px] w-[15px] text-primary" />
           {t('community.upcomingEvents')}
         </h3>
+        {viewAllTo && (
+          <Link
+            to={viewAllTo}
+            className="flex items-center gap-1 text-[12px] font-bold text-primary hover:opacity-80"
+          >
+            {t('community.viewAllEvents')}
+            <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+          </Link>
+        )}
       </div>
       <div className="flex flex-col gap-3">
         {upcomingEvents.map((event) => {

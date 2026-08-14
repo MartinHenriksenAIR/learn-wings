@@ -4,7 +4,7 @@ Single source of truth for all coding agents. `CLAUDE.md` imports this file — 
 
 ## Project shape
 - `src/` — React 18 + Vite SPA (TypeScript, shadcn/ui + Radix + Tailwind, TanStack Query v5, i18next en+da). Hosted on Azure Static Web Apps.
-- `functions/` — ~100 Azure Functions (v4 model, Node ~20, raw `pg`), one folder per endpoint plus `shared/` helpers. All authorization is enforced in code (no RLS).
+- `functions/` — Azure Functions (v4 model, Node ~20, raw `pg`), one folder per endpoint plus `shared/` helpers. All authorization is enforced in code (no RLS).
 - Database: Azure PostgreSQL 15 (Flexible Server). Canonical schema: `migration/azure/01-schema.sql`.
 - The app was migrated off Lovable/Supabase (completed June 2026); `supabase/` is kept only as authz-provenance reference.
 
@@ -18,14 +18,12 @@ Single source of truth for all coding agents. `CLAUDE.md` imports this file — 
 - Work on branches; open a draft PR early so what's in flight is visible.
 - Glance at open PRs before starting overlapping work; give a heads-up before big shared-contract changes (`functions/shared/*`, DB schema). Rebase work branches on trunk when it moves.
 - **Deploys: only from trunk, never from work branches** — merging to `main` deploys automatically (see Deploys). Announce on the merged PR.
-- **Bookkeeping:** merged PRs append a dated `migration/WORKLOG.md` entry (append-only) and update `migration/STATUS.html`'s checkpoint.
+- **Bookkeeping:** the PR is the record. Write what changed and why in the PR description — do not restate it in a file. If a merge changes the live checkpoint or an operational quirk, edit `migration/STATUS.html` in place.
 
 ## Preferred development workflow
-Default to **subagent-driven development** (`superpowers:subagent-driven-development` skill) for any task with more than a small surface — multi-file refactors, code-review fix sweeps, implementation plans with several discrete pieces, anything where the work decomposes into independent tasks with clear handoffs.
+Decompose anything with more than a small surface — multi-file refactors, review-fix sweeps, plans with several discrete pieces — into independent tasks and dispatch one subagent per task, sequentially within a workstream (parallel implementers on overlapping files conflict). Give each one the full task text and enough scene-setting to work without follow-ups, then review its output before moving on. The main session keeps its context for orchestration; each subagent gets a fresh window.
 
-The pattern: extract tasks → dispatch one implementer subagent per task with full task text and scene-setting context → spec-compliance review → code-quality review → mark complete → next task. Sequential within a workstream (parallel implementers on overlapping files conflict). The controller (main session) preserves its own context for orchestration; each subagent gets a fresh, focused window.
-
-For genuinely tiny single-edit changes, do them inline; the skill itself signals when it doesn't apply.
+For genuinely tiny single-edit changes, do them inline.
 
 ## Verification gates (all must exit 0 before a PR)
 - Root: `npm run lint` · `npm test` · `npx tsc --noEmit -p tsconfig.app.json` · `npx tsc --noEmit -p tsconfig.node.json` (the tooling tree: `vite.config.ts`, `playwright.config.ts`, `e2e/`) · `npm run build`
@@ -39,11 +37,16 @@ For genuinely tiny single-edit changes, do them inline; the skill itself signals
 - `docs/adr/` holds the architecture decision records — they define what is and isn't allowed; read them before structural changes. Plain markdown, edited by hand (the adr-kit tooling was removed 2026-06-06).
 
 ## Documentation policy
-- Docs describing current state must stay true or be deleted — git history is the archive; never leave "outdated, see X" markers.
-- Plans, handovers, and working notes are ephemeral: delete them once consumed.
-- ADRs are append-only — supersede with a new ADR, never edit or delete one.
+**Default to writing nothing.** Every doc is a claim that has to be re-verified forever, and this repo has already had to delete a corpus that rotted faster than anyone read it. A doc earns its place only by holding something you cannot get from the code, `git log`, or the GitHub board.
+
+- **Never restate history.** `git log` and PR descriptions are the archive. No changelogs, no worklogs, no "what shipped" lists in files.
+- **Never restate what code already says.** No file inventories, no per-endpoint tables, no counts of things (`~100 functions`, `15 ADRs`) — they are wrong within a month. Describe the convention and let `ls` be the list.
+- **Never mirror the issue board.** Open issues, known gaps, and TODOs live in GitHub. A "known gaps" list in a doc is stale the day an issue closes.
+- Docs describing current state must stay true or be deleted — never leave "outdated, see X" markers.
+- Plans, specs, handovers, and working notes are ephemeral: delete them once consumed, in the PR that consumes them.
 - Docs change in the same PR as the code they describe.
-- `migration/STATUS.html` stays bounded (a checkpoint, edited in place); `migration/WORKLOG.md` stays append-only.
+- ADRs are append-only — supersede with a new ADR, never edit or delete one.
+- `migration/STATUS.html` is present-tense only: the checkpoint plus operational knowledge that lives nowhere else. Edit it in place, delete what stops being true, and never let it accumulate into a log.
 
 ## Deploys
 - Merging to `main` deploys automatically: the SWA workflow ships the frontend (and builds a preview environment per PR), the functions workflow ships the backend. Never deploy from work branches; announce the deploy on the merged PR (`deploying trunk @<sha>` → `deployed, smoke ok`).

@@ -149,7 +149,6 @@ describe('community-posts', () => {
     expect(res.status).toBe(200);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('&&');
-    // tags is passed as a JS array directly; find it in params
     const tagsParam = params.find((p) => Array.isArray(p) && (p as string[]).includes('tag1'));
     expect(tagsParam).toEqual(['tag1', 'tag2']);
   });
@@ -185,15 +184,11 @@ describe('community-posts', () => {
     expect(res.status).toBe(200);
     const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
 
-    // Full params array in builder order:
-    // $1=scope, $2=orgId, $3=categoryId, $4=search, $5=tags, $6=includeHidden
     expect(params).toEqual(['org', 'org-1', 'cat-1', 'foo', ['a', 'b'], true]);
 
     expect(sql).toContain('ILIKE');
     expect(sql).toContain('&&');
 
-    // The comment_count subquery's cc.is_hidden = false will still be present;
-    // only the post-level filter must be absent.
     expect(sql).not.toContain('p.is_hidden = false');
   });
 
@@ -205,8 +200,6 @@ describe('community-posts', () => {
     expect(JSON.parse(res.body as string)).toEqual({ error: 'Internal server error' });
   });
 
-  // #180 — the author payload must carry avatar_url so the community feed can render
-  // profile photos: the joined `profile` object includes avatar_url (no extra query / N+1).
   it('joins avatar_url into the author profile payload', async () => {
     const rows = [{ id: 'post-1', title: 'Hello', profile: { id: 'a1', full_name: 'Ann', avatar_url: 'avatars/a1.png' } }];
     mockQuery.mockResolvedValueOnce(rows);

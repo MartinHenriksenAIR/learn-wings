@@ -28,11 +28,6 @@ const makeReq = (body: object) => ({
 
 const makeCtx = () => ({ log: vi.fn(), error: vi.fn(), warn: vi.fn() });
 
-// The body the frontend sends today. `orgName`, `role` and `email` are present
-// but the server MUST ignore them (#306): it derives org, role and recipient
-// from the authoritative invitation row identified by the link_id embedded in
-// `inviteLink`. The `role: 'platform_admin'` here is a deliberately hostile
-// client value that must never influence the email.
 const clientBody = {
   email: 'attacker-controlled@example.com',
   orgName: 'Client-Supplied Org',
@@ -40,13 +35,9 @@ const clientBody = {
   inviteLink: 'https://ai-uddannelse.dk/signup?invite=link-abc',
 };
 
-// Callers as resolved by getProfile.
 const orgAdmin = { id: 'prof-1', is_platform_admin: false };
 const platformAdmin = { id: 'prof-2', is_platform_admin: true };
 
-// Invitation rows as returned by the combined lookup+authz query. `role` is the
-// org_role enum ('org_admin' | 'learner'); platform-admin invites carry org_id
-// NULL and is_platform_admin_invite = true.
 const orgInvitation = {
   org_id: 'org-1',
   role: 'learner',
@@ -70,7 +61,6 @@ describe('send-invitation-email', () => {
     delete process.env.ALLOWED_ORIGINS;
   });
 
-  // ---- Authorization (#306) ------------------------------------------------
 
   it('returns 403 when the caller has no profile', async () => {
     mockGetProfile.mockResolvedValueOnce(null);
@@ -83,7 +73,6 @@ describe('send-invitation-email', () => {
 
   it('returns 403 (sending nothing) for an org admin of a DIFFERENT org than the invite', async () => {
     mockGetProfile.mockResolvedValueOnce(orgAdmin);
-    // The invite is for org-1, but this caller is not an admin of org-1.
     mockQueryOne.mockResolvedValueOnce({ ...orgInvitation, caller_is_org_admin: false });
 
     const res = await handler(makeReq(clientBody) as any, makeCtx() as any);
@@ -114,7 +103,6 @@ describe('send-invitation-email', () => {
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
     expect(mockEmailSend).toHaveBeenCalledOnce();
-    // Recipient is the invitation's email from the DB, NOT the client's `email`.
     expect(mockEmailSend.mock.calls[0][0].to).toEqual(['invitee@example.com']);
   });
 
@@ -154,7 +142,6 @@ describe('send-invitation-email', () => {
     expect(sent.html).not.toContain('undefined');
   });
 
-  // ---- No trust in client-supplied org/role (#306 + #307) ------------------
 
   it('renders the invitation’s org name from the DB, ignoring the client-supplied orgName', async () => {
     mockGetProfile.mockResolvedValueOnce(orgAdmin);
@@ -170,9 +157,6 @@ describe('send-invitation-email', () => {
     expect(sent.html).not.toContain('Client-Supplied Org');
   });
 
-  // #307: a hostile client role of 'platform_admin' must be ignored; the email
-  // reflects the invitation's real role (learner) and stays an org invite. There
-  // is no silent fallback because role now comes from the org_role enum column.
   it('ignores the client-supplied role and renders the invitation’s real role', async () => {
     mockGetProfile.mockResolvedValueOnce(orgAdmin);
     mockQueryOne.mockResolvedValueOnce(orgInvitation); // role: 'learner'
@@ -182,7 +166,6 @@ describe('send-invitation-email', () => {
     await handler(makeReq(clientBody) as any, makeCtx() as any);
 
     const sent = mockEmailSend.mock.calls[0][0];
-    // Danish default: learner label is "Kursist"; platform-admin text must be absent.
     expect(sent.subject).not.toContain('Platform Administrator');
     expect(sent.html).not.toContain('Platform Administrator');
     expect(sent.html).toContain('Kursist');
@@ -199,7 +182,6 @@ describe('send-invitation-email', () => {
     expect(mockEmailSend.mock.calls[0][0].html).toContain('Administrator');
   });
 
-  // ---- Invite-link validation ----------------------------------------------
 
   it('returns 400 when inviteLink is missing', async () => {
     mockGetProfile.mockResolvedValueOnce(platformAdmin);
@@ -237,9 +219,6 @@ describe('send-invitation-email', () => {
     expect(mockEmailSend).not.toHaveBeenCalled();
   });
 
-  // Regression (2026-07-22): until the #115 domain cutover the app runs on the
-  // SWA host and mints invite links on that origin — the hardcoded
-  // ai-uddannelse.dk-only allowlist 400'd every invite email in prod.
   it('accepts invite links on any ALLOWED_ORIGINS host', async () => {
     process.env.ALLOWED_ORIGINS = 'https://black-forest-0d7f96c03.7.azurestaticapps.net';
     mockGetProfile.mockResolvedValueOnce(platformAdmin);
@@ -272,7 +251,6 @@ describe('send-invitation-email', () => {
     expect(mockEmailSend).not.toHaveBeenCalled();
   });
 
-  // ---- Language resolution (#231) ------------------------------------------
 
   it("uses the existing recipient's preferred_language over the inviter's pick", async () => {
     mockGetProfile.mockResolvedValueOnce(orgAdmin);
@@ -307,7 +285,6 @@ describe('send-invitation-email', () => {
     mockQueryOne.mockResolvedValueOnce(undefined);
     mockEmailSend.mockResolvedValueOnce({ id: 'email-id-10' });
 
-    // clientBody carries no inviterLanguage.
     const res = await handler(makeReq(clientBody) as any, makeCtx() as any);
 
     expect(res.status).toBe(200);
@@ -327,10 +304,7 @@ describe('send-invitation-email', () => {
     expect(mockEmailSend).toHaveBeenCalledOnce();
   });
 
-  // ---- Delivery reporting (#200) -------------------------------------------
 
-  // The SDK resolves `{ data: null, error }` for every non-2xx (bad key,
-  // unverified domain, quota) rather than rejecting.
   it('reports a Resend-rejected send as a failure instead of success', async () => {
     mockGetProfile.mockResolvedValueOnce(orgAdmin);
     mockQueryOne.mockResolvedValueOnce(orgInvitation);
@@ -362,10 +336,7 @@ describe('send-invitation-email', () => {
     expect(ctx.error).toHaveBeenCalled();
   });
 
-  // ---- Injection hardening (#195) ------------------------------------------
 
-  // Org names are admin-supplied; a malicious one must not plant markup in a
-  // mail sent from the trusted no-reply address.
   it('escapes the org name (from the DB) before it reaches the email body', async () => {
     mockGetProfile.mockResolvedValueOnce(orgAdmin);
     mockQueryOne.mockResolvedValueOnce({ ...orgInvitation, org_name: '<script>alert(1)</script>Evil' });
@@ -379,8 +350,6 @@ describe('send-invitation-email', () => {
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;Evil');
   });
 
-  // Only the hostname is validated, so the link's path/query arrive verbatim — a
-  // quote would otherwise break out of the href attribute.
   it('escapes the invite link so it cannot break out of the href attribute', async () => {
     mockGetProfile.mockResolvedValueOnce(orgAdmin);
     mockQueryOne.mockResolvedValueOnce(orgInvitation);
@@ -400,8 +369,6 @@ describe('send-invitation-email', () => {
     expect(html).toContain('&quot;&gt;&lt;img');
   });
 
-  // Subjects are plain text (not HTML-escaped) but a CR/LF would let an org name
-  // inject extra mail headers.
   it('keeps the subject plain text and strips CR/LF from it', async () => {
     mockGetProfile.mockResolvedValueOnce(orgAdmin);
     mockQueryOne.mockResolvedValueOnce({ ...orgInvitation, org_name: 'Acme & Co\r\nBcc: attacker@evil.com' });

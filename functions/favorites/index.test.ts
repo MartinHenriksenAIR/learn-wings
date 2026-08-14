@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQuery, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockGetProfile, mockIsActiveMember } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   return {
     mockAuthenticate: vi.fn(), MockAuthError,
-    mockQuery: vi.fn(),
+    mockQuery: vi.fn(), mockQueryOne: vi.fn(),
     mockGetProfile: vi.fn(), mockIsActiveMember: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
-vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: mockQuery, queryOne: vi.fn() }));
+vi.mock('../shared/db', async (importOriginal) => ({ ...(await importOriginal<typeof import('../shared/db')>()), query: mockQuery, queryOne: mockQueryOne }));
 vi.mock('../shared/profile', () => ({ getProfile: mockGetProfile, isActiveMember: mockIsActiveMember, isOrgAdmin: vi.fn(), isOrgAdminOfAny: vi.fn() }));
 
 import handler from './index';
@@ -28,6 +28,7 @@ describe('favorites', () => {
     mockAuthenticate.mockResolvedValue({ id: 'oid-1', tid: 'tid-1', email: 'u@x.com' });
     mockGetProfile.mockResolvedValue({ id: 'p1', is_platform_admin: false });
     mockIsActiveMember.mockResolvedValue(true);
+    mockQueryOne.mockResolvedValue({ kind: 'standard', language: 'da' });
   });
 
   it('handles OPTIONS preflight', async () => {
@@ -72,10 +73,10 @@ describe('favorites', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it('happy path: returns the org-visible favorited courses', async () => {
+  it('happy path: returns the org-visible favorited courses with per-org completion', async () => {
     const courses = [
-      { id: 'c1', title: 'Alpha', description: null, level: 'beginner', language: 'da', is_published: true, thumbnail_url: null, created_by_user_id: 'admin-1', created_at: '2026-08-01T00:00:00.000Z' },
-      { id: 'c2', title: 'Beta', description: null, level: 'beginner', language: 'da', is_published: true, thumbnail_url: null, created_by_user_id: 'admin-1', created_at: '2026-08-02T00:00:00.000Z' },
+      { id: 'c1', title: 'Alpha', description: null, level: 'beginner', language: 'da', is_published: true, thumbnail_url: null, created_by_user_id: 'admin-1', created_at: '2026-08-01T00:00:00.000Z', completed: true },
+      { id: 'c2', title: 'Beta', description: null, level: 'beginner', language: 'da', is_published: true, thumbnail_url: null, created_by_user_id: 'admin-1', created_at: '2026-08-02T00:00:00.000Z', completed: false },
     ];
     mockQuery.mockResolvedValueOnce(courses);
 
@@ -89,10 +90,21 @@ describe('favorites', () => {
     expect(sql).toContain('JOIN courses c ON c.id = f.course_id');
     expect(sql).toContain('f.user_id = $1');
     expect(sql).toContain('ORDER BY f.created_at DESC');
-    // Reuses the shared visibility predicate against orgParam=$2.
+    expect(sql).toContain('LEFT JOIN enrollments e');
+    expect(sql).toContain('e.org_id = $3');
+    expect(sql).toContain("COALESCE(e.status = 'completed', false) AS completed");
     expect(sql).toContain("oca.org_id = $2");
     expect(sql).toContain('c.is_published = TRUE');
-    expect(params).toEqual(['p1', 'org-1']);
+    expect(params).toEqual(['p1', 'org-1', 'org-1']);
+  });
+
+  it('normalizes a NULL completed (no enrollment row) to false', async () => {
+    mockQuery.mockResolvedValueOnce([
+      { id: 'c1', title: 'Alpha', description: null, level: 'beginner', language: 'da', is_published: true, thumbnail_url: null, created_by_user_id: 'admin-1', created_at: '2026-08-01T00:00:00.000Z', completed: null },
+    ]);
+    const res = await handler(baseReq(validBody), {} as any);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string).courses[0].completed).toBe(false);
   });
 
   it('happy path (empty): returns { courses: [] }', async () => {
@@ -100,5 +112,24 @@ describe('favorites', () => {
     const res = await handler(baseReq(validBody), {} as any);
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body as string)).toEqual({ courses: [] });
+  });
+
+  it('individual org: filters favorites by published + saved language, bypassing org_course_access (#354)', async () => {
+    mockQueryOne.mockResolvedValueOnce({ kind: 'individual', language: 'en' });
+    const courses = [
+      { id: 'c1', title: 'Alpha', description: null, level: 'beginner', language: 'en', is_published: true, thumbnail_url: null, created_by_user_id: 'admin-1', created_at: '2026-08-01T00:00:00.000Z', completed: false },
+    ];
+    mockQuery.mockResolvedValueOnce(courses);
+
+    const res = await handler(baseReq({ orgId: 'ind-354' }), {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string)).toEqual({ courses });
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toContain('org_course_access');
+    expect(sql).toContain('c.is_published = TRUE');
+    expect(sql).toContain('c.language = $2');
+    expect(params).toEqual(['p1', 'en', 'ind-354']);
   });
 });

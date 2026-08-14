@@ -1,27 +1,9 @@
-/**
- * Single owner for every TanStack Query key shape in the frontend.
- *
- * TkDodo-style hierarchical factory: each family exposes an `all` constant
- * (a tuple used as the invalidation prefix) and typed factory methods for the
- * parameterized forms. Invalidation still works because TanStack Query matches
- * by prefix — invalidating `['ideas']` hits `['ideas', orgId, tab, ...]`.
- *
- * Keys must stay byte-for-byte identical to the literals they replace; do NOT
- * change string literals or parameter order here without updating every call
- * site and the test file in the same commit.
- *
- * Adding a family: give it an `all` prefix constant ONLY if something
- * invalidates it by prefix — a detail-only family with an unused `all` is
- * dead surface. Match each method's parameter nullability to what its call
- * site actually passes (e.g. `string | undefined` for `currentOrg?.id`).
- */
 export const queryKeys = {
   organizations: {
     all: ['organizations'] as const,
   },
 
   brandingAsset: {
-    /** One signed-URL cache entry per stored path. */
     signed: (blobPath: string) => ['branding-asset', blobPath] as const,
   },
 
@@ -114,10 +96,6 @@ export const queryKeys = {
 
   platformReports: {
     all: ['platform-reports'] as const,
-    /**
-     * scope is 'all' | 'global' | <orgId>; different scopes must not share a
-     * cache entry because the server-side auth path differs per scope.
-     */
     list: (scope: string, activeTab: string) =>
       ['platform-reports', scope, activeTab] as const,
   },
@@ -127,46 +105,28 @@ export const queryKeys = {
   },
 
   profiles: {
-    /**
-     * The platform-admin grant/revoke mutations invalidate this by prefix so the
-     * derived current-admins and grant-candidate lists both refresh (#198). Kept
-     * as `all` for shape-consistency with the other list families.
-     */
     all: ['profiles'] as const,
   },
 
   orgMemberships: {
-    /**
-     * No `all` prefix — nothing invalidates by prefix (each mutation targets a
-     * specific orgId and can invalidate the exact key).
-     */
     list: (orgId: string | undefined) => ['org-memberships', orgId] as const,
   },
 
   invitations: {
-    /**
-     * scope: 'platform' (OrganizationDetail) | 'org' (OrgMembersTab). The scope
-     * encodes the server-side auth path, so different scopes must not share a cache
-     * entry. No `all` prefix — mutations invalidate the exact (orgId, scope) pair.
-     */
     list: (orgId: string | undefined, scope: string) =>
       ['invitations', orgId, scope] as const,
   },
 
   orgDetail: {
-    /**
-     * Separate from `organizations.all` because the request body differs (passes
-     * `{ orgId }` to `/api/organizations` for a single-org fetch).
-     */
     detail: (orgId: string | undefined) => ['org-detail', orgId] as const,
   },
 
   platformSettings: {
-    /**
-     * No mutation currently invalidates this — saves write partial updates
-     * client-side and rely on local form state. Kept as `all` for shape-consistency.
-     */
     all: ['platform-settings'] as const,
+  },
+
+  orgSettings: {
+    detail: (orgId: string | undefined) => ['org-settings', orgId] as const,
   },
 
   orgAnalyticsData: {
@@ -174,10 +134,6 @@ export const queryKeys = {
   },
 
   orgCourseProgress: {
-    /**
-     * adminLang is in the key because the representative edition's title/level shown
-     * per group depends on the admin's app language (#213).
-     */
     detail: (orgId: string | undefined, adminLang: string | undefined) =>
       ['org-course-progress', orgId, adminLang] as const,
   },
@@ -188,10 +144,6 @@ export const queryKeys = {
   },
 
   orgCourseOrgBreakdown: {
-    /**
-     * Keyed by courseId only — the endpoint is platform-admin, cross-org by
-     * construction (#163).
-     */
     detail: (courseId: string | undefined) =>
       ['org-course-org-breakdown', courseId] as const,
   },
@@ -202,7 +154,6 @@ export const queryKeys = {
   },
 
   coursesAdmin: {
-    /** The admin course list + access matrix (one query, no params). */
     all: ['courses-admin'] as const,
   },
 
@@ -223,8 +174,12 @@ export const queryKeys = {
   },
 
   learnerCourses: {
-    /** Exposed as `list` because enroll/unenroll mutations invalidate by this key. */
     list: (orgId: string | undefined) => ['learner-courses', orgId] as const,
+  },
+
+  learnerCourseDetail: {
+    detail: (orgId: string | undefined, courseId: string | undefined) =>
+      ['learner-course-detail', orgId, courseId] as const,
   },
 
   learnerDashboard: {
@@ -236,27 +191,22 @@ export const queryKeys = {
   },
 
   learnerAssignments: {
-    /** The learner's own assigned/mandatory courses for an org (#365). */
     list: (orgId: string | undefined) => ['learner-assignments', orgId] as const,
   },
 
   assignments: {
-    /** The admin management list of an org's course assignments (#365). */
     list: (orgId: string | undefined) => ['assignments', orgId] as const,
   },
 
   orgCourseAccess: {
-    /** An org's published + enabled catalogue, for the assign picker (#365). */
     list: (orgId: string | undefined) => ['org-course-access', orgId] as const,
   },
 
   favorites: {
-    /** Exposed as `list` because the toggle mutation invalidates by this key. */
     list: (orgId: string | undefined) => ['favorites', orgId] as const,
   },
 
   assessment: {
-    /** No params; fixed content with a long staleTime. */
     questions: ['assessment-questions'] as const,
   },
 

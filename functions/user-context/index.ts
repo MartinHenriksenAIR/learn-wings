@@ -1,32 +1,17 @@
-// Hand-rolled (not shared/endpoint.ts): provisions the profile on first login (the factory 401s when getProfile misses) and serves GET as well as POST.
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { query, queryOne, withTransaction } from '../shared/db';
 import { convertInvitation } from '../shared/invitation-convert';
 import type { ConvertibleInvitation, ConvertResult } from '../shared/invitation-convert';
-import { seedTenantBinding, autoJoinByTenant } from '../shared/tenant-binding';
+import { seedTenantBinding, autoJoinByTenant, individualTierEnabled } from '../shared/tenant-binding';
+import { INDIVIDUAL_ORG_KIND } from '../shared/individual-tier';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 
-// The scalar subquery for assessment_taken_at cannot be expressed in a RETURNING clause,
-// so both branches use a full SELECT to guarantee an identical response shape.
 const PROFILE_SELECT = `id, full_name, first_name, last_name, department, email, avatar_url, is_platform_admin, preferred_language, created_at,
               assessment_level, assessment_skipped_at,
               (SELECT max(aa.created_at) FROM assessment_attempts aa WHERE aa.user_id = profiles.id) AS assessment_taken_at`;
 
-/**
- * Auto-adopt any pending organization invitations addressed to the caller's
- * Entra email, at login (#176). Runs on EVERY user-context call — not just
- * first-provision — so an invite created AFTER a user self-signed-up is still
- * honored on their next login (the common "won't click the link" case).
- *
- * Best-effort: adoption must never break login. Any failure is logged and
- * swallowed; because it runs every login, the next one retries. Scope is
- * deliberately ORG invites only — platform-admin invites (org_id NULL) stay
- * gated behind the explicit accept-link flow (#175), since this path
- * authenticates on email match alone (no secret link). Seat-neutral by
- * construction — see functions/shared/invitation-convert.ts.
- */
 const PENDING_ORG_INVITE_FILTER =
   `status = 'pending' AND org_id IS NOT NULL AND expires_at > now() AND lower(trim(email)) = $1`;
 
@@ -35,10 +20,6 @@ async function adoptPendingInvites(profileId: string, rawEmail: string, tid: str
   if (!email) return; // never match a blank/absent email claim against invitations
 
   try {
-    // Cheap, non-transactional pre-check first: the overwhelmingly common case
-    // is "no pending invite", and we don't want to check out a connection and
-    // run BEGIN/COMMIT on every login just to find nothing. Only open the
-    // locking transaction when there is actually something to adopt.
     const pending = await query<{ id: string }>(
       `SELECT id FROM invitations WHERE ${PENDING_ORG_INVITE_FILTER} LIMIT 1`,
       [email],
@@ -47,9 +28,6 @@ async function adoptPendingInvites(profileId: string, rawEmail: string, tid: str
 
     const converted: ConvertResult[] = [];
     await withTransaction(async (client) => {
-      // Re-select under FOR UPDATE inside the transaction so the conversion
-      // locks each invite against a concurrent accept-link flow and sees fresh
-      // state (an invite may have been accepted between the pre-check and here).
       const { rows } = await client.query<ConvertibleInvitation>(
         `SELECT id, org_id, role FROM invitations WHERE ${PENDING_ORG_INVITE_FILTER} FOR UPDATE`,
         [email],
@@ -59,10 +37,6 @@ async function adoptPendingInvites(profileId: string, rawEmail: string, tid: str
       }
     });
 
-    // #353: auto-seed the org↔tenant binding from the first org_admin to adopt
-    // an invite. Runs AFTER the conversion commits and on its own connection
-    // (see seedTenantBinding), so a binding collision can never roll back the
-    // membership. Uses the caller's VERIFIED token tid — this login IS that admin.
     for (const result of converted) {
       if (result.kind === 'org' && result.role === 'org_admin') {
         await seedTenantBinding(result.orgId, tid, rawEmail, context);
@@ -75,17 +49,37 @@ async function adoptPendingInvites(profileId: string, rawEmail: string, tid: str
 
 const SUPPORTED_LANGUAGES = ['da', 'en'] as const;
 
-/**
- * Resolve the language to stamp on a first-login profile (#226). The client
- * sends its browser-derived UI language on the user-context call; validate it
- * against the supported set and default to English for a missing/unknown value.
- * English is the platform's last-resort language (see src/i18n fallbackLng),
- * so a non-da/en browser correctly lands on English content and emails.
- */
 function resolveProvisioningLanguage(raw: unknown): string {
   return typeof raw === 'string' && (SUPPORTED_LANGUAGES as readonly string[]).includes(raw)
     ? raw
     : 'en';
+}
+
+async function ensureIndividualMembership(profileId: string, context: InvocationContext): Promise<void> {
+  try {
+    if (!(await individualTierEnabled())) return;
+
+    const active = await query(
+      `SELECT 1 FROM org_memberships WHERE user_id = $1 AND status = 'active' LIMIT 1`,
+      [profileId],
+    );
+    if (active.length > 0) return; // already belongs somewhere — leave untouched
+
+    const placeholder = await queryOne<{ id: string }>(
+      `SELECT id FROM organizations WHERE kind = $1 LIMIT 1`,
+      [INDIVIDUAL_ORG_KIND],
+    );
+    if (!placeholder) return; // not seeded yet — graceful fallback
+
+    await query(
+      `INSERT INTO org_memberships (org_id, user_id, role, status)
+       VALUES ($1, $2, 'learner', 'active')
+       ON CONFLICT (org_id, user_id) DO NOTHING`,
+      [placeholder.id, profileId],
+    );
+  } catch (err) {
+    context.error('user-context: individual-tier auto-join failed', err);
+  }
 }
 
 async function handler(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -102,16 +96,11 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     );
 
     if (!profile) {
-      // #226: stamp the caller's browser-derived language onto the new profile so
-      // it drives server-generated documents (e.g. #193 seat-request emails) from
-      // the first login. Best-effort parse — a bodyless call (e.g. a GET probe)
-      // falls through to the English default.
       let requestedLanguage = 'en';
       try {
         const body = (await req.json()) as { language?: unknown } | null;
         requestedLanguage = resolveProvisioningLanguage(body?.language);
       } catch {
-        // no/invalid JSON body — keep the English default
       }
 
       const inserted = await queryOne<{ id: string }>(
@@ -127,17 +116,11 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       );
     }
 
-    // #176: adopt pending org invites BEFORE loading memberships, so a freshly
-    // adopted org shows up in this same response (no client refresh needed).
-    // Adoption also seeds an org's tenant binding when it converts an org_admin
-    // invite (#353).
     await adoptPendingInvites(profile!.id, user.email, user.tid, context);
 
-    // #353: invite-less SSO onboarding — if the caller's verified tenant is
-    // bound to an org (self-reg on + free seat), join them as a learner. Runs
-    // AFTER adoption so a first-admin login (who just got an org_admin
-    // membership above) is skipped as an existing member, never double-joined.
     await autoJoinByTenant(profile!.id, user.tid, context);
+
+    await ensureIndividualMembership(profile!.id, context);
 
     const memberships = await query(
       `SELECT om.*, row_to_json(o.*) AS organization
@@ -147,10 +130,6 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [profile!.id]
     );
 
-    // #353: row_to_json(o.*) serializes the WHOLE org row, including the SSO
-    // tenant binding — platform-admin config that has no place in a per-member
-    // login payload. Strip it so the "platform-admin-only" invariant holds here
-    // too (the organizations endpoint strips it the same way).
     for (const m of memberships) {
       const org = (m as { organization?: Record<string, unknown> | null }).organization;
       if (org) {

@@ -14,10 +14,8 @@ export default endpoint('idea-comments', async ({ req, profile, reply }) => {
 
   const idea = await loadIdea(ideaId);
 
-  // Missing idea → RLS parity: return empty (not 404)
   if (!idea) return reply(200, { comments: [] });
 
-  // Draft privacy (shared/ideas): other-author's draft is invisible (no admin bypass)
   if (!isIdeaVisibleTo(idea, profile)) {
     return reply(200, { comments: [] });
   }

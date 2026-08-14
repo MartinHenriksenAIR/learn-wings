@@ -30,7 +30,6 @@ export default endpoint('course-review', async ({ req, profile, reply, requireAc
 
   await requireActiveMember(orgId);
 
-  // identity always from token — never client-supplied
   const review = await queryOne(
     `INSERT INTO course_reviews (org_id, user_id, course_id, rating, comment)
 VALUES ($1, $2, $3, $4, $5)

@@ -5,11 +5,6 @@ interface PageSpinnerProps {
   className?: string;
 }
 
-/**
- * The standard full-page loading block rendered inside an `AppLayout` while a
- * page's data (or auth context) resolves. Extracted from the block that was
- * copy-pasted across 10+ pages (#87).
- */
 export function PageSpinner({ className }: PageSpinnerProps) {
   return (
     <div className={cn('flex h-64 items-center justify-center', className)}>

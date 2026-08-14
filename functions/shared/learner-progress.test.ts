@@ -25,9 +25,7 @@ describe('getLearnerProgress', () => {
                   is_published: true, thumbnail_url: null, created_by_user_id: 'p2', created_at: '2024-01-02' },
       },
     ];
-    // totals: only c1 has lessons, c2 has none
     const totalsRows = [{ course_id: 'c1', total: 5 }];
-    // completed: only c1 has progress, c2 has none
     const completedRows = [{ course_id: 'c1', completed: 3 }];
 
     mockQuery
@@ -38,7 +36,6 @@ describe('getLearnerProgress', () => {
     const result = await getLearnerProgress('p1', 'org-1');
 
     expect(result.enrollments).toEqual(enrollmentRows);
-    // Zero-fill proven: c2 has 0/0
     expect(result.progress).toEqual({
       c1: { total: 5, completed: 3 },
       c2: { total: 0, completed: 0 },

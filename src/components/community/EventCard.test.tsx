@@ -4,8 +4,6 @@ import { MemoryRouter, Routes, Route, useParams } from 'react-router-dom';
 import { EventCard } from './EventCard';
 import type { CommunityPost } from '@/lib/community-types';
 
-// t returns the key, but interpolates `name` so the host line carries the real
-// author name (language is 'en' so the real formatDate stays English).
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: { name?: string }) => (opts?.name ? `${key}:${opts.name}` : key),
@@ -13,7 +11,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// A local-time date (no trailing Z) keeps the rendered month/day timezone-stable.
 const event = {
   id: 'e1',
   scope: 'global',
@@ -35,8 +32,6 @@ const event = {
   profile: { id: 'author-1', full_name: 'Ada Lovelace' } as CommunityPost['profile'],
 } as CommunityPost;
 
-// Probe that surfaces the detail route's params, so a card click can be asserted
-// to have navigated to the right post — routed by the event's own scope.
 function DetailProbe() {
   const { scope, postId } = useParams();
   return <div>detail:{scope}:{postId}</div>;
@@ -79,12 +74,9 @@ describe('EventCard (#125)', () => {
       ...event,
       event_registration_url: 'javascript:alert(document.cookie)',
     } as CommunityPost);
-    // An <a> with no href isn't exposed with the "link" role, so query the DOM
-    // directly: the Join anchor still renders but carries no (dangerous) href.
     const anchor = container.querySelector('a');
     expect(anchor).not.toBeNull();
     expect(anchor).not.toHaveAttribute('href');
-    // getByRole('link') finds nothing precisely because the href was stripped.
     expect(screen.queryByRole('link')).toBeNull();
   });
 
@@ -98,7 +90,6 @@ describe('EventCard (#125)', () => {
     renderCard();
     fireEvent.click(screen.getByRole('link', { name: 'community.join' }));
     expect(screen.queryByText(/^detail:/)).not.toBeInTheDocument();
-    // Still on the events route — the card is present.
     expect(screen.getByText('Prompt Engineering Workshop')).toBeInTheDocument();
   });
 });

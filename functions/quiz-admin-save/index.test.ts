@@ -309,7 +309,6 @@ describe('quiz-admin-save', () => {
       quiz: { id: 'quiz-1', lesson_id: 'lesson-1', passing_score: 70 },
     });
 
-    // Call 0: upsert — must use ON CONFLICT (lesson_id)
     const [upsertSql, upsertParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
     expect(upsertSql).toContain('ON CONFLICT');
     expect(upsertSql).toContain('lesson_id');
@@ -317,12 +316,10 @@ describe('quiz-admin-save', () => {
     expect(upsertParams[0]).toBe('lesson-1');
     expect(upsertParams[1]).toBe(70);
 
-    // Call 1: DELETE questions using upserted quiz id
     const [deleteSql, deleteParams] = mockClientQuery.mock.calls[1] as [string, unknown[]];
     expect(deleteSql).toContain('DELETE FROM quiz_questions');
     expect(deleteParams[0]).toBe('quiz-1');
 
-    // Call 2: INSERT question in array order with RETURNING id
     const [qInsertSql, qInsertParams] = mockClientQuery.mock.calls[2] as [string, unknown[]];
     expect(qInsertSql).toContain('INSERT INTO quiz_questions');
     expect(qInsertSql).toContain('RETURNING id');
@@ -330,7 +327,6 @@ describe('quiz-admin-save', () => {
     expect(qInsertParams[1]).toBe('What is 2+2?');
     expect(qInsertParams[2]).toBe(0); // sortOrder
 
-    // Call 3: INSERT options; sort_order = array index, is_correct values correct
     const [optInsertSql, optInsertParams] = mockClientQuery.mock.calls[3] as [string, unknown[]];
     expect(optInsertSql).toContain('INSERT INTO quiz_options');
     expect(optInsertParams).toContain(0); // sort_order of option[0]
@@ -380,7 +376,6 @@ describe('quiz-admin-save', () => {
 
     expect(mockClientQuery).toHaveBeenCalledTimes(6);
 
-    // q2 insert is call index 4
     const [q2InsertSql, q2InsertParams] = mockClientQuery.mock.calls[4] as [string, unknown[]];
     expect(q2InsertSql).toContain('INSERT INTO quiz_questions');
     expect(q2InsertParams[1]).toBe('Q2');
@@ -390,7 +385,6 @@ describe('quiz-admin-save', () => {
   it('returns 500 with err.message when transaction throws mid-sequence', async () => {
     mockWithTransaction.mockImplementationOnce(async (cb: any) => {
       const client = { query: vi.fn().mockRejectedValueOnce(new Error('FK violation')) };
-      // Like real withTransaction: the callback's rejection propagates after rollback
       return await cb(client);
     });
 

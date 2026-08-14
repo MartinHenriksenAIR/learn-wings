@@ -6,6 +6,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { PlatformSettingsProvider } from "@/hooks/usePlatformSettings";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { IdleTimeout } from "@/components/IdleTimeout";
 import { routes } from "@/lib/routes";
 
 import Login from "./pages/Login";
@@ -15,6 +16,7 @@ import ResetPassword from "./pages/ResetPassword";
 import LearnerDashboard from "./pages/learner/Dashboard";
 import LearnerTraining from "./pages/learner/Training";
 import LearnerCourses from "./pages/learner/Courses";
+import CourseDetail from "./pages/learner/CourseDetail";
 import Assessment from "./pages/learner/Assessment";
 import CoursePlayer from "./pages/learner/CoursePlayer";
 import TipsAndTricks from "./pages/learner/TipsAndTricks";
@@ -35,6 +37,7 @@ import IdeaLibrary from "./pages/community/IdeaLibrary";
 import IdeaSubmit from "./pages/community/IdeaSubmit";
 import IdeaDetail from "./pages/community/IdeaDetail";
 import ResourceLibrary from "./pages/community/ResourceLibrary";
+import EventsPage from "./pages/community/EventsPage";
 import OrgIdeasManagement from "./pages/org-admin/OrgIdeasManagement";
 import OrgCommunityModeration from "./pages/org-admin/OrgCommunityModeration";
 import PlatformCommunityModeration from "./pages/platform-admin/PlatformCommunityModeration";
@@ -52,6 +55,7 @@ function AppRoutes() {
       <Route path={routes.learner.dashboard} element={<ProtectedRoute learnerOnly><LearnerDashboard /></ProtectedRoute>} />
       <Route path={routes.learner.training} element={<ProtectedRoute learnerOnly><LearnerTraining /></ProtectedRoute>} />
       <Route path={routes.learner.courses} element={<ProtectedRoute learnerOnly><LearnerCourses /></ProtectedRoute>} />
+      <Route path={routes.learner.courseDetailPattern} element={<ProtectedRoute learnerOnly><CourseDetail /></ProtectedRoute>} />
       <Route path={routes.learner.assessment} element={<ProtectedRoute learnerOnly><Assessment /></ProtectedRoute>} />
       <Route path={routes.learner.coursePlayerPattern} element={<ProtectedRoute learnerOnly><CoursePlayer /></ProtectedRoute>} />
       <Route path={routes.learner.tips} element={<ProtectedRoute learnerOnly><TipsAndTricks /></ProtectedRoute>} />
@@ -64,8 +68,10 @@ function AppRoutes() {
       <Route path={routes.community.ideaNew} element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
       <Route path={routes.community.ideaEditPattern} element={<ProtectedRoute><IdeaSubmit /></ProtectedRoute>} />
       <Route path={routes.community.ideaDetailPattern} element={<ProtectedRoute><IdeaDetail /></ProtectedRoute>} />
+      <Route path={routes.community.events} element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
       <Route path={routes.community.resources} element={<ProtectedRoute><ResourceLibrary /></ProtectedRoute>} />
-      
+      <Route path={routes.community.resourcesLegacy} element={<Navigate to={routes.community.resources} replace />} />
+
       <Route path={routes.orgAdmin.root} element={<ProtectedRoute requireOrgAdmin><OrgAnalytics /></ProtectedRoute>} />
       <Route path={routes.orgAdmin.settings} element={<ProtectedRoute requireOrgAdmin><OrgSettings /></ProtectedRoute>} />
       <Route path={routes.orgAdmin.ideas} element={<ProtectedRoute requireOrgAdmin><OrgIdeasManagement /></ProtectedRoute>} />
@@ -80,9 +86,9 @@ function AppRoutes() {
       <Route path={routes.platformAdmin.moderation} element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
       <Route path={routes.settings} element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-      <Route path={routes.root} element={<Navigate to={routes.auth.login} replace />} />
+      <Route path={routes.root} element={<Login />} />
       <Route path={routes.appRoot} element={<Navigate to={routes.learner.dashboard} replace />} />
-      
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -94,6 +100,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <IdleTimeout />
           <PlatformSettingsProvider>
             <ErrorBoundary>
               <AppRoutes />

@@ -4,9 +4,6 @@ import i18n from './index';
 
 describe('i18n default language (#226 — overrides #119)', () => {
   it('uses English as the catch-all fallback for unsupported browser languages', () => {
-    // #226 flips #119's Danish catch-all: a browser that is neither da nor en
-    // now resolves to English, not Danish. i18next normalizes fallbackLng: 'en'
-    // to ['en'] — the chain must be exactly English, with no Danish entry.
     expect(i18n.options.fallbackLng).toEqual(['en']);
   });
 
@@ -24,8 +21,6 @@ describe('i18n default language (#226 — overrides #119)', () => {
   });
 
   it('keeps English as the secondary key fallback for any key missing in Danish', () => {
-    // A Danish user with a key absent from da.json still gets the English string:
-    // 'en' is the fallback for every code, including 'da'.
     const utils = i18n.services.languageUtils;
     expect(utils.getFallbackCodes(i18n.options.fallbackLng, 'da')).toEqual(['en']);
   });

@@ -19,12 +19,6 @@ const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
-// This shadcn provider writes SIDEBAR_COOKIE_NAME on every toggle but — being built
-// for a Next.js server that reads the cookie and feeds it back as `defaultOpen` — never
-// rehydrates it client-side. In our Vite SPA there is no such server AND every page mounts
-// its own AppLayout, so the provider remounts on each navigation; without reading the
-// cookie back the sidebar would snap back to expanded on every nav (#370). Read it here so
-// the collapsed/expanded choice actually persists.
 function readSidebarStateCookie(): boolean | undefined {
   if (typeof document === "undefined") return undefined;
   const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${SIDEBAR_COOKIE_NAME}=(true|false)(?:;|$)`));
@@ -169,8 +163,6 @@ const Sidebar = React.forwardRef<
           }
           side={side}
         >
-          {/* Radix requires an accessible title/description on dialog content —
-              visually hidden, screen-reader only (silences the a11y console error). */}
           <SheetHeader className="sr-only">
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
@@ -208,14 +200,14 @@ const Sidebar = React.forwardRef<
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
-            : "group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l",
+            : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
           className,
         )}
         {...props}
       >
         <div
           data-sidebar="sidebar"
-          className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
+          className="flex h-full w-full flex-col overflow-hidden bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
         >
           {children}
         </div>
@@ -391,7 +383,6 @@ const SidebarGroupAction = React.forwardRef<HTMLButtonElement, React.ComponentPr
         data-sidebar="group-action"
         className={cn(
           "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-          // Increases the hit area of the button on mobile.
           "after:absolute after:-inset-2 after:md:hidden",
           "group-data-[collapsible=icon]:hidden",
           className,
@@ -498,7 +489,6 @@ const SidebarMenuAction = React.forwardRef<
       data-sidebar="menu-action"
       className={cn(
         "absolute right-1 top-1.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform peer-hover/menu-button:text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 after:md:hidden",
         "peer-data-[size=sm]/menu-button:top-1",
         "peer-data-[size=default]/menu-button:top-1.5",

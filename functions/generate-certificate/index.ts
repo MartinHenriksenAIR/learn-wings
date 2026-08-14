@@ -1,4 +1,3 @@
-// Hand-rolled (not shared/endpoint.ts): binary PDF response and token-only auth (oid-scoped SQL lookups, no getProfile).
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { authenticate, AuthError } from '../shared/auth';
 import { queryOne } from '../shared/db';
@@ -7,25 +6,8 @@ import { internalError } from '../shared/errors';
 import { pdfResponse } from '../shared/http';
 import { pdfString } from '../shared/pdf';
 
-/**
- * Every byte of the document is emitted through `Buffer.from(s, PDF_ENCODING)`
- * and measured with `Buffer.byteLength(s, PDF_ENCODING)` — never `String.length`
- * (UTF-16 code units), which is what made every non-ASCII certificate
- * structurally invalid: the xref offsets, `startxref` and the content-stream
- * `/Length` all under-counted by one per `æøå` (see #273).
- *
- * `latin1` is safe as the emit encoding ONLY because every dynamic value is
- * folded through `toWinAnsi()` first, so no code point above 0xFF ever reaches
- * it (latin1 would silently truncate one to its low byte).
- */
 const PDF_ENCODING: BufferEncoding = 'latin1';
 
-/**
- * Unicode → cp1252 byte for the 27 codes in 0x80–0x9F that WinAnsiEncoding
- * fills with typographic punctuation. This is the one range where cp1252 and
- * ISO-8859-1 (Node's `latin1`) disagree — Latin-1 leaves it as unprintable C1
- * controls — so it has to be mapped by hand.
- */
 const CP1252_HIGH: Record<string, number> = {
   '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85,
   '†': 0x86, '‡': 0x87, 'ˆ': 0x88, '‰': 0x89, 'Š': 0x8a,
@@ -35,33 +17,6 @@ const CP1252_HIGH: Record<string, number> = {
   'ž': 0x9e, 'Ÿ': 0x9f,
 };
 
-/**
- * Fold text to cp1252 / WinAnsiEncoding, the encoding declared on the three
- * Type1 fonts below. Returns a string whose every code point is <= 0xFF, i.e.
- * exactly one `latin1` byte per character.
- *
- * SUPPORTED — the full cp1252 repertoire, and nothing else:
- *   - ASCII 0x20–0x7E, mapped byte-for-byte. All-ASCII certificates therefore
- *     produce the exact bytes they did before this function existed.
- *   - All of Latin-1 0xA0–0xFF: the entire Danish set `æ ø å Æ Ø Å`, plus
- *     `é è ü ö ä ñ ç ß à á â` and the rest of Western European Latin.
- *   - The 27 cp1252-only punctuation codes above (curly quotes, en/em dash,
- *     `€`, `…`, `†`, `™`, `Œ`, `Š`, `Ž`, `ƒ`, `‰`). This is genuine cp1252,
- *     not merely Latin-1 — a name pasted from Word with a `'` in it renders
- *     as an apostrophe rather than being dropped.
- *
- * OUTSIDE THAT SET — CJK (`李娜`), Cyrillic, Greek, Polish `ł`, Turkish `ğ`,
- * emoji, and the unprintable C0/C1 control ranges — every code point is
- * replaced by a single `?`. We substitute rather than drop so the glyph loss is
- * visible to whoever reads the certificate, and rather than emit the raw byte
- * so the file stays valid: a code point > 0xFF handed to `latin1` would be
- * truncated to a wrong byte, and handed to `utf8` would desynchronise the byte
- * count from the character count all over again. Substitution is 1 code point →
- * 1 byte, so offsets stay exact either way.
- *
- * Non-BMP code points are iterated whole (`for...of`), so an emoji collapses to
- * one `?` rather than two surrogate halves.
- */
 function toWinAnsi(value: string): string {
   let out = '';
   for (const ch of value) {
@@ -76,15 +31,6 @@ function toWinAnsi(value: string): string {
   return out;
 }
 
-/**
- * The single gate every dynamic value must pass on its way into a `(...) Tj`.
- * Order matters and is load-bearing: escape FIRST (`pdfString` neutralises the
- * `\ ( )` delimiters — #232), fold to WinAnsi SECOND, and only then measure. Do
- * it the other way round and the bytes you count are not the bytes you emit,
- * which is the whole of #273. `toWinAnsi` never produces a `\`, `(` or `)` that
- * `pdfString` did not already escape — its only inventions are `?` and the
- * 0x80–0x9F punctuation — so escaping first loses nothing.
- */
 function pdfText(value: string): string {
   return toWinAnsi(pdfString(value));
 }
@@ -164,9 +110,6 @@ function generateCertificatePDF(
 
   const contentStream = contentLines.join('\n');
   addObject(`4 0 obj\n<< /Length ${Buffer.byteLength(contentStream, PDF_ENCODING)} >>\nstream\n${contentStream}\nendstream\nendobj`);
-  // /Encoding is not optional now that text is emitted as cp1252 bytes: without
-  // it a Type1 font falls back to StandardEncoding, which has no glyph at 0xF8,
-  // so `ø` renders as a blank or as mojibake. It must match toWinAnsi().
   addObject(`5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj`);
   addObject(`6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj`);
   addObject(`7 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>\nendobj`);
@@ -214,10 +157,9 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       queryOne<{ title: string }>('SELECT title FROM courses WHERE id = $1', [enrollment.course_id]),
       queryOne<{ name: string }>(
         `SELECT o.name FROM organizations o
-         JOIN org_memberships om ON om.org_id = o.id
-         JOIN profiles p ON p.id = om.user_id
-         WHERE p.entra_oid = $1 AND om.status = 'active' LIMIT 1`,
-        [user.id]
+           JOIN enrollments e ON e.org_id = o.id
+          WHERE e.id = $1`,
+        [enrollmentId],
       ),
     ]);
 

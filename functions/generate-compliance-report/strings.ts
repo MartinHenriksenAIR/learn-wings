@@ -1,9 +1,3 @@
-// Localized fixed strings for the AI Act compliance PDF (ADR-0016 category 3:
-// one localized template, reader's language). Kept LOCAL to this endpoint on
-// purpose — when #225 builds the shared server-document i18n helper, this is
-// extracted and adopted. Variable data (org, names, numbers, dates) is passed
-// in and stays language-neutral.
-
 export type Lang = 'da' | 'en';
 export type LevelKey = 'basic' | 'intermediate' | 'advanced' | 'na';
 export type DeptStatus = 'ok' | 'warn' | 'bad';

@@ -16,8 +16,6 @@ export interface SeatRequestEmailParams {
 }
 
 export function renderSeatRequestEmail(p: SeatRequestEmailParams): { subject: string; html: string } {
-  // User- and org-supplied strings are HTML-escaped before interpolation to
-  // prevent HTML injection into the platform admin's mail client (#195).
   const org = escapeHtml(p.orgName);
   const requesterName = escapeHtml(p.requesterName);
   const requesterEmail = escapeHtml(p.requesterEmail);
@@ -51,12 +49,7 @@ export async function notifySeatRequest(context: InvocationContext, p: SeatReque
   });
 }
 
-// --- Requester-facing emails (#193) --------------------------------------
-// These go to the requesting org admin, not the platform admin. They embed
-// user- and org-supplied strings, so every interpolated string is HTML-escaped
-// — as is the platform-admin template above (#195).
 
-// Danish is the default: only an explicit 'en' preference selects English.
 function isEnglish(language: string | null): boolean {
   return language === 'en';
 }
@@ -77,7 +70,6 @@ export interface SeatRequestFulfilledParams {
 }
 
 export function renderSeatRequestReceivedEmail(p: SeatRequestReceivedParams): { subject: string; html: string } {
-  // Subjects are plain text — only HTML bodies get escaped (matches renderSeatRequestEmail).
   const org = escapeHtml(p.orgName);
   const n = p.additionalSeats;
   if (isEnglish(p.language)) {

@@ -4,21 +4,12 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface QueryErrorStateProps {
-  /** Retry handler — wire to the failed query's `refetch`. */
   onRetry: () => void;
-  /** Override the default title copy ("Something went wrong"). */
   title?: string;
-  /** Override the default description copy. */
   description?: string;
   className?: string;
 }
 
-/**
- * Full-page error fork for a failed primary query. Visually distinct from the
- * dashed `EmptyState` (a legitimately empty account) so a load failure can't be
- * misread as "no data yet". Defaults to shared `common.loadError*` copy; pass
- * `title`/`description` to specialize per surface.
- */
 export function QueryErrorState({ onRetry, title, description, className }: QueryErrorStateProps) {
   const { t } = useTranslation();
   return (

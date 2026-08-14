@@ -9,11 +9,6 @@ import { MessageSquare, FileText } from 'lucide-react';
 
 export interface ReportCardProps {
   report: ReportWithDetails;
-  /**
-   * Optional scope badge rendered in the meta row after the status badge. The
-   * platform queue spans every org + global so it shows where a report came
-   * from; the org queue is single-scope and passes nothing (#237).
-   */
   scopeBadge?: ReactNode;
   onViewContent: () => void;
   onSetHidden: (hide: boolean) => void;
@@ -25,13 +20,6 @@ export interface ReportCardProps {
   updatePending: boolean;
 }
 
-/**
- * One report row shared by the org + platform community moderation queues
- * (#237): the meta row (type icon/badge, status, optional scope badge, reporter
- * line), the report reason, any admin note, and the shared ReportActions bar.
- * View-only presentation — all actions are delegated to the caller, which owns
- * the mutations (useReportModeration) and dialog state.
- */
 export function ReportCard({
   report,
   scopeBadge,

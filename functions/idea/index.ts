@@ -4,8 +4,6 @@ import { isActiveMember } from '../shared/profile';
 import { profileJson } from '../shared/profile-json';
 import { isIdeaVisibleTo } from '../shared/ideas';
 
-// Wider projection than shared IdeaRow — this endpoint embeds profile/organization
-// /counts, so it keeps its own SELECT (and row type) rather than using loadIdea.
 interface IdeaRow {
   id: string;
   org_id: string;
@@ -35,13 +33,11 @@ export default endpoint('idea', async ({ req, profile, reply }) => {
     WHERE i.id = $1
   `, [ideaId, profile.id]);
 
-  // Not found → null (parity with Supabase .single() PGRST116)
   if (!idea) return reply(200, { idea: null });
 
   const canAccessOrg = profile.is_platform_admin || await isActiveMember(profile.id, idea.org_id);
   if (!canAccessOrg) return reply(200, { idea: null });
 
-  // Draft privacy (shared/ideas): drafts are author-private for EVERY role (no admin bypass).
   if (!isIdeaVisibleTo(idea, profile)) {
     return reply(200, { idea: null });
   }
