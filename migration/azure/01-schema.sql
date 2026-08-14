@@ -873,15 +873,17 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_org_completed
   WHERE status = 'completed';
 
 -- ---- orphan_sweep_runs (issue #286) ----
--- One row per nightly orphan-sweep run (folded in from 08-orphan-sweep-runs.sql
--- and 16-orphan-sweep-abort-detail.sql). The sweep is otherwise stateless, so
--- this table IS the memory that makes cross-run statements ("third night in a
--- row", "recovered") expressible at all.
+-- One row per nightly orphan-sweep run (folded in from 08-orphan-sweep-runs.sql,
+-- 16-orphan-sweep-abort-detail.sql and 17-orphan-sweep-census.sql). The sweep is
+-- otherwise stateless, so this table IS the memory that makes cross-run
+-- statements ("third night in a row", "recovered", "matched blobs halved
+-- overnight") expressible at all.
 --
 -- `outcome` is the summary's abort flag mapped once, here, so the notification
 -- policy never special-cases past-due in three places:
 --   aborted: false        -> 'completed'
 --   reason: 'past-due'    -> 'skipped'   (a benign, self-healing catch-up run)
+--   no baseline on record -> 'report-only' (censused, recorded, deleted nothing)
 --   any other abort       -> 'aborted'   (including the 'disabled' kill switch)
 --
 -- The two *_notified_at columns ARE the notification state — "time since the
@@ -893,12 +895,12 @@ CREATE TABLE IF NOT EXISTS public.orphan_sweep_runs (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   started_at            timestamptz NOT NULL,
   finished_at           timestamptz NOT NULL DEFAULT now(),
-  outcome               text NOT NULL CHECK (outcome IN ('completed', 'aborted', 'skipped')),
+  outcome               text NOT NULL CHECK (outcome IN ('completed', 'aborted', 'skipped', 'report-only')),
   reason                text,
   -- The refusal in prose (#451): what tripped, the numbers behind it, the sample
   -- paths and the remedy. `reason` is the machine code and on its own does not
-  -- say WHICH bucket tripped. NULL on completed runs, and on any abort recorded
-  -- before this column existed.
+  -- say what tripped. NULL on completed runs, and on any abort recorded before
+  -- this column existed.
   abort_detail          text,
   scanned               integer NOT NULL DEFAULT 0,
   referenced            integer NOT NULL DEFAULT 0,
@@ -912,7 +914,34 @@ CREATE TABLE IF NOT EXISTS public.orphan_sweep_runs (
   bytes_reclaimed       bigint NOT NULL DEFAULT 0,
   deleted_sample        text[] NOT NULL DEFAULT '{}',
   abort_notified_at     timestamptz,
-  deletions_reported_at timestamptz
+  deletions_reported_at timestamptz,
+  -- The census the break detection compares against (#469). Both are NULL for
+  -- "this run never got as far as a census", which every row written before
+  -- 17-orphan-sweep-census.sql is, and which is deliberately distinguishable
+  -- from a censused zero: no baseline means the next run is report-only rather
+  -- than a guess.
+  --
+  -- `matched` is blobs the reference set DOES point at. A healthy sweep never
+  -- deletes a matched blob, so it is stable by construction and collapses only
+  -- when references vanish by accident.
+  --
+  -- `unmatched_references` is references that resolve to no blob — the primary
+  -- check. A broken match raises it by the whole affected class; a backlog of
+  -- replaced uploads and a legitimate bulk deletion both leave it untouched.
+  -- Counted against the pre-listing reference read only, so a concurrent upload
+  -- does not read as a break.
+  matched               integer,
+  unmatched_references  integer,
+  -- Deletions this run was entitled to make but deferred to stay inside the
+  -- per-run ceiling. The ceiling drains oldest-first and carries the remainder;
+  -- it used to abort instead, which deleted nothing and met the same backlog the
+  -- next night.
+  deferred              integer NOT NULL DEFAULT 0,
+  -- Operator acceptance of this run's census as the new baseline. A refused run
+  -- is never a baseline on its own — otherwise a broken night becomes the next
+  -- night's normal — so a refusal repeats until someone either fixes the match
+  -- or sets this. The alert email carries the statement with the id filled in.
+  baseline_accepted     boolean NOT NULL DEFAULT false
 );
 
 CREATE INDEX IF NOT EXISTS orphan_sweep_runs_started_at_idx
