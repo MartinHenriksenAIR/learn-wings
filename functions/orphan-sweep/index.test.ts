@@ -357,7 +357,7 @@ describe('orphan-sweep — per-bucket orphan share', () => {
     expect(summary).toMatchObject({ aborted: true, reason: 'orphan-share-implausible' });
   });
 
-  it('still aborts on a TWO-blob prefix bucket — the root-class floor is not applied here', async () => {
+  it('sweeps a TWO-blob prefix bucket instead of wedging on it — the floor applies here now (#451)', async () => {
     const root = rootFleet(40);
     mockQuery.mockResolvedValue(root.map((path) => ({ path })));
     const { deleted } = stubFetch({
@@ -369,9 +369,66 @@ describe('orphan-sweep — per-bucket orphan share', () => {
 
     const summary = await runOrphanSweep(log, NOW);
 
+    expect(deleted.sort()).toEqual(['videos/a.mp4', 'videos/b.mp4']);
+    expect(summary).toMatchObject({ aborted: false, reason: null, deleted: 2 });
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it('still aborts on a prefix bucket once the break is big enough to be evidence', async () => {
+    const root = rootFleet(40);
+    const avatars = Array.from({ length: 5 }, (_, i) => `avatars/u-${i}.jpg`);
+    mockQuery.mockResolvedValue(root.map((path) => ({ path })));
+    const { deleted } = stubFetch({
+      pages: [listPage([...root, ...avatars].map((name) => ({ name })))],
+    });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
     expect(deleted).toEqual([]);
     expect(summary).toMatchObject({ aborted: true, reason: 'orphan-bucket-share-implausible', deleted: 0 });
-    expect(log.error.mock.calls[0][0] as string).toContain('2/2');
+    expect(log.error.mock.calls[0][0] as string).toContain('5/5');
+  });
+
+  it('sweeps the exact production container that wedged the job for 19 nights (#451)', async () => {
+    const referencedFixture = [
+      'avatars/4fd3938e.webp',
+      'avatars/a690881b.JPG',
+      'org-logos/c7973ef4.png',
+      'documents/handbook-1.pdf',
+      'documents/handbook-2.pdf',
+      ...Array.from({ length: 7 }, (_, i) => `thumb-${i}.png`),
+      ...Array.from({ length: 2 }, (_, i) => `lesson-${i}.mp4`),
+    ];
+    const orphanFixture = [
+      'avatars/2e2afef5.JPG',
+      'avatars/956d1789.jpeg',
+      'avatars/f36cc8f9.JPG',
+      'org-logos/0aebb9ce.jpg',
+      'org-logos/5edebeda.png',
+      'org-logos/7fad1639.png',
+      ...Array.from({ length: 5 }, (_, i) => `stranded-thumb-${i}.png`),
+      'stranded-lesson.mp4',
+    ];
+    mockQuery.mockResolvedValue(referencedFixture.map((path) => ({ path })));
+    const { deleted } = stubFetch({
+      pages: [listPage([...referencedFixture, ...orphanFixture].map((name) => ({ name })))],
+    });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
+    expect(summary).toMatchObject({
+      aborted: false,
+      reason: null,
+      abortDetail: null,
+      eligible: 26,
+      orphaned: 12,
+      deleted: 12,
+      failed: 0,
+    });
+    expect(deleted.sort()).toEqual([...orphanFixture].sort());
+    expect(log.error).not.toHaveBeenCalled();
   });
 });
 
@@ -472,6 +529,32 @@ describe('orphan-sweep — root file-type classes', () => {
 });
 
 describe('orphan-sweep — refusals', () => {
+  it('carries the whole refusal on the summary, not only into the log (#451)', async () => {
+    const root = Array.from({ length: 40 }, (_, i) => `root-${i}.mp4`);
+    const avatars = Array.from({ length: 6 }, (_, i) => `avatars/u-${i}.jpg`);
+    mockQuery.mockResolvedValue(root.map((path) => ({ path })));
+    stubFetch({ pages: [listPage([...root, ...avatars].map((name) => ({ name })))] });
+    const log = makeLog();
+
+    const summary = await runOrphanSweep(log, NOW);
+
+    expect(summary.reason).toBe('orphan-bucket-share-implausible');
+    expect(summary.abortDetail).toContain('avatars/');
+    expect(summary.abortDetail).toContain('6/6');
+    expect(summary.abortDetail).toContain('avatars/u-0.jpg');
+    expect(summary.abortDetail).toContain('WHAT TO DO');
+    expect(log.error.mock.calls[0][0] as string).toContain(summary.abortDetail as string);
+  });
+
+  it('leaves abortDetail null on a run that did not refuse', async () => {
+    stubFetch({ pages: [listPage([...referencedBlobs(), { name: 'stranded.mp4' }])] });
+    mockQuery.mockResolvedValue(REFERENCED_ROWS);
+
+    const summary = await runOrphanSweep(makeLog(), NOW);
+
+    expect(summary).toMatchObject({ aborted: false, reason: null, abortDetail: null, deleted: 1 });
+  });
+
   it('aborts when the orphan share is implausible, deleting nothing', async () => {
     mockQuery.mockResolvedValue([{ path: 'lesson-video.mp4' }]);
     const { deleted } = stubFetch({

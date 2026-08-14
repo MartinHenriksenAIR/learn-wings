@@ -13,7 +13,7 @@ const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_MAX_ORPHAN_SHARE = 0.5;
 
-const MIN_ROOT_CLASS_ORPHANS = 5;
+const MIN_BUCKET_ORPHANS = 5;
 
 const DEFAULT_MAX_DELETIONS_PER_RUN = 500;
 
@@ -107,6 +107,7 @@ export type SweepAbortReason =
 export interface OrphanSweepSummary {
   aborted: boolean;
   reason: SweepAbortReason | null;
+  abortDetail: string | null;
   scanned: number;
   referenced: number;
   eligible: number;
@@ -125,6 +126,7 @@ const DELETED_SAMPLE_SIZE = 20;
 const emptySummary = (): OrphanSweepSummary => ({
   aborted: false,
   reason: null,
+  abortDetail: null,
   scanned: 0,
   referenced: 0,
   eligible: 0,
@@ -284,10 +286,10 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
     summary.aborted = true;
     summary.reason = reason;
     summary.deleted = 0;
+    summary.abortDetail = `${message} WHAT TO DO: ${remedy}`;
     log.error(
       `[orphan-sweep] REFUSED TO SWEEP — 0 blobs deleted, nothing in storage was touched. ` +
-        `This is NOT a clean run with nothing to do. Reason: ${reason}. ${message} ` +
-        `WHAT TO DO: ${remedy}`,
+        `This is NOT a clean run with nothing to do. Reason: ${reason}. ${summary.abortDetail}`,
       summary,
     );
     return summary;
@@ -427,7 +429,7 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   for (const [bucket, eligible] of bucketEligible) {
     const orphaned = bucketOrphaned.get(bucket) ?? 0;
     const rootClass = rootClassOf(bucket);
-    if (rootClass !== null && orphaned < MIN_ROOT_CLASS_ORPHANS) continue;
+    if (bucket !== '' && orphaned < MIN_BUCKET_ORPHANS) continue;
     const bucketShare = orphaned / eligible;
     if (bucketShare <= maxShare) continue;
     const label = rootClass !== null ? ROOT_CLASS_LABELS[rootClass] : bucket === '' ? 'the container root' : bucket;
@@ -517,13 +519,15 @@ function refusePastDue(log: SweepLogger): OrphanSweepSummary {
   const summary = emptySummary();
   summary.aborted = true;
   summary.reason = 'past-due';
+  summary.abortDetail =
+    'The host fired this as CATCH-UP for a missed 03:00 UTC occurrence, so it is running at some ' +
+    'arbitrary time of day rather than in the maintenance window — and possibly against a reference ' +
+    'set the paired frontend/schema deploy has not caught up with. WHAT TO DO: nothing; the next ' +
+    'scheduled 03:00 UTC run proceeds normally. If this appears at all, `useMonitor` has been turned ' +
+    'back on — see the registration below.';
   log.warn(
     '[orphan-sweep] REFUSED TO SWEEP — 0 blobs deleted, nothing in storage was touched. ' +
-      'Reason: past-due. The host fired this as CATCH-UP for a missed 03:00 UTC occurrence, ' +
-      'so it is running at some arbitrary time of day rather than in the maintenance window — ' +
-      'and possibly against a reference set the paired frontend/schema deploy has not caught up ' +
-      'with. WHAT TO DO: nothing; the next scheduled 03:00 UTC run proceeds normally. If this ' +
-      'appears at all, `useMonitor` has been turned back on — see the registration below.',
+      `Reason: past-due. ${summary.abortDetail}`,
     summary,
   );
   return summary;
