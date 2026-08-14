@@ -9,6 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "lint:community-i18n": "eslint src/pages/community src/components/community",
+    "verify": "npm run lint && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && npm test && npm run build",
+    "verify:all": "npm run verify && npm --prefix functions run verify",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -828,7 +828,7 @@ CREATE TRIGGER trg_hash_invitation_token
 
 -- ---- course_favorites ----
 -- #358 per-user, org-neutral course favorites (folded in from
--- 10-course-favorites.sql). No org_id — favorites belong to the user, not an
+-- 12-course-favorites.sql). No org_id — favorites belong to the user, not an
 -- org; the PK (user_id, course_id) makes a favorite idempotent and is the
 -- upsert conflict target.
 CREATE TABLE IF NOT EXISTS public.course_favorites (
@@ -872,6 +872,52 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_org_completed
   ON public.enrollments (org_id, user_id, completed_at)
   WHERE status = 'completed';
 
+-- ---- orphan_sweep_runs (issue #286) ----
+-- One row per nightly orphan-sweep run (folded in from 08-orphan-sweep-runs.sql
+-- and 16-orphan-sweep-abort-detail.sql). The sweep is otherwise stateless, so
+-- this table IS the memory that makes cross-run statements ("third night in a
+-- row", "recovered") expressible at all.
+--
+-- `outcome` is the summary's abort flag mapped once, here, so the notification
+-- policy never special-cases past-due in three places:
+--   aborted: false        -> 'completed'
+--   reason: 'past-due'    -> 'skipped'   (a benign, self-healing catch-up run)
+--   any other abort       -> 'aborted'   (including the 'disabled' kill switch)
+--
+-- The two *_notified_at columns ARE the notification state — "time since the
+-- last alert email" is max(abort_notified_at) (stamped for the recovered note
+-- too, so the rate limit measures the inbox rather than one email kind), and the
+-- digest's working set is `deleted > 0 AND deletions_reported_at IS NULL`.
+-- There is no separate store.
+CREATE TABLE IF NOT EXISTS public.orphan_sweep_runs (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  started_at            timestamptz NOT NULL,
+  finished_at           timestamptz NOT NULL DEFAULT now(),
+  outcome               text NOT NULL CHECK (outcome IN ('completed', 'aborted', 'skipped')),
+  reason                text,
+  -- The refusal in prose (#451): what tripped, the numbers behind it, the sample
+  -- paths and the remedy. `reason` is the machine code and on its own does not
+  -- say WHICH bucket tripped. NULL on completed runs, and on any abort recorded
+  -- before this column existed.
+  abort_detail          text,
+  scanned               integer NOT NULL DEFAULT 0,
+  referenced            integer NOT NULL DEFAULT 0,
+  eligible              integer NOT NULL DEFAULT 0,
+  orphaned              integer NOT NULL DEFAULT 0,
+  skipped_by_grace      integer NOT NULL DEFAULT 0,
+  skipped_unsafe_name   integer NOT NULL DEFAULT 0,
+  skipped_by_recheck    integer NOT NULL DEFAULT 0,
+  deleted               integer NOT NULL DEFAULT 0,
+  failed                integer NOT NULL DEFAULT 0,
+  bytes_reclaimed       bigint NOT NULL DEFAULT 0,
+  deleted_sample        text[] NOT NULL DEFAULT '{}',
+  abort_notified_at     timestamptz,
+  deletions_reported_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS orphan_sweep_runs_started_at_idx
+  ON public.orphan_sweep_runs (started_at DESC);
+
 -- =====================================================================
 -- SECTION 6: SEED DATA
 -- =====================================================================
@@ -882,5 +928,13 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_org_completed
 INSERT INTO public.organizations (id, name, slug, kind, seat_limit, allow_self_registration)
 VALUES ('00000000-0000-0000-0000-000000000354', 'AI Uddannelse', 'individuals', 'individual', NULL, false)
 ON CONFLICT (id) DO NOTHING;
+
+-- Storage-ops alert recipients (#286, folded in from 08-orphan-sweep-runs.sql).
+-- Deliberately NOT seat_pricing.notification_email: storage ops and commercial
+-- seat requests are unrelated concerns that will want to diverge. No Platform
+-- Settings UI field — edit via SQL.
+INSERT INTO public.platform_settings (key, value)
+VALUES ('ops_alerts', '{"recipients": ["ev@ai-raadgivning.dk", "MartinH@ai-raadgivning.dk"], "enabled": true}'::jsonb)
+ON CONFLICT (key) DO NOTHING;
 
 COMMIT;
