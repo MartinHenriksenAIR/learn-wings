@@ -8,9 +8,8 @@ import { SIGN_IN_WORST_CASE_TIMEOUT, sidebarNav, signInThroughSso } from '../fix
  * (src/hooks/useAuth.tsx:99-101) — the token keeps full platform rights in every
  * view. So a green run proves the nav swaps and a view-gated route redirects; it
  * does NOT prove the API refuses a genuine org admin reaching across orgs.
- * Closing that gap needs a real org-admin account — the fuller explanation, and
- * what closing it would take, is the "Known gap: this does not prove isolation"
- * section of docs/superpowers/specs/2026-07-27-e2e-playwright-smoke-suite-design.md.
+ * Closing that gap needs a real org-admin account, or tests written against the
+ * API rather than the UI — see "What a green run proves" in e2e/README.md.
  *
  * One of the app's three route guards is not view-gated at all, and this spec must
  * not be read as covering it: `requirePlatformAdmin` tests the raw `isPlatformAdmin`

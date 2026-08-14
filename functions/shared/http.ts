@@ -27,8 +27,8 @@ function safeFilename(filename: string): string {
  * learner/course name carries æøå. No unit test can catch that (the mock never
  * re-encodes), which is why it is written down here. The Buffer body shipped in
  * `24ede7a` (PR #230); both endpoints are now prod-smoked as real `%PDF-`
- * downloads — the compliance report on `a3e635a` (WORKLOG.md:1440) and the
- * certificate on `813b4c4` (PR #272).
+ * downloads — the compliance report on `a3e635a` and the certificate on
+ * `813b4c4` (PR #272).
  *
  * This helper only owns the response envelope, not the bytes handed to it: the
  * certificate's own UTF-16-vs-UTF-8 offset bug (#273) had to be fixed inside
