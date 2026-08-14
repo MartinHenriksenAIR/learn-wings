@@ -16,7 +16,7 @@ import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useLearnerTraining } from '@/hooks/useLearnerTraining';
 import { useListView } from '@/hooks/useListView';
 import { callApiRaw } from '@/lib/api-client';
-import { BookOpen, Award, Play } from 'lucide-react';
+import { BookOpen, Award, Play, Sparkles } from 'lucide-react';
 import { CertificateCard } from '@/components/learner/CertificateCard';
 import { MandatoryCourses } from '@/components/learner/MandatoryCourses';
 import { FavoriteCourses } from '@/components/learner/FavoriteCourses';
@@ -25,7 +25,7 @@ import { formatDate } from '@/lib/date-locale';
 import { toast } from '@/components/ui/sonner';
 
 export default function LearnerTraining() {
-  const { currentOrg, profile, memberships } = useAuth();
+  const { currentOrg, profile, memberships, isPlatformAdmin, isOrgAdmin } = useAuth();
   const orgGuard = useOrgGuard();
   const { features } = usePlatformSettings();
   const { t, i18n } = useTranslation();
@@ -133,6 +133,24 @@ export default function LearnerTraining() {
         </div>
         <ListViewToggle view={view} onChange={setView} />
       </div>
+
+      {profile && !isPlatformAdmin && !isOrgAdmin && profile.assessment_level == null && (
+        <div
+          data-testid="assessment-banner"
+          className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4"
+        >
+          <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+            <Sparkles className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold">{t('assessment.banner.title')}</p>
+            <p className="text-[12.5px] text-muted-foreground">{t('assessment.banner.body')}</p>
+          </div>
+          <Button asChild className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90">
+            <Link to={routes.learner.assessment}>{t('assessment.banner.cta')}</Link>
+          </Button>
+        </div>
+      )}
 
       <div
         data-testid="training-progress-strip"

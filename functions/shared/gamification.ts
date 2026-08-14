@@ -1,4 +1,5 @@
 import { query } from './db';
+import { courseVisibilityPredicate } from './course-visibility';
 
 
 export const LESSON_XP = 10;
@@ -7,6 +8,12 @@ export const COURSE_XP = 100;
 
 const TZ = 'Europe/Copenhagen';
 const MONTH_START_SQL = `(date_trunc('month', now() AT TIME ZONE '${TZ}') AT TIME ZONE '${TZ}')`;
+const TODAY_SQL = `((now() AT TIME ZONE '${TZ}')::date)`;
+
+export const WINDOW_DAYS = 7;
+const WINDOW_SPAN = WINDOW_DAYS * 2;
+
+const HERO_COURSES = 3;
 
 export interface LevelInfo {
   level: number;
@@ -30,11 +37,31 @@ export interface LeaderboardWindow {
   me: LeaderboardRow | null;
 }
 
+export interface DashboardCourseCard {
+  courseId: string;
+  title: string;
+  thumbnailUrl: string | null;
+  lessonsTotal: number;
+  lessonsCompleted: number;
+  pct: number;
+}
+
+export interface WeekActivity {
+  lessons: number;
+  minutes: number;
+  untimedLessons: number;
+  perDayMinutes: number[];
+  previous: { lessons: number; minutes: number };
+}
+
 export interface LearnerDashboardData {
   snapshot: { started: number; inProgress: number; completed: number; overallPct: number };
   xp: { allTime: number; month: number };
   level: LevelInfo;
   streak: { current: number; activeToday: boolean };
+  week: WeekActivity;
+  courses: DashboardCourseCard[];
+  recommended: DashboardCourseCard[];
   leaderboard: { allTime: LeaderboardWindow; month: LeaderboardWindow };
   showLeaderboard: boolean;
 }
@@ -107,6 +134,55 @@ export function computeStreak(today: string, daysDesc: string[]): { current: num
 
 interface AggRow { user_id: string; all_time: number; month: number }
 interface MemberRow { user_id: string; first_name: string | null; last_name: string | null; full_name: string | null }
+interface DayRow { day: string; lessons: number; minutes: number; untimed: number }
+interface CourseRow { id: string; title: string; thumbnail_url: string | null; lessons_total: number; lessons_done: number }
+
+function toCourseCard(r: CourseRow): DashboardCourseCard {
+  const total = r.lessons_total ?? 0;
+  const done = r.lessons_done ?? 0;
+  return {
+    courseId: r.id,
+    title: r.title,
+    thumbnailUrl: r.thumbnail_url,
+    lessonsTotal: total,
+    lessonsCompleted: done,
+    pct: total > 0 ? Math.round((done / total) * 100) : 0,
+  };
+}
+
+export function buildWeekActivity(today: string, rows: DayRow[]): WeekActivity {
+  const empty: WeekActivity = {
+    lessons: 0, minutes: 0, untimedLessons: 0,
+    perDayMinutes: new Array(WINDOW_DAYS).fill(0),
+    previous: { lessons: 0, minutes: 0 },
+  };
+  if (!today) return empty;
+
+  const byDay = new Map(rows.map((r) => [r.day, r]));
+  const dayAt = (offset: number) => byDay.get(addDays(today, offset));
+
+  const perDayMinutes: number[] = [];
+  let lessons = 0;
+  let minutes = 0;
+  let untimedLessons = 0;
+  for (let i = WINDOW_DAYS - 1; i >= 0; i--) {
+    const row = dayAt(-i);
+    perDayMinutes.push(row?.minutes ?? 0);
+    lessons += row?.lessons ?? 0;
+    minutes += row?.minutes ?? 0;
+    untimedLessons += row?.untimed ?? 0;
+  }
+
+  let prevLessons = 0;
+  let prevMinutes = 0;
+  for (let i = WINDOW_SPAN - 1; i >= WINDOW_DAYS; i--) {
+    const row = dayAt(-i);
+    prevLessons += row?.lessons ?? 0;
+    prevMinutes += row?.minutes ?? 0;
+  }
+
+  return { lessons, minutes, untimedLessons, perDayMinutes, previous: { lessons: prevLessons, minutes: prevMinutes } };
+}
 
 function rankWindow(
   members: { userId: string; name: string; xp: number }[],
@@ -126,9 +202,17 @@ function rankWindow(
 export async function getLearnerDashboardData(
   orgId: string,
   callerId: string,
-  opts?: { suppressLeaderboard?: boolean },
+  opts?: { suppressLeaderboard?: boolean; isIndividual?: boolean; language?: string },
 ): Promise<LearnerDashboardData> {
-  const [snapshotRows, lessonRows, quizRows, courseRows, memberRows, streakRows] = await Promise.all([
+  const recommendVisibility = opts?.isIndividual
+    ? 'c.is_published = TRUE'
+    : courseVisibilityPredicate({ courseAlias: 'c', orgParam: 1 });
+  const recommendLanguage = opts?.language === 'en' ? 'en' : 'da';
+
+  const [
+    snapshotRows, lessonRows, quizRows, courseRows, memberRows, streakRows,
+    dayRows, heroCourseRows, recommendedRows,
+  ] = await Promise.all([
     query<{ started: number; in_progress: number; completed: number }>(
       `SELECT count(*)::int AS started,
               count(*) FILTER (WHERE status = 'enrolled')::int  AS in_progress,
@@ -183,6 +267,62 @@ export async function getLearnerDashboardData(
               ) AS days`,
       [callerId],
     ),
+    query<DayRow>(
+      `SELECT ((lp.completed_at AT TIME ZONE '${TZ}')::date)::text AS day,
+              count(*)::int AS lessons,
+              COALESCE(sum(l.duration_minutes), 0)::int AS minutes,
+              count(*) FILTER (WHERE l.duration_minutes IS NULL)::int AS untimed
+         FROM lesson_progress lp
+         JOIN lessons l ON l.id = lp.lesson_id
+        WHERE lp.org_id = $1 AND lp.user_id = $2
+          AND lp.status = 'completed' AND lp.completed_at IS NOT NULL
+          AND lp.completed_at >= ((${TODAY_SQL} - ${WINDOW_SPAN - 1}) AT TIME ZONE '${TZ}')
+        GROUP BY 1`,
+      [orgId, callerId],
+    ),
+    query<CourseRow>(
+      `SELECT c.id, c.title, c.thumbnail_url,
+              (SELECT count(*)::int
+                 FROM course_modules cm JOIN lessons l ON l.module_id = cm.id
+                WHERE cm.course_id = c.id) AS lessons_total,
+              (SELECT count(*)::int
+                 FROM lesson_progress lp
+                 JOIN lessons l ON l.id = lp.lesson_id
+                 JOIN course_modules cm ON cm.id = l.module_id
+                WHERE cm.course_id = c.id AND lp.org_id = $1 AND lp.user_id = $2
+                      AND lp.status = 'completed') AS lessons_done
+         FROM enrollments e
+         JOIN courses c ON c.id = e.course_id
+        WHERE e.org_id = $1 AND e.user_id = $2
+        ORDER BY (e.status = 'enrolled') DESC, e.last_accessed_at DESC NULLS LAST, e.enrolled_at DESC
+        LIMIT ${HERO_COURSES}`,
+      [orgId, callerId],
+    ),
+    query<CourseRow>(
+      `SELECT c.id, c.title, c.thumbnail_url,
+              (SELECT count(*)::int
+                 FROM course_modules cm JOIN lessons l ON l.module_id = cm.id
+                WHERE cm.course_id = c.id) AS lessons_total,
+              0 AS lessons_done,
+              (SELECT count(*)::int FROM enrollments en WHERE en.course_id = c.id) AS popularity
+         FROM courses c
+        WHERE ${recommendVisibility}
+              AND c.language = $2
+              AND NOT EXISTS (
+                    SELECT 1 FROM enrollments e
+                     WHERE e.course_id = c.id AND e.user_id = $3 AND e.org_id = $1
+                  )
+              -- A course with no lessons is a dead end, not a recommendation:
+              -- its tile would read "0 lessons" and open onto nothing.
+              AND EXISTS (
+                    SELECT 1 FROM course_modules cm
+                      JOIN lessons l ON l.module_id = cm.id
+                     WHERE cm.course_id = c.id
+                  )
+        ORDER BY popularity DESC, c.title
+        LIMIT ${HERO_COURSES}`,
+      [orgId, recommendLanguage, callerId],
+    ),
   ]);
 
   const toMap = (rows: AggRow[]) => new Map(rows.map((r) => [r.user_id, r]));
@@ -213,6 +353,9 @@ export async function getLearnerDashboardData(
     xp: { allTime: xpAllTime, month: xpMonth },
     level: levelProgress(xpAllTime),
     streak: computeStreak(streakRow?.today ?? '', streakRow?.days ?? []),
+    week: buildWeekActivity(streakRow?.today ?? '', dayRows ?? []),
+    courses: (heroCourseRows ?? []).map(toCourseCard),
+    recommended: (recommendedRows ?? []).map(toCourseCard),
     showLeaderboard: !opts?.suppressLeaderboard,
     leaderboard: opts?.suppressLeaderboard
       ? { allTime: { rows: [], me: null }, month: { rows: [], me: null } }

@@ -12,7 +12,7 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
 
   await requireActiveMember(orgId);
 
-  const [{ isIndividual }, settingsRow] = await Promise.all([
+  const [{ isIndividual, language }, settingsRow] = await Promise.all([
     resolveVisibilityContext(orgId, profile.id),
     queryOne<{ features: { leaderboard_enabled?: boolean } | null }>(
       `SELECT features FROM org_settings WHERE org_id = $1`,
@@ -23,6 +23,8 @@ export default endpoint('learner-dashboard', async ({ req, profile, reply, requi
 
   const data = await getLearnerDashboardData(orgId, profile.id, {
     suppressLeaderboard: isIndividual || leaderboardOff,
+    isIndividual,
+    language,
   });
   return reply(200, data);
 });

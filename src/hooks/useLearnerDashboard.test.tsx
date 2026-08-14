@@ -15,6 +15,15 @@ const data: LearnerDashboardData = {
   xp: { allTime: 75, month: 45 },
   level: { level: 1, xp: 75, xpIntoLevel: 75, xpForLevel: 200, xpToNext: 125, nextThreshold: 200, progressPct: 38 },
   streak: { current: 3, activeToday: true },
+  week: {
+    lessons: 6,
+    minutes: 90,
+    untimedLessons: 0,
+    perDayMinutes: [0, 10, 0, 20, 30, 0, 30],
+    previous: { lessons: 4, minutes: 60 },
+  },
+  courses: [],
+  recommended: [],
   showLeaderboard: true,
   leaderboard: {
     allTime: { rows: [{ rank: 1, name: 'Anna B.', xp: 300, isSelf: false }], me: { rank: 2, name: 'Martin H.', xp: 75, isSelf: true } },
@@ -30,6 +39,8 @@ function Consumer({ orgId, enabled }: { orgId: string | undefined; enabled?: boo
       <div data-testid="xp">{query.data?.xp.allTime}</div>
       <div data-testid="streak">{query.data?.streak.current}</div>
       <div data-testid="myrank">{query.data?.leaderboard.allTime.me?.rank}</div>
+      <div data-testid="thumb">{query.data?.courses[0]?.thumbnailUrl ?? 'none'}</div>
+      <div data-testid="rec-thumb">{query.data?.recommended[0]?.thumbnailUrl ?? 'none'}</div>
     </div>
   );
 }
@@ -64,6 +75,25 @@ describe('useLearnerDashboard', () => {
     });
     expect(screen.getByTestId('streak')).toHaveTextContent('3');
     expect(screen.getByTestId('myrank')).toHaveTextContent('2');
+  });
+
+  it('signs hero and recommended course thumbnails, leaving the artless ones null', async () => {
+    mockCallApi.mockImplementation((path: string) =>
+      path === '/api/learner-dashboard'
+        ? Promise.resolve({
+            ...data,
+            courses: [{ courseId: 'c-1', title: 'A', thumbnailUrl: 'lms/a.png', lessonsTotal: 9, lessonsCompleted: 4, pct: 44 }],
+            recommended: [{ courseId: 'c-2', title: 'B', thumbnailUrl: null, lessonsTotal: 6, lessonsCompleted: 0, pct: 0 }],
+          })
+        : Promise.resolve({ url: 'https://blob/signed-a.png' }),
+    );
+
+    renderWithClient(<Consumer orgId="org-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('thumb')).toHaveTextContent('https://blob/signed-a.png');
+    });
+    expect(screen.getByTestId('rec-thumb')).toHaveTextContent('none');
   });
 
   it('does not fetch when enabled is false', async () => {

@@ -1,32 +1,74 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { BookOpen, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { routes } from '@/lib/routes';
-import { StatCard } from '@/components/ui/stat-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { QueryErrorState } from '@/components/ui/query-error-state';
-import { Button } from '@/components/ui/button';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 import { useCommunityGate } from '@/hooks/useCommunityGate';
+import { useCommunityEvents } from '@/hooks/useCommunityEvents';
 import { useLearnerDashboard } from '@/hooks/useLearnerDashboard';
-import { GamificationSummary } from '@/components/learner/GamificationSummary';
-import { Leaderboard } from '@/components/learner/Leaderboard';
-import { DashboardCommunitySection } from '@/components/learner/DashboardCommunitySection';
-import { BookOpen, Clock, Award, TrendingUp, Sparkles } from 'lucide-react';
+import { DashboardHero } from '@/components/learner/dashboard/DashboardHero';
+import { DashboardStats } from '@/components/learner/dashboard/DashboardStats';
+import { DashboardCommunity } from '@/components/learner/dashboard/DashboardCommunity';
+import { DashboardLeaderboard } from '@/components/learner/dashboard/DashboardLeaderboard';
+import { DashboardEvents } from '@/components/learner/dashboard/DashboardEvents';
+import type { CommunityPost } from '@/lib/community-types';
+
+const RECENT_POSTS = 3;
+const UPCOMING_EVENTS = 5;
+
+function initialsOf(first?: string | null, last?: string | null, full?: string | null): string {
+  const parts = [first, last].filter(Boolean) as string[];
+  const tokens = parts.length > 0 ? parts : (full ?? '').split(/\s+/).filter(Boolean);
+  const letters = [tokens[0], tokens.length > 1 ? tokens[tokens.length - 1] : undefined]
+    .filter(Boolean)
+    .map((tok) => (tok as string)[0].toUpperCase());
+  return letters.join('') || '?';
+}
 
 export default function LearnerDashboard() {
-  const { currentOrg, profile, memberships, isPlatformAdmin, isOrgAdmin } = useAuth();
+  const { currentOrg, profile, memberships, isPlatformAdmin } = useAuth();
   const orgGuard = useOrgGuard();
   const isIndividual = currentOrg?.kind === 'individual';
   const communityGate = useCommunityGate();
+  const communityOn = communityGate === 'allowed';
   const { t } = useTranslation();
   const navigate = useNavigate();
 
   const query = useLearnerDashboard(currentOrg?.id, {
     enabled: orgGuard === 'ready' && !!currentOrg,
   });
+
+  const communityOrgId = isIndividual ? undefined : currentOrg?.id;
+  const globalPosts = useCommunityEvents('global', communityOrgId, { enabled: communityOn });
+  const orgPosts = useCommunityEvents('org', communityOrgId, { enabled: communityOn });
+
+  const allPosts = useMemo<CommunityPost[]>(
+    () => [...(globalPosts.data ?? []), ...(orgPosts.data ?? [])],
+    [globalPosts.data, orgPosts.data],
+  );
+
+  const recentPosts = useMemo(
+    () =>
+      [...allPosts]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, RECENT_POSTS),
+    [allPosts],
+  );
+
+  const upcomingEvents = useMemo(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    return allPosts
+      .filter((p) => p.event_date && new Date(p.event_date).getTime() >= startOfToday.getTime())
+      .sort((a, b) => new Date(a.event_date!).getTime() - new Date(b.event_date!).getTime())
+      .slice(0, UPCOMING_EVENTS);
+  }, [allPosts]);
 
   if (orgGuard === 'loading' || query.isLoading) {
     return (
@@ -61,73 +103,78 @@ export default function LearnerDashboard() {
     );
   }
 
-  const { snapshot, xp, level, streak, leaderboard, showLeaderboard } = query.data;
-  const firstName = profile?.first_name || profile?.full_name;
+  const { snapshot, level, week, courses, recommended, leaderboard, showLeaderboard } = query.data;
+
+  const heroCourses = courses.length > 0 ? courses : recommended;
+  const coursesAreRecommendations = courses.length === 0 && recommended.length > 0;
+  const isFresh = snapshot.started === 0;
+
+  const showRail = showLeaderboard || communityOn;
+  const communityLoading = communityOn && (globalPosts.isLoading || orgPosts.isLoading);
+  const communityError = communityOn && (globalPosts.isError || orgPosts.isError);
 
   return (
     <AppLayout>
-      <div className="mb-6">
-        <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
-          {firstName ? t('dashboard.welcomeBack', { name: firstName }) : t('dashboard.welcome')}
-        </h1>
-        <p className="text-sm text-muted-foreground">{t('dashboard.subtitle')}</p>
-      </div>
+      <DashboardHero
+        name={profile?.first_name || profile?.full_name || null}
+        initials={initialsOf(profile?.first_name, profile?.last_name, profile?.full_name)}
+        level={level}
+        lessonsThisWeek={week.lessons}
+        overallPct={snapshot.overallPct}
+        courses={heroCourses}
+        isFresh={isFresh}
+        coursesAreRecommendations={coursesAreRecommendations}
+        onCta={() => navigate(isFresh ? routes.learner.courses : routes.learner.training)}
+        onCourseClick={(courseId) =>
+          navigate(
+            coursesAreRecommendations
+              ? routes.learner.courseDetail(courseId)
+              : routes.learner.coursePlayer(courseId),
+          )
+        }
+      />
 
-      {profile && !isPlatformAdmin && !isOrgAdmin && profile.assessment_level == null && (
-        <div
-          data-testid="assessment-banner"
-          className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4"
-        >
-          <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
-            <Sparkles className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-semibold">{t('assessment.banner.title')}</p>
-            <p className="text-[12.5px] text-muted-foreground">{t('assessment.banner.body')}</p>
-          </div>
-          <Button
-            onClick={() => navigate(routes.learner.assessment)}
-            className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            {t('assessment.banner.cta')}
-          </Button>
+      <div className={showRail ? 'grid items-start gap-[26px] lg:grid-cols-[62%_minmax(0,1fr)]' : ''}>
+        <div className="min-w-0">
+          <DashboardStats snapshot={snapshot} week={week} />
+
+          {communityOn &&
+            (communityLoading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : communityError ? (
+              <div className="mt-[30px]">
+                <QueryErrorState
+                  onRetry={() => {
+                    globalPosts.refetch();
+                    orgPosts.refetch();
+                  }}
+                />
+              </div>
+            ) : (
+              <DashboardCommunity
+                posts={recentPosts}
+                onPostClick={(post) => navigate(routes.community.postDetail(post.scope, post.id))}
+                onSeeMore={() => navigate(routes.community.feed)}
+              />
+            ))}
         </div>
-      )}
 
-      <div data-testid="dashboard-snapshot" className="mb-7 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label={t('dashboard.started')}
-          value={snapshot.started}
-          icon={<BookOpen className="h-5 w-5" />}
-          onClick={() => navigate(routes.learner.training)}
-        />
-        <StatCard
-          label={t('dashboard.inProgress')}
-          value={snapshot.inProgress}
-          icon={<Clock className="h-5 w-5" />}
-          onClick={() => navigate(routes.learner.training)}
-        />
-        <StatCard
-          label={t('dashboard.completed')}
-          value={snapshot.completed}
-          icon={<Award className="h-5 w-5" />}
-          onClick={() => navigate(routes.learner.training)}
-        />
-        <StatCard
-          label={t('dashboard.overallProgress')}
-          value={`${snapshot.overallPct}%`}
-          icon={<TrendingUp className="h-5 w-5" />}
-          onClick={() => navigate(routes.learner.training)}
-        />
+        {showRail && (
+          <div className="min-w-0 self-stretch lg:border-l lg:border-[rgba(23,26,38,0.09)] lg:pl-[26px]">
+            {showLeaderboard && <DashboardLeaderboard leaderboard={leaderboard.allTime} />}
+
+            {communityOn && !communityLoading && !communityError && (
+              <DashboardEvents
+                events={upcomingEvents}
+                onEventClick={(event) => navigate(routes.community.postDetail(event.scope, event.id))}
+                onSeeMore={() => navigate(routes.community.events)}
+              />
+            )}
+          </div>
+        )}
       </div>
-
-      <GamificationSummary xp={xp} level={level} streak={streak} />
-
-      {showLeaderboard && <Leaderboard leaderboard={leaderboard} />}
-
-      {communityGate === 'allowed' && (
-        <DashboardCommunitySection orgId={isIndividual ? undefined : currentOrg.id} />
-      )}
     </AppLayout>
   );
 }

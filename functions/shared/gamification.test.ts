@@ -9,6 +9,7 @@ import {
   levelProgress,
   displayName,
   computeStreak,
+  buildWeekActivity,
   getLearnerDashboardData,
   LESSON_XP,
   QUIZ_XP,
@@ -88,11 +89,14 @@ describe('getLearnerDashboardData suppressLeaderboard', () => {
       .mockResolvedValueOnce([{ user_id: 'me', all_time: 5, month: 2 }])        // lessons
       .mockResolvedValueOnce([{ user_id: 'me', all_time: 1, month: 1 }])        // quizzes
       .mockResolvedValueOnce([])                                               // courses
-      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06'] }]);  // streak
+      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06'] }])   // streak
+      .mockResolvedValueOnce([])                                               // per-day activity
+      .mockResolvedValueOnce([])                                               // hero courses
+      .mockResolvedValueOnce([]);                                              // recommendations
 
     const data = await getLearnerDashboardData('org-solo', 'me', { suppressLeaderboard: true });
 
-    expect(mockQuery).toHaveBeenCalledTimes(5);
+    expect(mockQuery).toHaveBeenCalledTimes(8);
     const memberQueried = (mockQuery.mock.calls as [string, unknown[]][]).some(([sql]) => sql.includes('org_memberships'));
     expect(memberQueried).toBe(false);
 
@@ -113,13 +117,48 @@ describe('getLearnerDashboardData suppressLeaderboard', () => {
       .mockResolvedValueOnce([])                                               // quizzes
       .mockResolvedValueOnce([])                                               // courses
       .mockResolvedValueOnce([{ user_id: 'me', first_name: 'Solo', last_name: 'Learner', full_name: 'Solo Learner' }]) // members
-      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06'] }]);  // streak
+      .mockResolvedValueOnce([{ today: '2026-08-06', days: ['2026-08-06'] }])   // streak
+      .mockResolvedValueOnce([])                                               // per-day activity
+      .mockResolvedValueOnce([])                                               // hero courses
+      .mockResolvedValueOnce([]);                                              // recommendations
 
     const data = await getLearnerDashboardData('org-1', 'me');
 
-    expect(mockQuery).toHaveBeenCalledTimes(6);
+    expect(mockQuery).toHaveBeenCalledTimes(9);
     const memberQueried = (mockQuery.mock.calls as [string, unknown[]][]).some(([sql]) => sql.includes('org_memberships'));
     expect(memberQueried).toBe(true);
     expect(data.leaderboard.allTime.rows).toEqual([{ rank: 1, name: 'Solo L.', xp: 50, isSelf: true }]);
+  });
+});
+
+describe('buildWeekActivity (#455)', () => {
+  const day = (d: string, lessons: number, minutes: number, untimed = 0) =>
+    ({ day: d, lessons, minutes, untimed });
+
+  it('splits the rows into the current seven days and the seven before them', () => {
+    const week = buildWeekActivity('2026-08-06', [
+      day('2026-08-06', 2, 30, 1),
+      day('2026-08-04', 1, 15),
+      day('2026-07-31', 1, 20),   // oldest day still inside the current window
+      day('2026-07-30', 4, 45),   // first day of the previous window
+      day('2026-07-24', 1, 15),   // oldest day of the previous window
+      day('2026-07-23', 9, 999),  // outside both — must be ignored
+    ]);
+
+    expect(week.lessons).toBe(4);
+    expect(week.minutes).toBe(65);
+    expect(week.untimedLessons).toBe(1);
+    expect(week.previous).toEqual({ lessons: 5, minutes: 60 });
+  });
+
+  it('emits one value per day, oldest first, zero-filling the quiet ones', () => {
+    const week = buildWeekActivity('2026-08-06', [day('2026-08-06', 1, 30), day('2026-08-03', 1, 10)]);
+    expect(week.perDayMinutes).toEqual([0, 0, 0, 10, 0, 0, 30]);
+  });
+
+  it('returns a flat window rather than NaNs when there is no anchor date', () => {
+    const week = buildWeekActivity('', [day('2026-08-06', 1, 30)]);
+    expect(week.perDayMinutes).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(week).toMatchObject({ lessons: 0, minutes: 0, previous: { lessons: 0, minutes: 0 } });
   });
 });

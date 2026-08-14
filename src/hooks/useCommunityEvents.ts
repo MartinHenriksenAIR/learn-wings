@@ -3,7 +3,11 @@ import { queryKeys } from '@/lib/query-keys';
 import { fetchPosts } from '@/lib/community-api';
 import type { CommunityScope } from '@/lib/community-types';
 
-export function useCommunityEvents(scope: CommunityScope, orgId?: string) {
+export function useCommunityEvents(
+  scope: CommunityScope,
+  orgId?: string,
+  options: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: queryKeys.communityPosts.list(scope, orgId, '', '', []),
     queryFn: async () => {
@@ -13,6 +17,6 @@ export function useCommunityEvents(scope: CommunityScope, orgId?: string) {
       });
       return Array.isArray(posts) ? posts : [];
     },
-    enabled: scope === 'global' || !!orgId,
+    enabled: (options.enabled ?? true) && (scope === 'global' || !!orgId),
   });
 }

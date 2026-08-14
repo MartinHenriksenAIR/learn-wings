@@ -60,6 +60,16 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Learner-dashboard accents (#455, "Nordic"). Deliberately outside the
+        // app's token set: on that surface colour carries identity — which
+        // course, which rank — as a full fill, never the navy tint used
+        // elsewhere. Do not reach for these outside the dashboard.
+        dash: {
+          ink: "#141a33",
+          a1: "#a5b4fc",
+          a2: "#f7d9a8",
+          a3: "#a7e8c4",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

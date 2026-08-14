@@ -167,65 +167,58 @@
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Welcome back",
-    "coursesEnrolled": "Courses Enrolled",
-    "inProgress": "In Progress",
     "completed": "Completed",
-    "overallProgress": "Overall Progress",
-    "continueLearning": "Continue Learning",
-    "viewAllCourses": "View all courses",
-    "noCoursesInProgress": "No courses in progress",
-    "startLearning": "Start learning by opening a course from the Course Catalog.",
+    "overallProgress": "Overall progress",
     "browseCourses": "Browse Courses",
-    "completedCourses": "Completed Courses",
     "noMembershipTitle": "No organization membership yet",
     "noMembershipDescription": "You're not a member of any organization yet. Ask your administrator for an invitation to get started.",
     "invitationOnlyTitle": "Registration is by invitation only",
     "invitationOnlyDescription": "Ask your organisation for an invitation to get started.",
-    "welcomeBack": "Welcome back, {{name}}",
-    "pickUpWhereYouLeftOff": "Pick up where you left off.",
-    "heroContinueBadge": "Continue learning",
-    "heroResumeCta": "Resume course",
-    "heroLessonsDone": "{{done}} of {{total}} lessons done",
-    "heroAllCaughtUpBadge": "All caught up",
-    "heroAllDoneTitle": "Every course completed — nice work!",
-    "heroAllDoneDescription": "Keep the momentum going — browse the catalog and start a new course.",
-    "heroStartNewCta": "Start a new course",
-    "heroCoursesCompleted": "{{completed}} of {{total}} courses completed",
-    "heroFirstTimeBadge": "Get started",
-    "heroFirstTimeTitle": "Ready to start learning?",
-    "heroFirstTimeDescription": "Pick your first course from the catalog and start building practical AI skills.",
-    "heroPickFirstCourse": "Pick your first course",
     "noFavoritesTitle": "No favorites yet",
     "noFavoritesDescription": "Tap the heart on a course to save it here.",
-    "subtitle": "Track your momentum and see where you stand.",
-    "started": "Started",
     "level": {
-      "label": "Level {{level}}",
-      "toNext": "{{xp}} XP to Level {{level}}"
-    },
-    "xp": {
-      "total": "{{xp}} XP total"
-    },
-    "streak": {
-      "days_one": "{{count}}-day streak",
-      "days_other": "{{count}}-day streak",
-      "activeToday": "You've learned today — keep it going!",
-      "keepItUp": "Learn something today to keep your streak alive.",
-      "none": "Complete a lesson today to start a streak."
+      "label": "Level {{level}}"
     },
     "leaderboard": {
       "title": "Leaderboard",
-      "allTime": "All-time",
-      "thisMonth": "This month",
       "yourRank": "Your rank",
-      "empty": "No one's on the board yet — be the first."
+      "empty": "No one's on the board yet — be the first.",
+      "xpLabel": "{{xp}} XP"
     },
     "community": {
       "title": "Community",
-      "viewAll": "View all",
-      "recentActivity": "Recent activity",
       "noActivityTitle": "No recent activity yet",
-      "noActivityDescription": "Be the first to start a conversation in the community."
+      "noActivityDescription": "Be the first to start a conversation in the community.",
+      "scopeOrg": "Org",
+      "scopeGlobal": "Global",
+      "comments_one": "{{count}} comment",
+      "comments_other": "{{count}} comments"
+    },
+    "seeMore": "See more",
+    "hero": {
+      "greeting": "Hi, <b>{{name}}</b>!",
+      "headline_one": "You have completed <em>{{count}} lesson</em> this week!",
+      "headline_other": "You have completed <em>{{count}} lessons</em> this week!",
+      "headlineFresh": "Ready for <em>your first lesson</em>?",
+      "cta": "See my training",
+      "ctaFresh": "Find a course",
+      "lovedLabel": "Courses learners love",
+      "lessonsOnly": "{{lessons}} lessons",
+      "lessonsAndPct": "{{lessons}} lessons | {{pct}}%"
+    },
+    "stats": {
+      "coursesInProgress": "Courses in progress",
+      "coursesCompleted": "Courses completed",
+      "learningTime": "Hours spent this week",
+      "hoursUnit": "h",
+      "vsPrevious": "vs last week",
+      "untimed_one": "{{count}} lesson has no set length",
+      "untimed_other": "{{count}} lessons have no set length"
+    },
+    "events": {
+      "title": "Upcoming",
+      "emptyTitle": "No events coming up",
+      "emptyDescription": "New events will show up here."
     }
   },
   "training": {
@@ -680,8 +673,15 @@
       "adminNotesLabel": "Admin Notes (internal)",
       "adminNotesPlaceholder": "Notes visible only to admins..."
     },
-    "tabs": { "board": "Board", "prioritize": "Prioritize" },
-    "levels": { "low": "Low", "medium": "Medium", "high": "High" },
+    "tabs": {
+      "board": "Board",
+      "prioritize": "Prioritize"
+    },
+    "levels": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
     "bands": {
       "quick_win": "Quick Win",
       "big_bet": "Big Bet",
