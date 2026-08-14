@@ -28,10 +28,6 @@ export interface SweepRunRecord {
   startedAt: number;
   outcome: SweepRunOutcome;
   reason: string | null;
-  /**
-   * The refusal in full (#451) — see `OrphanSweepSummary.abortDetail`. Null on a
-   * completed run, and on any abort recorded before the column existed.
-   */
   abortDetail: string | null;
   deleted: number;
   failed: number;
@@ -134,13 +130,6 @@ function renderAbortEmail(
       : previous === null
         ? '<p>There is no earlier run on record, so there is nothing to compare this against — either the sweep has never completed a run, or its records have aged out.</p>'
         : '<p>The previous run was healthy, so this is the first refused night.</p>';
-  // THE REFUSAL ITSELF, IN THE EMAIL (#451). This used to be a pointer at an App
-  // Insights query and nothing else, which made acting on a refusal depend on log
-  // ingestion working — and when it silently was not, the sweep wedged for 19
-  // nights while every one of those emails sent its reader to an empty result set.
-  // The reason code alone never named the bucket, so there was nothing else in the
-  // message to act on. `abort_detail` is null only for aborts recorded before the
-  // column existed, so the old pointer stays as the fallback for those.
   const detail = run.abortDetail
     ? `<p><strong>What it refused, and what to do about it:</strong></p>
        <p style="background:#f5f4f0;border-left:3px solid #d97757;padding:10px 14px;white-space:pre-wrap">${escapeHtml(run.abortDetail)}</p>`

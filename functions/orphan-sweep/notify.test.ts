@@ -169,11 +169,6 @@ describe('decideSweepNotifications — abort alerting', () => {
   });
 
   it('puts the whole refusal in the abort email rather than a pointer to it (#451)', () => {
-    // THE #451 REGRESSION TEST. This email used to carry the reason CODE and an
-    // App Insights query, and nothing else. The code does not name the bucket, and
-    // the query returned nothing for 19 nights because the component's Log
-    // Analytics workspace had been deleted — so every alert was unactionable and
-    // the sweep stayed wedged. The detail has to travel IN the message.
     const detail =
       '3/4 blobs under org-logos/ (75.0%) look unreferenced, above the 50.0% ceiling — even though ' +
       'the container as a whole is only 46.2% unreferenced. Sample: org-logos/0aebb9ce.jpg. ' +
@@ -193,14 +188,10 @@ describe('decideSweepNotifications — abort alerting', () => {
     expect(decision.alert?.html).toContain('org-logos/');
     expect(decision.alert?.html).toContain('3/4');
     expect(decision.alert?.html).toContain('WHAT TO DO');
-    // The dead pointer must not be what the reader is sent to when the refusal is
-    // right there in the body.
     expect(decision.alert?.html).not.toContain('App Insights');
   });
 
   it('falls back to the App Insights pointer for a run recorded before abort_detail existed', () => {
-    // Rows written before the #451 migration have a null detail. They still have
-    // to produce a usable email rather than an abort with no guidance at all.
     const decision = decideSweepNotifications({
       thisRun: run({ startedAt: NOW, outcome: 'aborted', reason: 'listing-failed', abortDetail: null }),
       history: [completed(1)],
@@ -632,9 +623,6 @@ describe('recordAndNotify', () => {
   });
 
   it('persists the refusal detail so a later night can still quote it (#451)', async () => {
-    // The record is what the policy reads on EVERY subsequent night. Without the
-    // detail on the row, a wedge that has been running for a week can only be
-    // re-announced as a bare reason code.
     const detail = '3/4 blobs under org-logos/ (75.0%) look unreferenced. WHAT TO DO: do NOT raise the ceiling first.';
     await recordAndNotify(
       summaryOf({ aborted: true, reason: 'orphan-bucket-share-implausible', abortDetail: detail }),
