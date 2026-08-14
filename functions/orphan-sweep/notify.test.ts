@@ -14,6 +14,7 @@ vi.mock('resend', () => ({ Resend: vi.fn().mockImplementation(() => ({ emails: {
 import {
   decideSweepNotifications,
   formatBytes,
+  readSweepBaseline,
   recordAndNotify,
   runOutcome,
   type SweepRunRecord,
@@ -33,6 +34,7 @@ const run = (overrides: Partial<SweepRunRecord> = {}): SweepRunRecord => ({
   reason: null,
   abortDetail: null,
   deleted: 0,
+  deferred: 0,
   failed: 0,
   bytesReclaimed: 0,
   deletedSample: [],
@@ -42,7 +44,7 @@ const run = (overrides: Partial<SweepRunRecord> = {}): SweepRunRecord => ({
 });
 
 const aborted = (days: number, overrides: Partial<SweepRunRecord> = {}) =>
-  run({ startedAt: daysAgo(days), outcome: 'aborted', reason: 'orphan-count-implausible', ...overrides });
+  run({ startedAt: daysAgo(days), outcome: 'aborted', reason: 'listing-failed', ...overrides });
 const completed = (days: number, overrides: Partial<SweepRunRecord> = {}) =>
   run({ startedAt: daysAgo(days), outcome: 'completed', ...overrides });
 const pastDue = (days: number) =>
@@ -59,15 +61,15 @@ const deletedRun = (days: number, overrides: Partial<SweepRunRecord> = {}) =>
 
 describe('runOutcome', () => {
   it('maps a clean run to completed', () => {
-    expect(runOutcome({ aborted: false, reason: null })).toBe('completed');
+    expect(runOutcome({ aborted: false, reportOnly: false, reason: null })).toBe('completed');
   });
 
   it('maps a past-due catch-up to skipped — it is benign and self-healing', () => {
-    expect(runOutcome({ aborted: true, reason: 'past-due' })).toBe('skipped');
+    expect(runOutcome({ aborted: true, reportOnly: false, reason: 'past-due' })).toBe('skipped');
   });
 
   it('maps the disabled kill switch to aborted — "switched off and forgotten" IS the wedge', () => {
-    expect(runOutcome({ aborted: true, reason: 'disabled' })).toBe('aborted');
+    expect(runOutcome({ aborted: true, reportOnly: false, reason: 'disabled' })).toBe('aborted');
   });
 
   it('maps every other refusal to aborted', () => {
@@ -76,12 +78,15 @@ describe('runOutcome', () => {
       'reference-read-failed',
       'empty-reference-set',
       'listing-failed',
-      'orphan-share-implausible',
-      'orphan-bucket-share-implausible',
-      'orphan-count-implausible',
+      'reference-resolution-broken',
+      'reference-loss',
     ] as const) {
-      expect(runOutcome({ aborted: true, reason })).toBe('aborted');
+      expect(runOutcome({ aborted: true, reportOnly: false, reason })).toBe('aborted');
     }
+  });
+
+  it('maps a cold-start census to report-only, not to a refusal', () => {
+    expect(runOutcome({ aborted: false, reportOnly: true, reason: null })).toBe('report-only');
   });
 });
 
@@ -93,7 +98,7 @@ describe('decideSweepNotifications — abort alerting', () => {
       now: NOW,
     });
     expect(decision.alert?.kind).toBe('abort');
-    expect(decision.alert?.subject).toContain('orphan-count-implausible');
+    expect(decision.alert?.subject).toContain('listing-failed');
     expect(decision.alert?.html).toContain('deleted nothing');
   });
 
@@ -170,14 +175,14 @@ describe('decideSweepNotifications — abort alerting', () => {
 
   it('puts the whole refusal in the abort email rather than a pointer to it (#451)', () => {
     const detail =
-      '3/4 blobs under org-logos/ (75.0%) look unreferenced, above the 50.0% ceiling — even though ' +
-      'the container as a whole is only 46.2% unreferenced. Sample: org-logos/0aebb9ce.jpg. ' +
-      'WHAT TO DO: do NOT raise the ceiling first.';
+      '9 of 41 reference(s) in the database resolve to no blob in the container, against 0 on the last ' +
+      'accepted run — 9 more. Sample of what no longer resolves: org-logos/0aebb9ce.jpg. ' +
+      'WHAT TO DO: take the sampled values above and find their blobs by hand.';
     const decision = decideSweepNotifications({
       thisRun: run({
         startedAt: NOW,
         outcome: 'aborted',
-        reason: 'orphan-bucket-share-implausible',
+        reason: 'reference-resolution-broken',
         abortDetail: detail,
       }),
       history: [completed(1)],
@@ -186,7 +191,7 @@ describe('decideSweepNotifications — abort alerting', () => {
 
     expect(decision.alert?.kind).toBe('abort');
     expect(decision.alert?.html).toContain('org-logos/');
-    expect(decision.alert?.html).toContain('3/4');
+    expect(decision.alert?.html).toContain('9 of 41');
     expect(decision.alert?.html).toContain('WHAT TO DO');
     expect(decision.alert?.html).not.toContain('App Insights');
   });
@@ -537,6 +542,128 @@ describe('decideSweepNotifications — deletion digest', () => {
   });
 });
 
+describe('decideSweepNotifications — report-only and baseline acceptance (#469)', () => {
+  const reportOnly = (days: number, overrides: Partial<SweepRunRecord> = {}) =>
+    run({ startedAt: daysAgo(days), outcome: 'report-only', ...overrides });
+
+  it('announces a report-only night rather than letting it pass in silence', () => {
+    const thisRun = reportOnly(0, { abortDetail: 'No earlier run carries a census. WHAT TO DO: read the numbers.' });
+
+    const { alert } = decideSweepNotifications({ thisRun, history: [], now: NOW });
+
+    expect(alert?.kind).toBe('report-only');
+    expect(alert?.subject).toContain('report only');
+    expect(alert?.html).toContain('deleted nothing');
+    expect(alert?.html).toContain('No earlier run carries a census');
+  });
+
+  it('does not treat a report-only night as a refusal or as a recovery', () => {
+    const history = [reportOnly(1), completed(2)];
+
+    const { alert } = decideSweepNotifications({ thisRun: completed(0), history, now: NOW });
+
+    expect(alert).toBeNull();
+  });
+
+  it('does not let a report-only night break an ongoing refusal streak', () => {
+    const history = [reportOnly(1), aborted(2, { abortNotifiedAt: daysAgo(2) }), aborted(3)];
+
+    const { alert } = decideSweepNotifications({
+      thisRun: completed(0),
+      history,
+      now: NOW,
+    });
+
+    expect(alert?.kind).toBe('recovered');
+  });
+
+  it('gives a baseline refusal the exact statement that accepts it, scoped to this run', () => {
+    const thisRun = run({
+      id: 'abc-123',
+      startedAt: daysAgo(0),
+      outcome: 'aborted',
+      reason: 'reference-loss',
+      abortDetail: '2 blobs are still pointed at. WHAT TO DO: check.',
+    });
+
+    const { alert } = decideSweepNotifications({ thisRun, history: [], now: NOW });
+
+    expect(alert?.html).toContain('baseline_accepted = true');
+    expect(alert?.html).toContain("id = &#39;abc-123&#39;");
+    expect(alert?.html).toContain('Do not run it to make the alert stop');
+  });
+
+  it('offers baseline acceptance only for refusals a baseline could explain', () => {
+    const thisRun = run({ startedAt: daysAgo(0), outcome: 'aborted', reason: 'listing-failed' });
+
+    const { alert } = decideSweepNotifications({ thisRun, history: [], now: NOW });
+
+    expect(alert?.html).not.toContain('baseline_accepted');
+  });
+
+  it('tells the digest reader that a deferred backlog is draining, not stuck', () => {
+    const thisRun = deletedRun(0, { deferred: 47 });
+
+    const { digest } = decideSweepNotifications({ thisRun, history: [], now: NOW + 4 * DAY });
+
+    expect(digest?.html).toContain('47 further blob(s)');
+    expect(digest?.html).toContain('carried to the next run');
+  });
+
+  it('says nothing about deferral when nothing was deferred', () => {
+    const { digest } = decideSweepNotifications({
+      thisRun: deletedRun(0),
+      history: [],
+      now: NOW + 4 * DAY,
+    });
+
+    expect(digest?.html).not.toContain('further blob(s)');
+  });
+});
+
+describe('readSweepBaseline', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('reads the most recent accepted census', async () => {
+    mockQueryOne.mockResolvedValue({
+      started_at: new Date(daysAgo(1)),
+      matched: 26,
+      unmatched_references: 3,
+    });
+
+    await expect(readSweepBaseline()).resolves.toEqual({
+      startedAt: daysAgo(1),
+      matched: 26,
+      unmatchedReferences: 3,
+    });
+  });
+
+  it('only considers runs that were allowed to delete, or ones a human accepted', async () => {
+    mockQueryOne.mockResolvedValue(null);
+
+    await readSweepBaseline();
+
+    const sql = mockQueryOne.mock.calls[0][0] as string;
+    expect(sql).toContain("outcome IN ('completed', 'report-only')");
+    expect(sql).toContain('baseline_accepted');
+    expect(sql).toContain('matched IS NOT NULL');
+  });
+
+  it('returns null when there is no run to compare against', async () => {
+    mockQueryOne.mockResolvedValue(null);
+
+    await expect(readSweepBaseline()).resolves.toBeNull();
+  });
+
+  it('treats a run recorded before the census columns existed as no baseline at all', async () => {
+    mockQueryOne.mockResolvedValue({ started_at: new Date(daysAgo(1)), matched: null, unmatched_references: null });
+
+    await expect(readSweepBaseline()).resolves.toBeNull();
+  });
+});
+
 describe('formatBytes', () => {
   it('scales to the largest sensible unit', () => {
     expect(formatBytes(0)).toBe('0 B');
@@ -556,16 +683,20 @@ const makeLog = () => ({ log: vi.fn(), warn: vi.fn(), error: vi.fn() });
 
 const summaryOf = (overrides: Partial<OrphanSweepSummary> = {}): OrphanSweepSummary => ({
   aborted: false,
+  reportOnly: false,
   reason: null,
   abortDetail: null,
   scanned: 40,
   referenced: 30,
   eligible: 40,
   orphaned: 2,
+  matched: 38,
+  unmatchedReferences: 0,
   skippedByGrace: 1,
   skippedUnsafeName: 0,
   skippedByRecheck: 0,
   deleted: 0,
+  deferred: 0,
   failed: 0,
   bytesReclaimed: 0,
   deletedSample: [],
@@ -623,15 +754,49 @@ describe('recordAndNotify', () => {
   });
 
   it('persists the refusal detail so a later night can still quote it (#451)', async () => {
-    const detail = '3/4 blobs under org-logos/ (75.0%) look unreferenced. WHAT TO DO: do NOT raise the ceiling first.';
+    const detail = '9 of 40 references resolve to no blob. WHAT TO DO: find their blobs by hand.';
     await recordAndNotify(
-      summaryOf({ aborted: true, reason: 'orphan-bucket-share-implausible', abortDetail: detail }),
+      summaryOf({ aborted: true, reason: 'reference-resolution-broken', abortDetail: detail }),
       { startedAt: NOW, now: NOW, log: makeLog() },
     );
 
     const params = callsMatching(mockQueryOne, 'INSERT INTO orphan_sweep_runs')[0][1] as unknown[];
     expect(params[1]).toBe('aborted');
     expect(params[14]).toBe(detail);
+  });
+
+  it('persists the census the next run is measured against (#469)', async () => {
+    await recordAndNotify(summaryOf({ matched: 37, unmatchedReferences: 4, deferred: 12 }), {
+      startedAt: NOW,
+      now: NOW,
+      log: makeLog(),
+    });
+
+    const params = callsMatching(mockQueryOne, 'INSERT INTO orphan_sweep_runs')[0][1] as unknown[];
+    expect(params[15]).toBe(37);
+    expect(params[16]).toBe(4);
+    expect(params[17]).toBe(12);
+  });
+
+  it('persists a census-less refusal as NULL, never as a zero the next run would trust', async () => {
+    await recordAndNotify(
+      summaryOf({ aborted: true, reason: 'listing-failed', matched: null, unmatchedReferences: null }),
+      { startedAt: NOW, now: NOW, log: makeLog() },
+    );
+
+    const params = callsMatching(mockQueryOne, 'INSERT INTO orphan_sweep_runs')[0][1] as unknown[];
+    expect(params[15]).toBeNull();
+    expect(params[16]).toBeNull();
+  });
+
+  it('records a report-only run under its own outcome', async () => {
+    await recordAndNotify(summaryOf({ reportOnly: true, abortDetail: 'No earlier run carries a census.' }), {
+      startedAt: NOW,
+      now: NOW,
+      log: makeLog(),
+    });
+
+    expect((callsMatching(mockQueryOne, 'INSERT')[0][1] as unknown[])[1]).toBe('report-only');
   });
 
   it('records a past-due catch-up as skipped and a kill-switched run as aborted', async () => {
