@@ -31,7 +31,7 @@ For genuinely tiny single-edit changes, do them inline.
 
 ## Conventions
 - `.claude/rules/frontend.md` and `.claude/rules/functions.md` hold the hard-won per-tree conventions — read them before touching either tree.
-- `docs/glossary.md` is the canonical en/da terminology source of truth for user-facing copy (Member not "seat"; Course Catalog; heading == menu label). Match it when writing UI strings.
+- `docs/glossary.md` is the canonical en/da terminology source of truth for user-facing copy (User/Bruger for people, License/Licens for capacity; Course Catalog; heading == menu label). Match it when writing UI strings.
 - `docs/adr/` holds the architecture decision records — they define what is and isn't allowed; read them before structural changes. Plain markdown, edited by hand (the adr-kit tooling was removed 2026-06-06).
 
 ## Documentation policy
