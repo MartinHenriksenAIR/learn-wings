@@ -3,21 +3,14 @@
 Canonical source of truth for **user-facing** wording across the platform, in both
 English and Danish. When UI copy and this file disagree, this file wins — fix the copy.
 
-It **supersedes "Course Overview"** (now "Course Catalog" / "Kursuskatalog").
-
 ## Rules
 
-1. **User and License are distinct.** A person who can sign in and use the platform is
-   a **User** (da **Bruger**). The paid capacity unit that entitles one person is a
-   **License** (da **Licens**) — one user consumes one license (the org-wide cap). This
-   **supersedes the earlier rule that fused both into "Member" / "Medlem"** (#465):
-   "Member" / "Medlem" and "seat" / "plads" are all retired from user-facing copy,
-   including capacity, limit, requests, and **pricing / invoice** screens. Because the
-   two were fused, reclassify each old "Medlem" occurrence by meaning — a person becomes
-   **Bruger**, a capacity unit becomes **Licens**.
+1. **User and License are distinct.** A person who can sign in is a **User** (da
+   **Bruger**); the paid capacity unit that entitles one person is a **License** (da
+   **Licens**) — one user consumes one license (the org-wide cap). "Member" / "Medlem"
+   (the earlier fused term, #465) and "seat" / "plads" are retired from all copy.
 2. **Heading == menu label.** Every page's `<h1>` reads exactly as its sidebar nav item.
-3. **Internal code names are out of scope** (see the last section) — only rendered text
-   follows this glossary.
+3. **Internal code names are out of scope** (see the last section).
 
 ## Core terms
 
@@ -53,8 +46,7 @@ It **supersedes "Course Overview"** (now "Course Catalog" / "Kursuskatalog").
 
 ## Kept unchanged (internal code names — NOT user-facing)
 
-These are identifiers, not copy, and are deliberately left as "seat" or "member" — only
-rendered **values** follow this glossary, never the **keys** or symbol names:
+Identifiers, not copy — only rendered **values** follow this glossary, never keys or symbol names:
 
 - DB / SQL: `seat_limit`, `seat_requests`, `org_memberships`, `member_count`
 - Backend: `functions/**/seats.ts` and related handlers
