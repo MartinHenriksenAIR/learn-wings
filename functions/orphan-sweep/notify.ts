@@ -269,7 +269,7 @@ function decideAlert(
   const tooSoon = lastEmail !== null && now - lastEmail < ALERT_MIN_GAP_MS;
 
   if (thisRun.outcome === 'report-only') {
-    return tooSoon ? null : renderReportOnlyEmail(thisRun);
+    return renderReportOnlyEmail(thisRun);
   }
 
   if (thisRun.outcome === 'aborted') {

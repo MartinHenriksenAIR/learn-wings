@@ -557,6 +557,15 @@ describe('decideSweepNotifications — report-only and baseline acceptance (#469
     expect(alert?.html).toContain('No earlier run carries a census');
   });
 
+  it('announces a report-only night even when an abort email went out within the dedup gap', () => {
+    const thisRun = reportOnly(0);
+    const history = [aborted(1, { abortNotifiedAt: daysAgo(0.5) }), aborted(2, { abortNotifiedAt: daysAgo(2) })];
+
+    const { alert } = decideSweepNotifications({ thisRun, history, now: NOW });
+
+    expect(alert?.kind).toBe('report-only');
+  });
+
   it('does not treat a report-only night as a refusal or as a recovery', () => {
     const history = [reportOnly(1), completed(2)];
 
