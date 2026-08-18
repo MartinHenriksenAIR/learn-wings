@@ -22,6 +22,14 @@ recently. `ls` this folder for the list; each one names its issue in a header co
 `01-schema.sql`, so a fresh database stood up from `01`+`02` is always complete. The file
 stays here as the applied-migration record.
 
+`functions/schema-fold.test.ts` enforces this: CI fails if a table, column or index a
+migration creates is absent from `01-schema.sql`. It is a test rather than a line of prose
+because the prose did not work — migration `08` went unfolded for months while its own
+header claimed otherwise, leaving a fresh database with no `orphan_sweep_runs` table.
+
+**Apply an additive migration to production before the deploy that needs it.** Merging to
+`main` is the deploy, so "after the merge" is already too late.
+
 ## Applying it
 
 ```bash

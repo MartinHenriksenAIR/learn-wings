@@ -11,7 +11,7 @@ description: Use at session end on learn-wings — pushes state, updates the iss
 3. Update the issue if scope changed.
 
 **When the work is complete (merge ritual):**
-1. Verify locally: `cd functions && npm test` (if functions changed), `npm run build`, `npm test`, `npx tsc --noEmit -p tsconfig.app.json`.
+1. Verify locally: `npm run verify:all` (exit 0).
 2. Make the PR description the record of what changed and why. Do not write it into a file as well.
 3. Mark the PR ready: `gh pr ready`. Run `/code-review` on it.
 4. Merge once the review is clean (the `main` ruleset governs required approvals), then `git switch <trunk> && git pull` (`<trunk>` = the `trunk` value in `.claude/collab.json`), delete the branch.

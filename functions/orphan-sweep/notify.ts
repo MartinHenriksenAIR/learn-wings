@@ -1,9 +1,9 @@
 import { query, queryOne } from '../shared/db';
 import { escapeHtml, sendBestEffort } from '../shared/resend';
-import type { OrphanSweepSummary, SweepLogger } from './index';
+import type { OrphanSweepSummary, SweepBaseline, SweepLogger } from './index';
 
 
-export type SweepRunOutcome = 'completed' | 'aborted' | 'skipped';
+export type SweepRunOutcome = 'completed' | 'aborted' | 'skipped' | 'report-only';
 
 const DAY_MS = 86_400_000;
 
@@ -30,6 +30,7 @@ export interface SweepRunRecord {
   reason: string | null;
   abortDetail: string | null;
   deleted: number;
+  deferred: number;
   failed: number;
   bytesReclaimed: number;
   deletedSample: string[];
@@ -47,6 +48,7 @@ export interface DigestRun {
   id: string | null;
   startedAt: number;
   deleted: number;
+  deferred: number;
   failed: number;
   bytesReclaimed: number;
   deletedSample: string[];
@@ -54,7 +56,7 @@ export interface DigestRun {
 }
 
 export interface SweepAlertEmail {
-  kind: 'abort' | 'recovered';
+  kind: 'abort' | 'recovered' | 'report-only';
   subject: string;
   html: string;
 }
@@ -71,10 +73,17 @@ export interface SweepNotifyDecision {
   digest: SweepDigestEmail | null;
 }
 
-export function runOutcome(summary: Pick<OrphanSweepSummary, 'aborted' | 'reason'>): SweepRunOutcome {
+export function runOutcome(
+  summary: Pick<OrphanSweepSummary, 'aborted' | 'reportOnly' | 'reason'>,
+): SweepRunOutcome {
+  if (summary.reportOnly) return 'report-only';
   if (!summary.aborted) return 'completed';
   return summary.reason === 'past-due' ? 'skipped' : 'aborted';
 }
+
+const BASELINE_REASONS = new Set(['reference-resolution-broken', 'reference-loss']);
+
+const QUIET_OUTCOMES = new Set<SweepRunOutcome>(['skipped', 'report-only']);
 
 const latest = (values: readonly (number | null)[]): number | null =>
   values.reduce<number | null>((best, value) => (value !== null && (best === null || value > best) ? value : best), null);
@@ -88,7 +97,7 @@ function abortStreak(ordered: readonly SweepRunRecord[]): {
   let since: number | null = null;
   let announced = false;
   for (const run of ordered) {
-    if (run.outcome === 'skipped') continue;
+    if (QUIET_OUTCOMES.has(run.outcome)) continue;
     if (run.outcome !== 'aborted') break;
     nights++;
     since = run.startedAt;
@@ -116,6 +125,38 @@ const failedLine = (failed: number): string =>
   failed > 0
     ? `<p>${failed} delete(s) were REFUSED by Azure — nothing was lost, and the next run retries them.</p>`
     : '';
+
+function acceptBaselineBlock(run: SweepRunRecord): string {
+  if (run.reason === null || !BASELINE_REASONS.has(run.reason)) return '';
+  const statement =
+    run.id === null
+      ? "UPDATE public.orphan_sweep_runs SET baseline_accepted = true WHERE id = '<this run: not recorded, see the log>';"
+      : `UPDATE public.orphan_sweep_runs SET baseline_accepted = true WHERE id = '${run.id}';`;
+  return `<p><strong>If tonight's numbers are correct and expected</strong>, accept them as the baseline and the next
+     run sweeps normally. This is scoped to this one run and leaves nothing switched off afterwards:</p>
+     <p><code>${escapeHtml(statement)}</code></p>
+     <p>Do not run it to make the alert stop. A refusal that repeats is the sweep holding the line until the
+     reference match is fixed, and every unreferenced blob is still there while it does.</p>`;
+}
+
+function renderReportOnlyEmail(run: SweepRunRecord): SweepAlertEmail {
+  return {
+    kind: 'report-only',
+    subject: '[orphan-sweep] report only — census recorded, nothing deleted',
+    html: `
+    <h2>Orphan sweep took a census and deleted nothing</h2>
+    <p>The run that started ${utcStamp(run.startedAt)} had no earlier census to measure itself against, so it counted
+       the container, wrote the numbers down and <strong>deleted nothing</strong>. This is the intended cold-start
+       behaviour, not a fault — but it is a night on which nothing was reclaimed, which is why you are reading it.</p>
+    ${
+      run.abortDetail
+        ? `<p style="background:#f5f4f0;border-left:3px solid #788c5d;padding:10px 14px;white-space:pre-wrap">${escapeHtml(run.abortDetail)}</p>`
+        : ''
+    }
+    <p>The next scheduled run compares against tonight's numbers and sweeps normally.</p>
+  `,
+  };
+}
 
 function renderAbortEmail(
   run: SweepRunRecord,
@@ -145,6 +186,7 @@ function renderAbortEmail(
     ${streak}
     ${failedLine(run.failed)}
     ${detail}
+    ${acceptBaselineBlock(run)}
     <p style="color:#777;font-size:12px">You will not hear about this again for 7 days unless it changes state.</p>
   `,
   };
@@ -180,10 +222,15 @@ function renderDigestEmail(runs: readonly DigestRun[], now: number): { subject: 
         .join('');
       const rest = run.deleted - Math.min(run.deletedSample.length, DIGEST_SAMPLE_SIZE);
       const daysLeft = Math.floor((run.restorableUntil - now) / DAY_MS);
+      const deferred =
+        run.deferred > 0
+          ? `<p>${run.deferred} further blob(s) were eligible but held back to stay inside the per-run ceiling. They are carried to the next run, oldest first — the backlog drains rather than blocking the sweep.</p>`
+          : '';
       return `
     <h3>${utcStamp(run.startedAt)} — ${run.deleted} blob(s), ${formatBytes(run.bytesReclaimed)}</h3>
     <p><strong>Restorable until ${utcDate(run.restorableUntil)}</strong> (${daysLeft} day(s) left of the 7-day blob soft-delete window). After that the bytes are gone for good.</p>
     ${failedLine(run.failed)}
+    ${deferred}
     <ul>${sample}${rest > 0 ? `<li>… and ${rest} more</li>` : ''}</ul>`;
     })
     .join('');
@@ -216,10 +263,14 @@ function decideAlert(
   ordered: readonly SweepRunRecord[],
   now: number,
 ): SweepAlertEmail | null {
-  const previous = ordered.find((run) => run.outcome !== 'skipped') ?? null;
+  const previous = ordered.find((run) => !QUIET_OUTCOMES.has(run.outcome)) ?? null;
   const streak = abortStreak(ordered);
   const lastEmail = latest(ordered.map((run) => run.abortNotifiedAt));
   const tooSoon = lastEmail !== null && now - lastEmail < ALERT_MIN_GAP_MS;
+
+  if (thisRun.outcome === 'report-only') {
+    return renderReportOnlyEmail(thisRun);
+  }
 
   if (thisRun.outcome === 'aborted') {
     const isTransition = previous === null || previous.outcome === 'completed';
@@ -257,6 +308,7 @@ function decideDigest(
     id: run.id,
     startedAt: run.startedAt,
     deleted: run.deleted,
+    deferred: run.deferred,
     failed: run.failed,
     bytesReclaimed: run.bytesReclaimed,
     deletedSample: run.deletedSample,
@@ -274,18 +326,29 @@ const INSERT_RUN_SQL = `
   INSERT INTO orphan_sweep_runs (
     started_at, outcome, reason, scanned, referenced, eligible, orphaned,
     skipped_by_grace, skipped_unsafe_name, skipped_by_recheck, deleted, failed,
-    bytes_reclaimed, deleted_sample, abort_detail
-  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    bytes_reclaimed, deleted_sample, abort_detail, matched, unmatched_references,
+    deferred
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
   RETURNING id
 `;
 
 const HISTORY_SQL = `
-  SELECT id, started_at, outcome, reason, abort_detail, deleted, failed, bytes_reclaimed,
-         deleted_sample, abort_notified_at, deletions_reported_at
+  SELECT id, started_at, outcome, reason, abort_detail, deleted, deferred, failed,
+         bytes_reclaimed, deleted_sample, abort_notified_at, deletions_reported_at
   FROM orphan_sweep_runs
   WHERE started_at > now() - interval '${HISTORY_WINDOW_DAYS} days'
      OR (deleted > 0 AND deletions_reported_at IS NULL)
   ORDER BY started_at DESC
+`;
+
+const BASELINE_SQL = `
+  SELECT started_at, matched, unmatched_references
+  FROM orphan_sweep_runs
+  WHERE matched IS NOT NULL
+    AND unmatched_references IS NOT NULL
+    AND (outcome IN ('completed', 'report-only') OR baseline_accepted)
+  ORDER BY started_at DESC
+  LIMIT 1
 `;
 
 const STAMP_ABORT_SQL = `UPDATE orphan_sweep_runs SET abort_notified_at = now() WHERE id = $1`;
@@ -300,11 +363,18 @@ interface RunRow {
   reason: string | null;
   abort_detail: string | null;
   deleted: unknown;
+  deferred: unknown;
   failed: unknown;
   bytes_reclaimed: unknown;
   deleted_sample: unknown;
   abort_notified_at: unknown;
   deletions_reported_at: unknown;
+}
+
+interface BaselineRow {
+  started_at: unknown;
+  matched: unknown;
+  unmatched_references: unknown;
 }
 
 const toMillis = (value: unknown): number | null => {
@@ -322,14 +392,22 @@ const toCount = (value: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const KNOWN_OUTCOMES = new Set<SweepRunOutcome>(['completed', 'aborted', 'skipped', 'report-only']);
+
+const toOutcome = (value: unknown): SweepRunOutcome =>
+  typeof value === 'string' && KNOWN_OUTCOMES.has(value as SweepRunOutcome)
+    ? (value as SweepRunOutcome)
+    : 'aborted';
+
 function toRecord(row: RunRow): SweepRunRecord {
   return {
     id: row.id,
     startedAt: toMillis(row.started_at) ?? 0,
-    outcome: row.outcome === 'completed' ? 'completed' : row.outcome === 'skipped' ? 'skipped' : 'aborted',
+    outcome: toOutcome(row.outcome),
     reason: typeof row.reason === 'string' ? row.reason : null,
     abortDetail: typeof row.abort_detail === 'string' ? row.abort_detail : null,
     deleted: toCount(row.deleted),
+    deferred: toCount(row.deferred),
     failed: toCount(row.failed),
     bytesReclaimed: toCount(row.bytes_reclaimed),
     deletedSample: Array.isArray(row.deleted_sample) ? row.deleted_sample.map(String) : [],
@@ -366,6 +444,19 @@ async function readOpsAlertRecipients(log: SweepLogger): Promise<string[]> {
   return recipients;
 }
 
+export async function readSweepBaseline(): Promise<SweepBaseline | null> {
+  const row = await queryOne<BaselineRow>(BASELINE_SQL);
+  if (!row) return null;
+  const startedAt = toMillis(row.started_at);
+  if (startedAt === null) return null;
+  if (row.matched === null || row.unmatched_references === null) return null;
+  return {
+    startedAt,
+    matched: toCount(row.matched),
+    unmatchedReferences: toCount(row.unmatched_references),
+  };
+}
+
 export interface SweepNotifyContext {
   startedAt: number;
   now: number;
@@ -393,6 +484,9 @@ export async function recordAndNotify(summary: OrphanSweepSummary, ctx: SweepNot
       summary.bytesReclaimed,
       summary.deletedSample,
       summary.abortDetail,
+      summary.matched,
+      summary.unmatchedReferences,
+      summary.deferred,
     ]);
     runId = row?.id ?? null;
   } catch (err) {
@@ -433,6 +527,7 @@ async function notify(summary: OrphanSweepSummary, ctx: SweepNotifyContext, runI
     reason: summary.reason,
     abortDetail: summary.abortDetail,
     deleted: summary.deleted,
+    deferred: summary.deferred,
     failed: summary.failed,
     bytesReclaimed: summary.bytesReclaimed,
     deletedSample: summary.deletedSample,

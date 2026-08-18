@@ -12,4 +12,4 @@ paths:
 - **Spinner state:** any handler that sets a saving/loading flag clears it in `finally` — stranded spinners were a recurring migration bug class.
 - **i18n:** every new user-facing string gets keys in BOTH `en` and `da`.
 - **Stack (per ADRs 0001–0004):** React 18 + Vite SPA, TypeScript strict, shadcn/ui + Radix + Tailwind, TanStack Query v5. No new state libs.
-- Verify: `npm run build`, `npm test`, `npx tsc --noEmit -p tsconfig.app.json` (exit 0).
+- Verify: `npm run verify` (exit 0).

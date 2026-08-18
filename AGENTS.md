@@ -24,10 +24,9 @@ Decompose anything with more than a small surface — multi-file refactors, revi
 
 For genuinely tiny single-edit changes, do them inline.
 
-## Verification gates (all must exit 0 before a PR)
-- Root: `npm run lint` · `npm test` · `npx tsc --noEmit -p tsconfig.app.json` · `npx tsc --noEmit -p tsconfig.node.json` (the tooling tree: `vite.config.ts`, `playwright.config.ts`, `e2e/`) · `npm run build`
-- `functions/`: `npm run build` · `npm test`
-- CI (`.github/workflows/ci.yml`) runs the same gates on every PR.
+## Verification gates (must exit 0 before a PR)
+- **`npm run verify:all`** — runs both trees. Root only: `npm run verify`; backend only: `npm --prefix functions run verify`.
+- The gate list lives in `package.json` and nowhere else, so it cannot drift. CI runs the same script. **Do not restate the individual commands in any document** — that is how three of the five previous copies ended up omitting a gate.
 - `npm run e2e` — Playwright end-to-end suite against the **deployed** app with a real Entra login and real writes. **On-demand only; deliberately not a CI gate and not part of `npm test`.** See `e2e/README.md`.
 
 ## Conventions
