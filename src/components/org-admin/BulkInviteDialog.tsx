@@ -275,9 +275,9 @@ export function BulkInviteDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Bulk Invite Members</DialogTitle>
+          <DialogTitle>Bulk Invite Users</DialogTitle>
           <DialogDescription>
-            Upload a CSV file to invite multiple members to {orgName}.
+            Upload a CSV file to invite multiple users to {orgName}.
           </DialogDescription>
           <SeatUsageNote usage={seatUsage} className="pt-1" />
         </DialogHeader>
@@ -421,7 +421,7 @@ export function BulkInviteDialog({
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Invite {validCount} Member{validCount !== 1 ? 's' : ''}
+                  Invite {validCount} User{validCount !== 1 ? 's' : ''}
                 </>
               )}
             </Button>

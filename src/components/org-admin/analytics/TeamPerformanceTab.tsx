@@ -266,7 +266,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
           </div>
 
           <div className="mt-3 text-sm text-muted-foreground">
-            Showing {filteredUserStats.length} of {userStats.length} team members
+            Showing {filteredUserStats.length} of {userStats.length} users
           </div>
         </CardContent>
       </Card>
@@ -276,7 +276,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
           <CardContent className="py-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
             <p className="text-muted-foreground">
-              {userStats.length === 0 ? 'No team members found.' : 'No results match your filters.'}
+              {userStats.length === 0 ? 'No users found.' : 'No results match your filters.'}
             </p>
           </CardContent>
         </Card>
@@ -287,7 +287,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex items-center gap-3">
                   <span className="font-medium">{dept}</span>
-                  <span className="text-sm text-muted-foreground">({users.length} members)</span>
+                  <span className="text-sm text-muted-foreground">({users.length} users)</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent>
