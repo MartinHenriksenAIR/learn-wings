@@ -22,6 +22,7 @@ process.env.AZURE_STORAGE_CONTAINER_NAME = 'lms-videos';
 process.env.ALLOWED_ORIGINS = 'https://ai-uddannelse.dk';
 
 import { default as handler } from './index';
+import { verifyReleaseToken } from '../shared/release-token';
 
 const baseReq = {
   method: 'POST',
@@ -45,6 +46,15 @@ describe('azure-upload-url', () => {
     expect(body.uploadUrl).toMatch(/https:\/\/testaccount\.blob\.core\.windows\.net/);
     expect(body.blobPath).toMatch(/\.mp4$/);
     expect(body.contentType).toBe('video/mp4');
+  });
+
+  it('mints a releaseToken bound to the blobPath and the caller, so an abandoned upload can be reclaimed', async () => {
+    const body = JSON.parse((await handler(baseReq as any, {} as any)).body as string);
+
+    expect(typeof body.releaseToken).toBe('string');
+    expect(verifyReleaseToken(body.releaseToken, body.blobPath, 'p1')).toBe(true);
+    expect(verifyReleaseToken(body.releaseToken, body.blobPath, 'p2')).toBe(false);
+    expect(verifyReleaseToken(body.releaseToken, 'avatars/someone-else.png', 'p1')).toBe(false);
   });
 
   it('returns 403 for a non-admin uploading course content (default container)', async () => {

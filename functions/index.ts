@@ -10,6 +10,7 @@ import './assignment-delete/index';
 import './assignments/index';
 import './azure-document-upload-url/index';
 import './azure-upload-url/index';
+import './blob-release/index';
 import './branding-asset-url/index';
 import './azure-view-url/index';
 import './community-categories/index';

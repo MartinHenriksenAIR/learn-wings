@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
+import { mintedUpload, releaseUpload, type MintedUpload } from '@/lib/blob-release';
 import { downscaleImageFile, maxEdgeForUpload, type UploadAccept } from '@/lib/image-downscale';
 import {
   checkSelectedFileSize,
@@ -62,6 +63,7 @@ export function FileUpload({
   const [fileName, setFileName] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ url: string; forValue: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mintedRef = useRef<MintedUpload | null>(null);
 
   useEffect(() => {
     if (!preview) return;
@@ -107,7 +109,7 @@ export function FileUpload({
           return;
         }
 
-        const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>(
+        const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string; releaseToken?: string | null }>(
           '/api/azure-upload-url',
           { fileName: file.name, contentType: file.type, ...(assetType && { assetType }) }
         );
@@ -131,6 +133,9 @@ export function FileUpload({
         if (accept === 'image') {
           setPreview({ url: URL.createObjectURL(upload), forValue: uploadData.blobPath });
         }
+        const superseded = mintedRef.current;
+        mintedRef.current = mintedUpload(uploadData);
+        releaseUpload(superseded);
         onChange(uploadData.blobPath, uploadData.blobPath);
       } catch (err) {
         console.error('Upload failed:', err);
@@ -145,6 +150,9 @@ export function FileUpload({
   };
 
   const handleRemove = async () => {
+    const discarded = mintedRef.current;
+    mintedRef.current = null;
+    releaseUpload(discarded);
     setPreview(null);
     onChange(null, null);
     setFileName(null);

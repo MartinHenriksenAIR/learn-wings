@@ -1,8 +1,9 @@
 import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { adminEndpoint } from '../shared/endpoint';
 import { fileExtension, resolveUploadKind } from '../shared/upload-limits';
+import { mintReleaseToken } from '../shared/release-token';
 
-export default adminEndpoint('azure-document-upload-url', async ({ req, reply }) => {
+export default adminEndpoint('azure-document-upload-url', async ({ req, profile, reply }) => {
   const { fileName, contentType: reqContentType } = await req.json() as { fileName: string; contentType?: string };
   if (!fileName) return reply(400, { error: 'fileName is required' });
 
@@ -20,5 +21,5 @@ export default adminEndpoint('azure-document-upload-url', async ({ req, reply })
   const sasToken = generateSasToken(accountName, accountKey, containerName, uniqueName, 'cw', 30);
   const uploadUrl = buildBlobUrl(accountName, containerName, uniqueName, sasToken);
 
-  return reply(200, { uploadUrl, blobPath: uniqueName, contentType });
+  return reply(200, { uploadUrl, blobPath: uniqueName, contentType, releaseToken: mintReleaseToken(uniqueName, profile.id) });
 });
