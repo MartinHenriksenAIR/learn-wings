@@ -27,7 +27,6 @@ import { fetchIdeas, deleteIdea, fetchOrgTags } from '@/lib/ideas-api';
 import { BUSINESS_AREAS } from '@/lib/community-types';
 import type { IdeaStatusExtended, BusinessArea } from '@/lib/community-types';
 import {
-  ArrowLeft,
   Search,
   Plus,
   Loader2,
@@ -137,16 +136,7 @@ export default function IdeaLibrary() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary') }]}>
-      <Button
-        variant="ghost"
-        onClick={() => navigate(`${routes.community.feed}?scope=org`)}
-        className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
-      >
-        <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
-        {t('community.backToCommunity')}
-      </Button>
-
+    <AppLayout headerLabel={t('community.ideaLibrary')}>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">

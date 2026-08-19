@@ -166,7 +166,7 @@ export default function Settings() {
   const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || user?.name;
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('settings.title') }]}>
+    <AppLayout headerLabel={t('settings.title')}>
       <div className="max-w-[680px]">
         <h1 className="mb-[22px] font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('settings.title')}

@@ -91,7 +91,7 @@ export default function LearnerTraining() {
 
   if (orgGuard === 'loading' || query.isLoading) {
     return (
-      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
+      <AppLayout title={t('training.title')}>
         <PageSpinner />
       </AppLayout>
     );
@@ -100,7 +100,7 @@ export default function LearnerTraining() {
   if (!currentOrg) {
     const isNoMembership = memberships.length === 0;
     return (
-      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
+      <AppLayout title={t('training.title')}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<BookOpen className="h-6 w-6" />}
@@ -114,7 +114,7 @@ export default function LearnerTraining() {
 
   if (query.isError) {
     return (
-      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
+      <AppLayout title={t('training.title')}>
         <div className="flex h-64 items-center justify-center">
           <QueryErrorState onRetry={() => query.refetch()} />
         </div>
@@ -123,7 +123,7 @@ export default function LearnerTraining() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('nav.training') }]}>
+    <AppLayout headerLabel={t('nav.training')}>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">

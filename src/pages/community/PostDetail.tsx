@@ -41,7 +41,6 @@ import {
   toggleCommentHidden,
 } from '@/lib/community-api';
 import {
-  ArrowLeft,
   Calendar,
   MapPin,
   ExternalLink,
@@ -214,7 +213,7 @@ export default function PostDetail() {
 
   if (postLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.post') }]}>
+      <AppLayout headerLabel={t('community.post')}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -224,17 +223,10 @@ export default function PostDetail() {
 
   if (!post) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('community.title') }]}>
+      <AppLayout headerLabel={t('community.title')}>
         <div className="py-12 text-center">
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('community.postNotFound')}</h1>
-          <p className="mb-4 text-sm text-muted-foreground">{t('community.postNotFoundDescription')}</p>
-          <Button
-            onClick={() => navigate(`${routes.community.feed}?scope=${scope}`)}
-            className="rounded-[11px] text-[13px] font-bold"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {t('community.backToCommunity')}
-          </Button>
+          <p className="text-sm text-muted-foreground">{t('community.postNotFoundDescription')}</p>
         </div>
       </AppLayout>
     );
@@ -245,17 +237,8 @@ export default function PostDetail() {
   const isEvent = post.category?.slug === 'events';
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.post') }]}>
+    <AppLayout headerLabel={t('community.post')}>
       <div className="max-w-[760px]">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(`${routes.community.feed}?scope=${scope}`)}
-          className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
-        >
-          <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
-          {t('community.backToCommunity')}
-        </Button>
-
         <div className="mb-4 rounded-2xl border border-border bg-card px-[26px] py-6">
           <div className="mb-3.5 flex items-center gap-2.5">
             <BrandingAvatar
