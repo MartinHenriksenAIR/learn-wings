@@ -64,6 +64,7 @@
     "loadingPreview": "Loading preview...",
     "uploadedFile": "Uploaded file",
     "clickToReplace": "Click to replace",
+    "replace": "Replace",
     "uploadedToAzure": "Uploaded to Azure Cloud Storage",
     "videoUploadedToAzure": "Video uploaded to Azure Cloud Storage",
     "errorTooLarge": "File size must be less than {{size}}",

@@ -175,8 +175,14 @@ export function FileUpload({
         disabled={disabled || uploading}
       />
 
-      {value ? (
-        <div className="relative border rounded-lg overflow-hidden">
+      {value && !uploading ? (
+        <div
+          onClick={!disabled ? triggerUpload : undefined}
+          className={cn(
+            'relative border rounded-lg overflow-hidden',
+            !disabled && 'cursor-pointer transition-colors hover:border-primary/50'
+          )}
+        >
           {accept === 'image' ? (
             <div className="relative aspect-video bg-muted">
               <img
@@ -190,7 +196,10 @@ export function FileUpload({
                   variant="destructive"
                   size="icon"
                   className="absolute top-2 right-2 h-8 w-8"
-                  onClick={handleRemove}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemove();
+                  }}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -208,7 +217,10 @@ export function FileUpload({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={handleRemove}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemove();
+                  }}
                 >
                   <X className="h-4 w-4" />
                 </Button>

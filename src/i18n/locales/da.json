@@ -64,6 +64,7 @@
     "loadingPreview": "Indlæser forhåndsvisning...",
     "uploadedFile": "Uploadet fil",
     "clickToReplace": "Klik for at erstatte",
+    "replace": "Erstat",
     "uploadedToAzure": "Uploadet til Azure Cloud Storage",
     "videoUploadedToAzure": "Video uploadet til Azure Cloud Storage",
     "errorTooLarge": "Filstørrelsen skal være mindre end {{size}}",
