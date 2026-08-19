@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        **After creating: apply the matching type label** (`slice`/`bug`/`hardening`/`ci`/`polish`, plus `blocked` if applicable) — the pickup protocol filters on labels. GitHub forms cannot apply a label from a dropdown automatically.
+        **After creating: apply the matching type label** (`slice`/`bug`/`hardening`/`ci`/`polish`, plus `blocked` if applicable) — issue triage filters on labels. GitHub forms cannot apply a label from a dropdown automatically.
   - type: dropdown
     id: type
     attributes:
@@ -49,4 +49,4 @@ body:
     id: blocked-by
     attributes:
       label: Blocked by (external action)
-      description: If waiting on something outside the repo (secrets, Azure config, third party), name it — pickup treats this as blocked even without the label.
+      description: If waiting on something outside the repo (secrets, Azure config, third party), name it — treat this as blocked even without the label.

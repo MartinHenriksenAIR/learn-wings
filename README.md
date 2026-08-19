@@ -57,7 +57,7 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | `migration/azure/` | The canonical Postgres schema, seed data, and apply guide |
 | `docs/adr/` | Architecture decision records — read before structural changes |
 | `docs/glossary.md` | Canonical en/da terminology for user-facing copy |
-| `.claude/` | `rules/` (per-tree conventions), `skills/` (`pickup`/`handoff`), `collab.json` (branch topology) |
+| `.claude/` | `rules/` (per-tree conventions) |
 | `supabase/` | **Dead** — the original Supabase SQL migrations, kept only as provenance for the RLS policies the hand-written authz checks replaced. |
 
 ## Local development
@@ -103,7 +103,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migration/azure/02-seed.sql
 npm run verify:all
 ```
 
-Lint, both type-check trees, unit tests and the build, for the frontend and the backend. It must exit 0 before a PR, and CI runs the same script. `npm run e2e` drives the deployed app with a real login and real writes — on demand only, never a CI gate ([`e2e/README.md`](e2e/README.md)).
+Lint, both type-check trees, unit tests and the build, for the frontend and the backend. It must exit 0 before landing on `main`, and CI runs the same script. `npm run e2e` drives the deployed app with a real login and real writes — on demand only, never a CI gate ([`e2e/README.md`](e2e/README.md)).
 
 ## Conventions
 
@@ -112,4 +112,4 @@ Lint, both type-check trees, unit tests and the build, for the frontend and the 
   - Ownership checks use **`profile.id`** (the DB UUID), never **`user.id`** (the Entra OID) — they never match.
   - Role guards must wait for the user-context fetch to resolve, or they bounce authorized users.
 
-`main` takes changes only via pull request (server-side ruleset); work happens on short-lived branches with a draft PR opened early. Merging to `main` deploys both tiers automatically — never deploy from a work branch. The full playbook is in [`AGENTS.md`](AGENTS.md).
+Work happens on short-lived feature branches merged directly into `main`; claiming an issue means assigning yourself to it. Pushing `main` deploys both tiers automatically — never deploy from a work branch. The full playbook is in [`AGENTS.md`](AGENTS.md).
