@@ -75,7 +75,6 @@
     "errorUploadFailed": "Upload failed. Please try again."
   },
   "nav": {
-    "home": "Home",
     "dashboard": "Dashboard",
     "training": "My Training",
     "courses": "Course Catalog",
@@ -805,9 +804,7 @@
     "tryAgain": "Try again",
     "notFoundTitle": "Organization Not Found",
     "notFoundDescription": "Organization not found.",
-    "notFoundBreadcrumb": "Not Found",
     "loadingBreadcrumb": "Loading...",
-    "backToOrganizations": "Back to Organizations",
     "allOrganizations": "All organizations",
     "editSeatLimit": "Edit license limit",
     "deleteOrganization": "Delete organization",
