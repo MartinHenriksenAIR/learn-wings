@@ -719,3 +719,117 @@ describe('FileUpload — dropzone copy and type gate', () => {
     expect(lastSentBody).toBeNull();
   });
 });
+
+describe('FileUpload — replacing an uploaded file (#475)', () => {
+  const STORED_VALUE = 'https://acct.blob.core.windows.net/lms-assets/thumbnails/stored.png?sig=live';
+  let pickerSpy: ReturnType<typeof vi.spyOn>;
+
+  const releaseCalls = () =>
+    mockCallApi.mock.calls.filter(([path]) => path === '/api/blob-release').map(([, body]) => body);
+
+  function mintQueue(...mints: Array<{ blobPath: string; releaseToken?: string | null }>) {
+    let next = 0;
+    mockCallApi.mockImplementation((path: string) => {
+      if (path === '/api/blob-release') return Promise.resolve({ released: true });
+      const mint = mints[Math.min(next++, mints.length - 1)];
+      return Promise.resolve({
+        uploadUrl: `https://acct.blob.core.windows.net/lms-assets/${mint.blobPath}?sig=abc`,
+        contentType: 'image/png',
+        ...mint,
+      });
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('XMLHttpRequest', FakeXHR as unknown as typeof XMLHttpRequest);
+    URL.createObjectURL = vi.fn(() => 'blob:preview-url');
+    URL.revokeObjectURL = vi.fn();
+    pickerSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+    mintQueue({ blobPath: 'thumbnails/pic.png', releaseToken: 'tok-first' });
+  });
+
+  afterEach(() => {
+    cleanup();
+    pickerSpy.mockRestore();
+    vi.unstubAllGlobals();
+    URL.createObjectURL = realCreateObjectURL;
+    URL.revokeObjectURL = realRevokeObjectURL;
+  });
+
+  it('opens the file picker when the filled image preview is clicked', () => {
+    render(<FileUpload accept="image" value={STORED_VALUE} onChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('img'));
+
+    expect(pickerSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('honours the non-image "click to replace" copy', () => {
+    render(<FileUpload accept="document" value="docs/spec.pdf" onChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByText(en.fileUpload.clickToReplace));
+
+    expect(pickerSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes without opening the picker when the X is clicked', () => {
+    const onChange = vi.fn();
+    render(<FileUpload accept="image" value={STORED_VALUE} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button'));
+
+    expect(onChange).toHaveBeenCalledWith(null, null);
+    expect(pickerSpy).not.toHaveBeenCalled();
+  });
+
+  it('leaves a disabled preview inert — no replace, no remove', () => {
+    render(<FileUpload accept="image" value={STORED_VALUE} onChange={vi.fn()} disabled />);
+
+    fireEvent.click(screen.getByRole('img'));
+
+    expect(pickerSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('reaches the supersede path — a re-pick from the filled state releases the abandoned upload (#470)', async () => {
+    mintQueue(
+      { blobPath: 'thumbnails/first.png', releaseToken: 'tok-first' },
+      { blobPath: 'thumbnails/second.png', releaseToken: 'tok-second' },
+    );
+    const onChangeSpy = vi.fn();
+    const { container } = render(<Harness onChangeSpy={onChangeSpy} />);
+
+    uploadFile(container);
+    await screen.findByRole('img');
+
+    fireEvent.click(screen.getByRole('img'));
+    expect(pickerSpy).toHaveBeenCalledTimes(1);
+    uploadFile(container);
+
+    await waitFor(() =>
+      expect(releaseCalls()).toEqual([{ blobPath: 'thumbnails/first.png', releaseToken: 'tok-first' }])
+    );
+  });
+
+  it('shows upload progress, not the stale preview, while the replacement uploads', async () => {
+    let mint!: (data: unknown) => void;
+    mockCallApi.mockImplementation(() => new Promise((resolve) => { mint = resolve; }));
+    const { container } = render(<FileUpload accept="image" value={STORED_VALUE} onChange={vi.fn()} />);
+
+    selectFile(container, pngFile());
+
+    expect(
+      await screen.findByText(line(en.fileUpload.uploading, { name: 'pic.png' }))
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+
+    mint({
+      uploadUrl: 'https://acct.blob.core.windows.net/lms-assets/thumbnails/pic.png?sig=abc',
+      blobPath: 'thumbnails/pic.png',
+      contentType: 'image/png',
+    });
+
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
+  });
+});

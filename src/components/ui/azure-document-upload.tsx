@@ -149,15 +149,24 @@ export function AzureDocumentUpload({
         disabled={disabled || uploading}
       />
 
-      {value ? (
-        <div className="relative border rounded-lg overflow-hidden">
+      {value && !uploading ? (
+        <div
+          onClick={!disabled ? triggerUpload : undefined}
+          className={cn(
+            'relative border rounded-lg overflow-hidden',
+            !disabled && 'cursor-pointer transition-colors hover:border-primary/50'
+          )}
+        >
           <div className="flex items-center gap-3 p-4 bg-muted/50">
             <FileText className="h-8 w-8 text-muted-foreground flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{fileName || displayName}</p>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3 text-success" />
-                {t('fileUpload.uploadedToAzure')}
+                <span className="truncate">
+                  {t('fileUpload.uploadedToAzure')}
+                  {!disabled && ` • ${t('fileUpload.clickToReplace')}`}
+                </span>
               </p>
             </div>
             {!disabled && (
@@ -165,7 +174,10 @@ export function AzureDocumentUpload({
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={handleRemove}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemove();
+                }}
               >
                 <X className="h-4 w-4" />
               </Button>

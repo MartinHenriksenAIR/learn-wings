@@ -167,7 +167,7 @@ export function AzureVideoUpload({
         disabled={disabled || uploading}
       />
 
-      {value ? (
+      {value && !uploading ? (
         <div className="relative border rounded-lg overflow-hidden">
           <div className="aspect-video bg-muted relative">
             {previewUrl ? (
@@ -201,6 +201,18 @@ export function AzureVideoUpload({
             <span className="text-sm text-muted-foreground">
               {t('fileUpload.videoUploadedToAzure')}
             </span>
+            {!disabled && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
+                onClick={triggerUpload}
+              >
+                <Upload className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                {t('fileUpload.replace')}
+              </Button>
+            )}
           </div>
         </div>
       ) : (
