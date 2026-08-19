@@ -2,8 +2,9 @@ import { generateSasToken, buildBlobUrl } from '../shared/sas';
 import { endpoint } from '../shared/endpoint';
 import { resolveAssetContainer, isBrandingAssetType } from '../shared/blob';
 import { fileExtension, resolveUploadKind } from '../shared/upload-limits';
+import { mintReleaseToken } from '../shared/release-token';
 
-export default endpoint('azure-upload-url', async ({ req, reply, requirePlatformAdmin }) => {
+export default endpoint('azure-upload-url', async ({ req, profile, reply, requirePlatformAdmin }) => {
   const { fileName, contentType: reqContentType, assetType } = await req.json() as { fileName: string; contentType?: string; assetType?: string };
   if (!fileName) return reply(400, { error: 'fileName is required' });
 
@@ -33,5 +34,5 @@ export default endpoint('azure-upload-url', async ({ req, reply, requirePlatform
   const sasToken = generateSasToken(accountName, accountKey, containerName, blobPath, 'cw', 30);
   const uploadUrl = buildBlobUrl(accountName, containerName, blobPath, sasToken);
 
-  return reply(200, { uploadUrl, blobPath, contentType });
+  return reply(200, { uploadUrl, blobPath, contentType, releaseToken: mintReleaseToken(blobPath, profile.id) });
 });

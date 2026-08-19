@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
+import { mintedUpload, releaseUpload, type MintedUpload } from '@/lib/blob-release';
 import {
   checkUploadFileType,
   checkUploadPayloadSize,
@@ -38,6 +39,7 @@ export function AzureVideoUpload({
   const [fileName, setFileName] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mintedRef = useRef<MintedUpload | null>(null);
 
   React.useEffect(() => {
     const loadPreview = async () => {
@@ -84,7 +86,7 @@ export function AzureVideoUpload({
       setFileName(file.name);
 
       try {
-        const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>('/api/azure-upload-url', {
+        const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string; releaseToken?: string | null }>('/api/azure-upload-url', {
           fileName: file.name,
           contentType: file.type,
         });
@@ -123,6 +125,9 @@ export function AzureVideoUpload({
         });
 
         setProgress(100);
+        const superseded = mintedRef.current;
+        mintedRef.current = mintedUpload(uploadData);
+        releaseUpload(superseded);
         onChange(blobPath);
       } catch (err) {
         console.error('Video upload failed:', err);
@@ -137,6 +142,9 @@ export function AzureVideoUpload({
   };
 
   const handleRemove = () => {
+    const discarded = mintedRef.current;
+    mintedRef.current = null;
+    releaseUpload(discarded);
     onChange(null);
     setFileName(null);
     setProgress(0);
