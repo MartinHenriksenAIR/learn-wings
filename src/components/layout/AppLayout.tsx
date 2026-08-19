@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useViewModeLabels } from '@/components/layout/view-mode-labels';
 import { routes } from '@/lib/routes';
+import { parentRouteFor } from '@/lib/parent-routes';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -27,7 +28,9 @@ export function AppLayout({ children, title, headerLabel }: AppLayoutProps) {
 
   const showViewingAsChip = isPlatformAdmin && viewMode !== 'platform_admin';
 
-  const showBack = location.pathname !== homeHref;
+  const parentRoute = parentRouteFor(location.pathname, homeHref);
+
+  const showBack = parentRoute !== null;
 
   const label = headerLabel ?? title;
 
@@ -36,7 +39,7 @@ export function AppLayout({ children, title, headerLabel }: AppLayoutProps) {
       navigate(-1);
       return;
     }
-    navigate(homeHref);
+    navigate(parentRoute ?? homeHref);
   };
 
   return (

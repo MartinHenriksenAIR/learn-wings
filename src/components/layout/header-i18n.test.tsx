@@ -66,30 +66,61 @@ describe('AppLayout header (#462)', () => {
 
   it('renders the translated Back button in English', async () => {
     await i18n.changeLanguage('en');
-    renderLayout(routes.learner.courses);
+    renderLayout(routes.learner.courseDetail('c-1'));
     expect(screen.getByRole('button', { name: en.common.back })).toBeInTheDocument();
   });
 
   it('renders the translated Back button in Danish', async () => {
     await i18n.changeLanguage('da');
-    renderLayout(routes.learner.courses);
+    renderLayout(routes.learner.courseDetail('c-1'));
     expect(screen.getByRole('button', { name: da.common.back })).toBeInTheDocument();
     expect(en.common.back).not.toBe(da.common.back);
   });
 
-  it('hides the Back button on the role home route', () => {
-    renderLayout(routes.learner.dashboard);
+  it.each([
+    ['learner dashboard', routes.learner.dashboard],
+    ['my training', routes.learner.training],
+    ['course catalog', routes.learner.courses],
+    ['tips', routes.learner.tips],
+    ['community feed', routes.community.feed],
+    ['events', routes.community.events],
+    ['resources', routes.community.resources],
+  ])('hides Back on the top-level destination: %s', (_name, path) => {
+    renderLayout(path);
     expect(screen.queryByRole('button', { name: en.common.back })).not.toBeInTheDocument();
   });
 
-  it('hides the Back button on the platform admin home route', () => {
+  it.each([
+    ['organizations', routes.platformAdmin.organizations],
+    ['course manager', routes.platformAdmin.courses],
+    ['global analytics', routes.platformAdmin.analytics],
+    ['platform moderation', routes.platformAdmin.moderation],
+    ['platform settings', routes.platformAdmin.settings],
+    ['org analytics', routes.orgAdmin.root],
+    ['org settings', routes.orgAdmin.settings],
+    ['org ideas', routes.orgAdmin.ideas],
+    ['org moderation', routes.orgAdmin.moderation],
+  ])('hides Back on the admin top-level destination: %s', (_name, path) => {
     mockUseAuth.mockReturnValue({
       effectiveIsPlatformAdmin: true,
       isPlatformAdmin: true,
       viewMode: 'platform_admin',
     });
-    renderLayout(routes.platformAdmin.organizations);
+    renderLayout(path);
     expect(screen.queryByRole('button', { name: en.common.back })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['course detail', routes.learner.courseDetail('c-1')],
+    ['course player', routes.learner.coursePlayer('c-1')],
+    ['post detail', routes.community.postDetail('org', 'p-1')],
+    ['idea library', routes.community.ideas],
+    ['idea detail', routes.community.ideaDetail('i-1')],
+    ['idea submit', routes.community.ideaNew],
+    ['settings', routes.settings],
+  ])('shows Back on the child page: %s', (_name, path) => {
+    renderLayout(path);
+    expect(screen.getByRole('button', { name: en.common.back })).toBeInTheDocument();
   });
 
   it('renders headerLabel in the header without adding a second heading', () => {
