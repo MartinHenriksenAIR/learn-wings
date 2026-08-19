@@ -1,51 +1,43 @@
-import { CSSProperties, Fragment, ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { CSSProperties, ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Eye } from 'lucide-react';
+import { ArrowLeft, Eye } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useViewModeLabels } from '@/components/layout/view-mode-labels';
 import { routes } from '@/lib/routes';
 
-const DEFAULT_BREADCRUMB_HREFS = {
-  community: routes.community.feed,
-  ideaLibrary: routes.community.ideas,
-} as const;
-
-export type BreadcrumbHrefKey = keyof typeof DEFAULT_BREADCRUMB_HREFS;
-
-export interface Crumb {
-  label: string;
-  href?: string;
-  hrefKey?: BreadcrumbHrefKey;
-}
-
 interface AppLayoutProps {
   children: ReactNode;
-  breadcrumbs?: Crumb[];
   title?: string;
+  headerLabel?: string;
 }
 
-const CRUMB_LINK_CLASSES = 'font-medium text-muted-foreground transition-colors hover:text-primary';
-
-export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps) {
+export function AppLayout({ children, title, headerLabel }: AppLayoutProps) {
   const { effectiveIsPlatformAdmin, isPlatformAdmin, viewMode } = useAuth();
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const homeHref = effectiveIsPlatformAdmin ? routes.platformAdmin.organizations : routes.learner.dashboard;
 
   const viewModeLabels = useViewModeLabels();
 
   const showViewingAsChip = isPlatformAdmin && viewMode !== 'platform_admin';
+
+  const showBack = location.pathname !== homeHref;
+
+  const label = headerLabel ?? title;
+
+  const handleBack = () => {
+    if ((window.history.state?.idx ?? 0) > 0) {
+      navigate(-1);
+      return;
+    }
+    navigate(homeHref);
+  };
 
   return (
     <SidebarProvider style={{ '--sidebar-width': '252px' } as CSSProperties}>
@@ -54,33 +46,13 @@ export function AppLayout({ children, breadcrumbs = [], title }: AppLayoutProps)
         <SidebarInset className="min-w-0 flex-1">
           <header className="flex h-[58px] shrink-0 items-center gap-2 border-b bg-card px-7">
             <SidebarTrigger className="-ml-2" />
-            <Breadcrumb>
-              <BreadcrumbList className="text-[13px]">
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild className={CRUMB_LINK_CLASSES}>
-                    <Link to={homeHref}>{t('nav.home')}</Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                {breadcrumbs.map((crumb, index) => {
-                  const isLast = index === breadcrumbs.length - 1;
-                  const resolvedHref = crumb.href ?? (crumb.hrefKey ? DEFAULT_BREADCRUMB_HREFS[crumb.hrefKey] : undefined);
-                  return (
-                    <Fragment key={index}>
-                      <BreadcrumbSeparator className="text-[#c3c7d3] [&>svg]:size-[13px]" />
-                      <BreadcrumbItem>
-                        {!isLast && resolvedHref ? (
-                          <BreadcrumbLink asChild className={CRUMB_LINK_CLASSES}>
-                            <Link to={resolvedHref}>{crumb.label}</Link>
-                          </BreadcrumbLink>
-                        ) : (
-                          <BreadcrumbPage className="font-bold text-foreground">{crumb.label}</BreadcrumbPage>
-                        )}
-                      </BreadcrumbItem>
-                    </Fragment>
-                  );
-                })}
-              </BreadcrumbList>
-            </Breadcrumb>
+            {showBack && (
+              <Button variant="ghost" size="sm" onClick={handleBack}>
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                {t('common.back')}
+              </Button>
+            )}
+            {label && <span className="text-[13px] font-bold text-foreground">{label}</span>}
             <div className="flex-1" />
             {showViewingAsChip && (
               <span className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-[7px] border border-[#d7ddf4] bg-accent px-[13px] py-1.5 text-xs font-bold text-accent-foreground">

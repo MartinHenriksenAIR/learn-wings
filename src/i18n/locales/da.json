@@ -74,7 +74,6 @@
     "errorUploadFailed": "Upload mislykkedes. Prøv igen."
   },
   "nav": {
-    "home": "Hjem",
     "dashboard": "Dashboard",
     "training": "Min Træning",
     "courses": "Kursuskatalog",
@@ -801,9 +800,7 @@
     "tryAgain": "Prøv igen",
     "notFoundTitle": "Organisationen blev ikke fundet",
     "notFoundDescription": "Organisationen blev ikke fundet.",
-    "notFoundBreadcrumb": "Ikke fundet",
     "loadingBreadcrumb": "Indlæser...",
-    "backToOrganizations": "Tilbage til organisationer",
     "allOrganizations": "Alle organisationer",
     "editSeatLimit": "Rediger medlemsgrænse",
     "deleteOrganization": "Slet organisation",
