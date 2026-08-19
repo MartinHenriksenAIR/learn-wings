@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
@@ -171,5 +171,106 @@ describe('Settings — assessment card (#117)', () => {
     renderSettings();
 
     expect(screen.queryByTestId('assessment-settings-card')).toBeNull();
+  });
+});
+
+describe('Settings — the profile photo can be removed (#476)', () => {
+  const refreshUserContext = vi.fn().mockResolvedValue(undefined);
+
+  const photoProfile = {
+    id: 'p-1', first_name: 'Test', last_name: 'User', department: '',
+    preferred_language: 'en', created_at: '2026-01-01T00:00:00Z', is_platform_admin: false,
+  };
+
+  class FakeXHR {
+    upload: { onprogress: ((e: ProgressEvent) => void) | null } = { onprogress: null };
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    status = 200;
+    open() {}
+    setRequestHeader() {}
+    send() {
+      queueMicrotask(() => this.onload?.());
+    }
+  }
+
+  function renderWithPhoto(avatar_url: string | null) {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'u-1', tid: 'tid-1', email: 'test@example.com', name: 'Test User' },
+      profile: { ...photoProfile, avatar_url },
+      memberships: [],
+      isPlatformAdmin: false,
+      isOrgAdmin: false,
+      refreshUserContext,
+    });
+    return render(<MemoryRouter><Settings /></MemoryRouter>);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('XMLHttpRequest', FakeXHR as unknown as typeof XMLHttpRequest);
+    URL.createObjectURL = vi.fn(() => 'blob:preview-url');
+    URL.revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('asks profile-update to clear the column — the empty string it stores as NULL', async () => {
+    mockCallApi.mockResolvedValue({ profile: {} });
+    renderWithPhoto('avatars/p-1/face.png');
+
+    fireEvent.click(screen.getByRole('button', { name: /settings.removePhoto/i }));
+
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith('/api/profile-update', { avatar_url: '' })
+    );
+    await waitFor(() => expect(refreshUserContext).toHaveBeenCalled());
+  });
+
+  it('offers nothing to remove when no photo is stored', () => {
+    renderWithPhoto(null);
+
+    expect(screen.queryByRole('button', { name: /settings.removePhoto/i })).not.toBeInTheDocument();
+  });
+
+  it('reports the failure and stops spinning when the clear fails', async () => {
+    mockCallApi.mockRejectedValue(new Error('clear failed'));
+    renderWithPhoto('avatars/p-1/face.png');
+
+    fireEvent.click(screen.getByRole('button', { name: /settings.removePhoto/i }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'settings.photoUpdateFailed',
+        variant: 'destructive',
+      }))
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /settings.removePhoto/i })).not.toBeDisabled()
+    );
+  });
+
+  it('still saves an upload as the storage path the widget reports', async () => {
+    mockCallApi.mockImplementation((path: string) =>
+      path === '/api/azure-upload-url'
+        ? Promise.resolve({
+            uploadUrl: 'https://acct.blob.core.windows.net/lms-assets/avatars/p-1/face.png?sig=abc',
+            blobPath: 'avatars/p-1/face.png',
+            contentType: 'image/png',
+          })
+        : Promise.resolve({ profile: {} })
+    );
+    renderWithPhoto(null);
+
+    const png = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], 'face.png', {
+      type: 'image/png',
+    });
+    fireEvent.change(screen.getByLabelText('settings.profilePhoto'), { target: { files: [png] } });
+
+    await waitFor(() =>
+      expect(mockCallApi).toHaveBeenCalledWith('/api/profile-update', { avatar_url: 'avatars/p-1/face.png' })
+    );
   });
 });

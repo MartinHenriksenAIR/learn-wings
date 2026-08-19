@@ -145,6 +145,7 @@
     "updateProfile": "Update your personal information.",
     "profilePhoto": "Profile photo",
     "profilePhotoHint": "Square image recommended, 256×256px or larger.",
+    "removePhoto": "Remove photo",
     "firstName": "First Name",
     "lastName": "Last Name",
     "department": "Department",

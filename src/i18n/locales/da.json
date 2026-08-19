@@ -145,6 +145,7 @@
     "updateProfile": "Opdater dine personlige oplysninger.",
     "profilePhoto": "Profilbillede",
     "profilePhotoHint": "Kvadratisk billede anbefales, 256×256px eller større.",
+    "removePhoto": "Fjern billede",
     "firstName": "Fornavn",
     "lastName": "Efternavn",
     "department": "Afdeling",
