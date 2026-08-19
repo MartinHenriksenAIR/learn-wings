@@ -177,13 +177,10 @@ export default function OrgAnalytics() {
       : view === 'users'
         ? t('nav.users')
         : t('nav.organization');
-  const breadcrumbs = isGlobalView
-    ? [{ label: t('nav.platformAdmin') }, { label: t('nav.globalAnalytics') }]
-    : [{ label: pageTitle }];
 
   if (analyticsQuery.isLoading || settingsLoading) {
     return (
-      <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
+      <AppLayout title={pageTitle}>
         <PageSpinner />
       </AppLayout>
     );
@@ -191,7 +188,7 @@ export default function OrgAnalytics() {
 
   if (!isGlobalView && !currentOrg) {
     return (
-      <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
+      <AppLayout title={pageTitle}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground">No organization selected.</p>
@@ -203,7 +200,7 @@ export default function OrgAnalytics() {
 
   if (analyticsQuery.isError) {
     return (
-      <AppLayout title={pageTitle} breadcrumbs={breadcrumbs}>
+      <AppLayout title={pageTitle}>
         <div className="flex h-64 items-center justify-center">
           <QueryErrorState onRetry={() => analyticsQuery.refetch()} />
         </div>
@@ -237,7 +234,7 @@ export default function OrgAnalytics() {
   const currentTab = tabs.some((tab) => tab.key === activeTab) ? activeTab : tabs[0].key;
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs}>
+    <AppLayout headerLabel={pageTitle}>
       <div className="mb-5 flex flex-col items-start justify-between gap-4 md:flex-row">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">{pageTitle}</h1>

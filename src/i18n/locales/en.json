@@ -295,8 +295,7 @@
       "lessonCount_one": "{{count}} lesson",
       "lessonCount_other": "{{count}} lessons",
       "notAvailable": "This course isn't available",
-      "notAvailableDescription": "The course doesn't exist, or you don't have access to it.",
-      "backToCatalog": "Back to Course Catalog"
+      "notAvailableDescription": "The course doesn't exist, or you don't have access to it."
     }
   },
   "tipsAndTricks": {
@@ -331,7 +330,6 @@
     "quizPassedMessage": "Nice work — you passed!",
     "quizFailedMessage": "You need {{score}}% to pass. Try again!",
     "courseNotFound": "Course not found",
-    "backToCourses": "Back to courses",
     "selectLessonToBegin": "Select a lesson to begin",
     "loadingVideo": "Loading video...",
     "videoLoadFailed": "Unable to load video. Please try again.",
@@ -428,7 +426,6 @@
     "lock": "Lock",
     "unlock": "Unlock",
     "lockComments": "Lock Comments",
-    "backToCommunity": "Back to Community",
     "postNotFound": "Post not found",
     "postNotFoundDescription": "This post may have been deleted or you don't have access.",
     "global": "Global",
@@ -460,7 +457,6 @@
     "noCommentsStartDiscussion": "No comments yet. Start the discussion!",
     "ideaNotFound": "Idea Not Found",
     "ideaNotFoundDescription": "The idea you're looking for doesn't exist or you don't have access.",
-    "backToIdeas": "Back to Ideas",
     "updateStatus": "Update status",
     "statusLabel": "Status",
     "rejectionReason": "Rejection Reason *",
@@ -804,8 +800,7 @@
     "tryAgain": "Try again",
     "notFoundTitle": "Organization Not Found",
     "notFoundDescription": "Organization not found.",
-    "loadingBreadcrumb": "Loading...",
-    "allOrganizations": "All organizations",
+    "loading": "Loading...",
     "editSeatLimit": "Edit license limit",
     "deleteOrganization": "Delete organization",
     "seatsUsed": "Licenses Used",
@@ -1182,7 +1177,6 @@
   },
   "courseEditor": {
     "title": "Course Editor",
-    "backToCourses": "Back to Courses",
     "courseDetails": "Course Details",
     "published": "Published",
     "draft": "Draft",

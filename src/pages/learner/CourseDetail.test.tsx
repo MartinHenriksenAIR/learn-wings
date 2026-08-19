@@ -10,7 +10,20 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/components/layout/AppLayout', () => ({
-  AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AppLayout: ({
+    children,
+    title,
+    headerLabel,
+  }: {
+    children: React.ReactNode;
+    title?: string;
+    headerLabel?: string;
+  }) => (
+    <div>
+      <span data-testid="header-label" data-label={headerLabel ?? title ?? ''} />
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock('@/lib/api-client', () => ({ callApi: vi.fn() }));
@@ -113,14 +126,14 @@ describe('CourseDetail', () => {
     expect(cta).toHaveTextContent('courses.startCourse');
   });
 
-  it('renders a top-left Back-to-catalog control above the card', async () => {
+  it('names the course in the header and renders no in-page back control (#462)', async () => {
     vi.mocked(callApi).mockResolvedValue(detailResponse(null));
 
     renderDetail();
     await screen.findByTestId('course-detail-title');
 
-    const back = screen.getByRole('link', { name: 'courses.detail.backToCatalog' });
-    expect(back).toHaveAttribute('href', '/app/courses');
+    expect(screen.getByTestId('header-label')).toHaveAttribute('data-label', 'Intro to AI');
+    expect(screen.queryByText('courses.detail.backToCatalog')).toBeNull();
   });
 
   it('Contents is an accordion — collapsed on load, expanding reveals lesson names, one open at a time', async () => {
@@ -206,14 +219,14 @@ describe('CourseDetail', () => {
     expect(cta).toHaveTextContent('courses.reviewCourse');
   });
 
-  it('shows a not-available fork with a back-to-catalog link when the fetch fails (404/403)', async () => {
+  it('shows a text-only not-available fork when the fetch fails (404/403)', async () => {
     vi.mocked(callApi).mockRejectedValue(new Error('not found'));
 
     renderDetail();
 
     expect(await screen.findByText('courses.detail.notAvailable')).toBeInTheDocument();
-    const back = screen.getByRole('link', { name: 'courses.detail.backToCatalog' });
-    expect(back).toHaveAttribute('href', '/app/courses');
+    expect(screen.getByText('courses.detail.notAvailableDescription')).toBeInTheDocument();
+    expect(screen.queryByText('courses.detail.backToCatalog')).toBeNull();
     expect(screen.queryByTestId('course-detail-cta')).toBeNull();
   });
 

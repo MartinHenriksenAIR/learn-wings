@@ -295,8 +295,7 @@
       "lessonCount_one": "{{count}} lektion",
       "lessonCount_other": "{{count}} lektioner",
       "notAvailable": "Kurset er ikke tilgængeligt",
-      "notAvailableDescription": "Kurset findes ikke, eller du har ikke adgang til det.",
-      "backToCatalog": "Tilbage til Kursuskatalog"
+      "notAvailableDescription": "Kurset findes ikke, eller du har ikke adgang til det."
     }
   },
   "tipsAndTricks": {
@@ -331,7 +330,6 @@
     "quizPassedMessage": "Flot klaret — du bestod!",
     "quizFailedMessage": "Du skal have {{score}}% for at bestå. Prøv igen!",
     "courseNotFound": "Kursus ikke fundet",
-    "backToCourses": "Tilbage til kurser",
     "selectLessonToBegin": "Vælg en lektion for at begynde",
     "loadingVideo": "Indlæser video...",
     "videoLoadFailed": "Videoen kunne ikke indlæses. Prøv igen.",
@@ -428,7 +426,6 @@
     "lock": "Lås",
     "unlock": "Lås op",
     "lockComments": "Lås kommentarer",
-    "backToCommunity": "Tilbage til fællesskabet",
     "postNotFound": "Opslag ikke fundet",
     "postNotFoundDescription": "Dette opslag er muligvis blevet slettet, eller du har ikke adgang.",
     "global": "Global",
@@ -460,7 +457,6 @@
     "noCommentsStartDiscussion": "Ingen kommentarer endnu. Start diskussionen!",
     "ideaNotFound": "Idé ikke fundet",
     "ideaNotFoundDescription": "Idéen, du leder efter, findes ikke, eller du har ikke adgang.",
-    "backToIdeas": "Tilbage til idéer",
     "updateStatus": "Opdater status",
     "statusLabel": "Status",
     "rejectionReason": "Afvisningsårsag *",
@@ -804,8 +800,7 @@
     "tryAgain": "Prøv igen",
     "notFoundTitle": "Organisationen blev ikke fundet",
     "notFoundDescription": "Organisationen blev ikke fundet.",
-    "loadingBreadcrumb": "Indlæser...",
-    "allOrganizations": "Alle organisationer",
+    "loading": "Indlæser...",
     "editSeatLimit": "Rediger licensgrænse",
     "deleteOrganization": "Slet organisation",
     "seatsUsed": "Licenser brugt",
@@ -1182,7 +1177,6 @@
   },
   "courseEditor": {
     "title": "Kursusredigering",
-    "backToCourses": "Tilbage til kurser",
     "courseDetails": "Kursusdetaljer",
     "published": "Udgivet",
     "draft": "Kladde",

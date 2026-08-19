@@ -7,7 +7,7 @@ export default function TipsAndTricks() {
   const { t } = useTranslation();
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('tipsAndTricks.title') }]}>
+    <AppLayout headerLabel={t('tipsAndTricks.title')}>
       <div className="mb-[22px]">
         <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('tipsAndTricks.title')}

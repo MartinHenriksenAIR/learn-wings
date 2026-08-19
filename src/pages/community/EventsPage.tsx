@@ -52,7 +52,7 @@ export default function EventsPage() {
   if (communityGate === 'redirect') return <Navigate to={routes.learner.dashboard} replace />;
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('community.events') }]}>
+    <AppLayout headerLabel={t('community.events')}>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">

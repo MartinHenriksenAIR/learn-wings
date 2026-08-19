@@ -159,7 +159,7 @@ export default function PlatformSettings() {
 
   if (query.isLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('platformSettings.title') }]}>
+      <AppLayout headerLabel={t('platformSettings.title')}>
         <PageSpinner />
       </AppLayout>
     );
@@ -167,7 +167,7 @@ export default function PlatformSettings() {
 
   if (!query.isSuccess) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('platformSettings.title') }]}>
+      <AppLayout headerLabel={t('platformSettings.title')}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<AlertTriangle className="h-6 w-6" />}
@@ -192,7 +192,7 @@ export default function PlatformSettings() {
   ];
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('platformSettings.title') }]}>
+    <AppLayout headerLabel={t('platformSettings.title')}>
       <div className="max-w-[760px]">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('platformSettings.title')}

@@ -168,7 +168,7 @@ export default function OrgSettings() {
     (orgSettingsQuery.isLoading && !saving)
   ) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('orgSettings.title') }]}>
+      <AppLayout headerLabel={t('orgSettings.title')}>
         <PageSpinner />
       </AppLayout>
     );
@@ -176,7 +176,7 @@ export default function OrgSettings() {
 
   if (!currentOrg) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('orgSettings.title') }]}>
+      <AppLayout headerLabel={t('orgSettings.title')}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<Building2 className="h-6 w-6" />}
@@ -195,7 +195,7 @@ export default function OrgSettings() {
   ];
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('orgSettings.title') }]}>
+    <AppLayout headerLabel={t('orgSettings.title')}>
       <div className="max-w-[680px]">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('orgSettings.title')}
