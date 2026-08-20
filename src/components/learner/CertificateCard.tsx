@@ -4,6 +4,7 @@ import { Enrollment, Course, Profile } from '@/lib/types';
 import { useTranslation } from 'react-i18next';
 import { formatDate } from '@/lib/date-locale';
 import { cn } from '@/lib/utils';
+import { CourseDetailsButton } from './CourseDetailsButton';
 
 const PLATFORM_NAME = 'AIR Academy';
 
@@ -53,6 +54,11 @@ export function CertificateCard({ enrollment, profile, downloading, saved, onDow
           {t('certificates.issuedTo', { name: profile?.full_name, date: completedOn })}
         </span>
       </span>
+      <CourseDetailsButton
+        courseId={enrollment.course_id}
+        courseTitle={enrollment.course?.title}
+        className="py-2"
+      />
       <Button
         variant="outline"
         size="sm"

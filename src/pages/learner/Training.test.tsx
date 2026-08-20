@@ -166,7 +166,7 @@ describe('LearnerTraining', () => {
     const card = screen.getByTestId('training-continue-card');
     expect(within(card).getByText('Ongoing Course')).toBeInTheDocument();
     const resume = within(card).getByRole('link', { name: /common\.continue/ });
-    expect(resume).toHaveAttribute('href', '/app/learn/c-2?from=training');
+    expect(resume).toHaveAttribute('href', '/app/learn/c-2');
   });
 
   it('wires in the Mandatory and Favorites sections with the current org id (no coming-soon placeholders)', () => {
@@ -261,5 +261,23 @@ describe('LearnerTraining — card/list view toggle (#449)', () => {
     expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
     expect(screen.getByTestId('cert-card')).toBeInTheDocument();
     expect(screen.queryByTestId('training-completed-card')).toBeNull();
+  });
+
+  it('offers a Details link from an in-progress card (#459)', () => {
+    renderTraining();
+    const card = screen.getByTestId('training-continue-card');
+    expect(within(card).getByRole('link', { name: 'courses.detailsFor' })).toHaveAttribute(
+      'href',
+      '/app/courses/c-2',
+    );
+  });
+
+  it('offers a Details link from the plain completed card (#459)', () => {
+    renderTraining();
+    const card = screen.getByTestId('training-completed-card');
+    expect(within(card).getByRole('link', { name: 'courses.detailsFor' })).toHaveAttribute(
+      'href',
+      '/app/courses/c-1',
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, CircleCheck, Clock, Play } from 'lucide-react';
+import { BookOpen, Clock, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -8,6 +8,8 @@ import { routes } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/date-locale';
 import { useLearnerAssignments } from '@/hooks/useLearnerAssignments';
+import { CourseDetailsButton } from './CourseDetailsButton';
+import { CourseCompletedButton } from './CourseCompletedButton';
 import type { ListView } from '@/hooks/useListView';
 
 export function MandatoryCourses({
@@ -70,25 +72,31 @@ export function MandatoryCourses({
                     </div>
                   )}
                 </div>
-                {course.completed ? (
-                  <span
-                    data-testid="mandatory-completed"
-                    className="flex shrink-0 items-center gap-1.5 rounded-[10px] bg-success/10 px-3 py-2 text-[13px] font-bold text-success"
-                  >
-                    <CircleCheck aria-hidden="true" className="h-3.5 w-3.5" />
-                    {t('training.mandatory.completed')}
-                  </span>
-                ) : (
-                  <Button
-                    asChild
-                    className="h-auto shrink-0 rounded-[10px] bg-accent px-3 py-2 text-[12.5px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
-                  >
-                    <Link to={routes.learner.coursePlayer(course.courseId, 'training')}>
-                      <Play aria-hidden="true" className="h-3.5 w-3.5" />
-                      {t('courses.openCourse')}
-                    </Link>
-                  </Button>
-                )}
+                <div className="flex shrink-0 items-center gap-2">
+                  <CourseDetailsButton
+                    courseId={course.courseId}
+                    courseTitle={course.courseTitle}
+                    className="py-2"
+                  />
+                  {course.completed ? (
+                    <CourseCompletedButton
+                      courseId={course.courseId}
+                      courseTitle={course.courseTitle}
+                      testId="mandatory-completed"
+                      className="shrink-0 py-2"
+                    />
+                  ) : (
+                    <Button
+                      asChild
+                      className="h-auto shrink-0 rounded-[10px] bg-accent px-3 py-2 text-[12.5px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                    >
+                      <Link to={routes.learner.coursePlayer(course.courseId)}>
+                        <Play aria-hidden="true" className="h-3.5 w-3.5" />
+                        {t('courses.openCourse')}
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               <div
@@ -128,25 +136,30 @@ export function MandatoryCourses({
                     </div>
                   )}
 
-                  {course.completed ? (
-                    <span
-                      data-testid="mandatory-completed"
-                      className="mt-auto flex items-center justify-center gap-1.5 rounded-[10px] bg-success/10 px-3 py-[9px] text-[13px] font-bold text-success"
-                    >
-                      <CircleCheck aria-hidden="true" className="h-3.5 w-3.5" />
-                      {t('training.mandatory.completed')}
-                    </span>
-                  ) : (
-                    <Button
-                      asChild
-                      className="mt-auto h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
-                    >
-                      <Link to={routes.learner.coursePlayer(course.courseId, 'training')}>
-                        <Play aria-hidden="true" className="h-3.5 w-3.5" />
-                        {t('courses.openCourse')}
-                      </Link>
-                    </Button>
-                  )}
+                  <div className="mt-auto flex items-center gap-2">
+                    <CourseDetailsButton
+                      courseId={course.courseId}
+                      courseTitle={course.courseTitle}
+                    />
+                    {course.completed ? (
+                      <CourseCompletedButton
+                        courseId={course.courseId}
+                        courseTitle={course.courseTitle}
+                        testId="mandatory-completed"
+                        className="w-full justify-center"
+                      />
+                    ) : (
+                      <Button
+                        asChild
+                        className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                      >
+                        <Link to={routes.learner.coursePlayer(course.courseId)}>
+                          <Play aria-hidden="true" className="h-3.5 w-3.5" />
+                          {t('courses.openCourse')}
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ),

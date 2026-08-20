@@ -243,7 +243,8 @@
       "empty": "No mandatory courses",
       "due": "Due",
       "overdue": "Overdue",
-      "completed": "Completed"
+      "completed": "Completed",
+      "completedFor": "Completed — {{title}}"
     },
     "continue": {
       "title": "Continue",
@@ -283,6 +284,8 @@
     "viewAsCards": "Card view",
     "viewAsList": "List view",
     "readAbout": "Read about {{title}}",
+    "details": "Details",
+    "detailsFor": "Details — {{title}}",
     "allLevels": "All levels",
     "anyStatus": "Any status",
     "startCourse": "Start course",

@@ -16,8 +16,7 @@ export const routes = {
     courseDetail: (courseId: string) => `/app/courses/${courseId}`,
     assessment: '/app/assessment',
     coursePlayerPattern: '/app/learn/:courseId',
-    coursePlayer: (courseId: string, from?: 'training') =>
-      `/app/learn/${courseId}${from ? `?from=${from}` : ''}`,
+    coursePlayer: (courseId: string) => `/app/learn/${courseId}`,
     tips: '/app/tips',
     certificates: '/app/certificates',
   },

@@ -243,7 +243,8 @@
       "empty": "Ingen obligatoriske kurser",
       "due": "Frist",
       "overdue": "Overskredet",
-      "completed": "Gennemført"
+      "completed": "Gennemført",
+      "completedFor": "Gennemført — {{title}}"
     },
     "continue": {
       "title": "Fortsæt",
@@ -283,6 +284,8 @@
     "viewAsCards": "Kortvisning",
     "viewAsList": "Listevisning",
     "readAbout": "Læs om {{title}}",
+    "details": "Detaljer",
+    "detailsFor": "Detaljer — {{title}}",
     "allLevels": "Alle niveauer",
     "anyStatus": "Enhver status",
     "startCourse": "Start kursus",

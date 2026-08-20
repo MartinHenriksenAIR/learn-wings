@@ -32,7 +32,6 @@ describe('parentRouteFor — child pages climb one level (#462)', () => {
   it.each([
     [routes.learner.courseDetail('c-1'), routes.learner.courses],
     [routes.learner.coursePlayer('c-1'), routes.learner.courses],
-    [routes.learner.coursePlayer('c-1', 'training'), routes.learner.courses],
     [routes.community.postDetail('org', 'p-1'), routes.community.feed],
     [routes.community.ideas, routes.community.feed],
     [routes.community.ideaNew, routes.community.ideas],
