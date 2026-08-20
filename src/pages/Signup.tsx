@@ -94,7 +94,7 @@ export default function Signup() {
     useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [state, setState] = useState<FlowState>({ phase: 'accept', submitting: false });
 
   const inviteId = new URLSearchParams(location.search).get('invite');
@@ -120,7 +120,7 @@ export default function Signup() {
     if (state.phase !== 'accept' || state.submitting) return; // latch against double-submit
     setState({ phase: 'accept', submitting: true });
     try {
-      const result = await callApi<AcceptResponse>('/api/invitation-accept', { linkId: inviteId });
+      const result = await callApi<AcceptResponse>('/api/invitation-accept', { linkId: inviteId, language: i18n.resolvedLanguage });
       await refreshUserContext();
       setState({ phase: 'success', result });
     } catch (err) {

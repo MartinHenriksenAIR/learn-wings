@@ -4,6 +4,7 @@ import { queryOne, withTransaction } from '../shared/db';
 import { convertInvitation } from '../shared/invitation-convert';
 import type { ConvertResult } from '../shared/invitation-convert';
 import { seedTenantBinding } from '../shared/tenant-binding';
+import { orgDefaultLanguageForInvitation, resolveProvisioningLanguage } from '../shared/member-language';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 
@@ -31,7 +32,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
   try {
     const user = await authenticate(req);
 
-    const body = await req.json() as { linkId?: unknown };
+    const body = await req.json() as { linkId?: unknown; language?: unknown };
     const linkId = body.linkId;
     if (!linkId || typeof linkId !== 'string') {
       return corsResponse(origin, 400, { error: 'linkId is required' });
@@ -42,11 +43,13 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [user.id, user.tid],
     );
     if (!profile) {
+      const orgDefault = await orgDefaultLanguageForInvitation(linkId);
+      const language = resolveProvisioningLanguage(orgDefault, body.language);
       profile = await queryOne<{ id: string }>(
-        `INSERT INTO profiles (full_name, email, entra_oid, entra_tid)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO profiles (full_name, email, entra_oid, entra_tid, preferred_language)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [user.email.split('@')[0], user.email, user.id, user.tid],
+        [user.email.split('@')[0], user.email, user.id, user.tid, language],
       );
     }
     const profileId = profile!.id;

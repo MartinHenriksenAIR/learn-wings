@@ -771,6 +771,11 @@
     "selfRegTitle": "Self-registration",
     "selfRegLabel": "Allow self-registration",
     "selfRegHint": "Let people from your organization's verified Microsoft tenant join as users without an invite.",
+    "defaultLanguageLabel": "Default language for new users",
+    "defaultLanguageHint": "The language new users start with — their emails, and the app itself. Applies only when their account is first created; it never changes an existing user's choice in Settings.",
+    "defaultLanguageNone": "Follow their browser",
+    "defaultLanguageDa": "Danish",
+    "defaultLanguageEn": "English",
     "tabs": {
       "profile": "Profile",
       "access": "Access",

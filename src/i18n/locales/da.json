@@ -771,6 +771,11 @@
     "selfRegTitle": "Selvregistrering",
     "selfRegLabel": "Tillad selvregistrering",
     "selfRegHint": "Lad personer fra din organisations verificerede Microsoft-tenant blive brugere uden invitation.",
+    "defaultLanguageLabel": "Standardsprog for nye brugere",
+    "defaultLanguageHint": "Det sprog nye brugere starter med — både deres e-mails og selve appen. Gælder kun når kontoen oprettes første gang; det ændrer aldrig en eksisterende brugers valg under Indstillinger.",
+    "defaultLanguageNone": "Følg deres browser",
+    "defaultLanguageDa": "Dansk",
+    "defaultLanguageEn": "Engelsk",
     "tabs": {
       "profile": "Profil",
       "access": "Adgang",

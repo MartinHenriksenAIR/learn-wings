@@ -35,6 +35,7 @@ export interface Organization {
   entra_tid?: string | null;
   entra_tid_label?: string | null;
   allow_self_registration?: boolean;
+  default_member_language?: string | null;
   kind?: 'standard' | 'individual';
 }
 

@@ -5,6 +5,7 @@ import { convertInvitation } from '../shared/invitation-convert';
 import type { ConvertibleInvitation, ConvertResult } from '../shared/invitation-convert';
 import { seedTenantBinding, autoJoinByTenant, individualTierEnabled } from '../shared/tenant-binding';
 import { INDIVIDUAL_ORG_KIND } from '../shared/individual-tier';
+import { orgDefaultLanguageForNewProfile, resolveProvisioningLanguage } from '../shared/member-language';
 import { corsPreflightResponse, corsResponse } from '../shared/cors';
 import { internalError } from '../shared/errors';
 
@@ -47,14 +48,6 @@ async function adoptPendingInvites(profileId: string, rawEmail: string, tid: str
   }
 }
 
-const SUPPORTED_LANGUAGES = ['da', 'en'] as const;
-
-function resolveProvisioningLanguage(raw: unknown): string {
-  return typeof raw === 'string' && (SUPPORTED_LANGUAGES as readonly string[]).includes(raw)
-    ? raw
-    : 'en';
-}
-
 async function ensureIndividualMembership(profileId: string, context: InvocationContext): Promise<void> {
   try {
     if (!(await individualTierEnabled())) return;
@@ -95,19 +88,24 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       [user.id, user.tid]
     );
 
+    const profileCreated = !profile;
+
     if (!profile) {
-      let requestedLanguage = 'en';
+      let requestedLanguage: unknown;
       try {
         const body = (await req.json()) as { language?: unknown } | null;
-        requestedLanguage = resolveProvisioningLanguage(body?.language);
+        requestedLanguage = body?.language;
       } catch {
       }
+
+      const orgDefault = await orgDefaultLanguageForNewProfile(user.email, user.tid);
+      const language = resolveProvisioningLanguage(orgDefault, requestedLanguage);
 
       const inserted = await queryOne<{ id: string }>(
         `INSERT INTO profiles (full_name, email, entra_oid, entra_tid, preferred_language)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [user.email.split('@')[0], user.email, user.id, user.tid, requestedLanguage]
+        [user.email.split('@')[0], user.email, user.id, user.tid, language]
       );
       profile = await queryOne(
         `SELECT ${PROFILE_SELECT}
@@ -138,7 +136,7 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
       }
     }
 
-    return corsResponse(origin, 200, { profile, memberships });
+    return corsResponse(origin, 200, { profile, memberships, profileCreated });
   } catch (err: unknown) {
     if (err instanceof AuthError) return corsResponse(origin, 401, { error: err.message });
     return internalError(context, origin, err);

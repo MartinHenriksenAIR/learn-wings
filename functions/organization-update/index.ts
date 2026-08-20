@@ -7,10 +7,11 @@ import { deleteBlob } from '../shared/blob';
 import { enforceUploadLimits, type UploadCandidate } from '../shared/upload-limits';
 import { assertBindablePaths, isBlobReleasable } from '../shared/blob-ownership';
 import { CONSUMER_TENANT_ID } from '../shared/tenant-binding';
+import { isMemberLanguage } from '../shared/member-language';
 
-const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit', 'entra_tid', 'entra_tid_label', 'allow_self_registration']);
+const ALLOWED_UPDATE_FIELDS = new Set(['name', 'slug', 'logo_url', 'seat_limit', 'entra_tid', 'entra_tid_label', 'allow_self_registration', 'default_member_language']);
 
-const ORG_ADMIN_WRITABLE = new Set(['name', 'logo_url', 'allow_self_registration']);
+const ORG_ADMIN_WRITABLE = new Set(['name', 'logo_url', 'allow_self_registration', 'default_member_language']);
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -78,6 +79,10 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
       if (typeof v !== 'boolean') {
         return reply(400, { error: 'allow_self_registration must be a boolean' });
       }
+    } else if (key === 'default_member_language') {
+      if (v !== null && !isMemberLanguage(v)) {
+        return reply(400, { error: "default_member_language must be 'en', 'da', or null" });
+      }
     }
   }
 
@@ -122,7 +127,7 @@ export default endpoint('organization-update', async ({ req, profile, reply }) =
     const organization = await queryOne(
       `UPDATE organizations SET ${setClauses.join(', ')}
        WHERE id = $${idIndex}
-       RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, allow_self_registration, created_at`,
+       RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, allow_self_registration, default_member_language, created_at`,
       params,
     );
 

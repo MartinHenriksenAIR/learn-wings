@@ -86,7 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!account) return;
     setContextError(null);
     try {
-      const { profile: p, memberships: m } = await callApi<{ profile: Profile; memberships: OrgMembership[] }>('/api/user-context', { language: i18n.resolvedLanguage });
+      const { profile: p, memberships: m, profileCreated } = await callApi<{ profile: Profile; memberships: OrgMembership[]; profileCreated?: boolean }>('/api/user-context', { language: i18n.resolvedLanguage });
+      if (profileCreated && p?.preferred_language && p.preferred_language !== i18n.resolvedLanguage) {
+        void i18n.changeLanguage(p.preferred_language);
+      }
       setProfile(p);
       setMemberships(m);
       if (m.length > 0 && !currentOrg && !p?.is_platform_admin) {
