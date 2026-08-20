@@ -6,15 +6,12 @@ type SettingKey = typeof ALLOWED_KEYS[number];
 
 type FieldCheck = (v: unknown) => boolean;
 const isString: FieldCheck = (v) => typeof v === 'string';
-const isStringOrNull: FieldCheck = (v) => v === null || typeof v === 'string';
 const isBoolean: FieldCheck = (v) => typeof v === 'boolean';
-const isOneOf = (...allowed: string[]): FieldCheck => (v) => typeof v === 'string' && allowed.includes(v);
 const isNonNegativeNumberOrNull: FieldCheck = (v) =>
   v === null || (typeof v === 'number' && Number.isFinite(v) && v >= 0);
 
 const FIELD_SHAPES: Record<SettingKey, Record<string, FieldCheck>> = {
   user_access: {
-    default_role: isOneOf('learner', 'org_admin'),
     require_email_verification: isBoolean,
     allow_self_registration: isBoolean,
     allow_individual_registration: isBoolean,

@@ -28,7 +28,6 @@ const mockCallApi = callApi as ReturnType<typeof vi.fn>;
 const serverUserAccessRow = {
   key: 'user_access',
   value: {
-    default_role: 'learner',
     require_email_verification: true,
     allow_self_registration: true,
   },
@@ -220,6 +219,24 @@ describe('PlatformSettings', () => {
     });
     expect(screen.getByRole('button', { name: 'common.saved' }).className).toMatch(/bg-success/);
     expect(screen.queryByRole('button', { name: 'platformSettings.userAccess.save' })).not.toBeInTheDocument();
+  });
+
+  it('the save payload carries no default_role — the setting is gone, the caption stays (#486)', async () => {
+    mockCallApi.mockResolvedValue(successResponse);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'platformSettings.userAccess.save' })).toBeInTheDocument();
+    });
+
+    mockCallApi.mockClear();
+    mockCallApi.mockResolvedValue({});
+    fireEvent.click(screen.getByRole('button', { name: 'platformSettings.userAccess.save' }));
+
+    await waitFor(() => expect(mockCallApi).toHaveBeenCalled());
+    const [, payload] = mockCallApi.mock.calls[0] as [string, { value: Record<string, unknown> }];
+    expect(Object.keys(payload.value)).not.toContain('default_role');
   });
 
   it('the fixed default-role caption is a heading, not a form label (#327)', async () => {
