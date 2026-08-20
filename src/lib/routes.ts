@@ -55,3 +55,7 @@ export const routes = {
     moderation: '/app/admin/platform/moderation',
   },
 } as const;
+
+export function homeRouteFor(effectiveIsPlatformAdmin: boolean): string {
+  return effectiveIsPlatformAdmin ? routes.platformAdmin.organizations : routes.learner.dashboard;
+}
