@@ -274,6 +274,11 @@ function LessonContent() {
           Use the <InlineCode>/context</InlineCode> command to see what uses the window. The command shows the
           system prompt, the memory files, the conversation history, and the tool results.
         </Body>
+        <img
+          src="/prototype/context-command.png"
+          alt="The /context command output showing what uses the window"
+          className="w-full rounded-[14px] border border-border"
+        />
         <Body>Use the command at these two times:</Body>
         <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm leading-[1.7] text-foreground">
           <li>Before you start a large task in an open session. Make sure that there is space for the task.</li>
@@ -299,6 +304,11 @@ function LessonContent() {
           open it again with <InlineCode>/resume</InlineCode>. Your CLAUDE.md files load again automatically. Use
           /clear each time you change to an unrelated task.
         </Body>
+        <img
+          src="/prototype/clear-command.png"
+          alt="A fresh session after /clear"
+          className="w-full rounded-[14px] border border-border"
+        />
         <Body>
           <strong className="font-bold">
             If the answer is yes, use <InlineCode>/compact</InlineCode> and give it instructions.
@@ -311,6 +321,11 @@ function LessonContent() {
             /compact Keep the failing test, the root cause we found, and the fix we agreed on
           </code>
         </pre>
+        <img
+          src="/prototype/compact-command.png"
+          alt="Typing /compact in Claude Code"
+          className="w-full rounded-[14px] border border-border"
+        />
         <Body>Tell the command what the summary must keep: decisions, constraints, and the current plan.</Body>
         <Callout tone="tip" label="We recommend" icon={<Check className="h-4 w-4" />}>
           When you complete a task, use /clear. When you are deep in a task, use /compact with instructions. Do not
