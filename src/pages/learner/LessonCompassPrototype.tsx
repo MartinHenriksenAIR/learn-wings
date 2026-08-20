@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  CheckCircle2,
   Eye,
   FileText,
   Heart,
@@ -174,21 +173,17 @@ function Callout({
   children: string;
 }) {
   return (
-    <div className={cn('flex gap-2.5 rounded-[10px] p-3.5', tone === 'note' ? 'bg-accent' : 'bg-[#e8f5ef]')}>
-      <span className={cn('mt-0.5 shrink-0', tone === 'note' ? 'text-accent-foreground' : 'text-[#157a52]')}>
+    <div className={cn('flex flex-col gap-1.5 rounded-[10px] p-3.5', tone === 'note' ? 'bg-accent' : 'bg-[#e8f5ef]')}>
+      <span
+        className={cn(
+          'flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.06em]',
+          tone === 'note' ? 'text-accent-foreground' : 'text-[#157a52]'
+        )}
+      >
         {icon}
+        {label}
       </span>
-      <div className="flex flex-col gap-0.5">
-        <span
-          className={cn(
-            'text-[11px] font-bold uppercase tracking-[0.06em]',
-            tone === 'note' ? 'text-accent-foreground' : 'text-[#157a52]'
-          )}
-        >
-          {label}
-        </span>
-        <p className="text-[13.5px] leading-relaxed text-foreground">{children}</p>
-      </div>
+      <p className="text-[13.5px] leading-relaxed text-foreground">{children}</p>
     </div>
   );
 }
@@ -209,32 +204,21 @@ function LessonContent() {
   return (
     <div className="flex flex-col gap-6 rounded-2xl border border-border bg-card px-[26px] py-6">
       <div className="flex items-center gap-2.5">
-        <span className="rounded-[7px] bg-accent px-[11px] py-[5px] text-[11px] font-bold uppercase tracking-[0.06em] text-accent-foreground">
-          Document
-        </span>
         <h1 className="flex-1 text-[28px] font-extrabold tracking-tight text-foreground">
           Managing Context in Claude Code
         </h1>
         <span className="whitespace-nowrap text-xs text-[#9aa0af]">6 min read</span>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-primary">Summary</span>
-        <Body>
-          Claude Code keeps your full session in a limited space. This space is the context window. When the window
-          becomes full, the quality of Claude's work decreases. This lesson shows you how to monitor the window, how
-          to reset it correctly, and how to use less of it.
-        </Body>
-      </div>
+      <Body>
+        Claude Code keeps your full session in a limited space. This space is the context window. When the window
+        becomes full, the quality of Claude's work decreases. This lesson shows you how to monitor the window, how
+        to reset it correctly, and how to use less of it.
+      </Body>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex aspect-video flex-col items-center justify-center gap-2.5 rounded-[14px] bg-muted">
-          <Play className="h-12 w-12 text-muted-foreground" />
-          <span className="text-[13.5px] text-muted-foreground">The Workbench</span>
-        </div>
-        <span className="text-xs text-[#9aa0af]">
-          Video: 2 min 30 s. The video repeats the main idea of this lesson. You can read the lesson without it.
-        </span>
+      <div className="flex aspect-video flex-col items-center justify-center gap-2.5 rounded-[14px] bg-muted">
+        <Play className="h-12 w-12 text-muted-foreground" />
+        <span className="text-[13.5px] text-muted-foreground">The Workbench</span>
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -367,10 +351,6 @@ function LessonContent() {
           Previous
         </Button>
         <Button className="h-auto rounded-[10px] px-[18px] py-2.5 text-[13.5px] font-bold">
-          <CheckCircle2 aria-hidden="true" />
-          Mark as complete
-        </Button>
-        <Button variant="outline" className="rounded-[10px] border-[#dcdee6] text-[13px] font-bold">
           Next
           <ArrowRight aria-hidden="true" />
         </Button>
@@ -400,14 +380,16 @@ export default function LessonCompassPrototype() {
           Viewing as: Learner
         </span>
       </header>
-      <main ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[1140px] px-8 pb-14 pt-[30px]">
-          <div className="grid items-start gap-5 lg:grid-cols-[320px,1fr]">
-            <CourseSidebar />
+      <div className="flex min-h-0 flex-1">
+        <aside className="hidden w-[380px] shrink-0 overflow-y-auto px-8 pb-14 pt-[30px] lg:block">
+          <CourseSidebar />
+        </aside>
+        <main ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[860px] px-8 pb-14 pt-[30px] lg:px-10">
             <LessonContent />
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
       <DotsCompass active={active} />
     </div>
   );
