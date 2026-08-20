@@ -21,7 +21,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { Loader2, Users, ToggleLeft, AlertTriangle, DollarSign, ShieldCheck } from 'lucide-react';
 
 interface UserAccessSettings {
-  require_email_verification: boolean;
   allow_self_registration: boolean;
   allow_individual_registration: boolean;
 }
@@ -45,7 +44,6 @@ type SettingsKey = 'user_access' | 'features' | 'seat_pricing' | 'platform_admin
 type SettingsValue = UserAccessSettings | FeatureSettings | SeatPricingSettings;
 
 const defaultUserAccess: UserAccessSettings = {
-  require_email_verification: false,
   allow_self_registration: true,
   allow_individual_registration: true,
 };
@@ -212,22 +210,6 @@ export default function PlatformSettings() {
                 <p className="mt-1 text-[11.5px] text-muted-foreground">
                   {t('platformSettings.userAccess.defaultRoleNote')}
                 </p>
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]">
-                <div className="flex flex-col gap-px">
-                  <Label htmlFor="require_email_verification" className="text-[13.5px] font-bold">
-                    {t('platformSettings.userAccess.requireEmailVerification')}
-                  </Label>
-                  <p className="text-[11.5px] text-muted-foreground">
-                    {t('platformSettings.userAccess.requireEmailVerificationHint')}
-                  </p>
-                </div>
-                <Switch
-                  id="require_email_verification"
-                  checked={userAccess.require_email_verification}
-                  onCheckedChange={(checked) => setUserAccess({ ...userAccess, require_email_verification: checked })}
-                />
               </div>
 
               <div className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]">

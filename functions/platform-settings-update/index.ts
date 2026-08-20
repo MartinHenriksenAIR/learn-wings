@@ -12,7 +12,6 @@ const isNonNegativeNumberOrNull: FieldCheck = (v) =>
 
 const FIELD_SHAPES: Record<SettingKey, Record<string, FieldCheck>> = {
   user_access: {
-    require_email_verification: isBoolean,
     allow_self_registration: isBoolean,
     allow_individual_registration: isBoolean,
   },

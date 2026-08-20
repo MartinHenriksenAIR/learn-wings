@@ -968,8 +968,6 @@
     "userAccess": {
       "defaultRole": "Standardrolle for nye brugere",
       "defaultRoleNote": "Nye brugere oprettes altid som Elev. Udvidet adgang gives via udtrykkelige admin-invitationsforløb.",
-      "requireEmailVerification": "Kræv e-mailbekræftelse",
-      "requireEmailVerificationHint": "Brugere skal bekræfte deres e-mail, før de får adgang til platformen.",
       "allowSelfRegistration": "Tillad selvregistrering",
       "allowSelfRegistrationHint": "Tillad brugere at tilmelde sig uden en invitation.",
       "allowIndividualRegistration": "Tillad walk-in-brugere",

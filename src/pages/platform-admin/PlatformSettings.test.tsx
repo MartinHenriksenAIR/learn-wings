@@ -28,7 +28,6 @@ const mockCallApi = callApi as ReturnType<typeof vi.fn>;
 const serverUserAccessRow = {
   key: 'user_access',
   value: {
-    require_email_verification: true,
     allow_self_registration: true,
   },
 };
@@ -37,8 +36,8 @@ const successResponse = {
   settings: [serverUserAccessRow],
 };
 
-const verificationSwitch = () =>
-  screen.getByRole('switch', { name: 'platformSettings.userAccess.requireEmailVerification' });
+const selfRegistrationSwitch = () =>
+  screen.getByRole('switch', { name: 'platformSettings.userAccess.allowSelfRegistration' });
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -62,18 +61,18 @@ describe('PlatformSettings', () => {
     const { unmount } = renderPage();
 
     await waitFor(() => {
-      expect(verificationSwitch()).toBeChecked();
+      expect(selfRegistrationSwitch()).toBeChecked();
     });
 
-    fireEvent.click(verificationSwitch());
-    expect(verificationSwitch()).not.toBeChecked();
+    fireEvent.click(selfRegistrationSwitch());
+    expect(selfRegistrationSwitch()).not.toBeChecked();
 
     unmount();
 
     renderPage();
 
     await waitFor(() => {
-      expect(verificationSwitch()).toBeChecked();
+      expect(selfRegistrationSwitch()).toBeChecked();
     });
   });
 
@@ -116,7 +115,7 @@ describe('PlatformSettings', () => {
     fireEvent.click(retryBtn);
 
     await waitFor(() => {
-      expect(verificationSwitch()).toBeChecked();
+      expect(selfRegistrationSwitch()).toBeChecked();
     });
   });
 
