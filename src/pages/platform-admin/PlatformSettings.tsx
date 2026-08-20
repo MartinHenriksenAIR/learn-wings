@@ -21,7 +21,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { Loader2, Users, ToggleLeft, AlertTriangle, DollarSign, ShieldCheck } from 'lucide-react';
 
 interface UserAccessSettings {
-  default_role: 'learner' | 'org_admin';
   require_email_verification: boolean;
   allow_self_registration: boolean;
   allow_individual_registration: boolean;
@@ -46,7 +45,6 @@ type SettingsKey = 'user_access' | 'features' | 'seat_pricing' | 'platform_admin
 type SettingsValue = UserAccessSettings | FeatureSettings | SeatPricingSettings;
 
 const defaultUserAccess: UserAccessSettings = {
-  default_role: 'learner',
   require_email_verification: false,
   allow_self_registration: true,
   allow_individual_registration: true,
@@ -267,7 +265,7 @@ export default function PlatformSettings() {
               <SaveButton
                 done={flashed('user_access')}
                 idleLabel={t('platformSettings.userAccess.save')}
-                onClick={() => saveSetting('user_access', { ...userAccess, default_role: 'learner' })}
+                onClick={() => saveSetting('user_access', userAccess)}
                 disabled={isSaving('user_access')}
               />
             </CardContent>

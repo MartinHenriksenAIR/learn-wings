@@ -109,16 +109,6 @@ describe('platform-settings-update', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when default_role is not a known mode', async () => {
-    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-
-    const res = await handler(baseReq({ key: 'user_access', value: { default_role: 'superuser' } }), {} as any);
-
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "default_role"/);
-    expect(mockQueryOne).not.toHaveBeenCalled();
-  });
-
   it('updates the setting via a jsonb merge and returns the updated row', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const updatedRow = { key: 'features', value: { quizzes_enabled: false } };
@@ -156,7 +146,6 @@ describe('platform-settings-update', () => {
   it('a full-body write passes validation and merges all fields', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const fullUserAccess = {
-      default_role: 'learner',
       require_email_verification: true,
       allow_self_registration: false,
       allow_individual_registration: true,
