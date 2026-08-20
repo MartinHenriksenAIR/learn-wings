@@ -91,6 +91,12 @@ async function handler(req: HttpRequest, context: InvocationContext): Promise<Ht
     const profileCreated = !profile;
 
     if (!profile) {
+      if (!user.email) {
+        return corsResponse(origin, 403, {
+          error: 'Your Microsoft account did not supply an email address, so an account cannot be created.',
+        });
+      }
+
       let requestedLanguage: unknown;
       try {
         const body = (await req.json()) as { language?: unknown } | null;

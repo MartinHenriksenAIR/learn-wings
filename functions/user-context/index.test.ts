@@ -125,6 +125,29 @@ describe('user-context', () => {
     expect(insertCall![1]).toContain('entra-tid-456');
   });
 
+  it('#487: refuses to provision a profile when the token carries no email, and writes nothing', async () => {
+    mockAuthenticate.mockResolvedValueOnce({ id: 'entra-oid-123', tid: 'entra-tid-456', email: '' });
+    mockQueryOne.mockResolvedValueOnce(null); // no existing profile
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string).error).toMatch(/email address/i);
+    expect(mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT'))).toBeUndefined();
+  });
+
+  it('#487: an existing profile still logs in even if the token carries no email', async () => {
+    mockAuthenticate.mockResolvedValueOnce({ id: 'entra-oid-123', tid: 'entra-tid-456', email: '' });
+    mockQueryOne.mockResolvedValueOnce(existingProfile);
+    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValueOnce([]);
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string).profile.id).toBe('profile-uuid');
+  });
+
   describe('#226 preferred_language provisioning', () => {
     const arrangeNewProfile = () => {
       mockQueryOne.mockResolvedValueOnce(null); // no existing profile
