@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
 vi.mock('react-i18next', () => ({
@@ -25,14 +26,16 @@ const profile = { id: 'p-1', full_name: 'Maja Lindberg' } as Profile;
 function renderCard(props: Partial<React.ComponentProps<typeof CertificateCard>> = {}) {
   const onDownload = vi.fn();
   render(
-    <CertificateCard
-      enrollment={enrollment}
-      profile={profile}
-      downloading={false}
-      saved={false}
-      onDownload={onDownload}
-      {...props}
-    />
+    <MemoryRouter>
+      <CertificateCard
+        enrollment={enrollment}
+        profile={profile}
+        downloading={false}
+        saved={false}
+        onDownload={onDownload}
+        {...props}
+      />
+    </MemoryRouter>
   );
   return { onDownload };
 }
@@ -72,5 +75,15 @@ describe('CertificateCard', () => {
     expect(preview.textContent).toContain('certificates.certificateOfCompletion');
     expect(preview.textContent).toContain('Maja Lindberg');
     expect(preview.textContent).toContain('AIR Academy');
+  });
+
+  it('offers a Details link into the course alongside the download (#459)', () => {
+    renderCard();
+
+    expect(screen.getByRole('link', { name: 'courses.detailsFor' })).toHaveAttribute(
+      'href',
+      '/app/courses/c-1',
+    );
+    expect(screen.getByRole('button', { name: /common\.download/ })).toBeInTheDocument();
   });
 });

@@ -123,4 +123,38 @@ describe('MandatoryCourses', () => {
     expect(screen.getByTestId('mandatory-completed')).toHaveTextContent('training.mandatory.completed');
     expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
   });
+
+  it('offers a Details link to the course detail page on every card (#459)', () => {
+    setAssignments([base]);
+    renderSection();
+
+    expect(screen.getByRole('link', { name: 'courses.detailsFor' })).toHaveAttribute(
+      'href',
+      '/app/courses/c-1',
+    );
+  });
+
+  it('makes the completed marker a link into the player, not a dead badge (#459)', () => {
+    setAssignments([done]);
+    renderSection();
+
+    const completed = screen.getByTestId('mandatory-completed');
+    expect(completed.tagName).toBe('A');
+    expect(completed).toHaveAttribute('href', '/app/learn/c-3?from=training');
+    expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
+  });
+
+  it('keeps both affordances on a completed row in list view (#459)', () => {
+    setAssignments([done]);
+    renderSection('list');
+
+    expect(screen.getByTestId('mandatory-completed')).toHaveAttribute(
+      'href',
+      '/app/learn/c-3?from=training',
+    );
+    expect(screen.getByRole('link', { name: 'courses.detailsFor' })).toHaveAttribute(
+      'href',
+      '/app/courses/c-3',
+    );
+  });
 });

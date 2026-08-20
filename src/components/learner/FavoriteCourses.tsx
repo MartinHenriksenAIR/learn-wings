@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CircleCheck, Heart, Play } from 'lucide-react';
+import { Heart, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LevelBadge } from '@/components/ui/level-badge';
 import { routes } from '@/lib/routes';
 import { useFavorites, useToggleFavorite } from '@/hooks/useFavorites';
 import { FavoriteToggle } from './FavoriteToggle';
+import { CourseDetailsButton } from './CourseDetailsButton';
+import { CourseCompletedButton } from './CourseCompletedButton';
 import type { ListView } from '@/hooks/useListView';
 
 export function FavoriteCourses({
@@ -65,14 +67,18 @@ export function FavoriteCourses({
                     onToggle={(next) => toggleFavorite({ courseId: course.id, favorite: next, course })}
                     className="h-8 w-8"
                   />
+                  <CourseDetailsButton
+                    courseId={course.id}
+                    courseTitle={course.title}
+                    className="py-2"
+                  />
                   {course.completed ? (
-                    <span
-                      data-testid="favorite-completed"
-                      className="flex shrink-0 items-center gap-1.5 rounded-[10px] bg-success/10 px-3 py-2 text-[13px] font-bold text-success"
-                    >
-                      <CircleCheck aria-hidden="true" className="h-3.5 w-3.5" />
-                      {t('training.mandatory.completed')}
-                    </span>
+                    <CourseCompletedButton
+                      courseId={course.id}
+                      courseTitle={course.title}
+                      testId="favorite-completed"
+                      className="shrink-0 py-2"
+                    />
                   ) : (
                     <Button
                       asChild
@@ -109,25 +115,27 @@ export function FavoriteCourses({
                 </div>
                 <div className="flex flex-1 flex-col gap-2.5 px-[18px] pb-[18px] pt-4">
                   <h3 className="text-[14.5px] font-bold leading-[1.35]">{course.title}</h3>
-                  {course.completed ? (
-                    <span
-                      data-testid="favorite-completed"
-                      className="mt-auto flex items-center justify-center gap-1.5 rounded-[10px] bg-success/10 px-3 py-[9px] text-[13px] font-bold text-success"
-                    >
-                      <CircleCheck aria-hidden="true" className="h-3.5 w-3.5" />
-                      {t('training.mandatory.completed')}
-                    </span>
-                  ) : (
-                    <Button
-                      asChild
-                      className="mt-auto h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
-                    >
-                      <Link to={routes.learner.coursePlayer(course.id, 'training')}>
-                        <Play aria-hidden="true" className="h-3.5 w-3.5" />
-                        {t('courses.openCourse')}
-                      </Link>
-                    </Button>
-                  )}
+                  <div className="mt-auto flex items-center gap-2">
+                    <CourseDetailsButton courseId={course.id} courseTitle={course.title} />
+                    {course.completed ? (
+                      <CourseCompletedButton
+                        courseId={course.id}
+                        courseTitle={course.title}
+                        testId="favorite-completed"
+                        className="w-full justify-center"
+                      />
+                    ) : (
+                      <Button
+                        asChild
+                        className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                      >
+                        <Link to={routes.learner.coursePlayer(course.id, 'training')}>
+                          <Play aria-hidden="true" className="h-3.5 w-3.5" />
+                          {t('courses.openCourse')}
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ),
