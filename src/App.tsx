@@ -19,6 +19,7 @@ import LearnerCourses from "./pages/learner/Courses";
 import CourseDetail from "./pages/learner/CourseDetail";
 import Assessment from "./pages/learner/Assessment";
 import CoursePlayer from "./pages/learner/CoursePlayer";
+import LessonCompassPrototype from "./pages/learner/LessonCompassPrototype";
 import TipsAndTricks from "./pages/learner/TipsAndTricks";
 
 import OrgAnalytics from "./pages/org-admin/OrgAnalytics";
@@ -86,6 +87,10 @@ function AppRoutes() {
       <Route path={routes.platformAdmin.settings} element={<ProtectedRoute requirePlatformAdmin><PlatformSettings /></ProtectedRoute>} />
       <Route path={routes.platformAdmin.moderation} element={<ProtectedRoute requirePlatformAdmin><PlatformCommunityModeration /></ProtectedRoute>} />
       <Route path={routes.settings} element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
+      {import.meta.env.DEV && (
+        <Route path="/prototype/lesson-compass" element={<LessonCompassPrototype />} />
+      )}
 
       <Route path={routes.root} element={<Login />} />
       <Route path={routes.appRoot} element={<Navigate to={routes.learner.dashboard} replace />} />
