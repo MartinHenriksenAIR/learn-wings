@@ -28,7 +28,7 @@ export function CourseCompletedButton({
       )}
     >
       <Link
-        to={routes.learner.coursePlayer(courseId, 'training')}
+        to={routes.learner.coursePlayer(courseId)}
         aria-label={t('training.mandatory.completedFor', { title: courseTitle })}
       >
         <CircleCheck aria-hidden="true" className="h-3.5 w-3.5" />

@@ -54,7 +54,7 @@ describe('MandatoryCourses', () => {
     expect(screen.getByText('training.mandatory.title')).toBeInTheDocument();
     const card = screen.getByTestId('training-mandatory-card');
     expect(screen.getByText('Compliance 101')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1');
     expect(screen.getByTestId('mandatory-due')).toHaveTextContent(formatDate(new Date('2026-09-01'), 'P', 'en'));
     expect(card.querySelector('[data-testid="mandatory-overdue"]')).toBeNull();
   });
@@ -110,7 +110,7 @@ describe('MandatoryCourses', () => {
     const row = screen.getByTestId('training-mandatory-row');
     expect(screen.queryByTestId('training-mandatory-card')).toBeNull();
     expect(screen.getByText('Safety Basics')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-2?from=training');
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-2');
     expect(screen.getByTestId('mandatory-due')).toHaveTextContent(formatDate(new Date('2026-07-01'), 'P', 'en'));
     expect(row.querySelector('[data-testid="mandatory-overdue"]')).not.toBeNull();
   });
@@ -140,7 +140,7 @@ describe('MandatoryCourses', () => {
 
     const completed = screen.getByTestId('mandatory-completed');
     expect(completed.tagName).toBe('A');
-    expect(completed).toHaveAttribute('href', '/app/learn/c-3?from=training');
+    expect(completed).toHaveAttribute('href', '/app/learn/c-3');
     expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
   });
 
@@ -150,7 +150,7 @@ describe('MandatoryCourses', () => {
 
     expect(screen.getByTestId('mandatory-completed')).toHaveAttribute(
       'href',
-      '/app/learn/c-3?from=training',
+      '/app/learn/c-3',
     );
     expect(screen.getByRole('link', { name: 'courses.detailsFor' })).toHaveAttribute(
       'href',

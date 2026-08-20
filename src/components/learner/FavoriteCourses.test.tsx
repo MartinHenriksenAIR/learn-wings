@@ -46,7 +46,7 @@ describe('FavoriteCourses', () => {
 
     expect(screen.getByText('training.favorites.title')).toBeInTheDocument();
     expect(screen.getByText('Intro to AI')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1');
     expect(screen.queryByText('dashboard.noFavoritesTitle')).toBeNull();
   });
 
@@ -131,7 +131,7 @@ describe('FavoriteCourses', () => {
 
     expect(screen.getByTestId('training-favorite-row')).toBeInTheDocument();
     expect(screen.getByText('Intro to AI')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1');
 
     fireEvent.click(screen.getByRole('button', { name: 'courses.removeFromFavorites' }));
     expect(toggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'c-1', favorite: false }));
@@ -161,7 +161,7 @@ describe('FavoriteCourses', () => {
 
     const completed = screen.getByTestId('favorite-completed');
     expect(completed.tagName).toBe('A');
-    expect(completed).toHaveAttribute('href', '/app/learn/c-1?from=training');
+    expect(completed).toHaveAttribute('href', '/app/learn/c-1');
     expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
   });
 });
