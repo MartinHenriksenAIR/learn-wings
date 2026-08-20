@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useParams, useNavigate } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
@@ -35,7 +35,6 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNowLocalized } from '@/lib/date-locale';
 import { toast } from 'sonner';
 import {
-  ArrowLeft,
   Loader2,
   MessageSquare,
   ThumbsUp,
@@ -45,7 +44,6 @@ import {
 
 export default function IdeaDetail() {
   const { ideaId } = useParams<{ ideaId: string }>();
-  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { profile, effectiveIsOrgAdmin } = useAuth();
   const communityGate = useCommunityGate();
@@ -148,7 +146,7 @@ export default function IdeaDetail() {
 
   if (ideaLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: t('community.idea') }]}>
+      <AppLayout headerLabel={t('community.idea')}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -158,37 +156,21 @@ export default function IdeaDetail() {
 
   if (!idea) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary') }]}>
+      <AppLayout headerLabel={t('community.ideaLibrary')}>
         <div className="py-12 text-center">
           <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {t('community.ideaNotFound')}
           </h1>
-          <p className="mb-4 text-sm text-muted-foreground">{t('community.ideaNotFoundDescription')}</p>
-          <Button
-            onClick={() => navigate(routes.community.ideas)}
-            className="rounded-[11px] text-[13px] font-bold"
-          >
-            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-            {t('community.backToIdeas')}
-          </Button>
+          <p className="text-sm text-muted-foreground">{t('community.ideaNotFoundDescription')}</p>
         </div>
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: t('community.idea') }]}>
+    <AppLayout headerLabel={t('community.idea')}>
       <div className="max-w-[760px]">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
-        >
-          <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
-          {t('common.back')}
-        </Button>
-
         <div className="mb-4 rounded-2xl border border-border bg-card px-7 py-[26px]">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <IdeaStatusBadge status={idea.status} />

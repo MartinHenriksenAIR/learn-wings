@@ -11,17 +11,16 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({
     children,
-    breadcrumbs = [],
+    title,
+    headerLabel,
   }: {
     children: React.ReactNode;
-    breadcrumbs?: { label: string }[];
+    title?: string;
+    headerLabel?: string;
   }) => (
     <div>
-      <nav aria-label="breadcrumb">
-        {breadcrumbs.map((c) => (
-          <span key={c.label}>{c.label}</span>
-        ))}
-      </nav>
+      <span data-testid="header-label" data-label={headerLabel ?? title ?? ''} />
+      {title ? <h1>{title}</h1> : null}
       {children}
     </div>
   ),
@@ -150,10 +149,9 @@ describe('LearnerTraining', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'training.title' })).toBeInTheDocument();
   });
 
-  it('shows "My Training" in the header breadcrumb (#421)', () => {
+  it('identifies itself as "My Training" in the header (#421)', () => {
     renderTraining();
-    const crumbs = screen.getByRole('navigation', { name: 'breadcrumb' });
-    expect(within(crumbs).getByText('nav.training')).toBeInTheDocument();
+    expect(screen.getByTestId('header-label')).toHaveAttribute('data-label', 'nav.training');
   });
 
   it('shows the lesson-aggregate figure in the progress strip', () => {

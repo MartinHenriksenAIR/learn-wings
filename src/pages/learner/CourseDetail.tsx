@@ -19,7 +19,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { ArrowLeft, BookOpen, Layers, Play } from 'lucide-react';
+import { BookOpen, Layers, Play } from 'lucide-react';
 
 export default function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -49,11 +49,9 @@ export default function CourseDetail() {
     return match ? (isDanish ? match.name_da : match.name_en) : null;
   }, [categoriesQuery.data, course?.category_id, isDanish]);
 
-  const catalogCrumb = { label: t('nav.courses'), href: routes.learner.courses };
-
   if (orgGuard === 'loading' || query.isLoading) {
     return (
-      <AppLayout breadcrumbs={[catalogCrumb]}>
+      <AppLayout headerLabel={t('nav.courses')}>
         <PageSpinner />
       </AppLayout>
     );
@@ -61,7 +59,7 @@ export default function CourseDetail() {
 
   if (!currentOrg) {
     return (
-      <AppLayout breadcrumbs={[catalogCrumb]}>
+      <AppLayout headerLabel={t('nav.courses')}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/50" />
           <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
@@ -73,17 +71,12 @@ export default function CourseDetail() {
 
   if (query.isError || !course) {
     return (
-      <AppLayout breadcrumbs={[catalogCrumb]}>
+      <AppLayout headerLabel={t('nav.courses')}>
         <EmptyState
           icon={<BookOpen className="h-6 w-6" />}
           title={t('courses.detail.notAvailable')}
           description={t('courses.detail.notAvailableDescription')}
           className="rounded-2xl border-[#d6d8e0] bg-card"
-          action={
-            <Button asChild variant="outline">
-              <Link to={routes.learner.courses}>{t('courses.detail.backToCatalog')}</Link>
-            </Button>
-          }
         />
       </AppLayout>
     );
@@ -97,19 +90,8 @@ export default function CourseDetail() {
       : t('courses.startCourse');
 
   return (
-    <AppLayout breadcrumbs={[catalogCrumb, { label: course.title }]}>
+    <AppLayout headerLabel={course.title}>
       <div className="mx-auto max-w-[820px]">
-        <Button
-          asChild
-          variant="ghost"
-          className="mb-3 -ml-2 h-auto gap-1.5 px-2 py-1.5 text-[13px] font-semibold text-muted-foreground hover:text-foreground"
-        >
-          <Link to={routes.learner.courses}>
-            <ArrowLeft aria-hidden="true" />
-            {t('courses.detail.backToCatalog')}
-          </Link>
-        </Button>
-
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
           <div className="relative h-[190px] bg-gradient-to-br from-primary/80 to-primary">
             {course.thumbnail_url && (

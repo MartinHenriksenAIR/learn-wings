@@ -1,25 +1,25 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppLayout, type Crumb } from '@/components/layout/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { PageSpinner } from '@/components/ui/page-spinner';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrgGuard } from '@/hooks/useOrgGuard';
 
 interface OrgGateProps {
-  breadcrumbs?: Crumb[];
+  headerLabel?: string;
   titleKey: string;
   descriptionKey: string;
   children?: ReactNode;
 }
 
-export function OrgGate({ breadcrumbs, titleKey, descriptionKey, children }: OrgGateProps) {
+export function OrgGate({ headerLabel, titleKey, descriptionKey, children }: OrgGateProps) {
   const { t } = useTranslation();
   const { currentOrg } = useAuth();
   const orgGuard = useOrgGuard();
 
   if (orgGuard === 'loading') {
     return (
-      <AppLayout breadcrumbs={breadcrumbs}>
+      <AppLayout headerLabel={headerLabel}>
         <PageSpinner />
       </AppLayout>
     );
@@ -27,7 +27,7 @@ export function OrgGate({ breadcrumbs, titleKey, descriptionKey, children }: Org
 
   if (!currentOrg) {
     return (
-      <AppLayout breadcrumbs={breadcrumbs}>
+      <AppLayout headerLabel={headerLabel}>
         <div className="py-12 text-center">
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {t(titleKey)}

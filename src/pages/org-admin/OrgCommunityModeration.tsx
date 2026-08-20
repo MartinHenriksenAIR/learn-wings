@@ -68,8 +68,6 @@ export default function OrgCommunityModeration() {
     });
   };
 
-  const breadcrumbs = [{ label: t('nav.moderation') }];
-
   const tabs: { key: ReportStatus; label: string }[] = [
     { key: 'pending', label: t('moderation.tabs.pending') },
     { key: 'reviewed', label: t('moderation.tabs.reviewed') },
@@ -79,7 +77,7 @@ export default function OrgCommunityModeration() {
   if (orgGuard === 'loading' || !currentOrg) {
     return (
       <OrgGate
-        breadcrumbs={breadcrumbs}
+        headerLabel={t('nav.moderation')}
         titleKey="common.noOrgSelected"
         descriptionKey="moderation.noOrgDescription"
       />
@@ -87,7 +85,7 @@ export default function OrgCommunityModeration() {
   }
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs}>
+    <AppLayout headerLabel={t('nav.moderation')}>
       <div className="mb-5">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('moderation.title')}

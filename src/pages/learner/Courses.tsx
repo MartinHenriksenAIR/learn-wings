@@ -118,7 +118,7 @@ export default function LearnerCourses() {
 
   if (orgGuard === 'loading' || query.isLoading) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
+      <AppLayout headerLabel={t('nav.courses')}>
         <PageSpinner />
       </AppLayout>
     );
@@ -126,7 +126,7 @@ export default function LearnerCourses() {
 
   if (!currentOrg) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
+      <AppLayout headerLabel={t('nav.courses')}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
           <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/50" />
           <p className="text-muted-foreground">
@@ -142,7 +142,7 @@ export default function LearnerCourses() {
 
   if (query.isError) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
+      <AppLayout headerLabel={t('nav.courses')}>
         <div className="flex h-64 items-center justify-center">
           <QueryErrorState onRetry={() => query.refetch()} />
         </div>
@@ -314,7 +314,7 @@ export default function LearnerCourses() {
     );
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('nav.courses') }]}>
+    <AppLayout headerLabel={t('nav.courses')}>
       <div className="mb-[22px]">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('courses.title')}</h1>
         <p className="max-w-[680px] text-sm text-muted-foreground">{t('courses.subtitle')}</p>

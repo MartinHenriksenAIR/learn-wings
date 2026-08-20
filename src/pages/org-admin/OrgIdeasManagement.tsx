@@ -171,12 +171,10 @@ export default function OrgIdeasManagement() {
     }
   };
 
-  const breadcrumbs = [{ label: t('ideaManagement.title') }];
-
   if (orgGuard === 'loading' || !currentOrg) {
     return (
       <OrgGate
-        breadcrumbs={breadcrumbs}
+        headerLabel={t('ideaManagement.title')}
         titleKey="common.noOrgSelected"
         descriptionKey="ideaManagement.noOrgDescription"
       />
@@ -184,7 +182,7 @@ export default function OrgIdeasManagement() {
   }
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs}>
+    <AppLayout headerLabel={t('ideaManagement.title')}>
       <div className="mb-5 flex flex-col items-start justify-between gap-4 md:flex-row">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">

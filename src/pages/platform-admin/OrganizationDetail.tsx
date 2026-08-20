@@ -13,7 +13,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { getSeatUsage } from '@/lib/seats';
 import { routes } from '@/lib/routes';
 import { OrgMembership, Profile, OrgRole } from '@/lib/types';
-import { ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/sonner';
 import { orgSchema } from '@/lib/org-validation';
@@ -231,13 +230,7 @@ export default function OrganizationDetail() {
 
   if (loading) {
     return (
-      <AppLayout
-        title={t('orgDetail.loadingBreadcrumb')}
-        breadcrumbs={[
-          { label: t('organizations.title'), href: routes.platformAdmin.organizations },
-          { label: t('orgDetail.loadingBreadcrumb') },
-        ]}
-      >
+      <AppLayout title={t('orgDetail.loading')}>
         <PageSpinner />
       </AppLayout>
     );
@@ -248,7 +241,6 @@ export default function OrganizationDetail() {
       <OrgNotFoundScreen
         loadFailed={orgQuery.isError}
         onRetry={() => orgQuery.refetch()}
-        onBack={() => navigate(routes.platformAdmin.organizations)}
       />
     );
   }
@@ -260,21 +252,7 @@ export default function OrganizationDetail() {
   });
 
   return (
-    <AppLayout
-      breadcrumbs={[
-        { label: t('organizations.title'), href: routes.platformAdmin.organizations },
-        { label: org.name },
-      ]}
-    >
-      <button
-        type="button"
-        onClick={() => navigate(routes.platformAdmin.organizations)}
-        className="mb-3.5 inline-flex items-center gap-[7px] rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-        {t('orgDetail.allOrganizations')}
-      </button>
-
+    <AppLayout headerLabel={org.name}>
       <OrgDetailHeader org={org} onEdit={() => setEditOpen(true)} onDelete={() => setDeleteOpen(true)} />
 
       <OrgStatCards

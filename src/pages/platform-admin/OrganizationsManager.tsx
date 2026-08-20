@@ -235,7 +235,7 @@ export default function OrganizationsManager() {
 
   if (loading) {
     return (
-      <AppLayout title={t('organizations.title')} breadcrumbs={[{ label: t('organizations.title') }]}>
+      <AppLayout title={t('organizations.title')}>
         <PageSpinner />
       </AppLayout>
     );
@@ -374,7 +374,7 @@ export default function OrganizationsManager() {
   );
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('organizations.title') }]}>
+    <AppLayout headerLabel={t('organizations.title')}>
       <div className="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('organizations.title')}</h1>
