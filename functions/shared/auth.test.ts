@@ -76,6 +76,26 @@ describe('authenticate', () => {
     expect(user.email).toBe('user@contoso.com');
   });
 
+  it('#487: ignores the unverified email and upn claims — only preferred_username is trusted', async () => {
+    const token = makeToken({
+      oid: 'oid-abc', tid: '11111111-1111-1111-1111-111111111111', iss: VALID_ISSUER,
+      preferred_username: 'real@contoso.com', email: 'spoofed@victim.com', upn: 'other@contoso.com',
+    });
+    const req = { headers: { get: (k: string) => k === 'authorization' ? `Bearer ${token}` : null } };
+    const user = await authenticate(req as any);
+    expect(user.email).toBe('real@contoso.com');
+  });
+
+  it('#487: does NOT fall back to email or upn when preferred_username is absent', async () => {
+    const token = makeToken({
+      oid: 'oid-abc', tid: '11111111-1111-1111-1111-111111111111', iss: VALID_ISSUER,
+      email: 'spoofed@victim.com', upn: 'other@contoso.com',
+    });
+    const req = { headers: { get: (k: string) => k === 'authorization' ? `Bearer ${token}` : null } };
+    const user = await authenticate(req as any);
+    expect(user.email).toBe('');
+  });
+
   it('throws AuthError on missing Bearer header', async () => {
     const req = { headers: { get: () => null } };
     await expect(authenticate(req as any)).rejects.toBeInstanceOf(AuthError);

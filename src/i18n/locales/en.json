@@ -968,8 +968,6 @@
     "userAccess": {
       "defaultRole": "Default role for new users",
       "defaultRoleNote": "New users are always created as Learner. Elevated access is granted via explicit admin invitation flows.",
-      "requireEmailVerification": "Require email verification",
-      "requireEmailVerificationHint": "Users must verify their email before accessing the platform.",
       "allowSelfRegistration": "Allow self registration",
       "allowSelfRegistrationHint": "Allow users to sign up without an invitation.",
       "allowIndividualRegistration": "Allow Walk-in Users",
