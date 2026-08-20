@@ -216,10 +216,13 @@ function LessonContent() {
         to reset it correctly, and how to use less of it.
       </Body>
 
-      <div className="flex aspect-video flex-col items-center justify-center gap-2.5 rounded-[14px] bg-muted">
-        <Play className="h-12 w-12 text-muted-foreground" />
-        <span className="text-[13.5px] text-muted-foreground">The Workbench</span>
-      </div>
+      <video
+        src="/prototype/managing-context-hook.mp4"
+        controls
+        playsInline
+        preload="metadata"
+        className="aspect-video w-full rounded-[14px] border border-border bg-muted"
+      />
 
       <div className="flex flex-col gap-2.5">
         <SectionHeading id="window" title={SECTIONS[0].title} />
