@@ -182,7 +182,7 @@ describe('organization-update', () => {
     expect(sql).toContain('UPDATE organizations SET');
     expect(sql).toContain('name = $1');
     expect(sql).toContain('WHERE id = $2');
-    expect(sql).toContain('RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, allow_self_registration, created_at');
+    expect(sql).toContain('RETURNING id, name, slug, logo_url, seat_limit, entra_tid, entra_tid_label, allow_self_registration, default_member_language, created_at');
     expect(params).toEqual(['New Name', 'org-1']);
   });
 
@@ -382,6 +382,35 @@ describe('organization-update', () => {
     expect(sql).toContain('UPDATE organizations SET');
     expect(sql).toContain('allow_self_registration = $1');
     expect(params).toEqual([true, 'org-1']);
+  });
+
+  it('returns 400 when default_member_language is not en/da/null (before authz/DB)', async () => {
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { default_member_language: 'de' } }), {} as any);
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body as string)).toEqual({ error: "default_member_language must be 'en', 'da', or null" });
+    expect(mockQueryOne).not.toHaveBeenCalled();
+  });
+
+  it('org admin of the target org can set default_member_language (org-owned setting)', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', default_member_language: 'da' });
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { default_member_language: 'da' } }), {} as any);
+    expect(res.status).toBe(200);
+    expect(mockIsOrgAdmin).toHaveBeenCalledWith('p1', 'org-1');
+    const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('default_member_language = $1');
+    expect(params).toEqual(['da', 'org-1']);
+  });
+
+  it('org admin can clear default_member_language back to no default', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: false });
+    mockIsOrgAdmin.mockResolvedValueOnce(true);
+    mockQueryOne.mockResolvedValueOnce({ id: 'org-1', default_member_language: null });
+    const res = await handler(baseReq({ orgId: 'org-1', updates: { default_member_language: null } }), {} as any);
+    expect(res.status).toBe(200);
+    const [, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
+    expect(params).toEqual([null, 'org-1']);
   });
 
   it('org admin can update logo_url and allow_self_registration together', async () => {

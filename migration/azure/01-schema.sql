@@ -93,6 +93,7 @@ CREATE TABLE public.organizations (
   entra_tid       text UNIQUE,            -- ADDED (#353): bound Entra tenant ID for SSO auto-join. UNIQUE (multiple NULLs allowed) = a tenant binds to at most one org.
   entra_tid_label text,                   -- ADDED (#353): human-friendly domain label for the binding (e.g. 'acme.com'); cosmetic, editable by platform admin.
   allow_self_registration boolean NOT NULL DEFAULT true,  -- ADDED (#356): per-org on/off switch for tenant auto-join. ON = tenant members auto-join without invite; OFF = invite required. Gates #353's autoJoinByTenant alongside the platform-wide master switch.
+  default_member_language text CONSTRAINT organizations_default_member_language_check CHECK (default_member_language IN ('en', 'da')),  -- ADDED (#405): per-org default seeded into profiles.preferred_language at first profile creation. NULL = keep the member's browser-derived language.
   kind            text NOT NULL DEFAULT 'standard',  -- ADDED (#354): org classifier. 'standard' = a normal org; 'individual' = the hidden self-serve placeholder holding org-less walk-ins. Future free/pro tiers add values here.
   created_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -100,6 +101,7 @@ COMMENT ON COLUMN public.organizations.seat_limit IS 'Maximum number of users al
 COMMENT ON COLUMN public.organizations.entra_tid IS 'Bound Entra tenant ID for SSO auto-join (#353). NULL = unbound. UNIQUE: a verified tenant binds to at most one org.';
 COMMENT ON COLUMN public.organizations.entra_tid_label IS 'Human-friendly domain label for the tenant binding, e.g. acme.com (#353). Cosmetic; editable by platform admin.';
 COMMENT ON COLUMN public.organizations.allow_self_registration IS 'Per-org on/off switch for Entra tenant auto-join (#356). true = members of the bound tenant auto-join without an invite (still subject to the platform-wide master switch and the member seat cap); false = an invite is required. Default true. Toggling off blocks only future auto-joins; existing members are untouched.';
+COMMENT ON COLUMN public.organizations.default_member_language IS 'Per-org default language seeded into profiles.preferred_language when a member''s profile is first created via this org (#405). NULL = no default; the member keeps their browser-derived language. Applies to the first profile creation only: it never updates an existing profile, so a member''s own Settings choice always wins, and changing this column affects future joins only.';
 COMMENT ON COLUMN public.organizations.kind IS 'Org classifier (#354). standard = normal org; individual = the hidden self-serve placeholder. Logic keys off this label, never a hard-coded id.';
 
 -- ---- profiles ----

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockAuthenticate, MockAuthError, mockQueryOne, mockClientQuery, mockWithTransaction, mockSeedTenantBinding } = vi.hoisted(() => {
+const { mockAuthenticate, MockAuthError, mockQueryOne, mockClientQuery, mockWithTransaction, mockSeedTenantBinding, mockOrgDefaultLanguage } = vi.hoisted(() => {
   class MockAuthError extends Error {}
   const mockClientQuery = vi.fn();
   return {
@@ -9,6 +9,7 @@ const { mockAuthenticate, MockAuthError, mockQueryOne, mockClientQuery, mockWith
     mockClientQuery,
     mockWithTransaction: vi.fn(async (cb: (client: { query: typeof mockClientQuery }) => unknown) => cb({ query: mockClientQuery })),
     mockSeedTenantBinding: vi.fn(),
+    mockOrgDefaultLanguage: vi.fn(),
   };
 });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -18,6 +19,10 @@ vi.mock('../shared/db', () => ({
   withTransaction: mockWithTransaction,
 }));
 vi.mock('../shared/tenant-binding', () => ({ seedTenantBinding: mockSeedTenantBinding }));
+vi.mock('../shared/member-language', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/member-language')>()),
+  orgDefaultLanguageForInvitation: mockOrgDefaultLanguage,
+}));
 
 import handler from './index';
 
@@ -109,6 +114,44 @@ describe('invitation-accept', () => {
     const acceptCall = findCall(`UPDATE invitations SET status = 'accepted'`);
     expect(acceptCall).toBeDefined();
     expect(acceptCall![1]).toEqual(['inv-1']);
+  });
+
+  it('#405: seeds the provisioning INSERT with the invitation org default', async () => {
+    mockQueryOne.mockResolvedValueOnce(null);
+    mockQueryOne.mockResolvedValueOnce({ id: 'p-new' });
+    mockOrgDefaultLanguage.mockResolvedValueOnce('da');
+    mockClientQuery.mockResolvedValueOnce(rows(pendingOrgInvite));
+    mockClientQuery.mockResolvedValueOnce(rows());
+
+    await handler(baseReq({ linkId: 'link-1', language: 'en' }), {} as any);
+
+    const insertProfile = mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT INTO profiles'));
+    expect(insertProfile![0]).toContain('preferred_language');
+    expect(insertProfile![1]).toContain('da');
+    expect(mockOrgDefaultLanguage).toHaveBeenCalledWith('link-1');
+  });
+
+  it('#405: falls back to the sent language when the invitation org sets no default', async () => {
+    mockQueryOne.mockResolvedValueOnce(null);
+    mockQueryOne.mockResolvedValueOnce({ id: 'p-new' });
+    mockOrgDefaultLanguage.mockResolvedValueOnce(null);
+    mockClientQuery.mockResolvedValueOnce(rows(pendingOrgInvite));
+    mockClientQuery.mockResolvedValueOnce(rows());
+
+    await handler(baseReq({ linkId: 'link-1', language: 'da' }), {} as any);
+
+    const insertProfile = mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT INTO profiles'));
+    expect(insertProfile![1]).toContain('da');
+  });
+
+  it('#405: never re-languages an existing profile', async () => {
+    mockClientQuery.mockResolvedValueOnce(rows(pendingOrgInvite));
+    mockClientQuery.mockResolvedValueOnce(rows());
+
+    await handler(baseReq({ linkId: 'link-1', language: 'en' }), {} as any);
+
+    expect(mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT INTO profiles'))).toBeUndefined();
+    expect(mockOrgDefaultLanguage).not.toHaveBeenCalled();
   });
 
   it('provisions a profile on first authenticated call (does not assume user-context ran)', async () => {
