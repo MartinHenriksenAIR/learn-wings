@@ -7,7 +7,7 @@ import { AppSidebar } from './AppSidebar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useViewModeLabels } from '@/components/layout/view-mode-labels';
-import { routes } from '@/lib/routes';
+import { homeRouteFor } from '@/lib/routes';
 import { parentRouteFor } from '@/lib/parent-routes';
 
 interface AppLayoutProps {
@@ -22,7 +22,7 @@ export function AppLayout({ children, title, headerLabel }: AppLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const homeHref = effectiveIsPlatformAdmin ? routes.platformAdmin.organizations : routes.learner.dashboard;
+  const homeHref = homeRouteFor(effectiveIsPlatformAdmin);
 
   const viewModeLabels = useViewModeLabels();
 
