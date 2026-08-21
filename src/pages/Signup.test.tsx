@@ -14,7 +14,7 @@ vi.mock('react-router-dom', async (importOriginal) => ({
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({ t: (key: string) => key, i18n: { resolvedLanguage: 'da' } }),
   Trans: ({ i18nKey, values }: { i18nKey: string; values?: Record<string, unknown> }) => (
     <>{values ? `${i18nKey} ${Object.values(values).join(' ')}` : i18nKey}</>
   ),
@@ -156,7 +156,7 @@ describe('Signup (accept-invitation flow, #175)', () => {
       renderSignup();
       await acceptAndWaitFor('invitationAccept.platformTitle');
 
-      expect(mockCallApi).toHaveBeenCalledWith('/api/invitation-accept', { linkId: 'link-123' });
+      expect(mockCallApi).toHaveBeenCalledWith('/api/invitation-accept', { linkId: 'link-123', language: 'da' });
     });
 
     it('latches against double-submit and shows the busy label while in flight', async () => {

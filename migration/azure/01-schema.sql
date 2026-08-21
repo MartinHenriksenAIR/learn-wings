@@ -93,6 +93,7 @@ CREATE TABLE public.organizations (
   entra_tid       text UNIQUE,            -- ADDED (#353): bound Entra tenant ID for SSO auto-join. UNIQUE (multiple NULLs allowed) = a tenant binds to at most one org.
   entra_tid_label text,                   -- ADDED (#353): human-friendly domain label for the binding (e.g. 'acme.com'); cosmetic, editable by platform admin.
   allow_self_registration boolean NOT NULL DEFAULT true,  -- ADDED (#356): per-org on/off switch for tenant auto-join. ON = tenant members auto-join without invite; OFF = invite required. Gates #353's autoJoinByTenant alongside the platform-wide master switch.
+  default_member_language text CONSTRAINT organizations_default_member_language_check CHECK (default_member_language IN ('en', 'da')),  -- ADDED (#405): per-org default seeded into profiles.preferred_language at first profile creation. NULL = keep the member's browser-derived language.
   kind            text NOT NULL DEFAULT 'standard',  -- ADDED (#354): org classifier. 'standard' = a normal org; 'individual' = the hidden self-serve placeholder holding org-less walk-ins. Future free/pro tiers add values here.
   created_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -100,6 +101,7 @@ COMMENT ON COLUMN public.organizations.seat_limit IS 'Maximum number of users al
 COMMENT ON COLUMN public.organizations.entra_tid IS 'Bound Entra tenant ID for SSO auto-join (#353). NULL = unbound. UNIQUE: a verified tenant binds to at most one org.';
 COMMENT ON COLUMN public.organizations.entra_tid_label IS 'Human-friendly domain label for the tenant binding, e.g. acme.com (#353). Cosmetic; editable by platform admin.';
 COMMENT ON COLUMN public.organizations.allow_self_registration IS 'Per-org on/off switch for Entra tenant auto-join (#356). true = members of the bound tenant auto-join without an invite (still subject to the platform-wide master switch and the member seat cap); false = an invite is required. Default true. Toggling off blocks only future auto-joins; existing members are untouched.';
+COMMENT ON COLUMN public.organizations.default_member_language IS 'Per-org default language seeded into profiles.preferred_language when a member''s profile is first created via this org (#405). NULL = no default; the member keeps their browser-derived language. Applies to the first profile creation only: it never updates an existing profile, so a member''s own Settings choice always wins, and changing this column affects future joins only.';
 COMMENT ON COLUMN public.organizations.kind IS 'Org classifier (#354). standard = normal org; individual = the hidden self-serve placeholder. Logic keys off this label, never a hard-coded id.';
 
 -- ---- profiles ----
@@ -828,7 +830,7 @@ CREATE TRIGGER trg_hash_invitation_token
 
 -- ---- course_favorites ----
 -- #358 per-user, org-neutral course favorites (folded in from
--- 10-course-favorites.sql). No org_id — favorites belong to the user, not an
+-- 12-course-favorites.sql). No org_id — favorites belong to the user, not an
 -- org; the PK (user_id, course_id) makes a favorite idempotent and is the
 -- upsert conflict target.
 CREATE TABLE IF NOT EXISTS public.course_favorites (
@@ -872,6 +874,81 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_org_completed
   ON public.enrollments (org_id, user_id, completed_at)
   WHERE status = 'completed';
 
+-- ---- orphan_sweep_runs (issue #286) ----
+-- One row per nightly orphan-sweep run (folded in from 08-orphan-sweep-runs.sql,
+-- 16-orphan-sweep-abort-detail.sql and 17-orphan-sweep-census.sql). The sweep is
+-- otherwise stateless, so this table IS the memory that makes cross-run
+-- statements ("third night in a row", "recovered", "matched blobs halved
+-- overnight") expressible at all.
+--
+-- `outcome` is the summary's abort flag mapped once, here, so the notification
+-- policy never special-cases past-due in three places:
+--   aborted: false        -> 'completed'
+--   reason: 'past-due'    -> 'skipped'   (a benign, self-healing catch-up run)
+--   no baseline on record -> 'report-only' (censused, recorded, deleted nothing)
+--   any other abort       -> 'aborted'   (including the 'disabled' kill switch)
+--
+-- The two *_notified_at columns ARE the notification state — "time since the
+-- last alert email" is max(abort_notified_at) (stamped for the recovered note
+-- too, so the rate limit measures the inbox rather than one email kind), and the
+-- digest's working set is `deleted > 0 AND deletions_reported_at IS NULL`.
+-- There is no separate store.
+CREATE TABLE IF NOT EXISTS public.orphan_sweep_runs (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  started_at            timestamptz NOT NULL,
+  finished_at           timestamptz NOT NULL DEFAULT now(),
+  outcome               text NOT NULL CHECK (outcome IN ('completed', 'aborted', 'skipped', 'report-only')),
+  reason                text,
+  -- The refusal in prose (#451): what tripped, the numbers behind it, the sample
+  -- paths and the remedy. `reason` is the machine code and on its own does not
+  -- say what tripped. NULL on completed runs, and on any abort recorded before
+  -- this column existed.
+  abort_detail          text,
+  scanned               integer NOT NULL DEFAULT 0,
+  referenced            integer NOT NULL DEFAULT 0,
+  eligible              integer NOT NULL DEFAULT 0,
+  orphaned              integer NOT NULL DEFAULT 0,
+  skipped_by_grace      integer NOT NULL DEFAULT 0,
+  skipped_unsafe_name   integer NOT NULL DEFAULT 0,
+  skipped_by_recheck    integer NOT NULL DEFAULT 0,
+  deleted               integer NOT NULL DEFAULT 0,
+  failed                integer NOT NULL DEFAULT 0,
+  bytes_reclaimed       bigint NOT NULL DEFAULT 0,
+  deleted_sample        text[] NOT NULL DEFAULT '{}',
+  abort_notified_at     timestamptz,
+  deletions_reported_at timestamptz,
+  -- The census the break detection compares against (#469). Both are NULL for
+  -- "this run never got as far as a census", which every row written before
+  -- 17-orphan-sweep-census.sql is, and which is deliberately distinguishable
+  -- from a censused zero: no baseline means the next run is report-only rather
+  -- than a guess.
+  --
+  -- `matched` is blobs the reference set DOES point at. A healthy sweep never
+  -- deletes a matched blob, so it is stable by construction and collapses only
+  -- when references vanish by accident.
+  --
+  -- `unmatched_references` is references that resolve to no blob — the primary
+  -- check. A broken match raises it by the whole affected class; a backlog of
+  -- replaced uploads and a legitimate bulk deletion both leave it untouched.
+  -- Counted against the pre-listing reference read only, so a concurrent upload
+  -- does not read as a break.
+  matched               integer,
+  unmatched_references  integer,
+  -- Deletions this run was entitled to make but deferred to stay inside the
+  -- per-run ceiling. The ceiling drains oldest-first and carries the remainder;
+  -- it used to abort instead, which deleted nothing and met the same backlog the
+  -- next night.
+  deferred              integer NOT NULL DEFAULT 0,
+  -- Operator acceptance of this run's census as the new baseline. A refused run
+  -- is never a baseline on its own — otherwise a broken night becomes the next
+  -- night's normal — so a refusal repeats until someone either fixes the match
+  -- or sets this. The alert email carries the statement with the id filled in.
+  baseline_accepted     boolean NOT NULL DEFAULT false
+);
+
+CREATE INDEX IF NOT EXISTS orphan_sweep_runs_started_at_idx
+  ON public.orphan_sweep_runs (started_at DESC);
+
 -- =====================================================================
 -- SECTION 6: SEED DATA
 -- =====================================================================
@@ -882,5 +959,13 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_org_completed
 INSERT INTO public.organizations (id, name, slug, kind, seat_limit, allow_self_registration)
 VALUES ('00000000-0000-0000-0000-000000000354', 'AI Uddannelse', 'individuals', 'individual', NULL, false)
 ON CONFLICT (id) DO NOTHING;
+
+-- Storage-ops alert recipients (#286, folded in from 08-orphan-sweep-runs.sql).
+-- Deliberately NOT seat_pricing.notification_email: storage ops and commercial
+-- seat requests are unrelated concerns that will want to diverge. No Platform
+-- Settings UI field — edit via SQL.
+INSERT INTO public.platform_settings (key, value)
+VALUES ('ops_alerts', '{"recipients": ["ev@ai-raadgivning.dk", "MartinH@ai-raadgivning.dk"], "enabled": true}'::jsonb)
+ON CONFLICT (key) DO NOTHING;
 
 COMMIT;

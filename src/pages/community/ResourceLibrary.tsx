@@ -130,7 +130,7 @@ export default function ResourceLibrary() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('community.resources') }]}>
+    <AppLayout headerLabel={t('community.resources')}>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">

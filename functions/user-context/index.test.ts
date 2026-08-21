@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   mockAuthenticate, MockAuthError, mockQuery, mockQueryOne, mockClientQuery, mockWithTransaction,
-  mockSeedTenantBinding, mockAutoJoinByTenant, mockIndividualTierEnabled,
+  mockSeedTenantBinding, mockAutoJoinByTenant, mockIndividualTierEnabled, mockOrgDefaultLanguage,
 } =
   vi.hoisted(() => {
     class MockAuthError extends Error {}
@@ -19,6 +19,7 @@ const {
       mockSeedTenantBinding: vi.fn(),
       mockAutoJoinByTenant: vi.fn(),
       mockIndividualTierEnabled: vi.fn(),
+      mockOrgDefaultLanguage: vi.fn(),
     };
   });
 vi.mock('../shared/auth', () => ({ authenticate: mockAuthenticate, AuthError: MockAuthError }));
@@ -31,6 +32,10 @@ vi.mock('../shared/tenant-binding', () => ({
   seedTenantBinding: mockSeedTenantBinding,
   autoJoinByTenant: mockAutoJoinByTenant,
   individualTierEnabled: mockIndividualTierEnabled,
+}));
+vi.mock('../shared/member-language', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/member-language')>()),
+  orgDefaultLanguageForNewProfile: mockOrgDefaultLanguage,
 }));
 
 import handler from './index';
@@ -120,6 +125,29 @@ describe('user-context', () => {
     expect(insertCall![1]).toContain('entra-tid-456');
   });
 
+  it('#487: refuses to provision a profile when the token carries no email, and writes nothing', async () => {
+    mockAuthenticate.mockResolvedValueOnce({ id: 'entra-oid-123', tid: 'entra-tid-456', email: '' });
+    mockQueryOne.mockResolvedValueOnce(null); // no existing profile
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body as string).error).toMatch(/email address/i);
+    expect(mockQueryOne.mock.calls.find((c) => (c[0] as string).includes('INSERT'))).toBeUndefined();
+  });
+
+  it('#487: an existing profile still logs in even if the token carries no email', async () => {
+    mockAuthenticate.mockResolvedValueOnce({ id: 'entra-oid-123', tid: 'entra-tid-456', email: '' });
+    mockQueryOne.mockResolvedValueOnce(existingProfile);
+    mockQuery.mockResolvedValueOnce([]);
+    mockQuery.mockResolvedValueOnce([]);
+
+    const res = await handler(baseReq as any, {} as any);
+
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body as string).profile.id).toBe('profile-uuid');
+  });
+
   describe('#226 preferred_language provisioning', () => {
     const arrangeNewProfile = () => {
       mockQueryOne.mockResolvedValueOnce(null); // no existing profile
@@ -163,6 +191,37 @@ describe('user-context', () => {
       arrangeNewProfile();
       await handler(baseReq as any, {} as any);
       expect(insertParams()).toContain('en');
+    });
+
+    it('#405: the joining org default beats the browser-derived language', async () => {
+      arrangeNewProfile();
+      mockOrgDefaultLanguage.mockResolvedValueOnce('da');
+      await handler(reqWith({ language: 'en' }) as any, {} as any);
+      const params = insertParams();
+      expect(params).toContain('da');
+      expect(params).not.toContain('en');
+      expect(mockOrgDefaultLanguage).toHaveBeenCalledWith('user@contoso.com', 'entra-tid-456');
+    });
+
+    it('#405: keeps the browser-derived language when the joining org sets no default', async () => {
+      arrangeNewProfile();
+      mockOrgDefaultLanguage.mockResolvedValueOnce(null);
+      await handler(reqWith({ language: 'da' }) as any, {} as any);
+      expect(insertParams()).toContain('da');
+    });
+
+    it('#405: reports profileCreated so the client can apply the org default once', async () => {
+      arrangeNewProfile();
+      mockOrgDefaultLanguage.mockResolvedValueOnce('da');
+      const res = await handler(reqWith({ language: 'en' }) as any, {} as any);
+      expect(JSON.parse(res.body as string).profileCreated).toBe(true);
+    });
+
+    it('#405: does not report profileCreated for an existing profile', async () => {
+      mockQueryOne.mockResolvedValueOnce(existingProfile);
+      mockQuery.mockResolvedValueOnce([]);
+      const res = await handler(reqWith({ language: 'da' }) as any, {} as any);
+      expect(JSON.parse(res.body as string).profileCreated).toBe(false);
     });
 
     it('does NOT overwrite an existing profile — later logins never touch preferred_language', async () => {

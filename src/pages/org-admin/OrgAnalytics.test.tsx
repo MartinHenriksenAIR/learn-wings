@@ -66,6 +66,7 @@ function renderAt(path: string) {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path={routes.orgAdmin.root} element={<OrgAnalytics />} />
+          <Route path={routes.orgAdmin.users} element={<OrgAnalytics />} />
           <Route path={routes.platformAdmin.analytics} element={<OrgAnalytics />} />
         </Routes>
       </MemoryRouter>
@@ -86,12 +87,23 @@ describe('OrgAnalytics — view is selected by route (#120)', () => {
     expect(screen.queryByText('analytics.tabs.members')).not.toBeInTheDocument();
   });
 
-  it('renders the org-scoped view at the org admin route', () => {
+  it('renders the Organisation view (overview + courses, no members) at the org admin root', () => {
     primeHooks({ isPlatformAdmin: false, currentOrg: org });
     renderAt(routes.orgAdmin.root);
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('nav.organization');
+    expect(screen.getByText('analytics.tabs.courses')).toBeInTheDocument();
+    expect(screen.queryByText('analytics.tabs.members')).not.toBeInTheDocument();
+  });
+
+  it('renders the Brugere view (members + learning progress) at the org users route', () => {
+    primeHooks({ isPlatformAdmin: false, currentOrg: org });
+    renderAt(routes.orgAdmin.users);
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('nav.users');
     expect(screen.getByText('analytics.tabs.members')).toBeInTheDocument();
+    expect(screen.getByText('analytics.tabs.team')).toBeInTheDocument();
+    expect(screen.queryByText('analytics.tabs.overview')).not.toBeInTheDocument();
   });
 });
 

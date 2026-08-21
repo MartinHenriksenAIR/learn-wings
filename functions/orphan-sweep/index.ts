@@ -3,17 +3,16 @@ import type { InvocationContext, Timer } from '@azure/functions';
 import { query } from '../shared/db';
 import { deleteBlob } from '../shared/blob';
 import { generateContainerSasToken, SAS_SIGNED_VERSION } from '../shared/sas';
-import { UPLOAD_LIMITS, fileExtension, type UploadAssetKind } from '../shared/upload-limits';
-import { recordAndNotify } from './notify';
+import { recordAndNotify, readSweepBaseline } from './notify';
 
 
 const SCHEDULE = '0 0 3 * * *';
 
 const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000;
 
-const DEFAULT_MAX_ORPHAN_SHARE = 0.5;
+const MIN_NEW_UNMATCHED_REFERENCES = 5;
 
-const MIN_ROOT_CLASS_ORPHANS = 5;
+const MATCH_COLLAPSE_FRACTION = 0.5;
 
 const DEFAULT_MAX_DELETIONS_PER_RUN = 500;
 
@@ -58,39 +57,10 @@ export interface ListedBlob {
   encodedName: boolean;
 }
 
-export function blobBucket(name: string): string {
-  const slash = name.indexOf('/');
-  return slash < 0 ? '' : name.slice(0, slash + 1);
-}
-
-export type RootFileClass = UploadAssetKind | 'other';
-
-const ROOT_CLASS_KEY = 'root:';
-
-const UPLOAD_KINDS: readonly UploadAssetKind[] = ['image', 'video', 'document'];
-
-const ROOT_CLASS_LABELS: Readonly<Record<RootFileClass, string>> = {
-  image: 'image files at the container root',
-  video: 'video files at the container root',
-  document: 'document files at the container root',
-  other: 'files of no recognised type at the container root',
-};
-
-export function rootFileClass(name: string): RootFileClass {
-  const ext = fileExtension(name);
-  return UPLOAD_KINDS.find((kind) => UPLOAD_LIMITS[kind].extensions.has(ext)) ?? 'other';
-}
-
-function rootClassOf(bucket: string): RootFileClass | null {
-  if (!bucket.startsWith(ROOT_CLASS_KEY)) return null;
-  const cls = bucket.slice(ROOT_CLASS_KEY.length);
-  return cls in ROOT_CLASS_LABELS ? (cls as RootFileClass) : null;
-}
-
-export function blobBuckets(name: string): string[] {
-  const prefix = blobBucket(name);
-  if (prefix !== '') return [prefix];
-  return ['', `${ROOT_CLASS_KEY}${rootFileClass(name)}`];
+export interface SweepBaseline {
+  startedAt: number;
+  matched: number;
+  unmatchedReferences: number;
 }
 
 export type SweepAbortReason =
@@ -100,21 +70,25 @@ export type SweepAbortReason =
   | 'reference-read-failed'
   | 'empty-reference-set'
   | 'listing-failed'
-  | 'orphan-share-implausible'
-  | 'orphan-bucket-share-implausible'
-  | 'orphan-count-implausible';
+  | 'reference-resolution-broken'
+  | 'reference-loss';
 
 export interface OrphanSweepSummary {
   aborted: boolean;
+  reportOnly: boolean;
   reason: SweepAbortReason | null;
+  abortDetail: string | null;
   scanned: number;
   referenced: number;
   eligible: number;
   orphaned: number;
+  matched: number | null;
+  unmatchedReferences: number | null;
   skippedByGrace: number;
   skippedUnsafeName: number;
   skippedByRecheck: number;
   deleted: number;
+  deferred: number;
   failed: number;
   bytesReclaimed: number;
   deletedSample: string[];
@@ -124,15 +98,20 @@ const DELETED_SAMPLE_SIZE = 20;
 
 const emptySummary = (): OrphanSweepSummary => ({
   aborted: false,
+  reportOnly: false,
   reason: null,
+  abortDetail: null,
   scanned: 0,
   referenced: 0,
   eligible: 0,
   orphaned: 0,
+  matched: null,
+  unmatchedReferences: null,
   skippedByGrace: 0,
   skippedUnsafeName: 0,
   skippedByRecheck: 0,
   deleted: 0,
+  deferred: 0,
   failed: 0,
   bytesReclaimed: 0,
   deletedSample: [],
@@ -147,7 +126,7 @@ export function referenceVariants(stored: string): string[] {
   add(stored);
   const trimmed = stored.trim();
   add(trimmed);
-  add(trimmed.replace(/^\/+/, '')); // a stray leading slash
+  add(trimmed.replace(/^\/+/, ''));
 
   if (!/^https?:\/\//i.test(trimmed)) return [...variants];
 
@@ -250,16 +229,22 @@ async function listContainer(
   throw new ListingError(`listing exceeded ${MAX_LIST_PAGES} pages`);
 }
 
-async function readReferencedPaths(): Promise<{ rows: number; referenced: Set<string> }> {
+interface ReferenceRead {
+  rows: string[][];
+  referenced: Set<string>;
+}
+
+async function readReferencedPaths(): Promise<ReferenceRead> {
   const rows = await query<{ path: string | null }>(REFERENCED_PATHS_SQL);
   const referenced = new Set<string>();
-  let counted = 0;
+  const perRow: string[][] = [];
   for (const row of rows) {
     if (typeof row?.path !== 'string' || row.path === '') continue;
-    counted++;
-    for (const variant of referenceVariants(row.path)) referenced.add(variant);
+    const variants = referenceVariants(row.path);
+    perRow.push(variants);
+    for (const variant of variants) referenced.add(variant);
   }
-  return { rows: counted, referenced };
+  return { rows: perRow, referenced };
 }
 
 function numericEnv(
@@ -278,16 +263,21 @@ function numericEnv(
   return value;
 }
 
-export async function runOrphanSweep(log: SweepLogger, now: number = Date.now()): Promise<OrphanSweepSummary> {
+export async function runOrphanSweep(
+  log: SweepLogger,
+  now: number = Date.now(),
+  baseline: SweepBaseline | null = null,
+): Promise<OrphanSweepSummary> {
   const summary = emptySummary();
   const abort = (reason: SweepAbortReason, message: string, remedy: string): OrphanSweepSummary => {
     summary.aborted = true;
     summary.reason = reason;
     summary.deleted = 0;
+    summary.deferred = 0;
+    summary.abortDetail = `${message} WHAT TO DO: ${remedy}`;
     log.error(
       `[orphan-sweep] REFUSED TO SWEEP — 0 blobs deleted, nothing in storage was touched. ` +
-        `This is NOT a clean run with nothing to do. Reason: ${reason}. ${message} ` +
-        `WHAT TO DO: ${remedy}`,
+        `This is NOT a clean run with nothing to do. Reason: ${reason}. ${summary.abortDetail}`,
       summary,
     );
     return summary;
@@ -312,13 +302,6 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
     );
   }
 
-  const maxShare = numericEnv(
-    process.env.ORPHAN_SWEEP_MAX_SHARE,
-    DEFAULT_MAX_ORPHAN_SHARE,
-    (v) => v > 0 && v <= 1,
-    log,
-    'ORPHAN_SWEEP_MAX_SHARE',
-  );
   const maxDeletions = numericEnv(
     process.env.ORPHAN_SWEEP_MAX_DELETIONS,
     DEFAULT_MAX_DELETIONS_PER_RUN,
@@ -330,17 +313,17 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   const readFailureRemedy =
     'nothing immediately — a database the sweep cannot read makes it refuse, which is the safe direction, and it retries tomorrow. If it recurs, check the function app can reach Postgres (DATABASE_URL, pool exhaustion, firewall).';
   const emptySetRemedy =
-    'treat this as a BROKEN QUERY, not an empty database: a renamed column or a dropped table produces exactly this. Check REFERENCED_PATHS_SQL against migration/azure/01-schema.sql before changing anything else, and do not raise any ceiling to work around it.';
+    'treat this as a BROKEN QUERY, not an empty database: a renamed column or a dropped table produces exactly this. Check REFERENCED_PATHS_SQL against migration/azure/01-schema.sql before changing anything else.';
   const listingFailureRemedy =
     'nothing immediately — a listing that could not be completed is never used as a basis for deletion. If it recurs, check the storage account and that the list SAS is still valid.';
 
-  let before: { rows: number; referenced: Set<string> };
+  let before: ReferenceRead;
   try {
     before = await readReferencedPaths();
   } catch (err: unknown) {
     return abort('reference-read-failed', err instanceof Error ? err.message : String(err), readFailureRemedy);
   }
-  if (before.rows === 0) {
+  if (before.rows.length === 0) {
     return abort(
       'empty-reference-set',
       'the six-column union returned no rows (far likelier a query bug than an empty database).',
@@ -356,7 +339,7 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   }
   summary.scanned = blobs.length;
 
-  let after: { rows: number; referenced: Set<string> };
+  let after: ReferenceRead;
   try {
     after = await readReferencedPaths();
   } catch (err: unknown) {
@@ -366,17 +349,20 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
       readFailureRemedy,
     );
   }
-  if (after.rows === 0) {
+  if (after.rows.length === 0) {
     return abort('empty-reference-set', 'the six-column union returned no rows on the second read.', emptySetRemedy);
   }
 
   const referenced = new Set<string>([...before.referenced, ...after.referenced]);
   summary.referenced = referenced.size;
 
+  const listedNames = new Set<string>(blobs.map((blob) => blob.name));
+  const unresolved = before.rows.filter((variants) => !variants.some((variant) => listedNames.has(variant)));
+  summary.unmatchedReferences = unresolved.length;
+  summary.matched = blobs.filter((blob) => referenced.has(blob.name)).length;
+
   const orphans: ListedBlob[] = [];
   const deletable: ListedBlob[] = [];
-  const bucketEligible = new Map<string, number>();
-  const bucketOrphaned = new Map<string, number>();
   for (const blob of blobs) {
     if (blob.encodedName) {
       summary.skippedUnsafeName++;
@@ -392,12 +378,9 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
       continue;
     }
     summary.eligible++;
-    const buckets = blobBuckets(blob.name);
-    for (const bucket of buckets) bucketEligible.set(bucket, (bucketEligible.get(bucket) ?? 0) + 1);
     if (referenced.has(blob.name)) continue;
 
     orphans.push(blob);
-    for (const bucket of buckets) bucketOrphaned.set(bucket, (bucketOrphaned.get(bucket) ?? 0) + 1);
     if (blob.lastModified === null || now - blob.lastModified < GRACE_PERIOD_MS) {
       summary.skippedByGrace++;
       continue;
@@ -406,53 +389,76 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
   }
   summary.orphaned = orphans.length;
 
-  const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
-  const sampleOf = (candidates: ListedBlob[]) => {
-    const names = candidates.slice(0, ABORT_SAMPLE_SIZE).map((b) => b.name);
+  const sampleOf = (candidates: readonly string[]) => {
+    const names = candidates.slice(0, ABORT_SAMPLE_SIZE);
     const rest = candidates.length - names.length;
     return `${names.join(', ')}${rest > 0 ? `, … (+${rest} more)` : ''}`;
   };
-  const brokenMatchRemedy =
-    'do NOT raise the ceiling first. Take the sampled names above and check by hand whether the database really references none of them (the six columns in REFERENCED_PATHS_SQL). If any IS referenced, the match is broken — fix the match. Only once the backlog is confirmed genuine, raise ORPHAN_SWEEP_MAX_SHARE for a single run and put it back afterwards.';
 
-  const share = summary.eligible === 0 ? 0 : summary.orphaned / summary.eligible;
-  if (share > maxShare) {
+  if (baseline === null) {
+    summary.reportOnly = true;
+    summary.abortDetail =
+      `No earlier run carries a census to compare tonight against, so this run counted everything and ` +
+      `deleted nothing. It found ${summary.orphaned} unreferenced blob(s) of ${summary.eligible} eligible, ` +
+      `${summary.matched} blob(s) that the database does point at, and ${summary.unmatchedReferences} ` +
+      `reference(s) that resolve to no blob at all. ` +
+      `WHAT TO DO: read those four numbers. They are tonight's baseline and the next run is measured against ` +
+      `them, so if they are already wrong this is the night to say so — set ORPHAN_SWEEP_DISABLED=1 and ` +
+      `investigate. If they look right, nothing: the next scheduled run sweeps normally.`;
+    log.warn(
+      `[orphan-sweep] REPORT ONLY — 0 blobs deleted, nothing in storage was touched. ${summary.abortDetail}`,
+      summary,
+    );
+    return summary;
+  }
+
+  const newlyUnmatched = summary.unmatchedReferences - baseline.unmatchedReferences;
+  if (newlyUnmatched >= MIN_NEW_UNMATCHED_REFERENCES) {
     return abort(
-      'orphan-share-implausible',
-      `${summary.orphaned}/${summary.eligible} blobs (${pct(share)}) look unreferenced across the whole container, above the ${pct(maxShare)} ceiling — treating this as a broken reconciliation, not a big cleanup. Sample: ${sampleOf(orphans)}.`,
-      brokenMatchRemedy,
+      'reference-resolution-broken',
+      `${summary.unmatchedReferences} of ${before.rows.length} reference(s) in the database resolve to no blob in ` +
+        `the container, against ${baseline.unmatchedReferences} on the last accepted run — ${newlyUnmatched} more. ` +
+        `A reference that exists must point at a blob that exists, so this is the match itself going wrong, not a ` +
+        `backlog: a backlog leaves this number alone. The likely causes, in order, are a changed path format that ` +
+        `referenceVariants does not normalise, a changed AZURE_STORAGE_CONTAINER_NAME or storage account, and a ` +
+        `listing that came back partial. Every unreferenced blob this run found is therefore suspect and none were ` +
+        `deleted. Sample of what no longer resolves: ${sampleOf(unresolved.map((variants) => variants[0]))}.`,
+      `take the sampled values above and find their blobs by hand. If they exist in the container under a name the ` +
+        `sweep did not match, fix the match — do not accept this as the new normal. If the container or account ` +
+        `setting changed, put it back. Only if this drop is real and expected, accept it as the baseline with the ` +
+        `statement below; until either happens the sweep will refuse every night, which is the intended behaviour.`,
     );
   }
 
-  for (const [bucket, eligible] of bucketEligible) {
-    const orphaned = bucketOrphaned.get(bucket) ?? 0;
-    const rootClass = rootClassOf(bucket);
-    if (rootClass !== null && orphaned < MIN_ROOT_CLASS_ORPHANS) continue;
-    const bucketShare = orphaned / eligible;
-    if (bucketShare <= maxShare) continue;
-    const label = rootClass !== null ? ROOT_CLASS_LABELS[rootClass] : bucket === '' ? 'the container root' : bucket;
-    const diagnosis =
-      rootClass !== null
-        ? 'The root is the one bucket two writers share — courses.thumbnail_url puts images there, the bare lesson paths put videos and documents there — so it is censused per file-type class, by extension. One class going bad like this is what a break confined to one of those columns looks like once the rest of the root has diluted it away.'
-        : 'A single prefix going bad like this is what a break confined to one path-writing column looks like.';
+  if (summary.matched < baseline.matched * MATCH_COLLAPSE_FRACTION) {
     return abort(
-      'orphan-bucket-share-implausible',
-      `${orphaned}/${eligible} blobs under ${label} (${pct(bucketShare)}) look unreferenced, above the ${pct(maxShare)} ceiling — even though the container as a whole is only ${pct(share)} unreferenced. ${diagnosis} Sample: ${sampleOf(orphans.filter((b) => blobBuckets(b.name).includes(bucket)))}.`,
-      brokenMatchRemedy,
+      'reference-loss',
+      `${summary.matched} blob(s) are still pointed at by the database, against ${baseline.matched} on the last ` +
+        `accepted run — a fall of more than ${(MATCH_COLLAPSE_FRACTION * 100).toFixed(0)}%. A healthy sweep never ` +
+        `deletes a blob the database points at, so this number does not fall on its own. Either a large amount of ` +
+        `content was deliberately removed, or references were lost by accident — a part-applied migration or a ` +
+        `restore to an older snapshot both look exactly like this, and both would make this run delete live media.`,
+      `check whether that much content really was removed on purpose. If it was, accept the new baseline with the ` +
+        `statement below and the next run sweeps normally. If it was not, the database is missing rows it should ` +
+        `have — restore them before letting this job run again, because the blobs are still there and this is the ` +
+        `only thing standing between them and deletion.`,
     );
   }
 
-  if (deletable.length > maxDeletions) {
-    return abort(
-      'orphan-count-implausible',
-      `${deletable.length} deletions requested, above the per-run ceiling of ${maxDeletions}. Sample: ${sampleOf(deletable)}.`,
-      `this needs a DECISION, not patience — it will repeat identically every night until someone acts, and until then nothing is ever reclaimed. A long-accrued backlog trips this on the first armed night, which is expected. Spot-check the sampled names, then either raise ORPHAN_SWEEP_MAX_DELETIONS above ${deletable.length} for one run (and restore ${DEFAULT_MAX_DELETIONS_PER_RUN} afterwards) or work the backlog down in stages.`,
+  const ordered = [...deletable].sort((a, b) => (a.lastModified ?? 0) - (b.lastModified ?? 0));
+  const capped = ordered.slice(0, maxDeletions);
+  summary.deferred = ordered.length - capped.length;
+  if (summary.deferred > 0) {
+    log.warn(
+      `[orphan-sweep] ${ordered.length} blob(s) are deletable, above the per-run ceiling of ${maxDeletions}. ` +
+        `Deleting the ${capped.length} oldest and carrying ${summary.deferred} to the next run — the backlog drains ` +
+        `at this rate rather than blocking the sweep.`,
     );
   }
 
-  let confirmed = deletable;
-  if (deletable.length > 0) {
-    let final: { rows: number; referenced: Set<string> };
+  let confirmed = capped;
+  if (capped.length > 0) {
+    let final: ReferenceRead;
     try {
       final = await readReferencedPaths();
     } catch (err: unknown) {
@@ -462,7 +468,7 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
         readFailureRemedy,
       );
     }
-    if (final.rows === 0) {
+    if (final.rows.length === 0) {
       return abort(
         'empty-reference-set',
         'the six-column union returned no rows on the pre-delete re-check.',
@@ -470,12 +476,12 @@ export async function runOrphanSweep(log: SweepLogger, now: number = Date.now())
       );
     }
 
-    confirmed = deletable.filter((blob) => !final.referenced.has(blob.name));
-    summary.skippedByRecheck = deletable.length - confirmed.length;
+    confirmed = capped.filter((blob) => !final.referenced.has(blob.name));
+    summary.skippedByRecheck = capped.length - confirmed.length;
     if (summary.skippedByRecheck > 0) {
       log.warn(
         `[orphan-sweep] ${summary.skippedByRecheck} candidate(s) became referenced after the listing and will NOT be deleted:`,
-        deletable.filter((blob) => final.referenced.has(blob.name)).map((blob) => blob.name),
+        capped.filter((blob) => final.referenced.has(blob.name)).map((blob) => blob.name),
       );
     }
   }
@@ -517,13 +523,15 @@ function refusePastDue(log: SweepLogger): OrphanSweepSummary {
   const summary = emptySummary();
   summary.aborted = true;
   summary.reason = 'past-due';
+  summary.abortDetail =
+    'The host fired this as CATCH-UP for a missed 03:00 UTC occurrence, so it is running at some ' +
+    'arbitrary time of day rather than in the maintenance window — and possibly against a reference ' +
+    'set the paired frontend/schema deploy has not caught up with. WHAT TO DO: nothing; the next ' +
+    'scheduled 03:00 UTC run proceeds normally. If this appears at all, `useMonitor` has been turned ' +
+    'back on — see the registration below.';
   log.warn(
     '[orphan-sweep] REFUSED TO SWEEP — 0 blobs deleted, nothing in storage was touched. ' +
-      'Reason: past-due. The host fired this as CATCH-UP for a missed 03:00 UTC occurrence, ' +
-      'so it is running at some arbitrary time of day rather than in the maintenance window — ' +
-      'and possibly against a reference set the paired frontend/schema deploy has not caught up ' +
-      'with. WHAT TO DO: nothing; the next scheduled 03:00 UTC run proceeds normally. If this ' +
-      'appears at all, `useMonitor` has been turned back on — see the registration below.',
+      `Reason: past-due. ${summary.abortDetail}`,
     summary,
   );
   return summary;
@@ -534,7 +542,23 @@ export async function runScheduledSweep(
   log: SweepLogger,
   now: number = Date.now(),
 ): Promise<OrphanSweepSummary> {
-  const summary = timer?.isPastDue ? refusePastDue(log) : await runOrphanSweep(log, now);
+  let summary: OrphanSweepSummary;
+  if (timer?.isPastDue) {
+    summary = refusePastDue(log);
+  } else {
+    let baseline: SweepBaseline | null = null;
+    try {
+      baseline = await readSweepBaseline();
+    } catch (err: unknown) {
+      log.error(
+        '[orphan-sweep] could not read the baseline census from orphan_sweep_runs — this run will report rather ' +
+          'than delete, which is the safe direction',
+        err,
+      );
+    }
+    summary = await runOrphanSweep(log, now, baseline);
+  }
+
   try {
     await recordAndNotify(summary, { startedAt: now, now, log });
   } catch (err: unknown) {

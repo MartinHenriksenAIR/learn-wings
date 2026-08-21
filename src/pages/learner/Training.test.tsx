@@ -11,17 +11,16 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({
     children,
-    breadcrumbs = [],
+    title,
+    headerLabel,
   }: {
     children: React.ReactNode;
-    breadcrumbs?: { label: string }[];
+    title?: string;
+    headerLabel?: string;
   }) => (
     <div>
-      <nav aria-label="breadcrumb">
-        {breadcrumbs.map((c) => (
-          <span key={c.label}>{c.label}</span>
-        ))}
-      </nav>
+      <span data-testid="header-label" data-label={headerLabel ?? title ?? ''} />
+      {title ? <h1>{title}</h1> : null}
       {children}
     </div>
   ),
@@ -150,10 +149,9 @@ describe('LearnerTraining', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'training.title' })).toBeInTheDocument();
   });
 
-  it('shows "My Training" in the header breadcrumb (#421)', () => {
+  it('identifies itself as "My Training" in the header (#421)', () => {
     renderTraining();
-    const crumbs = screen.getByRole('navigation', { name: 'breadcrumb' });
-    expect(within(crumbs).getByText('nav.training')).toBeInTheDocument();
+    expect(screen.getByTestId('header-label')).toHaveAttribute('data-label', 'nav.training');
   });
 
   it('shows the lesson-aggregate figure in the progress strip', () => {
@@ -168,7 +166,7 @@ describe('LearnerTraining', () => {
     const card = screen.getByTestId('training-continue-card');
     expect(within(card).getByText('Ongoing Course')).toBeInTheDocument();
     const resume = within(card).getByRole('link', { name: /common\.continue/ });
-    expect(resume).toHaveAttribute('href', '/app/learn/c-2?from=training');
+    expect(resume).toHaveAttribute('href', '/app/learn/c-2');
   });
 
   it('wires in the Mandatory and Favorites sections with the current org id (no coming-soon placeholders)', () => {
@@ -263,6 +261,24 @@ describe('LearnerTraining — card/list view toggle (#449)', () => {
     expect(screen.getByTestId('training-continue-row')).toBeInTheDocument();
     expect(screen.getByTestId('cert-card')).toBeInTheDocument();
     expect(screen.queryByTestId('training-completed-card')).toBeNull();
+  });
+
+  it('offers a Details link from an in-progress card (#459)', () => {
+    renderTraining();
+    const card = screen.getByTestId('training-continue-card');
+    expect(within(card).getByRole('link', { name: 'courses.detailsFor' })).toHaveAttribute(
+      'href',
+      '/app/courses/c-2',
+    );
+  });
+
+  it('offers a Details link from the plain completed card (#459)', () => {
+    renderTraining();
+    const card = screen.getByTestId('training-completed-card');
+    expect(within(card).getByRole('link', { name: 'courses.detailsFor' })).toHaveAttribute(
+      'href',
+      '/app/courses/c-1',
+    );
   });
 });
 

@@ -30,7 +30,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { routes } from '@/lib/routes';
 import { extractLmsAssetPath, getSignedLmsAssetUrl } from '@/lib/storage';
 import { Course, CourseModule, Lesson, CourseLevel, LessonType } from '@/lib/types';
-import { ArrowLeft, Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, ListChecks, Pencil } from 'lucide-react';
+import { Plus, Loader2, GripVertical, Trash2, Video, FileText, HelpCircle, ListChecks, Pencil } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useToastMutation } from '@/hooks/useToastMutation';
@@ -446,29 +446,14 @@ export default function CourseEditor() {
       <AppLayout title={t('courseEditor.title')}>
         <div className="text-center py-12">
           <p className="text-muted-foreground">{t('courseEditor.courseNotFound')}</p>
-          <Button variant="outline" onClick={() => navigate(routes.platformAdmin.courses)} className="mt-4">
-            <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> {t('courseEditor.backToCourses')}
-          </Button>
         </div>
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout
-      title={t('courseEditor.title')}
-      breadcrumbs={[{ label: t('coursesManager.tabCourses'), href: routes.platformAdmin.courses }, { label: course.title }]}
-    >
+    <AppLayout title={t('courseEditor.title')} headerLabel={course.title}>
       <div className="mx-auto max-w-[860px]">
-        <button
-          type="button"
-          onClick={() => navigate(routes.platformAdmin.courses)}
-          className="mb-3.5 inline-flex items-center gap-[7px] rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground transition-colors hover:text-primary"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('courseEditor.backToCourses')}
-        </button>
-
         <div className="mb-[18px] rounded-2xl border border-border bg-card p-6">
           <div className="mb-[18px] flex items-center justify-between gap-3">
             <h2 className="text-base font-extrabold">{t('courseEditor.courseDetails')}</h2>

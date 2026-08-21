@@ -9,7 +9,7 @@ export class AuthError extends Error {
 export interface AuthUser {
   id: string;    // Entra oid claim
   tid: string;   // Entra tenant ID
-  email: string; // preferred_username or email claim
+  email: string; // preferred_username claim (UPN-derived, domain-verified by Entra)
 }
 
 const client = jwksClient({
@@ -49,7 +49,7 @@ function verifyToken(token: string): Promise<AuthUser> {
         resolve({
           id: d.oid,
           tid: d.tid,
-          email: d.preferred_username ?? d.email ?? d.upn ?? '',
+          email: d.preferred_username ?? '',
         });
       },
     );

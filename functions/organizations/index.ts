@@ -8,7 +8,7 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
     await requireActiveMember(orgId);
 
     const organization = await queryOne<Record<string, unknown>>(
-      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.entra_tid, o.entra_tid_label, o.allow_self_registration, o.created_at,
+      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.entra_tid, o.entra_tid_label, o.allow_self_registration, o.default_member_language, o.created_at,
         (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count,
         (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
        FROM organizations o
@@ -27,7 +27,7 @@ export default endpoint('organizations', async ({ req, profile, reply, requireAc
 
   if (profile.is_platform_admin) {
     const organizations = await query(
-      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.entra_tid, o.entra_tid_label, o.allow_self_registration, o.created_at,
+      `SELECT o.id, o.name, o.slug, o.logo_url, o.seat_limit, o.entra_tid, o.entra_tid_label, o.allow_self_registration, o.default_member_language, o.created_at,
         (SELECT COUNT(*)::int FROM org_memberships om2 WHERE om2.org_id = o.id AND om2.status = 'active') AS member_count,
         (SELECT COUNT(*)::int FROM invitations i WHERE i.org_id = o.id AND i.status = 'pending') AS pending_invite_count
        FROM organizations o

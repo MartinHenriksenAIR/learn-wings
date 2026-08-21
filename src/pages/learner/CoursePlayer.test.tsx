@@ -11,21 +11,15 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({
     children,
-    breadcrumbs = [],
+    title,
+    headerLabel,
   }: {
     children: React.ReactNode;
-    breadcrumbs?: { label: string; href?: string }[];
+    title?: string;
+    headerLabel?: string;
   }) => (
     <div>
-      <nav aria-label="breadcrumb">
-        {breadcrumbs
-          .filter((c) => c.href)
-          .map((c) => (
-            <a key={c.href} href={c.href}>
-              {c.label}
-            </a>
-          ))}
-      </nav>
+      <span data-testid="header-label" data-label={headerLabel ?? title ?? ''} />
       {children}
     </div>
   ),
@@ -771,7 +765,7 @@ describe('CoursePlayer — quiz not-ready empty state (#299)', () => {
   });
 });
 
-describe('CoursePlayer — breadcrumb origin (#438)', () => {
+describe('CoursePlayer — header identity is origin-independent (#438)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -786,23 +780,29 @@ describe('CoursePlayer — breadcrumb origin (#438)', () => {
     );
   }
 
-  it('links the parent crumb to My Training when opened from ?from=training', async () => {
+  it('labels the header with the course title when opened from My Training', async () => {
     setup({ reviewsEnabled: false, completed: [] });
     renderPlayerAt('/app/learn/c-1?from=training');
     await screen.findByText('Intro to AI');
 
-    const crumb = screen.getByRole('link', { name: 'nav.training' });
-    expect(crumb).toHaveAttribute('href', '/app/training');
-    expect(screen.queryByRole('link', { name: 'nav.courses' })).toBeNull();
+    expect(screen.getByTestId('header-label')).toHaveAttribute('data-label', 'Intro to AI');
   });
 
-  it('falls back to the Course Catalog crumb with no origin', async () => {
+  it('labels the header with the same course title when opened with no origin', async () => {
     setup({ reviewsEnabled: false, completed: [] });
     renderPlayerAt('/app/learn/c-1');
     await screen.findByText('Intro to AI');
 
-    const crumb = screen.getByRole('link', { name: 'nav.courses' });
-    expect(crumb).toHaveAttribute('href', '/app/courses');
+    expect(screen.getByTestId('header-label')).toHaveAttribute('data-label', 'Intro to AI');
+  });
+
+  it('declares no parent destination of its own — going back is history, not an origin guess', async () => {
+    setup({ reviewsEnabled: false, completed: [] });
+    renderPlayerAt('/app/learn/c-1?from=training');
+    await screen.findByText('Intro to AI');
+
     expect(screen.queryByRole('link', { name: 'nav.training' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'nav.courses' })).toBeNull();
+    expect(screen.queryByText('coursePlayer.backToCourses')).toBeNull();
   });
 });

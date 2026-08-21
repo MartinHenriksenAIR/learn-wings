@@ -109,16 +109,6 @@ describe('platform-settings-update', () => {
     expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when default_role is not a known mode', async () => {
-    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-
-    const res = await handler(baseReq({ key: 'user_access', value: { default_role: 'superuser' } }), {} as any);
-
-    expect(res.status).toBe(400);
-    expect(JSON.parse(res.body as string).error).toMatch(/invalid value for field "default_role"/);
-    expect(mockQueryOne).not.toHaveBeenCalled();
-  });
-
   it('updates the setting via a jsonb merge and returns the updated row', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const updatedRow = { key: 'features', value: { quizzes_enabled: false } };
@@ -142,22 +132,20 @@ describe('platform-settings-update', () => {
 
   it('a partial body merges only the fields present (stored config survives)', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
-    const updatedRow = { key: 'user_access', value: { require_email_verification: true, allow_self_registration: true } };
+    const updatedRow = { key: 'user_access', value: { allow_self_registration: false, allow_individual_registration: true } };
     mockQueryOne.mockResolvedValueOnce(updatedRow);
 
-    const res = await handler(baseReq({ key: 'user_access', value: { require_email_verification: true } }), {} as any);
+    const res = await handler(baseReq({ key: 'user_access', value: { allow_self_registration: false } }), {} as any);
 
     expect(res.status).toBe(200);
     const [sql, params] = mockQueryOne.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('value = value || $2::jsonb');
-    expect(params[1]).toBe(JSON.stringify({ require_email_verification: true }));
+    expect(params[1]).toBe(JSON.stringify({ allow_self_registration: false }));
   });
 
   it('a full-body write passes validation and merges all fields', async () => {
     mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
     const fullUserAccess = {
-      default_role: 'learner',
-      require_email_verification: true,
       allow_self_registration: false,
       allow_individual_registration: true,
     };

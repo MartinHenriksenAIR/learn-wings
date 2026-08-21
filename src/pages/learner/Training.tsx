@@ -21,6 +21,7 @@ import { CertificateCard } from '@/components/learner/CertificateCard';
 import { MandatoryCourses } from '@/components/learner/MandatoryCourses';
 import { FavoriteCourses } from '@/components/learner/FavoriteCourses';
 import { ListViewToggle } from '@/components/learner/ListViewToggle';
+import { CourseDetailsButton } from '@/components/learner/CourseDetailsButton';
 import { formatDate } from '@/lib/date-locale';
 import { toast } from '@/components/ui/sonner';
 
@@ -91,7 +92,7 @@ export default function LearnerTraining() {
 
   if (orgGuard === 'loading' || query.isLoading) {
     return (
-      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
+      <AppLayout title={t('training.title')}>
         <PageSpinner />
       </AppLayout>
     );
@@ -100,7 +101,7 @@ export default function LearnerTraining() {
   if (!currentOrg) {
     const isNoMembership = memberships.length === 0;
     return (
-      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
+      <AppLayout title={t('training.title')}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<BookOpen className="h-6 w-6" />}
@@ -114,7 +115,7 @@ export default function LearnerTraining() {
 
   if (query.isError) {
     return (
-      <AppLayout title={t('training.title')} breadcrumbs={[{ label: t('nav.training') }]}>
+      <AppLayout title={t('training.title')}>
         <div className="flex h-64 items-center justify-center">
           <QueryErrorState onRetry={() => query.refetch()} />
         </div>
@@ -123,7 +124,7 @@ export default function LearnerTraining() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('nav.training') }]}>
+    <AppLayout headerLabel={t('nav.training')}>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
@@ -218,15 +219,22 @@ export default function LearnerTraining() {
                       </span>
                     </div>
                   </div>
-                  <Button
-                    asChild
-                    className="h-auto shrink-0 rounded-[10px] bg-accent px-3 py-2 text-[12.5px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
-                  >
-                    <Link to={routes.learner.coursePlayer(enrollment.course_id, 'training')}>
-                      <Play aria-hidden="true" className="h-3.5 w-3.5" />
-                      {t('common.continue')}
-                    </Link>
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <CourseDetailsButton
+                      courseId={enrollment.course_id}
+                      courseTitle={enrollment.course?.title}
+                      className="py-2"
+                    />
+                    <Button
+                      asChild
+                      className="h-auto shrink-0 rounded-[10px] bg-accent px-3 py-2 text-[12.5px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                    >
+                      <Link to={routes.learner.coursePlayer(enrollment.course_id)}>
+                        <Play aria-hidden="true" className="h-3.5 w-3.5" />
+                        {t('common.continue')}
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div
@@ -254,15 +262,21 @@ export default function LearnerTraining() {
                         {p?.completed ?? 0}/{p?.total ?? 0}
                       </span>
                     </div>
-                    <Button
-                      asChild
-                      className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
-                    >
-                      <Link to={routes.learner.coursePlayer(enrollment.course_id, 'training')}>
-                        <Play aria-hidden="true" className="h-3.5 w-3.5" />
-                        {t('common.continue')}
-                      </Link>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <CourseDetailsButton
+                        courseId={enrollment.course_id}
+                        courseTitle={enrollment.course?.title}
+                      />
+                      <Button
+                        asChild
+                        className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                      >
+                        <Link to={routes.learner.coursePlayer(enrollment.course_id)}>
+                          <Play aria-hidden="true" className="h-3.5 w-3.5" />
+                          {t('common.continue')}
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );
@@ -312,6 +326,11 @@ export default function LearnerTraining() {
                     {t('common.completedOn')} {formatDate(new Date(enrollment.completed_at!), 'P', i18n.language)}
                   </span>
                 </span>
+                <CourseDetailsButton
+                  courseId={enrollment.course_id}
+                  courseTitle={enrollment.course?.title}
+                  className="ml-auto"
+                />
               </div>
             ))}
           </div>

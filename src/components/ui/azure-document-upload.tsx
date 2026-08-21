@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { callApi } from '@/lib/api-client';
+import { mintedUpload, releaseUpload, type MintedUpload } from '@/lib/blob-release';
 import {
   checkUploadFileType,
   checkUploadPayloadSize,
@@ -39,6 +40,7 @@ export function AzureDocumentUpload({
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mintedRef = useRef<MintedUpload | null>(null);
 
   const showMessage = (message: UploadMessage) => setError(t(message.key, message.values));
 
@@ -65,7 +67,7 @@ export function AzureDocumentUpload({
       setFileName(file.name);
 
       try {
-        const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string }>('/api/azure-document-upload-url', {
+        const uploadData = await callApi<{ uploadUrl: string; blobPath: string; contentType: string; releaseToken?: string | null }>('/api/azure-document-upload-url', {
           fileName: file.name,
           contentType: file.type,
         });
@@ -104,6 +106,9 @@ export function AzureDocumentUpload({
         });
 
         setProgress(100);
+        const superseded = mintedRef.current;
+        mintedRef.current = mintedUpload(uploadData);
+        releaseUpload(superseded);
         onChange(blobPath);
       } catch (err) {
         console.error('Document upload failed:', err);
@@ -118,6 +123,9 @@ export function AzureDocumentUpload({
   };
 
   const handleRemove = () => {
+    const discarded = mintedRef.current;
+    mintedRef.current = null;
+    releaseUpload(discarded);
     onChange(null);
     setFileName(null);
     setProgress(0);
@@ -141,15 +149,24 @@ export function AzureDocumentUpload({
         disabled={disabled || uploading}
       />
 
-      {value ? (
-        <div className="relative border rounded-lg overflow-hidden">
+      {value && !uploading ? (
+        <div
+          onClick={!disabled ? triggerUpload : undefined}
+          className={cn(
+            'relative border rounded-lg overflow-hidden',
+            !disabled && 'cursor-pointer transition-colors hover:border-primary/50'
+          )}
+        >
           <div className="flex items-center gap-3 p-4 bg-muted/50">
             <FileText className="h-8 w-8 text-muted-foreground flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{fileName || displayName}</p>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3 text-success" />
-                {t('fileUpload.uploadedToAzure')}
+                <span className="truncate">
+                  {t('fileUpload.uploadedToAzure')}
+                  {!disabled && ` • ${t('fileUpload.clickToReplace')}`}
+                </span>
               </p>
             </div>
             {!disabled && (
@@ -157,7 +174,10 @@ export function AzureDocumentUpload({
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={handleRemove}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemove();
+                }}
               >
                 <X className="h-4 w-4" />
               </Button>

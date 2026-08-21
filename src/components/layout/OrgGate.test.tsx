@@ -75,7 +75,7 @@ describe('OrgGate (#256)', () => {
     expect(screen.queryByTestId('page-content')).not.toBeInTheDocument();
   });
 
-  it('forwards breadcrumbs to AppLayout in the gate states', () => {
+  it('forwards headerLabel to AppLayout in the gate states', () => {
     mockUseAuth.mockReturnValue({
       ...baseAuth,
       user: { id: 'entra-oid' },
@@ -86,7 +86,7 @@ describe('OrgGate (#256)', () => {
       <I18nextProvider i18n={i18n}>
         <MemoryRouter>
           <OrgGate
-            breadcrumbs={[{ label: 'Idea Management' }]}
+            headerLabel="Idea Management"
             titleKey="community.noOrganizationTitle"
             descriptionKey="community.noOrgIdeas"
           />

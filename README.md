@@ -55,7 +55,6 @@ There is **no row-level security** — the Supabase RLS was stripped, so **every
 | `src/` | Frontend SPA — `pages/` (by role), `components/`, `hooks/useAuth.tsx`, `lib/` (api-client, types, msal-config) |
 | `functions/` | One folder per Azure Function + `shared/` (`endpoint`, `auth`, `db`, `profile`, `cors`, `errors`, …) + the `index.ts` barrel |
 | `migration/azure/` | The canonical Postgres schema, seed data, and apply guide |
-| `migration/STATUS.html` | Live ledger — current checkpoint and operational quirks. Read it first. |
 | `docs/adr/` | Architecture decision records — read before structural changes |
 | `docs/glossary.md` | Canonical en/da terminology for user-facing copy |
 | `.claude/` | `rules/` (per-tree conventions), `skills/` (`pickup`/`handoff`), `collab.json` (branch topology) |
@@ -101,15 +100,10 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migration/azure/02-seed.sql
 ## Verification gates
 
 ```sh
-npm run lint
-npm test                                  # frontend unit tests (vitest)
-npx tsc --noEmit -p tsconfig.app.json     # app tree
-npx tsc --noEmit -p tsconfig.node.json    # tooling + e2e tree
-npm run build
-cd functions && npm run build && npm test # backend contract tests (mocked auth/db)
+npm run verify:all
 ```
 
-All of them must exit 0 before a PR; CI runs the same set. `npm run e2e` drives the deployed app with a real login and real writes — on demand only, never a CI gate ([`e2e/README.md`](e2e/README.md)).
+Lint, both type-check trees, unit tests and the build, for the frontend and the backend. It must exit 0 before a PR, and CI runs the same script. `npm run e2e` drives the deployed app with a real login and real writes — on demand only, never a CI gate ([`e2e/README.md`](e2e/README.md)).
 
 ## Conventions
 

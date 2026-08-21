@@ -46,7 +46,7 @@ describe('FavoriteCourses', () => {
 
     expect(screen.getByText('training.favorites.title')).toBeInTheDocument();
     expect(screen.getByText('Intro to AI')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1');
     expect(screen.queryByText('dashboard.noFavoritesTitle')).toBeNull();
   });
 
@@ -131,9 +131,37 @@ describe('FavoriteCourses', () => {
 
     expect(screen.getByTestId('training-favorite-row')).toBeInTheDocument();
     expect(screen.getByText('Intro to AI')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1?from=training');
+    expect(screen.getByRole('link', { name: /courses\.openCourse/ })).toHaveAttribute('href', '/app/learn/c-1');
 
     fireEvent.click(screen.getByRole('button', { name: 'courses.removeFromFavorites' }));
     expect(toggleFavorite).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'c-1', favorite: false }));
+  });
+
+  it('offers a Details link to the course detail page (#459)', () => {
+    mockUseFavorites.mockReturnValue({
+      data: { courses: [course] },
+      isFavorite: () => true,
+      isLoading: false,
+    });
+    renderSection();
+
+    expect(screen.getByRole('link', { name: 'courses.detailsFor' })).toHaveAttribute(
+      'href',
+      '/app/courses/c-1',
+    );
+  });
+
+  it('makes the completed marker a link into the player, not a dead badge (#459)', () => {
+    mockUseFavorites.mockReturnValue({
+      data: { courses: [{ ...course, completed: true }] },
+      isFavorite: () => true,
+      isLoading: false,
+    });
+    renderSection();
+
+    const completed = screen.getByTestId('favorite-completed');
+    expect(completed.tagName).toBe('A');
+    expect(completed).toHaveAttribute('href', '/app/learn/c-1');
+    expect(screen.queryByRole('link', { name: /courses\.openCourse/ })).toBeNull();
   });
 });

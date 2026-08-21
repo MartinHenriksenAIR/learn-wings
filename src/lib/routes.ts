@@ -16,8 +16,7 @@ export const routes = {
     courseDetail: (courseId: string) => `/app/courses/${courseId}`,
     assessment: '/app/assessment',
     coursePlayerPattern: '/app/learn/:courseId',
-    coursePlayer: (courseId: string, from?: 'training') =>
-      `/app/learn/${courseId}${from ? `?from=${from}` : ''}`,
+    coursePlayer: (courseId: string) => `/app/learn/${courseId}`,
     tips: '/app/tips',
     certificates: '/app/certificates',
   },
@@ -39,6 +38,7 @@ export const routes = {
   },
   orgAdmin: {
     root: '/app/admin/org',
+    users: '/app/admin/org/users',
     settings: '/app/admin/org/settings',
     ideas: '/app/admin/org/ideas',
     moderation: '/app/admin/org/moderation',
@@ -55,3 +55,7 @@ export const routes = {
     moderation: '/app/admin/platform/moderation',
   },
 } as const;
+
+export function homeRouteFor(effectiveIsPlatformAdmin: boolean): string {
+  return effectiveIsPlatformAdmin ? routes.platformAdmin.organizations : routes.learner.dashboard;
+}

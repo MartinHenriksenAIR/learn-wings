@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { routes } from '@/lib/routes';
@@ -85,9 +85,6 @@ export default function CoursePlayer() {
   const { features } = usePlatformSettings();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  const cameFromTraining = searchParams.get('from') === 'training';
 
   const { isFavorite } = useFavorites(currentOrg?.id);
   const { toggleFavorite, togglingId } = useToggleFavorite(currentOrg?.id);
@@ -406,23 +403,13 @@ export default function CoursePlayer() {
       <AppLayout>
         <div className="py-12 text-center">
           <p className="text-muted-foreground">{t('coursePlayer.courseNotFound')}</p>
-          <Button className="mt-4" onClick={() => navigate(routes.learner.courses)}>
-            {t('coursePlayer.backToCourses')}
-          </Button>
         </div>
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout
-      breadcrumbs={[
-        cameFromTraining
-          ? { label: t('nav.training'), href: routes.learner.training }
-          : { label: t('nav.courses'), href: routes.learner.courses },
-        { label: course.title },
-      ]}
-    >
+    <AppLayout headerLabel={course.title}>
       <div className="grid items-start gap-5 lg:grid-cols-[320px,1fr]">
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
           <div className="border-b border-[#eceef3] px-[18px] pb-3.5 pt-[18px]">

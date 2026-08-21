@@ -18,7 +18,7 @@ import { useFlash } from '@/hooks/useFlash';
 import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/sonner';
-import { Loader2, Mail, Calendar, Building2, Sparkles } from 'lucide-react';
+import { Loader2, Mail, Calendar, Building2, Sparkles, Trash2 } from 'lucide-react';
 import { z } from 'zod';
 import { formatDate } from '@/lib/date-locale';
 import { useTranslation } from 'react-i18next';
@@ -88,11 +88,12 @@ export default function Settings() {
   };
 
   const handleAvatarChange = async (_url: string | null, storagePath: string | null) => {
-    if (!profile || !storagePath) return;
+    if (!profile) return;
+    if (!storagePath && !profile.avatar_url) return;
 
     setAvatarSaving(true);
     try {
-      await callApi('/api/profile-update', { avatar_url: storagePath });
+      await callApi('/api/profile-update', { avatar_url: storagePath ?? '' });
       await refreshUserContext();
     } catch (error) {
       toast({
@@ -166,7 +167,7 @@ export default function Settings() {
   const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || user?.name;
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('settings.title') }]}>
+    <AppLayout headerLabel={t('settings.title')}>
       <div className="max-w-[680px]">
         <h1 className="mb-[22px] font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('settings.title')}
@@ -190,6 +191,18 @@ export default function Settings() {
                 <h3 className="text-[15px] font-extrabold">{t('settings.profile')}</h3>
                 <p className="truncate text-[12.5px] text-muted-foreground">{t('settings.updateProfile')}</p>
               </div>
+              {profile?.avatar_url && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleAvatarChange(null, null)}
+                  disabled={avatarSaving}
+                  className="ml-auto shrink-0 text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                  {t('settings.removePhoto')}
+                </Button>
+              )}
             </div>
 
             <div className="space-y-1.5">

@@ -373,7 +373,7 @@ export default function CoursesManager() {
   );
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('coursesManager.tabCourses') }]}>
+    <AppLayout headerLabel={t('coursesManager.tabCourses')}>
       <div className="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('coursesManager.title')}</h1>

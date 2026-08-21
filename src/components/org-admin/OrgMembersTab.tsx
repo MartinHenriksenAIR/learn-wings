@@ -841,7 +841,7 @@ export function OrgMembersTab() {
               {roleChangeDialog?.newRole === 'org_admin' ? (
                 <>
                   <strong>{roleChangeDialog?.member?.profile?.full_name}</strong> will be able to
-                  manage team members, view analytics, and control course access for this organization.
+                  manage users, view analytics, and control course access for this organization.
                 </>
               ) : (
                 <>

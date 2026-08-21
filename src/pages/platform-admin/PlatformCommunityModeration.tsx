@@ -97,8 +97,6 @@ export default function PlatformCommunityModeration() {
     return { label: orgName, global: false };
   };
 
-  const breadcrumbs = [{ label: t('platformModeration.title') }];
-
   const tabs: { key: ReportStatus; label: string }[] = [
     { key: 'pending', label: t('moderation.tabs.pending') },
     { key: 'reviewed', label: t('moderation.tabs.reviewed') },
@@ -113,7 +111,7 @@ export default function PlatformCommunityModeration() {
         : orgsMap?.get(scope) ?? t('platformModeration.scopeOrganization');
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs}>
+    <AppLayout headerLabel={t('platformModeration.title')}>
       <div className="mb-5">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('platformModeration.title')}

@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { savePostLoginRedirect } from '@/lib/post-login-redirect';
-import { routes } from '@/lib/routes';
+import { homeRouteFor, routes } from '@/lib/routes';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -23,7 +23,6 @@ export function ProtectedRoute({
   const {
     user,
     isLoading,
-    isPlatformAdmin,
     effectiveIsPlatformAdmin,
     effectiveIsOrgAdmin,
     contextError,
@@ -66,16 +65,18 @@ export function ProtectedRoute({
     );
   }
 
+  const homeRoute = homeRouteFor(effectiveIsPlatformAdmin);
+
   if (learnerOnly && effectiveIsPlatformAdmin) {
-    return <Navigate to={routes.platformAdmin.organizations} replace />;
+    return <Navigate to={homeRoute} replace />;
   }
 
-  if (requirePlatformAdmin && !isPlatformAdmin) {
-    return <Navigate to={routes.learner.dashboard} replace />;
+  if (requirePlatformAdmin && !effectiveIsPlatformAdmin) {
+    return <Navigate to={homeRoute} replace />;
   }
 
   if (requireOrgAdmin && !effectiveIsOrgAdmin) {
-    return <Navigate to={routes.learner.dashboard} replace />;
+    return <Navigate to={homeRoute} replace />;
   }
 
   return <>{children}</>;

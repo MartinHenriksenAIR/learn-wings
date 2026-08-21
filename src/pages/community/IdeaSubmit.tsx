@@ -50,7 +50,6 @@ import type { BusinessArea } from '@/lib/community-types';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
-  ArrowLeft,
   Loader2,
   Save,
   Send,
@@ -266,17 +265,8 @@ export default function IdeaSubmit() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('community.title'), hrefKey: 'community' }, { label: t('community.ideaLibrary'), hrefKey: 'ideaLibrary' }, { label: isEditMode ? t('community.ideaForm.editHeading') : t('community.submitIdea') }]}>
+    <AppLayout headerLabel={isEditMode ? t('community.ideaForm.editHeading') : t('community.submitIdea')}>
       <div className="max-w-[680px]">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(routes.community.ideas)}
-          className="mb-3.5 h-auto rounded-lg px-2 py-1.5 text-[13px] font-bold text-muted-foreground hover:bg-transparent hover:text-primary"
-        >
-          <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
-          {t('community.backToIdeas')}
-        </Button>
-
         <div className="mb-[22px]">
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {isEditMode ? t('community.ideaForm.editHeading') : t('ideas.submitNew')}

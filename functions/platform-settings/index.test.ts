@@ -62,13 +62,29 @@ describe('platform-settings', () => {
     expect(sql).toContain('platform_settings');
   });
 
-  it('returns empty settings for non-admin without querying the DB', async () => {
+  it('returns only the features row for non-admin', async () => {
+    mockQuery.mockResolvedValueOnce([
+      { key: 'features', value: { analytics_enabled: false } },
+    ]);
+
     const res = await handler(baseReq({}), {} as any);
 
     expect(res.status).toBe(200);
     const body = JSON.parse(res.body as string);
-    expect(body).toEqual({ settings: [] });
-    expect(mockQuery).not.toHaveBeenCalled();
+    expect(body).toEqual({ settings: [{ key: 'features', value: { analytics_enabled: false } }] });
+
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain(`key = 'features'`);
+  });
+
+  it('does not filter the query for platform admin', async () => {
+    mockGetProfile.mockResolvedValueOnce({ id: 'p1', is_platform_admin: true });
+    mockQuery.mockResolvedValueOnce([]);
+
+    await handler(baseReq({}), {} as any);
+
+    const [sql] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toContain('WHERE');
   });
 
   it('returns 500 on db error', async () => {

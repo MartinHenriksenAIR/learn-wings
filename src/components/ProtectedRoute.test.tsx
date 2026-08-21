@@ -47,9 +47,21 @@ function renderAt(url: string, routeProps: Record<string, boolean> = {}) {
         />
         <Route path="/login" element={<div>LOGIN</div>} />
         <Route path="/app/dashboard" element={<div>DASHBOARD</div>} />
+        <Route path="/app/admin/platform/organizations" element={<div>ORGANIZATIONS</div>} />
       </Routes>
     </MemoryRouter>
   );
+}
+
+function adminViewing(viewMode: 'learner' | 'org_admin' | 'platform_admin') {
+  return {
+    ...baseAuth,
+    profile: { id: 'p-1', is_platform_admin: true },
+    isPlatformAdmin: true,
+    viewMode,
+    effectiveIsPlatformAdmin: viewMode === 'platform_admin',
+    effectiveIsOrgAdmin: viewMode === 'org_admin' || viewMode === 'platform_admin',
+  };
 }
 
 describe('ProtectedRoute', () => {
@@ -140,6 +152,61 @@ describe('ProtectedRoute', () => {
 
       expect(screen.getByText('contextError.title')).toBeDefined();
       expect(screen.getByText('contextError.retry')).toBeDefined();
+      expect(screen.queryByText('DASHBOARD')).toBeNull();
+    });
+  });
+
+  describe('view mode contains platform-admin routes (#481)', () => {
+    it('redirects a platform admin who is viewing as a learner away from a platform-admin route', () => {
+      mockUseAuth.mockReturnValue(adminViewing('learner'));
+
+      renderAt(DEEP_URL, { requirePlatformAdmin: true });
+
+      expect(screen.getByText('DASHBOARD')).toBeDefined();
+      expect(screen.queryByText('POST')).toBeNull();
+    });
+
+    it('redirects a platform admin who is viewing as an org admin away from a platform-admin route', () => {
+      mockUseAuth.mockReturnValue(adminViewing('org_admin'));
+
+      renderAt(DEEP_URL, { requirePlatformAdmin: true });
+
+      expect(screen.getByText('DASHBOARD')).toBeDefined();
+      expect(screen.queryByText('POST')).toBeNull();
+    });
+
+    it('still renders a platform-admin route while actually in platform-admin view', () => {
+      mockUseAuth.mockReturnValue(adminViewing('platform_admin'));
+
+      renderAt(DEEP_URL, { requirePlatformAdmin: true });
+
+      expect(screen.getByText('POST')).toBeDefined();
+    });
+
+    it('redirects a genuine non-admin away from a platform-admin route', () => {
+      mockUseAuth.mockReturnValue(baseAuth);
+
+      renderAt(DEEP_URL, { requirePlatformAdmin: true });
+
+      expect(screen.getByText('DASHBOARD')).toBeDefined();
+      expect(screen.queryByText('POST')).toBeNull();
+    });
+
+    it('does not bounce a genuine non-admin toward the admin area even though viewMode defaults to platform_admin', () => {
+      mockUseAuth.mockReturnValue({ ...baseAuth, viewMode: 'platform_admin' });
+
+      renderAt(DEEP_URL, { requirePlatformAdmin: true });
+
+      expect(screen.getByText('DASHBOARD')).toBeDefined();
+      expect(screen.queryByText('ORGANIZATIONS')).toBeNull();
+    });
+
+    it('lands a redirected user on the home for the view they are in, not a hardcoded dashboard', () => {
+      mockUseAuth.mockReturnValue(adminViewing('platform_admin'));
+
+      renderAt(DEEP_URL, { learnerOnly: true });
+
+      expect(screen.getByText('ORGANIZATIONS')).toBeDefined();
       expect(screen.queryByText('DASHBOARD')).toBeNull();
     });
   });

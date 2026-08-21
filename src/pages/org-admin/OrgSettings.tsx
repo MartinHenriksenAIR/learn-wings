@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { SlidingTabs } from '@/components/ui/sliding-tabs';
 import { FileUpload } from '@/components/ui/file-upload';
@@ -62,6 +63,7 @@ export default function OrgSettings() {
 
   const [name, setName] = useState('');
   const [allowSelfReg, setAllowSelfReg] = useState(true);
+  const [defaultLanguage, setDefaultLanguage] = useState('none');
   const [localFeatures, setLocalFeatures] = useState<FeatureState>({
     certificates_enabled: true,
     quizzes_enabled: true,
@@ -80,6 +82,10 @@ export default function OrgSettings() {
   }, [currentOrg?.id, currentOrg?.allow_self_registration]);
 
   useEffect(() => {
+    setDefaultLanguage(currentOrg?.default_member_language ?? 'none');
+  }, [currentOrg?.id, currentOrg?.default_member_language]);
+
+  useEffect(() => {
     setLocalFeatures({
       certificates_enabled: rawFeatures?.certificates_enabled ?? true,
       quizzes_enabled: rawFeatures?.quizzes_enabled ?? true,
@@ -95,7 +101,8 @@ export default function OrgSettings() {
 
   const orgDirty =
     (!nameInvalid && trimmedName !== (currentOrg?.name ?? '')) ||
-    allowSelfReg !== (currentOrg?.allow_self_registration ?? true);
+    allowSelfReg !== (currentOrg?.allow_self_registration ?? true) ||
+    defaultLanguage !== (currentOrg?.default_member_language ?? 'none');
   const featuresDirty =
     featureKeys.some((k) => localFeatures[k] !== (rawFeatures?.[k] ?? true)) ||
     leaderboardEnabled !== (rawFeatures?.leaderboard_enabled ?? true);
@@ -114,6 +121,9 @@ export default function OrgSettings() {
       if (trimmedName !== (currentOrg.name ?? '')) orgUpdates.name = trimmedName;
       if (allowSelfReg !== (currentOrg.allow_self_registration ?? true)) {
         orgUpdates.allow_self_registration = allowSelfReg;
+      }
+      if (defaultLanguage !== (currentOrg.default_member_language ?? 'none')) {
+        orgUpdates.default_member_language = defaultLanguage === 'none' ? null : defaultLanguage;
       }
       if (Object.keys(orgUpdates).length > 0) {
         await callApi('/api/organization-update', { orgId: currentOrg.id, updates: orgUpdates });
@@ -168,7 +178,7 @@ export default function OrgSettings() {
     (orgSettingsQuery.isLoading && !saving)
   ) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('orgSettings.title') }]}>
+      <AppLayout headerLabel={t('orgSettings.title')}>
         <PageSpinner />
       </AppLayout>
     );
@@ -176,7 +186,7 @@ export default function OrgSettings() {
 
   if (!currentOrg) {
     return (
-      <AppLayout breadcrumbs={[{ label: t('orgSettings.title') }]}>
+      <AppLayout headerLabel={t('orgSettings.title')}>
         <div className="flex h-64 items-center justify-center">
           <EmptyState
             icon={<Building2 className="h-6 w-6" />}
@@ -195,7 +205,7 @@ export default function OrgSettings() {
   ];
 
   return (
-    <AppLayout breadcrumbs={[{ label: t('orgSettings.title') }]}>
+    <AppLayout headerLabel={t('orgSettings.title')}>
       <div className="max-w-[680px]">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('orgSettings.title')}
@@ -314,6 +324,25 @@ export default function OrgSettings() {
                   checked={allowSelfReg}
                   onCheckedChange={setAllowSelfReg}
                 />
+              </div>
+
+              <div className={rowClass}>
+                <div className="flex flex-col gap-px pr-4">
+                  <Label htmlFor="default-member-language" className="text-[13.5px] font-bold">
+                    {t('orgSettings.defaultLanguageLabel')}
+                  </Label>
+                  <p className="text-[11.5px] text-muted-foreground">{t('orgSettings.defaultLanguageHint')}</p>
+                </div>
+                <Select value={defaultLanguage} onValueChange={setDefaultLanguage}>
+                  <SelectTrigger id="default-member-language" className="w-[190px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{t('orgSettings.defaultLanguageNone')}</SelectItem>
+                    <SelectItem value="da">{t('orgSettings.defaultLanguageDa')}</SelectItem>
+                    <SelectItem value="en">{t('orgSettings.defaultLanguageEn')}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
