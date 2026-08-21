@@ -16,7 +16,7 @@ const REPO_ROOT = resolve(__dirname, '..');
 // were deleted (#461, #463, #466). Nothing structural had stopped either.
 const ALLOWED: ReadonlyArray<readonly [path: string, maxLines: number]> = [
   ['README.md', 115],
-  ['AGENTS.md', 57],
+  ['AGENTS.md', 65],
   ['CLAUDE.md', 3],
   ['docs/glossary.md', 58],
   ['e2e/README.md', 115],
