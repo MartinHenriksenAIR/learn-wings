@@ -105,7 +105,7 @@ export function CourseReviewDialog({
                     className={cn(
                       'h-8 w-8 transition-colors',
                       star <= displayRating
-                        ? 'fill-amber-400 text-amber-400'
+                        ? 'fill-amber-pastel text-amber-pastel'
                         : 'text-legacy-muted-foreground'
                     )}
                   />

@@ -67,7 +67,7 @@ export function BucketSortPlayer({ config, onComplete }: Props) {
       <div className="mt-4 flex items-center gap-3">
         <Button onClick={handleCheck} disabled={completed}>{t('exercise.check')}</Button>
         {checked && (
-          <span role="status" className={cn('text-sm', isAllCorrect ? 'text-green-600' : 'text-legacy-destructive')}>
+          <span role="status" className={cn('text-sm', isAllCorrect ? 'text-green' : 'text-legacy-destructive')}>
             {isAllCorrect ? t('exercise.allCorrect') : t('exercise.tryAgain')}
           </span>
         )}
@@ -85,7 +85,7 @@ function Item({ id, text, isSelected, feedback, onSelect }: {
       aria-pressed={isSelected}
       className={cn('block w-full text-left rounded-legacy-md border px-3 py-2 text-sm',
         isSelected && 'ring-2 ring-legacy-primary', isDragging && 'opacity-50',
-        feedback === 'correct' && 'border-green-600 bg-green-50',
+        feedback === 'correct' && 'border-green bg-green-tint',
         feedback === 'incorrect' && 'border-legacy-destructive bg-legacy-destructive/10')}>
       {text}
     </button>

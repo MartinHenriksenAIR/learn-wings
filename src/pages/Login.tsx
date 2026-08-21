@@ -71,7 +71,7 @@ export default function Login() {
         {notice && (
           <p
             role="status"
-            className="w-full rounded-legacy-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm leading-[1.5] text-amber-900"
+            className="w-full rounded-legacy-xl border border-amber-pastel bg-amber-tint px-4 py-3 text-center text-sm leading-[1.5] text-amber-deep"
           >
             {notice === 'idle' ? t('auth.idleTimeoutNotice') : t('auth.sessionExpiredNotice')}
           </p>
