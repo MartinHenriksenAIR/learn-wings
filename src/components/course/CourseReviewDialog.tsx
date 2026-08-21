@@ -105,14 +105,14 @@ export function CourseReviewDialog({
                     className={cn(
                       'h-8 w-8 transition-colors',
                       star <= displayRating
-                        ? 'fill-amber-400 text-amber-400'
-                        : 'text-muted-foreground'
+                        ? 'fill-amber-pastel text-amber-pastel'
+                        : 'text-legacy-muted-foreground'
                     )}
                   />
                 </button>
               ))}
             </div>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-legacy-muted-foreground">
               {displayRating === 0 && 'Select a rating'}
               {displayRating === 1 && 'Poor'}
               {displayRating === 2 && 'Fair'}
@@ -134,7 +134,7 @@ export function CourseReviewDialog({
               rows={4}
               maxLength={1000}
             />
-            <p className="text-xs text-muted-foreground text-right">
+            <p className="text-xs text-legacy-muted-foreground text-right">
               {comment.length}/1000
             </p>
           </div>

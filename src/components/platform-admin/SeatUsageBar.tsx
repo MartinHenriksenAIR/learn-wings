@@ -17,15 +17,15 @@ export function SeatUsageBar({
     <span
       aria-hidden="true"
       data-testid="seat-usage-bar"
-      className={cn('block w-full overflow-hidden rounded bg-[#eceef3]', className)}
+      className={cn('block w-full overflow-hidden rounded-legacy-base bg-[#eceef3]', className)}
     >
       <span
         data-testid="seat-usage-bar-fill"
         data-danger={danger ? 'true' : 'false'}
-        className="block h-full rounded transition-[width] duration-300"
+        className="block h-full rounded-legacy-base transition-[width] duration-300"
         style={{
           width: `${pct}%`,
-          background: danger ? 'hsl(var(--destructive))' : 'hsl(var(--primary))',
+          background: danger ? 'hsl(var(--legacy-destructive))' : 'hsl(var(--legacy-primary))',
         }}
       />
     </span>

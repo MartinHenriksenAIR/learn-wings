@@ -121,7 +121,7 @@ export function AssignCourseDialog({
           {presetUserId ? (
             <div className="space-y-1.5">
               <Label>{t('assignments.targetLabel')}</Label>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-legacy-muted-foreground">
                 {presetMember?.profile.full_name ?? presetUserId}
               </p>
             </div>
@@ -183,10 +183,10 @@ export function AssignCourseDialog({
               </SelectContent>
             </Select>
             {noCourses && (
-              <p className="text-sm text-muted-foreground">{t('assignments.noCourses')}</p>
+              <p className="text-sm text-legacy-muted-foreground">{t('assignments.noCourses')}</p>
             )}
             {coursesError && (
-              <p className="text-sm text-destructive">{t('common.loadErrorDescription')}</p>
+              <p className="text-sm text-legacy-destructive">{t('common.loadErrorDescription')}</p>
             )}
           </div>
 

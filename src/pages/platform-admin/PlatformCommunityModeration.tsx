@@ -116,11 +116,11 @@ export default function PlatformCommunityModeration() {
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('platformModeration.title')}
         </h1>
-        <p className="text-sm text-muted-foreground">{t('platformModeration.description')}</p>
+        <p className="text-sm text-legacy-muted-foreground">{t('platformModeration.description')}</p>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">
+        <span className="text-sm font-medium text-legacy-muted-foreground">
           {t('platformModeration.scopeSelectLabel')}
         </span>
         <Popover open={scopeOpen} onOpenChange={setScopeOpen}>
@@ -182,7 +182,7 @@ export default function PlatformCommunityModeration() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
         </div>
       ) : reports.length === 0 ? (
         <EmptyState
@@ -203,8 +203,8 @@ export default function PlatformCommunityModeration() {
                     className={cn(
                       'rounded-[7px] px-[11px] py-1 text-[11px] font-bold',
                       scopeBadge.global
-                        ? 'bg-[#f3f4f8] text-muted-foreground'
-                        : 'bg-accent text-accent-foreground'
+                        ? 'bg-[#f3f4f8] text-legacy-muted-foreground'
+                        : 'bg-legacy-accent text-legacy-accent-foreground'
                     )}
                   >
                     {scopeBadge.label}

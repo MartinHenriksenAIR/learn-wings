@@ -18,15 +18,15 @@ export function OrgDetailHeader({ org, onEdit, onDelete }: OrgDetailHeaderProps)
   return (
     <div className="mb-6 flex flex-wrap items-center gap-4">
       {logoSrc ? (
-        <img src={logoSrc} alt="" className="h-14 w-14 shrink-0 rounded-2xl bg-muted object-contain" />
+        <img src={logoSrc} alt="" className="h-14 w-14 shrink-0 rounded-legacy-2xl bg-legacy-muted object-contain" />
       ) : (
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-accent text-primary">
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-legacy-2xl bg-legacy-accent text-legacy-primary">
           <Building2 className="h-[26px] w-[26px]" aria-hidden="true" />
         </span>
       )}
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-2xl font-extrabold tracking-[-0.02em]">{org.name}</h1>
-        <p className="truncate font-mono text-[13px] text-muted-foreground">
+        <p className="truncate font-mono text-[13px] text-legacy-muted-foreground">
           {org.slug} · {formatDate(new Date(org.created_at), 'P', i18n.language)}
         </p>
       </div>
@@ -39,7 +39,7 @@ export function OrgDetailHeader({ org, onEdit, onDelete }: OrgDetailHeaderProps)
           variant="outline"
           size="icon"
           onClick={onDelete}
-          className="text-destructive hover:bg-destructive/10"
+          className="text-legacy-destructive hover:bg-legacy-destructive/10"
           aria-label={t('orgDetail.deleteOrganization')}
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />

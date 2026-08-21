@@ -40,7 +40,7 @@ export function FavoriteToggle({
       >
         <Heart
           aria-hidden="true"
-          className={cn('mr-2 h-4 w-4', isFavorite && 'fill-current text-primary')}
+          className={cn('mr-2 h-4 w-4', isFavorite && 'fill-current text-legacy-primary')}
         />
         {label}
       </Button>
@@ -55,8 +55,8 @@ export function FavoriteToggle({
       disabled={pending}
       onClick={handleClick}
       className={cn(
-        'grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50',
-        isFavorite && 'text-primary',
+        'grid h-8 w-8 shrink-0 place-items-center rounded-full text-legacy-muted-foreground transition-colors hover:bg-legacy-muted hover:text-legacy-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-legacy-ring disabled:opacity-50',
+        isFavorite && 'text-legacy-primary',
         className,
       )}
     >

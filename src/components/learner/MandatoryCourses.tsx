@@ -39,9 +39,9 @@ export function MandatoryCourses({
               <div
                 key={course.courseId}
                 data-testid="training-mandatory-row"
-                className="hover-lift flex items-center gap-4 rounded-xl border border-border bg-card p-3"
+                className="hover-lift flex items-center gap-4 rounded-legacy-xl border border-legacy-border bg-legacy-card p-3"
               >
-                <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-primary/80 to-primary">
+                <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-legacy-lg bg-gradient-to-br from-legacy-primary/80 to-legacy-primary">
                   {course.thumbnailUrl && (
                     <img
                       src={course.thumbnailUrl}
@@ -57,7 +57,7 @@ export function MandatoryCourses({
                       data-testid="mandatory-due"
                       className={cn(
                         'mt-1 flex items-center gap-2 text-xs font-semibold',
-                        course.overdue ? 'text-destructive' : 'text-muted-foreground',
+                        course.overdue ? 'text-legacy-destructive' : 'text-legacy-muted-foreground',
                       )}
                     >
                       <Clock aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
@@ -88,7 +88,7 @@ export function MandatoryCourses({
                   ) : (
                     <Button
                       asChild
-                      className="h-auto shrink-0 rounded-[10px] bg-accent px-3 py-2 text-[12.5px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                      className="h-auto shrink-0 rounded-[10px] bg-legacy-accent px-3 py-2 text-[12.5px] font-bold text-legacy-accent-foreground hover:bg-[#dfe5f8]"
                     >
                       <Link to={routes.learner.coursePlayer(course.courseId)}>
                         <Play aria-hidden="true" className="h-3.5 w-3.5" />
@@ -102,9 +102,9 @@ export function MandatoryCourses({
               <div
                 key={course.courseId}
                 data-testid="training-mandatory-card"
-                className="hover-lift flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+                className="hover-lift flex flex-col overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card"
               >
-                <div className="relative h-[110px] bg-gradient-to-br from-primary/80 to-primary">
+                <div className="relative h-[110px] bg-gradient-to-br from-legacy-primary/80 to-legacy-primary">
                   {course.thumbnailUrl && (
                     <img
                       src={course.thumbnailUrl}
@@ -121,7 +121,7 @@ export function MandatoryCourses({
                       data-testid="mandatory-due"
                       className={cn(
                         'flex items-center gap-2 text-xs font-semibold',
-                        course.overdue ? 'text-destructive' : 'text-muted-foreground',
+                        course.overdue ? 'text-legacy-destructive' : 'text-legacy-muted-foreground',
                       )}
                     >
                       <Clock aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
@@ -151,7 +151,7 @@ export function MandatoryCourses({
                     ) : (
                       <Button
                         asChild
-                        className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                        className="h-auto w-full rounded-[10px] bg-legacy-accent px-3 py-[9px] text-[13px] font-bold text-legacy-accent-foreground hover:bg-[#dfe5f8]"
                       >
                         <Link to={routes.learner.coursePlayer(course.courseId)}>
                           <Play aria-hidden="true" className="h-3.5 w-3.5" />

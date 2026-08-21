@@ -258,7 +258,7 @@ export default function IdeaSubmit() {
     return (
       <AppLayout>
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
         </div>
       </AppLayout>
     );
@@ -271,7 +271,7 @@ export default function IdeaSubmit() {
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {isEditMode ? t('community.ideaForm.editHeading') : t('ideas.submitNew')}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-legacy-muted-foreground">
             {t('community.ideaForm.subtitle', { orgName: currentOrg.name })}
           </p>
         </div>
@@ -285,10 +285,10 @@ export default function IdeaSubmit() {
               className={cn(
                 'flex-1 border-b-2 pb-2 text-center transition-colors',
                 index === currentStep
-                  ? 'border-primary font-bold text-primary'
+                  ? 'border-legacy-primary font-bold text-legacy-primary'
                   : index < currentStep
-                  ? 'border-muted-foreground/50 font-semibold text-muted-foreground'
-                  : 'border-muted font-semibold text-muted-foreground/50'
+                  ? 'border-legacy-muted-foreground/50 font-semibold text-legacy-muted-foreground'
+                  : 'border-legacy-muted font-semibold text-legacy-muted-foreground/50'
               )}
             >
               <span className="text-[13px]">{step.title}</span>
@@ -299,10 +299,10 @@ export default function IdeaSubmit() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             {currentStep === 0 && (
-              <Card className="rounded-2xl">
+              <Card className="rounded-legacy-2xl">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-[17px] font-bold">
-                    <Lightbulb aria-hidden="true" className="h-5 w-5 text-primary" />
+                    <Lightbulb aria-hidden="true" className="h-5 w-5 text-legacy-primary" />
                     {t('community.ideaForm.whatsYourIdea')}
                   </CardTitle>
                   <CardDescription className="text-[13px]">
@@ -392,12 +392,12 @@ export default function IdeaSubmit() {
                         {(form.watch('tags') || []).length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-2">
                             {form.watch('tags')?.map((tag) => (
-                              <Badge key={tag} variant="secondary" className="gap-1 rounded-[7px] bg-accent text-[11.5px] font-semibold text-accent-foreground">
+                              <Badge key={tag} variant="secondary" className="gap-1 rounded-[7px] bg-legacy-accent text-[11.5px] font-semibold text-legacy-accent-foreground">
                                 {tag}
                                 <button
                                   type="button"
                                   onClick={() => removeTag(tag)}
-                                  className="hover:text-destructive"
+                                  className="hover:text-legacy-destructive"
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
@@ -417,7 +417,7 @@ export default function IdeaSubmit() {
             )}
 
             {currentStep === 1 && (
-              <Card className="rounded-2xl">
+              <Card className="rounded-legacy-2xl">
                 <CardHeader>
                   <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.stepCurrentState')}</CardTitle>
                   <CardDescription className="text-[13px]">
@@ -513,7 +513,7 @@ export default function IdeaSubmit() {
             )}
 
             {currentStep === 2 && (
-              <Card className="rounded-2xl">
+              <Card className="rounded-legacy-2xl">
                 <CardHeader>
                   <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.proposedTitle')}</CardTitle>
                   <CardDescription className="text-[13px]">
@@ -587,7 +587,7 @@ export default function IdeaSubmit() {
             )}
 
             {currentStep === 3 && (
-              <Card className="rounded-2xl">
+              <Card className="rounded-legacy-2xl">
                 <CardHeader>
                   <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.detailsTitle')}</CardTitle>
                   <CardDescription className="text-[13px]">
@@ -672,7 +672,7 @@ export default function IdeaSubmit() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="rounded-[10px] text-[13px] font-bold text-destructive hover:text-destructive"
+                        className="rounded-[10px] text-[13px] font-bold text-legacy-destructive hover:text-legacy-destructive"
                         disabled={deleteDraftMutation.isPending}
                       >
                         {deleteDraftMutation.isPending ? (
@@ -694,7 +694,7 @@ export default function IdeaSubmit() {
                         <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => deleteDraftMutation.mutate()}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          className="bg-legacy-destructive text-legacy-destructive-foreground hover:bg-legacy-destructive/90"
                         >
                           {t('common.delete')}
                         </AlertDialogAction>
@@ -708,7 +708,7 @@ export default function IdeaSubmit() {
                   type="button"
                   onClick={handleSaveDraft}
                   disabled={saveDraftMutation.isPending}
-                  className="rounded-[10px] bg-accent text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                  className="rounded-[10px] bg-legacy-accent text-[13px] font-bold text-legacy-accent-foreground hover:bg-[#dfe5f8]"
                 >
                   {saveDraftMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

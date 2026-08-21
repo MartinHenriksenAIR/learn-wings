@@ -149,7 +149,7 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
 
   const CourseRow = ({ course }: { course: CourseStats }) => (
     <div
-      className="flex items-center gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+      className="flex items-center gap-4 p-4 border rounded-legacy-lg cursor-pointer hover:bg-legacy-muted/50 transition-colors"
       onClick={() => {
         setSelectedCourse(course);
       }}
@@ -159,26 +159,26 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
           <h4 className="font-medium truncate">{course.title}</h4>
           <LevelBadge level={course.level} />
         </div>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-4 text-sm text-legacy-muted-foreground">
           <span>{course.enrolled} enrolled</span>
           <span>{course.completed} completed</span>
         </div>
       </div>
       <div className="w-32">
         <div className="flex items-center justify-between text-sm mb-1">
-          <span className="text-muted-foreground">Progress</span>
+          <span className="text-legacy-muted-foreground">Progress</span>
           <span className="font-medium">{course.avgProgress}%</span>
         </div>
         <Progress value={course.avgProgress} className="h-2" />
       </div>
-      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+      <ChevronRight className="h-5 w-5 text-legacy-muted-foreground" />
     </div>
   );
 
   if (courseProgressQuery.isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
       </div>
     );
   }
@@ -189,7 +189,7 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-legacy-muted-foreground" />
               <Input
                 placeholder="Search courses..."
                 value={searchQuery}
@@ -221,7 +221,7 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
             </Select>
           </div>
 
-          <div className="mt-3 text-sm text-muted-foreground">
+          <div className="mt-3 text-sm text-legacy-muted-foreground">
             {filteredCourses.length} of {courseStats.length} courses
           </div>
         </CardContent>
@@ -230,8 +230,8 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
       {filteredCourses.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <BookOpen className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-            <p className="text-muted-foreground">
+            <BookOpen className="h-12 w-12 text-legacy-muted-foreground/50 mx-auto mb-4" />
+            <p className="text-legacy-muted-foreground">
               {courseStats.length === 0 ? 'No courses available.' : 'No courses match your filters.'}
             </p>
           </CardContent>
@@ -240,11 +240,11 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
         <Accordion type="multiple" defaultValue={['basic', 'intermediate', 'advanced']} className="space-y-2">
           {Object.entries(groupedByLevel).map(([level, courses]) =>
             courses.length > 0 && (
-              <AccordionItem key={level} value={level} className="border rounded-lg px-4">
+              <AccordionItem key={level} value={level} className="border rounded-legacy-lg px-4">
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-3">
                     <LevelBadge level={level as CourseLevel} />
-                    <span className="text-sm text-muted-foreground">({courses.length} courses)</span>
+                    <span className="text-sm text-legacy-muted-foreground">({courses.length} courses)</span>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
@@ -278,13 +278,13 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
           {isAllOrgs && (
             <div className="mb-4">
               <h3 className="text-sm font-semibold">{t('analytics.courseOrgBreakdown.title')}</h3>
-              <p className="mb-2 text-xs text-muted-foreground">{t('analytics.courseOrgBreakdown.caption')}</p>
+              <p className="mb-2 text-xs text-legacy-muted-foreground">{t('analytics.courseOrgBreakdown.caption')}</p>
               {breakdownQuery.isLoading ? (
                 <div className="flex h-20 items-center justify-center">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  <Loader2 className="h-5 w-5 animate-spin text-legacy-muted-foreground" />
                 </div>
               ) : orgBreakdown.length === 0 ? (
-                <p className="py-2 text-sm text-muted-foreground">{t('analytics.courseOrgBreakdown.empty')}</p>
+                <p className="py-2 text-sm text-legacy-muted-foreground">{t('analytics.courseOrgBreakdown.empty')}</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -312,12 +312,12 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
 
           {enrolleesQuery.isLoading ? (
             <div className="flex h-32 items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="h-6 w-6 animate-spin text-legacy-muted-foreground" />
             </div>
           ) : enrollees.length === 0 ? (
             <div className="py-8 text-center">
-              <Users className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-              <p className="text-muted-foreground">No learners enrolled in this course.</p>
+              <Users className="h-10 w-10 text-legacy-muted-foreground/50 mx-auto mb-3" />
+              <p className="text-legacy-muted-foreground">No learners enrolled in this course.</p>
             </div>
           ) : (
             <>
@@ -325,13 +325,13 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
                 <Card>
                   <CardContent className="pt-4">
                     <div className="text-2xl font-bold">{selectedCourse?.enrolled}</div>
-                    <div className="text-sm text-muted-foreground">Total Enrolled</div>
+                    <div className="text-sm text-legacy-muted-foreground">Total Enrolled</div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-4">
                     <div className="text-2xl font-bold">{selectedCourse?.completed}</div>
-                    <div className="text-sm text-muted-foreground">Completed</div>
+                    <div className="text-sm text-legacy-muted-foreground">Completed</div>
                   </CardContent>
                 </Card>
               </div>
@@ -351,23 +351,23 @@ export function CourseProgressTab({ orgId }: CourseProgressTabProps) {
                     <TableRow key={enrollee.orgId ? `${enrollee.userId}-${enrollee.orgId}` : enrollee.userId}>
                       <TableCell className="font-medium">{enrollee.name}</TableCell>
                       {isAllOrgs && (
-                        <TableCell className="text-muted-foreground text-sm">{enrollee.orgName}</TableCell>
+                        <TableCell className="text-legacy-muted-foreground text-sm">{enrollee.orgName}</TableCell>
                       )}
                       <TableCell>
                         <span
                           className={`rounded-[7px] px-2.5 py-1 text-[11px] font-bold ${
                             enrollee.status === 'completed'
-                              ? 'bg-success/10 text-success'
-                              : 'bg-accent text-primary'
+                              ? 'bg-legacy-success/10 text-legacy-success'
+                              : 'bg-legacy-accent text-legacy-primary'
                           }`}
                         >
                           {enrollee.status === 'completed' ? 'Completed' : 'In Progress'}
                         </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-legacy-muted-foreground text-sm">
                         {formatDate(new Date(enrollee.enrolledAt), 'P', i18n.language)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
+                      <TableCell className="text-legacy-muted-foreground text-sm">
                         {enrollee.completedAt
                           ? formatDate(new Date(enrollee.completedAt), 'P', i18n.language)
                           : '-'}

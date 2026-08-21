@@ -53,10 +53,10 @@ import { getInitials } from '@/lib/utils';
 import { routes } from '@/lib/routes';
 
 const NAV_BUTTON_CLASSES =
-  'h-auto gap-[11px] rounded-[11px] px-3 py-2.5 text-[13.5px] font-semibold text-sidebar-foreground ' +
-  'hover:bg-[#f3f4f8] hover:text-foreground active:bg-[#f3f4f8] active:text-foreground ' +
-  'data-[active=true]:bg-primary data-[active=true]:font-semibold data-[active=true]:text-primary-foreground ' +
-  'data-[active=true]:hover:bg-primary data-[active=true]:hover:text-primary-foreground [&>svg]:size-[17px] ' +
+  'h-auto gap-[11px] rounded-[11px] px-3 py-2.5 text-[13.5px] font-semibold text-legacy-sidebar-foreground ' +
+  'hover:bg-[#f3f4f8] hover:text-legacy-foreground active:bg-[#f3f4f8] active:text-legacy-foreground ' +
+  'data-[active=true]:bg-legacy-primary data-[active=true]:font-semibold data-[active=true]:text-legacy-primary-foreground ' +
+  'data-[active=true]:hover:bg-legacy-primary data-[active=true]:hover:text-legacy-primary-foreground [&>svg]:size-[17px] ' +
   'group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center';
 
 const GROUP_LABEL_CLASSES =
@@ -184,7 +184,7 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <div className="flex min-h-0 flex-1 flex-col border-r border-border">
+      <div className="flex min-h-0 flex-1 flex-col border-r border-legacy-border">
         <OrgSelector />
 
         <SidebarContent className="gap-3.5 px-3.5 pb-4 pt-2 group-data-[collapsible=icon]:px-2">
@@ -207,25 +207,25 @@ export function AppSidebar() {
           )}
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-border p-3 group-data-[collapsible=icon]:p-1.5">
+        <SidebarFooter className="border-t border-legacy-border p-3 group-data-[collapsible=icon]:p-1.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="h-auto w-full justify-start gap-2.5 rounded-xl p-2 text-sidebar-foreground hover:bg-[#f3f4f8] hover:text-foreground group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center"
+                className="h-auto w-full justify-start gap-2.5 rounded-legacy-xl p-2 text-legacy-sidebar-foreground hover:bg-[#f3f4f8] hover:text-legacy-foreground group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center"
               >
                 <Avatar className="h-9 w-9">
                   {avatarSrc && (
                     <AvatarImage src={avatarSrc} alt="" className="object-cover" />
                   )}
-                  <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
+                  <AvatarFallback className="bg-legacy-primary text-xs font-bold text-legacy-primary-foreground">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
                 {!collapsed && (
                   <>
                     <div className="flex min-w-0 flex-1 flex-col items-start text-left">
-                      <span className="w-full truncate text-[13px] font-bold text-foreground">
+                      <span className="w-full truncate text-[13px] font-bold text-legacy-foreground">
                         {profile?.full_name}
                       </span>
                       <span className="w-full truncate text-[11.5px] text-[#9aa0af]">
@@ -240,7 +240,7 @@ export function AppSidebar() {
             <DropdownMenuContent
               side="top"
               align="end"
-              className="w-56 rounded-[14px] border-border p-1.5 shadow-[0_16px_40px_rgba(20,24,46,0.14)]"
+              className="w-56 rounded-[14px] border-legacy-border p-1.5 shadow-[0_16px_40px_rgba(20,24,46,0.14)]"
             >
               {isPlatformAdmin && (
                 <>
@@ -258,17 +258,17 @@ export function AppSidebar() {
                       {t('nav.roles.learner')}
                     </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
-                  <DropdownMenuSeparator className="bg-border" />
+                  <DropdownMenuSeparator className="bg-legacy-border" />
                 </>
               )}
               <DropdownMenuItem className={MENU_ITEM_CLASSES} onClick={() => navigate(routes.settings)}>
                 <SettingsIcon className="mr-2 h-4 w-4" />
                 {t('nav.settings')}
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuSeparator className="bg-legacy-border" />
               <DropdownMenuItem
                 onClick={handleSignOut}
-                className={`${MENU_ITEM_CLASSES} text-destructive focus:bg-[#fdf1f1] focus:text-destructive`}
+                className={`${MENU_ITEM_CLASSES} text-legacy-destructive focus:bg-[#fdf1f1] focus:text-legacy-destructive`}
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 {t('nav.signOut')}

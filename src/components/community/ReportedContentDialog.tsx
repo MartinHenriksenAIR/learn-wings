@@ -64,15 +64,15 @@ export function ReportedContentDialog({ open, onOpenChange, report }: ReportedCo
 
         {postLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+            <Loader2 className="h-7 w-7 animate-spin text-legacy-muted-foreground" />
           </div>
         ) : !post ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">
+          <div className="py-10 text-center text-sm text-legacy-muted-foreground">
             {t('moderation.contentUnavailable')}
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-border bg-card px-[22px] py-5">
+            <div className="rounded-legacy-2xl border border-legacy-border bg-legacy-card px-[22px] py-5">
               <div className="mb-3 flex items-center gap-2.5">
                 <Avatar className="h-9 w-9 shrink-0">
                   <AvatarFallback
@@ -94,7 +94,7 @@ export function ReportedContentDialog({ open, onOpenChange, report }: ReportedCo
                 <div className="flex shrink-0 items-center gap-2">
                   <Badge
                     variant="outline"
-                    className="rounded-[7px] text-[11px] font-bold text-muted-foreground"
+                    className="rounded-[7px] text-[11px] font-bold text-legacy-muted-foreground"
                   >
                     {post.scope === 'org' && post.organization
                       ? post.organization.name
@@ -104,7 +104,7 @@ export function ReportedContentDialog({ open, onOpenChange, report }: ReportedCo
                     <Lock aria-label={t('community.locked')} className="h-4 w-4 text-[#9aa0af]" />
                   )}
                   {post.is_hidden && (
-                    <span className="rounded-[7px] bg-[#fbf2dd] px-[11px] py-1 text-[11px] font-bold text-warning">
+                    <span className="rounded-[7px] bg-[#fbf2dd] px-[11px] py-1 text-[11px] font-bold text-legacy-warning">
                       {t('community.hidden')}
                     </span>
                   )}

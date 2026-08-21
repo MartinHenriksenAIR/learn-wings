@@ -398,8 +398,8 @@ export function OrgMembersTab() {
   if (!currentOrg) {
     return (
       <div className="flex h-64 flex-col items-center justify-center text-center">
-        <Users className="mb-4 h-12 w-12 text-muted-foreground/50" />
-        <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
+        <Users className="mb-4 h-12 w-12 text-legacy-muted-foreground/50" />
+        <p className="text-legacy-muted-foreground">{t('common.noOrgSelected')}</p>
       </div>
     );
   }
@@ -525,7 +525,7 @@ export function OrgMembersTab() {
             </div>
             {(atSeatLimit || inviteErrorMessage) && (
               <>
-                <p className="text-xs font-medium text-destructive">
+                <p className="text-xs font-medium text-legacy-destructive">
                   {inviteErrorMessage ?? t('seats.limitReached')}
                 </p>
                 {atSeatLimit && !pendingSeatRequest && (
@@ -558,7 +558,7 @@ export function OrgMembersTab() {
         {hasFiniteSeatLimit && (
           pendingSeatRequest ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-legacy-muted-foreground">
                 {t('seatRequests.pending', {
                   seats: pendingSeatRequest.additional_seats,
                   date: formatDate(new Date(pendingSeatRequest.created_at), 'P', i18n.language),
@@ -638,7 +638,7 @@ export function OrgMembersTab() {
           }
         />
       ) : (
-        <div className="mb-[18px] overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="mb-[18px] overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
           <div className="grid grid-cols-[2.2fr_1.2fr_0.9fr_0.9fr_0.9fr_0.6fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
             <span>{t('analytics.members.colMember')}</span>
             <span>{t('analytics.members.colDepartment')}</span>
@@ -669,7 +669,7 @@ export function OrgMembersTab() {
                       {isChampion && (
                         <Sparkles
                           aria-label={t('analytics.members.aiChampion')}
-                          className="h-[13px] w-[13px] text-warning"
+                          className="h-[13px] w-[13px] text-legacy-warning"
                         />
                       )}
                     </span>
@@ -682,7 +682,7 @@ export function OrgMembersTab() {
                   <span
                     className={cn(
                       'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
-                      isAdmin ? 'bg-accent text-primary' : 'bg-[#f3f4f8] text-[#686d7e]',
+                      isAdmin ? 'bg-legacy-accent text-legacy-primary' : 'bg-[#f3f4f8] text-[#686d7e]',
                     )}
                   >
                     {isAdmin ? t('analytics.members.admin') : t('analytics.members.learner')}
@@ -693,14 +693,14 @@ export function OrgMembersTab() {
                     className={cn(
                       'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold capitalize',
                       member.status === 'active'
-                        ? 'bg-success/10 text-success'
-                        : 'bg-warning/10 text-warning',
+                        ? 'bg-legacy-success/10 text-legacy-success'
+                        : 'bg-legacy-warning/10 text-legacy-warning',
                     )}
                   >
                     {member.status}
                   </span>
                 </span>
-                <span className="text-[12.5px] text-muted-foreground">
+                <span className="text-[12.5px] text-legacy-muted-foreground">
                   {formatDate(new Date(member.created_at), 'P', i18n.language)}
                 </span>
                 <span className="text-right">
@@ -751,7 +751,7 @@ export function OrgMembersTab() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => setRemoveMemberDialog({ open: true, member })}
-                          className="text-destructive"
+                          className="text-legacy-destructive"
                         >
                           <UserX className="mr-2 h-4 w-4" aria-hidden="true" />
                           {t('analytics.members.removeFromTeam')}
@@ -771,7 +771,7 @@ export function OrgMembersTab() {
       {canInvite && invitations.length > 0 && (
         <>
           <h3 className="mb-3 text-[15px] font-extrabold">{t('analytics.members.pendingInvitations')}</h3>
-          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
             {invitations.map((invitation) => {
               const linkId = invitation.link_id || '';
               const copied = copyFlashed(linkId);
@@ -802,8 +802,8 @@ export function OrgMembersTab() {
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-[9px] border px-3 py-[7px] text-xs font-bold transition-colors',
                       copied
-                        ? 'border-[#bfe5d3] bg-success/10 text-success'
-                        : 'border-[#dcdee6] bg-card text-[#2a2d3a] hover:border-primary hover:text-primary',
+                        ? 'border-[#bfe5d3] bg-legacy-success/10 text-legacy-success'
+                        : 'border-[#dcdee6] bg-legacy-card text-[#2a2d3a] hover:border-legacy-primary hover:text-legacy-primary',
                     )}
                   >
                     <span className={cn('inline-flex', copied && 'animate-pop-in')} aria-hidden="true">
@@ -815,7 +815,7 @@ export function OrgMembersTab() {
                     type="button"
                     onClick={() => handleCancelInvitation(invitation)}
                     disabled={revoked}
-                    className="rounded-lg px-2.5 py-[7px] text-xs font-bold text-[#9aa0af] transition-colors hover:text-destructive disabled:text-success disabled:hover:text-success"
+                    className="rounded-legacy-lg px-2.5 py-[7px] text-xs font-bold text-[#9aa0af] transition-colors hover:text-legacy-destructive disabled:text-legacy-success disabled:hover:text-legacy-success"
                   >
                     {revoked ? t('analytics.members.revoked') : t('analytics.members.revoke')}
                   </button>
@@ -877,7 +877,7 @@ export function OrgMembersTab() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemoveMember}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-legacy-destructive text-legacy-destructive-foreground hover:bg-legacy-destructive/90"
             >
               Remove Member
             </AlertDialogAction>

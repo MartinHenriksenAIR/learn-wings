@@ -35,10 +35,10 @@ interface ResourceCardProps {
 }
 
 const typeStyles: Record<string, { icon: typeof Link; classes: string }> = {
-  guide: { icon: BookOpen, classes: 'bg-accent text-accent-foreground' },
-  template: { icon: FileCode, classes: 'bg-[#e7f6ef] text-success' },
+  guide: { icon: BookOpen, classes: 'bg-legacy-accent text-legacy-accent-foreground' },
+  template: { icon: FileCode, classes: 'bg-[#e7f6ef] text-legacy-success' },
   document: { icon: FileText, classes: 'bg-[#fdecec] text-[#c43d3d]' },
-  link: { icon: Link, classes: 'bg-[#fbf2dd] text-warning' },
+  link: { icon: Link, classes: 'bg-[#fbf2dd] text-legacy-warning' },
 };
 
 export function ResourceCard({
@@ -60,8 +60,8 @@ export function ResourceCard({
   return (
     <div
       className={cn(
-        'group rounded-2xl border bg-card px-5 py-[18px] transition-shadow hover:shadow-[0_10px_28px_rgba(20,24,46,0.08)]',
-        resource.is_pinned ? 'border-[#cfd6ef]' : 'border-border'
+        'group rounded-legacy-2xl border bg-legacy-card px-5 py-[18px] transition-shadow hover:shadow-[0_10px_28px_rgba(20,24,46,0.08)]',
+        resource.is_pinned ? 'border-[#cfd6ef]' : 'border-legacy-border'
       )}
     >
       <div className="mb-2.5 flex items-center gap-2">
@@ -72,7 +72,7 @@ export function ResourceCard({
           {typeLabel}
         </span>
         {resource.is_pinned && (
-          <span className="inline-flex items-center whitespace-nowrap rounded-[7px] bg-accent px-[11px] py-1 text-[11px] font-bold text-accent-foreground">
+          <span className="inline-flex items-center whitespace-nowrap rounded-[7px] bg-legacy-accent px-[11px] py-1 text-[11px] font-bold text-legacy-accent-foreground">
             {t('community.pinned')}
           </span>
         )}
@@ -83,7 +83,7 @@ export function ResourceCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 rounded-lg text-[#9aa0af] opacity-0 hover:text-primary focus-visible:opacity-100 group-hover:opacity-100"
+                className="h-7 w-7 rounded-legacy-lg text-[#9aa0af] opacity-0 hover:text-legacy-primary focus-visible:opacity-100 group-hover:opacity-100"
               >
                 <MoreVertical aria-hidden="true" className="h-4 w-4" />
                 <span className="sr-only">{t('common.actions')}</span>
@@ -112,7 +112,7 @@ export function ResourceCard({
                 </DropdownMenuItem>
               )}
               {(isOwner || isAdmin) && onDelete && (
-                <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <DropdownMenuItem onClick={onDelete} className="text-legacy-destructive">
                   <Trash2 className="mr-2 h-4 w-4" />
                   {t('common.delete')}
                 </DropdownMenuItem>
@@ -124,7 +124,7 @@ export function ResourceCard({
 
       <h3 className="mb-1.5 line-clamp-2 text-[14.5px] font-bold leading-[1.35]">{resource.title}</h3>
       {resource.description && (
-        <p className="mb-3 line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
+        <p className="mb-3 line-clamp-2 text-[12.5px] leading-normal text-legacy-muted-foreground">
           {resource.description}
         </p>
       )}
@@ -137,7 +137,7 @@ export function ResourceCard({
             href={safeHref(resource.url)}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-[7px] rounded-[9px] bg-accent px-[13px] py-2 text-[12.5px] font-bold text-accent-foreground transition-colors hover:bg-[#dfe5f8]"
+            className="inline-flex items-center gap-[7px] rounded-[9px] bg-legacy-accent px-[13px] py-2 text-[12.5px] font-bold text-legacy-accent-foreground transition-colors hover:bg-[#dfe5f8]"
           >
             <ExternalLink aria-hidden="true" className="h-[13px] w-[13px]" />
             {t('community.openResource')}

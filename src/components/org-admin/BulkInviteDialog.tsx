@@ -285,12 +285,12 @@ export function BulkInviteDialog({
         <div className="flex-1 overflow-y-auto space-y-4 py-4">
           <InviteLanguageSelect value={inviteLanguage} onChange={setInviteLanguage} />
 
-          <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
+          <div className="flex items-center justify-between p-4 rounded-legacy-lg border bg-legacy-muted/50">
             <div className="flex items-center gap-3">
-              <FileSpreadsheet className="h-8 w-8 text-primary" />
+              <FileSpreadsheet className="h-8 w-8 text-legacy-primary" />
               <div>
                 <p className="font-medium">Download Template</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-legacy-muted-foreground">
                   Use this CSV template to format your invitations correctly.
                 </p>
               </div>
@@ -313,17 +313,17 @@ export function BulkInviteDialog({
             />
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/50"
+              className="border-2 border-dashed rounded-legacy-lg p-6 text-center cursor-pointer transition-colors hover:border-legacy-primary/50 hover:bg-legacy-muted/50"
             >
               {uploading ? (
                 <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Parsing file...</p>
+                  <Loader2 className="h-8 w-8 animate-spin text-legacy-primary" />
+                  <p className="text-sm text-legacy-muted-foreground">Parsing file...</p>
                 </div>
               ) : (
                 <>
-                  <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">
+                  <Upload className="h-8 w-8 mx-auto text-legacy-muted-foreground mb-2" />
+                  <p className="text-sm text-legacy-muted-foreground">
                     Click to upload CSV file (.csv)
                   </p>
                 </>
@@ -334,19 +334,19 @@ export function BulkInviteDialog({
           {parsedData.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-4">
-                <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
+                <Badge variant="outline" className="border-legacy-success/30 bg-legacy-success/10 text-legacy-success">
                   <CheckCircle2 className="mr-1 h-3 w-3" />
                   {validCount} valid
                 </Badge>
                 {invalidCount > 0 && (
-                  <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">
+                  <Badge variant="outline" className="border-legacy-destructive/30 bg-legacy-destructive/10 text-legacy-destructive">
                     <XCircle className="mr-1 h-3 w-3" />
                     {invalidCount} invalid
                   </Badge>
                 )}
               </div>
 
-              <div className="border rounded-lg max-h-60 overflow-x-auto overflow-y-auto">
+              <div className="border rounded-legacy-lg max-h-60 overflow-x-auto overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -364,9 +364,9 @@ export function BulkInviteDialog({
                       <TableRow key={idx}>
                         <TableCell>
                           {row.valid ? (
-                            <CheckCircle2 className="h-4 w-4 text-success" />
+                            <CheckCircle2 className="h-4 w-4 text-legacy-success" />
                           ) : (
-                            <XCircle className="h-4 w-4 text-destructive" />
+                            <XCircle className="h-4 w-4 text-legacy-destructive" />
                           )}
                         </TableCell>
                         <TableCell className="font-medium">{row.email}</TableCell>
@@ -378,7 +378,7 @@ export function BulkInviteDialog({
                             {row.role === 'org_admin' ? 'Admin' : 'Learner'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-destructive text-sm">
+                        <TableCell className="text-legacy-destructive text-sm">
                           {row.error || '-'}
                         </TableCell>
                       </TableRow>
@@ -401,7 +401,7 @@ export function BulkInviteDialog({
         </div>
 
         {atSeatLimit && !results && (
-          <p className="text-xs font-medium text-destructive">{t('seats.limitReached')}</p>
+          <p className="text-xs font-medium text-legacy-destructive">{t('seats.limitReached')}</p>
         )}
 
         <DialogFooter>

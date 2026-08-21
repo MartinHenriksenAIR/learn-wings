@@ -74,7 +74,7 @@ export function SlidingTabs({ tabs, active, onChange, className }: SlidingTabsPr
     <div
       ref={containerRef}
       role="tablist"
-      className={cn("relative inline-flex gap-0.5 rounded-xl bg-muted p-1", className)}
+      className={cn("relative inline-flex gap-0.5 rounded-legacy-xl bg-legacy-muted p-1", className)}
     >
       {indicator && (
         <div
@@ -106,7 +106,7 @@ export function SlidingTabs({ tabs, active, onChange, className }: SlidingTabsPr
           onKeyDown={handleKeyDown}
           className={cn(
             "relative z-[1] inline-flex cursor-pointer items-center gap-[7px] whitespace-nowrap rounded-[8px] border-0 bg-transparent px-4 py-2 text-[13px] font-bold transition-colors duration-[220ms]",
-            tab.key === active ? "text-primary" : "text-[#686d7e]",
+            tab.key === active ? "text-legacy-primary" : "text-[#686d7e]",
             "disabled:cursor-default disabled:text-[#b3b8c6]",
           )}
         >

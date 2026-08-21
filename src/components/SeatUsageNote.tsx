@@ -6,7 +6,7 @@ export function SeatUsageNote({ usage, className }: { usage: SeatUsage; classNam
   const { t } = useTranslation();
 
   return (
-    <p className={cn('text-xs font-medium text-muted-foreground', className)}>
+    <p className={cn('text-xs font-medium text-legacy-muted-foreground', className)}>
       {usage.isUnlimited
         ? t('seats.unlimited')
         : t('seats.usage', {

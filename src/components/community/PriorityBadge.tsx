@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 import { getBand, type PriorityBand } from '@/lib/idea-priority';
 
 const BAND_STYLES: Record<PriorityBand, string> = {
-  quick_win: 'bg-success/15 text-success',
-  big_bet: 'bg-primary/15 text-primary',
-  fill_in: 'bg-warning/15 text-warning',
-  deprioritize: 'bg-muted text-muted-foreground',
+  quick_win: 'bg-legacy-success/15 text-legacy-success',
+  big_bet: 'bg-legacy-primary/15 text-legacy-primary',
+  fill_in: 'bg-legacy-warning/15 text-legacy-warning',
+  deprioritize: 'bg-legacy-muted text-legacy-muted-foreground',
 };
 
 interface Props {

@@ -274,8 +274,8 @@ export default function CoursesManager() {
     return (
       <AppLayout title={t('coursesManager.title')}>
         <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
-          <p className="text-destructive font-medium">{t('coursesManager.failedToLoad')}</p>
-          <p className="text-sm text-muted-foreground">{combinedLoadError}</p>
+          <p className="text-legacy-destructive font-medium">{t('coursesManager.failedToLoad')}</p>
+          <p className="text-sm text-legacy-muted-foreground">{combinedLoadError}</p>
           <Button
             variant="outline"
             onClick={() => {
@@ -377,7 +377,7 @@ export default function CoursesManager() {
       <div className="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('coursesManager.title')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t('coursesManager.subtitle')}</p>
+          <p className="mt-1 text-sm text-legacy-muted-foreground">{t('coursesManager.subtitle')}</p>
         </div>
         {createDialog}
       </div>
@@ -447,7 +447,7 @@ export default function CoursesManager() {
               ) : undefined}
             />
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            <div className="overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
               <div className="grid grid-cols-[2.4fr_0.9fr_1fr_0.9fr_0.8fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
                 <span>{t('coursesManager.colCourse')}</span>
                 <span>{t('coursesManager.colLevel')}</span>
@@ -469,10 +469,10 @@ export default function CoursesManager() {
                       <img
                         src={course.thumbnail_url}
                         alt=""
-                        className="h-[30px] w-[42px] shrink-0 rounded-lg object-cover"
+                        className="h-[30px] w-[42px] shrink-0 rounded-legacy-lg object-cover"
                       />
                     ) : (
-                      <span className="h-[30px] w-[42px] shrink-0 rounded-lg bg-gradient-to-br from-primary/80 to-primary" />
+                      <span className="h-[30px] w-[42px] shrink-0 rounded-legacy-lg bg-gradient-to-br from-legacy-primary/80 to-legacy-primary" />
                     )}
                     <span className="truncate text-[13px] font-bold">{course.title}</span>
                   </button>
@@ -484,7 +484,7 @@ export default function CoursesManager() {
                     <span
                       className={cn(
                         'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
-                        course.is_published ? 'bg-success/10 text-success' : 'bg-[#f3f4f8] text-[#686d7e]',
+                        course.is_published ? 'bg-legacy-success/10 text-legacy-success' : 'bg-[#f3f4f8] text-[#686d7e]',
                       )}
                     >
                       {course.is_published ? t('coursesManager.published') : t('coursesManager.draft')}
@@ -503,7 +503,7 @@ export default function CoursesManager() {
                       onClick={() => navigate(routes.platformAdmin.courseEditor(course.id))}
                       title={t('coursesManager.editCourse')}
                       aria-label={t('coursesManager.editCourse')}
-                      className="grid h-[30px] w-[30px] place-items-center rounded-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-primary"
+                      className="grid h-[30px] w-[30px] place-items-center rounded-legacy-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-legacy-primary"
                     >
                       <Pencil className="h-[14px] w-[14px]" aria-hidden="true" />
                     </button>
@@ -512,7 +512,7 @@ export default function CoursesManager() {
                       onClick={() => openDeleteDialog(course)}
                       title={t('coursesManager.deleteCourse')}
                       aria-label={t('coursesManager.deleteCourse')}
-                      className="grid h-[30px] w-[30px] place-items-center rounded-lg text-[#9aa0af] transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      className="grid h-[30px] w-[30px] place-items-center rounded-legacy-lg text-[#9aa0af] transition-colors hover:bg-legacy-destructive/10 hover:text-legacy-destructive"
                     >
                       <Trash2 className="h-[14px] w-[14px]" aria-hidden="true" />
                     </button>
@@ -528,17 +528,17 @@ export default function CoursesManager() {
 
       {activeTab === 'access' && (
         <div className="space-y-6">
-          <div className="flex items-start gap-3 rounded-2xl border border-[#d7ddf4] bg-[#eef1fb] px-5 py-4">
-            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+          <div className="flex items-start gap-3 rounded-legacy-2xl border border-[#d7ddf4] bg-[#eef1fb] px-5 py-4">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-legacy-primary" aria-hidden="true" />
             <div>
-              <p className="font-bold text-primary">{t('coursesManager.accessInfoTitle')}</p>
-              <p className="text-sm text-muted-foreground">{t('coursesManager.accessInfoBody')}</p>
+              <p className="font-bold text-legacy-primary">{t('coursesManager.accessInfoTitle')}</p>
+              <p className="text-sm text-legacy-muted-foreground">{t('coursesManager.accessInfoBody')}</p>
             </div>
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <Building2 className="h-4 w-4 text-legacy-muted-foreground" aria-hidden="true" />
               <Popover open={orgComboboxOpen} onOpenChange={setOrgComboboxOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" aria-expanded={orgComboboxOpen} className="w-[240px] justify-between">
@@ -586,23 +586,23 @@ export default function CoursesManager() {
           </div>
 
           {publishedCourses.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center">
-              <BookOpen className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
-              <p className="text-muted-foreground">{t('coursesManager.noPublishedCoursesTitle')}</p>
-              <p className="text-sm text-muted-foreground">{t('coursesManager.noPublishedCoursesDescription')}</p>
+            <div className="rounded-legacy-2xl border border-dashed border-[#d6d8e0] bg-legacy-card p-12 text-center">
+              <BookOpen className="mx-auto mb-4 h-12 w-12 text-legacy-muted-foreground/50" aria-hidden="true" />
+              <p className="text-legacy-muted-foreground">{t('coursesManager.noPublishedCoursesTitle')}</p>
+              <p className="text-sm text-legacy-muted-foreground">{t('coursesManager.noPublishedCoursesDescription')}</p>
             </div>
           ) : filteredOrgs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center">
-              <Building2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
-              <p className="text-muted-foreground">{t('coursesManager.noOrganizationsFound')}</p>
+            <div className="rounded-legacy-2xl border border-dashed border-[#d6d8e0] bg-legacy-card p-12 text-center">
+              <Building2 className="mx-auto mb-4 h-12 w-12 text-legacy-muted-foreground/50" aria-hidden="true" />
+              <p className="text-legacy-muted-foreground">{t('coursesManager.noOrganizationsFound')}</p>
             </div>
           ) : (
             <div className="space-y-6">
               {filteredOrgs.map((org) => (
-                <div key={org.id} className="overflow-hidden rounded-2xl border border-border bg-card">
+                <div key={org.id} className="overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
                   <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-legacy-accent text-legacy-primary">
                         <Building2 className="h-5 w-5" aria-hidden="true" />
                       </span>
                       <span className="text-[15px] font-extrabold">{org.name}</span>
@@ -635,7 +635,7 @@ export default function CoursesManager() {
                               className="h-[34px] w-[34px] shrink-0 rounded-[10px] object-cover"
                             />
                           ) : (
-                            <span className="h-[34px] w-[34px] shrink-0 rounded-[10px] bg-gradient-to-br from-primary/80 to-primary" />
+                            <span className="h-[34px] w-[34px] shrink-0 rounded-[10px] bg-gradient-to-br from-legacy-primary/80 to-legacy-primary" />
                           )}
                           <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{course.title}</span>
                           <LevelBadge level={course.level} />
@@ -643,7 +643,7 @@ export default function CoursesManager() {
                           <span
                             className={cn(
                               'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
-                              isEnabled ? 'bg-success/10 text-success' : 'bg-[#f3f4f8] text-[#686d7e]',
+                              isEnabled ? 'bg-legacy-success/10 text-legacy-success' : 'bg-[#f3f4f8] text-[#686d7e]',
                             )}
                           >
                             {isEnabled ? t('coursesManager.enabled') : t('coursesManager.disabled')}

@@ -48,7 +48,7 @@ export function DeleteCourseDialog({
           <AlertDialogAction
             onClick={onConfirm}
             disabled={pending}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="bg-legacy-destructive text-legacy-destructive-foreground hover:bg-legacy-destructive/90"
           >
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             {t('courseDelete.confirm')}

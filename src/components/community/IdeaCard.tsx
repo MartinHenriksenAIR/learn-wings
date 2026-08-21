@@ -44,7 +44,7 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
   return (
     <div
       className={cn(
-        'cursor-pointer rounded-2xl border border-border bg-card px-5 py-[18px] transition-shadow hover:shadow-[0_10px_28px_rgba(20,24,46,0.08)]',
+        'cursor-pointer rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-[18px] transition-shadow hover:shadow-[0_10px_28px_rgba(20,24,46,0.08)]',
         className
       )}
       onClick={onClick}
@@ -63,7 +63,7 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 rounded-lg text-[#9aa0af] hover:bg-[#fdf1f1] hover:text-destructive"
+                className="h-7 w-7 rounded-legacy-lg text-[#9aa0af] hover:bg-[#fdf1f1] hover:text-legacy-destructive"
                 onClick={handleDeleteClick}
               >
                 <Trash2 aria-hidden="true" className="h-[13px] w-[13px]" />
@@ -84,7 +84,7 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
                     e.stopPropagation();
                     onDelete();
                   }}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-legacy-destructive text-legacy-destructive-foreground hover:bg-legacy-destructive/90"
                 >
                   {t('common.delete')}
                 </AlertDialogAction>
@@ -96,7 +96,7 @@ export function IdeaCard({ idea, onClick, onDelete, className }: IdeaCardProps) 
 
       <h3 className="mb-1.5 line-clamp-2 text-[14.5px] font-bold leading-[1.35]">{idea.title}</h3>
       {(idea.description || idea.pain_points) && (
-        <p className="mb-3 line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
+        <p className="mb-3 line-clamp-2 text-[12.5px] leading-normal text-legacy-muted-foreground">
           {idea.pain_points || idea.description}
         </p>
       )}

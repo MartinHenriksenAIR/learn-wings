@@ -37,11 +37,11 @@ function MiniBar({ pct }: { pct: number }) {
   return (
     <span
       aria-hidden="true"
-      className="block h-[5px] flex-1 overflow-hidden rounded"
+      className="block h-[5px] flex-1 overflow-hidden rounded-legacy-base"
       style={{ background: TRACK }}
     >
       <span
-        className="block h-full rounded"
+        className="block h-full rounded-legacy-base"
         style={{ width: `${clamped}%`, background: NAVY, transition: 'width .4s ease' }}
       />
     </span>
@@ -114,7 +114,7 @@ function LevelDistributionCard({
     <Card>
       <CardContent className="px-[22px] py-5">
         <h3 className="mb-0.5 text-[14px] font-extrabold">{title}</h3>
-        <p className="mb-4 text-[12.5px] text-muted-foreground">
+        <p className="mb-4 text-[12.5px] text-legacy-muted-foreground">
           {t('assessment.analytics.distributionSubtitle')}
         </p>
 
@@ -153,11 +153,11 @@ function LevelDistributionCard({
           {legendItems.map(seg => (
             <span key={seg.key} className="flex items-center gap-1.5 text-[12.5px]">
               <span
-                className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                className="inline-block h-2.5 w-2.5 shrink-0 rounded-legacy-sm"
                 style={{ background: seg.color }}
                 aria-hidden="true"
               />
-              <span className="text-muted-foreground">{seg.label}</span>
+              <span className="text-legacy-muted-foreground">{seg.label}</span>
               <span className="font-bold">{seg.count}</span>
             </span>
           ))}
@@ -193,7 +193,7 @@ export function AnalyticsOverview({
     {
       key: 'total',
       visual: (
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-legacy-accent text-legacy-primary">
           <Users className="h-[17px] w-[17px]" aria-hidden="true" />
         </span>
       ),
@@ -204,7 +204,7 @@ export function AnalyticsOverview({
       key: 'active7',
       visual: (
         <span className="flex flex-1 items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-legacy-accent text-legacy-primary">
             <TrendingUp className="h-[17px] w-[17px]" aria-hidden="true" />
           </span>
           <MiniBar pct={active7Pct} />
@@ -217,7 +217,7 @@ export function AnalyticsOverview({
       key: 'active30',
       visual: (
         <span className="flex flex-1 items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-legacy-accent text-legacy-primary">
             <TrendingUp className="h-[17px] w-[17px]" aria-hidden="true" />
           </span>
           <MiniBar pct={active30Pct} />
@@ -264,11 +264,11 @@ export function AnalyticsOverview({
         {cards.map((card) => (
           <div
             key={card.key}
-            className="rounded-2xl border border-border bg-card px-[18px] py-4"
+            className="rounded-legacy-2xl border border-legacy-border bg-legacy-card px-[18px] py-4"
           >
             <div className="mb-3 flex min-h-[46px] items-center">{card.visual}</div>
             <span className="block text-[21px] font-extrabold tracking-[-0.02em]">{card.value}</span>
-            <span className="mt-px block text-xs font-medium text-muted-foreground">{card.label}</span>
+            <span className="mt-px block text-xs font-medium text-legacy-muted-foreground">{card.label}</span>
           </div>
         ))}
       </div>
@@ -310,7 +310,7 @@ export function AnalyticsOverview({
           <CardContent className="flex items-center justify-between gap-4 px-[22px] py-5">
             <div>
               <h3 className="mb-0.5 text-[14px] font-extrabold">{t('analytics.aiActCompliance')}</h3>
-              <p className="text-[12.5px] text-muted-foreground">{t('analytics.aiActComplianceBlurb')}</p>
+              <p className="text-[12.5px] text-legacy-muted-foreground">{t('analytics.aiActComplianceBlurb')}</p>
             </div>
             <Button
               onClick={onGenerateReport}
@@ -337,12 +337,12 @@ function SummaryRow({ label, value, pct }: { label: string; value: string; pct: 
   return (
     <div className="border-b border-[#f3f4f8] py-2.5 last:border-b-0">
       <div className="mb-[7px] flex items-center justify-between">
-        <span className="text-[13px] text-muted-foreground">{label}</span>
+        <span className="text-[13px] text-legacy-muted-foreground">{label}</span>
         <span className="text-[13px] font-bold">{value}</span>
       </div>
-      <div className="h-[5px] overflow-hidden rounded" style={{ background: TRACK }}>
+      <div className="h-[5px] overflow-hidden rounded-legacy-base" style={{ background: TRACK }}>
         <div
-          className="h-full rounded"
+          className="h-full rounded-legacy-base"
           style={{ width: `${clamped}%`, background: NAVY, transition: 'width .4s ease' }}
         />
       </div>

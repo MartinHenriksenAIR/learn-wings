@@ -61,9 +61,9 @@ export default function CourseDetail() {
     return (
       <AppLayout headerLabel={t('nav.courses')}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
-          <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/50" />
-          <p className="text-muted-foreground">{t('common.noOrgSelected')}</p>
-          <p className="text-sm text-muted-foreground">{t('courses.joinOrgToAccessCourses')}</p>
+          <BookOpen className="mb-4 h-12 w-12 text-legacy-muted-foreground/50" />
+          <p className="text-legacy-muted-foreground">{t('common.noOrgSelected')}</p>
+          <p className="text-sm text-legacy-muted-foreground">{t('courses.joinOrgToAccessCourses')}</p>
         </div>
       </AppLayout>
     );
@@ -76,7 +76,7 @@ export default function CourseDetail() {
           icon={<BookOpen className="h-6 w-6" />}
           title={t('courses.detail.notAvailable')}
           description={t('courses.detail.notAvailableDescription')}
-          className="rounded-2xl border-[#d6d8e0] bg-card"
+          className="rounded-legacy-2xl border-[#d6d8e0] bg-legacy-card"
         />
       </AppLayout>
     );
@@ -92,8 +92,8 @@ export default function CourseDetail() {
   return (
     <AppLayout headerLabel={course.title}>
       <div className="mx-auto max-w-[820px]">
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          <div className="relative h-[190px] bg-gradient-to-br from-primary/80 to-primary">
+        <div className="overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
+          <div className="relative h-[190px] bg-gradient-to-br from-legacy-primary/80 to-legacy-primary">
             {course.thumbnail_url && (
               <img
                 src={course.thumbnail_url}
@@ -122,14 +122,14 @@ export default function CourseDetail() {
             <div className="flex flex-wrap items-center gap-2">
               <LevelBadge level={course.level} />
               {categoryName && (
-                <span className="inline-flex items-center rounded-[7px] bg-accent px-[11px] py-[5px] text-[11px] font-bold text-accent-foreground">
+                <span className="inline-flex items-center rounded-[7px] bg-legacy-accent px-[11px] py-[5px] text-[11px] font-bold text-legacy-accent-foreground">
                   {categoryName}
                 </span>
               )}
             </div>
 
             {course.description && (
-              <p className="whitespace-pre-line text-[14.5px] leading-relaxed text-muted-foreground">
+              <p className="whitespace-pre-line text-[14.5px] leading-relaxed text-legacy-muted-foreground">
                 {course.description}
               </p>
             )}
@@ -137,7 +137,7 @@ export default function CourseDetail() {
             {modules.length > 0 && (
               <div className="mt-1" data-testid="module-outline">
                 <div className="mb-2.5 flex items-center gap-2">
-                  <Layers aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+                  <Layers aria-hidden="true" className="h-4 w-4 text-legacy-muted-foreground" />
                   <h2 className="font-display text-[15px] font-bold">{t('courses.detail.contents')}</h2>
                 </div>
                 <Accordion type="single" collapsible className="flex flex-col gap-1.5">
@@ -146,18 +146,18 @@ export default function CourseDetail() {
                       <AccordionItem
                         key={m.id}
                         value={m.id}
-                        className="rounded-xl border border-border bg-background"
+                        className="rounded-legacy-xl border border-legacy-border bg-legacy-background"
                       >
                         <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline">
                           <span className="text-[13.5px] font-semibold">{m.title}</span>
-                          <span className="ml-auto whitespace-nowrap text-xs font-semibold text-muted-foreground">
+                          <span className="ml-auto whitespace-nowrap text-xs font-semibold text-legacy-muted-foreground">
                             {t('courses.detail.lessonCount', { count: m.lesson_count })}
                           </span>
                         </AccordionTrigger>
                         <AccordionContent className="px-4 pb-3 pt-0">
-                          <ul className="flex flex-col gap-1.5 border-t border-border pt-3">
+                          <ul className="flex flex-col gap-1.5 border-t border-legacy-border pt-3">
                             {m.lessons.map((lesson) => (
-                              <li key={lesson.id} className="text-[13px] text-muted-foreground">
+                              <li key={lesson.id} className="text-[13px] text-legacy-muted-foreground">
                                 {lesson.title}
                               </li>
                             ))}
@@ -167,10 +167,10 @@ export default function CourseDetail() {
                     ) : (
                       <div
                         key={m.id}
-                        className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3"
+                        className="flex items-center gap-3 rounded-legacy-xl border border-legacy-border bg-legacy-background px-4 py-3"
                       >
                         <span className="text-[13.5px] font-semibold">{m.title}</span>
-                        <span className="ml-auto whitespace-nowrap text-xs font-semibold text-muted-foreground">
+                        <span className="ml-auto whitespace-nowrap text-xs font-semibold text-legacy-muted-foreground">
                           {t('courses.detail.lessonCount', { count: m.lesson_count })}
                         </span>
                       </div>

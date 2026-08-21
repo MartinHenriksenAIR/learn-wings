@@ -59,12 +59,12 @@ export function AssignmentsManager({ orgId }: AssignmentsManagerProps) {
 
       {isLoading ? (
         <div className="flex justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <Loader2 className="h-5 w-5 animate-spin text-legacy-muted-foreground" />
         </div>
       ) : isError ? (
         <QueryErrorState onRetry={() => refetch()} />
       ) : assignments.length === 0 ? (
-        <p className="py-6 text-sm text-muted-foreground">{t('assignments.empty')}</p>
+        <p className="py-6 text-sm text-legacy-muted-foreground">{t('assignments.empty')}</p>
       ) : (
         <div className="overflow-x-auto">
           <Table>

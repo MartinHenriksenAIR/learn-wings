@@ -47,12 +47,12 @@ export function PriorityOverview({ ideas }: PriorityOverviewProps) {
 
   return (
     <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className="rounded-2xl border border-[#e4e6ee] bg-card p-4">
+      <div className="rounded-legacy-2xl border border-[#e4e6ee] bg-legacy-card p-4">
         <div className="grid grid-cols-2 gap-2">
           {BANDS.map((band) => (
-            <div key={band} className="rounded-xl bg-[#f3f4f8] p-3">
+            <div key={band} className="rounded-legacy-xl bg-[#f3f4f8] p-3">
               <div data-testid={`band-count-${band}`} className="text-[22px] font-extrabold leading-none">{bandCounts[band]}</div>
-              <div className="mt-1 text-[11.5px] font-bold text-muted-foreground">
+              <div className="mt-1 text-[11.5px] font-bold text-legacy-muted-foreground">
                 {t(`ideaManagement.bands.${band}`)}
               </div>
             </div>
@@ -60,17 +60,17 @@ export function PriorityOverview({ ideas }: PriorityOverviewProps) {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[#e4e6ee] bg-card p-4">
+      <div className="rounded-legacy-2xl border border-[#e4e6ee] bg-legacy-card p-4">
         <h3 className="mb-3 text-[13px] font-extrabold tracking-[0.02em]">
           {t('ideaManagement.prioritize.doNext')}
         </h3>
         <ol data-testid="do-next-list" className="space-y-2">
           {ranked.map((idea, idx) => (
             <li key={idea.id} className="flex items-center gap-2 text-[13px]">
-              <span className="w-4 shrink-0 text-right font-bold text-muted-foreground">{idx + 1}</span>
+              <span className="w-4 shrink-0 text-right font-bold text-legacy-muted-foreground">{idx + 1}</span>
               <span className="flex-1 truncate font-semibold">{idea.title}</span>
               <PriorityBadge value={idea.value_score} effort={idea.effort_score} />
-              <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-muted-foreground">
+              <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-legacy-muted-foreground">
                 <TrendingUp className="h-[11px] w-[11px]" />
                 {idea.vote_count || 0}
               </span>
@@ -79,7 +79,7 @@ export function PriorityOverview({ ideas }: PriorityOverviewProps) {
         </ol>
       </div>
 
-      <div className="rounded-2xl border border-[#e4e6ee] bg-card p-4">
+      <div className="rounded-legacy-2xl border border-[#e4e6ee] bg-legacy-card p-4">
         <h3 className="mb-3 text-[13px] font-extrabold tracking-[0.02em]">
           {t('ideaManagement.prioritize.byBusinessArea')}
         </h3>
@@ -87,7 +87,7 @@ export function PriorityOverview({ ideas }: PriorityOverviewProps) {
           {areaCounts.map((a) => (
             <li key={a.value} className="flex items-center justify-between text-[13px]">
               <span className="font-semibold">{a.label}</span>
-              <span className="text-muted-foreground">{t('ideaManagement.prioritize.count', { count: a.count })}</span>
+              <span className="text-legacy-muted-foreground">{t('ideaManagement.prioritize.count', { count: a.count })}</span>
             </li>
           ))}
         </ul>

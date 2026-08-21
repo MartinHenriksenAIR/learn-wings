@@ -21,7 +21,7 @@ const ALLOWED: ReadonlyArray<readonly [path: string, maxLines: number]> = [
   ['docs/glossary.md', 58],
   ['e2e/README.md', 115],
   ['migration/azure/README.md', 66],
-  ['.claude/rules/frontend.md', 15],
+  ['.claude/rules/frontend.md', 23],
   ['.claude/rules/functions.md', 15],
   ['.claude/skills/pickup/SKILL.md', 15],
   ['.claude/skills/handoff/SKILL.md', 19],

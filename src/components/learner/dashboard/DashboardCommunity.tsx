@@ -46,7 +46,7 @@ export function DashboardCommunity({ posts, onPostClick, onSeeMore }: DashboardC
               avatarPath={post.profile?.avatar_url}
               name={post.profile?.full_name}
               className="h-[34px] w-[34px] shrink-0"
-              fallbackClassName="text-[11.5px] font-extrabold text-dash-ink"
+              fallbackClassName="text-[11.5px] font-extrabold text-legacy-dash-ink"
               fallbackStyle={{ backgroundColor: DASH_ACCENTS[i % DASH_ACCENTS.length] }}
             />
             <div className="min-w-0 flex-1">
@@ -54,16 +54,16 @@ export function DashboardCommunity({ posts, onPostClick, onSeeMore }: DashboardC
                 <span className="truncate text-[12.5px] font-bold">
                   {post.profile?.full_name || t('community.unknownUser')}
                 </span>
-                <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                <span className="shrink-0 text-xs font-medium text-legacy-muted-foreground">
                   · {formatDistanceToNowLocalized(new Date(post.created_at), i18n.language)}
                 </span>
-                <span className="ml-auto shrink-0 rounded-md bg-[rgba(23,26,38,0.055)] px-[7px] py-[3px] text-[10px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">
+                <span className="ml-auto shrink-0 rounded-legacy-md bg-[rgba(23,26,38,0.055)] px-[7px] py-[3px] text-[10px] font-extrabold uppercase tracking-[0.06em] text-legacy-muted-foreground">
                   {post.scope === 'org' ? t('dashboard.community.scopeOrg') : t('dashboard.community.scopeGlobal')}
                 </span>
               </div>
               <div className="mb-[3px] text-[14.5px] font-bold leading-[1.3] tracking-[-0.01em]">{post.title}</div>
-              <p className="mb-[9px] line-clamp-2 text-[12.5px] leading-[1.5] text-muted-foreground">{post.content}</p>
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <p className="mb-[9px] line-clamp-2 text-[12.5px] leading-[1.5] text-legacy-muted-foreground">{post.content}</p>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-legacy-muted-foreground">
                 <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
                 {t('dashboard.community.comments', { count: post.comment_count ?? 0 })}
               </span>

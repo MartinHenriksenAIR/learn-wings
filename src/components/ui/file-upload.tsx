@@ -32,9 +32,9 @@ interface FileUploadProps {
 }
 
 const fileIcons: Record<UploadAccept, React.ReactNode> = {
-  image: <ImageIcon className="h-8 w-8 text-muted-foreground" />,
-  video: <Video className="h-8 w-8 text-muted-foreground" />,
-  document: <FileText className="h-8 w-8 text-muted-foreground" />,
+  image: <ImageIcon className="h-8 w-8 text-legacy-muted-foreground" />,
+  video: <Video className="h-8 w-8 text-legacy-muted-foreground" />,
+  document: <FileText className="h-8 w-8 text-legacy-muted-foreground" />,
 };
 
 const ctaKeys: Record<UploadAccept, string> = {
@@ -179,12 +179,12 @@ export function FileUpload({
         <div
           onClick={!disabled ? triggerUpload : undefined}
           className={cn(
-            'relative border rounded-lg overflow-hidden',
-            !disabled && 'cursor-pointer transition-colors hover:border-primary/50'
+            'relative border rounded-legacy-lg overflow-hidden',
+            !disabled && 'cursor-pointer transition-colors hover:border-legacy-primary/50'
           )}
         >
           {accept === 'image' ? (
-            <div className="relative aspect-video bg-muted">
+            <div className="relative aspect-video bg-legacy-muted">
               <img
                 src={preview && preview.forValue === value ? preview.url : value}
                 alt={t('fileUpload.uploadedFile')}
@@ -206,11 +206,11 @@ export function FileUpload({
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-3 p-4 bg-muted/50">
+            <div className="flex items-center gap-3 p-4 bg-legacy-muted/50">
               {fileIcons[accept]}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{fileName || t('fileUpload.uploadedFile')}</p>
-                <p className="text-xs text-muted-foreground">{t('fileUpload.clickToReplace')}</p>
+                <p className="text-xs text-legacy-muted-foreground">{t('fileUpload.clickToReplace')}</p>
               </div>
               {!disabled && (
                 <Button
@@ -232,17 +232,17 @@ export function FileUpload({
         <div
           onClick={!disabled && !uploading ? triggerUpload : undefined}
           className={cn(
-            'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
-            'hover:border-primary/50 hover:bg-muted/50',
+            'border-2 border-dashed rounded-legacy-lg p-6 text-center cursor-pointer transition-colors',
+            'hover:border-legacy-primary/50 hover:bg-legacy-muted/50',
             disabled && 'opacity-50 cursor-not-allowed',
             uploading && 'cursor-wait'
           )}
         >
           {uploading ? (
             <div className="space-y-3">
-              <Loader2 className="h-8 w-8 mx-auto animate-spin text-primary" />
+              <Loader2 className="h-8 w-8 mx-auto animate-spin text-legacy-primary" />
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-legacy-muted-foreground">
                   {t('fileUpload.uploading', { name: fileName })}
                 </p>
                 <Progress value={progress} className="h-2 w-full max-w-xs mx-auto" />
@@ -250,9 +250,9 @@ export function FileUpload({
             </div>
           ) : (
             <>
-              <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">{t(ctaKeys[accept])}</p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <Upload className="h-8 w-8 mx-auto text-legacy-muted-foreground mb-2" />
+              <p className="text-sm text-legacy-muted-foreground">{t(ctaKeys[accept])}</p>
+              <p className="text-xs text-legacy-muted-foreground mt-1">
                 {t('fileUpload.maxSize', { size: formatSizeMB(capMB) })}
                 {maxEdge !== null && ` • ${t('fileUpload.imageResizeHint', { maxEdge })}`}
               </p>
@@ -262,7 +262,7 @@ export function FileUpload({
       )}
 
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-sm text-legacy-destructive">{error}</p>
       )}
     </div>
   );

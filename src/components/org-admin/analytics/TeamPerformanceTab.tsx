@@ -31,10 +31,10 @@ import { getAvatarColor, getInitials } from '@/lib/utils';
 import { LevelBadge, type CourseLevel } from '@/components/ui/level-badge';
 
 function scoreClass(score: number): string {
-  if (score >= 80) return 'text-success';
-  if (score >= 50) return 'text-warning';
-  if (score > 0) return 'text-destructive';
-  return 'text-muted-foreground';
+  if (score >= 80) return 'text-legacy-success';
+  if (score >= 50) return 'text-legacy-warning';
+  if (score > 0) return 'text-legacy-destructive';
+  return 'text-legacy-muted-foreground';
 }
 
 function NameCell({ name }: { name: string }) {
@@ -160,12 +160,12 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
     level ? (
       <LevelBadge level={level} />
     ) : (
-      <span className="text-muted-foreground">—</span>
+      <span className="text-legacy-muted-foreground">—</span>
     );
 
   const UserRow = ({ user }: { user: UserStats }) => (
     <TableRow
-      className="cursor-pointer hover:bg-muted/50"
+      className="cursor-pointer hover:bg-legacy-muted/50"
       onClick={() => {
         setSelectedUser(user);
         setProgressDialogOpen(true);
@@ -174,7 +174,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
       <TableCell>
         <NameCell name={user.name} />
       </TableCell>
-      <TableCell className="text-muted-foreground text-sm">
+      <TableCell className="text-legacy-muted-foreground text-sm">
         {user.department || <span className="italic">Unassigned</span>}
       </TableCell>
       <TableCell>
@@ -186,7 +186,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
         {user.avgQuizScore}%
       </TableCell>
       <TableCell>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        <ChevronRight className="h-4 w-4 text-legacy-muted-foreground" />
       </TableCell>
     </TableRow>
   );
@@ -197,7 +197,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-legacy-muted-foreground" />
               <Input
                 placeholder="Search by name..."
                 value={searchQuery}
@@ -265,7 +265,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
             </Button>
           </div>
 
-          <div className="mt-3 text-sm text-muted-foreground">
+          <div className="mt-3 text-sm text-legacy-muted-foreground">
             Showing {filteredUserStats.length} of {userStats.length} users
           </div>
         </CardContent>
@@ -274,8 +274,8 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
       {filteredUserStats.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <Users className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-            <p className="text-muted-foreground">
+            <Users className="h-12 w-12 text-legacy-muted-foreground/50 mx-auto mb-4" />
+            <p className="text-legacy-muted-foreground">
               {userStats.length === 0 ? 'No users found.' : 'No results match your filters.'}
             </p>
           </CardContent>
@@ -283,11 +283,11 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
       ) : viewMode === 'grouped' ? (
         <Accordion type="multiple" defaultValue={Object.keys(groupedByDepartment)} className="space-y-2">
           {Object.entries(groupedByDepartment).map(([dept, users]) => (
-            <AccordionItem key={dept} value={dept} className="border rounded-lg px-4">
+            <AccordionItem key={dept} value={dept} className="border rounded-legacy-lg px-4">
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex items-center gap-3">
                   <span className="font-medium">{dept}</span>
-                  <span className="text-sm text-muted-foreground">({users.length} users)</span>
+                  <span className="text-sm text-legacy-muted-foreground">({users.length} users)</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent>
@@ -306,7 +306,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
                     {users.map((user) => (
                       <TableRow
                         key={user.id}
-                        className="cursor-pointer hover:bg-muted/50"
+                        className="cursor-pointer hover:bg-legacy-muted/50"
                         onClick={() => {
                           setSelectedUser(user);
                           setProgressDialogOpen(true);
@@ -324,7 +324,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
                           {user.avgQuizScore}%
                         </TableCell>
                         <TableCell>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          <ChevronRight className="h-4 w-4 text-legacy-muted-foreground" />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -357,7 +357,7 @@ export function TeamPerformanceTab({ userStats, departments, orgId }: TeamPerfor
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-legacy-muted-foreground">
                 Page {currentPage} of {totalPages}
               </p>
               <div className="flex gap-2">

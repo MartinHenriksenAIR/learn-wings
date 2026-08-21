@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Sparkline } from './Sparkline';
 import type { DashboardSnapshot, WeekActivity } from '@/hooks/useLearnerDashboard';
 
-const CARD = 'rounded-[20px] bg-card shadow-[0_2px_5px_rgba(17,20,45,0.045)]';
+const CARD = 'rounded-[20px] bg-legacy-card shadow-[0_2px_5px_rgba(17,20,45,0.045)]';
 
 function Counter({ value, label }: { value: number; label: string }) {
   return (
@@ -10,7 +10,7 @@ function Counter({ value, label }: { value: number; label: string }) {
       <div className="mb-2 text-[32px] font-extrabold leading-none tracking-[-0.035em] tabular-nums sm:text-[38px]">
         {value}
       </div>
-      <div className="text-[12.5px] font-semibold leading-[1.35] text-muted-foreground">{label}</div>
+      <div className="text-[12.5px] font-semibold leading-[1.35] text-legacy-muted-foreground">{label}</div>
     </div>
   );
 }
@@ -45,12 +45,12 @@ export function DashboardStats({ snapshot, week }: DashboardStatsProps) {
               {t('dashboard.stats.hoursUnit')}
             </small>
           </div>
-          <div className="text-[12.5px] font-semibold leading-[1.35] text-muted-foreground">
+          <div className="text-[12.5px] font-semibold leading-[1.35] text-legacy-muted-foreground">
             {t('dashboard.stats.learningTime')}
           </div>
           {deltaPct !== null && (
-            <div className="mt-[7px] whitespace-nowrap text-xs font-semibold text-muted-foreground">
-              <span className="font-extrabold text-foreground">
+            <div className="mt-[7px] whitespace-nowrap text-xs font-semibold text-legacy-muted-foreground">
+              <span className="font-extrabold text-legacy-foreground">
                 {deltaPct > 0 ? '+' : ''}
                 {deltaPct}%
               </span>{' '}
@@ -58,7 +58,7 @@ export function DashboardStats({ snapshot, week }: DashboardStatsProps) {
             </div>
           )}
           {untimedLessons > 0 && (
-            <div className="mt-1 text-[11px] font-medium text-muted-foreground">
+            <div className="mt-1 text-[11px] font-medium text-legacy-muted-foreground">
               {t('dashboard.stats.untimed', { count: untimedLessons })}
             </div>
           )}

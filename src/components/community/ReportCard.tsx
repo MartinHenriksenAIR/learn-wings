@@ -42,7 +42,7 @@ export function ReportCard({
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[#fdecec] text-[#c43d3d]">
             {isPost ? <FileText className="h-[15px] w-[15px]" /> : <MessageSquare className="h-[15px] w-[15px]" />}
           </span>
-          <span className="rounded-[7px] bg-[#f3f4f8] px-[11px] py-1 text-[11px] font-bold text-muted-foreground">
+          <span className="rounded-[7px] bg-[#f3f4f8] px-[11px] py-1 text-[11px] font-bold text-legacy-muted-foreground">
             {isPost ? t('moderation.typePost') : t('moderation.typeComment')}
           </span>
           <span
@@ -50,14 +50,14 @@ export function ReportCard({
               'rounded-[7px] px-[11px] py-1 text-[11px] font-bold capitalize',
               report.status === 'pending'
                 ? 'bg-[#fdecec] text-[#c43d3d]'
-                : 'bg-[#f3f4f8] text-muted-foreground'
+                : 'bg-[#f3f4f8] text-legacy-muted-foreground'
             )}
           >
             {report.status}
           </span>
           {scopeBadge}
           <div className="flex-1" />
-          <span className="text-[11.5px] font-semibold text-muted-foreground">
+          <span className="text-[11.5px] font-semibold text-legacy-muted-foreground">
             {t('moderation.reportedBy', {
               name: report.reporter?.full_name || t('moderation.unknownReporter'),
               time: formatDistanceToNowLocalized(new Date(report.created_at), i18n.language),
@@ -66,7 +66,7 @@ export function ReportCard({
         </div>
 
         <p className="mb-1 text-[13.5px] font-bold">{t('moderation.reasonLabel')}</p>
-        <p className="mb-3.5 text-[13px] italic leading-[1.5] text-muted-foreground">
+        <p className="mb-3.5 text-[13px] italic leading-[1.5] text-legacy-muted-foreground">
           {report.reason}
         </p>
 

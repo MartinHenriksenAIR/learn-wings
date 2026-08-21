@@ -168,8 +168,8 @@ export function AzureVideoUpload({
       />
 
       {value && !uploading ? (
-        <div className="relative border rounded-lg overflow-hidden">
-          <div className="aspect-video bg-muted relative">
+        <div className="relative border rounded-legacy-lg overflow-hidden">
+          <div className="aspect-video bg-legacy-muted relative">
             {previewUrl ? (
               <video
                 src={previewUrl}
@@ -178,7 +178,7 @@ export function AzureVideoUpload({
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center text-muted-foreground">
+                <div className="text-center text-legacy-muted-foreground">
                   <Video className="mx-auto h-12 w-12 mb-2" />
                   <p className="text-sm">{t('fileUpload.loadingPreview')}</p>
                 </div>
@@ -196,9 +196,9 @@ export function AzureVideoUpload({
               </Button>
             )}
           </div>
-          <div className="p-3 bg-muted/50 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-success" />
-            <span className="text-sm text-muted-foreground">
+          <div className="p-3 bg-legacy-muted/50 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-legacy-success" />
+            <span className="text-sm text-legacy-muted-foreground">
               {t('fileUpload.videoUploadedToAzure')}
             </span>
             {!disabled && (
@@ -219,32 +219,32 @@ export function AzureVideoUpload({
         <div
           onClick={!disabled && !uploading ? triggerUpload : undefined}
           className={cn(
-            'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
-            'hover:border-primary/50 hover:bg-muted/50',
+            'border-2 border-dashed rounded-legacy-lg p-8 text-center cursor-pointer transition-colors',
+            'hover:border-legacy-primary/50 hover:bg-legacy-muted/50',
             disabled && 'opacity-50 cursor-not-allowed',
             uploading && 'cursor-wait'
           )}
         >
           {uploading ? (
             <div className="space-y-4">
-              <Cloud className="h-12 w-12 mx-auto text-primary animate-pulse" />
+              <Cloud className="h-12 w-12 mx-auto text-legacy-primary animate-pulse" />
               <div className="space-y-2">
                 <p className="text-sm font-medium">{t('fileUpload.uploadingToAzure')}</p>
-                <p className="text-xs text-muted-foreground">{fileName}</p>
+                <p className="text-xs text-legacy-muted-foreground">{fileName}</p>
                 <Progress value={progress} className="h-2 w-full max-w-xs mx-auto" />
-                <p className="text-xs text-muted-foreground">{progress}%</p>
+                <p className="text-xs text-legacy-muted-foreground">{progress}%</p>
               </div>
             </div>
           ) : (
             <>
-              <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+              <Upload className="h-12 w-12 mx-auto text-legacy-muted-foreground mb-3" />
               <p className="text-sm font-medium">{t('fileUpload.ctaVideo')}</p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-legacy-muted-foreground mt-1">
                 {t('fileUpload.maxSize', { size: formatSizeMB(capMB) })}
                 {' • '}
                 {t('fileUpload.videoFormats')}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-legacy-muted-foreground mt-1">
                 {t('fileUpload.directToAzure')}
               </p>
             </>
@@ -253,7 +253,7 @@ export function AzureVideoUpload({
       )}
 
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-sm text-legacy-destructive">{error}</p>
       )}
     </div>
   );

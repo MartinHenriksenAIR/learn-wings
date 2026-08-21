@@ -38,20 +38,20 @@ describe('SaveButton + useFlash', () => {
     render(<Harness onSave={onSave} />);
 
     const button = screen.getByRole('button', { name: 'Save changes' });
-    expect(button.className).not.toContain('bg-success');
+    expect(button.className).not.toContain('bg-legacy-success');
 
     fireEvent.click(button);
 
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Saved!' })).toBeInTheDocument();
-    expect(screen.getByRole('button').className).toContain('bg-success');
+    expect(screen.getByRole('button').className).toContain('bg-legacy-success');
 
     act(() => {
       vi.advanceTimersByTime(1600);
     });
 
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
-    expect(screen.getByRole('button').className).not.toContain('bg-success');
+    expect(screen.getByRole('button').className).not.toContain('bg-legacy-success');
   });
 
   it('falls back to the i18n "Saved" label when doneLabel is omitted', () => {

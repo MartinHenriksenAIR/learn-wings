@@ -17,9 +17,9 @@ const EFFORT_COLS = [1, 2, 3] as const;  // left → right: Low, Med, High
 
 function cellTint(value: number, effort: number): string {
   const goodness = value - effort; // -2 .. +2
-  if (goodness >= 2) return 'bg-success/10';
-  if (goodness === 1) return 'bg-success/[0.06]';
-  if (goodness === 0) return 'bg-warning/[0.06]';
+  if (goodness >= 2) return 'bg-legacy-success/10';
+  if (goodness === 1) return 'bg-legacy-success/[0.06]';
+  if (goodness === 0) return 'bg-legacy-warning/[0.06]';
   if (goodness === -1) return 'bg-[#c43d3d]/[0.06]';
   return 'bg-[#c43d3d]/10';
 }
@@ -63,13 +63,13 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
       onDragEnd={() => setDraggedId(null)}
       onClick={() => setDialogIdea(idea)}
       className={cn(
-        'cursor-grab rounded-lg border border-[#e4e6ee] bg-card px-2.5 py-2 text-[12px] font-bold leading-tight',
+        'cursor-grab rounded-legacy-lg border border-[#e4e6ee] bg-legacy-card px-2.5 py-2 text-[12px] font-bold leading-tight',
         'transition-shadow hover:shadow-[0_6px_16px_rgba(20,24,46,0.10)]',
         draggedId === idea.id && 'opacity-40',
       )}
     >
       <p className="line-clamp-2">{idea.title}</p>
-      <span className="mt-1 inline-flex items-center gap-1 text-[10.5px] font-semibold text-muted-foreground">
+      <span className="mt-1 inline-flex items-center gap-1 text-[10.5px] font-semibold text-legacy-muted-foreground">
         <TrendingUp className="h-[10px] w-[10px]" />
         {idea.vote_count || 0}
       </span>
@@ -78,7 +78,7 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
 
   if (inScope.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#d6d8e0] p-8 text-center text-sm text-muted-foreground">
+      <div className="rounded-legacy-2xl border border-dashed border-[#d6d8e0] p-8 text-center text-sm text-legacy-muted-foreground">
         {t('ideaManagement.prioritize.empty')}
       </div>
     );
@@ -90,18 +90,18 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
         data-testid="unscored-tray"
         onDragOver={(e) => e.preventDefault()}
         onDrop={() => drop(null, null)}
-        className="rounded-2xl bg-[#eceef3] p-3"
+        className="rounded-legacy-2xl bg-[#eceef3] p-3"
       >
         <div className="mb-2 flex items-center gap-2 px-1">
           <span className="text-[12.5px] font-extrabold tracking-[0.02em]">
             {t('ideaManagement.prioritize.unscored')}
           </span>
-          <span className="ml-auto rounded-[7px] bg-card px-[9px] py-0.5 text-[11px] font-extrabold text-muted-foreground">
+          <span className="ml-auto rounded-[7px] bg-legacy-card px-[9px] py-0.5 text-[11px] font-extrabold text-legacy-muted-foreground">
             {unscored.length}
           </span>
         </div>
         {unscored.length === 0 ? (
-          <p className="px-1 pb-1 text-xs text-muted-foreground">{t('ideaManagement.prioritize.unscoredHint')}</p>
+          <p className="px-1 pb-1 text-xs text-legacy-muted-foreground">{t('ideaManagement.prioritize.unscoredHint')}</p>
         ) : (
           <div className="flex flex-wrap gap-2">{unscored.map(card)}</div>
         )}
@@ -109,7 +109,7 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
 
       <div className="grid grid-cols-[auto_1fr] gap-2">
         <div className="flex items-center">
-          <span className="rotate-180 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground [writing-mode:vertical-rl]">
+          <span className="rotate-180 text-[11px] font-extrabold uppercase tracking-wide text-legacy-muted-foreground [writing-mode:vertical-rl]">
             {t('ideaManagement.prioritize.axisValue')} →
           </span>
         </div>
@@ -121,13 +121,13 @@ export function PrioritizationMatrix({ ideas, onScore, isScoring }: Prioritizati
                 data-testid={`cell-${v}-${e}`}
                 onDragOver={(ev) => ev.preventDefault()}
                 onDrop={() => drop(v, e)}
-                className={cn('min-h-[110px] rounded-xl p-2', cellTint(v, e))}
+                className={cn('min-h-[110px] rounded-legacy-xl p-2', cellTint(v, e))}
               >
                 <div className="flex flex-col gap-1.5">{(scoredByCell.get(`${v}-${e}`) ?? []).map(card)}</div>
               </div>
             )),
           )}
-          <div className="col-span-3 pt-1 text-center text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+          <div className="col-span-3 pt-1 text-center text-[11px] font-extrabold uppercase tracking-wide text-legacy-muted-foreground">
             {t('ideaManagement.prioritize.axisEffort')} →
           </div>
         </div>

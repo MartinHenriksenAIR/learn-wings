@@ -402,7 +402,7 @@ export default function CoursePlayer() {
     return (
       <AppLayout>
         <div className="py-12 text-center">
-          <p className="text-muted-foreground">{t('coursePlayer.courseNotFound')}</p>
+          <p className="text-legacy-muted-foreground">{t('coursePlayer.courseNotFound')}</p>
         </div>
       </AppLayout>
     );
@@ -411,18 +411,18 @@ export default function CoursePlayer() {
   return (
     <AppLayout headerLabel={course.title}>
       <div className="grid items-start gap-5 lg:grid-cols-[320px,1fr]">
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
           <div className="border-b border-[#eceef3] px-[18px] pb-3.5 pt-[18px]">
             <h2 className="mb-3 font-display text-[15px] font-extrabold leading-[1.3]">{course.title}</h2>
-            <div className="mb-[7px] flex justify-between text-xs font-semibold text-muted-foreground">
+            <div className="mb-[7px] flex justify-between text-xs font-semibold text-legacy-muted-foreground">
               <span>{t('courses.progress')}</span>
-              <span className="text-foreground">
+              <span className="text-legacy-foreground">
                 {completedLessons}/{totalLessons} · {Math.round(progressPercent)}%
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-[#eceef3]">
               <div
-                className="h-full rounded-full bg-primary transition-[width] duration-300"
+                className="h-full rounded-full bg-legacy-primary transition-[width] duration-300"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -448,7 +448,7 @@ export default function CoursePlayer() {
           <div className="max-h-[520px] overflow-y-auto">
             {modules.map((module, moduleIndex) => (
               <div key={module.id}>
-                <div className="bg-[#f7f8fa] px-[18px] py-[9px] text-[11.5px] font-bold uppercase tracking-[0.05em] text-muted-foreground">
+                <div className="bg-[#f7f8fa] px-[18px] py-[9px] text-[11.5px] font-bold uppercase tracking-[0.05em] text-legacy-muted-foreground">
                   {t('coursePlayer.moduleHeader', { number: moduleIndex + 1, title: module.title })}
                 </div>
                 {module.lessons.map((lesson) => {
@@ -461,15 +461,15 @@ export default function CoursePlayer() {
                       onClick={() => handleSelectLesson(lesson)}
                       className={cn(
                         'flex w-full items-center gap-[11px] border-l-[3px] px-[18px] py-[11px] text-left transition-colors',
-                        isCurrent ? 'border-l-primary bg-accent' : 'border-l-transparent hover:bg-[#f3f4f8]',
+                        isCurrent ? 'border-l-legacy-primary bg-legacy-accent' : 'border-l-transparent hover:bg-[#f3f4f8]',
                       )}
                     >
                       <span
                         className={cn(
                           'grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full',
                           isCompleted
-                            ? 'bg-success text-success-foreground'
-                            : 'bg-[#eceef3] text-muted-foreground',
+                            ? 'bg-legacy-success text-legacy-success-foreground'
+                            : 'bg-[#eceef3] text-legacy-muted-foreground',
                           isCompleted && justCompletedIds.has(lesson.id) && 'animate-pop-in'
                         )}
                       >
@@ -482,7 +482,7 @@ export default function CoursePlayer() {
                       <span
                         className={cn(
                           'flex-1 text-[13px] font-semibold',
-                          isCompleted && !isCurrent ? 'text-[#9aa0af]' : 'text-foreground'
+                          isCompleted && !isCurrent ? 'text-[#9aa0af]' : 'text-legacy-foreground'
                         )}
                       >
                         {lesson.title}
@@ -501,9 +501,9 @@ export default function CoursePlayer() {
         </div>
 
         {currentLesson ? (
-          <div className="rounded-2xl border border-border bg-card px-[26px] py-6">
+          <div className="rounded-legacy-2xl border border-legacy-border bg-legacy-card px-[26px] py-6">
             <div className="mb-[18px] flex items-center gap-2.5">
-              <span className="rounded-[7px] bg-accent px-[11px] py-[5px] text-[11px] font-bold uppercase tracking-[0.06em] text-accent-foreground">
+              <span className="rounded-[7px] bg-legacy-accent px-[11px] py-[5px] text-[11px] font-bold uppercase tracking-[0.06em] text-legacy-accent-foreground">
                 {t(`coursePlayer.lessonTypes.${currentLesson.lesson_type}`)}
               </span>
               <h2 className="font-display text-lg font-extrabold">{currentLesson.title}</h2>
@@ -511,9 +511,9 @@ export default function CoursePlayer() {
 
             {currentLesson.lesson_type === 'video' && (
               <div className="space-y-4">
-                <div className="flex aspect-video items-center justify-center overflow-hidden rounded-[14px] bg-muted">
+                <div className="flex aspect-video items-center justify-center overflow-hidden rounded-[14px] bg-legacy-muted">
                   {loadingAssets ? (
-                    <div className="text-center text-muted-foreground">
+                    <div className="text-center text-legacy-muted-foreground">
                       <Loader2 className="mx-auto mb-2 h-12 w-12 animate-spin" />
                       <p>{t('coursePlayer.loadingVideo')}</p>
                     </div>
@@ -534,19 +534,19 @@ export default function CoursePlayer() {
                       onTimeUpdate={markVideoActivity}
                     />
                   ) : currentLesson.azure_blob_path || currentLesson.video_storage_path ? (
-                    <div className="text-center text-muted-foreground">
+                    <div className="text-center text-legacy-muted-foreground">
                       <Play className="mx-auto mb-2 h-12 w-12" />
                       <p>{t('coursePlayer.videoLoadFailed')}</p>
                     </div>
                   ) : (
-                    <div className="text-center text-muted-foreground">
+                    <div className="text-center text-legacy-muted-foreground">
                       <Play className="mx-auto mb-2 h-12 w-12" />
                       <p>{t('coursePlayer.noVideo')}</p>
                     </div>
                   )}
                 </div>
                 {currentLesson.content_text && (
-                  <p className="text-[13.5px] leading-relaxed text-muted-foreground">{currentLesson.content_text}</p>
+                  <p className="text-[13.5px] leading-relaxed text-legacy-muted-foreground">{currentLesson.content_text}</p>
                 )}
               </div>
             )}
@@ -559,32 +559,32 @@ export default function CoursePlayer() {
                   </div>
                 )}
                 {loadingAssets ? (
-                  <div className="flex items-center justify-center rounded-[14px] border bg-muted/50 py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    <span className="ml-3 text-muted-foreground">{t('coursePlayer.loadingDocument')}</span>
+                  <div className="flex items-center justify-center rounded-[14px] border bg-legacy-muted/50 py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
+                    <span className="ml-3 text-legacy-muted-foreground">{t('coursePlayer.loadingDocument')}</span>
                   </div>
                 ) : (signedDocUrl || azureDocUrl) ? (
                   <div className="overflow-hidden rounded-[14px] border">
                     <PdfViewer url={azureDocUrl || signedDocUrl || ''} />
                   </div>
                 ) : currentLesson.document_storage_path ? (
-                  <div className="flex items-center justify-center rounded-[14px] border bg-muted/50 py-12">
-                    <FileText className="h-8 w-8 text-muted-foreground" />
-                    <span className="ml-3 text-muted-foreground">{t('coursePlayer.documentLoadFailed')}</span>
+                  <div className="flex items-center justify-center rounded-[14px] border bg-legacy-muted/50 py-12">
+                    <FileText className="h-8 w-8 text-legacy-muted-foreground" />
+                    <span className="ml-3 text-legacy-muted-foreground">{t('coursePlayer.documentLoadFailed')}</span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center rounded-[14px] border bg-muted/50 py-12">
-                    <FileText className="h-8 w-8 text-muted-foreground" />
-                    <span className="ml-3 text-muted-foreground">{t('coursePlayer.noDocument')}</span>
+                  <div className="flex items-center justify-center rounded-[14px] border bg-legacy-muted/50 py-12">
+                    <FileText className="h-8 w-8 text-legacy-muted-foreground" />
+                    <span className="ml-3 text-legacy-muted-foreground">{t('coursePlayer.noDocument')}</span>
                   </div>
                 )}
               </div>
             )}
 
             {currentLesson.lesson_type === 'quiz' && quizLoading && (
-              <div className="flex items-center justify-center rounded-[14px] border bg-muted/50 py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <span className="ml-3 text-muted-foreground">{t('coursePlayer.loadingQuiz')}</span>
+              <div className="flex items-center justify-center rounded-[14px] border bg-legacy-muted/50 py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
+                <span className="ml-3 text-legacy-muted-foreground">{t('coursePlayer.loadingQuiz')}</span>
               </div>
             )}
 
@@ -597,10 +597,10 @@ export default function CoursePlayer() {
             )}
 
             {currentLesson.lesson_type === 'quiz' && !quizLoading && !quizLoadFailed && (!quiz || questions.length === 0) && (
-              <div className="flex flex-col items-center justify-center rounded-[14px] border bg-muted/50 py-12 text-center">
-                <HelpCircle aria-hidden="true" className="mb-3 h-8 w-8 text-muted-foreground" />
-                <p className="font-semibold text-foreground">{t('coursePlayer.quizNotReady')}</p>
-                <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">
+              <div className="flex flex-col items-center justify-center rounded-[14px] border bg-legacy-muted/50 py-12 text-center">
+                <HelpCircle aria-hidden="true" className="mb-3 h-8 w-8 text-legacy-muted-foreground" />
+                <p className="font-semibold text-legacy-foreground">{t('coursePlayer.quizNotReady')}</p>
+                <p className="mt-1 max-w-sm text-[13px] text-legacy-muted-foreground">
                   {currentIndex >= allLessons.length - 1
                     ? t('coursePlayer.quizNotReadyDescriptionLast')
                     : t('coursePlayer.quizNotReadyDescription')}
@@ -620,7 +620,7 @@ export default function CoursePlayer() {
                     <span
                       className={cn(
                         'block text-[38px] font-extrabold',
-                        quizScore >= quiz.passing_score ? 'text-success' : 'text-[#c43d3d]'
+                        quizScore >= quiz.passing_score ? 'text-legacy-success' : 'text-[#c43d3d]'
                       )}
                     >
                       {quizScore}%
@@ -628,7 +628,7 @@ export default function CoursePlayer() {
                     <p
                       className={cn(
                         'mb-3.5 mt-1.5 text-[13.5px] font-semibold',
-                        quizScore >= quiz.passing_score ? 'text-success' : 'text-[#c43d3d]'
+                        quizScore >= quiz.passing_score ? 'text-legacy-success' : 'text-[#c43d3d]'
                       )}
                     >
                       {quizScore >= quiz.passing_score
@@ -654,7 +654,7 @@ export default function CoursePlayer() {
                             <div className="space-y-3">
                               <span
                                 className={cn(
-                                  'inline-flex items-center gap-[5px] rounded-[7px] bg-success/15 px-[11px] py-[5px] text-xs font-bold text-success',
+                                  'inline-flex items-center gap-[5px] rounded-[7px] bg-legacy-success/15 px-[11px] py-[5px] text-xs font-bold text-legacy-success',
                                   justCompletedIds.has(currentLesson.id) && 'animate-pop-in'
                                 )}
                               >
@@ -698,7 +698,7 @@ export default function CoursePlayer() {
                     ) : (
                       <Button
                         variant="outline"
-                        className="h-auto rounded-[10px] border-[#dcdee6] bg-card px-4 py-[9px] text-[13px] font-bold"
+                        className="h-auto rounded-[10px] border-[#dcdee6] bg-legacy-card px-4 py-[9px] text-[13px] font-bold"
                         onClick={() => {
                           setQuizSubmitted(false);
                           setAnswers({});
@@ -711,13 +711,13 @@ export default function CoursePlayer() {
                 ) : (
                   <>
                     {questions.length > 0 && (
-                      <p className="text-[13px] text-muted-foreground">
+                      <p className="text-[13px] text-legacy-muted-foreground">
                         {t('coursePlayer.quizIntro', { total: questions.length, score: quiz.passing_score })}
                       </p>
                     )}
                     <div className="flex flex-col gap-4">
                       {questions.map((question, qIndex) => (
-                        <div key={question.id} className="rounded-[14px] border border-border px-5 py-[18px]">
+                        <div key={question.id} className="rounded-[14px] border border-legacy-border px-5 py-[18px]">
                           <p className="mb-3 text-sm font-bold">
                             {qIndex + 1}. {question.question_text}
                           </p>
@@ -728,8 +728,8 @@ export default function CoursePlayer() {
                                 className={cn(
                                   'flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-[13px] py-2.5 text-[13px] font-medium transition-colors',
                                   answers[question.id] === option.id
-                                    ? 'border-primary bg-accent'
-                                    : 'border-border bg-card hover:bg-muted/50'
+                                    ? 'border-legacy-primary bg-legacy-accent'
+                                    : 'border-legacy-border bg-legacy-card hover:bg-legacy-muted/50'
                                 )}
                               >
                                 <input
@@ -748,8 +748,8 @@ export default function CoursePlayer() {
                                   className={cn(
                                     'h-[15px] w-[15px] shrink-0 rounded-full border-2',
                                     answers[question.id] === option.id
-                                      ? 'border-primary bg-primary shadow-[inset_0_0_0_2.5px_#fff]'
-                                      : 'border-[#c9cdd9] bg-card'
+                                      ? 'border-legacy-primary bg-legacy-primary shadow-[inset_0_0_0_2.5px_#fff]'
+                                      : 'border-[#c9cdd9] bg-legacy-card'
                                   )}
                                 />
                                 <span>{option.option_text}</span>
@@ -787,7 +787,7 @@ export default function CoursePlayer() {
                 {progress[currentLesson.id]?.status === 'completed' ? (
                   <span
                     className={cn(
-                      'inline-flex items-center gap-[7px] text-[13.5px] font-bold text-success',
+                      'inline-flex items-center gap-[7px] text-[13.5px] font-bold text-legacy-success',
                       justCompletedIds.has(currentLesson.id) && 'animate-pop-in'
                     )}
                   >
@@ -821,8 +821,8 @@ export default function CoursePlayer() {
             )}
           </div>
         ) : (
-          <div className="rounded-2xl border border-border bg-card py-12 text-center">
-            <p className="text-muted-foreground">{t('coursePlayer.selectLessonToBegin')}</p>
+          <div className="rounded-legacy-2xl border border-legacy-border bg-legacy-card py-12 text-center">
+            <p className="text-legacy-muted-foreground">{t('coursePlayer.selectLessonToBegin')}</p>
           </div>
         )}
       </div>

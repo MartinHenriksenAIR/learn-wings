@@ -52,7 +52,7 @@ export function OrgSelector() {
     return (
       <div
         className={cn(
-          'flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground',
+          'flex items-center gap-2 px-3 py-2 text-sm text-legacy-muted-foreground',
           collapsed && 'justify-center px-2',
         )}
       >
@@ -85,7 +85,7 @@ export function OrgSelector() {
             <TooltipTrigger asChild>
               <SelectTrigger
                 aria-label={orgLabel}
-                className="h-8 w-8 justify-center p-0 bg-sidebar-accent/50 border-sidebar-border text-sidebar-foreground [&>svg]:hidden"
+                className="h-8 w-8 justify-center p-0 bg-legacy-sidebar-accent/50 border-legacy-sidebar-border text-legacy-sidebar-foreground [&>svg]:hidden"
               >
                 <span className="flex items-center justify-center">
                   <Building2 className="h-4 w-4 shrink-0" />
@@ -95,7 +95,7 @@ export function OrgSelector() {
             <TooltipContent side="right">{orgLabel}</TooltipContent>
           </Tooltip>
         ) : (
-          <SelectTrigger className="w-full bg-sidebar-accent/50 border-sidebar-border text-sidebar-foreground">
+          <SelectTrigger className="w-full bg-legacy-sidebar-accent/50 border-legacy-sidebar-border text-legacy-sidebar-foreground">
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 shrink-0" />
               <SelectValue placeholder="Select organization" />
@@ -105,7 +105,7 @@ export function OrgSelector() {
         <SelectContent>
           {!isOrgAdminMode && (
             <SelectItem value="none">
-              <span className="text-muted-foreground">Platform-wide (no org)</span>
+              <span className="text-legacy-muted-foreground">Platform-wide (no org)</span>
             </SelectItem>
           )}
           {orgs.map((org) => (

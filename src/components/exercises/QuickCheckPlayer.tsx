@@ -43,7 +43,7 @@ export function QuickCheckPlayer({ config, onComplete }: Props) {
             ))}
           </RadioGroup>
           {checked && (
-            <span role="status" className={cn('text-sm', isQuestionCorrect(q.id) ? 'text-green-600' : 'text-destructive')}>
+            <span role="status" className={cn('text-sm', isQuestionCorrect(q.id) ? 'text-green' : 'text-legacy-destructive')}>
               {isQuestionCorrect(q.id) ? t('exercise.allCorrect') : t('exercise.tryAgain')}
             </span>
           )}

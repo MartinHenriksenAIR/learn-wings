@@ -66,7 +66,7 @@ function StatusIcon({ tone, children }: { tone: 'success' | 'error'; children: R
   return (
     <div
       className={`grid h-14 w-14 place-items-center rounded-full ${
-        tone === 'success' ? 'bg-[#e6f5ee] text-success' : 'bg-[#fbe9e9] text-destructive'
+        tone === 'success' ? 'bg-[#e6f5ee] text-legacy-success' : 'bg-[#fbe9e9] text-legacy-destructive'
       }`}
     >
       {children}
@@ -75,19 +75,19 @@ function StatusIcon({ tone, children }: { tone: 'success' | 'error'; children: R
 }
 
 function CardTitle({ children }: { children: ReactNode }) {
-  return <h1 className="text-balance text-center text-lg font-bold text-foreground">{children}</h1>;
+  return <h1 className="text-balance text-center text-lg font-bold text-legacy-foreground">{children}</h1>;
 }
 
 function CardBody({ children }: { children: ReactNode }) {
   return (
-    <p className="text-balance text-center text-sm leading-[1.55] text-muted-foreground">
+    <p className="text-balance text-center text-sm leading-[1.55] text-legacy-muted-foreground">
       {children}
     </p>
   );
 }
 
 const PRIMARY_BUTTON_CLASSES =
-  'h-auto w-full gap-2.5 rounded-xl px-4 py-[13px] text-[14.5px] font-semibold';
+  'h-auto w-full gap-2.5 rounded-legacy-xl px-4 py-[13px] text-[14.5px] font-semibold';
 
 export default function Signup() {
   const { user, isLoading, isPlatformAdmin, isOrgAdmin, signIn, signOut, refreshUserContext } =
@@ -106,7 +106,7 @@ export default function Signup() {
   if (isLoading) {
     return (
       <div className={`grid min-h-screen place-items-center ${PAGE_GRADIENT_CLASSES}`}>
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-legacy-primary" />
       </div>
     );
   }
@@ -269,7 +269,7 @@ export default function Signup() {
         <CardBody>{t(bodyKey)}</CardBody>
         <Button
           variant="ghost"
-          className="h-auto rounded-xl px-4 py-2 text-sm font-semibold text-muted-foreground"
+          className="h-auto rounded-legacy-xl px-4 py-2 text-sm font-semibold text-legacy-muted-foreground"
           onClick={() => navigate(routes.auth.login)}
         >
           {t('invitationAccept.goToSignIn')}
@@ -285,7 +285,7 @@ export default function Signup() {
       <CardBody>
         <Trans i18nKey="invitationAccept.acceptBody" />
       </CardBody>
-      <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+      <span className="rounded-full bg-legacy-muted px-3 py-1 text-xs text-legacy-muted-foreground">
         {t('invitationAccept.signedInAs', { email: user.email })}
       </span>
       <Button className={PRIMARY_BUTTON_CLASSES} onClick={handleAccept} disabled={state.submitting}>
@@ -296,7 +296,7 @@ export default function Signup() {
       </Button>
       <Button
         variant="ghost"
-        className="h-auto rounded-xl px-4 py-2 text-xs font-medium text-muted-foreground"
+        className="h-auto rounded-legacy-xl px-4 py-2 text-xs font-medium text-legacy-muted-foreground"
         onClick={signOut}
         disabled={state.submitting}
       >

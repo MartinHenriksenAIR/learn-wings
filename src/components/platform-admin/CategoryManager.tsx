@@ -124,7 +124,7 @@ export function CategoryManager() {
   if (isLoading) {
     return (
       <div className="flex h-40 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+        <Loader2 className="h-6 w-6 animate-spin text-legacy-muted-foreground" aria-hidden="true" />
       </div>
     );
   }
@@ -132,8 +132,8 @@ export function CategoryManager() {
   if (error) {
     return (
       <div className="flex h-40 flex-col items-center justify-center gap-4 text-center">
-        <p className="font-medium text-destructive">{t('categoryManager.loadError')}</p>
-        <p className="text-sm text-muted-foreground">{error.message}</p>
+        <p className="font-medium text-legacy-destructive">{t('categoryManager.loadError')}</p>
+        <p className="text-sm text-legacy-muted-foreground">{error.message}</p>
         <Button variant="outline" onClick={() => refetch()}>
           {t('coursesManager.retry')}
         </Button>
@@ -145,10 +145,10 @@ export function CategoryManager() {
     <div className="space-y-6">
       <div>
         <h2 className="text-[17px] font-extrabold tracking-[-0.01em]">{t('categoryManager.title')}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{t('categoryManager.description')}</p>
+        <p className="mt-1 text-sm text-legacy-muted-foreground">{t('categoryManager.description')}</p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="rounded-legacy-2xl border border-legacy-border bg-legacy-card p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1 space-y-2">
             <Label htmlFor="category-add-name-en">{t('categoryManager.addNameEnLabel')}</Label>
@@ -189,7 +189,7 @@ export function CategoryManager() {
           description={t('categoryManager.emptyDescription')}
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
           <div className="grid grid-cols-[1fr_1fr_auto] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
             <span>{t('categoryManager.nameEnHeader')}</span>
             <span>{t('categoryManager.nameDaHeader')}</span>
@@ -209,7 +209,7 @@ export function CategoryManager() {
                   disabled={index === 0 || reorderMutation.isPending}
                   title={t('categoryManager.moveUp')}
                   aria-label={t('categoryManager.moveUp')}
-                  className="grid h-[30px] w-[30px] place-items-center rounded-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-primary disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#9aa0af]"
+                  className="grid h-[30px] w-[30px] place-items-center rounded-legacy-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-legacy-primary disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#9aa0af]"
                 >
                   <ArrowUp className="h-[14px] w-[14px]" aria-hidden="true" />
                 </button>
@@ -219,7 +219,7 @@ export function CategoryManager() {
                   disabled={index === ordered.length - 1 || reorderMutation.isPending}
                   title={t('categoryManager.moveDown')}
                   aria-label={t('categoryManager.moveDown')}
-                  className="grid h-[30px] w-[30px] place-items-center rounded-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-primary disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#9aa0af]"
+                  className="grid h-[30px] w-[30px] place-items-center rounded-legacy-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-legacy-primary disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#9aa0af]"
                 >
                   <ArrowDown className="h-[14px] w-[14px]" aria-hidden="true" />
                 </button>
@@ -228,7 +228,7 @@ export function CategoryManager() {
                   onClick={() => openRename(category)}
                   title={t('categoryManager.rename')}
                   aria-label={t('categoryManager.rename')}
-                  className="grid h-[30px] w-[30px] place-items-center rounded-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-primary"
+                  className="grid h-[30px] w-[30px] place-items-center rounded-legacy-lg text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-legacy-primary"
                 >
                   <Pencil className="h-[14px] w-[14px]" aria-hidden="true" />
                 </button>
@@ -237,7 +237,7 @@ export function CategoryManager() {
                   onClick={() => setDeleting(category)}
                   title={t('categoryManager.delete')}
                   aria-label={t('categoryManager.delete')}
-                  className="grid h-[30px] w-[30px] place-items-center rounded-lg text-[#9aa0af] transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  className="grid h-[30px] w-[30px] place-items-center rounded-legacy-lg text-[#9aa0af] transition-colors hover:bg-legacy-destructive/10 hover:text-legacy-destructive"
                 >
                   <Trash2 className="h-[14px] w-[14px]" aria-hidden="true" />
                 </button>
@@ -298,7 +298,7 @@ export function CategoryManager() {
                 if (deleting) deleteMutation.mutate(deleting.id);
               }}
               disabled={deleteMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-legacy-destructive text-legacy-destructive-foreground hover:bg-legacy-destructive/90"
             >
               {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
               {t('categoryManager.deleteButton')}

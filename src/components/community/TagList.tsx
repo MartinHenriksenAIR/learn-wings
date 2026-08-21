@@ -25,13 +25,13 @@ export function TagList({
         <Badge
           key={tag}
           variant="secondary"
-          className="rounded-[7px] border-transparent bg-muted px-2.5 py-[3px] text-[11.5px] font-semibold text-muted-foreground"
+          className="rounded-[7px] border-transparent bg-legacy-muted px-2.5 py-[3px] text-[11.5px] font-semibold text-legacy-muted-foreground"
         >
           #{tag}
         </Badge>
       ))}
       {hiddenCount > 0 && (
-        <Badge variant="outline" className="rounded-[7px] px-2 py-[3px] text-[11px] font-semibold text-muted-foreground">
+        <Badge variant="outline" className="rounded-[7px] px-2 py-[3px] text-[11px] font-semibold text-legacy-muted-foreground">
           {t('community.moreTags', { count: hiddenCount })}
         </Badge>
       )}

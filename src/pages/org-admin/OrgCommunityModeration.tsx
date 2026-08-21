@@ -90,7 +90,7 @@ export default function OrgCommunityModeration() {
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('moderation.title')}
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-legacy-muted-foreground">
           {t('moderation.subtitleOrg', { orgName: currentOrg.name })}
         </p>
       </div>
@@ -104,7 +104,7 @@ export default function OrgCommunityModeration() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
         </div>
       ) : reports.length === 0 ? (
         <EmptyState

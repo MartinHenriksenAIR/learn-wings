@@ -44,13 +44,13 @@ function OrgRowLogo({ logoPath }: { logoPath: string | null }) {
   const { data: src } = useSignedBrandingUrl(logoPath);
   if (src) {
     return (
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-legacy-muted">
         <img src={src} alt="" className="max-h-full max-w-full object-contain" />
       </span>
     );
   }
   return (
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-accent text-primary">
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-legacy-accent text-legacy-primary">
       <Building2 className="h-[17px] w-[17px]" aria-hidden="true" />
     </span>
   );
@@ -282,10 +282,10 @@ export default function OrganizationsManager() {
               placeholder="Acme Corporation"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className={errors.name ? 'border-destructive' : ''}
+              className={errors.name ? 'border-legacy-destructive' : ''}
             />
             {errors.name && (
-              <p className="text-xs text-destructive">{errors.name}</p>
+              <p className="text-xs text-legacy-destructive">{errors.name}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -295,10 +295,10 @@ export default function OrganizationsManager() {
               placeholder="acme-corp"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              className={`font-mono ${errors.slug ? 'border-destructive' : ''}`}
+              className={`font-mono ${errors.slug ? 'border-legacy-destructive' : ''}`}
             />
             {errors.slug && (
-              <p className="text-xs text-destructive">{errors.slug}</p>
+              <p className="text-xs text-legacy-destructive">{errors.slug}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -311,7 +311,7 @@ export default function OrganizationsManager() {
               value={seatLimit}
               onChange={(e) => setSeatLimit(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-legacy-muted-foreground">
               {t('organizations.seatLimitHint')}
             </p>
           </div>
@@ -350,7 +350,7 @@ export default function OrganizationsManager() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-legacy-muted-foreground mt-1">
                   {t('organizations.inviteEmailHint')}
                 </p>
                 <div className="mt-3">
@@ -378,7 +378,7 @@ export default function OrganizationsManager() {
       <div className="mb-5 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <h1 className="font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('organizations.title')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t('organizations.subtitle')}</p>
+          <p className="mt-1 text-sm text-legacy-muted-foreground">{t('organizations.subtitle')}</p>
         </div>
         {createDialog}
       </div>
@@ -408,7 +408,7 @@ export default function OrganizationsManager() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
           <div className="grid grid-cols-[2.2fr_1.2fr_0.9fr_1fr_1fr_0.4fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
             <span>{t('organizations.colOrganization')}</span>
             <span>{t('organizations.colSlug')}</span>
@@ -430,12 +430,12 @@ export default function OrganizationsManager() {
                   <OrgRowLogo logoPath={org.logo_url} />
                   <span className="truncate text-[13.5px] font-bold">{org.name}</span>
                 </span>
-                <span className="truncate font-mono text-[12.5px] text-muted-foreground">{org.slug}</span>
+                <span className="truncate font-mono text-[12.5px] text-legacy-muted-foreground">{org.slug}</span>
                 <span className="text-[13px] font-semibold text-[#4a4f60]">{org.memberCount}</span>
                 <span className="min-w-0">
                   {org.seat_limit ? (
                     <>
-                      <span className={`text-[13px] font-semibold ${atLimit ? 'text-destructive' : 'text-[#4a4f60]'}`}>
+                      <span className={`text-[13px] font-semibold ${atLimit ? 'text-legacy-destructive' : 'text-[#4a4f60]'}`}>
                         {org.usedSeats}/{org.seat_limit}
                       </span>
                       <SeatUsageBar
@@ -445,12 +445,12 @@ export default function OrganizationsManager() {
                       />
                     </>
                   ) : (
-                    <span className="text-[13px] font-semibold text-muted-foreground">
+                    <span className="text-[13px] font-semibold text-legacy-muted-foreground">
                       {t('organizations.seatsUnlimited')}
                     </span>
                   )}
                 </span>
-                <span className="text-[12.5px] text-muted-foreground">
+                <span className="text-[12.5px] text-legacy-muted-foreground">
                   {formatDate(new Date(org.created_at), 'P', i18n.language)}
                 </span>
                 <span className="flex justify-end text-[#c3c7d3]">

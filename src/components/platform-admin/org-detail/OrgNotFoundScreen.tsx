@@ -14,8 +14,8 @@ export function OrgNotFoundScreen({ loadFailed, onRetry }: OrgNotFoundScreenProp
   return (
     <AppLayout title={loadFailed ? t('orgDetail.loadFailedTitle') : t('orgDetail.notFoundTitle')}>
       <div className="flex h-64 flex-col items-center justify-center text-center">
-        <Building2 className="h-12 w-12 text-muted-foreground/50 mb-4" />
-        <p className="text-muted-foreground">
+        <Building2 className="h-12 w-12 text-legacy-muted-foreground/50 mb-4" />
+        <p className="text-legacy-muted-foreground">
           {loadFailed ? t('orgDetail.loadFailedDescription') : t('orgDetail.notFoundDescription')}
         </p>
         {loadFailed && (

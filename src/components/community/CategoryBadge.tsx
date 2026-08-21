@@ -34,12 +34,12 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 const colorMap: Record<string, string> = {
-  'challenges-obstacles': 'bg-orange-100 text-orange-800',
-  'risks-mitigation': 'bg-red-100 text-red-800',
-  'questions-help': 'bg-blue-100 text-blue-800',
-  'wins-learnings': 'bg-green-100 text-green-800',
-  'announcements': 'bg-pink-100 text-pink-800',
-  'events': 'bg-indigo-100 text-indigo-800',
+  'challenges-obstacles': 'bg-amber-tint text-amber-deep',
+  'risks-mitigation': 'bg-red-tint text-red-deep',
+  'questions-help': 'bg-interactive-tint text-interactive',
+  'wins-learnings': 'bg-green-tint text-green-deep',
+  'announcements': 'bg-peri-pastel text-ink',
+  'events': 'bg-peri-tint text-peri-deep',
 };
 
 export function CategoryBadge({
@@ -51,7 +51,7 @@ export function CategoryBadge({
   className,
 }: CategoryBadgeProps) {
   const Icon = icon ? iconMap[icon] : null;
-  const colorClass = colorMap[slug] || 'bg-muted text-muted-foreground';
+  const colorClass = colorMap[slug] || 'bg-legacy-muted text-legacy-muted-foreground';
 
   return (
     <Badge

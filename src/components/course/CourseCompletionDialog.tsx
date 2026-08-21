@@ -42,8 +42,8 @@ export function CourseCompletionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md text-center">
         <DialogHeader className="items-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/20">
-            <Award className="h-8 w-8 text-success" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-legacy-success/20">
+            <Award className="h-8 w-8 text-legacy-success" />
           </div>
           <DialogTitle className="text-2xl">Congratulations! 🎉</DialogTitle>
           <DialogDescription className="text-base">
@@ -53,7 +53,7 @@ export function CourseCompletionDialog({
 
         <div className="py-4 space-y-4">
           {features.certificates_enabled && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-legacy-muted-foreground">
               Your certificate is now available in your certificates section.
             </p>
           )}

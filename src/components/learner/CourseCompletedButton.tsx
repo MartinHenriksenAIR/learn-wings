@@ -23,7 +23,7 @@ export function CourseCompletedButton({
       asChild
       data-testid={testId}
       className={cn(
-        'h-auto rounded-[10px] border-2 border-success bg-transparent px-3 py-[9px] text-[13px] font-bold text-success shadow-none hover:bg-success/10',
+        'h-auto rounded-[10px] border-2 border-legacy-success bg-transparent px-3 py-[9px] text-[13px] font-bold text-legacy-success shadow-none hover:bg-legacy-success/10',
         className,
       )}
     >

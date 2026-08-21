@@ -58,7 +58,7 @@ export default function EventsPage() {
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {t('community.events')}
           </h1>
-          <p className="text-sm text-muted-foreground">{t('community.eventsSubtitle')}</p>
+          <p className="text-sm text-legacy-muted-foreground">{t('community.eventsSubtitle')}</p>
         </div>
         {canCreateEvent && (
           <Button

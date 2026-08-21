@@ -20,7 +20,7 @@ describe('ProgressRing', () => {
     expect(circles[1].getAttribute('stroke-linecap')).toBe('round');
   });
 
-  it('shows a rounded centered percentage label when labelColor is given', () => {
+  it('shows a rounded-legacy-base centered percentage label when labelColor is given', () => {
     render(<ProgressRing pct={66.6} size={120} stroke={9} fg="#10298f" bg="#e9eaf0" labelColor="#171a26" />);
 
     const label = screen.getByText('67%');
