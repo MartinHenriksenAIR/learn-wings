@@ -4,14 +4,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-[7px] border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center rounded-xs border border-transparent px-2.5 py-0.5 text-xs font-semibold transition-colors duration-fast ease-standard",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-        secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
-        outline: "text-foreground",
+        default: "bg-interactive text-white",
+        secondary: "bg-interactive-tint text-interactive",
+        success: "bg-green-tint text-green-deep",
+        progress: "bg-interactive-tint text-interactive",
+        warning: "bg-amber-tint text-amber-deep",
+        destructive: "bg-red-tint text-red-deep",
+        neutral: "bg-surface-sunken text-neutral-700",
+        outline: "border-neutral-300 text-neutral-900",
+        filter:
+          "rounded-full bg-surface-sunken text-neutral-700 aria-pressed:border-interactive aria-pressed:bg-interactive-tint aria-pressed:text-interactive data-[state=active]:border-interactive data-[state=active]:bg-interactive-tint data-[state=active]:text-interactive data-[state=on]:border-interactive data-[state=on]:bg-interactive-tint data-[state=on]:text-interactive",
       },
     },
     defaultVariants: {
