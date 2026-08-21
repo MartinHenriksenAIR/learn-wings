@@ -52,11 +52,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
         classNames: {
           closeButton: "!opacity-100",
           toast:
-            "group toast min-w-[22rem] px-5 py-4 text-[15px] group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
+            "group toast min-w-[22rem] px-5 py-4 text-[15px] group-[.toaster]:rounded-sm group-[.toaster]:border-0 group-[.toaster]:bg-ink group-[.toaster]:text-cream group-[.toaster]:shadow-overlay",
           title: "text-[15px] font-semibold leading-5",
-          description: "mt-1 text-[14px] leading-5 group-[.toast]:text-muted-foreground",
-          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+          description: "mt-1 text-[14px] leading-5 group-[.toast]:text-neutral-300",
+          actionButton: "group-[.toast]:bg-cream group-[.toast]:text-ink",
+          cancelButton: "group-[.toast]:bg-neutral-800 group-[.toast]:text-neutral-300",
         },
       }}
       {...props}
