@@ -50,7 +50,7 @@ export function DashboardHero({
   return (
     <section
       data-testid="dashboard-hero"
-      className="mb-[30px] flex flex-col items-stretch gap-8 rounded-[26px] bg-dash-ink p-[34px] text-white lg:flex-row lg:items-center"
+      className="mb-[30px] flex flex-col items-stretch gap-8 rounded-[26px] bg-legacy-dash-ink p-[34px] text-white lg:flex-row lg:items-center"
     >
       <div className="min-w-0 flex-1">
         <div className="mb-3 flex items-center gap-3">
@@ -60,12 +60,12 @@ export function DashboardHero({
               background: `conic-gradient(#a7e8c4 ${isFresh ? 0 : level.progressPct}%, rgba(255,255,255,0.22) 0)`,
             }}
           >
-            <span className="grid h-full w-full place-items-center rounded-full bg-white text-[13px] font-extrabold tracking-[-0.02em] text-dash-ink">
+            <span className="grid h-full w-full place-items-center rounded-full bg-white text-[13px] font-extrabold tracking-[-0.02em] text-legacy-dash-ink">
               {initials}
             </span>
             <span
               aria-label={t('dashboard.level.label', { level: level.level })}
-              className="absolute -bottom-1 -right-1 grid h-[19px] min-w-[19px] place-items-center rounded-full border-[2.5px] border-dash-ink bg-dash-a3 px-[5px] text-[10px] font-extrabold leading-none text-dash-ink"
+              className="absolute -bottom-1 -right-1 grid h-[19px] min-w-[19px] place-items-center rounded-full border-[2.5px] border-legacy-dash-ink bg-legacy-dash-a3 px-[5px] text-[10px] font-extrabold leading-none text-legacy-dash-ink"
             >
               {level.level}
             </span>
@@ -81,13 +81,13 @@ export function DashboardHero({
 
         <h1 className="mb-[18px] max-w-[17ch] font-display text-[25px] font-extrabold leading-[1.12] tracking-[-0.03em] sm:text-[30px]">
           {isFresh ? (
-            <Trans i18nKey="dashboard.hero.headlineFresh" components={{ em: <em className="not-italic text-dash-a3" /> }} />
+            <Trans i18nKey="dashboard.hero.headlineFresh" components={{ em: <em className="not-italic text-legacy-dash-a3" /> }} />
           ) : (
             <Trans
               i18nKey="dashboard.hero.headline"
               count={lessonsThisWeek}
               values={{ count: lessonsThisWeek }}
-              components={{ em: <em className="not-italic text-dash-a3" /> }}
+              components={{ em: <em className="not-italic text-legacy-dash-a3" /> }}
             />
           )}
         </h1>
@@ -95,7 +95,7 @@ export function DashboardHero({
         <button
           type="button"
           onClick={onCta}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-[18px] py-[11px] text-[12px] font-extrabold uppercase tracking-[0.06em] text-dash-ink transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dash-ink"
+          className="inline-flex items-center gap-2 rounded-full bg-white px-[18px] py-[11px] text-[12px] font-extrabold uppercase tracking-[0.06em] text-legacy-dash-ink transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-legacy-dash-ink"
         >
           {isFresh ? t('dashboard.hero.ctaFresh') : t('dashboard.hero.cta')}
           <ArrowUpRight aria-hidden="true" className="h-3 w-3" />
@@ -108,7 +108,7 @@ export function DashboardHero({
               <b className="text-[13px] font-extrabold tabular-nums opacity-100">{overallPct}%</b>
             </div>
             <div className="h-[5px] overflow-hidden rounded-full bg-white/20">
-              <span className="block h-full rounded-full bg-dash-a3" style={{ width: `${overallPct}%` }} />
+              <span className="block h-full rounded-full bg-legacy-dash-a3" style={{ width: `${overallPct}%` }} />
             </div>
           </div>
         )}

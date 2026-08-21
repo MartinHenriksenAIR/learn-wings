@@ -51,7 +51,7 @@ export function CategoryBadge({
   className,
 }: CategoryBadgeProps) {
   const Icon = icon ? iconMap[icon] : null;
-  const colorClass = colorMap[slug] || 'bg-muted text-muted-foreground';
+  const colorClass = colorMap[slug] || 'bg-legacy-muted text-legacy-muted-foreground';
 
   return (
     <Badge

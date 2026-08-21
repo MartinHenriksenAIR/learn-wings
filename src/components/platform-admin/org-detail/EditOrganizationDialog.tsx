@@ -76,14 +76,14 @@ export function EditOrganizationDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="edit-org-logo">{t('orgDetail.logo')}</Label>
-            <div className="border-2 border-dashed rounded-lg p-4 mb-3">
+            <div className="border-2 border-dashed rounded-legacy-lg p-4 mb-3">
               <div className="flex flex-col items-center gap-2 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-                  <Building2 className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-legacy-xl bg-legacy-muted">
+                  <Building2 className="h-6 w-6 text-legacy-muted-foreground" aria-hidden="true" />
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">{t('orgDetail.logoRecommended')}</p>
-                  <p className="text-xs text-muted-foreground">{t('orgDetail.logoSize')}</p>
+                  <p className="text-xs text-legacy-muted-foreground">{t('orgDetail.logoSize')}</p>
                 </div>
               </div>
             </div>
@@ -117,7 +117,7 @@ export function EditOrganizationDialog({
               placeholder="acme-corp"
               className="font-mono"
             />
-            <p className="text-xs text-muted-foreground">{t('orgDetail.slugHint')}</p>
+            <p className="text-xs text-legacy-muted-foreground">{t('orgDetail.slugHint')}</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="edit-seat-limit">{t('orgDetail.seatLimitLabel')}</Label>
@@ -129,14 +129,14 @@ export function EditOrganizationDialog({
               value={seatLimit}
               onChange={(e) => setSeatLimit(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">{t('orgDetail.seatLimitHint')}</p>
+            <p className="text-xs text-legacy-muted-foreground">{t('orgDetail.seatLimitHint')}</p>
           </div>
-          <div className="flex items-center justify-between rounded-lg border p-3">
+          <div className="flex items-center justify-between rounded-legacy-lg border p-3">
             <div className="space-y-0.5 pr-4">
               <Label htmlFor="edit-allow-self-reg" className="text-sm font-medium">
                 {t('orgDetail.selfRegLabel')}
               </Label>
-              <p className="text-xs text-muted-foreground">{t('orgDetail.selfRegHint')}</p>
+              <p className="text-xs text-legacy-muted-foreground">{t('orgDetail.selfRegHint')}</p>
             </div>
             <Switch
               id="edit-allow-self-reg"
@@ -144,10 +144,10 @@ export function EditOrganizationDialog({
               onCheckedChange={setAllowSelfRegistration}
             />
           </div>
-          <div className="space-y-3 rounded-lg border p-3">
+          <div className="space-y-3 rounded-legacy-lg border p-3">
             <div className="space-y-0.5">
               <p className="text-sm font-medium">{t('orgDetail.ssoBindingLabel')}</p>
-              <p className="text-xs text-muted-foreground">{t('orgDetail.ssoBindingHint')}</p>
+              <p className="text-xs text-legacy-muted-foreground">{t('orgDetail.ssoBindingHint')}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-entra-label">{t('orgDetail.ssoDomainLabel')}</Label>
@@ -157,7 +157,7 @@ export function EditOrganizationDialog({
                 onChange={(e) => setEntraTidLabel(e.target.value)}
                 placeholder="acme.com"
               />
-              <p className="text-xs text-muted-foreground">{t('orgDetail.ssoDomainHint')}</p>
+              <p className="text-xs text-legacy-muted-foreground">{t('orgDetail.ssoDomainHint')}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-entra-tid">{t('orgDetail.ssoTenantIdLabel')}</Label>
@@ -168,7 +168,7 @@ export function EditOrganizationDialog({
                 placeholder="00000000-0000-0000-0000-000000000000"
                 className="font-mono"
               />
-              <p className="text-xs text-muted-foreground">{t('orgDetail.ssoTenantIdHint')}</p>
+              <p className="text-xs text-legacy-muted-foreground">{t('orgDetail.ssoTenantIdHint')}</p>
             </div>
           </div>
         </div>

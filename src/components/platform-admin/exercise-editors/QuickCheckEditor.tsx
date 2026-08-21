@@ -13,7 +13,7 @@ export function QuickCheckEditor({ value, onChange }: Props) {
   return (
     <div className="space-y-6">
       {value.questions.map((q) => (
-        <div key={q.id} className="rounded-md border p-3 space-y-2">
+        <div key={q.id} className="rounded-legacy-md border p-3 space-y-2">
           <div className="flex gap-2">
             <Input value={q.text} placeholder={t('exercise.editor.questionText')}
               onChange={(e) => setQuestions(value.questions.map((x) => x.id === q.id ? { ...x, text: e.target.value } : x))} />

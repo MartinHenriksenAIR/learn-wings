@@ -130,7 +130,7 @@ export default function LearnerTraining() {
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {t('training.title')}
           </h1>
-          <p className="text-sm text-muted-foreground">{t('training.subtitle')}</p>
+          <p className="text-sm text-legacy-muted-foreground">{t('training.subtitle')}</p>
         </div>
         <ListViewToggle view={view} onChange={setView} />
       </div>
@@ -138,16 +138,16 @@ export default function LearnerTraining() {
       {profile && !isPlatformAdmin && !isOrgAdmin && profile.assessment_level == null && (
         <div
           data-testid="assessment-banner"
-          className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4"
+          className="mb-6 flex flex-wrap items-center gap-4 rounded-legacy-2xl border border-legacy-primary/20 bg-legacy-primary/5 px-5 py-4"
         >
-          <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+          <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-legacy-xl bg-legacy-primary text-legacy-primary-foreground">
             <Sparkles className="h-5 w-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-semibold">{t('assessment.banner.title')}</p>
-            <p className="text-[12.5px] text-muted-foreground">{t('assessment.banner.body')}</p>
+            <p className="text-[12.5px] text-legacy-muted-foreground">{t('assessment.banner.body')}</p>
           </div>
-          <Button asChild className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button asChild className="shrink-0 bg-legacy-primary text-legacy-primary-foreground hover:bg-legacy-primary/90">
             <Link to={routes.learner.assessment}>{t('assessment.banner.cta')}</Link>
           </Button>
         </div>
@@ -155,10 +155,10 @@ export default function LearnerTraining() {
 
       <div
         data-testid="training-progress-strip"
-        className="mb-7 rounded-2xl border border-border bg-card px-5 py-4"
+        className="mb-7 rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-4"
       >
         <div className="mb-2.5 flex items-center justify-between gap-4">
-          <span className="text-[13.5px] font-semibold text-muted-foreground">
+          <span className="text-[13.5px] font-semibold text-legacy-muted-foreground">
             {lessonTotal > 0
               ? t('training.progress.summary', { done: lessonDone, total: lessonTotal })
               : t('training.progress.empty')}
@@ -196,9 +196,9 @@ export default function LearnerTraining() {
                 <div
                   key={enrollment.id}
                   data-testid="training-continue-row"
-                  className="hover-lift flex items-center gap-4 rounded-xl border border-border bg-card p-3"
+                  className="hover-lift flex items-center gap-4 rounded-legacy-xl border border-legacy-border bg-legacy-card p-3"
                 >
-                  <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-primary/80 to-primary">
+                  <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-legacy-lg bg-gradient-to-br from-legacy-primary/80 to-legacy-primary">
                     {thumbnailUrls[enrollment.course_id] && (
                       <img
                         src={thumbnailUrls[enrollment.course_id]}
@@ -214,7 +214,7 @@ export default function LearnerTraining() {
                     </div>
                     <div className="mt-1.5 flex max-w-[260px] items-center gap-2.5">
                       <Progress value={coursePct} className="h-1.5 flex-1" />
-                      <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-muted-foreground">
+                      <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-legacy-muted-foreground">
                         {p?.completed ?? 0}/{p?.total ?? 0}
                       </span>
                     </div>
@@ -227,7 +227,7 @@ export default function LearnerTraining() {
                     />
                     <Button
                       asChild
-                      className="h-auto shrink-0 rounded-[10px] bg-accent px-3 py-2 text-[12.5px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                      className="h-auto shrink-0 rounded-[10px] bg-legacy-accent px-3 py-2 text-[12.5px] font-bold text-legacy-accent-foreground hover:bg-[#dfe5f8]"
                     >
                       <Link to={routes.learner.coursePlayer(enrollment.course_id)}>
                         <Play aria-hidden="true" className="h-3.5 w-3.5" />
@@ -240,9 +240,9 @@ export default function LearnerTraining() {
                 <div
                   key={enrollment.id}
                   data-testid="training-continue-card"
-                  className="hover-lift flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+                  className="hover-lift flex flex-col overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card"
                 >
-                  <div className="relative h-[110px] bg-gradient-to-br from-primary/80 to-primary">
+                  <div className="relative h-[110px] bg-gradient-to-br from-legacy-primary/80 to-legacy-primary">
                     {thumbnailUrls[enrollment.course_id] && (
                       <img
                         src={thumbnailUrls[enrollment.course_id]}
@@ -258,7 +258,7 @@ export default function LearnerTraining() {
                     <h3 className="text-[14.5px] font-bold leading-[1.35]">{enrollment.course?.title}</h3>
                     <div className="mt-auto flex items-center gap-2.5">
                       <Progress value={coursePct} className="h-1.5 flex-1" />
-                      <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-muted-foreground">
+                      <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-legacy-muted-foreground">
                         {p?.completed ?? 0}/{p?.total ?? 0}
                       </span>
                     </div>
@@ -269,7 +269,7 @@ export default function LearnerTraining() {
                       />
                       <Button
                         asChild
-                        className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                        className="h-auto w-full rounded-[10px] bg-legacy-accent px-3 py-[9px] text-[13px] font-bold text-legacy-accent-foreground hover:bg-[#dfe5f8]"
                       >
                         <Link to={routes.learner.coursePlayer(enrollment.course_id)}>
                           <Play aria-hidden="true" className="h-3.5 w-3.5" />
@@ -313,11 +313,11 @@ export default function LearnerTraining() {
                 data-testid="training-completed-card"
                 className={
                   view === 'list'
-                    ? 'hover-lift flex items-center gap-3.5 rounded-xl border border-border bg-card p-3'
-                    : 'hover-lift flex items-center gap-3.5 rounded-2xl border border-border bg-card px-[18px] py-4'
+                    ? 'hover-lift flex items-center gap-3.5 rounded-legacy-xl border border-legacy-border bg-legacy-card p-3'
+                    : 'hover-lift flex items-center gap-3.5 rounded-legacy-2xl border border-legacy-border bg-legacy-card px-[18px] py-4'
                 }
               >
-                <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-success/10 text-success">
+                <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-legacy-xl bg-legacy-success/10 text-legacy-success">
                   <Award className="h-5 w-5" />
                 </span>
                 <span className="flex min-w-0 flex-col gap-0.5">

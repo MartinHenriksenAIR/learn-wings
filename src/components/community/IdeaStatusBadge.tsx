@@ -11,11 +11,11 @@ interface IdeaStatusBadgeProps {
 
 const STATUS_STYLES: Partial<Record<IdeaStatusExtended, string>> = {
   draft: 'bg-[#f3f4f8] text-[#686d7e]',
-  submitted: 'bg-accent text-accent-foreground',
-  in_review: 'bg-[#fbf2dd] text-warning',
-  accepted: 'bg-[#e7f6ef] text-success',
+  submitted: 'bg-legacy-accent text-legacy-accent-foreground',
+  in_review: 'bg-[#fbf2dd] text-legacy-warning',
+  accepted: 'bg-[#e7f6ef] text-legacy-success',
   in_progress: 'bg-[#e3f4f6] text-[#0f7e8a]',
-  done: 'bg-[#e7f6ef] text-success',
+  done: 'bg-[#e7f6ef] text-legacy-success',
   rejected: 'bg-[#fdecec] text-[#c43d3d]',
 };
 

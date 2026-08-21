@@ -40,12 +40,12 @@ export function AIChampionsList({ orgId }: AIChampionsListProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card px-5 py-[18px]">
+    <div className="rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-[18px]">
       <h3 className="mb-2 flex items-center gap-2 text-[13.5px] font-extrabold">
-        <Sparkles aria-hidden="true" className="h-[15px] w-[15px] text-warning" />
+        <Sparkles aria-hidden="true" className="h-[15px] w-[15px] text-legacy-warning" />
         {t('community.aiChampions')}
       </h3>
-      <p className="mb-3 text-xs text-muted-foreground">{t('community.aiChampionsBlurb')}</p>
+      <p className="mb-3 text-xs text-legacy-muted-foreground">{t('community.aiChampionsBlurb')}</p>
       <div className="flex flex-col gap-[11px]">
         {champions.map((champion) => (
           <div key={champion.id} className="flex items-center gap-2.5">

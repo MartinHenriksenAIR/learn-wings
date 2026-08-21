@@ -18,7 +18,7 @@ export function PendingInvitationsList({
   return (
     <>
       <h2 className="mb-3 text-[17px] font-extrabold">{t('orgDetail.pendingInvitations')}</h2>
-      <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="mb-6 overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
         {invitations.map((invitation) => (
             <div
               key={invitation.id}
@@ -36,7 +36,7 @@ export function PendingInvitationsList({
               <span
                 className={cn(
                   'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
-                  invitation.role === 'org_admin' ? 'bg-accent text-primary' : 'bg-[#f3f4f8] text-[#686d7e]',
+                  invitation.role === 'org_admin' ? 'bg-legacy-accent text-legacy-primary' : 'bg-[#f3f4f8] text-[#686d7e]',
                 )}
               >
                 {invitation.role === 'org_admin' ? t('orgDetail.admin') : t('orgDetail.learner')}
@@ -44,7 +44,7 @@ export function PendingInvitationsList({
               <button
                 type="button"
                 onClick={() => onCancel(invitation.id)}
-                className="rounded-lg px-2.5 py-[7px] text-xs font-bold text-[#9aa0af] transition-colors hover:text-destructive"
+                className="rounded-legacy-lg px-2.5 py-[7px] text-xs font-bold text-[#9aa0af] transition-colors hover:text-legacy-destructive"
               >
                 {t('orgDetail.cancelInvite')}
               </button>

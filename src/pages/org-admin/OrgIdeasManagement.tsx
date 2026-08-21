@@ -59,10 +59,10 @@ interface KanbanColumn {
 }
 
 const KANBAN_COLUMNS: KanbanColumn[] = [
-  { key: 'inbox', label: 'Inbox', icon: <Inbox className="h-[15px] w-[15px]" />, iconColor: 'text-primary', statuses: ['submitted', 'in_review'] },
-  { key: 'backlog', label: 'Backlog', icon: <FileText className="h-[15px] w-[15px]" />, iconColor: 'text-warning', statuses: ['accepted'] },
-  { key: 'inProgress', label: 'In Progress', icon: <Loader2 className="h-[15px] w-[15px]" />, iconColor: 'text-primary', statuses: ['in_progress'] },
-  { key: 'done', label: 'Done', icon: <CheckCircle className="h-[15px] w-[15px]" />, iconColor: 'text-success', statuses: ['done'] },
+  { key: 'inbox', label: 'Inbox', icon: <Inbox className="h-[15px] w-[15px]" />, iconColor: 'text-legacy-primary', statuses: ['submitted', 'in_review'] },
+  { key: 'backlog', label: 'Backlog', icon: <FileText className="h-[15px] w-[15px]" />, iconColor: 'text-legacy-warning', statuses: ['accepted'] },
+  { key: 'inProgress', label: 'In Progress', icon: <Loader2 className="h-[15px] w-[15px]" />, iconColor: 'text-legacy-primary', statuses: ['in_progress'] },
+  { key: 'done', label: 'Done', icon: <CheckCircle className="h-[15px] w-[15px]" />, iconColor: 'text-legacy-success', statuses: ['done'] },
   { key: 'rejected', label: 'Rejected', icon: <XCircle className="h-[15px] w-[15px]" />, iconColor: 'text-[#c43d3d]', statuses: ['rejected'] },
 ];
 
@@ -188,7 +188,7 @@ export default function OrgIdeasManagement() {
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {t('ideaManagement.title')}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-legacy-muted-foreground">
             {t('ideaManagement.subtitle', { orgName: currentOrg.name })}
           </p>
         </div>
@@ -214,7 +214,7 @@ export default function OrgIdeasManagement() {
 
       {activeTab === 'board' && (
         <div className="relative mb-5 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-legacy-muted-foreground" />
           <Input
             placeholder={t('ideaManagement.searchPlaceholder')}
             value={searchQuery}
@@ -233,7 +233,7 @@ export default function OrgIdeasManagement() {
         <TabsContent value="board">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
             </div>
           ) : ideas.length === 0 ? (
             <EmptyState
@@ -257,7 +257,7 @@ export default function OrgIdeasManagement() {
                     }}
                     onDrop={() => handleDrop(column.key)}
                     className={cn(
-                      'min-h-[380px] rounded-2xl p-3 transition-colors',
+                      'min-h-[380px] rounded-legacy-2xl p-3 transition-colors',
                       isDragOver ? 'bg-[#e2e7f6]' : 'bg-[#eceef3]'
                     )}
                   >
@@ -266,14 +266,14 @@ export default function OrgIdeasManagement() {
                       <span className="text-[12.5px] font-extrabold tracking-[0.02em]">
                         {t(`ideaManagement.columns.${column.key}`)}
                       </span>
-                      <span className="ml-auto rounded-[7px] bg-card px-[9px] py-0.5 text-[11px] font-extrabold text-muted-foreground">
+                      <span className="ml-auto rounded-[7px] bg-legacy-card px-[9px] py-0.5 text-[11px] font-extrabold text-legacy-muted-foreground">
                         {columnIdeas.length}
                       </span>
                     </div>
 
                     <div className="flex flex-col gap-2.5">
                       {columnIdeas.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-[#d6d8e0] p-4 text-center text-xs text-muted-foreground">
+                        <div className="rounded-legacy-xl border border-dashed border-[#d6d8e0] p-4 text-center text-xs text-legacy-muted-foreground">
                           {t('ideaManagement.dropHere')}
                         </div>
                       ) : (
@@ -290,7 +290,7 @@ export default function OrgIdeasManagement() {
                               }}
                               onClick={() => navigate(routes.community.ideaDetail(idea.id))}
                               className={cn(
-                                'group cursor-grab rounded-xl border border-[#e4e6ee] bg-card px-[15px] py-[13px] transition-[transform,box-shadow,opacity]',
+                                'group cursor-grab rounded-legacy-xl border border-[#e4e6ee] bg-legacy-card px-[15px] py-[13px] transition-[transform,box-shadow,opacity]',
                                 'hover:shadow-[0_8px_22px_rgba(20,24,46,0.10)]',
                                 isDragged && 'rotate-2 scale-[0.98] opacity-40'
                               )}
@@ -298,7 +298,7 @@ export default function OrgIdeasManagement() {
                               <div className="mb-2 flex items-center gap-1.5">
                                 <IdeaStatusBadge status={idea.status} size="sm" />
                                 {idea.business_area && (
-                                  <span className="rounded-[7px] bg-[#f3f4f8] px-[9px] py-[3px] text-[10.5px] font-bold text-muted-foreground">
+                                  <span className="rounded-[7px] bg-[#f3f4f8] px-[9px] py-[3px] text-[10.5px] font-bold text-legacy-muted-foreground">
                                     {BUSINESS_AREAS.find((a) => a.value === idea.business_area)?.label ??
                                       idea.business_area}
                                   </span>
@@ -306,7 +306,7 @@ export default function OrgIdeasManagement() {
                                 <PriorityBadge value={idea.value_score} effort={idea.effort_score} />
                                 <span
                                   aria-hidden="true"
-                                  className="ml-auto inline-flex items-center gap-0.5 text-[10.5px] font-extrabold text-primary opacity-0 transition-opacity group-hover:opacity-100"
+                                  className="ml-auto inline-flex items-center gap-0.5 text-[10.5px] font-extrabold text-legacy-primary opacity-0 transition-opacity group-hover:opacity-100"
                                 >
                                   {t('ideaManagement.open')}
                                   <ChevronRight className="h-3 w-3" />
@@ -315,7 +315,7 @@ export default function OrgIdeasManagement() {
                               <p className="mb-2 line-clamp-2 text-[13px] font-bold leading-[1.35]">
                                 {idea.title}
                               </p>
-                              <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                              <div className="flex items-center gap-2 text-[11px] font-semibold text-legacy-muted-foreground">
                                 <span className="inline-flex items-center gap-1">
                                   <TrendingUp className="h-[11px] w-[11px]" />
                                   {idea.vote_count || 0}
@@ -339,11 +339,11 @@ export default function OrgIdeasManagement() {
         <TabsContent value="prioritize">
           {isPrioritizeLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
             </div>
           ) : (
             <>
-              <p className="mb-4 text-sm text-muted-foreground">
+              <p className="mb-4 text-sm text-legacy-muted-foreground">
                 {t('ideaManagement.prioritize.description')}
               </p>
               <PrioritizationMatrix

@@ -470,7 +470,7 @@ describe('LearnerCourses — progress bar + % on enrolled cards (#340)', () => {
     });
   });
 
-  it('renders a progress bar with the rounded percentage on an in-progress enrolled card', async () => {
+  it('renders a progress bar with the rounded-legacy-base percentage on an in-progress enrolled card', async () => {
     vi.mocked(callApi).mockResolvedValue({
       courses: [course],
       enrollments: [{ id: 'e-1', course_id: 'c-1', status: 'enrolled', enrolled_at: '2026-01-10T00:00:00Z', completed_at: null }],
@@ -482,7 +482,7 @@ describe('LearnerCourses — progress bar + % on enrolled cards (#340)', () => {
     const bar = await screen.findByTestId('course-progress-c-1');
     expect(bar).toBeInTheDocument();
     expect(screen.getByText('67%')).toBeInTheDocument();
-    const fill = bar.querySelector('.bg-primary') as HTMLElement | null;
+    const fill = bar.querySelector('.bg-legacy-primary') as HTMLElement | null;
     expect(fill).not.toBeNull();
     expect(fill!.style.width).toBe('67%');
   });

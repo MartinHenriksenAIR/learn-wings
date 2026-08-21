@@ -30,9 +30,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     return (
       <div className={`grid min-h-screen place-items-center ${PAGE_GRADIENT_CLASSES} px-4`}>
-        <div className="flex w-full max-w-[420px] flex-col items-center gap-4 rounded-[20px] border border-border bg-card px-10 py-11 text-center shadow-[0_24px_60px_rgba(16,41,143,0.10)]">
-          <h1 className="text-[17px] font-bold text-foreground">{i18n.t("errorBoundary.title")}</h1>
-          <p className="text-balance text-sm leading-[1.55] text-muted-foreground">
+        <div className="flex w-full max-w-[420px] flex-col items-center gap-4 rounded-[20px] border border-legacy-border bg-legacy-card px-10 py-11 text-center shadow-[0_24px_60px_rgba(16,41,143,0.10)]">
+          <h1 className="text-[17px] font-bold text-legacy-foreground">{i18n.t("errorBoundary.title")}</h1>
+          <p className="text-balance text-sm leading-[1.55] text-legacy-muted-foreground">
             {i18n.t("errorBoundary.description")}
           </p>
           <Button size="sm" onClick={() => window.location.reload()}>

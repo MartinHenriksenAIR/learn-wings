@@ -43,7 +43,7 @@ const featureKeys: FeatureKey[] = [
 type FeatureState = Record<FeatureKey, boolean>;
 
 const rowClass =
-  'flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]';
+  'flex items-center justify-between rounded-legacy-xl border border-[#eceef3] px-4 py-[13px]';
 
 export default function OrgSettings() {
   const { currentOrg, refreshUserContext } = useAuth();
@@ -210,7 +210,7 @@ export default function OrgSettings() {
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('orgSettings.title')}
         </h1>
-        <p className="mb-[22px] text-sm text-muted-foreground">{t('orgSettings.subtitle')}</p>
+        <p className="mb-[22px] text-sm text-legacy-muted-foreground">{t('orgSettings.subtitle')}</p>
 
         <SlidingTabs tabs={tabs} active={activeTab} onChange={setActiveTab} className="mb-6" />
 
@@ -233,29 +233,29 @@ export default function OrgSettings() {
                     aria-invalid={nameInvalid}
                   />
                   {nameInvalid ? (
-                    <p className="text-[11.5px] text-destructive">{t('orgSettings.profile.nameError')}</p>
+                    <p className="text-[11.5px] text-legacy-destructive">{t('orgSettings.profile.nameError')}</p>
                   ) : (
-                    <p className="text-[11.5px] text-muted-foreground">{t('orgSettings.profile.nameHint')}</p>
+                    <p className="text-[11.5px] text-legacy-muted-foreground">{t('orgSettings.profile.nameHint')}</p>
                   )}
                 </div>
 
                 <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-[13px]">
                   <dt className="font-bold">{t('orgSettings.profile.slugLabel')}</dt>
-                  <dd className="text-muted-foreground">{currentOrg.slug}</dd>
+                  <dd className="text-legacy-muted-foreground">{currentOrg.slug}</dd>
                   <dt className="font-bold">{t('orgSettings.profile.memberLimitLabel')}</dt>
-                  <dd className="text-muted-foreground">
+                  <dd className="text-legacy-muted-foreground">
                     {currentOrg.seat_limit ?? t('orgSettings.profile.unlimited')}
                   </dd>
                   {currentOrg.member_count != null && (
                     <>
                       <dt className="font-bold">{t('orgSettings.profile.membersUsedLabel')}</dt>
-                      <dd className="text-muted-foreground">{currentOrg.member_count}</dd>
+                      <dd className="text-legacy-muted-foreground">{currentOrg.member_count}</dd>
                     </>
                   )}
                   {createdLabel && (
                     <>
                       <dt className="font-bold">{t('orgSettings.profile.createdLabel')}</dt>
-                      <dd className="text-muted-foreground">{createdLabel}</dd>
+                      <dd className="text-legacy-muted-foreground">{createdLabel}</dd>
                     </>
                   )}
                 </dl>
@@ -272,11 +272,11 @@ export default function OrgSettings() {
                     <img
                       src={logoSrc}
                       alt={`${currentOrg.name} logo`}
-                      className="h-16 w-16 rounded-xl bg-muted object-contain"
+                      className="h-16 w-16 rounded-legacy-xl bg-legacy-muted object-contain"
                     />
                   ) : (
-                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
-                      <Building2 className="h-8 w-8 text-primary" aria-hidden="true" />
+                    <div className="flex h-16 w-16 items-center justify-center rounded-legacy-xl bg-legacy-primary/10">
+                      <Building2 className="h-8 w-8 text-legacy-primary" aria-hidden="true" />
                     </div>
                   )}
                   {logoSrc && (
@@ -285,14 +285,14 @@ export default function OrgSettings() {
                       size="sm"
                       onClick={() => persistLogo(null)}
                       disabled={logoBusy}
-                      className="text-destructive hover:text-destructive"
+                      className="text-legacy-destructive hover:text-legacy-destructive"
                     >
                       <Trash2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
                       {t('orgSettings.profile.logoRemove')}
                     </Button>
                   )}
                 </div>
-                <p className="text-[11.5px] text-muted-foreground">{t('orgSettings.profile.logoHint')}</p>
+                <p className="text-[11.5px] text-legacy-muted-foreground">{t('orgSettings.profile.logoHint')}</p>
                 <FileUpload
                   assetType="org-logo"
                   folder={currentOrg.id}
@@ -317,7 +317,7 @@ export default function OrgSettings() {
                   <Label htmlFor="allow-self-registration" className="text-[13.5px] font-bold">
                     {t('orgSettings.selfRegLabel')}
                   </Label>
-                  <p className="text-[11.5px] text-muted-foreground">{t('orgSettings.selfRegHint')}</p>
+                  <p className="text-[11.5px] text-legacy-muted-foreground">{t('orgSettings.selfRegHint')}</p>
                 </div>
                 <Switch
                   id="allow-self-registration"
@@ -331,7 +331,7 @@ export default function OrgSettings() {
                   <Label htmlFor="default-member-language" className="text-[13.5px] font-bold">
                     {t('orgSettings.defaultLanguageLabel')}
                   </Label>
-                  <p className="text-[11.5px] text-muted-foreground">{t('orgSettings.defaultLanguageHint')}</p>
+                  <p className="text-[11.5px] text-legacy-muted-foreground">{t('orgSettings.defaultLanguageHint')}</p>
                 </div>
                 <Select value={defaultLanguage} onValueChange={setDefaultLanguage}>
                   <SelectTrigger id="default-member-language" className="w-[190px]">
@@ -354,7 +354,7 @@ export default function OrgSettings() {
               <CardTitle>{t('orgSettings.featureOverrides')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2.5">
-              <p className="mb-2 text-[11.5px] text-muted-foreground">{t('orgSettings.combinedNote')}</p>
+              <p className="mb-2 text-[11.5px] text-legacy-muted-foreground">{t('orgSettings.combinedNote')}</p>
               <div className="flex flex-col gap-2.5">
                 {featureKeys.map((key) => (
                   <div key={key} className={rowClass}>
@@ -362,7 +362,7 @@ export default function OrgSettings() {
                       <Label htmlFor={`feature-${key}`} className="text-[13.5px] font-bold">
                         {t(`orgSettings.features.${key}`)}
                       </Label>
-                      <p className="text-[11.5px] text-muted-foreground">
+                      <p className="text-[11.5px] text-legacy-muted-foreground">
                         {t('orgSettings.platformDefault', {
                           state: platformFeatures[key]
                             ? t('orgSettings.enabled')
@@ -385,7 +385,7 @@ export default function OrgSettings() {
                     <Label htmlFor="leaderboard-enabled" className="text-[13.5px] font-bold">
                       {t('orgSettings.leaderboardLabel')}
                     </Label>
-                    <p className="text-[11.5px] text-muted-foreground">{t('orgSettings.leaderboardHint')}</p>
+                    <p className="text-[11.5px] text-legacy-muted-foreground">{t('orgSettings.leaderboardHint')}</p>
                   </div>
                   <Switch
                     id="leaderboard-enabled"
@@ -398,7 +398,7 @@ export default function OrgSettings() {
           </Card>
         )}
 
-        <div className="sticky bottom-0 mt-6 flex justify-end border-t border-[#eceef3] bg-background/95 py-3 backdrop-blur">
+        <div className="sticky bottom-0 mt-6 flex justify-end border-t border-[#eceef3] bg-legacy-background/95 py-3 backdrop-blur">
           <SaveButton
             done={flashed('orgSettings')}
             idleLabel={t('orgSettings.saveAll')}

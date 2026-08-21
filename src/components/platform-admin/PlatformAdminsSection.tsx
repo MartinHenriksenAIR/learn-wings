@@ -71,16 +71,16 @@ export function PlatformAdminsSection({
       <div className="space-y-2">
         <h2 className="text-[13px] font-bold text-[#4a4f60]">{t('platformAdmins.currentTitle')}</h2>
         {admins.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('platformAdmins.empty')}</p>
+          <p className="text-sm text-legacy-muted-foreground">{t('platformAdmins.empty')}</p>
         ) : (
           <ul className="space-y-2">
             {admins.map((a) => (
               <li
                 key={a.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#eceef3] px-4 py-[13px]"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-legacy-xl border border-[#eceef3] px-4 py-[13px]"
               >
-                <span className="text-sm text-muted-foreground">
-                  <strong className="text-foreground">{a.full_name}</strong>
+                <span className="text-sm text-legacy-muted-foreground">
+                  <strong className="text-legacy-foreground">{a.full_name}</strong>
                   {a.email ? ` · ${a.email}` : ''}
                 </span>
                 <Button
@@ -99,7 +99,7 @@ export function PlatformAdminsSection({
 
       <div className="space-y-2 border-t border-[#eceef3] pt-5">
         <Label htmlFor="grant-admin-user" className="text-[13px] font-bold text-[#4a4f60]">{t('platformAdmins.grantLabel')}</Label>
-        <p className="text-[11.5px] text-muted-foreground">{t('platformAdmins.grantHint')}</p>
+        <p className="text-[11.5px] text-legacy-muted-foreground">{t('platformAdmins.grantHint')}</p>
         <div className="flex flex-wrap items-center gap-3 pt-1">
           <Select value={selectedUserId} onValueChange={setSelectedUserId}>
             <SelectTrigger id="grant-admin-user" className="w-[260px]">
@@ -107,7 +107,7 @@ export function PlatformAdminsSection({
             </SelectTrigger>
             <SelectContent>
               {availableUsers.length === 0 ? (
-                <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                <div className="px-2 py-4 text-center text-sm text-legacy-muted-foreground">
                   {t('platformAdmins.noCandidates')}
                 </div>
               ) : (

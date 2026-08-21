@@ -123,14 +123,14 @@ export function CommentThread({
 
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-6 w-6 animate-spin text-legacy-muted-foreground" />
         </div>
       ) : commentTree.length === 0 ? (
         <CommunityEmptyState variant="comments" />
       ) : (
         <div className="flex flex-col gap-2.5">
           {commentTree.map((comment) => (
-            <div key={comment.id} className="rounded-[14px] border border-border bg-card px-[18px] py-3.5">
+            <div key={comment.id} className="rounded-[14px] border border-legacy-border bg-legacy-card px-[18px] py-3.5">
               <CommentItem
                 comment={comment}
                 currentUserId={currentUserId}
@@ -149,15 +149,15 @@ export function CommentThread({
       )}
 
       {replyingTo && (
-        <div className="ml-8 space-y-2 border-l-2 border-primary pl-4">
-          <p className="text-[13px] text-muted-foreground">
+        <div className="ml-8 space-y-2 border-l-2 border-legacy-primary pl-4">
+          <p className="text-[13px] text-legacy-muted-foreground">
             {t('community.replyingTo')}{' '}
             <button
               onClick={() => {
                 setReplyingTo(null);
                 setReplyContent('');
               }}
-              className="font-semibold text-primary hover:underline"
+              className="font-semibold text-legacy-primary hover:underline"
             >
               {t('common.cancel')}
             </button>
@@ -191,7 +191,7 @@ export function CommentThread({
       )}
 
       {!readOnly && !isLocked && currentUserId && (
-        <div className="flex items-end gap-2.5 rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-end gap-2.5 rounded-legacy-2xl border border-legacy-border bg-legacy-card p-4">
           {(currentUserAvatarPath || currentUserName) && (
             <BrandingAvatar
               avatarPath={currentUserAvatarPath}

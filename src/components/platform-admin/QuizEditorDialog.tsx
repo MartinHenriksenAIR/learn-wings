@@ -250,11 +250,11 @@ export function QuizEditorDialog({
 
         {loading ? (
           <div className="flex h-48 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
           </div>
         ) : loadError ? (
           <div className="flex h-48 flex-col items-center justify-center gap-4">
-            <p className="text-sm text-destructive">Failed to load quiz data. Please retry.</p>
+            <p className="text-sm text-legacy-destructive">Failed to load quiz data. Please retry.</p>
             <Button variant="outline" onClick={() => refetchQuiz()}>
               Retry
             </Button>
@@ -272,7 +272,7 @@ export function QuizEditorDialog({
                 onChange={(e) => { const v = parseInt(e.target.value); setPassingScore(Number.isNaN(v) ? 0 : Math.max(0, Math.min(100, v))); }}
                 className="w-24"
               />
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-legacy-muted-foreground">
                 Learners must score at least {passingScore}% to pass
               </span>
             </div>
@@ -286,8 +286,8 @@ export function QuizEditorDialog({
               {questions.length === 0 ? (
                 <Card className="border-dashed">
                   <CardContent className="py-8 text-center">
-                    <HelpCircle className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-                    <p className="text-muted-foreground mb-4">No questions yet. Add your first question.</p>
+                    <HelpCircle className="h-10 w-10 text-legacy-muted-foreground/50 mx-auto mb-3" />
+                    <p className="text-legacy-muted-foreground mb-4">No questions yet. Add your first question.</p>
                     <Button onClick={addQuestion}>
                       <Plus className="mr-2 h-4 w-4" />
                       Add Question
@@ -300,7 +300,7 @@ export function QuizEditorDialog({
                     <Card key={question.id}>
                       <CardHeader className="pb-3">
                         <div className="flex items-start gap-3">
-                          <GripVertical className="h-5 w-5 text-muted-foreground mt-1 flex-shrink-0" />
+                          <GripVertical className="h-5 w-5 text-legacy-muted-foreground mt-1 flex-shrink-0" />
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center justify-between">
                               <h4 className="text-sm font-medium">{t('quizEditor.questionHeading', { number: qIndex + 1 })}</h4>
@@ -308,7 +308,7 @@ export function QuizEditorDialog({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="text-destructive hover:text-destructive"
+                                className="text-legacy-destructive hover:text-legacy-destructive"
                                 onClick={() => removeQuestion(qIndex)}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -325,7 +325,7 @@ export function QuizEditorDialog({
                       </CardHeader>
                       <CardContent className="pt-0">
                         <div className="pl-8 space-y-3">
-                          <p id={`quiz-options-label-${question.id}`} className="text-sm text-muted-foreground">
+                          <p id={`quiz-options-label-${question.id}`} className="text-sm text-legacy-muted-foreground">
                             {t('quizEditor.answerOptionsLabel')}
                           </p>
                           <RadioGroup
@@ -336,10 +336,10 @@ export function QuizEditorDialog({
                             {question.options.map((option, oIndex) => (
                               <div
                                 key={option.id}
-                                className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                                className={`flex items-center gap-2 p-2 rounded-legacy-lg border cursor-pointer transition-colors ${
                                   option.is_correct
-                                    ? 'border-success bg-success/10'
-                                    : 'border-transparent hover:bg-muted/50'
+                                    ? 'border-legacy-success bg-legacy-success/10'
+                                    : 'border-transparent hover:bg-legacy-muted/50'
                                 }`}
                                 onClick={() => setCorrectOption(qIndex, option.id)}
                               >
@@ -352,7 +352,7 @@ export function QuizEditorDialog({
                                   className="flex-1"
                                 />
                                 {option.is_correct && (
-                                  <Badge variant="outline" className="rounded-[7px] border-success/30 bg-success/10 text-success">
+                                  <Badge variant="outline" className="rounded-[7px] border-legacy-success/30 bg-legacy-success/10 text-legacy-success">
                                     Correct
                                   </Badge>
                                 )}
@@ -361,7 +361,7 @@ export function QuizEditorDialog({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    className="h-8 w-8 text-legacy-muted-foreground hover:text-legacy-destructive"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       removeOption(qIndex, oIndex);

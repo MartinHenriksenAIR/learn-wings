@@ -34,19 +34,19 @@ export function EventCard({ event }: EventCardProps) {
           openDetail();
         }
       }}
-      className="flex cursor-pointer items-center gap-4 rounded-2xl border border-border bg-card px-5 py-4 transition-shadow hover:shadow-[0_10px_28px_rgba(20,24,46,0.08)]"
+      className="flex cursor-pointer items-center gap-4 rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-4 transition-shadow hover:shadow-[0_10px_28px_rgba(20,24,46,0.08)]"
     >
       {eventDate && (
         <div
           className={cn(
-            'flex h-16 w-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] bg-accent',
-            isEventToday && 'bg-primary'
+            'flex h-16 w-[58px] shrink-0 flex-col items-center justify-center rounded-[14px] bg-legacy-accent',
+            isEventToday && 'bg-legacy-primary'
           )}
         >
           <span
             className={cn(
               'text-[11px] font-extrabold uppercase tracking-[0.05em]',
-              isEventToday ? 'text-primary-foreground' : 'text-primary'
+              isEventToday ? 'text-legacy-primary-foreground' : 'text-legacy-primary'
             )}
           >
             {formatDate(eventDate, 'MMM', i18n.language)}
@@ -54,7 +54,7 @@ export function EventCard({ event }: EventCardProps) {
           <span
             className={cn(
               'text-[22px] font-extrabold leading-none',
-              isEventToday ? 'text-primary-foreground' : 'text-primary'
+              isEventToday ? 'text-legacy-primary-foreground' : 'text-legacy-primary'
             )}
           >
             {formatDate(eventDate, 'd', i18n.language)}
@@ -65,12 +65,12 @@ export function EventCard({ event }: EventCardProps) {
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h3 className="line-clamp-2 text-[15px] font-bold leading-[1.3]">{event.title}</h3>
         {hostName && (
-          <span className="truncate text-[12.5px] text-muted-foreground">
+          <span className="truncate text-[12.5px] text-legacy-muted-foreground">
             {t('community.hostedBy', { name: hostName })}
           </span>
         )}
         {eventDate && (
-          <span className="flex flex-wrap items-center gap-1.5 text-[12.5px] text-muted-foreground">
+          <span className="flex flex-wrap items-center gap-1.5 text-[12.5px] text-legacy-muted-foreground">
             <Clock aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
             {isEventToday ? t('community.today') : formatDate(eventDate, 'PPP', i18n.language)}
             {' · '}
@@ -93,7 +93,7 @@ export function EventCard({ event }: EventCardProps) {
           className="shrink-0"
           onClick={(e) => e.stopPropagation()}
         >
-          <Button size="sm" className="h-9 rounded-lg px-4 text-[12.5px] font-bold">
+          <Button size="sm" className="h-9 rounded-legacy-lg px-4 text-[12.5px] font-bold">
             <ExternalLink aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />
             {t('community.join')}
           </Button>

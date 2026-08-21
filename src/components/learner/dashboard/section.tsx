@@ -12,7 +12,7 @@ export function SeeMore({ onClick }: { onClick: () => void }) {
       <button
         type="button"
         onClick={onClick}
-        className="text-[13px] font-bold text-foreground underline decoration-[1.5px] underline-offset-[3px] opacity-[0.62] transition-opacity hover:opacity-100"
+        className="text-[13px] font-bold text-legacy-foreground underline decoration-[1.5px] underline-offset-[3px] opacity-[0.62] transition-opacity hover:opacity-100"
       >
         {t('dashboard.seeMore')}
       </button>

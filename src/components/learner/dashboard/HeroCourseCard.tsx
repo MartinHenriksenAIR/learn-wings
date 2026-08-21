@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import type { DashboardCourseCard } from '@/hooks/useLearnerDashboard';
 
-const ACCENTS = ['bg-dash-a1', 'bg-dash-a2', 'bg-dash-a3'] as const;
-const BAR_ACCENTS = ['bg-dash-a1', 'bg-dash-a2', 'bg-dash-a3'] as const;
+const ACCENTS = ['bg-legacy-dash-a1', 'bg-legacy-dash-a2', 'bg-legacy-dash-a3'] as const;
+const BAR_ACCENTS = ['bg-legacy-dash-a1', 'bg-legacy-dash-a2', 'bg-legacy-dash-a3'] as const;
 
 interface HeroCourseCardProps {
   course: DashboardCourseCard;
@@ -25,8 +25,8 @@ export function HeroCourseCard({ course, index, showProgress = true, onClick }: 
       className={cn(
         'group relative flex min-h-[190px] w-full flex-col overflow-hidden rounded-[18px] text-left',
         'shadow-[0_10px_26px_rgba(9,12,32,0.16)] transition-shadow focus-visible:outline-none',
-        'focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-dash-ink',
-        hasArt ? 'bg-[#fbf9f4] text-white' : cn(accent, 'text-dash-ink'),
+        'focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-legacy-dash-ink',
+        hasArt ? 'bg-[#fbf9f4] text-white' : cn(accent, 'text-legacy-dash-ink'),
       )}
     >
       {hasArt && (
@@ -59,11 +59,11 @@ export function HeroCourseCard({ course, index, showProgress = true, onClick }: 
           <span
             className={cn(
               'block h-1 overflow-hidden rounded-full',
-              hasArt ? 'bg-white/[0.28]' : 'bg-dash-ink/[0.18]',
+              hasArt ? 'bg-white/[0.28]' : 'bg-legacy-dash-ink/[0.18]',
             )}
           >
             <span
-              className={cn('block h-full rounded-full', hasArt ? BAR_ACCENTS[index % BAR_ACCENTS.length] : 'bg-dash-ink')}
+              className={cn('block h-full rounded-full', hasArt ? BAR_ACCENTS[index % BAR_ACCENTS.length] : 'bg-legacy-dash-ink')}
               style={{ width: `${course.pct}%` }}
             />
           </span>

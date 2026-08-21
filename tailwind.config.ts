@@ -20,66 +20,62 @@ export default {
         display: ['Hanken Grotesk', 'system-ui', 'sans-serif'],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+        "legacy-border": "hsl(var(--legacy-border))",
+        "legacy-input": "hsl(var(--legacy-input))",
+        "legacy-ring": "hsl(var(--legacy-ring))",
+        "legacy-background": "hsl(var(--legacy-background))",
+        "legacy-foreground": "hsl(var(--legacy-foreground))",
+        "legacy-primary": {
+          DEFAULT: "hsl(var(--legacy-primary))",
+          foreground: "hsl(var(--legacy-primary-foreground))",
         },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+        "legacy-secondary": {
+          DEFAULT: "hsl(var(--legacy-secondary))",
+          foreground: "hsl(var(--legacy-secondary-foreground))",
         },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+        "legacy-destructive": {
+          DEFAULT: "hsl(var(--legacy-destructive))",
+          foreground: "hsl(var(--legacy-destructive-foreground))",
         },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+        "legacy-muted": {
+          DEFAULT: "hsl(var(--legacy-muted))",
+          foreground: "hsl(var(--legacy-muted-foreground))",
         },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+        "legacy-accent": {
+          DEFAULT: "hsl(var(--legacy-accent))",
+          foreground: "hsl(var(--legacy-accent-foreground))",
         },
-        success: {
-          DEFAULT: "hsl(var(--success))",
-          foreground: "hsl(var(--success-foreground))",
+        "legacy-success": {
+          DEFAULT: "hsl(var(--legacy-success))",
+          foreground: "hsl(var(--legacy-success-foreground))",
         },
-        warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
+        "legacy-warning": {
+          DEFAULT: "hsl(var(--legacy-warning))",
+          foreground: "hsl(var(--legacy-warning-foreground))",
         },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+        "legacy-popover": {
+          DEFAULT: "hsl(var(--legacy-popover))",
+          foreground: "hsl(var(--legacy-popover-foreground))",
         },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+        "legacy-card": {
+          DEFAULT: "hsl(var(--legacy-card))",
+          foreground: "hsl(var(--legacy-card-foreground))",
         },
-        // Learner-dashboard accents (#455, "Nordic"). Deliberately outside the
-        // app's token set: on that surface colour carries identity — which
-        // course, which rank — as a full fill, never the navy tint used
-        // elsewhere. Do not reach for these outside the dashboard.
-        dash: {
+        "legacy-dash": {
           ink: "#141a33",
           a1: "#a5b4fc",
           a2: "#f7d9a8",
           a3: "#a7e8c4",
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+        "legacy-sidebar": {
+          DEFAULT: "hsl(var(--legacy-sidebar-background))",
+          foreground: "hsl(var(--legacy-sidebar-foreground))",
+          primary: "hsl(var(--legacy-sidebar-primary))",
+          "primary-foreground": "hsl(var(--legacy-sidebar-primary-foreground))",
+          accent: "hsl(var(--legacy-sidebar-accent))",
+          "accent-foreground": "hsl(var(--legacy-sidebar-accent-foreground))",
+          border: "hsl(var(--legacy-sidebar-border))",
+          ring: "hsl(var(--legacy-sidebar-ring))",
         },
         canvas: "var(--canvas)",
         surface: {
@@ -154,6 +150,13 @@ export default {
         md: "var(--radius-md)",
         lg: "var(--radius-lg)",
         xl: "var(--radius-xl)",
+        "legacy-base": "0.25rem",
+        "legacy-sm": "calc(var(--legacy-radius) - 4px)",
+        "legacy-md": "calc(var(--legacy-radius) - 2px)",
+        "legacy-lg": "var(--legacy-radius)",
+        "legacy-xl": "0.75rem",
+        "legacy-2xl": "1rem",
+        "legacy-3xl": "1.5rem",
       },
       boxShadow: {
         overlay: "var(--shadow-overlay)",

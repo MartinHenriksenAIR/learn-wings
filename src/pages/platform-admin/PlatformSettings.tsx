@@ -193,7 +193,7 @@ export default function PlatformSettings() {
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
           {t('platformSettings.title')}
         </h1>
-        <p className="mb-5 text-sm text-muted-foreground">{t('platformSettings.subtitle')}</p>
+        <p className="mb-5 text-sm text-legacy-muted-foreground">{t('platformSettings.subtitle')}</p>
 
         <SlidingTabs
           tabs={tabs}
@@ -205,19 +205,19 @@ export default function PlatformSettings() {
         {activeTab === 'user_access' && (
           <Card>
             <CardContent className="space-y-[18px] px-[26px] py-6">
-              <div className="rounded-xl border border-[#eceef3] bg-muted/50 p-4">
+              <div className="rounded-legacy-xl border border-[#eceef3] bg-legacy-muted/50 p-4">
                 <p className="text-[13.5px] font-bold leading-none">{t('platformSettings.userAccess.defaultRole')}</p>
-                <p className="mt-1 text-[11.5px] text-muted-foreground">
+                <p className="mt-1 text-[11.5px] text-legacy-muted-foreground">
                   {t('platformSettings.userAccess.defaultRoleNote')}
                 </p>
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]">
+              <div className="flex items-center justify-between rounded-legacy-xl border border-[#eceef3] px-4 py-[13px]">
                 <div className="flex flex-col gap-px">
                   <Label htmlFor="allow_self_registration" className="text-[13.5px] font-bold">
                     {t('platformSettings.userAccess.allowSelfRegistration')}
                   </Label>
-                  <p className="text-[11.5px] text-muted-foreground">
+                  <p className="text-[11.5px] text-legacy-muted-foreground">
                     {t('platformSettings.userAccess.allowSelfRegistrationHint')}
                   </p>
                 </div>
@@ -228,12 +228,12 @@ export default function PlatformSettings() {
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]">
+              <div className="flex items-center justify-between rounded-legacy-xl border border-[#eceef3] px-4 py-[13px]">
                 <div className="flex flex-col gap-px">
                   <Label htmlFor="allow_individual_registration" className="text-[13.5px] font-bold">
                     {t('platformSettings.userAccess.allowIndividualRegistration')}
                   </Label>
-                  <p className="text-[11.5px] text-muted-foreground">
+                  <p className="text-[11.5px] text-legacy-muted-foreground">
                     {t('platformSettings.userAccess.allowIndividualRegistrationHint')}
                   </p>
                 </div>
@@ -257,18 +257,18 @@ export default function PlatformSettings() {
         {activeTab === 'features' && (
           <Card>
             <CardContent className="space-y-2.5 px-[26px] py-6">
-              <p className="mb-4 text-[13px] text-muted-foreground">{t('platformSettings.features.note')}</p>
+              <p className="mb-4 text-[13px] text-legacy-muted-foreground">{t('platformSettings.features.note')}</p>
               <div className="mb-[22px] flex flex-col gap-2.5">
                 {featureKeys.map((key) => (
                   <div
                     key={key}
-                    className="flex items-center justify-between rounded-xl border border-[#eceef3] px-4 py-[13px]"
+                    className="flex items-center justify-between rounded-legacy-xl border border-[#eceef3] px-4 py-[13px]"
                   >
                     <div className="flex flex-col gap-px">
                       <Label htmlFor={`feature-${key}`} className="text-[13.5px] font-bold">
                         {t(`platformSettings.features.${key}`)}
                       </Label>
-                      <p className="text-[11.5px] text-muted-foreground">
+                      <p className="text-[11.5px] text-legacy-muted-foreground">
                         {t(`platformSettings.features.${key}_hint`)}
                       </p>
                     </div>
@@ -345,7 +345,7 @@ export default function PlatformSettings() {
             <CardContent className="px-[26px] py-6">
               {profilesQuery.isPending ? (
                 <div className="flex h-40 items-center justify-center">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  <Loader2 className="h-5 w-5 animate-spin text-legacy-muted-foreground" />
                 </div>
               ) : !profilesQuery.isSuccess ? (
                 <EmptyState

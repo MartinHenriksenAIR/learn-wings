@@ -431,8 +431,8 @@ export default function CourseEditor() {
     return (
       <AppLayout title={t('courseEditor.title')}>
         <div className="flex h-64 flex-col items-center justify-center gap-4 text-center">
-          <p className="text-destructive font-medium">{t('courseEditor.failedToLoad')}</p>
-          <p className="text-sm text-muted-foreground">{loadError.message}</p>
+          <p className="text-legacy-destructive font-medium">{t('courseEditor.failedToLoad')}</p>
+          <p className="text-sm text-legacy-muted-foreground">{loadError.message}</p>
           <Button variant="outline" onClick={() => refetchStructure()}>
             {t('courseEditor.retry')}
           </Button>
@@ -445,7 +445,7 @@ export default function CourseEditor() {
     return (
       <AppLayout title={t('courseEditor.title')}>
         <div className="text-center py-12">
-          <p className="text-muted-foreground">{t('courseEditor.courseNotFound')}</p>
+          <p className="text-legacy-muted-foreground">{t('courseEditor.courseNotFound')}</p>
         </div>
       </AppLayout>
     );
@@ -454,13 +454,13 @@ export default function CourseEditor() {
   return (
     <AppLayout title={t('courseEditor.title')} headerLabel={course.title}>
       <div className="mx-auto max-w-[860px]">
-        <div className="mb-[18px] rounded-2xl border border-border bg-card p-6">
+        <div className="mb-[18px] rounded-legacy-2xl border border-legacy-border bg-legacy-card p-6">
           <div className="mb-[18px] flex items-center justify-between gap-3">
             <h2 className="text-base font-extrabold">{t('courseEditor.courseDetails')}</h2>
             <span
               className={cn(
                 'inline-flex items-center rounded-[7px] px-3 py-[5px] text-[11px] font-bold',
-                course.is_published ? 'bg-success/10 text-success' : 'bg-[#f3f4f8] text-[#686d7e]',
+                course.is_published ? 'bg-legacy-success/10 text-legacy-success' : 'bg-[#f3f4f8] text-[#686d7e]',
               )}
             >
               {course.is_published ? t('courseEditor.published') : t('courseEditor.draft')}
@@ -489,7 +489,7 @@ export default function CourseEditor() {
                   onChange={(_url, storagePath) => setEditThumbnailPath(storagePath)}
                 />
                 {editThumbnailPath && !thumbnailDisplayUrl && (
-                  <p className="text-xs text-muted-foreground">{t('courseEditor.thumbnailPreviewUnavailable')}</p>
+                  <p className="text-xs text-legacy-muted-foreground">{t('courseEditor.thumbnailPreviewUnavailable')}</p>
                 )}
               </div>
               <div className="space-y-1.5">
@@ -533,16 +533,16 @@ export default function CourseEditor() {
             </div>
           </div>
 
-          <div className="mb-[18px] space-y-2 border-t border-border pt-[18px]">
+          <div className="mb-[18px] space-y-2 border-t border-legacy-border pt-[18px]">
             <h3 className="text-sm font-medium leading-none">{t('courseEditor.editions.title')}</h3>
-            <p className="text-sm text-muted-foreground">{t('courseEditor.editions.description')}</p>
+            <p className="text-sm text-legacy-muted-foreground">{t('courseEditor.editions.description')}</p>
 
             {siblings.length > 0 ? (
               <div className="space-y-1.5">
                 <p className="text-[13px] font-semibold">{t('courseEditor.editions.linkedHeading')}</p>
                 <ul className="space-y-1">
                   {siblings.map((s) => (
-                    <li key={s.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                    <li key={s.id} className="flex items-center justify-between rounded-legacy-md border px-3 py-2">
                       <span className="flex items-center gap-2 text-sm font-medium">
                         {s.title}
                         {s.language && <LanguageBadge language={s.language} />}
@@ -560,7 +560,7 @@ export default function CourseEditor() {
                 </ul>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">{t('courseEditor.editions.none')}</p>
+              <p className="text-sm text-legacy-muted-foreground">{t('courseEditor.editions.none')}</p>
             )}
 
             {candidates.length > 0 ? (
@@ -585,7 +585,7 @@ export default function CourseEditor() {
                 </Button>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">{t('courseEditor.editions.noCandidates')}</p>
+              <p className="text-sm text-legacy-muted-foreground">{t('courseEditor.editions.noCandidates')}</p>
             )}
           </div>
 
@@ -610,7 +610,7 @@ export default function CourseEditor() {
             <Button
               variant="outline"
               onClick={() => setDeleteOpen(true)}
-              className="border-[#f0c7c7] text-destructive hover:bg-destructive/10 hover:text-destructive"
+              className="border-[#f0c7c7] text-legacy-destructive hover:bg-legacy-destructive/10 hover:text-legacy-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" /> {t('courseEditor.deleteCourse')}
             </Button>
@@ -621,20 +621,20 @@ export default function CourseEditor() {
           <h2 className="text-base font-extrabold">{t('courseEditor.modulesAndLessons')}</h2>
           <Button
             onClick={openAddModule}
-            className="bg-accent text-primary hover:bg-[#dfe5f8]"
+            className="bg-legacy-accent text-legacy-primary hover:bg-[#dfe5f8]"
           >
             <Plus className="mr-2 h-4 w-4" aria-hidden="true" /> {t('courseEditor.addModule')}
           </Button>
         </div>
 
         {modules.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center text-sm text-muted-foreground">
+          <div className="rounded-legacy-2xl border border-dashed border-[#d6d8e0] bg-legacy-card p-12 text-center text-sm text-legacy-muted-foreground">
             {t('courseEditor.noModules')}
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             {modules.map((mod, modIndex) => (
-              <div key={mod.id} className="overflow-hidden rounded-2xl border border-border bg-card">
+              <div key={mod.id} className="overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
                 <div className="flex items-center gap-2.5 bg-[#f7f8fa] px-[18px] py-3">
                   <span className="flex text-[#c3c7d3]" aria-hidden="true">
                     <GripVertical className="h-[15px] w-[15px]" />
@@ -645,7 +645,7 @@ export default function CourseEditor() {
                   <button
                     type="button"
                     onClick={() => openAddLesson(mod.id)}
-                    className="rounded-[7px] px-2.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-accent"
+                    className="rounded-[7px] px-2.5 py-1.5 text-xs font-bold text-legacy-primary transition-colors hover:bg-legacy-accent"
                   >
                     + {t('courseEditor.lessonShort')}
                   </button>
@@ -654,7 +654,7 @@ export default function CourseEditor() {
                     onClick={() => openEditModule(mod)}
                     title={t('courseEditor.renameModule')}
                     aria-label={t('courseEditor.renameModule')}
-                    className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-[#eceef3] hover:text-primary"
+                    className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-[#eceef3] hover:text-legacy-primary"
                   >
                     <Pencil className="h-[13px] w-[13px]" aria-hidden="true" />
                   </button>
@@ -663,7 +663,7 @@ export default function CourseEditor() {
                     onClick={() => handleDeleteModule(mod.id)}
                     title={t('courseEditor.deleteModule')}
                     aria-label={t('courseEditor.deleteModule')}
-                    className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-legacy-destructive/10 hover:text-legacy-destructive"
                   >
                     <Trash2 className="h-[13px] w-[13px]" aria-hidden="true" />
                   </button>
@@ -678,7 +678,7 @@ export default function CourseEditor() {
                       <span className="flex text-[#d6d8e0]" aria-hidden="true">
                         <GripVertical className="h-3.5 w-3.5" />
                       </span>
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent text-primary">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-legacy-lg bg-legacy-accent text-legacy-primary">
                         {lessonTypeIcon(lesson.lesson_type)}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{lesson.title}</span>
@@ -700,7 +700,7 @@ export default function CourseEditor() {
                             setQuizLessonTitle(lesson.title);
                             setQuizEditorOpen(true);
                           }}
-                          className="rounded-[7px] px-2 py-[5px] text-xs font-bold text-primary transition-colors hover:bg-accent"
+                          className="rounded-[7px] px-2 py-[5px] text-xs font-bold text-legacy-primary transition-colors hover:bg-legacy-accent"
                         >
                           {t('courseEditor.editQuiz')}
                         </button>
@@ -713,7 +713,7 @@ export default function CourseEditor() {
                             setExerciseLessonTitle(lesson.title);
                             setExerciseEditorOpen(true);
                           }}
-                          className="rounded-[7px] px-2 py-[5px] text-xs font-bold text-primary transition-colors hover:bg-accent"
+                          className="rounded-[7px] px-2 py-[5px] text-xs font-bold text-legacy-primary transition-colors hover:bg-legacy-accent"
                         >
                           {t('courseEditor.editExercise')}
                         </button>
@@ -723,7 +723,7 @@ export default function CourseEditor() {
                         onClick={() => openEditLesson(lesson)}
                         title={t('courseEditor.editLesson')}
                         aria-label={t('courseEditor.editLesson')}
-                        className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-primary"
+                        className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-[#f3f4f8] hover:text-legacy-primary"
                       >
                         <Pencil className="h-[13px] w-[13px]" aria-hidden="true" />
                       </button>
@@ -732,14 +732,14 @@ export default function CourseEditor() {
                         onClick={() => handleDeleteLesson(lesson.id)}
                         title={t('courseEditor.deleteLesson')}
                         aria-label={t('courseEditor.deleteLesson')}
-                        className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        className="grid h-7 w-7 place-items-center rounded-[7px] text-[#9aa0af] transition-colors hover:bg-legacy-destructive/10 hover:text-legacy-destructive"
                       >
                         <Trash2 className="h-[13px] w-[13px]" aria-hidden="true" />
                       </button>
                     </div>
                   ))
                 ) : (
-                  <p className="border-t border-[#f3f4f8] px-[18px] py-[11px] text-sm text-muted-foreground">
+                  <p className="border-t border-[#f3f4f8] px-[18px] py-[11px] text-sm text-legacy-muted-foreground">
                     {t('courseEditor.noLessons')}
                   </p>
                 )}
@@ -849,7 +849,7 @@ export default function CourseEditor() {
                     value={lessonAzureBlobPath}
                     onChange={setLessonAzureBlobPath}
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-legacy-muted-foreground">
                     {t('courseEditor.videoFileHint')}
                   </p>
                 </div>
@@ -867,14 +867,14 @@ export default function CourseEditor() {
             )}
             {lessonType === 'quiz' && (
               <>
-                <div className="rounded-xl border border-dashed border-[#d6d8e0] p-4 text-center">
-                  <HelpCircle className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
-                  <p className="mb-2 text-sm text-muted-foreground">
+                <div className="rounded-legacy-xl border border-dashed border-[#d6d8e0] p-4 text-center">
+                  <HelpCircle className="mx-auto mb-2 h-8 w-8 text-legacy-muted-foreground/50" aria-hidden="true" />
+                  <p className="mb-2 text-sm text-legacy-muted-foreground">
                     {editingLesson
                       ? t('courseEditor.quizSetupHintEdit')
                       : t('courseEditor.quizSetupHintCreate')}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-legacy-muted-foreground">
                     {t('courseEditor.quizSetupSubhint')}
                   </p>
                 </div>
@@ -891,9 +891,9 @@ export default function CourseEditor() {
               </>
             )}
             {lessonType === 'exercise' && (
-              <div className="rounded-xl border border-dashed border-[#d6d8e0] p-4 text-center">
-                <ListChecks className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
-                <p className="text-sm text-muted-foreground">
+              <div className="rounded-legacy-xl border border-dashed border-[#d6d8e0] p-4 text-center">
+                <ListChecks className="mx-auto mb-2 h-8 w-8 text-legacy-muted-foreground/50" aria-hidden="true" />
+                <p className="text-sm text-legacy-muted-foreground">
                   {t('courseEditor.exerciseSetupHint')}
                 </p>
               </div>

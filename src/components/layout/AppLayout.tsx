@@ -47,7 +47,7 @@ export function AppLayout({ children, title, headerLabel }: AppLayoutProps) {
       <div className="flex h-svh w-full overflow-hidden">
         <AppSidebar />
         <SidebarInset className="min-w-0 flex-1">
-          <header className="flex h-[58px] shrink-0 items-center gap-2 border-b bg-card px-7">
+          <header className="flex h-[58px] shrink-0 items-center gap-2 border-b bg-legacy-card px-7">
             <SidebarTrigger className="-ml-2" />
             {showBack && (
               <Button variant="ghost" size="sm" onClick={handleBack}>
@@ -55,10 +55,10 @@ export function AppLayout({ children, title, headerLabel }: AppLayoutProps) {
                 {t('common.back')}
               </Button>
             )}
-            {label && <span className="text-[13px] font-bold text-foreground">{label}</span>}
+            {label && <span className="text-[13px] font-bold text-legacy-foreground">{label}</span>}
             <div className="flex-1" />
             {showViewingAsChip && (
-              <span className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-[7px] border border-[#d7ddf4] bg-accent px-[13px] py-1.5 text-xs font-bold text-accent-foreground">
+              <span className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-[7px] border border-[#d7ddf4] bg-legacy-accent px-[13px] py-1.5 text-xs font-bold text-legacy-accent-foreground">
                 <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('nav.viewingAs', { role: viewModeLabels[viewMode] })}
               </span>

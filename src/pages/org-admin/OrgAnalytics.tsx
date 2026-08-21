@@ -190,9 +190,9 @@ export default function OrgAnalytics() {
     return (
       <AppLayout title={pageTitle}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
-          <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <p className="text-muted-foreground">No organization selected.</p>
-          <p className="text-sm text-muted-foreground">Join an organization to view analytics.</p>
+          <Users className="h-12 w-12 text-legacy-muted-foreground/50 mb-4" />
+          <p className="text-legacy-muted-foreground">No organization selected.</p>
+          <p className="text-sm text-legacy-muted-foreground">Join an organization to view analytics.</p>
         </div>
       </AppLayout>
     );
@@ -238,7 +238,7 @@ export default function OrgAnalytics() {
       <div className="mb-5 flex flex-col items-start justify-between gap-4 md:flex-row">
         <div>
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">{pageTitle}</h1>
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <p className="text-sm text-legacy-muted-foreground">{subtitle}</p>
         </div>
         {isGlobalView && isPlatformAdmin && (
           <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
@@ -279,7 +279,7 @@ export default function OrgAnalytics() {
         (effectiveOrgId ? (
           <TeamPerformanceTab userStats={userStats} departments={departments} orgId={effectiveOrgId} />
         ) : (
-          <div className="py-12 text-center text-muted-foreground">
+          <div className="py-12 text-center text-legacy-muted-foreground">
             Select an organization to view team performance.
           </div>
         ))}
@@ -288,7 +288,7 @@ export default function OrgAnalytics() {
         (effectiveOrgId ? (
           <CourseProgressTab orgId={effectiveOrgId} />
         ) : (
-          <div className="py-12 text-center text-muted-foreground">
+          <div className="py-12 text-center text-legacy-muted-foreground">
             Select an organization to view course progress.
           </div>
         ))}

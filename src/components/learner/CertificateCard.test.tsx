@@ -57,7 +57,7 @@ describe('CertificateCard', () => {
     renderCard({ saved: true });
 
     const button = screen.getByRole('button', { name: /common\.saved/ });
-    expect(button.className).toContain('text-success');
+    expect(button.className).toContain('text-legacy-success');
     expect(screen.queryByText('common.download')).toBeNull();
   });
 

@@ -148,7 +148,7 @@ export default function IdeaDetail() {
     return (
       <AppLayout headerLabel={t('community.idea')}>
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
         </div>
       </AppLayout>
     );
@@ -158,11 +158,11 @@ export default function IdeaDetail() {
     return (
       <AppLayout headerLabel={t('community.ideaLibrary')}>
         <div className="py-12 text-center">
-          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-legacy-muted-foreground" />
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {t('community.ideaNotFound')}
           </h1>
-          <p className="text-sm text-muted-foreground">{t('community.ideaNotFoundDescription')}</p>
+          <p className="text-sm text-legacy-muted-foreground">{t('community.ideaNotFoundDescription')}</p>
         </div>
       </AppLayout>
     );
@@ -171,7 +171,7 @@ export default function IdeaDetail() {
   return (
     <AppLayout headerLabel={t('community.idea')}>
       <div className="max-w-[760px]">
-        <div className="mb-4 rounded-2xl border border-border bg-card px-7 py-[26px]">
+        <div className="mb-4 rounded-legacy-2xl border border-legacy-border bg-legacy-card px-7 py-[26px]">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <IdeaStatusBadge status={idea.status} />
             {idea.business_area && (
@@ -194,8 +194,8 @@ export default function IdeaDetail() {
               className={cn(
                 'inline-flex items-center gap-[7px] rounded-[7px] border px-4 py-2 text-[13px] font-bold disabled:opacity-60',
                 idea.user_has_voted
-                  ? 'border-primary bg-accent text-accent-foreground'
-                  : 'border-[#dcdee6] bg-card text-[#686d7e]'
+                  ? 'border-legacy-primary bg-legacy-accent text-legacy-accent-foreground'
+                  : 'border-[#dcdee6] bg-legacy-card text-[#686d7e]'
               )}
             >
               <ThumbsUp
@@ -214,7 +214,7 @@ export default function IdeaDetail() {
                 {idea.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-[7px] bg-accent px-[11px] py-1 text-[11.5px] font-semibold text-accent-foreground"
+                    className="rounded-[7px] bg-legacy-accent px-[11px] py-1 text-[11.5px] font-semibold text-legacy-accent-foreground"
                   >
                     #{tag}
                   </span>
@@ -226,7 +226,7 @@ export default function IdeaDetail() {
 
         {idea.status === 'rejected' && idea.rejection_reason && (
           <div className="mb-4 rounded-[14px] border border-[#f3ccd0] bg-[#fdf1f1] px-5 py-4">
-            <p className="mb-1 text-xs font-extrabold uppercase tracking-[0.05em] text-destructive">
+            <p className="mb-1 text-xs font-extrabold uppercase tracking-[0.05em] text-legacy-destructive">
               {t('community.ideaRejected')}
             </p>
             <p className="text-[13px] leading-[1.55] text-[#7a2e2e]">{idea.rejection_reason}</p>
@@ -244,7 +244,7 @@ export default function IdeaDetail() {
 
         <div className="space-y-4">
           {idea.current_process && (
-            <Card className="rounded-2xl">
+            <Card className="rounded-legacy-2xl">
               <CardHeader>
                 <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.currentProcessLabel')}</CardTitle>
               </CardHeader>
@@ -255,7 +255,7 @@ export default function IdeaDetail() {
           )}
 
           {idea.pain_points && (
-            <Card className="rounded-2xl">
+            <Card className="rounded-legacy-2xl">
               <CardHeader>
                 <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.painPointsLabel')}</CardTitle>
               </CardHeader>
@@ -268,7 +268,7 @@ export default function IdeaDetail() {
           {(idea.affected_roles || idea.frequency_volume) && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {idea.affected_roles && (
-                <Card className="rounded-2xl">
+                <Card className="rounded-legacy-2xl">
                   <CardHeader className="py-4">
                     <CardTitle className="text-[14.5px] font-bold">{t('community.ideaForm.affectedRolesLabel')}</CardTitle>
                   </CardHeader>
@@ -278,7 +278,7 @@ export default function IdeaDetail() {
                 </Card>
               )}
               {idea.frequency_volume && (
-                <Card className="rounded-2xl">
+                <Card className="rounded-legacy-2xl">
                   <CardHeader className="py-4">
                     <CardTitle className="text-[14.5px] font-bold">{t('community.ideaForm.frequencyLabel')}</CardTitle>
                   </CardHeader>
@@ -291,7 +291,7 @@ export default function IdeaDetail() {
           )}
 
           {idea.proposed_improvement && (
-            <Card className="rounded-2xl">
+            <Card className="rounded-legacy-2xl">
               <CardHeader>
                 <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.proposedTitle')}</CardTitle>
               </CardHeader>
@@ -302,7 +302,7 @@ export default function IdeaDetail() {
           )}
 
           {idea.desired_process && (
-            <Card className="rounded-2xl">
+            <Card className="rounded-legacy-2xl">
               <CardHeader>
                 <CardTitle className="text-[17px] font-bold">{t('community.ideaForm.desiredProcessLabel')}</CardTitle>
               </CardHeader>
@@ -313,9 +313,9 @@ export default function IdeaDetail() {
           )}
 
           {idea.success_metrics && (
-            <Card className="rounded-2xl">
+            <Card className="rounded-legacy-2xl">
               <CardHeader>
-                <CardTitle className="text-[17px] font-bold text-success">
+                <CardTitle className="text-[17px] font-bold text-legacy-success">
                   {t('community.ideaForm.successMetricsLabel')}
                 </CardTitle>
               </CardHeader>
@@ -326,7 +326,7 @@ export default function IdeaDetail() {
           )}
 
           {(idea.data_inputs || idea.systems_involved || idea.constraints_risks) && (
-            <Card className="rounded-2xl">
+            <Card className="rounded-legacy-2xl">
               <CardHeader>
                 <CardTitle className="text-[17px] font-bold">{t('community.technicalDetails')}</CardTitle>
               </CardHeader>
@@ -334,19 +334,19 @@ export default function IdeaDetail() {
                 {idea.data_inputs && (
                   <div>
                     <h4 className="mb-1 text-[13px] font-bold">{t('community.ideaForm.dataInputsLabel')}</h4>
-                    <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-muted-foreground">{idea.data_inputs}</p>
+                    <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-legacy-muted-foreground">{idea.data_inputs}</p>
                   </div>
                 )}
                 {idea.systems_involved && (
                   <div>
                     <h4 className="mb-1 text-[13px] font-bold">{t('community.ideaForm.systemsLabel')}</h4>
-                    <p className="text-[13px] leading-[1.6] text-muted-foreground">{idea.systems_involved}</p>
+                    <p className="text-[13px] leading-[1.6] text-legacy-muted-foreground">{idea.systems_involved}</p>
                   </div>
                 )}
                 {idea.constraints_risks && (
                   <div>
                     <h4 className="mb-1 text-[13px] font-bold">{t('community.ideaForm.constraintsLabel')}</h4>
-                    <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-muted-foreground">{idea.constraints_risks}</p>
+                    <p className="whitespace-pre-wrap text-[13px] leading-[1.6] text-legacy-muted-foreground">{idea.constraints_risks}</p>
                   </div>
                 )}
               </CardContent>
@@ -355,7 +355,7 @@ export default function IdeaDetail() {
         </div>
 
         {effectiveIsOrgAdmin && (
-          <div className="mt-4 rounded-2xl border border-border bg-card px-6 py-5">
+          <div className="mt-4 rounded-legacy-2xl border border-legacy-border bg-legacy-card px-6 py-5">
             <h3 className="mb-3 text-sm font-extrabold">{t('community.updateStatus')}</h3>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -413,7 +413,7 @@ export default function IdeaDetail() {
             {t('community.discussion', { count: comments.length })}
           </h2>
 
-          <div className="rounded-2xl border border-border bg-card px-5 py-4">
+          <div className="rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-4">
             <div className="flex gap-3">
               <BrandingAvatar
                 avatarPath={profile?.avatar_url}
@@ -448,14 +448,14 @@ export default function IdeaDetail() {
           </div>
 
           {comments.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-8 text-center text-muted-foreground">
+            <div className="rounded-legacy-2xl border border-dashed border-[#d6d8e0] bg-legacy-card p-8 text-center text-legacy-muted-foreground">
               <MessageSquare aria-hidden="true" className="mx-auto mb-2 h-8 w-8 opacity-50" />
               <p className="text-[13px]">{t('community.noCommentsStartDiscussion')}</p>
             </div>
           ) : (
             <div className="space-y-3">
               {comments.map((comment) => (
-                <div key={comment.id} className="rounded-2xl border border-border bg-card px-5 py-4">
+                <div key={comment.id} className="rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-4">
                   <div className="flex gap-3">
                     <BrandingAvatar
                       avatarPath={comment.profile?.avatar_url}

@@ -176,7 +176,7 @@ export function PostForm({
                               size="sm"
                             />
                             {cat.is_restricted && (
-                              <span className="text-xs text-muted-foreground">{t('community.postForm.adminOnly')}</span>
+                              <span className="text-xs text-legacy-muted-foreground">{t('community.postForm.adminOnly')}</span>
                             )}
                           </div>
                         </SelectItem>
@@ -230,7 +230,7 @@ export function PostForm({
                       <FormLabel>{t('community.postForm.eventDateTime')}</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-legacy-muted-foreground" />
                           <Input
                             type="datetime-local"
                             className="pl-10"
@@ -306,12 +306,12 @@ export function PostForm({
                   {field.value.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {field.value.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="rounded-[7px] bg-accent pr-1 text-[11.5px] font-semibold text-accent-foreground">
+                        <Badge key={tag} variant="secondary" className="rounded-[7px] bg-legacy-accent pr-1 text-[11.5px] font-semibold text-legacy-accent-foreground">
                           #{tag}
                           <button
                             type="button"
                             onClick={() => removeTag(tag)}
-                            className="ml-1 hover:text-destructive"
+                            className="ml-1 hover:text-legacy-destructive"
                           >
                             <X className="h-3 w-3" />
                           </button>

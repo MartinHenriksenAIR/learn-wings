@@ -71,10 +71,10 @@ export function CommentItem({
     <div
       id={`comment-${comment.id}`}
       className={cn(
-        'flex gap-2.5 rounded-xl transition-colors',
-        depth > 0 && 'ml-8 border-l-2 border-muted pl-4',
+        'flex gap-2.5 rounded-legacy-xl transition-colors',
+        depth > 0 && 'ml-8 border-l-2 border-legacy-muted pl-4',
         comment.is_hidden && 'opacity-55',
-        highlightedCommentId === comment.id && 'bg-accent/60'
+        highlightedCommentId === comment.id && 'bg-legacy-accent/60'
       )}
     >
       <BrandingAvatar
@@ -91,7 +91,7 @@ export function CommentItem({
               {formatDistanceToNowLocalized(new Date(comment.created_at), i18n.language)}
             </span>
             {comment.is_hidden && (
-              <span className="rounded-[7px] bg-[#fbf2dd] px-2 py-0.5 text-[10.5px] font-bold text-warning">
+              <span className="rounded-[7px] bg-[#fbf2dd] px-2 py-0.5 text-[10.5px] font-bold text-legacy-warning">
                 {t('community.hidden')}
               </span>
             )}
@@ -99,7 +99,7 @@ export function CommentItem({
           {hasActions && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 rounded-lg p-0 text-[#9aa0af]">
+              <Button variant="ghost" size="sm" className="h-7 w-7 rounded-legacy-lg p-0 text-[#9aa0af]">
                 <MoreHorizontal aria-hidden="true" className="h-4 w-4" />
                 <span className="sr-only">{t('common.actions')}</span>
               </Button>
@@ -141,7 +141,7 @@ export function CommentItem({
               {canDelete && onDelete && (
                 <DropdownMenuItem
                   onClick={() => onDelete(comment.id)}
-                  className="text-destructive"
+                  className="text-legacy-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   {t('common.delete')}
@@ -160,7 +160,7 @@ export function CommentItem({
               className="min-h-[80px] rounded-[11px] text-[13px]"
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleSaveEdit} className="rounded-lg text-xs font-bold">
+              <Button size="sm" onClick={handleSaveEdit} className="rounded-legacy-lg text-xs font-bold">
                 {t('common.save')}
               </Button>
               <Button
@@ -170,7 +170,7 @@ export function CommentItem({
                   setIsEditing(false);
                   setEditContent(comment.content);
                 }}
-                className="rounded-lg text-xs font-bold"
+                className="rounded-legacy-lg text-xs font-bold"
               >
                 {t('common.cancel')}
               </Button>

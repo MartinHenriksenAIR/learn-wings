@@ -222,9 +222,9 @@ export function EnrollUserDialog({
           <div className="space-y-2">
             <Label htmlFor="enroll-member">{t('enrollDialog.selectMemberLabel')}</Label>
             {activeLearners.length === 0 ? (
-              <div className="p-4 rounded-lg border bg-muted/50 text-center">
-                <Users className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">
+              <div className="p-4 rounded-legacy-lg border bg-legacy-muted/50 text-center">
+                <Users className="h-8 w-8 mx-auto text-legacy-muted-foreground mb-2" />
+                <p className="text-sm text-legacy-muted-foreground">
                   No active learners to enroll. Invite users first.
                 </p>
               </div>
@@ -255,22 +255,22 @@ export function EnrollUserDialog({
               <p className="text-sm font-medium leading-none">{t('enrollDialog.selectCoursesLabel')}</p>
               {loading ? (
                 <div className="flex items-center justify-center p-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <Loader2 className="h-6 w-6 animate-spin text-legacy-primary" />
                 </div>
               ) : courses.length === 0 ? (
-                <div className="p-4 rounded-lg border bg-muted/50 text-center">
-                  <BookOpen className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">
+                <div className="p-4 rounded-legacy-lg border bg-legacy-muted/50 text-center">
+                  <BookOpen className="h-8 w-8 mx-auto text-legacy-muted-foreground mb-2" />
+                  <p className="text-sm text-legacy-muted-foreground">
                     No courses available for this organization.
                   </p>
                 </div>
               ) : (
-                <ScrollArea className="h-64 border rounded-lg">
+                <ScrollArea className="h-64 border rounded-legacy-lg">
                   <div className="p-2 space-y-1">
                     {availableCourses.map((course) => (
                       <div
                         key={course.id}
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer"
+                        className="flex items-center gap-3 p-3 rounded-legacy-lg hover:bg-legacy-muted/50 cursor-pointer"
                         onClick={() => toggleCourse(course.id)}
                       >
                         <Checkbox
@@ -288,18 +288,18 @@ export function EnrollUserDialog({
 
                     {enrolledCourses.length > 0 && (
                       <>
-                        <div className="px-3 py-2 text-xs text-muted-foreground font-medium uppercase">
+                        <div className="px-3 py-2 text-xs text-legacy-muted-foreground font-medium uppercase">
                           Already Enrolled
                         </div>
                         {enrolledCourses.map((course) => (
                           <div
                             key={course.id}
-                            className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 opacity-60"
+                            className="flex items-center gap-3 p-3 rounded-legacy-lg bg-legacy-muted/30 opacity-60"
                           >
-                            <GraduationCap className="h-4 w-4 text-primary" />
+                            <GraduationCap className="h-4 w-4 text-legacy-primary" />
                             <div className="flex-1 min-w-0">
                               <p className="font-medium truncate">{course.title}</p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-legacy-muted-foreground">
                                 Already enrolled
                               </p>
                             </div>

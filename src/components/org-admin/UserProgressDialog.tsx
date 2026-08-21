@@ -100,7 +100,7 @@ export function UserProgressDialog({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-legacy-primary text-legacy-primary-foreground">
               {userName.charAt(0).toUpperCase()}
             </div>
             <span>{userName}</span>
@@ -109,39 +109,39 @@ export function UserProgressDialog({
 
         {loading ? (
           <div className="flex h-48 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <Loader2 className="h-8 w-8 animate-spin text-legacy-primary" />
           </div>
         ) : (
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Card>
                 <CardContent className="p-3 text-center">
-                  <BookOpen className="mx-auto h-5 w-5 text-muted-foreground" />
+                  <BookOpen className="mx-auto h-5 w-5 text-legacy-muted-foreground" />
                   <p className="mt-1 text-2xl font-bold">{totalEnrolled}</p>
-                  <p className="text-xs text-muted-foreground">Enrolled</p>
+                  <p className="text-xs text-legacy-muted-foreground">Enrolled</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-3 text-center">
-                  <Award className="mx-auto h-5 w-5 text-muted-foreground" />
+                  <Award className="mx-auto h-5 w-5 text-legacy-muted-foreground" />
                   <p className="mt-1 text-2xl font-bold">{totalCompleted}</p>
-                  <p className="text-xs text-muted-foreground">Completed</p>
+                  <p className="text-xs text-legacy-muted-foreground">Completed</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-3 text-center">
-                  <TrendingUp className="mx-auto h-5 w-5 text-muted-foreground" />
+                  <TrendingUp className="mx-auto h-5 w-5 text-legacy-muted-foreground" />
                   <p className="mt-1 text-2xl font-bold">{avgQuizScore}%</p>
-                  <p className="text-xs text-muted-foreground">Avg Quiz</p>
+                  <p className="text-xs text-legacy-muted-foreground">Avg Quiz</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-3 text-center">
-                  <Calendar className="mx-auto h-5 w-5 text-muted-foreground" />
+                  <Calendar className="mx-auto h-5 w-5 text-legacy-muted-foreground" />
                   <p className="mt-1 text-sm font-bold">
                     {lastActivity ? formatDate(new Date(lastActivity), 'MMM d', i18n.language) : '—'}
                   </p>
-                  <p className="text-xs text-muted-foreground">Last Active</p>
+                  <p className="text-xs text-legacy-muted-foreground">Last Active</p>
                 </CardContent>
               </Card>
             </div>
@@ -149,7 +149,7 @@ export function UserProgressDialog({
             <div className="space-y-3">
               <h3 className="font-semibold">Course Progress</h3>
               {courseProgress.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No course enrollments yet.</p>
+                <p className="text-sm text-legacy-muted-foreground">No course enrollments yet.</p>
               ) : (
                 courseProgress.map(course => {
                   const progressPercent = course.totalLessons > 0
@@ -186,12 +186,12 @@ export function UserProgressDialog({
                             </div>
                             <div className="mt-2 flex items-center gap-3">
                               <Progress value={progressPercent} className="h-2 flex-1" />
-                              <span className="text-sm text-muted-foreground">
+                              <span className="text-sm text-legacy-muted-foreground">
                                 {course.completedLessons}/{course.totalLessons} lessons
                               </span>
                             </div>
                             {course.completedAt && (
-                              <p className="mt-1 text-xs text-muted-foreground">
+                              <p className="mt-1 text-xs text-legacy-muted-foreground">
                                 Completed on {formatDate(new Date(course.completedAt), 'MMM d, yyyy', i18n.language)}
                               </p>
                             )}
@@ -203,7 +203,7 @@ export function UserProgressDialog({
                             <div className="space-y-3">
                               {course.modules.map(module => (
                                 <div key={module.id}>
-                                  <p className="text-sm font-medium text-muted-foreground">
+                                  <p className="text-sm font-medium text-legacy-muted-foreground">
                                     {module.title}
                                   </p>
                                   <div className="mt-1 space-y-1 pl-4">
@@ -213,15 +213,15 @@ export function UserProgressDialog({
                                         className="flex items-center gap-2 text-sm"
                                       >
                                         {lesson.status === 'completed' ? (
-                                          <CheckCircle2 className="h-4 w-4 text-primary" />
+                                          <CheckCircle2 className="h-4 w-4 text-legacy-primary" />
                                         ) : (
-                                          <Circle className="h-4 w-4 text-muted-foreground" />
+                                          <Circle className="h-4 w-4 text-legacy-muted-foreground" />
                                         )}
                                         <span
                                           className={
                                             lesson.status === 'completed'
-                                              ? 'text-foreground'
-                                              : 'text-muted-foreground'
+                                              ? 'text-legacy-foreground'
+                                              : 'text-legacy-muted-foreground'
                                           }
                                         >
                                           {lesson.title}

@@ -59,7 +59,7 @@ describe('Settings — profile save feedback (#20)', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'common.saved' })).toBeInTheDocument();
     });
-    expect(screen.getByRole('button', { name: 'common.saved' }).className).toMatch(/bg-success/);
+    expect(screen.getByRole('button', { name: 'common.saved' }).className).toMatch(/bg-legacy-success/);
 
     expect(mockToast).not.toHaveBeenCalledWith(
       expect.objectContaining({ variant: 'success' })

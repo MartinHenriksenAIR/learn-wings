@@ -129,7 +129,7 @@ describe('IdeaDetail admin status panel', () => {
     });
 
     const doneButton = await screen.findByRole('button', { name: 'common.saved' });
-    expect(doneButton.className).toContain('bg-success');
+    expect(doneButton.className).toContain('bg-legacy-success');
   });
 
   it('disables save for a rejected status without a rejection reason (gate preserved)', async () => {

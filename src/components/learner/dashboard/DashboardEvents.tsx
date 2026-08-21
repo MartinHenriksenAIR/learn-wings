@@ -42,7 +42,7 @@ export function DashboardEvents({ events, onEventClick, onSeeMore }: DashboardEv
               }}
               className="flex cursor-pointer items-center gap-[13px] py-[11px] [&+&]:border-t [&+&]:border-[rgba(23,26,38,0.07)]"
             >
-              <span className="w-[46px] shrink-0 rounded-[14px] bg-dash-a1 px-0 py-[7px] pb-2 text-center text-dash-ink">
+              <span className="w-[46px] shrink-0 rounded-[14px] bg-legacy-dash-a1 px-0 py-[7px] pb-2 text-center text-legacy-dash-ink">
                 <b className="block text-[17px] font-extrabold leading-none tabular-nums">
                   {formatDate(date, 'd', i18n.language)}
                 </b>
@@ -54,12 +54,12 @@ export function DashboardEvents({ events, onEventClick, onSeeMore }: DashboardEv
                 <span className="mb-[3px] line-clamp-2 block text-[13.5px] font-bold leading-[1.25] tracking-[-0.01em]">
                   {event.title}
                 </span>
-                <span className="block truncate text-[11.5px] font-medium text-muted-foreground">
+                <span className="block truncate text-[11.5px] font-medium text-legacy-muted-foreground">
                   {event.event_location ? `${event.event_location} · ` : ''}
                   {formatDate(date, 'HH:mm', i18n.language)}
                 </span>
               </span>
-              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-legacy-muted-foreground" />
             </div>
           );
         })

@@ -29,7 +29,7 @@ export function OrgStatCards({
           <>
             {seatLimit ? usedSeats : activeCount}
             {seatLimit ? (
-              <span className="text-base font-normal text-muted-foreground"> / {seatLimit}</span>
+              <span className="text-base font-normal text-legacy-muted-foreground"> / {seatLimit}</span>
             ) : null}
           </>
         }

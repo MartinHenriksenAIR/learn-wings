@@ -42,7 +42,7 @@ export function MembersTable({
   const { t, i18n } = useTranslation();
 
   return (
-    <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
+    <div className="mb-6 overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card">
       <div className="grid grid-cols-[2.2fr_0.9fr_0.9fr_0.9fr_0.5fr] gap-3 bg-[#f7f8fa] px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa0af]">
         <span>{t('orgDetail.colName')}</span>
         <span>{t('orgDetail.colRole')}</span>
@@ -74,7 +74,7 @@ export function MembersTable({
               <span
                 className={cn(
                   'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold',
-                  isAdmin ? 'bg-accent text-primary' : 'bg-[#f3f4f8] text-[#686d7e]',
+                  isAdmin ? 'bg-legacy-accent text-legacy-primary' : 'bg-[#f3f4f8] text-[#686d7e]',
                 )}
               >
                 {isAdmin ? t('orgDetail.admin') : t('orgDetail.learner')}
@@ -85,16 +85,16 @@ export function MembersTable({
                 className={cn(
                   'inline-flex items-center rounded-[7px] px-2.5 py-1 text-[11px] font-bold capitalize',
                   member.status === 'active'
-                    ? 'bg-success/10 text-success'
+                    ? 'bg-legacy-success/10 text-legacy-success'
                     : member.status === 'disabled'
-                      ? 'bg-destructive/10 text-destructive'
-                      : 'bg-warning/10 text-warning',
+                      ? 'bg-legacy-destructive/10 text-legacy-destructive'
+                      : 'bg-legacy-warning/10 text-legacy-warning',
                 )}
               >
                 {member.status}
               </span>
             </span>
-            <span className="text-[12.5px] text-muted-foreground">
+            <span className="text-[12.5px] text-legacy-muted-foreground">
               {formatDate(new Date(member.created_at), 'P', i18n.language)}
             </span>
             <span className="text-right">
@@ -108,7 +108,7 @@ export function MembersTable({
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-popover">
+                <DropdownMenuContent align="end" className="bg-legacy-popover">
                   {member.status === 'active' && (
                     <>
                       {member.role === 'learner' ? (
@@ -131,7 +131,7 @@ export function MembersTable({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => onDisable(member.id)}
-                        className="text-destructive"
+                        className="text-legacy-destructive"
                       >
                         <UserX className="mr-2 h-4 w-4" aria-hidden="true" />
                         {t('orgDetail.disableAccess')}

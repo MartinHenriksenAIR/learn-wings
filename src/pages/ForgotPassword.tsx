@@ -12,9 +12,9 @@ export default function ForgotPassword() {
 
   return (
     <div className={`grid min-h-screen place-items-center ${PAGE_GRADIENT_CLASSES} px-4`}>
-      <div className="flex w-full max-w-[380px] flex-col items-center gap-5 rounded-[20px] border border-border bg-card px-10 py-11 text-center shadow-[0_24px_60px_rgba(16,41,143,0.10)]">
+      <div className="flex w-full max-w-[380px] flex-col items-center gap-5 rounded-[20px] border border-legacy-border bg-legacy-card px-10 py-11 text-center shadow-[0_24px_60px_rgba(16,41,143,0.10)]">
         <img src={logoLight} alt="AI Uddannelse" className="h-[52px] w-auto object-contain" />
-        <p className="text-balance text-sm leading-[1.55] text-muted-foreground">
+        <p className="text-balance text-sm leading-[1.55] text-legacy-muted-foreground">
           {t('auth.passwordResetInfo')}
         </p>
         <Link to={routes.auth.login}>

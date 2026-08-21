@@ -153,16 +153,16 @@ export function AzureDocumentUpload({
         <div
           onClick={!disabled ? triggerUpload : undefined}
           className={cn(
-            'relative border rounded-lg overflow-hidden',
-            !disabled && 'cursor-pointer transition-colors hover:border-primary/50'
+            'relative border rounded-legacy-lg overflow-hidden',
+            !disabled && 'cursor-pointer transition-colors hover:border-legacy-primary/50'
           )}
         >
-          <div className="flex items-center gap-3 p-4 bg-muted/50">
-            <FileText className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+          <div className="flex items-center gap-3 p-4 bg-legacy-muted/50">
+            <FileText className="h-8 w-8 text-legacy-muted-foreground flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{fileName || displayName}</p>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3 text-success" />
+              <p className="text-xs text-legacy-muted-foreground flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3 text-legacy-success" />
                 <span className="truncate">
                   {t('fileUpload.uploadedToAzure')}
                   {!disabled && ` • ${t('fileUpload.clickToReplace')}`}
@@ -188,32 +188,32 @@ export function AzureDocumentUpload({
         <div
           onClick={!disabled && !uploading ? triggerUpload : undefined}
           className={cn(
-            'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
-            'hover:border-primary/50 hover:bg-muted/50',
+            'border-2 border-dashed rounded-legacy-lg p-6 text-center cursor-pointer transition-colors',
+            'hover:border-legacy-primary/50 hover:bg-legacy-muted/50',
             disabled && 'opacity-50 cursor-not-allowed',
             uploading && 'cursor-wait'
           )}
         >
           {uploading ? (
             <div className="space-y-3">
-              <Cloud className="h-10 w-10 mx-auto text-primary animate-pulse" />
+              <Cloud className="h-10 w-10 mx-auto text-legacy-primary animate-pulse" />
               <div className="space-y-2">
                 <p className="text-sm font-medium">{t('fileUpload.uploadingToAzure')}</p>
-                <p className="text-xs text-muted-foreground truncate max-w-xs mx-auto">{fileName}</p>
+                <p className="text-xs text-legacy-muted-foreground truncate max-w-xs mx-auto">{fileName}</p>
                 <Progress value={progress} className="h-2 w-full max-w-xs mx-auto" />
-                <p className="text-xs text-muted-foreground">{progress}%</p>
+                <p className="text-xs text-legacy-muted-foreground">{progress}%</p>
               </div>
             </div>
           ) : (
             <>
-              <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+              <Upload className="h-10 w-10 mx-auto text-legacy-muted-foreground mb-2" />
               <p className="text-sm font-medium">{t('fileUpload.ctaDocument')}</p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-legacy-muted-foreground mt-1">
                 {t('fileUpload.documentFormats')}
                 {' • '}
                 {t('fileUpload.maxSize', { size: formatSizeMB(capMB) })}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-legacy-muted-foreground mt-1">
                 {t('fileUpload.directToAzure')}
               </p>
             </>
@@ -222,7 +222,7 @@ export function AzureDocumentUpload({
       )}
 
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-sm text-legacy-destructive">{error}</p>
       )}
     </div>
   );

@@ -6,9 +6,9 @@ import type { LeaderboardRow, LeaderboardWindow } from '@/hooks/useLearnerDashbo
 const VISIBLE_ROWS = 4;
 
 const RANK_TILES: Record<number, string> = {
-  1: 'bg-dash-a3 text-dash-ink',
-  2: 'bg-dash-a1 text-dash-ink',
-  3: 'bg-dash-a2 text-dash-ink',
+  1: 'bg-legacy-dash-a3 text-legacy-dash-ink',
+  2: 'bg-legacy-dash-a1 text-legacy-dash-ink',
+  3: 'bg-legacy-dash-a2 text-legacy-dash-ink',
 };
 
 function Row({ row, xpLabel }: { row: LeaderboardRow; xpLabel: string }) {
@@ -16,14 +16,14 @@ function Row({ row, xpLabel }: { row: LeaderboardRow; xpLabel: string }) {
     <div
       className={cn(
         'flex items-center gap-3 rounded-[13px] px-2 py-2.5',
-        row.isSelf && 'bg-dash-a1 text-dash-ink',
+        row.isSelf && 'bg-legacy-dash-a1 text-legacy-dash-ink',
       )}
     >
       <span
         className={cn(
           'grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[10px] text-[12.5px] font-extrabold tabular-nums',
-          RANK_TILES[row.rank] ?? 'bg-[rgba(23,26,38,0.05)] text-muted-foreground',
-          row.isSelf && !RANK_TILES[row.rank] && 'bg-dash-ink/[0.14] text-dash-ink',
+          RANK_TILES[row.rank] ?? 'bg-[rgba(23,26,38,0.05)] text-legacy-muted-foreground',
+          row.isSelf && !RANK_TILES[row.rank] && 'bg-legacy-dash-ink/[0.14] text-legacy-dash-ink',
         )}
       >
         {row.rank}
@@ -47,7 +47,7 @@ export function DashboardLeaderboard({ leaderboard }: { leaderboard: Leaderboard
       <SectionHeading>{t('dashboard.leaderboard.title')}</SectionHeading>
 
       {rows.length === 0 ? (
-        <p className="px-2 py-6 text-[13px] text-muted-foreground">{t('dashboard.leaderboard.empty')}</p>
+        <p className="px-2 py-6 text-[13px] text-legacy-muted-foreground">{t('dashboard.leaderboard.empty')}</p>
       ) : (
         <>
           {rows.map((row) => (
@@ -55,8 +55,8 @@ export function DashboardLeaderboard({ leaderboard }: { leaderboard: Leaderboard
           ))}
           {leaderboard.me && !meShown && (
             <>
-              <div className="mx-2 my-1.5 border-t border-dashed border-border" />
-              <p className="px-2 pb-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              <div className="mx-2 my-1.5 border-t border-dashed border-legacy-border" />
+              <p className="px-2 pb-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-legacy-muted-foreground">
                 {t('dashboard.leaderboard.yourRank')}
               </p>
               <Row

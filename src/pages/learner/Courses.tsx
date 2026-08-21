@@ -128,11 +128,11 @@ export default function LearnerCourses() {
     return (
       <AppLayout headerLabel={t('nav.courses')}>
         <div className="flex h-64 flex-col items-center justify-center text-center">
-          <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/50" />
-          <p className="text-muted-foreground">
+          <BookOpen className="mb-4 h-12 w-12 text-legacy-muted-foreground/50" />
+          <p className="text-legacy-muted-foreground">
             {isPlatformAdmin ? t('common.noOrgSelected') : t('dashboard.invitationOnlyTitle')}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-legacy-muted-foreground">
             {isPlatformAdmin ? t('courses.joinOrgToAccessCourses') : t('dashboard.invitationOnlyDescription')}
           </p>
         </div>
@@ -157,14 +157,14 @@ export default function LearnerCourses() {
     <Link
       to={routes.learner.courseDetail(course.id)}
       aria-label={t('courses.readAbout', { title: course.title })}
-      className="absolute inset-0 z-10 rounded-2xl"
+      className="absolute inset-0 z-10 rounded-legacy-2xl"
     />
   );
 
   const courseCta = (course: Course, enrollment: Enrollment | undefined, isCompleted: boolean) => (
     <Button
       asChild
-      className="relative z-20 h-auto self-start rounded-[9px] bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-foreground hover:bg-primary/90"
+      className="relative z-20 h-auto self-start rounded-[9px] bg-legacy-primary px-3 py-1.5 text-[12px] font-bold text-legacy-primary-foreground hover:bg-legacy-primary/90"
     >
       <Link to={routes.learner.coursePlayer(course.id)}>
         <Play aria-hidden="true" className="h-3.5 w-3.5" />
@@ -176,9 +176,9 @@ export default function LearnerCourses() {
   const progressBar = (course: Course, percent: number) => (
     <div data-testid={`course-progress-${course.id}`} className="flex items-center gap-2.5">
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eceef3]">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
+        <div className="h-full rounded-full bg-legacy-primary" style={{ width: `${percent}%` }} />
       </div>
-      <span className="whitespace-nowrap text-xs font-semibold text-muted-foreground">{percent}%</span>
+      <span className="whitespace-nowrap text-xs font-semibold text-legacy-muted-foreground">{percent}%</span>
     </div>
   );
 
@@ -196,11 +196,11 @@ export default function LearnerCourses() {
     return (
       <div
         key={course.id}
-        className="hover-lift-lg relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+        className="hover-lift-lg relative flex flex-col overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card"
       >
         {detailOverlay(course)}
 
-        <div className="relative h-[118px] bg-gradient-to-br from-primary/80 to-primary">
+        <div className="relative h-[118px] bg-gradient-to-br from-legacy-primary/80 to-legacy-primary">
           {course.thumbnail_url && (
             <img
               src={course.thumbnail_url}
@@ -211,7 +211,7 @@ export default function LearnerCourses() {
           {showChip && (
             <span
               data-testid="recommended-chip"
-              className="absolute right-3 top-3 inline-flex items-center rounded-[7px] bg-primary px-[11px] py-[5px] text-[11px] font-bold text-primary-foreground"
+              className="absolute right-3 top-3 inline-flex items-center rounded-[7px] bg-legacy-primary px-[11px] py-[5px] text-[11px] font-bold text-legacy-primary-foreground"
             >
               {t('assessment.recommendations.chip')}
             </span>
@@ -219,7 +219,7 @@ export default function LearnerCourses() {
           {isCompleted && (
             <span
               data-testid="status-badge-completed"
-              className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 inline-flex items-center gap-[5px] rounded-[7px] bg-success px-[11px] py-[5px] text-[11px] font-bold text-success-foreground`}
+              className={`absolute ${showChip ? 'left-3' : 'right-3'} top-3 inline-flex items-center gap-[5px] rounded-[7px] bg-legacy-success px-[11px] py-[5px] text-[11px] font-bold text-legacy-success-foreground`}
             >
               <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
               {t('dashboard.completed')}
@@ -241,7 +241,7 @@ export default function LearnerCourses() {
             </div>
           </div>
           {courseCta(course, enrollment, isCompleted)}
-          <p className="line-clamp-2 text-[12.5px] leading-normal text-muted-foreground">
+          <p className="line-clamp-2 text-[12.5px] leading-normal text-legacy-muted-foreground">
             {course.description}
           </p>
 
@@ -259,16 +259,16 @@ export default function LearnerCourses() {
     return (
       <div
         key={course.id}
-        className="hover-lift-lg relative flex items-center gap-4 rounded-xl border border-border bg-card p-3"
+        className="hover-lift-lg relative flex items-center gap-4 rounded-legacy-xl border border-legacy-border bg-legacy-card p-3"
       >
         {detailOverlay(course)}
 
-        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-primary/80 to-primary">
+        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-legacy-lg bg-gradient-to-br from-legacy-primary/80 to-legacy-primary">
           {course.thumbnail_url && (
             <img src={course.thumbnail_url} alt={course.title} className="absolute inset-0 h-full w-full object-cover" />
           )}
           {isCompleted && (
-            <span className="absolute left-1.5 top-1.5 inline-flex items-center rounded-[6px] bg-success p-1 text-success-foreground">
+            <span className="absolute left-1.5 top-1.5 inline-flex items-center rounded-[6px] bg-legacy-success p-1 text-legacy-success-foreground">
               <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
             </span>
           )}
@@ -279,7 +279,7 @@ export default function LearnerCourses() {
             <h3 className="truncate text-[14px] font-bold leading-[1.35]">{course.title}</h3>
             <LevelBadge level={course.level} />
           </div>
-          <p className="line-clamp-1 text-[12.5px] leading-normal text-muted-foreground">{course.description}</p>
+          <p className="line-clamp-1 text-[12.5px] leading-normal text-legacy-muted-foreground">{course.description}</p>
           {enrollment && <div className="mt-1.5 max-w-[240px]">{progressBar(course, percent)}</div>}
         </div>
 
@@ -292,7 +292,7 @@ export default function LearnerCourses() {
           />
           <Button
             asChild
-            className="h-auto min-w-[150px] rounded-[9px] bg-primary px-3 py-2 text-[12.5px] font-bold text-primary-foreground hover:bg-primary/90"
+            className="h-auto min-w-[150px] rounded-[9px] bg-legacy-primary px-3 py-2 text-[12.5px] font-bold text-legacy-primary-foreground hover:bg-legacy-primary/90"
           >
             <Link to={routes.learner.coursePlayer(course.id)}>
               <Play aria-hidden="true" className="h-3.5 w-3.5" />
@@ -317,7 +317,7 @@ export default function LearnerCourses() {
     <AppLayout headerLabel={t('nav.courses')}>
       <div className="mb-[22px]">
         <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('courses.title')}</h1>
-        <p className="max-w-[680px] text-sm text-muted-foreground">{t('courses.subtitle')}</p>
+        <p className="max-w-[680px] text-sm text-legacy-muted-foreground">{t('courses.subtitle')}</p>
       </div>
 
       <div className="mb-[22px] flex flex-wrap items-center gap-2.5">
@@ -359,7 +359,7 @@ export default function LearnerCourses() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('courses.searchPlaceholder')}
-            className="h-auto rounded-xl bg-card py-[11px] pl-10 pr-3.5 text-[13.5px] md:text-[13.5px]"
+            className="h-auto rounded-legacy-xl bg-legacy-card py-[11px] pl-10 pr-3.5 text-[13.5px] md:text-[13.5px]"
           />
         </div>
 
@@ -367,7 +367,7 @@ export default function LearnerCourses() {
           <button
             type="button"
             onClick={clearFilters}
-            className="whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold text-muted-foreground hover:text-primary"
+            className="whitespace-nowrap rounded-legacy-lg px-2.5 py-2 text-[13px] font-semibold text-legacy-muted-foreground hover:text-legacy-primary"
           >
             {t('common.clear')}
           </button>
@@ -401,7 +401,7 @@ export default function LearnerCourses() {
               ? t('courses.noCoursesMatch')
               : t('courses.noCoursesForOrg')
           }
-          className="rounded-2xl border-[#d6d8e0] bg-card"
+          className="rounded-legacy-2xl border-[#d6d8e0] bg-legacy-card"
         />
       ) : (
         renderCatalog(filteredCourses)

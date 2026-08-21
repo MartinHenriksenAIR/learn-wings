@@ -142,7 +142,7 @@ export default function IdeaLibrary() {
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {t('community.ideaLibrary')}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-legacy-muted-foreground">
             {t('community.ideaLibrarySubtitle', { orgName: currentOrg.name })}
           </p>
         </div>
@@ -163,14 +163,14 @@ export default function IdeaLibrary() {
             placeholder={t('community.searchIdeas')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-auto rounded-xl py-[11px] pl-10 pr-3.5 text-[13.5px] md:text-[13.5px]"
+            className="h-auto rounded-legacy-xl py-[11px] pl-10 pr-3.5 text-[13.5px] md:text-[13.5px]"
           />
         </div>
         <Select
           value={selectedBusinessArea || 'all'}
           onValueChange={(v) => setSelectedBusinessArea(v === 'all' ? '' : v)}
         >
-          <SelectTrigger className="h-auto w-full rounded-xl py-[11px] text-[13px] font-semibold md:w-[200px]">
+          <SelectTrigger className="h-auto w-full rounded-legacy-xl py-[11px] text-[13px] font-semibold md:w-[200px]">
             <SelectValue placeholder={t('community.allBusinessAreas')} />
           </SelectTrigger>
           <SelectContent>
@@ -191,7 +191,7 @@ export default function IdeaLibrary() {
             setTagPickerValue('all_tags');
           }}
         >
-          <SelectTrigger className="h-auto w-full rounded-xl py-[11px] text-[13px] font-semibold md:w-[200px]">
+          <SelectTrigger className="h-auto w-full rounded-legacy-xl py-[11px] text-[13px] font-semibold md:w-[200px]">
             <SelectValue placeholder={t('community.filterByTags')} />
           </SelectTrigger>
           <SelectContent>
@@ -212,7 +212,7 @@ export default function IdeaLibrary() {
               key={tag}
               type="button"
               onClick={() => setSelectedTags((prev) => prev.filter((x) => x !== tag))}
-              className="inline-flex items-center gap-1 rounded-[7px] bg-accent px-2.5 py-[3px] text-[11.5px] font-semibold text-accent-foreground hover:opacity-85"
+              className="inline-flex items-center gap-1 rounded-[7px] bg-legacy-accent px-2.5 py-[3px] text-[11.5px] font-semibold text-legacy-accent-foreground hover:opacity-85"
             >
               #{tag}
               <X aria-hidden="true" className="h-3 w-3" />
@@ -223,7 +223,7 @@ export default function IdeaLibrary() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
         </div>
       ) : ideasError ? (
         <QueryErrorState onRetry={() => refetchIdeas()} />

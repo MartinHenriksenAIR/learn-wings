@@ -23,7 +23,7 @@ export function SaveButton({ done, idleLabel, doneLabel, onClick, disabled, clas
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={cn(done && "bg-success text-success-foreground hover:bg-success/90", className)}
+      className={cn(done && "bg-legacy-success text-legacy-success-foreground hover:bg-legacy-success/90", className)}
     >
       {done ? <Check aria-hidden="true" /> : <Save aria-hidden="true" />}
       {done ? (doneLabel ?? t("common.saved")) : idleLabel}

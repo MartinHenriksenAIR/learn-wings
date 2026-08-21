@@ -20,8 +20,8 @@ export function ListViewToggle({
       aria-pressed={view === value}
       onClick={() => onChange(value)}
       className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-        view === value ? 'bg-accent text-primary' : 'text-muted-foreground hover:text-primary',
+        'flex h-8 w-8 items-center justify-center rounded-legacy-lg transition-colors',
+        view === value ? 'bg-legacy-accent text-legacy-primary' : 'text-legacy-muted-foreground hover:text-legacy-primary',
       )}
     >
       {icon}
@@ -29,7 +29,7 @@ export function ListViewToggle({
   );
 
   return (
-    <div className="flex items-center gap-0.5 rounded-xl border border-input bg-card p-0.5">
+    <div className="flex items-center gap-0.5 rounded-legacy-xl border border-legacy-input bg-legacy-card p-0.5">
       {button('card', t('courses.viewAsCards'), <LayoutGrid aria-hidden="true" className="h-4 w-4" />)}
       {button('list', t('courses.viewAsList'), <List aria-hidden="true" className="h-4 w-4" />)}
     </div>

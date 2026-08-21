@@ -176,20 +176,20 @@ export default function Settings() {
         <Card className="mb-4">
           <CardContent className="space-y-3.5 px-[26px] py-6">
             <div className="mb-1 flex items-center gap-3.5">
-              <Avatar className="h-[52px] w-[52px] shrink-0 rounded-2xl">
+              <Avatar className="h-[52px] w-[52px] shrink-0 rounded-legacy-2xl">
                 {avatarSrc && (
                   <AvatarImage src={avatarSrc} alt="" className="object-cover" />
                 )}
                 <AvatarFallback
                   aria-hidden="true"
-                  className="rounded-2xl bg-accent text-[17px] font-extrabold text-accent-foreground"
+                  className="rounded-legacy-2xl bg-legacy-accent text-[17px] font-extrabold text-legacy-accent-foreground"
                 >
                   {getInitials(displayName)}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0">
                 <h3 className="text-[15px] font-extrabold">{t('settings.profile')}</h3>
-                <p className="truncate text-[12.5px] text-muted-foreground">{t('settings.updateProfile')}</p>
+                <p className="truncate text-[12.5px] text-legacy-muted-foreground">{t('settings.updateProfile')}</p>
               </div>
               {profile?.avatar_url && (
                 <Button
@@ -197,7 +197,7 @@ export default function Settings() {
                   size="sm"
                   onClick={() => handleAvatarChange(null, null)}
                   disabled={avatarSaving}
-                  className="ml-auto shrink-0 text-destructive hover:text-destructive"
+                  className="ml-auto shrink-0 text-legacy-destructive hover:text-legacy-destructive"
                 >
                   <Trash2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
                   {t('settings.removePhoto')}
@@ -215,21 +215,21 @@ export default function Settings() {
                 maxSizeMB={2}
                 disabled={avatarSaving}
               />
-              <p className="text-[11.5px] text-muted-foreground">{t('settings.profilePhotoHint')}</p>
+              <p className="text-[11.5px] text-legacy-muted-foreground">{t('settings.profilePhotoHint')}</p>
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="email" className="flex items-center gap-2 text-xs font-bold text-[#4a4f60]">
-                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                <Mail className="h-3.5 w-3.5 text-legacy-muted-foreground" />
                 {t('auth.email')}
               </Label>
               <Input
                 id="email"
                 value={user?.email || ''}
                 disabled
-                className="bg-muted"
+                className="bg-legacy-muted"
               />
-              <p className="text-[11.5px] text-muted-foreground">
+              <p className="text-[11.5px] text-legacy-muted-foreground">
                 {t('settings.emailCannotBeChanged')}
               </p>
             </div>
@@ -248,7 +248,7 @@ export default function Settings() {
                   placeholder={t('settings.firstName')}
                 />
                 {profileErrors.firstName && (
-                  <p className="text-sm text-destructive">{profileErrors.firstName}</p>
+                  <p className="text-sm text-legacy-destructive">{profileErrors.firstName}</p>
                 )}
               </div>
               <div className="space-y-1.5">
@@ -265,7 +265,7 @@ export default function Settings() {
                   placeholder={t('settings.lastName')}
                 />
                 {profileErrors.lastName && (
-                  <p className="text-sm text-destructive">{profileErrors.lastName}</p>
+                  <p className="text-sm text-legacy-destructive">{profileErrors.lastName}</p>
                 )}
               </div>
             </div>
@@ -283,7 +283,7 @@ export default function Settings() {
                 placeholder={t('settings.departmentPlaceholder')}
               />
               {profileErrors.department && (
-                <p className="text-sm text-destructive">{profileErrors.department}</p>
+                <p className="text-sm text-legacy-destructive">{profileErrors.department}</p>
               )}
             </div>
             <SaveButton
@@ -299,7 +299,7 @@ export default function Settings() {
           <CardContent className="space-y-3 px-[26px] py-6">
             <div>
               <h3 className="text-[15px] font-extrabold">{t('settings.language')}</h3>
-              <p className="text-[12.5px] text-muted-foreground">{t('settings.languageDescription')}</p>
+              <p className="text-[12.5px] text-legacy-muted-foreground">{t('settings.languageDescription')}</p>
             </div>
             <div className="flex items-center gap-4">
               <Select
@@ -315,7 +315,7 @@ export default function Settings() {
                   <SelectItem value="da">{t('languages.da')}</SelectItem>
                 </SelectContent>
               </Select>
-              {languageSaving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              {languageSaving && <Loader2 className="h-4 w-4 animate-spin text-legacy-muted-foreground" />}
             </div>
           </CardContent>
         </Card>
@@ -324,7 +324,7 @@ export default function Settings() {
           <Card className="mb-4" data-testid="assessment-settings-card">
             <CardContent className="space-y-3 px-[26px] py-6">
               <div className="flex items-center gap-3.5">
-                <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+                <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-legacy-xl bg-legacy-primary text-legacy-primary-foreground">
                   <Sparkles className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <h3 className="text-[15px] font-extrabold">{t('assessment.settings.title')}</h3>
@@ -334,7 +334,7 @@ export default function Settings() {
                   <div className="flex flex-wrap items-center gap-2">
                     <LevelBadge level={profile.assessment_level} />
                     {profile.assessment_taken_at && (
-                      <span className="text-[12.5px] text-muted-foreground">
+                      <span className="text-[12.5px] text-legacy-muted-foreground">
                         {t('assessment.settings.lastTaken', {
                           date: formatDate(
                             new Date(profile.assessment_taken_at),
@@ -347,13 +347,13 @@ export default function Settings() {
                   </div>
                 </div>
               ) : (
-                <p className="text-[12.5px] text-muted-foreground">{t('assessment.settings.notTaken')}</p>
+                <p className="text-[12.5px] text-legacy-muted-foreground">{t('assessment.settings.notTaken')}</p>
               )}
-              <p className="text-[11.5px] text-muted-foreground">{t('assessment.settings.privacyNote')}</p>
+              <p className="text-[11.5px] text-legacy-muted-foreground">{t('assessment.settings.privacyNote')}</p>
               <Button
                 onClick={() => navigate(routes.learner.assessment)}
                 variant={profile?.assessment_level ? 'outline' : 'default'}
-                className={profile?.assessment_level ? 'border-primary text-primary hover:bg-accent' : ''}
+                className={profile?.assessment_level ? 'border-legacy-primary text-legacy-primary hover:bg-legacy-accent' : ''}
               >
                 {profile?.assessment_level ? t('assessment.settings.retake') : t('assessment.settings.take')}
               </Button>
@@ -365,10 +365,10 @@ export default function Settings() {
           <CardContent className="space-y-3.5 px-[26px] py-6">
             <h3 className="text-[15px] font-extrabold">{t('settings.accountInfo')}</h3>
             <div className="flex items-center gap-3">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Calendar className="h-4 w-4 text-legacy-muted-foreground" />
               <div>
                 <p className="text-sm font-medium">{t('settings.accountCreated')}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-legacy-muted-foreground">
                   {profile?.created_at
                     ? formatDate(new Date(profile.created_at), 'MMMM d, yyyy', i18n.language)
                     : 'Unknown'}
@@ -376,7 +376,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <Building2 className="h-4 w-4 text-legacy-muted-foreground" />
               <div>
                 <p className="text-sm font-medium">{t('settings.role')}</p>
                 <Badge variant={roleInfo.variant} className="mt-1">

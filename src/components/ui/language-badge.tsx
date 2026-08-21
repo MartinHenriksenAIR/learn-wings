@@ -16,7 +16,7 @@ export function LanguageBadge({ language, className }: LanguageBadgeProps) {
   }
 
   return (
-    <span className={cn("inline-flex items-center gap-1 text-[11px] text-muted-foreground", className)}>
+    <span className={cn("inline-flex items-center gap-1 text-[11px] text-legacy-muted-foreground", className)}>
       <Globe aria-hidden="true" className="h-3.5 w-3.5" />
       {t(`languages.${language}`)}
     </span>

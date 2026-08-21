@@ -123,7 +123,7 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="flex items-center justify-between gap-2 p-3 border-b bg-muted/50 rounded-t-lg">
+      <div className="flex items-center justify-between gap-2 p-3 border-b bg-legacy-muted/50 rounded-t-legacy-lg">
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -134,7 +134,7 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm text-muted-foreground min-w-[80px] text-center">
+          <span className="text-sm text-legacy-muted-foreground min-w-[80px] text-center">
             {loading || fetchingPdf ? '...' : `${pageNumber} / ${numPages}`}
           </span>
           <Button
@@ -158,7 +158,7 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
           >
             <ZoomOut className="h-4 w-4" />
           </Button>
-          <span className="text-sm text-muted-foreground min-w-[50px] text-center">
+          <span className="text-sm text-legacy-muted-foreground min-w-[50px] text-center">
             {Math.round(scale * 100)}%
           </span>
           <Button
@@ -178,14 +178,14 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-auto bg-muted/30 rounded-b-lg" style={{ maxHeight: '65vh' }}>
+      <div className="flex-1 overflow-auto bg-legacy-muted/30 rounded-b-legacy-lg" style={{ maxHeight: '65vh' }}>
         {error ? (
-          <div className="flex items-center justify-center h-64 text-destructive">
+          <div className="flex items-center justify-center h-64 text-legacy-destructive">
             <p>{error}</p>
           </div>
         ) : fetchingPdf ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
           </div>
         ) : pdfUrl ? (
           <div className="flex justify-center p-4">
@@ -195,7 +195,7 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
               onLoadError={onDocumentLoadError}
               loading={
                 <div className="flex items-center justify-center h-64">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
                 </div>
               }
             >
@@ -204,7 +204,7 @@ export function PdfViewer({ url, className }: PdfViewerProps) {
                 scale={scale}
                 loading={
                   <div className="flex items-center justify-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
                   </div>
                 }
               />

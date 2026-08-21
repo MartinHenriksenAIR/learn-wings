@@ -152,7 +152,7 @@ export default function CommunityFeed() {
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {t('community.title')}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-legacy-muted-foreground">
             {scope === 'org'
               ? t('community.subtitleOrg', { orgName: orgForCommunity?.name || t('nav.organization') })
               : t('community.subtitleGlobal')}
@@ -163,7 +163,7 @@ export default function CommunityFeed() {
             <Button
               variant="outline"
               onClick={() => navigate(routes.community.ideaNew)}
-              className="group h-auto whitespace-nowrap rounded-[11px] border-[#dcdee6] bg-card px-4 py-2.5 text-[13px] font-bold text-[#2a2d3a] hover:border-primary hover:bg-card hover:text-primary"
+              className="group h-auto whitespace-nowrap rounded-[11px] border-[#dcdee6] bg-legacy-card px-4 py-2.5 text-[13px] font-bold text-[#2a2d3a] hover:border-legacy-primary hover:bg-legacy-card hover:text-legacy-primary"
             >
               <Lightbulb aria-hidden="true" className="h-[15px] w-[15px] group-hover:animate-bulb-wiggle" />
               {t('community.submitIdea')}
@@ -188,7 +188,7 @@ export default function CommunityFeed() {
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_300px]">
         <div className="flex flex-col gap-3.5">
-          <div className="flex flex-col gap-[13px] rounded-2xl border border-border bg-card px-[18px] py-4">
+          <div className="flex flex-col gap-[13px] rounded-legacy-2xl border border-legacy-border bg-legacy-card px-[18px] py-4">
             <div className="relative">
               <Search aria-hidden="true" className="absolute left-[13px] top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0af]" />
               <Input
@@ -206,8 +206,8 @@ export default function CommunityFeed() {
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-[7px] border px-3.5 py-[7px] text-[12.5px] font-bold',
                   !selectedCategory
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-input bg-card text-[#4a4f60] hover:opacity-85'
+                    ? 'border-legacy-primary bg-legacy-primary text-legacy-primary-foreground'
+                    : 'border-legacy-input bg-legacy-card text-[#4a4f60] hover:opacity-85'
                 )}
               >
                 {t('common.all')}
@@ -222,8 +222,8 @@ export default function CommunityFeed() {
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-[7px] border px-3.5 py-[7px] text-[12.5px] font-bold',
                       active
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-input bg-card text-[#4a4f60] hover:opacity-85'
+                        ? 'border-legacy-primary bg-legacy-primary text-legacy-primary-foreground'
+                        : 'border-legacy-input bg-legacy-card text-[#4a4f60] hover:opacity-85'
                     )}
                   >
                     {categoryLabel(cat, t)}
@@ -235,13 +235,13 @@ export default function CommunityFeed() {
 
             {selectedTags.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[12.5px] font-semibold text-muted-foreground">{t('community.tagsLabel')}</span>
+                <span className="text-[12.5px] font-semibold text-legacy-muted-foreground">{t('community.tagsLabel')}</span>
                 {selectedTags.map((tag) => (
                   <button
                     key={tag}
                     type="button"
                     onClick={() => setSelectedTags((t) => t.filter((x) => x !== tag))}
-                    className="inline-flex items-center gap-1 rounded-[7px] bg-accent px-2.5 py-[3px] text-[11.5px] font-semibold text-accent-foreground hover:opacity-85"
+                    className="inline-flex items-center gap-1 rounded-[7px] bg-legacy-accent px-2.5 py-[3px] text-[11.5px] font-semibold text-legacy-accent-foreground hover:opacity-85"
                   >
                     #{tag}
                     <X aria-hidden="true" className="h-3 w-3" />
@@ -250,7 +250,7 @@ export default function CommunityFeed() {
                 <button
                   type="button"
                   onClick={() => setSelectedTags([])}
-                  className="rounded-lg px-1.5 py-[3px] text-[11.5px] font-semibold text-muted-foreground hover:text-primary"
+                  className="rounded-legacy-lg px-1.5 py-[3px] text-[11.5px] font-semibold text-legacy-muted-foreground hover:text-legacy-primary"
                 >
                   {t('community.clearTags')}
                 </button>
@@ -260,7 +260,7 @@ export default function CommunityFeed() {
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
             </div>
           ) : postsError ? (
             <QueryErrorState onRetry={() => refetchPosts()} />
@@ -303,14 +303,14 @@ export default function CommunityFeed() {
           )}
 
           {scope === 'org' && orgForCommunity && (
-            <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card px-5 py-[18px]">
+            <div className="flex flex-col gap-1 rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-[18px]">
               <h3 className="mb-2 text-[13.5px] font-extrabold">{t('community.libraries')}</h3>
               <button
                 type="button"
                 onClick={() => navigate(routes.community.ideas)}
-                className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-left text-[13px] font-bold text-[#2a2d3a] hover:bg-muted/60"
+                className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-[9px] text-left text-[13px] font-bold text-[#2a2d3a] hover:bg-legacy-muted/60"
               >
-                <Lightbulb aria-hidden="true" className="h-[15px] w-[15px] text-warning" />
+                <Lightbulb aria-hidden="true" className="h-[15px] w-[15px] text-legacy-warning" />
                 {t('community.ideaLibrary')}
                 <ChevronRight aria-hidden="true" className="ml-auto h-[13px] w-[13px] text-[#c3c7d3]" />
               </button>
@@ -322,7 +322,7 @@ export default function CommunityFeed() {
           )}
 
           {allTags.length > 0 && (
-            <div className="rounded-2xl border border-border bg-card px-5 py-[18px]">
+            <div className="rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-[18px]">
               <h3 className="mb-3 text-[13.5px] font-extrabold">{t('community.popularTags')}</h3>
               <div className="flex flex-wrap gap-1.5">
                 {allTags.slice(0, 10).map((tag) => (
@@ -337,8 +337,8 @@ export default function CommunityFeed() {
                     className={cn(
                       'rounded-[7px] px-2.5 py-[3px] text-[11.5px] font-semibold',
                       selectedTags.includes(tag)
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-accent text-accent-foreground hover:opacity-85'
+                        ? 'bg-legacy-primary text-legacy-primary-foreground'
+                        : 'bg-legacy-accent text-legacy-accent-foreground hover:opacity-85'
                     )}
                   >
                     #{tag}

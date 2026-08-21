@@ -43,9 +43,9 @@ export function FavoriteCourses({
               <div
                 key={course.id}
                 data-testid="training-favorite-row"
-                className="hover-lift flex items-center gap-4 rounded-xl border border-border bg-card p-3"
+                className="hover-lift flex items-center gap-4 rounded-legacy-xl border border-legacy-border bg-legacy-card p-3"
               >
-                <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-primary/80 to-primary">
+                <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-legacy-lg bg-gradient-to-br from-legacy-primary/80 to-legacy-primary">
                   {course.thumbnail_url && (
                     <img
                       src={course.thumbnail_url}
@@ -82,7 +82,7 @@ export function FavoriteCourses({
                   ) : (
                     <Button
                       asChild
-                      className="h-auto shrink-0 rounded-[10px] bg-accent px-3 py-2 text-[12.5px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                      className="h-auto shrink-0 rounded-[10px] bg-legacy-accent px-3 py-2 text-[12.5px] font-bold text-legacy-accent-foreground hover:bg-[#dfe5f8]"
                     >
                       <Link to={routes.learner.coursePlayer(course.id)}>
                         <Play aria-hidden="true" className="h-3.5 w-3.5" />
@@ -95,9 +95,9 @@ export function FavoriteCourses({
             ) : (
               <div
                 key={course.id}
-                className="hover-lift flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+                className="hover-lift flex flex-col overflow-hidden rounded-legacy-2xl border border-legacy-border bg-legacy-card"
               >
-                <div className="relative h-[110px] bg-gradient-to-br from-primary/80 to-primary">
+                <div className="relative h-[110px] bg-gradient-to-br from-legacy-primary/80 to-legacy-primary">
                   {course.thumbnail_url && (
                     <img
                       src={course.thumbnail_url}
@@ -110,7 +110,7 @@ export function FavoriteCourses({
                     isFavorite={isFavorite(course.id)}
                     pending={togglingId === course.id}
                     onToggle={(next) => toggleFavorite({ courseId: course.id, favorite: next, course })}
-                    className="absolute right-2 top-2 bg-card/90 hover:bg-card"
+                    className="absolute right-2 top-2 bg-legacy-card/90 hover:bg-legacy-card"
                   />
                 </div>
                 <div className="flex flex-1 flex-col gap-2.5 px-[18px] pb-[18px] pt-4">
@@ -127,7 +127,7 @@ export function FavoriteCourses({
                     ) : (
                       <Button
                         asChild
-                        className="h-auto w-full rounded-[10px] bg-accent px-3 py-[9px] text-[13px] font-bold text-accent-foreground hover:bg-[#dfe5f8]"
+                        className="h-auto w-full rounded-[10px] bg-legacy-accent px-3 py-[9px] text-[13px] font-bold text-legacy-accent-foreground hover:bg-[#dfe5f8]"
                       >
                         <Link to={routes.learner.coursePlayer(course.id)}>
                           <Play aria-hidden="true" className="h-3.5 w-3.5" />

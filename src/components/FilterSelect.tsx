@@ -26,7 +26,7 @@ export function FilterSelect({ label, value, onValueChange, options, className }
       <SelectTrigger
         aria-label={label}
         className={cn(
-          'h-auto w-auto cursor-pointer gap-2 rounded-xl bg-card py-[11px] pl-[13px] text-[13px] font-semibold text-[#2a2d3a] focus:border-primary focus:shadow-[0_0_0_3px_rgba(16,41,143,0.10)] focus:ring-0 focus:ring-offset-0',
+          'h-auto w-auto cursor-pointer gap-2 rounded-legacy-xl bg-legacy-card py-[11px] pl-[13px] text-[13px] font-semibold text-[#2a2d3a] focus:border-legacy-primary focus:shadow-[0_0_0_3px_rgba(16,41,143,0.10)] focus:ring-0 focus:ring-offset-0',
           className,
         )}
       >

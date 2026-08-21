@@ -33,16 +33,16 @@ export function UpcomingEvents({
   }
 
   return (
-    <div className={cn('rounded-2xl border border-border bg-card px-5 py-[18px]', className)}>
+    <div className={cn('rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-[18px]', className)}>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold">
-          <Calendar aria-hidden="true" className="h-[15px] w-[15px] text-primary" />
+          <Calendar aria-hidden="true" className="h-[15px] w-[15px] text-legacy-primary" />
           {t('community.upcomingEvents')}
         </h3>
         {viewAllTo && (
           <Link
             to={viewAllTo}
-            className="flex items-center gap-1 text-[12px] font-bold text-primary hover:opacity-80"
+            className="flex items-center gap-1 text-[12px] font-bold text-legacy-primary hover:opacity-80"
           >
             {t('community.viewAllEvents')}
             <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
@@ -62,14 +62,14 @@ export function UpcomingEvents({
             >
               <span
                 className={cn(
-                  'flex h-[46px] w-[42px] shrink-0 flex-col items-center justify-center rounded-[11px] bg-accent',
-                  isEventToday && 'bg-primary'
+                  'flex h-[46px] w-[42px] shrink-0 flex-col items-center justify-center rounded-[11px] bg-legacy-accent',
+                  isEventToday && 'bg-legacy-primary'
                 )}
               >
                 <span
                   className={cn(
                     'text-[10px] font-extrabold uppercase tracking-[0.05em]',
-                    isEventToday ? 'text-primary-foreground' : 'text-primary'
+                    isEventToday ? 'text-legacy-primary-foreground' : 'text-legacy-primary'
                   )}
                 >
                   {formatDate(eventDate, 'MMM', i18n.language)}
@@ -77,7 +77,7 @@ export function UpcomingEvents({
                 <span
                   className={cn(
                     'text-base font-extrabold leading-none',
-                    isEventToday ? 'text-primary-foreground' : 'text-primary'
+                    isEventToday ? 'text-legacy-primary-foreground' : 'text-legacy-primary'
                   )}
                 >
                   {formatDate(eventDate, 'd', i18n.language)}
@@ -85,7 +85,7 @@ export function UpcomingEvents({
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="line-clamp-1 text-[12.5px] font-bold leading-[1.3]">{event.title}</span>
-                <span className={cn('truncate text-[11.5px]', isEventToday ? 'font-semibold text-primary' : 'text-[#9aa0af]')}>
+                <span className={cn('truncate text-[11.5px]', isEventToday ? 'font-semibold text-legacy-primary' : 'text-[#9aa0af]')}>
                   {isEventToday ? t('community.today') : formatDate(eventDate, 'MMM d', i18n.language)}
                   {' · '}
                   {formatDate(eventDate, 'h:mm a', i18n.language)}
@@ -103,7 +103,7 @@ export function UpcomingEvents({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 rounded-lg border-input px-2.5 text-[11px] font-bold"
+                    className="h-7 rounded-legacy-lg border-legacy-input px-2.5 text-[11px] font-bold"
                   >
                     <ExternalLink aria-hidden="true" className="mr-1 h-3 w-3" />
                     {t('community.register')}

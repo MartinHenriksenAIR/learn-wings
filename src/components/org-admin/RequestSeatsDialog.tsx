@@ -54,7 +54,7 @@ export function RequestSeatsDialog({ orgId, open, onOpenChange }: RequestSeatsDi
         {isLoading ? (
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
         ) : !priceConfigured ? (
-          <p className="text-sm font-medium text-muted-foreground">{t('seatRequests.notConfigured')}</p>
+          <p className="text-sm font-medium text-legacy-muted-foreground">{t('seatRequests.notConfigured')}</p>
         ) : (
           <div className="space-y-3">
             <div className="space-y-1.5">
@@ -74,7 +74,7 @@ export function RequestSeatsDialog({ orgId, open, onOpenChange }: RequestSeatsDi
             <p className="text-sm font-medium">
               {t('seatRequests.estimate', { seats, price, currency, total })}
             </p>
-            <p className="text-xs text-muted-foreground">{t('seatRequests.vatNote')}</p>
+            <p className="text-xs text-legacy-muted-foreground">{t('seatRequests.vatNote')}</p>
           </div>
         )}
 

@@ -67,7 +67,7 @@ export function BucketSortPlayer({ config, onComplete }: Props) {
       <div className="mt-4 flex items-center gap-3">
         <Button onClick={handleCheck} disabled={completed}>{t('exercise.check')}</Button>
         {checked && (
-          <span role="status" className={cn('text-sm', isAllCorrect ? 'text-green-600' : 'text-destructive')}>
+          <span role="status" className={cn('text-sm', isAllCorrect ? 'text-green-600' : 'text-legacy-destructive')}>
             {isAllCorrect ? t('exercise.allCorrect') : t('exercise.tryAgain')}
           </span>
         )}
@@ -83,10 +83,10 @@ function Item({ id, text, isSelected, feedback, onSelect }: {
   return (
     <button ref={setNodeRef} {...listeners} {...attributes} type="button" onClick={onSelect}
       aria-pressed={isSelected}
-      className={cn('block w-full text-left rounded-md border px-3 py-2 text-sm',
-        isSelected && 'ring-2 ring-primary', isDragging && 'opacity-50',
+      className={cn('block w-full text-left rounded-legacy-md border px-3 py-2 text-sm',
+        isSelected && 'ring-2 ring-legacy-primary', isDragging && 'opacity-50',
         feedback === 'correct' && 'border-green-600 bg-green-50',
-        feedback === 'incorrect' && 'border-destructive bg-destructive/10')}>
+        feedback === 'incorrect' && 'border-legacy-destructive bg-legacy-destructive/10')}>
       {text}
     </button>
   );
@@ -98,7 +98,7 @@ function Bucket({ id, label, canPlace, onPlaceClick, children }: {
   const { t } = useTranslation();
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
-    <div ref={setNodeRef} className={cn('rounded-lg border-2 border-dashed p-3', isOver && 'border-primary bg-accent')}>
+    <div ref={setNodeRef} className={cn('rounded-legacy-lg border-2 border-dashed p-3', isOver && 'border-legacy-primary bg-legacy-accent')}>
       <div className="mb-2 flex items-center justify-between">
         <span className="font-medium">{label}</span>
         {canPlace && (
@@ -113,5 +113,5 @@ function Bucket({ id, label, canPlace, onPlaceClick, children }: {
 
 function Tray({ children }: { bucketId: null; selected: string | null; children: ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: TRAY });
-  return <div ref={setNodeRef} className={cn('rounded-lg border p-3 space-y-2 min-h-[3rem]', isOver && 'bg-accent')}>{children}</div>;
+  return <div ref={setNodeRef} className={cn('rounded-legacy-lg border p-3 space-y-2 min-h-[3rem]', isOver && 'bg-legacy-accent')}>{children}</div>;
 }

@@ -215,7 +215,7 @@ export default function PostDetail() {
     return (
       <AppLayout headerLabel={t('community.post')}>
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
         </div>
       </AppLayout>
     );
@@ -226,7 +226,7 @@ export default function PostDetail() {
       <AppLayout headerLabel={t('community.title')}>
         <div className="py-12 text-center">
           <h1 className="mb-2 font-display text-[26px] font-extrabold tracking-[-0.02em]">{t('community.postNotFound')}</h1>
-          <p className="text-sm text-muted-foreground">{t('community.postNotFoundDescription')}</p>
+          <p className="text-sm text-legacy-muted-foreground">{t('community.postNotFoundDescription')}</p>
         </div>
       </AppLayout>
     );
@@ -239,7 +239,7 @@ export default function PostDetail() {
   return (
     <AppLayout headerLabel={t('community.post')}>
       <div className="max-w-[760px]">
-        <div className="mb-4 rounded-2xl border border-border bg-card px-[26px] py-6">
+        <div className="mb-4 rounded-legacy-2xl border border-legacy-border bg-legacy-card px-[26px] py-6">
           <div className="mb-3.5 flex items-center gap-2.5">
             <BrandingAvatar
               avatarPath={post.profile?.avatar_url}
@@ -264,19 +264,19 @@ export default function PostDetail() {
                 />
               )}
               {post.scope === 'org' && post.organization && (
-                <Badge variant="outline" className="rounded-[7px] text-[11px] font-bold text-muted-foreground">
+                <Badge variant="outline" className="rounded-[7px] text-[11px] font-bold text-legacy-muted-foreground">
                   {post.organization.name}
                 </Badge>
               )}
               {post.scope === 'global' && (
-                <Badge variant="outline" className="rounded-[7px] text-[11px] font-bold text-muted-foreground">
+                <Badge variant="outline" className="rounded-[7px] text-[11px] font-bold text-legacy-muted-foreground">
                   {t('community.global')}
                 </Badge>
               )}
-              {post.is_pinned && <Pin aria-label={t('community.pinned')} className="h-4 w-4 text-primary" />}
+              {post.is_pinned && <Pin aria-label={t('community.pinned')} className="h-4 w-4 text-legacy-primary" />}
               {post.is_locked && <Lock aria-label={t('community.locked')} className="h-4 w-4 text-[#9aa0af]" />}
               {post.is_hidden && (
-                <span className="rounded-[7px] bg-[#fbf2dd] px-[11px] py-1 text-[11px] font-bold text-warning">
+                <span className="rounded-[7px] bg-[#fbf2dd] px-[11px] py-1 text-[11px] font-bold text-legacy-warning">
                   {t('community.hidden')}
                 </span>
               )}
@@ -287,12 +287,12 @@ export default function PostDetail() {
           <p className="mb-4 whitespace-pre-wrap text-sm leading-[1.65] text-[#4a4f60]">{post.content}</p>
           {isEvent && post.event_date && (
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-[7px] bg-muted px-2.5 py-[5px] text-[12px] font-semibold text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-[7px] bg-legacy-muted px-2.5 py-[5px] text-[12px] font-semibold text-legacy-muted-foreground">
                 <Calendar aria-hidden="true" className="h-3.5 w-3.5" />
                 {formatDate(new Date(post.event_date), 'EEEE, MMMM d, yyyy · h:mm a', i18n.language)}
               </span>
               {post.event_location && (
-                <span className="inline-flex items-center gap-1.5 rounded-[7px] bg-muted px-2.5 py-[5px] text-[12px] font-semibold text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5 rounded-[7px] bg-legacy-muted px-2.5 py-[5px] text-[12px] font-semibold text-legacy-muted-foreground">
                   <MapPin aria-hidden="true" className="h-3.5 w-3.5" />
                   {post.event_location}
                 </span>
@@ -302,7 +302,7 @@ export default function PostDetail() {
                   href={safeHref(post.event_registration_url)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-[9px] text-[12.5px] font-bold text-primary hover:underline"
+                  className="inline-flex items-center gap-1.5 rounded-legacy-lg px-2 py-[9px] text-[12.5px] font-bold text-legacy-primary hover:underline"
                 >
                   <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
                   {t('community.registerForEvent')}
@@ -313,7 +313,7 @@ export default function PostDetail() {
                   href={safeHref(post.event_recording_url)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-[9px] text-[12.5px] font-bold text-primary hover:underline"
+                  className="inline-flex items-center gap-1.5 rounded-legacy-lg px-2 py-[9px] text-[12.5px] font-bold text-legacy-primary hover:underline"
                 >
                   <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
                   {t('community.watchRecording')}
@@ -330,7 +330,7 @@ export default function PostDetail() {
                   variant="ghost"
                   size="sm"
                   onClick={handleReportPost}
-                  className="h-auto rounded-lg px-2 py-1.5 text-xs font-bold text-[#9aa0af] hover:bg-transparent hover:text-destructive"
+                  className="h-auto rounded-legacy-lg px-2 py-1.5 text-xs font-bold text-[#9aa0af] hover:bg-transparent hover:text-legacy-destructive"
                 >
                   <Flag aria-hidden="true" className="h-[13px] w-[13px]" />
                   {t('community.report')}
@@ -344,7 +344,7 @@ export default function PostDetail() {
                     variant="ghost"
                     size="sm"
                     onClick={() => navigate(routes.community.postEdit(scope, post.id))}
-                    className="h-auto rounded-lg px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:text-primary"
+                    className="h-auto rounded-legacy-lg px-2.5 py-1.5 text-xs font-bold text-legacy-muted-foreground hover:text-legacy-primary"
                   >
                     <Edit2 aria-hidden="true" className="h-[13px] w-[13px]" />
                     {t('common.edit')}
@@ -354,7 +354,7 @@ export default function PostDetail() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-auto rounded-lg px-2.5 py-1.5 text-xs font-bold text-destructive"
+                        className="h-auto rounded-legacy-lg px-2.5 py-1.5 text-xs font-bold text-legacy-destructive"
                       >
                         <Trash2 aria-hidden="true" className="h-[13px] w-[13px]" />
                         {t('common.delete')}
@@ -371,7 +371,7 @@ export default function PostDetail() {
                         <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => deletePostMutation.mutate()}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          className="bg-legacy-destructive text-legacy-destructive-foreground hover:bg-legacy-destructive/90"
                         >
                           {t('common.delete')}
                         </AlertDialogAction>
@@ -386,7 +386,7 @@ export default function PostDetail() {
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleHideMutation.mutate(!post.is_hidden)}
-                    className="h-auto rounded-lg px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:text-primary"
+                    className="h-auto rounded-legacy-lg px-2.5 py-1.5 text-xs font-bold text-legacy-muted-foreground hover:text-legacy-primary"
                   >
                     {post.is_hidden ? (
                       <><Eye aria-hidden="true" className="h-[13px] w-[13px]" /> {t('community.show')}</>
@@ -398,7 +398,7 @@ export default function PostDetail() {
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleLockMutation.mutate(!post.is_locked)}
-                    className="h-auto rounded-lg px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:text-primary"
+                    className="h-auto rounded-legacy-lg px-2.5 py-1.5 text-xs font-bold text-legacy-muted-foreground hover:text-legacy-primary"
                   >
                     {post.is_locked ? (
                       <><Unlock aria-hidden="true" className="h-[13px] w-[13px]" /> {t('community.unlock')}</>

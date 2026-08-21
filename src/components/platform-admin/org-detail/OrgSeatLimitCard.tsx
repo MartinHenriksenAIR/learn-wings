@@ -12,10 +12,10 @@ export function OrgSeatLimitCard({ usedCount, seatLimit }: OrgSeatLimitCardProps
   const seatLimitReached = usedCount >= seatLimit;
 
   return (
-    <div className="mb-6 rounded-2xl border border-border bg-card px-5 py-4">
+    <div className="mb-6 rounded-legacy-2xl border border-legacy-border bg-legacy-card px-5 py-4">
       <div className="flex items-center justify-between">
         <span className="text-[12.5px] font-bold text-[#4a4f60]">{t('orgDetail.seatLimit')}</span>
-        <span className={cn('text-[12.5px] font-bold', seatLimitReached ? 'text-destructive' : 'text-muted-foreground')}>
+        <span className={cn('text-[12.5px] font-bold', seatLimitReached ? 'text-legacy-destructive' : 'text-legacy-muted-foreground')}>
           {usedCount}/{seatLimit}
         </span>
       </div>
@@ -25,7 +25,7 @@ export function OrgSeatLimitCard({ usedCount, seatLimit }: OrgSeatLimitCardProps
         className="mt-2 h-[6px]"
       />
       {seatLimitReached && (
-        <p className="mt-2 text-xs font-medium text-destructive">{t('orgDetail.seatLimitReached')}</p>
+        <p className="mt-2 text-xs font-medium text-legacy-destructive">{t('orgDetail.seatLimitReached')}</p>
       )}
     </div>
   );

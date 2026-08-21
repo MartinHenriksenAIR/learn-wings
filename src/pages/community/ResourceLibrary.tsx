@@ -136,7 +136,7 @@ export default function ResourceLibrary() {
           <h1 className="mb-1 font-display text-[26px] font-extrabold tracking-[-0.02em]">
             {t('community.resources')}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-legacy-muted-foreground">
             {t('community.resourceLibrarySubtitle', { orgName: currentOrg.name })}
           </p>
         </div>
@@ -156,14 +156,14 @@ export default function ResourceLibrary() {
             placeholder={t('community.searchResources')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-auto rounded-xl py-[11px] pl-10 pr-3.5 text-[13.5px] md:text-[13.5px]"
+            className="h-auto rounded-legacy-xl py-[11px] pl-10 pr-3.5 text-[13.5px] md:text-[13.5px]"
           />
         </div>
         <Select
           value={selectedType || 'all'}
           onValueChange={(v) => setSelectedType(v === 'all' ? '' : v)}
         >
-          <SelectTrigger className="h-auto w-full rounded-xl py-[11px] text-[13px] font-semibold md:w-[160px]">
+          <SelectTrigger className="h-auto w-full rounded-legacy-xl py-[11px] text-[13px] font-semibold md:w-[160px]">
             <SelectValue placeholder={t('community.allTypes')} />
           </SelectTrigger>
           <SelectContent>
@@ -180,7 +180,7 @@ export default function ResourceLibrary() {
             value={selectedTag || 'all'}
             onValueChange={(v) => setSelectedTag(v === 'all' ? '' : v)}
           >
-            <SelectTrigger className="h-auto w-full rounded-xl py-[11px] text-[13px] font-semibold md:w-[160px]">
+            <SelectTrigger className="h-auto w-full rounded-legacy-xl py-[11px] text-[13px] font-semibold md:w-[160px]">
               <SelectValue placeholder={t('community.allTagsFilter')} />
             </SelectTrigger>
             <SelectContent>
@@ -197,7 +197,7 @@ export default function ResourceLibrary() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-legacy-muted-foreground" />
         </div>
       ) : resources.length === 0 ? (
         <CommunityEmptyState
@@ -252,7 +252,7 @@ export default function ResourceLibrary() {
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-legacy-destructive text-legacy-destructive-foreground hover:bg-legacy-destructive/90"
             >
               {t('common.delete')}
             </AlertDialogAction>

@@ -43,7 +43,7 @@ export function Sparkline({ values }: { values: number[] }) {
         </linearGradient>
       </defs>
       {flat ? (
-        <path d={line} fill="none" stroke="hsl(var(--border))" strokeWidth="2.5" />
+        <path d={line} fill="none" stroke="hsl(var(--legacy-border))" strokeWidth="2.5" />
       ) : (
         <>
           <path d={`${line} L${W},${H} L0,${H} Z`} fill="url(#dashboard-spark-fill)" />

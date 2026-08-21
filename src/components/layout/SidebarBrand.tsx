@@ -26,7 +26,7 @@ export function SidebarBrand() {
 
   if (!coBranded || !currentOrg) {
     return collapsed ? (
-      <GraduationCap className="h-6 w-6 text-sidebar-primary" />
+      <GraduationCap className="h-6 w-6 text-legacy-sidebar-primary" />
     ) : (
       <img
         src={platformSrc}
@@ -37,14 +37,14 @@ export function SidebarBrand() {
   }
 
   const initialsFallback = (
-    <AvatarFallback className="rounded-lg bg-primary text-xs font-bold text-primary-foreground">
+    <AvatarFallback className="rounded-legacy-lg bg-legacy-primary text-xs font-bold text-legacy-primary-foreground">
       {getInitials(currentOrg.name)}
     </AvatarFallback>
   );
 
   if (collapsed) {
     return (
-      <Avatar className="h-9 w-9 shrink-0 rounded-lg">
+      <Avatar className="h-9 w-9 shrink-0 rounded-legacy-lg">
         {orgLogoSrc && (
           <AvatarImage src={orgLogoSrc} alt={currentOrg.name} className="object-cover" />
         )}
@@ -65,9 +65,9 @@ export function SidebarBrand() {
           className="block h-8 w-auto max-w-[120px] shrink-0 object-contain"
         />
       ) : (
-        <Avatar className="h-8 w-8 shrink-0 rounded-lg">{initialsFallback}</Avatar>
+        <Avatar className="h-8 w-8 shrink-0 rounded-legacy-lg">{initialsFallback}</Avatar>
       )}
-      <span className="min-w-0 truncate text-[15px] font-bold leading-tight text-sidebar-foreground">
+      <span className="min-w-0 truncate text-[15px] font-bold leading-tight text-legacy-sidebar-foreground">
         {currentOrg.name}
       </span>
     </div>

@@ -64,12 +64,12 @@ export function CommunityEmptyState({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#d6d8e0] bg-card p-12 text-center',
+        'flex flex-col items-center justify-center rounded-legacy-2xl border border-dashed border-[#d6d8e0] bg-legacy-card p-12 text-center',
         className
       )}
     >
-      <div className="mb-4 rounded-full bg-muted p-4">
-        <Icon aria-hidden="true" className="h-8 w-8 text-muted-foreground" />
+      <div className="mb-4 rounded-full bg-legacy-muted p-4">
+        <Icon aria-hidden="true" className="h-8 w-8 text-legacy-muted-foreground" />
       </div>
       <h3 className="mb-1 text-[15px] font-bold">{t(config.titleKey)}</h3>
       <p className="mb-4 max-w-sm text-[13px] text-[#9aa0af]">
