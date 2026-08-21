@@ -13,3 +13,11 @@ paths:
 - **i18n:** every new user-facing string gets keys in BOTH `en` and `da`.
 - **Stack (per ADRs 0001–0004):** React 18 + Vite SPA, TypeScript strict, shadcn/ui + Radix + Tailwind, TanStack Query v5. No new state libs.
 - Verify: `npm run verify` (exit 0).
+
+## Design system (#494)
+
+- **Semantic tokens only.** Style with the theme classes backed by the token vars in `src/index.css` (canvas/surface, interactive, neutral + navy ramps, green/amber/red/peri families, radius xs–xl, shadow overlay/float, motion fast/base/slow + standard/exit/celebrate). Never raw hex, never arbitrary values (`bg-[#…]`, `rounded-[…]`, `shadow-[…]`), never `style=` props (dynamic geometry is the rare allowlisted exception), never new `.css` files — `scripts/design-gates.mjs` enforces all of this in `verify`.
+- **Never invent component tokens.** A component needs no `--button-bg`; derive from the semantic layer.
+- **`legacy-*` is a burn-down namespace.** It exists only so pre-redesign surfaces keep rendering. Rebuilding a surface must reduce the legacy count (then refresh the baseline: `node scripts/design-gates.mjs --update-baseline` in the same PR) and must never add a legacy usage.
+- **Empty states** go through `EmptyState` and its tiers (`blank` / `done` / `no-results` / `coming-soon`) — no bespoke empty markup.
+- **Icons:** lucide only, sizes 16/20/24, stroke 2. **Weights:** 400/600/800 only. **Copy:** sentence case.
